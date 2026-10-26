@@ -1,0 +1,214 @@
+[
+ {
+  "name": "R1 refund earbuds from T2",
+  "sale": "T2",
+  "line": 1,
+  "prev_refunded_milli": 0,
+  "refund_milli": 1000,
+  "sold_milli": 1000,
+  "exact": 345977,
+  "cash_rounded": 346000
+ },
+ {
+  "name": "R2 refund 1 of 2 cables from T1",
+  "sale": "T1",
+  "line": 0,
+  "prev_refunded_milli": 0,
+  "refund_milli": 1000,
+  "sold_milli": 2000,
+  "exact": 45000,
+  "cash_rounded": 45000
+ },
+ {
+  "name": "R3 refund line 1 of T5",
+  "sale": "T5",
+  "line": 0,
+  "prev_refunded_milli": 0,
+  "refund_milli": 1000,
+  "sold_milli": 1000,
+  "exact": 6666,
+  "cash_rounded": 6700
+ },
+ {
+  "name": "R4 three single-unit refunds of T3 sum exactly to line final",
+  "sale": "T3",
+  "line": 0,
+  "parts_exact": [
+   142400,
+   142400,
+   142400
+  ],
+  "line_final": 427200,
+  "sum": 427200
+ },
+ {
+  "name": "R5 part-udhaar bill (T1 paid Rs 1,000 cash, Rs 1,150 udhaar): refund charger, paid part first",
+  "sale": "T1",
+  "paid_total": 100000,
+  "udhaar_amount": 115000,
+  "prior_refunds": [],
+  "lines": [
+   {
+    "line": 1,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 125000,
+   "udhaar_part": 25000,
+   "paid_exact": 100000,
+   "method": "cash",
+   "amount": 100000,
+   "rounding": 0
+  }
+ },
+ {
+  "name": "R6 same bill after R5: refund 1 cable, nothing paid left, all to khata",
+  "sale": "T1",
+  "paid_total": 100000,
+  "udhaar_amount": 115000,
+  "prior_refunds": [
+   {
+    "amount": 100000,
+    "udhaar_part": 25000
+   }
+  ],
+  "lines": [
+   {
+    "line": 0,
+    "sold_milli": 2000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 45000,
+   "udhaar_part": 45000,
+   "paid_exact": 0,
+   "method": null,
+   "amount": 0,
+   "rounding": 0
+  }
+ },
+ {
+  "name": "R7 fully udhaar bill (T5): refund first line, no cash refund",
+  "sale": "T5",
+  "paid_total": 0,
+  "udhaar_amount": 20000,
+  "prior_refunds": [],
+  "lines": [
+   {
+    "line": 0,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 6666,
+   "udhaar_part": 6666,
+   "paid_exact": 0,
+   "method": null,
+   "amount": 0,
+   "rounding": 0
+  }
+ },
+ {
+  "name": "R8 T5 paid Rs 100 cash + Rs 100 udhaar: refund lines 0 and 1, paid part capped at Rs 100",
+  "sale": "T5",
+  "paid_total": 10000,
+  "udhaar_amount": 10000,
+  "prior_refunds": [],
+  "lines": [
+   {
+    "line": 0,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   },
+   {
+    "line": 1,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 13333,
+   "udhaar_part": 3333,
+   "paid_exact": 10000,
+   "method": "cash",
+   "amount": 10000,
+   "rounding": 0
+  }
+ },
+ {
+  "name": "R9 T5 paid Rs 100 cash + Rs 100 udhaar: refund line 0, all from paid part, cash rounded",
+  "sale": "T5",
+  "paid_total": 10000,
+  "udhaar_amount": 10000,
+  "prior_refunds": [],
+  "lines": [
+   {
+    "line": 0,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 6666,
+   "udhaar_part": 0,
+   "paid_exact": 6666,
+   "method": "cash",
+   "amount": 6700,
+   "rounding": 34
+  }
+ },
+ {
+  "name": "R10 T5 all cash, lines 0 and 1 already refunded at Rs 67 each: last line capped, rounds down",
+  "sale": "T5",
+  "paid_total": 20000,
+  "udhaar_amount": 0,
+  "prior_refunds": [
+   {
+    "amount": 6700,
+    "udhaar_part": 0
+   },
+   {
+    "amount": 6700,
+    "udhaar_part": 0
+   }
+  ],
+  "lines": [
+   {
+    "line": 2,
+    "sold_milli": 1000,
+    "prev_refunded_milli": 0,
+    "refund_milli": 1000
+   }
+  ],
+  "method": "cash",
+  "refund_rounding": "nearest",
+  "expected": {
+   "exact": 6667,
+   "udhaar_part": 0,
+   "paid_exact": 6667,
+   "method": "cash",
+   "amount": 6600,
+   "rounding": -67
+  }
+ }
+]

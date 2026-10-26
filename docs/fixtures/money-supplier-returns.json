@@ -1,0 +1,96 @@
+[
+ {
+  "name": "S1 return 2 faulty chargers linked to their delivery line (landed Rs 1,200, avg Rs 1,120); supplier owed Rs 60,000",
+  "supplier_balance_before": 6000000,
+  "lines": [
+   {
+    "qty_milli": 2000,
+    "avg_cost": 112000,
+    "last_cost": 120000,
+    "linked_landed_unit_cost": 120000
+   }
+  ],
+  "refund_received": 0,
+  "expected": {
+   "lines": [
+    {
+     "unit_credit": 120000,
+     "line_total": 240000,
+     "cost_snapshot": 112000,
+     "stock_delta_milli": -2000
+    }
+   ],
+   "total": 240000,
+   "return_difference": 16000,
+   "suggested_refund": 0,
+   "ledger": [
+    -240000
+   ],
+   "supplier_balance_after": 5760000,
+   "avg_cost_after": "unchanged"
+  }
+ },
+ {
+  "name": "S2 return 3 cables without a delivery link (avg Rs 350); supplier owed only Rs 500, pays Rs 550 cash back",
+  "supplier_balance_before": 50000,
+  "lines": [
+   {
+    "qty_milli": 3000,
+    "avg_cost": 35000,
+    "last_cost": 40000,
+    "linked_landed_unit_cost": null
+   }
+  ],
+  "refund_received": 55000,
+  "expected": {
+   "lines": [
+    {
+     "unit_credit": 35000,
+     "line_total": 105000,
+     "cost_snapshot": 35000,
+     "stock_delta_milli": -3000
+    }
+   ],
+   "total": 105000,
+   "return_difference": 0,
+   "suggested_refund": 55000,
+   "ledger": [
+    -105000,
+    55000
+   ],
+   "supplier_balance_after": 0,
+   "avg_cost_after": "unchanged"
+  }
+ },
+ {
+  "name": "S3 return a Rs 36,000 phone while the shop has an advance of Rs 200 with the supplier; no cash yet",
+  "supplier_balance_before": -20000,
+  "lines": [
+   {
+    "qty_milli": 1000,
+    "avg_cost": 3600000,
+    "last_cost": 3600000,
+    "linked_landed_unit_cost": null
+   }
+  ],
+  "refund_received": 0,
+  "expected": {
+   "lines": [
+    {
+     "unit_credit": 3600000,
+     "line_total": 3600000,
+     "cost_snapshot": 3600000,
+     "stock_delta_milli": -1000
+    }
+   ],
+   "total": 3600000,
+   "return_difference": 0,
+   "suggested_refund": 3600000,
+   "ledger": [
+    -3600000
+   ],
+   "supplier_balance_after": -3620000,
+   "avg_cost_after": "unchanged"
+  }
+ }
+]

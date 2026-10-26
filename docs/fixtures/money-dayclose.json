@@ -1,0 +1,47 @@
+[
+ {
+  "name": "D1 day close with supplier cash payout",
+  "opening_cash": 500000,
+  "cash_sales": 4300000,
+  "udhaar_cash_in": 50000,
+  "pay_ins": 0,
+  "supplier_cash_in": 0,
+  "cash_refunds": 346000,
+  "cash_expenses": 30000,
+  "supplier_cash_out": 550000,
+  "pay_outs": 0,
+  "counted_cash": 3920000,
+  "expected_cash": 3924000,
+  "difference": -4000
+ },
+ {
+  "name": "D2 Dukaan screenshot case (no supplier payout)",
+  "opening_cash": 0,
+  "cash_sales": 0,
+  "udhaar_cash_in": 50000,
+  "pay_ins": 0,
+  "supplier_cash_in": 0,
+  "cash_refunds": 0,
+  "cash_expenses": 30000,
+  "supplier_cash_out": 0,
+  "pay_outs": 0,
+  "counted_cash": 20000,
+  "expected_cash": 20000,
+  "difference": 0
+ },
+ {
+  "name": "D3 cash refund received from a supplier for returned stock (S2)",
+  "opening_cash": 200000,
+  "cash_sales": 150000,
+  "udhaar_cash_in": 0,
+  "pay_ins": 0,
+  "supplier_cash_in": 55000,
+  "cash_refunds": 0,
+  "cash_expenses": 0,
+  "supplier_cash_out": 0,
+  "pay_outs": 0,
+  "counted_cash": 405000,
+  "expected_cash": 405000,
+  "difference": 0
+ }
+]
