@@ -210,7 +210,7 @@ describe('Powered by AlgoVyn footer (D-085)', () => {
           t: 'text',
           text: POWERED_BY,
           align: 'center',
-          font: 'B',
+          size: 'small',
         });
         const t = renderReceiptText(blocks, resolvePaper({ paperMm: mm }));
         expect(t.trimEnd().split('\n').at(-1)?.trim()).toBe(

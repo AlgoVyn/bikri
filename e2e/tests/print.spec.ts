@@ -73,7 +73,12 @@ for (const mm of [80, 58] as const) {
                 l.scrollWidth > l.clientWidth + 1,
             )
             .map((l) => l.textContent),
-          last: lines.at(-1)?.textContent,
+          last: document.querySelector('p.powered-by:last-of-type')
+            ?.textContent,
+          poweredFontPx: Number.parseFloat(
+            getComputedStyle(document.querySelector('p.powered-by') as Element)
+              .fontSize,
+          ),
           urdu: lines
             .filter((l) => l.classList.contains('urdu'))
             .map((l) => l.dir),
@@ -83,6 +88,7 @@ for (const mm of [80, 58] as const) {
       expect(metrics.bodyWidth).toBeCloseTo((expectedMm / 25.4) * 96, 0);
       expect(metrics.overflowing).toEqual([]);
       expect(metrics.last).toBe('Powered by AlgoVyn');
+      expect(metrics.poweredFontPx).toBe(8);
       if (kind === 'refund') expect(metrics.urdu).toEqual(['rtl']);
       const height = await page.evaluate(
         () => document.documentElement.scrollHeight,

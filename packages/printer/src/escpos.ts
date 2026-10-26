@@ -16,7 +16,6 @@ import {
 import type {
   Block,
   CutMode,
-  Font,
   RasterRenderer,
   RasterSource,
   ReceiptLanguage,
@@ -48,7 +47,7 @@ type Style = {
   align: LaidText['align'];
   bold: boolean;
   size: TextSize;
-  font: Font;
+  font: 'A' | 'B';
 };
 
 const INITIAL_STYLE: Style = {
@@ -91,6 +90,10 @@ class ByteBuf {
     }
     return out;
   }
+}
+
+function fontOf(size: TextSize): Style['font'] {
+  return size === 'small' ? 'B' : 'A';
 }
 
 function sizeByte(size: TextSize): number {
@@ -254,7 +257,16 @@ function encodeCommands(
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
   let style = { ...INITIAL_STYLE };
 
+  const applyFont = (next: Style): void => {
+    if (style.font !== next.font) {
+      buf.push(0x1b, 0x4d, next.font === 'B' ? 0x01 : 0x00);
+      style = { ...style, font: next.font };
+    }
+  };
+
   const applyStyle = (next: Style): void => {
+    // 06 §4.4: back to Font A right after the small line, before any other reset.
+    if (next.font === 'A') applyFont(next);
     if (style.align !== next.align) {
       buf.push(0x1b, 0x61, alignByte(next.align));
       style = { ...style, align: next.align };
@@ -267,10 +279,7 @@ function encodeCommands(
       buf.push(0x1d, 0x21, sizeByte(next.size));
       style = { ...style, size: next.size };
     }
-    if (style.font !== next.font) {
-      buf.push(0x1b, 0x4d, next.font === 'B' ? 0x01 : 0x00);
-      style = { ...style, font: next.font };
-    }
+    applyFont(next);
   };
 
   const resetStyle = (): void => {
@@ -285,10 +294,8 @@ function encodeCommands(
   for (const command of commands) {
     switch (command.kind) {
       case 'text': {
-        // Font B lines (the D-085 footer) stay printer text even on all-image Urdu receipts.
-        const raster =
-          (state.imageMode && command.font !== 'B') ||
-          hasNonAscii(command.text);
+        // On image (Urdu) receipts every line is raster, the small footer too (06 §4.4).
+        const raster = state.imageMode || hasNonAscii(command.text);
         if (raster) {
           const renderer = requireRenderer(state.renderer);
           const rendered = renderer.renderLine(command.text, {
@@ -306,8 +313,8 @@ function encodeCommands(
         applyStyle({
           align: command.align,
           bold: command.bold,
-          size: command.size,
-          font: command.font ?? 'A',
+          size: command.size === 'small' ? 'normal' : command.size,
+          font: fontOf(command.size),
         });
         buf.ascii(command.text);
         buf.push(0x0a);
