@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": "dist/types",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/types/tsconfig.tsbuildinfo",
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2024"]
+  },
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"],
+  "references": [{ "path": "../../packages/core" }]
+}

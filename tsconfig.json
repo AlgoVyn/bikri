@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/db" },
+    { "path": "./packages/printer" },
+    { "path": "./packages/i18n" },
+    { "path": "./apps/pos" },
+    { "path": "./apps/api" },
+    { "path": "./e2e" },
+    { "path": "./tools" }
+  ]
+}
