@@ -74,16 +74,28 @@ Scanner: test field showing keystroke timing; "suffix Enter" check; camera scann
 
 System / English / اردو / Roman Urdu; immediate switch; affects UI and (if receipt language = same) receipts.
 
+## Devices (admin devices, owner only)
+
+Shown only on an admin device (`kv.is_admin`) when unlocked as an `owner` (`devices.manage`); online only. Uses `/api/shop/*` with `X-Bikri-Staff` ([04 §3.8](../04-api.md#38-shop-admin-endpoints-admin-device)). Everything here is this shop's only.
+
+- **Add a till**: device name, branch, "Can manage devices" (admin, off) → code `XXXX-XXXX` + QR of the enrol link, 15:00 countdown; list of unused codes with `Cancel`.
+- **Devices list**: name, code (A, B…), branch, admin badge, last seen, app version, pending ops, status; `Rename`, `Move branch`, `Make admin` / `Remove admin` (not the last admin device), `Revoke` (confirm: "Unsynced sales on that device will stay on it and can be exported there").
+- **Import unsynced ops** (revoked devices only): choose the `bikri-unsynced-*.json` file → preview (op count, date range, sales/payment totals) → `Import` → `POST /api/shop/import-ops` in chunks of 200 → summary ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)). A file from another shop is refused ("This file is from a different shop").
+
+## This device
+
+Shop name, device name/code/branch, admin or not. `Leave this shop` (owner PIN; blocked while ops are unsynced unless exported first): deletes this shop's local database `bikri-<tenant_id>`, clears `bikri.active_tenant` and goes to the enrol screen. It does not revoke the device on the server (an owner does that in Devices).
+
 ## Sync (everyone sees status; actions need owner)
 
-Last push/pull time, pending ops count, failed ops with error and `Retry` / (owner) `Discard` (writes `audit_log sync_ops_discarded`), rejected unique conflicts with links to fix, `Sync now`, device name/code/branch, storage used and persisted status, `Rebuild local data` (owner; re-pulls everything after pushing; `audit_log cache_rebuilt`).
+Last push/pull time, pending ops count, failed ops with error and `Retry` / (owner) `Discard` (writes `audit_log sync_ops_discarded`), rejected unique conflicts with links to fix, **Conflicts** list from `sync_conflicts` (owner on an admin device can `Acknowledge`), "Daily sync limit reached — sales are safe on this device and will sync after <local time of 00:00 UTC>" when the shop is over its budget (`TENANT_QUOTA`), `Sync now`, device name/code/branch, storage used and persisted status, `Rebuild local data` (owner; re-pulls everything after pushing; `audit_log cache_rebuilt`).
 
 ## Backup and export (`export.data`)
 
-- Status of nightly server backups (last 7 listed, from `/api/admin/backups` when owner is signed in to admin; otherwise "See Admin").
-- `Download full export` (all tables as JSON + CSV zip, generated from local data, REQ-B13).
-- `Restore from export` (owner; only into an empty shop — new deploy), see [09](../09-backups-and-ops.md).
-- Unsynced ops of a removed (revoked) till are imported in Admin → Devices, not here ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
+- Server backups: "Your data is backed up every night by Algovyn." (the nightly backup covers all shops and is run by the platform operator; shops don't see or download it, [09 §2](../09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)). To restore, contact the operator, who restores **this shop only** ([09 §3.4](../09-backups-and-ops.md#34-restore-one-tenant)).
+- `Download full export` (all of **this shop's** tables as JSON + CSV zip, generated from local data, REQ-B13).
+- `Restore from export` (owner; only into an empty shop, and only an export of the same shop or one without a tenant; the operator does restores of a live shop), see [09](../09-backups-and-ops.md).
+- Unsynced ops of a removed (revoked) till are imported in **Devices** above, not here ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
 
 ## Activity (owner)
 
@@ -103,3 +115,5 @@ Version, build hash, licence (link to LICENSE), source link (GitHub), check for 
 6. `Download full export` works offline and contains every table with row counts matching the device.
 7. The `#printer` link opens the Printer section directly.
 8. With tax 0 the "Prices include tax" switch is hidden and `tax_mode` is `exclusive`; after setting 17% and switching it on, the next Rs 11,700 bill totals Rs 11,700 with "Includes Sales tax 17%: Rs 1,700" (T9), while bills saved earlier are unchanged.
+9. On an admin device unlocked as owner, `Add a till` produces a code that enrols a device into this shop only; on a non-admin device or as a manager the Devices section is hidden and `/api/shop/*` returns 403.
+10. `Leave this shop` removes every IndexedDB database and cache entry of this shop from the browser.
