@@ -1,4 +1,4 @@
-import type { Align, Block, Font, TextSize } from './types.ts';
+import type { Align, Block, TextSize } from './types.ts';
 
 export type PaperMm = 44 | 58 | 76 | 80 | 112;
 
@@ -289,8 +289,6 @@ export type LaidText = {
   align: Align;
   bold: boolean;
   size: TextSize;
-  /** Present only for Font B. */
-  font?: 'B';
 };
 
 export type LaidCommand =
@@ -309,26 +307,24 @@ function pushText(
   bold: boolean,
   size: TextSize,
   charsPerLine: number,
-  font: Font = 'A',
 ): void {
   const paragraphs = text.split('\n');
-  // Font B is 9 dots wide against Font A's 12, so 4/3 as many characters fit.
+  // Font B ('small') is 9 dots wide against Font A's 12, so 4/3 as many characters fit.
   const columns =
-    font === 'B' ? Math.floor((charsPerLine * 4) / 3) : charsPerLine;
+    size === 'small' ? Math.floor((charsPerLine * 4) / 3) : charsPerLine;
   const width =
     size === 'double' ? Math.max(1, Math.floor(columns / 2)) : columns;
-  const extra = font === 'B' ? { font: 'B' as const } : {};
   for (const paragraph of paragraphs) {
     if (paragraph.length === 0) {
       continue;
     }
     // Nastaliq width is not the code-unit count. Hand the whole line to the renderer.
     if (hasNonAscii(paragraph)) {
-      out.push({ kind: 'text', text: paragraph, align, bold, size, ...extra });
+      out.push({ kind: 'text', text: paragraph, align, bold, size });
       continue;
     }
     for (const line of wrapText(paragraph, width)) {
-      out.push({ kind: 'text', text: line, align, bold, size, ...extra });
+      out.push({ kind: 'text', text: line, align, bold, size });
     }
   }
 }
@@ -350,7 +346,6 @@ function pushBlock(
         block.bold ?? false,
         block.size ?? 'normal',
         options.charsPerLine,
-        block.font ?? 'A',
       );
       return;
     case 'pair': {

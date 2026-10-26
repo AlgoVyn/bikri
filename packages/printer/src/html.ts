@@ -4,6 +4,7 @@ import {
   layOut,
   lineNeedsRtl,
 } from './layout.ts';
+import { POWERED_BY } from './templates/common.ts';
 import type { Block } from './types.ts';
 
 export type HtmlOptions = {
@@ -43,8 +44,9 @@ const COMMON_CSS = [
   '.logo-wrap { text-align: center } img.logo { max-width: 60%; }',
   ".urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9; white-space: normal }",
   '.qr { text-align: center; font-size: 0.8em }',
-  // Font B is 9×17 against Font A's 12×24.
-  '.fb { font-size: 0.75em }',
+  // 06 §4.4: the Powered by line; other small (Font B) text is 3/4 of the body.
+  '.powered-by { text-align: center; font-size: 8px; margin: 2mm 0 0 }',
+  '.sm { font-size: 0.75em }',
   '.feed { height: 1.35em }',
 ].join('\n');
 
@@ -89,12 +91,16 @@ export function renderReceiptHtml(
         }
         break;
       case 'text': {
+        if (command.text === POWERED_BY) {
+          body.push(`<p class="powered-by">${POWERED_BY}</p>`);
+          break;
+        }
         const classes = ['l'];
         if (command.align !== 'left') classes.push(command.align);
         if (command.bold) classes.push('b');
         if (command.size === 'double') classes.push('dw');
         if (command.size === 'double-height') classes.push('dh');
-        if (command.font === 'B') classes.push('fb');
+        if (command.size === 'small') classes.push('sm');
         let attrs = '';
         if (hasNonAscii(command.text)) {
           classes.push('urdu');

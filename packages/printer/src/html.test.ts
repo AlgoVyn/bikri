@@ -21,11 +21,13 @@ describe('renderReceiptHtml (06 §5.3)', () => {
       expect(html).toContain(
         '<div class="qr">01SALEBASIC000000000000000</div>',
       );
-      const lines = [
-        ...html.matchAll(/<div class="l[^"]*"[^>]*>([^<]*)<\/div>/g),
-      ].map((m) => m[1]);
-      expect(lines.at(-1)).toBe('Powered by AlgoVyn');
-      expect(html).toContain('class="l center fb"');
+      // 06 §4.4: the last element of the body is the small Powered by line.
+      expect(html).toMatch(
+        /<p class="powered-by">Powered by AlgoVyn<\/p>\n(<div class="feed"><\/div>\n)*<\/body>/,
+      );
+      expect(html).toContain(
+        '.powered-by { text-align: center; font-size: 8px; margin: 2mm 0 0 }',
+      );
     });
   }
 

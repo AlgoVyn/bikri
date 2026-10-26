@@ -165,25 +165,47 @@ describe('ESC/POS commands (06 §3)', () => {
     expect(hex(sale80.subarray(0, 5))).toBe('1b 40 1b 74 00');
   });
 
-  it('prints "Powered by AlgoVyn" in Font B as the last text, then returns to Font A (D-085)', () => {
-    for (const bytes of [
-      sale80,
-      encodeSale(58),
-      encodeSale(80, { language: 'ur' }),
-    ]) {
+  it('prints "Powered by AlgoVyn" small (Font B), centred, last, then Font A and left (06 §4.4)', () => {
+    for (const bytes of [sale80, encodeSale(58)]) {
+      const text = [...'Powered by AlgoVyn'].map((c) => c.charCodeAt(0));
       const footer = [
         0x1b,
         0x4d,
         0x01,
-        ...[...'Powered by AlgoVyn'].map((c) => c.charCodeAt(0)),
+        ...text,
         0x0a,
+        0x1b,
+        0x4d,
+        0x00,
+        0x1b,
+        0x61,
+        0x00,
       ];
       const at = indexOf(bytes, footer);
       expect(at).toBeGreaterThan(0);
+      // Centred when it starts: the last alignment command before it is 1B 61 01.
+      let align = -1;
+      for (let i = 0; i + 2 < at; i += 1) {
+        if (bytes[i] === 0x1b && bytes[i + 1] === 0x61)
+          align = bytes[i + 2] ?? -1;
+      }
+      expect(align).toBe(1);
+      // Nothing but the feed, cut and drawer follow.
       expect(
-        hex(bytes.subarray(at + footer.length, at + footer.length + 6)),
-      ).toBe('1b 61 00 1b 4d 00');
+        hex(bytes.subarray(at + footer.length, at + footer.length + 3)),
+      ).toBe('1b 64 03');
     }
+  });
+
+  it('draws the Powered by line as the last raster row on Urdu receipts, never as Font B text', () => {
+    const bytes = encodeSale(80, { language: 'ur' });
+    expect(indexOf(bytes, [0x1b, 0x4d, 0x01])).toBe(-1);
+    const feed = indexOf(bytes, [0x1b, 0x64, 0x03]);
+    // Last GS v 0 before the feed: 72 bytes wide, 6 rows (the fake renderer's 70 % "small").
+    const header = [0x1d, 0x76, 0x30, 0x00, 72, 0, 6, 0];
+    const at = indexOf(bytes, header);
+    expect(at).toBeGreaterThan(0);
+    expect(at + header.length + 72 * 6).toBe(feed);
   });
 
   it('ends with feed 3, partial cut and drawer pin 2', () => {

@@ -97,7 +97,7 @@ export function pushFooter(blocks: Block[], footer: string): void {
 export const POWERED_BY = 'Powered by AlgoVyn';
 
 export function pushPoweredBy(blocks: Block[]): void {
-  blocks.push({ t: 'text', text: POWERED_BY, align: 'center', font: 'B' });
+  blocks.push({ t: 'text', text: POWERED_BY, align: 'center', size: 'small' });
 }
 
 export function pushJobEnd(blocks: Block[], drawer: boolean): void {
