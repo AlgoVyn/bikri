@@ -15,6 +15,11 @@ export {
   formatTaxRate,
 } from './format.ts';
 export {
+  fitPageCss,
+  type HtmlOptions,
+  renderReceiptHtml,
+} from './html.ts';
+export {
   columnWidths,
   formatColumnHeader,
   formatItemLines,
@@ -46,7 +51,10 @@ export {
   prepareLogo,
   scaleToFit,
 } from './raster.ts';
-export type { TemplateSettings } from './templates/common.ts';
+export {
+  POWERED_BY,
+  type TemplateSettings,
+} from './templates/common.ts';
 export { englishReceiptLabels, resolveLabels } from './templates/labels.ts';
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';

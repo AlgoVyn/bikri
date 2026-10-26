@@ -11,6 +11,7 @@ import {
   pushFooter,
   pushJobEnd,
   pushPair,
+  pushPoweredBy,
   pushShopHeader,
   type TemplateSettings,
 } from './common.ts';
@@ -114,6 +115,7 @@ export function buildRefundReceipt(
     pushFooter(blocks, footer);
   }
   const cashBack = input.method === 'cash' && input.amount > 0;
+  pushPoweredBy(blocks);
   pushJobEnd(blocks, settings.drawer !== false && cashBack);
   return blocks;
 }

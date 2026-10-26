@@ -11,6 +11,7 @@ import {
   fitRasterToDots,
   packMono,
   prepareLogo,
+  scaleToFit,
 } from './raster.ts';
 import type {
   Block,
@@ -305,7 +306,12 @@ function encodeCommands(
         break;
       }
       case 'image': {
-        const fitted = command.source.source;
+        // Explicit bitmaps are scaled down to the paper if needed, then left-aligned on it.
+        const source = command.source.source;
+        const fitted = fitRasterToDots(
+          scaleToFit(source, state.dots, Math.max(1, source.height)),
+          state.dots,
+        );
         const mode = command.source.dither === true ? 'dither' : 'threshold';
         writeRaster(packMono(fitted, mode));
         break;

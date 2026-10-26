@@ -230,10 +230,10 @@ Baud choices: 9600 (default), 19200, 38400, 115200; flow control none (default) 
 ### 5.3 System printing (fallback; also for A4/office printers)
 
 - Render `renderReceiptHtml(model, { widthMm })` into a hidden iframe and call `iframe.contentWindow.print()` (i.e. `window.print()` of the receipt document).
-- CSS by paper width (`apps/pos/src/print/receipt-80.css`, `receipt-58.css`):
+- CSS by paper width, embedded by `renderReceiptHtml` (`packages/printer/src/html.ts`); the font size is `body width ÷ (chars_per_line × 0.6)` so exactly `chars_per_line` monospace columns fit, and before printing the till appends `fitPageCss()` so the page is as long as the receipt (`80mm auto` is not valid CSS) (D-087):
   ```css
-  /* 80 mm */ @page { size: 80mm auto; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 12px/1.35 'JetBrains Mono', monospace }
-  /* 58 mm */ @page { size: 58mm auto; margin: 0 } body { width: 48mm; margin: 0 5mm; font: 10px/1.35 'JetBrains Mono', monospace }
+  /* 80 mm */ @page { size: 80mm 297mm; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 72mm ÷ (48 × 0.6) */
+  /* 58 mm */ @page { size: 58mm 297mm; margin: 0 } body { width: 48mm; margin: 0 5mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 48mm ÷ (32 × 0.6) */
   img.logo { max-width: 60%; } .urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9 }
   ```
   Urdu prints as real text here (the OS driver rasterises it), so no bitmap step is needed. A4: `@page { size: A4; margin: 15mm }` with a proper invoice layout (shop block, table of lines, totals block).

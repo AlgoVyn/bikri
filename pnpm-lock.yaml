@@ -209,6 +209,9 @@ importers:
       '@bikri/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@bikri/printer':
+        specifier: workspace:*
+        version: link:../../packages/printer
       '@radix-ui/react-dialog':
         specifier: 1.3.1
         version: 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -300,6 +303,9 @@ importers:
       '@axe-core/playwright':
         specifier: 4.14.0
         version: 4.14.0(playwright-core@1.64.1)
+      '@bikri/printer':
+        specifier: workspace:*
+        version: link:../packages/printer
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1
