@@ -1,0 +1,95 @@
+{
+  "description": "T2 cart (07 §3.3, 10 §1): phone Rs 42,000 less Rs 2,000 + earbuds Rs 3,500, bill discount Rs 500, cash tendered Rs 50,000. Shop from shop-basic. Used by packages/printer golden tests and E2E journey 2.",
+  "cart": {
+    "lines": [
+      {
+        "sku": "PHO-SA15",
+        "name": "Samsung A15 4/128 Blue",
+        "qty_milli": 1000,
+        "unit_price": 4200000,
+        "line_discount": 200000
+      },
+      {
+        "sku": "AUD-EB01",
+        "name": "Earbuds",
+        "qty_milli": 1000,
+        "unit_price": 350000,
+        "line_discount": 0
+      }
+    ],
+    "bill_discount": 50000,
+    "cash_tendered": 5000000
+  },
+  "expected": {
+    "total": 4300000,
+    "paid_total": 4300000,
+    "change_given": 700000
+  },
+  "receipt_input": {
+    "shop": {
+      "name": "Algovyn Mobiles",
+      "address": "Shop 12, Hall Road, Lahore",
+      "phone": "03001234567",
+      "receiptHeader": "",
+      "receiptFooter": "Shukriya! Phir tashreef laiye.",
+      "showPaymentDetails": true,
+      "showCashierOnReceipt": true,
+      "taxLabel": "Sales tax",
+      "numberGrouping": "intl",
+      "ntn": "",
+      "strn": "",
+      "printWarranty": true,
+      "showYouSaved": false,
+      "timeZone": "Asia/Karachi"
+    },
+    "sale": {
+      "id": "01SALEBASIC000000000000000",
+      "invoiceNo": "INV-A-1042",
+      "createdAt": 1793091900000,
+      "businessDate": "2026-10-27",
+      "itemsQtyMilli": 2000,
+      "itemDiscountTotal": 200000,
+      "subtotal": 4350000,
+      "billDiscount": 50000,
+      "taxRateBp": 0,
+      "tax": 0,
+      "taxInclusive": false,
+      "rounding": 0,
+      "total": 4300000,
+      "udhaarAmount": 0,
+      "cashTendered": 5000000,
+      "changeGiven": 700000,
+      "customerName": null,
+      "khataBalancePaisa": null
+    },
+    "lines": [
+      {
+        "name": "Samsung A15 4/128 Blue",
+        "qtyMilli": 1000,
+        "unitPrice": 4200000,
+        "discount": 200000,
+        "net": 4000000,
+        "warrantyUntil": null
+      },
+      {
+        "name": "Earbuds",
+        "qtyMilli": 1000,
+        "unitPrice": 350000,
+        "discount": 0,
+        "net": 350000,
+        "warrantyUntil": null
+      }
+    ],
+    "payments": [
+      {
+        "method": "cash",
+        "amount": 4300000
+      }
+    ],
+    "staffName": "Adnan"
+  },
+  "receipt_text": {
+    "58": "        Algovyn Mobiles         \n   Shop 12, Hall Road, Lahore   \n       Tel: 0300 1234567        \n--------------------------------\n          SALE RECEIPT          \n--------------------------------\nBill                  INV-A-1042\nDate            27-10-2026 14:05\nCashier                    Adnan\n--------------------------------\nSamsung A15 4/128 Blue          \n 1 x 42,000 -2,000     Rs 40,000\nEarbuds                         \n 1 x 3,500              Rs 3,500\n--------------------------------\nSubtotal (2)           Rs 43,500\nDiscount                 -Rs 500\n================================\nTOTAL                  Rs 43,000\n================================\nCash                   Rs 43,000\nTendered               Rs 50,000\nChange                  Rs 7,000\n--------------------------------\n Shukriya! Phir tashreef laiye. \n       Powered by AlgoVyn       \n",
+    "80": "                Algovyn Mobiles                 \n           Shop 12, Hall Road, Lahore           \n               Tel: 0300 1234567                \n------------------------------------------------\n                  SALE RECEIPT                  \n------------------------------------------------\nBill                                  INV-A-1042\nDate                            27-10-2026 14:05\nCashier                                    Adnan\n------------------------------------------------\nITEM                          QTY         AMOUNT\nSamsung A15 4/128 Blue          1      Rs 40,000\n  Rs 42,000 each - less Rs 2,000                \nEarbuds                         1       Rs 3,500\n------------------------------------------------\nSubtotal (2 items)                     Rs 43,500\nDiscount                                 -Rs 500\n================================================\nTOTAL                                  Rs 43,000\n================================================\nCash                                   Rs 43,000\nAmount tendered                        Rs 50,000\nChange                                  Rs 7,000\n------------------------------------------------\n         Shukriya! Phir tashreef laiye.         \n               Powered by AlgoVyn               \n"
+  }
+}

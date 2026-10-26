@@ -16,6 +16,7 @@ import {
   pushFooter,
   pushJobEnd,
   pushPair,
+  pushPoweredBy,
   pushShopHeader,
   subtotalLabel,
   type TemplateSettings,
@@ -263,6 +264,7 @@ export function buildSaleReceipt(
   const cash = input.payments.some(
     (payment) => payment.method === 'cash' && payment.amount > 0,
   );
+  pushPoweredBy(blocks);
   pushJobEnd(blocks, settings.drawer !== false && cash);
   return blocks;
 }
