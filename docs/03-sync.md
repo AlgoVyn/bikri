@@ -13,12 +13,13 @@
 
 ```ts
 // packages/core/schemas/sync.ts (example)
+// every op also carries tx_id: the outbox's transaction id (D-054), so the server can keep one user action together (read-only cutoff, 13 §7.2)
 type Op =
-  | { op_id: string; tbl: LedgerTable; kind: 'insert'; row: Record<string, unknown> }
-  | { op_id: string; tbl: MasterTable; kind: 'upsert'; row: Record<string, unknown>;
+  | { op_id: string; tx_id: string; tbl: LedgerTable; kind: 'insert'; row: Record<string, unknown> }
+  | { op_id: string; tx_id: string; tbl: MasterTable; kind: 'upsert'; row: Record<string, unknown>;
       base_rev: number;            // 0 when creating
       changed_fields: string[] }   // fields the user changed (empty when creating)
-  | { op_id: string; tbl: MasterTable; kind: 'delete'; row_id: string; base_rev: number };
+  | { op_id: string; tx_id: string; tbl: MasterTable; kind: 'delete'; row_id: string; base_rev: number };
 ```
 
 - `row` contains **all columns of the table known to that app version** except server-managed ones (`rev`, and `products.avg_cost`, which the server ignores on input). `row` never contains `tenant_id`; if it does, the server drops the key and uses the token's tenant.
@@ -27,7 +28,7 @@ type Op =
 - Allowed `tbl` values: the master and ledger tables of [02 §1.1](02-data-model.md#11-table-kinds) only; any server-owned or unknown table → `rejected` / `UNKNOWN_TABLE`. On ledger inserts the server ignores client values for derived columns (`sales.status`).
 - `change_log.op` is `upsert` for every insert or update (including a ledger row's first insert) and `delete` for soft deletes.
 
-**Push result handling (client):** `applied` → delete the outbox entry; `conflict_merged` → delete it (the merged row arrives with the next pull); `rejected` → keep it with `status: 'failed'`, `last_error = error_code`, never auto-retried (Settings → Sync offers Retry after the user fixes the data, or owner Discard); ops missing from `results` → stay `pending`. HTTP 401 `DEVICE_REVOKED` → stop syncing ([§8](#8-device-revocation-and-data-loss-window)); 409 → show "Update the app"; 413/5xx/network → backoff (§6), nothing changes locally.
+**Push result handling (client):** `applied` → delete the outbox entry; `conflict_merged` → delete it (the merged row arrives with the next pull); `rejected` → keep it with `status: 'failed'`, `last_error = error_code`, never auto-retried (Settings → Sync offers Retry after the user fixes the data, or owner Discard); ops missing from `results` → stay `pending`. HTTP 401 `DEVICE_REVOKED` → stop syncing ([§8](#8-device-revocation-and-data-loss-window)); 403 `TENANT_READ_ONLY` → enter read-only mode, keep every op pending ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)); 409 → show "Update the app"; 413/5xx/network → backoff (§6), nothing changes locally.
 
 ## 3. Outbox
 
@@ -57,7 +58,8 @@ Request:
 ```
 
 Server algorithm (`apps/api/src/sync/applyOps.ts`). `T` = the tenant of the authenticated device; every statement below binds `tenant_id = T` (through `tenantDb`, [13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)):
-0. Tenant gate: tenant `status` must be `active` (`suspended` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`); read today's `tenant_usage` row: at or above `daily_write_budget` → `503 TENANT_QUOTA` with `Retry-After` until 00:00 UTC ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). The client keeps its ops in all three cases.
+0. Tenant gate: tenant `status` must be `active` or `read_only` (`suspended` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`); a push from a `support` device → `403 FORBIDDEN`; read today's `tenant_usage` row: at or above `daily_write_budget` → `503 TENANT_QUOTA` with `Retry-After` until 00:00 UTC ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). The client keeps its ops in all these cases.
+   - **Read-only cutoff** ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080), D-080): if the tenant is `read_only` and the device's `read_only_seen_at` is NULL, every op in this push is eligible and `read_only_seen_at = now` is added to the batch. Otherwise only ops of transactions (`tx_id`) whose rows all have `created_at ≤ read_only_seen_at + 10 min` are eligible; the rest are not processed and are omitted from `results` (step 7), so they stay pending on the till. No eligible op → `403 TENANT_READ_ONLY`.
 1. Reject if `schema_version` < server `MIN_CLIENT_SCHEMA` (Worker var) → `409 SCHEMA_OUTDATED` (client must update the app first; it keeps the ops). Clients with `MIN_CLIENT_SCHEMA ≤ schema_version ≤ SCHEMA_VERSION` are accepted, which is what makes additive migrations safe while old cached tills are still running ([09 §5](09-backups-and-ops.md#5-routine-operations)). `MIN_CLIENT_SCHEMA` is raised only when a migration is not backward compatible.
 2. Validate the whole body with Zod; reject the batch on structural errors (`400`).
 3. Look up which `op_id`s already exist in `applied_ops` (one `SELECT ... WHERE tenant_id = ?1 AND op_id IN (...)`, chunked by 100 because D1 allows 100 bound parameters). Those ops are answered `applied` without re-applying.
@@ -82,7 +84,9 @@ Response:
     { "op_id": "01JC1B...", "result": "conflict_merged", "server_rev": 5 }
   ],
   "server_time": 1793050000000,
-  "latest_seq": 48213
+  "latest_seq": 48213,
+  "tenant_status": { "status": "active", "since": null },
+  "support": null
 }
 ```
 
@@ -106,11 +110,13 @@ Response:
   "server_time": 1793050000000,
   "restore_epoch": "1",
   "restore_point_at": 0,
-  "poll_after_ms": 60000
+  "poll_after_ms": 60000,
+  "tenant_status": { "status": "active", "since": null },
+  "support": null
 }
 ```
 
-`restore_epoch`, `restore_point_at` and `poll_after_ms` are the caller's tenant's values (`tenants` row); a restore of one shop never disturbs the tills of another. If `restore_epoch` differs from `kv.restore_epoch` (the pull response also carries `restore_point_at`, epoch ms of the data the server was restored to), the client runs **restore recovery** before anything else:
+`restore_epoch`, `restore_point_at`, `poll_after_ms`, `tenant_status` and `support` are the caller's tenant's values (`tenants` row); a restore, status change or support grant of one shop never disturbs the tills of another. The till saves `tenant_status` and `support` in `kv` and switches read-only mode and the banners on or off ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080), [§7.5](13-multi-tenancy.md#75-operator-support-access-d-084)). If `restore_epoch` differs from `kv.restore_epoch` (the pull response also carries `restore_point_at`, epoch ms of the data the server was restored to), the client runs **restore recovery** before anything else:
 1. Re-enqueue every ledger row **this device created** (`device_id` = own id) with `created_at ≥ restore_point_at` as fresh `insert` ops (new `op_id`s; the server ignores rows it already has via `ON CONFLICT(id) DO NOTHING`). Master rows are not re-sent (the restored server copy wins).
 2. Keep the outbox; clear all synced tables and caches; run a snapshot ([§4.3](#43-snapshot--get-apisyncsnapshot)); then push the outbox.
 3. Never lower the invoice counter: `kv.invoice_seq = max(kv.invoice_seq, max local sales.invoice_seq for this device, devices.last_invoice_seq)`, so no invoice number is ever issued twice.
@@ -147,7 +153,7 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 1. `cutoff = now − 30 days`. Targets for every tenant in one query: `SELECT tenant_id, MAX(seq) AS target FROM change_log WHERE at < ?cutoff GROUP BY tenant_id` (index `change_log_at`).
 2. Per tenant, delete in chunks, each chunk one `db.batch()` that also moves that tenant's floor: `DELETE FROM change_log WHERE tenant_id = ?t AND seq > ?floor AND seq <= ?upto` (`upto` = the 5,000th seq above the floor, capped at `target`) + `UPDATE tenants SET change_log_floor = ?upto WHERE id = ?t`. At most 50,000 rows per night across tenants; tenants are served round-robin from where the last run stopped (`meta.prune_cursor`), so one big shop cannot starve the others.
 3. `DELETE FROM applied_ops WHERE applied_at < now − 90 days` (index `applied_ops_at`, chunked by `rowid`). Applied-op IDs are kept 3× longer than the change log so a till that was offline for weeks and re-sends ops whose acknowledgement it never received is still answered from `applied_ops`; ledger inserts would be harmless anyway (`ON CONFLICT(tenant_id, id) DO NOTHING`).
-4. `DELETE FROM enrolment_codes WHERE expires_at < now − 1 day`; `DELETE FROM tenant_usage WHERE day < <today − 90 days>`. `sync_conflicts`, `audit_log` and all ledger and master rows are never pruned.
+4. `DELETE FROM enrolment_codes WHERE expires_at < now − 1 day`; `DELETE FROM owner_email_codes WHERE expires_at < now − 1 day`; `DELETE FROM tenant_usage WHERE day < <today − 90 days>`. For tenants whose `support_until` has passed and that still have non-revoked support devices: revoke them and write `support_access_end` (`ended_by: 'expiry'`) if no `/api/me` call did it first ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)). `sync_conflicts`, `audit_log` and all ledger and master rows are never pruned.
 5. Tenant deletion ([13 §7.4](13-multi-tenancy.md#74-delete-a-tenant)): for tenants with `status = 'deleting'`, delete their rows child tables first (`DELETE FROM <tbl> WHERE rowid IN (SELECT rowid FROM <tbl> WHERE tenant_id = ?t LIMIT 2000)`), at most 20,000 rows per night in total, and their R2 objects under `t/<tenant_id>/` (list + delete). When every table is empty, set `status = 'deleted'`, `deleted_at = now`.
 6. Set `meta.last_prune_at`; log counts per tenant (Workers Logs). The cron uses only I/O (no CPU-heavy work), within the 10 ms CPU limit; rows deleted count as D1 rows written and are charged to the account's shared budget, not to a tenant's `daily_write_budget`.
 
@@ -206,6 +212,7 @@ The rail badge (bottom of the rail) shows one of:
 | error | red dot | "Sync problem: <message> · Open details" |
 | outdated | blue arrow | "Update the app to keep syncing" (on `SCHEMA_OUTDATED`) |
 | downloading | blue spinner + % | "Downloading shop data… 45%" (snapshot running, §4.3) |
+| read-only | grey lock | "This shop is read-only · n changes waiting" (`tenant_status = read_only`; pulls continue, new changes are blocked, [13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 
 If pending ops are older than 24 h, Home shows a warning card: "This till hasn't synced since <time>. Connect to the internet so your data is backed up."
 
@@ -238,3 +245,5 @@ A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device
 21. Tenant isolation of sync (also part of [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)): tenants A and B both create a product with the same ULID and an `INV-A-1` sale → both applied, each tenant pulls only its own rows; a pull or snapshot with B's token never returns an A row; a B push of a sale referencing A's customer id → `rejected` / `FOREIGN_KEY`; a B upsert with A's product id creates or edits only B's row; a `tenant_id: "A"` key inside a B row is ignored.
 22. Restore epoch per tenant: a new `restore_epoch` on tenant A triggers restore recovery on A's tills only.
 23. Quota: tenant A at its `daily_write_budget` gets `503 TENANT_QUOTA` and keeps its ops; tenant B's push in the same minute is applied.
+24. Read-only cutoff: tenant A made read-only while device A1 is offline with 30 sales → A1's first push applies all 30 and the response carries `read_only`; A1 then refuses new sales locally; a forged later push from A1 with a sale created 1 hour after `read_only_seen_at` → that op is omitted from `results` (stays pending) and a push with only such ops gets `403 TENANT_READ_ONLY`; a refund whose `payments` row is in the same `tx_id` is never split; pull and snapshot keep working; after reactivation the held-back op is applied.
+25. Support devices: a push or file upload from a `kind = 'support'` device → `403 FORBIDDEN`; pull and snapshot work; after `expires_at` the token gets `401 DEVICE_REVOKED`.

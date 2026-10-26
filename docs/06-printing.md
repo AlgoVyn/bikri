@@ -53,7 +53,7 @@ flowchart LR
 ```ts
 type Block =
   | { t: 'logo' }
-  | { t: 'text'; text: string; align?: 'left'|'center'|'right'; bold?: boolean; size?: 'normal'|'double' }
+  | { t: 'text'; text: string; align?: 'left'|'center'|'right'; bold?: boolean; size?: 'small'|'normal'|'double' }  // 'small' = Font B (§4.4)
   | { t: 'pair'; left: string; right: string; bold?: boolean }       // label ... value
   | { t: 'item'; name: string; qty: string; amount: string; detail?: string }
   | { t: 'rule'; char: '-'|'=' }
@@ -88,6 +88,7 @@ All bytes hex. `n` etc. are single bytes.
 | Align | `1B 61 n` | 0 left, 1 centre, 2 right |
 | Bold on/off | `1B 45 01` / `1B 45 00` | |
 | Size | `1D 21 n` | `00` normal, `11` double width+height, `01` double height |
+| Font B / Font A | `1B 4D 01` / `1B 4D 00` | Font B (9×17: 42 chars at 58 mm, 64 at 80 mm) for `size: 'small'`; always switch back to Font A after the line. A printer without Font B prints it in Font A, which still fits |
 | Line feed | `0A` | |
 | Feed n lines | `1B 64 n` | |
 | Raster image | `1D 76 30 00 xL xH yL yH d…` | width **bytes** = xL + xH·256 = `ceil(dots/8)` (pad the last byte with white bits), height rows = yL + yH·256; send bands of ≤ 255 rows |
@@ -104,7 +105,7 @@ All bytes hex. `n` etc. are single bytes.
 
 ## 4. Receipt templates
 
-**Branding is per shop (multi-tenant, [13](13-multi-tenancy.md)).** Every receipt, label and A4 invoice takes its shop name, address, phone, NTN, logo, header and footer only from the active shop's own `shop` / `branches` rows and `kv.logo_bitmap`, passed per call (`ReceiptShop`), never from module-level state or a deployment setting; a till holds one shop's database only (D-073), so there is nothing else to pick from. No "Bikri" or "Algovyn" branding is printed in v1 (open question 9 in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)). Printer settings (`kv.printer`) are per device.
+**Branding is per shop (multi-tenant, [13](13-multi-tenancy.md)).** Every receipt, label and A4 invoice takes its shop name, address, phone, NTN, logo, header and footer only from the active shop's own `shop` / `branches` rows and `kv.logo_bitmap`, passed per call (`ReceiptShop`), never from module-level state or a deployment setting; a till holds one shop's database only (D-073), so there is nothing else to pick from. The only platform branding is the small **"Powered by AlgoVyn"** line at the bottom of customer receipts (§4.4, D-085). Printer settings (`kv.printer`) are per device.
 
 Money format on receipts: `Rs 40,000` when whole rupees, `Rs 3,459.77` when paisa ≠ 0; grouping per `shop.number_grouping`. Text mode uses ASCII only (`x` not `×`, `-` not `·`).
 
@@ -143,6 +144,7 @@ Warranty: Samsung A15 - 365 days (till 27-10-2027)  <- lines with sale_lines.war
 ------------------------------------------------
       Shukriya! Phir tashreef laiye.       <- receipt_footer, centre
                [ QR: bill id ]             <- optional setting "QR on receipt"
+               Powered by AlgoVyn          <- always; Font B (small), centre, last line (§4.4)
 <feed 3><cut><drawer if cash and drawer enabled>
 ```
 
@@ -179,6 +181,7 @@ Tendered               Rs 41,000
 Change                    Rs 600
 --------------------------------
  Shukriya! Phir tashreef laiye.
+       Powered by AlgoVyn
 ```
 
 58 mm always uses the two-line item format: name line (wrap at 32), then ` <qty> x <unit price>[ -<discount>]` left and amount right.
@@ -194,7 +197,17 @@ Change                    Rs 600
 | Supplier payment slip | `PAYMENT TO SUPPLIER` | Supplier, amount, method, note, balance after |
 | Supplier return slip | `RETURN TO SUPPLIER` | Supplier, linked delivery no, lines with qty and credit, total credit, money received back and method, reason, balance after |
 | Barcode labels | — | Not ESC/POS: printed through the browser print dialog on a label printer or A4 sticker sheet, Code 128, see [screens/20](screens/20-barcode-labels.md) |
-| Test page | `BIKRI TEST PRINT` | Paper width ruler `123456789012…`, bold/double sample, an Urdu raster line `اردو ٹیسٹ پرنٹ`, QR, "If the drawer opened, the drawer works", then cut |
+| Test page (no "Powered by" line) | `BIKRI TEST PRINT` | Paper width ruler `123456789012…`, bold/double sample, an Urdu raster line `اردو ٹیسٹ پرنٹ`, QR, "If the drawer opened, the drawer works", then cut |
+
+### 4.4 "Powered by AlgoVyn" line (D-085)
+
+Owner decision (27 Oct 2026, supersedes the "no vendor branding" part of REQ-B03): every **customer receipt** ends with one small line `Powered by AlgoVyn`, centred, after the footer and the optional QR, before the feed and cut.
+- Documents: sale receipt (also reprints and the reissued bill of a void-and-reissue), refund receipt, void notice, and their shared image and A4 versions. Not on internal slips (day close, supplier payment and return slips), barcode labels or the test page.
+- ESC/POS: block `{ t: 'text', text: 'Powered by AlgoVyn', align: 'center', size: 'small' }` → `1B 61 01`, `1B 4D 01`, text, `0A`, `1B 4D 00`, `1B 61 00`. Same on 58 mm and 80 mm (18 characters fit every width).
+- Raster receipts (Urdu, §6): the same line drawn in Inter at about 70 % of the body size, centred, as the last row of the bitmap.
+- Browser print (`window.print` fallback, §5.3) and the Settings preview: `<p class="powered-by">Powered by AlgoVyn</p>` with `.powered-by { text-align: center; font-size: 8px; margin-top: 2mm }` (58 mm and 80 mm CSS) and 9 pt on A4.
+- Always the English words "Powered by AlgoVyn" (the company name, spelled exactly so), in every receipt language. Not a shop setting in v1: Settings → Receipt shows it in the preview with the note "Added by AlgoVyn".
+- Golden files: the T-019 byte snapshots (`sale-basic` at 58 and 80 mm, §10) and the E2E receipt text snapshot include this line.
 
 ## 5. Transports
 
@@ -288,7 +301,7 @@ REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 
 ## 10. Tests
 
-- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`).
+- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`), ending with the Font B "Powered by AlgoVyn" line (§4.4); the day-close template snapshot has no such line.
 - `layout.test.ts`: long names wrap, amounts right-align, pair overflow, 24/32/40/42/48/69 widths.
 - `raster.test.ts`: 1-bit packing of a known 16×2 bitmap; band splitting at 255 rows.
 - `transports.test.ts`: fake `navigator.usb` and `navigator.serial` record bytes; both produce identical bytes for the same job; chunking ≤ 4096 bytes; timeout → `TIMEOUT`.
