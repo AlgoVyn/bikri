@@ -1,0 +1,23 @@
+{
+  "name": "bikri",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -b",
+    "dev": "turbo dev --filter=@bikri/pos",
+    "e2e": "turbo e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "turbo": "2.11.10",
+    "typescript": "7.0.2"
+  }
+}

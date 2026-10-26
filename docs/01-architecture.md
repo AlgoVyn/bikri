@@ -116,7 +116,7 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 | pdf-lib | 1.17 | pos | PDF report export |
 | zxing-wasm | 3.1 | pos | camera barcode fallback |
 | vitest | 5.0 | all | unit tests |
-| @cloudflare/vitest-pool-workers | 0.23 | api | Worker + D1 integration tests |
+| @cloudflare/vitest-plugin | 1.4.8 | api | Worker + D1 integration tests (renamed from vitest-pool-workers; [D-055](decisions.md)) |
 | fake-indexeddb | 6.2 | pos tests | Dexie in Node |
 | @playwright/test | 1.64 | e2e | |
 
