@@ -4,32 +4,47 @@ Base URL: `https://algovyn.com/bikri/api` (path-based, see [01 §1.1](01-archite
 
 ## 1. Endpoint list
 
+Every device-authenticated endpoint acts on **the caller's tenant only** (from the token, [13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)); no request body or query names a tenant. Operator endpoints name the tenant in the path.
+
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | none | Liveness and versions |
-| POST | `/devices/enrol` | none (rate-limited) | Exchange an enrolment code for a device token |
-| GET | `/me` | device | Device, branch and setup status |
+| POST | `/devices/enrol` | none (rate-limited) | Exchange an enrolment code for a device token (the code decides the tenant) |
+| GET | `/me` | device | Tenant, device, branch and setup status |
 | POST | `/sync/push` | device | Push outbox ops ([03 §4.1](03-sync.md#41-push--post-apisyncpush)) |
 | GET | `/sync/pull` | device | Pull changes since a cursor ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) |
-| GET | `/sync/snapshot` | device | Full copy of the synced tables, paged per table, for new or stale tills ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)) |
+| GET | `/sync/snapshot` | device | Full copy of the tenant's synced tables, paged per table ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)) |
 | PUT | `/files/:kind/:id/:sha256` | device | Upload a product image or logo |
 | GET | `/files/*key` | device | Download a file from R2 |
-| GET | `/admin/session` | Access | Who is signed in to admin |
-| POST | `/admin/devices/enrol-this-browser` | Access | Enrol the current browser directly |
-| POST | `/admin/enrolment-codes` | Access | Create a one-time 8-char enrolment code |
-| GET | `/admin/devices` | Access | List devices |
-| PATCH | `/admin/devices/:id` | Access | Rename / move branch |
-| POST | `/admin/devices/:id/revoke` | Access | Revoke a device |
+| GET/POST/DELETE | `/shop/enrolment-codes` | admin device + owner | List, create, cancel enrolment codes for this shop ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) |
+| GET | `/shop/devices` | admin device + owner | List this shop's devices |
+| PATCH | `/shop/devices/:id` | admin device + owner | Rename / move branch / set `is_admin` |
+| POST | `/shop/devices/:id/revoke` | admin device + owner | Revoke a device |
+| POST | `/shop/import-ops` | admin device + owner | Import the unsynced-ops file of a revoked device of this shop ([03 §8](03-sync.md#8-device-revocation-and-data-loss-window)) |
+| POST | `/shop/conflicts/:id/acknowledge` | admin device + owner | Mark a `sync_conflicts` row acknowledged |
+| GET | `/admin/session` | Access | Who is signed in to the operator console |
+| GET | `/admin/usage` | Access | Account-wide usage today: Σ `tenant_usage`, per tenant, vs free-tier limits |
+| GET/POST | `/admin/tenants` | Access | List tenants; create a tenant (+ default branch, expense categories, owner pairing code) |
+| GET/PATCH | `/admin/tenants/:id` | Access | Tenant detail; edit display name, budget, poll interval, note |
+| POST | `/admin/tenants/:id/suspend`, `/reactivate`, `/delete` | Access | Lifecycle ([13 §7](13-multi-tenancy.md#7-tenant-lifecycle)) |
+| POST | `/admin/tenants/:id/enrolment-codes` | Access | Issue a code (e.g. a new owner pairing code) |
+| GET | `/admin/tenants/:id/devices` | Access | List the tenant's devices |
+| POST | `/admin/tenants/:id/devices/:device_id/revoke` | Access | Revoke a device |
+| GET | `/admin/tenants/:id/export` | Access | Paged export of the tenant's tables (same paging as the snapshot) |
+| POST | `/admin/tenants/:id/maintenance` | Access | `{ on: boolean }` set or clear `status = 'maintenance'` for a restore |
+| POST | `/admin/tenants/:id/purge` | Access | Delete the tenant's rows in chunks (only in maintenance) |
+| POST | `/admin/tenants/:id/import` | Access | Import export pages into an emptied tenant (only in maintenance) |
+| POST | `/admin/tenants/:id/restore-epoch` | Access | `{ restore_point_at }` set a new `restore_epoch` for the tenant |
+| POST | `/admin/tenants/:id/import-ops` | Access | Import a revoked device's unsynced ops |
+| POST | `/admin/tenants/:id/reset-owner-pin` | Access | Set a new owner PIN when no other owner can |
 | GET | `/admin/backups` | Access | List backup objects in R2 |
 | GET | `/admin/backups/*key` | Access | Download a backup |
-| GET | `/admin/conflicts` | Access | Recent `sync_conflicts` (last 200) |
-| POST | `/admin/reset-owner-pin` | Access | Set a new owner PIN when it is forgotten |
-| POST | `/admin/import-ops` | Access | Import the unsynced-ops file of a revoked device ([03 §8](03-sync.md#8-device-revocation-and-data-loss-window)) |
 
 ## 2. Conventions
 
 - **Auth header (device):** `Authorization: Bearer <device_token>` where the token is 43 base64url chars (32 random bytes).
-- **Auth (admin):** Cloudflare Access adds `Cf-Access-Jwt-Assertion`; the Worker verifies it ([05 §3](05-auth-and-roles.md#3-owner-admin-via-cloudflare-access)).
+- **Auth (shop admin):** device token of an admin device plus `X-Bikri-Staff: <owner staff id>` ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)).
+- **Auth (operator):** Cloudflare Access adds `Cf-Access-Jwt-Assertion`; the Worker verifies it ([05 §3.1](05-auth-and-roles.md#31-platform-operator-via-cloudflare-access)).
 - **Version headers:** the till sends `X-Bikri-App: 0.1.0` and `X-Bikri-Schema: 1` on every request.
 - **Times** are epoch ms. **Money** is paisa integers.
 - **Error shape** (all non-2xx):
@@ -44,16 +59,19 @@ Base URL: `https://algovyn.com/bikri/api` (path-based, see [01 §1.1](01-archite
 | 400 | `BAD_ENROLMENT_CODE` | Code unknown, used or expired |
 | 401 | `UNAUTHENTICATED` | Missing/unknown token or Access JWT |
 | 401 | `DEVICE_REVOKED` | Token belongs to a revoked device |
-| 403 | `FORBIDDEN` | Access email not in `OWNER_EMAILS`, or permission failure |
-| 404 | `NOT_FOUND` | File or device not found |
+| 403 | `FORBIDDEN` | Access email not in `OWNER_EMAILS`, not an admin device / not an owner on `/shop/*`, or permission failure |
+| 403 | `TENANT_SUSPENDED` | The caller's tenant is suspended or being deleted; the till keeps selling offline |
+| 404 | `NOT_FOUND` | File, device or tenant not found **in the caller's tenant** (the same answer whether or not the id exists in another tenant) |
 | 409 | `SCHEMA_OUTDATED` | Client schema version < `MIN_CLIENT_SCHEMA` |
-| 410 | `SNAPSHOT_REQUIRED` | Pull `since` is below `meta.change_log_floor` (changes pruned after 30 days); `details.change_log_floor` |
+| 409 | `SLUG_TAKEN` / `NOT_IN_MAINTENANCE` / `LAST_ADMIN_DEVICE` | Operator and shop-admin endpoints (§3.7, §3.8) |
+| 410 | `SNAPSHOT_REQUIRED` | Pull `since` is below the tenant's `change_log_floor` (changes pruned after 30 days); `details.change_log_floor` |
 | 413 | `PAYLOAD_TOO_LARGE` | Push body > 1 MB, image > 2 MB |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload not webp/png/jpeg |
 | 429 | `RATE_LIMITED` | Too many requests (see §6) |
 | 500 | `INTERNAL` | Unexpected; includes `details.request_id` |
-| 503 | `MAINTENANCE` | Worker var `MAINTENANCE=1` during a restore; client keeps ops, retries after `Retry-After: 300` |
-| 503 | `D1_LIMIT` | D1 daily free limit reached; client keeps ops and retries after `Retry-After` |
+| 503 | `MAINTENANCE` | Worker var `MAINTENANCE=1` (whole deployment) or the caller's tenant has `status = 'maintenance'` (restore of that shop); client keeps ops, retries after `Retry-After: 300` |
+| 503 | `TENANT_QUOTA` | The caller's tenant reached its `daily_write_budget` for the UTC day ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)); `Retry-After` = seconds to 00:00 UTC; client keeps ops |
+| 503 | `D1_LIMIT` | D1 daily free limit of the account reached (all tenants); client keeps ops and retries after `Retry-After` |
 
 Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNIQUE_VIOLATION`, `FOREIGN_KEY`, `FORBIDDEN`, `IMMUTABLE_TABLE` (update/delete attempted on a ledger table), `UNKNOWN_TABLE`, `SETUP_ALREADY_DONE` (a `shop` insert when `setup_completed_at` is already set).
 
@@ -72,18 +90,21 @@ Request:
 Response `201`:
 ```json
 {
-  "device": { "id": "01JC0Z8K3V7R1M2Q4S6T8V0X2Y", "name": "Counter 1", "branch_id": "01JC0Y...", "device_code": "A", "last_invoice_seq": 0 },
+  "tenant": { "id": "01JBZT...", "display_name": "Algovyn Mobiles" },
+  "device": { "id": "01JC0Z8K3V7R1M2Q4S6T8V0X2Y", "name": "Counter 1", "branch_id": "01JC0Y...", "device_code": "A", "is_admin": true, "last_invoice_seq": 0 },
   "token": "q3J4m...43chars",
   "shop_setup_completed": false
 }
 ```
-Errors: `400 BAD_ENROLMENT_CODE`, `429 RATE_LIMITED`. The code is single-use and valid 15 minutes. The plain token is returned **once** and stored only as a SHA-256 hash.
+Errors: `400 BAD_ENROLMENT_CODE`, `403 TENANT_SUSPENDED`, `429 RATE_LIMITED`. The code is single-use and valid 15 minutes (owner pairing codes 72 hours). The new device belongs to the code's tenant and branch; `is_admin` = the code's `grants_admin`. The plain token is returned **once** and stored only as a SHA-256 hash.
 
 ### 3.3 `GET /api/me`
 ```json
 200 {
-  "device": { "id": "01JC0Z...", "name": "Counter 1", "branch_id": "01JC0Y...", "device_code": "A", "revoked": false },
+  "tenant": { "id": "01JBZT...", "display_name": "Algovyn Mobiles", "status": "active" },
+  "device": { "id": "01JC0Z...", "name": "Counter 1", "branch_id": "01JC0Y...", "device_code": "A", "is_admin": false, "revoked": false },
   "shop_setup_completed": true,
+  "poll_after_ms": 60000,
   "server_time": 1793050000000,
   "latest_seq": 48213
 }
@@ -97,46 +118,67 @@ Specified in [03-sync §4](03-sync.md#4-protocol). Limits: ≤ 200 ops, ≤ 1 MB
 ### 3.5 `PUT /api/files/:kind/:id/:sha256`
 - `kind` ∈ `product_image`, `logo`. `id` = product ID (or `shop` for logo). `sha256` = hex digest of the body (client computes).
 - Body: raw bytes, `Content-Type: image/webp | image/png | image/jpeg`, ≤ 2 MB (client resizes first: product images 512×512 max WebP q=0.8; logo PNG ≤ 576 px wide).
-- Server verifies the digest, writes R2 key `products/<id>/<sha256>.webp` or `shop/logo-<sha256>.png`, returns:
+- Server verifies the digest, writes R2 key `t/<tenant_id>/products/<id>/<sha256>.webp` or `t/<tenant_id>/shop/logo-<sha256>.png` (the tenant prefix is added by the server from the token and never shown to the till), returns the **relative** key:
 ```json
 201 { "key": "products/01J9.../9f2c...e1.webp", "size": 24311 }
 ```
 The till then upserts `products.image_key` / `shop.logo_key` through the normal sync path. Uploading the same digest twice is a no-op `200`.
 
 ### 3.6 `GET /api/files/*key`
-Streams the R2 object from `FILES` with `Cache-Control: private, max-age=31536000, immutable` and `ETag`. **Only keys matching `^products/[0-9A-HJKMNP-TV-Z]{26}/[0-9a-f]{64}\.webp$` or `^shop/logo-[0-9a-f]{64}\.png$` are served**; anything else → `404 NOT_FOUND`. Backups live in the separate `bikri-backups` bucket and are reachable only through `/api/admin/backups/*`. Keys are content-addressed, so they never change.
+`key` is the relative key; the Worker reads `t/<caller's tenant_id>/<key>`, so a till can only ever read its own shop's files, whatever key it asks for. Streams the R2 object from `FILES` with `Cache-Control: private, max-age=31536000, immutable` and `ETag`. **Only keys matching `^products/[0-9A-HJKMNP-TV-Z]{26}/[0-9a-f]{64}\.webp$` or `^shop/logo-[0-9a-f]{64}\.png$` are served**; anything else → `404 NOT_FOUND`. Backups live in the separate `bikri-backups` bucket and are reachable only through the operator's `/api/admin/backups/*`. Keys are content-addressed, so they never change.
 
-### 3.7 Admin endpoints (Cloudflare Access)
+### 3.7 Operator endpoints (Cloudflare Access)
 
 `GET /api/admin/session` → `200 { "email": "operator@example.com" }`
 
-`POST /api/admin/devices/enrol-this-browser`
+`POST /api/admin/tenants`
 ```json
-{ "name": "Counter 1", "branch_id": "01JC0Y..." }   // branch_id optional: default branch, created if none exists
-→ 201 { "device": { ... }, "token": "...", "shop_setup_completed": false }
+{ "slug": "hall-road-mobiles", "display_name": "Hall Road Mobiles", "daily_write_budget": 7000, "note": "" }
+→ 201 { "tenant": { "id": "01JBZT...", "slug": "hall-road-mobiles", "status": "active", ... },
+        "owner_code": { "code": "K7Q2-M9XD", "expires_at": 1793309200000, "link": "https://algovyn.com/bikri/enrol?code=K7Q2M9XD" } }
 ```
-Used when the owner opens `/admin` on the till itself. If no branch exists yet, the Worker creates the default branch `{ name: 'Main', bill_prefix: 'INV', is_default: 1 }` and appends it to `change_log`.
+Creates the tenant, its default branch (`Main` / `INV`), its expense categories from the templates, their `change_log` rows and an owner pairing code (`grants_admin = 1`, 72 h), in one batch ([02 §2.1](02-data-model.md#21-seed-data-migration-0002_seedsql)). `409 SLUG_TAKEN` if the slug exists (also for deleted tenants).
 
-`POST /api/admin/enrolment-codes`
+`GET /api/admin/tenants` → `200 { "tenants": [ { "id", "slug", "display_name", "status", "devices": 3, "last_seen_at", "today": { "rows_written", "rows_read", "pushes" }, "daily_write_budget", "setup_completed": true } ], "account_today": { "rows_written", "rows_read" } }`
+
+`PATCH /api/admin/tenants/:id` `{ "display_name"?, "daily_write_budget"?, "poll_after_ms"?, "note"? }` → `200 { "tenant": {...} }`. `display_name` is the console label and the pre-fill for the setup wizard; the shop's own `shop.name` (receipts) is edited by the shop owner.
+
+`POST /api/admin/tenants/:id/suspend` / `reactivate` → `200`. `POST /api/admin/tenants/:id/delete` `{ "confirm_slug": "hall-road-mobiles" }` → `202` (status `deleting`, devices revoked; rows removed by the nightly cron, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)).
+
+`POST /api/admin/tenants/:id/enrolment-codes` `{ "device_name", "branch_id"?, "grants_admin": true }` → `201 { "code", "expires_at", "link" }` (72 h when `grants_admin`, else 15 min).
+
+`GET /api/admin/tenants/:id/export?tbl=&after=&limit=` → same shapes as the snapshot ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)), for that tenant; the first call (no `tbl`) also writes an `audit_log` row `operator_export` in the tenant. `devices.token_hash` is never exported.
+
+Restore of one tenant ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)): `POST …/maintenance { on: true }` → `POST …/purge` (repeat until `{ "remaining": 0 }`; each call deletes ≤ 5,000 rows child tables first) → `POST …/import { tbl, rows: [...] }` (≤ 500 rows per call, rows validated with the table schemas, written with `INSERT … (tenant_id, …)` and `change_log` rows) → `POST …/restore-epoch { restore_point_at }` → `POST …/maintenance { on: false }`. Purge and import return `409 NOT_IN_MAINTENANCE` otherwise.
+
+`POST /api/admin/tenants/:id/import-ops` `{ "device_id": "01JC…", "ops": [ … ] }` (≤ 200 ops per call) → same response shape as push. `404 NOT_FOUND` if the device is not in that tenant, `403 FORBIDDEN` if it is not revoked.
+
+`POST /api/admin/tenants/:id/reset-owner-pin` `{ "staff_id": "01JB...", "pin_hash": "<base64>", "pin_salt": "<base64>", "pin_iterations": 150000 }` → the **console page in the browser** computes the PBKDF2 hash with WebCrypto (the Worker never hashes PINs, to stay inside the 10 ms CPU limit); the Worker upserts that tenant's staff row with `rev+1`, appends `change_log` and an `audit_log` row (`pin_reset`) → `200 { "ok": true }`.
+
+`GET /api/admin/backups?prefix=d1/` (bucket `bikri-backups`; downloads are sent with `Cache-Control: no-store` and `Content-Disposition: attachment`) → `200 { "objects": [ { "key": "d1/2026-10-27.sql.gz", "size": 4810233, "uploaded": 1793050000000 } ] }`. Backups are whole-database (all tenants), [09 §2](09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml).
+
+### 3.8 Shop-admin endpoints (admin device)
+
+Device token of an admin device (`is_admin = 1`) **and** `X-Bikri-Staff` = an active `owner` of the same tenant ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)); otherwise `403 FORBIDDEN`. Online only. Every call writes an `audit_log` row in the tenant.
+
+`POST /api/shop/enrolment-codes`
 ```json
-{ "device_name": "Counter 2", "branch_id": "01JC0Y..." }
-→ 201 { "code": "K7Q2-M9XD", "expires_at": 1793050900000 }
+{ "device_name": "Counter 2", "branch_id": "01JC0Y...", "is_admin": false }
+→ 201 { "code": "K7Q2-M9XD", "expires_at": 1793050900000, "link": "https://algovyn.com/bikri/enrol?code=K7Q2M9XD" }
 ```
-Code alphabet: `23456789ABCDEFGHJKMNPQRSTVWXYZ` (30 symbols, no `0 O 1 I L U`, matching [screens/02](screens/02-enrol.md)); 8 chars (30⁸ ≈ 6.6 × 10¹¹) shown as `XXXX-XXXX`. Codes are generated with `crypto.getRandomValues` and rejection sampling.
+Code alphabet: `23456789ABCDEFGHJKMNPQRSTVWXYZ` (30 symbols, no `0 O 1 I L U`, matching [screens/02](screens/02-enrol.md)); 8 chars (30⁸ ≈ 6.6 × 10¹¹) shown as `XXXX-XXXX`. Codes are generated with `crypto.getRandomValues` and rejection sampling; only the SHA-256 is stored, with the tenant.
 
-`DELETE /api/admin/enrolment-codes/:code` → `204` (cancel an unused code; the admin page lists active codes from `GET /api/admin/enrolment-codes`, returning `{ codes: [ { code_hint: 'K7Q2-…', device_name, expires_at } ] }`; only the hash is stored, so the page keeps the plain code in memory until it expires).
+`GET /api/shop/enrolment-codes` → `{ codes: [ { code_hint: 'K7Q2-…', device_name, is_admin, expires_at } ] }` (unused, unexpired, this tenant only); `DELETE /api/shop/enrolment-codes/:code` → `204`. The page keeps the plain code in memory until it expires.
 
-`GET /api/admin/devices` → `200 { "devices": [ { "id", "name", "branch_id", "device_code", "enrolled_at", "last_seen_at", "app_version", "revoked_at" } ] }`
+`GET /api/shop/devices` → `200 { "devices": [ { "id", "name", "branch_id", "device_code", "is_admin", "enrolled_at", "last_seen_at", "app_version", "pending_ops", "oldest_pending_at", "revoked_at" } ] }`
 
-`PATCH /api/admin/devices/:id` `{ "name"?: string, "branch_id"?: string }` → `200 { "device": {...} }`. Moving a device to another branch assigns it a **new** `device_code` in the target branch (codes are never reused), so invoice numbers stay unique; the till picks up the new code on its next `/api/me` and continues its own `invoice_seq`.
+`PATCH /api/shop/devices/:id` `{ "name"?: string, "branch_id"?: string, "is_admin"?: boolean }` → `200 { "device": {...} }`. Moving a device to another branch assigns it a **new** `device_code` in the target branch (codes are never reused), so invoice numbers stay unique; the till picks up the new code on its next `/api/me` and continues its own `invoice_seq`. Removing admin from the last admin device → `409 LAST_ADMIN_DEVICE`.
 
-`POST /api/admin/devices/:id/revoke` → `200 { "revoked_at": 1793050000000 }`
+`POST /api/shop/devices/:id/revoke` → `200 { "revoked_at": 1793050000000 }` (`409 LAST_ADMIN_DEVICE` for the last admin device; the operator can still revoke it).
 
-`GET /api/admin/backups?prefix=d1/` (bucket `bikri-backups`; downloads are sent with `Cache-Control: no-store` and `Content-Disposition: attachment`) → `200 { "objects": [ { "key": "d1/2026-10-27.sql.gz", "size": 4810233, "uploaded": 1793050000000 } ] }`
+`POST /api/shop/import-ops` `{ "device_id": "01JC…", "ops": [ … ] }` (the file from [03 §8](03-sync.md#8-device-revocation-and-data-loss-window); ≤ 200 ops per call, sent in chunks) → same response shape as push. `404 NOT_FOUND` if the device is not in the caller's tenant, `403 FORBIDDEN` if it is not revoked.
 
-`POST /api/admin/import-ops` `{ "device_id": "01JC…", "ops": [ … ] }` (the file from [03 §8](03-sync.md#8-device-revocation-and-data-loss-window); ≤ 200 ops per call, the admin page sends the file in chunks) → same response shape as push. `403 FORBIDDEN` if the device is not revoked.
-
-`POST /api/admin/reset-owner-pin` `{ "staff_id": "01JB...", "pin_hash": "<base64>", "pin_salt": "<base64>", "pin_iterations": 150000 }` → the **admin page in the browser** computes the PBKDF2 hash with WebCrypto (the Worker never hashes PINs, to stay inside the 10 ms CPU limit); the Worker upserts the staff row with `rev+1`, appends `change_log` and an `audit_log` row (`pin_reset`) → `200 { "ok": true }`.
+`POST /api/shop/conflicts/:id/acknowledge` → `200` (sets `resolution = 'acknowledged'`, appends `change_log`).
 
 ## 4. Zod schemas (excerpt, `packages/core/schemas`)
 
@@ -146,7 +188,7 @@ Every table has a schema generated from one table-metadata definition in `packag
 import { z } from 'zod';
 
 export const Ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-// Not every id is a ULID: shop.id is 'shop', system expense_categories use their code as id,
+// Not every id is a ULID: shop.id is 'shop' (one per tenant), system expense_categories use their code as id,
 // and server-originated rows use device_id / staff_id = 'server' (05 §3).
 export const RowId = z.union([Ulid, z.literal('shop'), z.string().regex(/^[a-z_]{2,30}$/)]); // per-table schemas narrow this
 export const ActorId = z.union([Ulid, z.literal('server')]); // device_id, staff_id, updated_by on rows the server may write
@@ -208,6 +250,7 @@ export const SnapshotQuery = z.object({ tbl: z.enum(SNAPSHOT_TABLES).optional(),
 export const OpInsert = z.object({ op_id: Ulid, tbl: z.enum(LEDGER_TABLES), kind: z.literal('insert'), row: z.record(z.string(), z.unknown()) });
 export const OpUpsert = z.object({ op_id: Ulid, tbl: z.enum(MASTER_TABLES), kind: z.literal('upsert'), base_rev: z.number().int().min(0), changed_fields: z.array(z.string()).max(50), row: z.record(z.string(), z.unknown()) });
 export const OpDelete = z.object({ op_id: Ulid, tbl: z.enum(MASTER_TABLES), kind: z.literal('delete'), row_id: Ulid, base_rev: z.number().int().min(0) });
+// No row schema contains tenant_id: the server strips the key before parsing (03 §2) and sets it from the token.
 export const PushBody = z.object({
   device_id: Ulid, schema_version: z.number().int(), app_version: z.string().max(20),
   ops: z.array(z.discriminatedUnion('kind', [OpInsert, OpUpsert, OpDelete])).min(1).max(200),
@@ -222,8 +265,9 @@ After the op-level parse, the server parses `row` with the table's row schema (e
 
 | Check | Applies to | Error |
 |---|---|---|
+| Every row is written with the authenticated device's `tenant_id`; references to ids that are not in that tenant fail the composite foreign keys | all ops | `FOREIGN_KEY` |
 | `row.device_id` equals the authenticated device | all ledger inserts that have `device_id` | `FORBIDDEN` |
-| `row.staff_id` is an active staff member | ledger inserts | `FORBIDDEN` |
+| `row.staff_id` is an active staff member **of the same tenant** | ledger inserts | `FORBIDDEN` |
 | `tbl` is a master or ledger table | all ops | `UNKNOWN_TABLE` |
 | `created_at` ≤ server time + 24 h | all inserts | `CONSTRAINT_FAILED` |
 | Staff role permits the action ([05 §5](05-auth-and-roles.md#5-server-side-enforcement)) | refunds, voids, staff/shop/branch upserts, deletes | `FORBIDDEN` |
@@ -234,8 +278,8 @@ After the op-level parse, the server parses `row` with the table's row schema (e
 | `refunds.amount > 0` has exactly one `payments` row (out, `refund`, same method and amount) and `udhaar_part > 0` exactly one customer `ledger_entries` row (−udhaar_part), in the same batch or already stored | `refunds` | `CONSTRAINT_FAILED` |
 | `supplier_return_lines.line_total = mulDivRound(qty_milli, unit_credit, 1000)`, `Σ line_total = supplier_returns.total`, `line_count` matches; a linked `purchase_line_id` belongs to a purchase of the same `supplier_id` | `supplier_returns`, `supplier_return_lines` | `CONSTRAINT_FAILED` (returned qty above received − already returned is **accepted** and flagged `over_return`) |
 | `supplier_returns.refund_received > 0` has exactly one `payments` row (in, `supplier_refund`, same method and amount, `supplier_return_id`), in the same batch or already stored | `supplier_returns` | `CONSTRAINT_FAILED` |
-| Ops pushed through `POST /api/admin/import-ops` | ops of a revoked device | `device_id` must be that revoked device instead of the caller |
+| Ops imported through `POST /api/shop/import-ops` or `/api/admin/tenants/:id/import-ops` | ops of a revoked device of that tenant | `device_id` must be that revoked device instead of the caller |
 
 ## 6. Rate limits
 
-Optional Cloudflare WAF rate-limiting rule on the `algovyn.com` zone: the **Free plan allows one rule, counting by IP, with a fixed 10-second period and 10-second block** (longer windows need Pro). If the website does not already use that one rule: path equals `/bikri/api/devices/enrol`, 5 requests per 10 s per IP → block 10 s. The real protection is the code itself (≈10¹² combinations, single use, 15-minute expiry) plus the Worker's own check: more than 5 failed enrolment attempts per IP per 15 minutes → `429 RATE_LIMITED`, counted in an in-memory map per isolate (best effort).
+Optional Cloudflare WAF rate-limiting rule on the `algovyn.com` zone: the **Free plan allows one rule, counting by IP, with a fixed 10-second period and 10-second block** (longer windows need Pro). If the website does not already use that one rule: path equals `/bikri/api/devices/enrol`, 5 requests per 10 s per IP → block 10 s. The real protection is the code itself (≈10¹² combinations, single use, 15-minute expiry) plus the Worker's own check: more than 5 failed enrolment attempts per IP per 15 minutes → `429 RATE_LIMITED`, counted in an in-memory map per isolate (best effort). Per-tenant fairness is handled by the daily write budget and `poll_after_ms` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)), not by IP rate limits (a shop's tills often share one IP).
