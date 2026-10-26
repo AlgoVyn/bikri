@@ -2,7 +2,7 @@
 
 Bikri is **multi-tenant** (decision [D-069](decisions.md), superseding D-001). One deployment at `https://algovyn.com/bikri/` serves several independent shops (**tenants**), run by one **platform operator** (Adnan, `operator@example.com`). Each tenant has its own staff, branches, tills, products, stock, sales, udhaar, suppliers, expenses, settings, receipts and files, and **must never see or change another tenant's data**.
 
-This doc holds the tenancy model, the facts it is based on, the per-shop free-tier budget, the tenant lifecycle (onboarding, suspension, export, restore, deletion), the migration plan from the single-shop M0 code, and the questions only the owner can answer. The other docs apply it: schema [02](02-data-model.md), sync [03](03-sync.md), API [04](04-api.md), auth [05](05-auth-and-roles.md), backups [09](09-backups-and-ops.md), tests [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory), roadmap [11](11-roadmap.md). Decisions: D-069–D-079 in the [decisions log](decisions.md).
+This doc holds the tenancy model, the facts it is based on, the per-shop free-tier budget, the tenant lifecycle (onboarding, read-only and suspension, export, restore, deletion, operator support access), the migration plan from the single-shop M0 code, and the questions only the owner can answer. The other docs apply it: schema [02](02-data-model.md), sync [03](03-sync.md), API [04](04-api.md), auth [05](05-auth-and-roles.md), backups [09](09-backups-and-ops.md), tests [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory), roadmap [11](11-roadmap.md). Decisions: D-069–D-079, and the owner's answers to the first open questions D-080–D-085, in the [decisions log](decisions.md).
 
 ## 1. Terms
 
@@ -11,7 +11,8 @@ This doc holds the tenancy model, the facts it is based on, the per-shop free-ti
 | **Tenant** | One business using Bikri: its own `shop` row, branches, devices, staff and every business record. Row in `tenants`; id `tenant_id` (ULID). "Shop" in the UI. |
 | **Platform operator** | The person who runs the deployment (v1: only `operator@example.com`). Creates, suspends and deletes tenants, sees usage, holds the backup key. Not a staff member of any shop. |
 | **Shop owner** | The `owner`-role staff member of one tenant. Manages that shop only. |
-| **Admin device** | A till with `devices.is_admin = 1`, allowed to call the shop-admin API (create enrolment codes, manage devices) for its own tenant ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)). |
+| **Admin device** | A till with `devices.is_admin = 1`, allowed to call the shop-admin API (create enrolment codes, manage devices, server export) for its own tenant after an owner email sign-in ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)). |
+| **Support device** | A browser the operator enrolled into a shop for support (`devices.kind = 'support'`): view-only, time-limited, announced by a banner on the shop's tills (§7.5). |
 | **Shard** | A D1 database that holds tenant data. v1 has one shard, binding `DB`. `tenants.db_shard` names the binding a tenant lives in (§4). |
 
 ## 2. Cloudflare facts the decision rests on (checked 27 Oct 2026)
@@ -35,6 +36,12 @@ This doc holds the tenancy model, the facts it is based on, the per-shop free-ti
 | Workers subrequests | 50 per request on Free (1,000 to Cloudflare services) | [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
 | Cron Triggers | 5 per account on Free | [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
 | R2 free tier | 10 GB-month storage, 1 M Class A, 10 M Class B operations **per month**; deletes free; no egress fees | [R2 pricing](https://developers.cloudflare.com/r2/pricing/) |
+| Email Sending to **arbitrary** recipients | **not available on Workers Free**; Workers Paid: 3,000 emails/month included, then USD 0.35 per 1,000 | [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/) |
+| Email to **verified destination addresses** | free on every plan, including when only Email Routing is configured; does not count toward any quota or daily limit; sent from a `send_email` Worker binding; "You can only send from your routing domains" until a sending domain is onboarded | [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/), [Email Service limits](https://developers.cloudflare.com/email-service/platform/limits/) |
+| Destination addresses | **200 per account**, shared by all domains; each is verified by Cloudflare emailing a link that the address owner must click | [Email Service limits](https://developers.cloudflare.com/email-service/platform/limits/), [Routing addresses](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/) |
+| `send_email` binding restrictions | `allowed_sender_addresses`, `allowed_destination_addresses`, `destination_address` | [Send bindings](https://developers.cloudflare.com/email-service/configuration/send-bindings/) |
+| Workers Rate Limiting binding (`ratelimits`) | available on Free, no extra charge; period 10 or 60 s; counts are approximate and per Cloudflare location | [Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
+| `algovyn.com` mail | MX already points at Cloudflare Email Routing (`route1-3.mx.cloudflare.net`, checked by DNS lookup on 27 Oct 2026), so `algovyn.com` is a routing domain | DNS |
 
 Consequences: the daily D1 row limits and the Workers request limit are **per account**, so they are shared by every tenant (and by the other Algovyn Workers such as SmartGrind and MarkSocial) whichever database layout is used. Only storage (500 MB) is per database.
 
@@ -104,26 +111,81 @@ How the daily row budget is shared:
 
 ### 7.1 Onboarding a new shop (D-072)
 
-1. **Operator creates the tenant** in the console (`/admin/tenants/new`): shop display name, slug (`[a-z0-9-]{3,30}`, unique, used in the console, backup manifests and file names only, never in till URLs), daily write budget, note. `POST /api/admin/tenants` writes, in one batch: the `tenants` row (`status 'active'`, `db_shard 'DB'`, fresh `restore_epoch`), the default branch (`Main`, `INV`, `is_default 1`), the expense categories copied from `expense_category_templates`, and their `change_log` rows.
+1. **Operator creates the tenant** in the console (`/admin/tenants/new`): shop display name, slug (`[a-z0-9-]{3,30}`, unique, used in the console, backup manifests and file names only, never in till URLs), owner email (for owner email sign-in, [05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082); the operator also adds it as a Cloudflare Email Routing destination address so the owner can verify it), daily write budget, note. `POST /api/admin/tenants` writes, in one batch: the `tenants` row (`status 'active'`, `db_shard 'DB'`, fresh `restore_epoch`), the default branch (`Main`, `INV`, `is_default 1`), the expense categories copied from `expense_category_templates`, and their `change_log` rows.
 2. The same call returns an **owner pairing code**: an enrolment code with `grants_admin = 1`, valid **72 hours**, single use, shown as `XXXX-XXXX` plus QR/link `https://algovyn.com/bikri/enrol?code=…`. The operator sends it to the shop owner out of band (WhatsApp, in person). The console can cancel and re-issue it.
 3. The shop owner opens the link on their PC or phone → [enrol screen](screens/02-enrol.md) → the device becomes the shop's first **admin device** → the [setup wizard](screens/01-setup-wizard.md) creates the shop profile (pre-filled with the display name) and the owner staff row with their PIN.
 4. The owner adds tills from **Settings → Devices** on an admin device (15-minute codes, admin or not), and staff in Settings → Cashiers. The operator is not needed again.
 
 The operator's own shop is onboarded the same way (Adnan as both operator and a shop owner).
 
-### 7.2 Suspend, reactivate
+### 7.2 Shop status: active, read-only, suspended (D-080)
 
-`status = 'suspended'`: device calls get `403 TENANT_SUSPENDED` (enrol, push, pull, files); tills keep selling offline and can still export locally. Reactivating resumes sync; nothing is lost. Used for non-payment or abuse (see open questions).
+The operator sets a shop's status in the console (Tenant → Summary). Every change needs a reason (1–200 characters), sets `tenants.status`, `status_reason`, `status_changed_at`, `status_changed_by`, and writes one `audit_log` row **in that shop** in the same batch: `action = 'tenant_status_change'`, `entity = 'shop'`, `entity_id = 'shop'`, `before_json = { "status": "active" }`, `after_json = { "status": "read_only", "reason": "…", "by": "operator:operator@example.com" }`, `device_id = 'server'`, `staff_id` = the shop's first owner (or `'server'` before setup). The row syncs to the shop's tills, so the owner sees it in Settings → Activity. The console also lists the status history of each shop from these rows.
+
+| Status | Who sets it | Sign in (enrol, PIN unlock, owner email sign-in) | Pull, snapshot, `/api/me`, file download, reports and history | Owner exports (device and server) | New business data (push, file upload) |
+|---|---|---|---|---|---|
+| `active` | operator (create, reactivate) | yes | yes | yes | yes |
+| **`read_only`** | operator, manually | yes | yes | yes | **no**: `403 TENANT_READ_ONLY` (ops made before the till learned the status are still accepted, below) |
+| `suspended` | operator | no (`403 TENANT_SUSPENDED`) | no | on the device only | no on the server; tills keep selling offline and push after reactivation |
+| `maintenance` | operator during a restore (§7.3) | no (`503 MAINTENANCE`) | no | on the device only | no (kept and retried) |
+| `deleting` / `deleted` | operator delete / cron (§7.4) | no (devices revoked) | no | no | no |
+
+**Read-only** is the lever for non-payment, and the operator can also use it by hand for any other reason (a shop closing down, a dispute, before deleting a shop). Billing is not automated in v1, so read-only is never set automatically; pricing is still an open question (§9). Over-budget shops are **not** made read-only: they keep the existing quota behaviour (sync pauses with `TENANT_QUOTA` until 00:00 UTC, §6). **Suspended** stays for abuse or emergencies: it stops all server access, while a read-only shop can still sign in, look at its data and take it away.
+
+What read-only allows and blocks:
+- Allowed: enrol a device, PIN unlock, owner email sign-in (05 §3.2), pull, snapshot, `/api/me`, `GET /api/files/*`, every report, list and bill on the till, CSV/PDF and full exports on the device, the owner's server export (§7.3), and shop-admin actions that are not business data (list, rename and revoke devices, issue and cancel enrolment codes, end operator support access).
+- Blocked: every push of new ops (sales, refunds, voids, udhaar entries and payments, stock adjustments and counts, products and prices, customers, suppliers, deliveries, supplier returns, expenses, cash moves, day closes, staff and shop settings), `PUT /api/files/*`, `POST /api/shop/import-ops` for ops created after the read-only start, and conflict acknowledgement. The answer is `403 TENANT_READ_ONLY` with `details: { since }`.
+- Local-only device settings (printer, scanner, display, language) still work, because they are not shop data.
+
+**How tills learn it.** `/api/me` (called at app start and every `poll_after_ms`), and every pull and push response, carry `tenant_status: { status, since }`. When the server sends `read_only` to a device for the first time it also sets `devices.read_only_seen_at = now` (server clock, one write per device). The till saves `kv.tenant_status` and enters **read-only mode** at once: the repository layer refuses every write that would create an outbox op (one guard in `apps/pos/src/data/`, so no screen can bypass it), Sell, Pay, Refund, Void, Udhaar, Stock, Products, Suppliers, Expenses and Day close show their data but hide or disable their actions, carts and held bills stay on the device, and a non-dismissable banner shows on every screen (§7.2.1). An offline till learns it on its next successful request.
+
+**Rule for ops made offline before the till learned it.** A sale made while the till could not know is a real event and is never lost:
+1. A push from a device whose `read_only_seen_at` is NULL is applied in full (every op in it was created before the device was told), and the response tells the device (`read_only_seen_at` is set in the same batch).
+2. Later pushes apply only the ops with `created_at ≤ read_only_seen_at + 10 minutes` (allowance for a slow device clock), whole transactions only (`tx_id`, D-054). The other ops are **omitted from `results`** and stay pending on the till, exactly like ops that did not fit in a request (03 §4.1 step 7, D-029); if no op qualifies the push gets `403 TENANT_READ_ONLY`. The till never creates such ops itself; they can only exist through a wrong clock or a modified client, and they sync once the shop is reactivated. They are never discarded.
+3. Settings → Sync lists pending ops held back by read-only as "Waiting: this shop is read-only".
+4. The operator's console shows, per device, `read_only_seen_at` and pending ops, so they can see what is still waiting.
+
+Reactivating (`read_only` → `active`) clears `read_only_seen_at` on all the shop's devices in the same batch; tills leave read-only mode on their next `/api/me` or pull and push anything still pending. Restore's `maintenance off` asks which status to return to (default: the status before maintenance, read from the last `tenant_status_change` row).
+
+#### 7.2.1 Banner texts (i18n keys; native-speaker review in T-063)
+
+| Key | en | ur | roman-ur |
+|---|---|---|---|
+| `tenant.readOnly.banner` | This shop is read-only. You can view reports and history and export your data, but you can't make sales or changes. Contact Algovyn. | یہ دکان صرف دیکھنے کے لیے ہے۔ آپ رپورٹس اور ریکارڈ دیکھ سکتے ہیں اور اپنا ڈیٹا ایکسپورٹ کر سکتے ہیں، لیکن نئی سیل یا کوئی تبدیلی نہیں کر سکتے۔ الگوون سے رابطہ کریں۔ | Yeh dukaan sirf dekhne ke liye hai. Aap reports aur record dekh sakte hain aur apna data export kar sakte hain, lekin nayi sale ya koi tabdeeli nahin kar sakte. Algovyn se rabta karein. |
+| `tenant.readOnly.blocked` (toast on a blocked action) | Read-only shop: this can't be saved. | دکان صرف دیکھنے کے لیے ہے: یہ محفوظ نہیں ہو سکتا۔ | Dukaan sirf dekhne ke liye hai: yeh save nahin ho sakta. |
+| `tenant.readOnly.waiting` (Settings → Sync) | Waiting: this shop is read-only | انتظار: یہ دکان صرف دیکھنے کے لیے ہے | Intezar: yeh dukaan sirf dekhne ke liye hai |
+
+The banner uses the warning tokens (`--color-warning-subtle` / ink, [08 §2](08-ux-guidelines.md#2-design-tokens-appspossrcstylestokenscss-tailwind-4-theme)), sits under the top bar on every screen including the PIN lock, and has `role="status"`.
 
 ### 7.3 Per-tenant export and restore
 
 - **Export (operator):** console → tenant → `Export` pages through `GET /api/admin/tenants/:id/export` (same paging as the snapshot) and builds the `bikri-export` zip ([09 §3.3](09-backups-and-ops.md#33-restore-from-the-owners-json-export-new-deploy--leaving-cloudflare)) in the browser, with `tenant` in `manifest.json`.
-- **Export (shop owner):** Settings → Backup → Export (built on the till from IndexedDB; `export.data`). It always contains only that shop's data, because a till only holds its own tenant.
+- **Export (shop owner, on the device):** Settings → Backup → Export (built on the till from IndexedDB; `export.data`). It always contains only that shop's data, because a till only holds its own tenant.
+- **Export (shop owner, from the server, D-081):** Settings → Backup → `Download from server` on an admin device, unlocked as an owner, with an owner email sign-in (05 §3.2). It pages through `GET /api/shop/export` (same paging and table list as the snapshot, [03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot); `devices` without `token_hash`; never `owner_email_codes` or platform tables) and builds the same `bikri-export` zip (JSON + CSV, [09 §3.3](09-backups-and-ops.md#33-restore-from-the-owners-json-export-new-deploy--leaving-cloudflare)) **in the browser**, with `manifest.source = "server"` and `snapshot_seq`. Unlike the device export it includes rows from every till of the shop, also revoked or lost ones. Tenant scope comes only from the device token (no tenant in the request), so it is covered by the isolation suite (I22). Allowed when the shop is `active` or `read_only`.
+  - Why the browser builds the zip: zipping a large shop takes far more than the Free plan's **10 ms CPU per request**, and storing a ready zip in R2 would mean a background job and another copy of personal data. Each page is one indexed range read of ≤ 500 rows, which fits the CPU limit.
+  - Free-tier cost and limits: a reference shop after a year has about 300,000 rows, so one export is about 600 Worker requests (0.6 % of the account's 100,000/day) and 300,000 D1 rows read (6 % of 5,000,000/day). Therefore **one server export start per shop per 24 hours** (`tenants.last_owner_export_at`; else `429 RATE_LIMITED` with `Retry-After`), and a started export stays valid for 2 hours (signed `export_id`, so an interrupted download resumes without a new start). Rows read are added to `tenant_usage.rows_read` like snapshot reads; reads never count against the write budget.
+  - Audit: the start writes `audit_log` `owner_export` (staff, device, `after_json: { tables, rows }`) in the shop. The operator sees owner exports in the console.
 - **Restore one tenant** (mistake, corruption, shard move): never with Time Travel, which would roll back every shop. Instead ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)): tenant `status = 'maintenance'` → purge its rows (chunked) → import the export → new `restore_epoch` / `restore_point_at` for that tenant → `active`. The export comes from the operator, the shop owner, or from a nightly backup loaded into the scratch DB `bikri-restore` and extracted with `tools/backup/tenant-extract.mjs`.
 
 ### 7.4 Delete a tenant
 
-Operator → tenant → `Delete` (type the slug to confirm; only after a final export is offered): `status = 'deleting'`, all its devices revoked (tokens stop at once), then the nightly cron deletes its rows child-tables first, at most 20,000 rows per night across all deleting tenants (deletes count as rows written), and deletes its R2 prefix `t/<tenant_id>/` (deletes are free). When nothing is left the `tenants` row becomes `status = 'deleted'` (id, slug, timestamps kept as a tombstone so the slug is not reused by mistake). Data still exists in the encrypted nightly backups until they age out (30 daily + 12 monthly, [09 §2](09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)); see open questions.
+Operator → tenant → `Delete` (type the slug to confirm; only after a final export is offered): `status = 'deleting'`, all its devices revoked (tokens stop at once), then the nightly cron deletes its rows child-tables first, at most 20,000 rows per night across all deleting tenants (deletes count as rows written), and deletes its R2 prefix `t/<tenant_id>/` (deletes are free). When nothing is left the `tenants` row becomes `status = 'deleted'` (id, slug, timestamps kept as a tombstone so the slug is not reused by mistake; `owner_email` is cleared). **Retention after deletion (D-083, owner decision):** the shop's data stays in the encrypted nightly backups until they age out: up to **30 days** in the daily R2 backups, up to **12 months** in the monthly R2 backups, and up to **90 days** in the encrypted GitHub Actions artifacts ([09 §2](09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)). Deleting a shop does not shorten that retention, and a deleted shop is never restored from a backup unless its owner asks. This is stated to shop owners in the terms and privacy notes ([09 §6.1](09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)).
+
+### 7.5 Operator support access (D-084)
+
+The operator may join a shop's devices to help with support. It is always **explicit, visible, time-limited and audited**:
+
+1. **Start.** Console → tenant → `Support access` → reason (required, 3–200 characters) and duration (1, 2, 4, 8 or 24 hours; default 2) → `POST /api/admin/tenants/:id/support-access`. In one batch: `tenants.support_until = now + duration`, `support_reason`, a single-use **support enrolment code** (`enrolment_codes.kind = 'support'`, 15 minutes, never `grants_admin`), and an `audit_log` row `support_access_start` in the shop (`after_json: { reason, until, by: 'operator:<email>' }`). Only one grant at a time; starting again extends it (new audit row). Allowed when the shop is `active` or `read_only`.
+2. **Join.** The operator opens the enrol link in a **separate browser profile** (one shop per browser, D-073). The device is created with `kind = 'support'`, name "Algovyn support", `is_admin = 0`, `expires_at = support_until`. On that device the PIN lock offers one extra local profile "Algovyn support" (not a `staff` row, no PIN) with view-only permissions: every screen, report, bill, Activity, Settings → Sync and Devices lists, but no action that writes. The repository guard of read-only mode (§7.2) is always on for support devices, and the server refuses any push or upload from a `support` device with `403 FORBIDDEN`. Fixes are made with the console's audited tools (unsynced-ops import, owner PIN reset, restore), never by typing into the shop's till.
+3. **Visible.** While `support_until > now`, `/api/me` and pull responses carry `support: { until, reason }`, and every till of the shop shows an info banner on every screen: "Algovyn support has access to this shop until {time}. Reason: {reason}." with `End now` for an owner. The support device is listed in Settings → Devices with a "Support" badge. A till learns it on its next `/api/me` or pull; support only reads server data, so an offline till missing the banner is not a risk.
+4. **End.** Whichever comes first: the time runs out (`deviceAuth` treats a support device past `expires_at` as revoked, `401 DEVICE_REVOKED`); the operator presses `End support access` (`POST …/support-access/end`); or a shop owner presses `End now` on an admin device after a PIN unlock (`POST /api/shop/support-access/end`; no email sign-in needed, because it only removes access). Ending sets `support_until = now`, revokes the shop's support devices and writes `support_access_end` (`after_json: { ended_by: 'operator' | 'owner' | 'expiry' }`); the expiry row is written by the next `/api/me` call that notices it or by the nightly cron, whichever is first.
+
+What is not logged: the individual reads made by the support device (logging each request would cost D1 writes); the start and end rows, the device row and the operator's console actions are the record. Banner texts:
+
+| Key | en | ur | roman-ur |
+|---|---|---|---|
+| `tenant.support.banner` | Algovyn support has access to this shop until {time}. Reason: {reason}. | الگوون سپورٹ کو {time} تک اس دکان تک رسائی حاصل ہے۔ وجہ: {reason}۔ | Algovyn support ko {time} tak is dukaan tak rasai hasil hai. Wajah: {reason}. |
+| `tenant.support.end` | End now | ابھی ختم کریں | Abhi khatam karein |
 
 ## 8. Migration plan from the single-shop M0 code (D-077)
 
@@ -151,12 +213,12 @@ Phase 2 work already done on `phase-2-local-till` (T-010 money, part of T-019 pr
 
 ## 9. Open questions (owner decision needed)
 
-1. **Pricing and billing** for other shops: free, flat monthly fee, or per till? Who pays when Bikri needs Workers Paid (USD 5/month) or more? Should over-budget shops be suspended or slowed?
-2. **Self-service export:** can shop owners download a server-side export of their shop themselves (an owner-only `GET /api/shop/export`), or only the on-device export plus an operator export on request?
-3. **Stronger shop-owner sign-in:** v1 shop-admin actions need an admin device plus a locally checked owner PIN ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)). Add passkeys (WebAuthn) or email OTP for shop owners in v1, or later?
-4. **Deleted-shop data in backups:** is it acceptable that a deleted shop's data stays in encrypted backups for up to 12 months (monthly backups) and 90 days (GitHub artifacts), or should deletion also shorten retention?
-5. **Terms and privacy:** the operator can technically read every shop's data (D1 access and the backup key). Should Bikri show terms/privacy text to new shop owners, and should operator exports be logged visibly to the shop (an audit row in their Activity)?
-6. **Operator support access:** may the operator enrol a browser into a customer's shop for support (audited), or only see usage and devices?
-7. **One browser, several shops:** v1 allows one active shop per browser profile (D-073). Is switching between shops on one PC needed (e.g. one person running two businesses)?
-8. **Default daily write budget** per shop (7,000 rows) and the 30 % reserve for the other Algovyn Workers: right numbers?
-9. **Branding:** receipts and the PWA show each shop's own name and logo; the app stays "Bikri" with Algovyn colours. Should other shops' receipts carry any "Powered by Bikri" line (currently none, REQ-B03)?
+Answered on 27 Oct 2026 and recorded as D-080–D-085: read-only shops (§7.2), the owner's server export (§7.3), owner email sign-in ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)), backup retention after deletion (§7.4), operator support access (§7.5) and the "Powered by AlgoVyn" receipt line ([06 §4](06-printing.md#4-receipt-templates)). Still open:
+
+1. **Pricing and billing amounts** for other shops: free, flat monthly fee, or per till? Who pays when Bikri needs Workers Paid (USD 5/month) or more? (The enforcement lever is decided: the operator makes a shop read-only, D-080; whether billing is ever automated is part of this question.)
+2. **Terms acceptance:** the terms and privacy notes ([09 §6.1](09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)) are shown to shop owners as information. Must a new owner explicitly accept them (a checkbox at the owner pairing step), and should the text get a legal review before the first outside shop joins?
+3. **One browser, several shops:** v1 allows one active shop per browser profile (D-073). Is switching between shops on one PC needed (e.g. one person running two businesses)?
+4. **Default daily write budget** per shop (7,000 rows) and the 30 % reserve for the other Algovyn Workers: right numbers?
+5. **Email beyond verified addresses:** on the Free plan each shop owner's email must be a verified destination address in Cloudflare (the owner clicks Cloudflare's verification email once; at most 200 addresses per account). Moving to Workers Paid and onboarding `algovyn.com` as a sending domain (new SPF/DKIM DNS records) removes that step. When shops grow, switch, or keep verified addresses?
+6. **Owner self-recovery:** should an owner who lost every admin device be able to make a till an admin device with their email code, instead of asking the operator for a new owner pairing code (current design)?
+7. **Writes by support access:** support devices are view-only (§7.5). Should the operator ever be allowed to make changes in a shop's data from a support device (for example with the owner's explicit approval per session)?
