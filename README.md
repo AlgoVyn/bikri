@@ -1,6 +1,6 @@
 # Bikri POS
 
-Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale web app for small shops in Pakistan. It is being built first for one cash-heavy electronics shop, and is designed so the owner keeps full control of the code and the data.
+Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale web app for small shops in Pakistan. It is being built first for one cash-heavy electronics shop and runs many independent shops on one deployment, operated by Algovyn; each shop's data is isolated from every other shop and can be exported at any time.
 
 - **Sell fast:** scan or tap items, take cash/card/wallet/udhaar, print an ESC/POS thermal receipt, open the cash drawer.
 - **Works offline:** every sale is saved in the browser first (IndexedDB) and synced to Cloudflare D1 when online.
@@ -8,7 +8,8 @@ Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale we
 - **Stock and suppliers:** deliveries, returns to supplier, supplier ledger, stock adjustments with reasons, weighted-average cost, Code 128 barcode labels printed from the browser.
 - **Day close and reports:** a cash drawer reconciliation that counts every cash movement; reports with CSV/PDF export.
 - **English, Urdu (RTL) and Roman Urdu.**
-- **Hosting:** one Cloudflare Worker (Hono API + static PWA), D1 and R2, on the Cloudflare free tier. URL: **`https://algovyn.com/bikri/`** (path-based on the existing Algovyn domain); owner admin behind Cloudflare Access for `adnan@yaqoob.org`.
+- **Hosting:** one Cloudflare Worker (Hono API + static PWA), D1 and R2, on the Cloudflare free tier. URL: **`https://algovyn.com/bikri/`** (path-based on the existing Algovyn domain).
+- **Multi-tenant:** many independent shops share one deployment and one D1 database, every row scoped by `tenant_id` and never visible to another shop; the platform operator console sits behind Cloudflare Access for `adnan@yaqoob.org`, and shop owners manage their own devices from admin devices ([docs/13](docs/13-multi-tenancy.md)).
 
 - **Printing:** printer-agnostic ESC/POS over WebUSB or Web Serial, 58 mm or 80 mm, with browser-print fallback.
 - **Look:** Algovyn brand colours (blue `#006BB3`, navy `#182E55`, teal `#4BC2BF`), Inter.
@@ -35,7 +36,7 @@ pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
 pnpm website:check                           # go-live gate for algovyn.com (01 §5.5)
 ```
 
-CI/CD workflows are staged in [`tools/github-workflows/`](tools/github-workflows/README.md) until they are moved to `.github/workflows/` (D-063). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-owner) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
+CI/CD workflows live in `.github/workflows/` (`ci`, `deploy`, `website-guard`). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-platform-operator) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
 
 ## Repository layout
 

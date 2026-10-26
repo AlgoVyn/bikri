@@ -61,5 +61,5 @@ On hand may go below zero (warning "Only 1 in stock", allowed like a sale). Save
 4. There is no "Supplier" expense category anywhere (REQ-B01).
 5. Freight Rs 300 on lines worth Rs 6,000 and Rs 3,000 adds Rs 200 and Rs 100 to the lines' landed cost.
 6. Return vectors S1–S3 ([07 §10](../07-money-rules.md#10-return-to-supplier)): S1 credits Rs 2,400 at the landed cost, avg cost stays Rs 1,120, on hand −2; S2 records Rs 550 cash received, supplier balance 0, and day close vector D3 shows it as "Refunds from suppliers (cash)"; S3 leaves an advance of Rs 36,200.
-7. A linked return cannot exceed received − already returned in the UI; a return created offline on two tills that together exceed it is accepted and flagged `over_return` in Admin → Conflicts.
+7. A linked return cannot exceed received − already returned in the UI; a return created offline on two tills that together exceed it is accepted and flagged `over_return` in Settings → Sync → Conflicts.
 8. Supplier balance after a return = Σ deliveries − Σ payments − Σ paid now − Σ returns + Σ money received back.

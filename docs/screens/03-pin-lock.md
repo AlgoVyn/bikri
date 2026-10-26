@@ -21,7 +21,7 @@ If only one active staff exists, the chip is pre-selected.
 - Wrong PIN: dots shake (200 ms; disabled with `prefers-reduced-motion`), "Wrong PIN, n tries left before a 5-minute lock".
 - Lockout per profile as in 05 §4: profile chip shows "Locked for 4:59" countdown.
 - Success: returns to the route that was active before locking (default `/sell` for cashiers, `/` for owner/manager).
-- "Forgot PIN?" link: cashiers → "Ask the owner to reset it in Settings → Cashiers"; owner → link to `/admin` (reset via Access).
+- "Forgot PIN?" link: cashiers → "Ask the owner to reset it in Settings → Cashiers"; owner → "Another owner of your shop can reset it in Settings → Cashiers. If you are the only owner, contact Algovyn (the platform operator) to reset it after checking it's you" ([05 §3](../05-auth-and-roles.md#3-shop-admin-on-admin-devices)).
 
 ## Acceptance criteria
 
