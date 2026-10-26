@@ -13,7 +13,12 @@
     "format": "biome format --write .",
     "typecheck": "tsc -b",
     "dev": "turbo dev --filter=@bikri/pos",
-    "e2e": "turbo e2e"
+    "e2e": "turbo e2e",
+    "i18n:check": "pnpm --filter @bikri/i18n check",
+    "contrast:check": "node tools/contrast-check.ts",
+    "docs:check": "node tools/check-docs.mjs",
+    "size": "node tools/check-bundle-size.mjs",
+    "website:check": "node tools/check-website.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",

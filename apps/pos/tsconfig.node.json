@@ -11,6 +11,11 @@
     "types": ["node"],
     "lib": ["ES2024"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "scripts/**/*.ts"],
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "pwa.config.ts",
+    "scripts/**/*.ts"
+  ],
   "references": [{ "path": "../../packages/core" }]
 }

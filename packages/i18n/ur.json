@@ -1,0 +1,82 @@
+{
+  "common": {
+    "app_name": "Bikri",
+    "app_title": "Bikri POS",
+    "cancel": "منسوخ",
+    "close": "بند کریں",
+    "coming_soon": "جلد آ رہا ہے۔",
+    "confirm": "تصدیق",
+    "dismiss": "ہٹا دیں",
+    "go_home": "ہوم پر جائیں",
+    "not_found": "یہ صفحہ دستیاب نہیں۔"
+  },
+  "errors": {
+    "money_invalid": "رقم لکھیں، اعشار زیادہ سے زیادہ دو۔",
+    "phone_invalid": "درست پاکستانی فون نمبر لکھیں۔",
+    "pin_invalid": "پن قبول نہیں ہوا۔",
+    "pin_required": "پن لکھیں۔",
+    "qty_invalid": "درست مقدار لکھیں۔"
+  },
+  "glossary": {
+    "baqaya": "بقایا",
+    "bill": "بل",
+    "kharcha": "خرچہ",
+    "khata": "کھاتہ",
+    "rozana_hisaab": "روزانہ حساب",
+    "supplier": "سپلائر",
+    "udhaar": "ادھار",
+    "wapsi": "واپسی"
+  },
+  "nav": {
+    "home": "ہوم",
+    "products": "مصنوعات",
+    "rail": "مرکزی",
+    "sales": "فروخت",
+    "sell": "بیچیں",
+    "settings": "ترتیبات",
+    "udhaar": "ادھار"
+  },
+  "shell": {
+    "lang_en": "English",
+    "lang_roman_ur": "Roman Urdu",
+    "lang_ur": "اردو",
+    "language": "زبان",
+    "theme_dark": "گہرا",
+    "theme_light": "روشن",
+    "theme_rtl": "اردو",
+    "ui_kit": "اجزاء",
+    "update_ready": "اپ ڈیٹ تیار ہے"
+  },
+  "ui": {
+    "allow_negative": "منفی رقم",
+    "confirm_action": "حذف",
+    "confirm_body": "یہ واپس نہیں ہوگا۔",
+    "confirm_title": "کیا آپ کو یقین ہے؟",
+    "empty_action": "شامل کریں",
+    "empty_message": "یہاں ابھی کچھ نہیں۔",
+    "export": "برآمد",
+    "export_csv": "CSV",
+    "export_pdf": "PDF",
+    "export_share": "شیئر",
+    "money_label": "رقم",
+    "override_body": "اس کے لیے مینیجر کی منظوری چاہیے۔",
+    "override_pin": "مینیجر کا پن",
+    "override_profile": "مینیجر",
+    "override_submit": "منظور",
+    "override_title": "مینیجر کا پن درکار ہے",
+    "phone_label": "فون",
+    "phone_whatsapp": "واٹس ایپ",
+    "qty_decrease": "مقدار گھٹائیں",
+    "qty_increase": "مقدار بڑھائیں",
+    "qty_label": "مقدار",
+    "qty_unit": "اکائی",
+    "sample_error": "کچھ غلط ہو گیا۔",
+    "sample_manager_a": "ثنا",
+    "sample_manager_b": "بلال",
+    "sample_toast": "محفوظ ہو گیا۔",
+    "search_label": "تلاش",
+    "search_placeholder": "تلاش",
+    "show_dialog": "تصدیق کھولیں",
+    "show_override": "منظوری کھولیں"
+  }
+}
