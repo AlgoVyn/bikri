@@ -1,11 +1,11 @@
 -- Bikri seed data. Source: docs/02-data-model.md §2.1.
 
-INSERT INTO expense_categories (id, code, name_en, name_ur, icon, is_system, sort_order, created_at, updated_at) VALUES
- ('electricity','electricity','Electricity','بجلی','bolt',1,1,0,0),  -- created_at/updated_at 0 = system seed (EpochMs allows 0)
- ('tea_snacks','tea_snacks','Tea & snacks','چائے پانی','cup',1,2,0,0),
- ('transport','transport','Transport','کرایہ','truck',1,3,0,0),
- ('salary','salary','Salary','تنخواہ','users',1,4,0,0),
- ('rent','rent','Rent','کرایہ دکان','home',1,5,0,0),
- ('repairs','repairs','Repairs','مرمت','wrench',1,6,0,0),
- ('internet_phone','internet_phone','Internet & phone','انٹرنیٹ و فون','wifi',1,7,0,0),
- ('other','other','Other','دیگر','dots',1,99,0,0);
+INSERT INTO expense_category_templates (code, name_en, name_ur, icon, sort_order) VALUES
+ ('electricity','Electricity','بجلی','bolt',1),
+ ('tea_snacks','Tea & snacks','چائے پانی','cup',2),
+ ('transport','Transport','کرایہ','truck',3),
+ ('salary','Salary','تنخواہ','users',4),
+ ('rent','Rent','کرایہ دکان','home',5),
+ ('repairs','Repairs','مرمت','wrench',6),
+ ('internet_phone','Internet & phone','انٹرنیٹ و فون','wifi',7),
+ ('other','Other','دیگر','dots',99);
