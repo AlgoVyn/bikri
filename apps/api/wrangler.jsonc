@@ -35,7 +35,7 @@
     "SCHEMA_VERSION": "1",
     "MIN_CLIENT_SCHEMA": "1",
     "MAINTENANCE": "0",
-    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // TODO: set once Zero Trust is enabled on the account (team name not chosen yet)
+    "ACCESS_TEAM_DOMAIN": "odd-rain-0287.cloudflareaccess.com", // Zero Trust team domain (Access app "Bikri admin")
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
     "SHOP_TIMEZONE": "Asia/Karachi"

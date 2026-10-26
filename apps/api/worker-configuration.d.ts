@@ -9,7 +9,7 @@ interface __BaseEnv_Env {
 	SCHEMA_VERSION: "1";
 	MIN_CLIENT_SCHEMA: "1";
 	MAINTENANCE: "0";
-	ACCESS_TEAM_DOMAIN: "<team>.cloudflareaccess.com";
+	ACCESS_TEAM_DOMAIN: "odd-rain-0287.cloudflareaccess.com";
 	BASE_PATH: "/bikri";
 	ALLOWED_ORIGINS: "https://algovyn.com";
 	SHOP_TIMEZONE: "Asia/Karachi";
