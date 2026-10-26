@@ -1,8 +1,8 @@
 # 13 — Multi-tenancy
 
-Bikri is **multi-tenant** (decision [D-064](decisions.md), superseding D-001). One deployment at `https://algovyn.com/bikri/` serves several independent shops (**tenants**), run by one **platform operator** (Adnan, `operator@example.com`). Each tenant has its own staff, branches, tills, products, stock, sales, udhaar, suppliers, expenses, settings, receipts and files, and **must never see or change another tenant's data**.
+Bikri is **multi-tenant** (decision [D-069](decisions.md), superseding D-001). One deployment at `https://algovyn.com/bikri/` serves several independent shops (**tenants**), run by one **platform operator** (Adnan, `operator@example.com`). Each tenant has its own staff, branches, tills, products, stock, sales, udhaar, suppliers, expenses, settings, receipts and files, and **must never see or change another tenant's data**.
 
-This doc holds the tenancy model, the facts it is based on, the per-shop free-tier budget, the tenant lifecycle (onboarding, suspension, export, restore, deletion), the migration plan from the single-shop M0 code, and the questions only the owner can answer. The other docs apply it: schema [02](02-data-model.md), sync [03](03-sync.md), API [04](04-api.md), auth [05](05-auth-and-roles.md), backups [09](09-backups-and-ops.md), tests [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory), roadmap [11](11-roadmap.md). Decisions: D-064–D-074 in the [decisions log](decisions.md).
+This doc holds the tenancy model, the facts it is based on, the per-shop free-tier budget, the tenant lifecycle (onboarding, suspension, export, restore, deletion), the migration plan from the single-shop M0 code, and the questions only the owner can answer. The other docs apply it: schema [02](02-data-model.md), sync [03](03-sync.md), API [04](04-api.md), auth [05](05-auth-and-roles.md), backups [09](09-backups-and-ops.md), tests [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory), roadmap [11](11-roadmap.md). Decisions: D-069–D-079 in the [decisions log](decisions.md).
 
 ## 1. Terms
 
@@ -38,7 +38,7 @@ This doc holds the tenancy model, the facts it is based on, the per-shop free-ti
 
 Consequences: the daily D1 row limits and the Workers request limit are **per account**, so they are shared by every tenant (and by the other Algovyn Workers such as SmartGrind and MarkSocial) whichever database layout is used. Only storage (500 MB) is per database.
 
-## 3. Tenancy model (D-064)
+## 3. Tenancy model (D-069)
 
 ### 3.1 Options considered
 
@@ -102,7 +102,7 @@ How the daily row budget is shared:
 
 ## 7. Tenant lifecycle
 
-### 7.1 Onboarding a new shop (D-067)
+### 7.1 Onboarding a new shop (D-072)
 
 1. **Operator creates the tenant** in the console (`/admin/tenants/new`): shop display name, slug (`[a-z0-9-]{3,30}`, unique, used in the console, backup manifests and file names only, never in till URLs), daily write budget, note. `POST /api/admin/tenants` writes, in one batch: the `tenants` row (`status 'active'`, `db_shard 'DB'`, fresh `restore_epoch`), the default branch (`Main`, `INV`, `is_default 1`), the expense categories copied from `expense_category_templates`, and their `change_log` rows.
 2. The same call returns an **owner pairing code**: an enrolment code with `grants_admin = 1`, valid **72 hours**, single use, shown as `XXXX-XXXX` plus QR/link `https://algovyn.com/bikri/enrol?code=…`. The operator sends it to the shop owner out of band (WhatsApp, in person). The console can cancel and re-issue it.
@@ -125,7 +125,7 @@ The operator's own shop is onboarded the same way (Adnan as both operator and a 
 
 Operator → tenant → `Delete` (type the slug to confirm; only after a final export is offered): `status = 'deleting'`, all its devices revoked (tokens stop at once), then the nightly cron deletes its rows child-tables first, at most 20,000 rows per night across all deleting tenants (deletes count as rows written), and deletes its R2 prefix `t/<tenant_id>/` (deletes are free). When nothing is left the `tenants` row becomes `status = 'deleted'` (id, slug, timestamps kept as a tombstone so the slug is not reused by mistake). Data still exists in the encrypted nightly backups until they age out (30 daily + 12 monthly, [09 §2](09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)); see open questions.
 
-## 8. Migration plan from the single-shop M0 code (D-072)
+## 8. Migration plan from the single-shop M0 code (D-077)
 
 M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset, so `wrangler d1 migrations apply --remote` never ran. `apps/api/wrangler.jsonc` points at a real D1 database `bikri`, but no deploy has applied the migrations to it (this was not re-checked against Cloudflare when writing this doc; the check below covers it).
 
@@ -143,7 +143,7 @@ M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset,
 | `devices`, `enrolment_codes` linked only to a branch | `tenant_id` + composite FK to the branch; `token_hash` and `code_hash` stay globally unique (they identify the tenant); `is_admin`, `grants_admin` added |
 | cron `prune.ts` deployment-wide | still one cron (no extra trigger), but floors are per tenant and it also runs tenant deletion ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)) |
 | one `DB` binding used directly | `tenantDb(env, tenant)` resolves `tenants.db_shard` (v1 always `DB`) |
-| localStorage `bikri.language`, `bikri.persist` | device-level, not shop data: they stay per browser. `bikri.language` is only the pre-enrolment default; after enrolment the language lives in the tenant's Dexie `kv.language`. A new non-secret key `bikri.active_tenant` points at the tenant's Dexie database `bikri-<tenant_id>` (D-068) |
+| localStorage `bikri.language`, `bikri.persist` | device-level, not shop data: they stay per browser. `bikri.language` is only the pre-enrolment default; after enrolment the language lives in the tenant's Dexie `kv.language`. A new non-secret key `bikri.active_tenant` points at the tenant's Dexie database `bikri-<tenant_id>` (D-073) |
 | `ReceiptShop` printer parameter | already per call: unchanged |
 | `SHOP_TIMEZONE` Worker var | default only; each tenant's `shop.timezone` is authoritative |
 
@@ -157,6 +157,6 @@ Phase 2 work already done on `phase-2-local-till` (T-010 money, part of T-019 pr
 4. **Deleted-shop data in backups:** is it acceptable that a deleted shop's data stays in encrypted backups for up to 12 months (monthly backups) and 90 days (GitHub artifacts), or should deletion also shorten retention?
 5. **Terms and privacy:** the operator can technically read every shop's data (D1 access and the backup key). Should Bikri show terms/privacy text to new shop owners, and should operator exports be logged visibly to the shop (an audit row in their Activity)?
 6. **Operator support access:** may the operator enrol a browser into a customer's shop for support (audited), or only see usage and devices?
-7. **One browser, several shops:** v1 allows one active shop per browser profile (D-068). Is switching between shops on one PC needed (e.g. one person running two businesses)?
+7. **One browser, several shops:** v1 allows one active shop per browser profile (D-073). Is switching between shops on one PC needed (e.g. one person running two businesses)?
 8. **Default daily write budget** per shop (7,000 rows) and the 30 % reserve for the other Algovyn Workers: right numbers?
 9. **Branding:** receipts and the PWA show each shop's own name and logo; the app stays "Bikri" with Algovyn colours. Should other shops' receipts carry any "Powered by Bikri" line (currently none, REQ-B03)?

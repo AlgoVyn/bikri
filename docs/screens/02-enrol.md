@@ -15,7 +15,7 @@ Footer: language switcher; "Revoked?" helper text when the reason is `DEVICE_REV
 
 After a successful `Connect`, a confirmation line shows the shop name from the response ("Connected to **Hall Road Mobiles**") before the download starts; `Not my shop?` revokes nothing but tells the user to ask the owner for the right code and runs "Leave this shop".
 
-If the browser already belongs to another shop (`bikri.active_tenant` set, D-068), the screen first shows "This browser is connected to <shop>." with `Open <shop>` and `Leave that shop` (owner PIN; blocked while there are unsynced ops unless they were exported; deletes Dexie database `bikri-<old tenant_id>`).
+If the browser already belongs to another shop (`bikri.active_tenant` set, D-073), the screen first shows "This browser is connected to <shop>." with `Open <shop>` and `Leave that shop` (owner PIN; blocked while there are unsynced ops unless they were exported; deletes Dexie database `bikri-<old tenant_id>`).
 
 ## Validation and errors
 

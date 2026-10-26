@@ -26,7 +26,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 ## 4. Non-goals
 
-- No self-service sign-up: shops are created by the platform operator ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)). No in-app billing (open question in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)).
+- No self-service sign-up: shops are created by the platform operator ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)). No in-app billing (open question in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)).
 - No sharing of data between shops (no shared catalogue, customers or stock across tenants).
 - No double-entry accounting, payroll, restaurant/table features, e-commerce, loyalty points, multi-currency.
 - No batch/expiry tracking (pharmacy feature, not needed for electronics).

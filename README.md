@@ -36,7 +36,7 @@ pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
 pnpm website:check                           # go-live gate for algovyn.com (01 §5.5)
 ```
 
-CI/CD workflows are staged in [`tools/github-workflows/`](tools/github-workflows/README.md) until they are moved to `.github/workflows/` (D-063). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-platform-operator) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
+CI/CD workflows live in `.github/workflows/` (`ci`, `deploy`, `website-guard`). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-platform-operator) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
 
 ## Repository layout
 

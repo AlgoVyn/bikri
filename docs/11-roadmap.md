@@ -2,7 +2,7 @@
 
 Ordered tasks for an implementing agent. Do them **in order**; each task is one PR titled `T-0xx: <title>` with conventional commits. A task is done when its acceptance criteria (AC) pass in CI and the definition of done in [AGENTS.md](../AGENTS.md) holds. Estimates assume one experienced developer + AI assistance.
 
-**Multi-tenancy (D-064, [13](13-multi-tenancy.md)) applies to every task:** every server query goes through `tenantDb` and is scoped to the caller's tenant, every new table follows the tenant rules of [02 §1](02-data-model.md#1-conventions), and every task that adds an endpoint, table, query, file path or export adds cases to the cross-tenant isolation suite ([10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)) in the same PR. Tasks changed by the move to multi-tenancy are marked **(MT)**.
+**Multi-tenancy (D-069, [13](13-multi-tenancy.md)) applies to every task:** every server query goes through `tenantDb` and is scoped to the caller's tenant, every new table follows the tenant rules of [02 §1](02-data-model.md#1-conventions), and every task that adds an endpoint, table, query, file path or export adds cases to the cross-tenant isolation suite ([10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)) in the same PR. Tasks changed by the move to multi-tenancy are marked **(MT)**.
 
 ## Milestones
 
@@ -33,7 +33,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 
 ## M1 — Local till
 
-**T-008 Multi-tenant schema (MT, new, first).** Rewrite `packages/db/migrations/0001_init.sql` and `0002_seed.sql` **in place** to the SQL blocks of [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) (M0 was never deployed, D-072); keep `SCHEMA_VERSION` 1. Rewrite `apps/api/test/migrations.test.ts` for two tenants (tenants row first; one valid row per table in each tenant with **colliding ids**; per-tenant uniques; a cross-tenant reference fails the composite FK), add the schema check I20 ([10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)), and add `apps/api/src/db/tenantDb.ts` (shard lookup + `tenant_id` binding) with the lint rule / grep test I19 even though few queries exist yet. AC: `node tools/check-docs.mjs` passes again; migration tests and I19–I20 pass.
+**T-008 Multi-tenant schema (MT, new, first).** Rewrite `packages/db/migrations/0001_init.sql` and `0002_seed.sql` **in place** to the SQL blocks of [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) (M0 was never deployed, D-077); keep `SCHEMA_VERSION` 1. Rewrite `apps/api/test/migrations.test.ts` for two tenants (tenants row first; one valid row per table in each tenant with **colliding ids**; per-tenant uniques; a cross-tenant reference fails the composite FK), add the schema check I20 ([10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)), and add `apps/api/src/db/tenantDb.ts` (shard lookup + `tenant_id` binding) with the lint rule / grep test I19 even though few queries exist yet. AC: `node tools/check-docs.mjs` passes again; migration tests and I19–I20 pass.
 
 **T-010 Core money module.** [07](07-money-rules.md) functions, including both tax modes (§3), the refund split (§6.1) and supplier returns (§10). AC: all `docs/fixtures/money-*.json` vectors pass (T1–T10, R1–R10, C1–C4, D1–D3, S1–S3); property tests pass.
 
@@ -145,5 +145,5 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 | T-109 | Recurring expenses (rent, salary reminders) | |
 | T-110 | Product variants | Parent product with options (e.g. colour × length) generating child SKUs, shared photo/category, variant picker on Sell; v1 uses one product per variant (D-050) |
 | T-111 | Shards | Second D1 binding, tenant move between shards ([13 §4](13-multi-tenancy.md#4-shards-later-not-built-in-v1)); needed when the primary DB nears 70 % of its size limit |
-| T-112 | Several shops in one browser | Shop switcher at the PIN lock (one Dexie database per tenant already, D-068); open question 7 in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed) |
+| T-112 | Several shops in one browser | Shop switcher at the PIN lock (one Dexie database per tenant already, D-073); open question 7 in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed) |
 | T-113 | Stronger shop-owner sign-in | Passkeys (WebAuthn) or email OTP for shop-admin actions; open question 3 |
