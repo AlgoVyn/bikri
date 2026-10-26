@@ -165,6 +165,27 @@ describe('ESC/POS commands (06 §3)', () => {
     expect(hex(sale80.subarray(0, 5))).toBe('1b 40 1b 74 00');
   });
 
+  it('prints "Powered by AlgoVyn" in Font B as the last text, then returns to Font A (D-085)', () => {
+    for (const bytes of [
+      sale80,
+      encodeSale(58),
+      encodeSale(80, { language: 'ur' }),
+    ]) {
+      const footer = [
+        0x1b,
+        0x4d,
+        0x01,
+        ...[...'Powered by AlgoVyn'].map((c) => c.charCodeAt(0)),
+        0x0a,
+      ];
+      const at = indexOf(bytes, footer);
+      expect(at).toBeGreaterThan(0);
+      expect(
+        hex(bytes.subarray(at + footer.length, at + footer.length + 6)),
+      ).toBe('1b 61 00 1b 4d 00');
+    }
+  });
+
   it('ends with feed 3, partial cut and drawer pin 2', () => {
     expect(hex(sale80.subarray(sale80.length - 12))).toBe(
       '1b 64 03 1d 56 42 00 1b 70 00 19 fa',

@@ -25,7 +25,7 @@ describe('renderReceiptHtml (06 §5.3)', () => {
         ...html.matchAll(/<div class="l[^"]*"[^>]*>([^<]*)<\/div>/g),
       ].map((m) => m[1]);
       expect(lines.at(-1)).toBe('Powered by AlgoVyn');
-      expect(html).toContain('class="l center powered"');
+      expect(html).toContain('class="l center fb"');
     });
   }
 
