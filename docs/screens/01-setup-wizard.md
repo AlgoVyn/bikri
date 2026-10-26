@@ -1,6 +1,6 @@
 # 01 — Setup wizard (first run)
 
-**Route** `/setup`. Shown on the first enrolled device when `GET /api/me` returns `shop_setup_completed: false`. Not reachable afterwards (redirect to `/`). No PIN needed (the device was just enrolled by the shop owner with the owner pairing code from the operator, [13 §7.1](../13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)). Each shop (tenant) runs this wizard once, on its first admin device; other shops' setups are unrelated.
+**Route** `/setup`. Shown on the first enrolled device when `GET /api/me` returns `shop_setup_completed: false`. Not reachable afterwards (redirect to `/`). No PIN needed (the device was just enrolled by the shop owner with the owner pairing code from the operator, [13 §7.1](../13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)). Each shop (tenant) runs this wizard once, on its first admin device; other shops' setups are unrelated.
 
 ## Reference
 

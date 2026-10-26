@@ -7,7 +7,7 @@
 | Client | React 19 + Vite + TypeScript PWA (`apps/pos`) |
 | Local data | IndexedDB via Dexie 4 — the till's source of truth for reads and writes |
 | Server | One Cloudflare Worker (`apps/api`) running Hono: JSON API under `/bikri/api/*` + static assets for the PWA under `/bikri/` |
-| Tenancy | **Multi-tenant**: many shops on one deployment, one shared D1 with `tenant_id` on every tenant row, composite keys, a tenant-scoped data layer; shard-ready ([13](13-multi-tenancy.md), D-064) |
+| Tenancy | **Multi-tenant**: many shops on one deployment, one shared D1 with `tenant_id` on every tenant row, composite keys, a tenant-scoped data layer; shard-ready ([13](13-multi-tenancy.md), D-069) |
 | Database | Cloudflare D1 (SQLite), binding `DB` (primary database: platform tables + all tenants in v1) |
 | Files | Cloudflare R2 bucket `bikri-files`, binding `FILES` (logo, product photos only, keys prefixed `t/<tenant_id>/`); separate bucket `bikri-backups`, binding `BACKUPS` (nightly D1 exports, admin-only) |
 | Auth | Device token (Bearer, identifies the tenant) for the till API; staff PIN on the device; admin devices for the shop-admin API `/bikri/api/shop/*`; Cloudflare Access (email OTP, only the platform operator `adnan@yaqoob.org`) for the operator console `/bikri/admin*` and `/bikri/api/admin/*` ([05](05-auth-and-roles.md)) |
@@ -37,7 +37,7 @@ Bikri lives at **`https://algovyn.com/bikri/`** (decision D-021). It is not a su
 | `https://algovyn.com/bikri/admin*` | Bikri Worker → static assets, behind Cloudflare Access | platform operator console |
 | `https://algovyn.com/bikri/api/admin/*` | Bikri Worker → Hono, behind Cloudflare Access | platform operator API |
 
-**No shop in the URL.** Every shop uses the same app URL `https://algovyn.com/bikri/`; a till knows its shop from its device token (the server) and from `localStorage['bikri.active_tenant']` → Dexie database `bikri-<tenant_id>` (the browser), see D-068. Shop slugs appear only in the operator console and backup manifests, so URLs never reveal which shops exist and the PWA has one scope and one install.
+**No shop in the URL.** Every shop uses the same app URL `https://algovyn.com/bikri/`; a till knows its shop from its device token (the server) and from `localStorage['bikri.active_tenant']` → Dexie database `bikri-<tenant_id>` (the browser), see D-073. Shop slugs appear only in the operator console and backup manifests, so URLs never reveal which shops exist and the PWA has one scope and one install.
 
 **Convention:** everywhere else in these docs (screen specs, sync, API tables), app routes such as `/sell`, `/enrol`, `/admin` and API paths such as `/api/sync/push` are written **relative to the base path `/bikri`**. So `/sell` means `https://algovyn.com/bikri/sell` and `/api/sync/push` means `https://algovyn.com/bikri/api/sync/push`. Never hard-code `/bikri` in components or fetch calls; use the single constants below.
 
@@ -296,7 +296,7 @@ Checked on 27 Oct 2026: `https://algovyn.com/` is the Algovyn marketing site, se
 Path-based hosting means Bikri and the Algovyn website share **one browser origin, `https://algovyn.com`**. Consequences the implementation must respect (decision D-026):
 
 - **Website service worker:** the live website registers no service worker (checked 27 Oct 2026). It must never register one whose scope covers `/bikri/` (a site SW at `/` would intercept Bikri's requests). Enforced by the release gate in §5.5.
-- **Storage is per origin, not per path.** IndexedDB, Cache Storage, `localStorage` and the `navigator.storage.persist()` grant are shared with every page on `algovyn.com`. Prefix every Bikri store: Dexie DB names `bikri-<tenant_id>` (one per shop, D-068) and the pointer `localStorage['bikri.active_tenant']`, Workbox cache names `bikri-*` (`cacheId: 'bikri'`). Never clear origin-wide storage (no `caches.keys()` deletes without the `bikri-` prefix, no Clear-Site-Data header).
+- **Storage is per origin, not per path.** IndexedDB, Cache Storage, `localStorage` and the `navigator.storage.persist()` grant are shared with every page on `algovyn.com`. Prefix every Bikri store: Dexie DB names `bikri-<tenant_id>` (one per shop, D-073) and the pointer `localStorage['bikri.active_tenant']`, Workbox cache names `bikri-*` (`cacheId: 'bikri'`). Never clear origin-wide storage (no `caches.keys()` deletes without the `bikri-` prefix, no Clear-Site-Data header).
 - **Any script on any `algovyn.com` page can read Bikri's IndexedDB**, including the device tokens of every shop enrolled in that browser. Therefore: Bikri loads no third-party scripts (CSP `default-src 'self'`), and the Algovyn website should not load third-party JavaScript either. Note: as of 27 Oct 2026 the live site HTML still loads `<script src="https://cdn.tailwindcss.com">` and Google Fonts, while the `website` repo has already switched to a built `tailwind.css` — deploy that change before Bikri goes live (the release gate in §5.5 fails until then). If the website ever needs third-party JS, move Bikri to a subdomain (a new decision).
 - **WebUSB / Web Serial permissions** are granted per origin; a printer granted to Bikri is also visible to other pages on `algovyn.com`. Same mitigation as above.
 - **Secure context:** `https://algovyn.com` is HTTPS, so service workers, WebCrypto, WebUSB and Web Serial (all require a secure context) work. `http://localhost` is also a secure context for development.
@@ -337,9 +337,9 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 2. `wrangler r2 bucket create bikri-files` and `wrangler r2 bucket create bikri-backups`.
 3. `algovyn.com` is already an active, proxied Cloudflare zone (the website). No DNS change: `wrangler deploy` creates the two Worker routes `algovyn.com/bikri` and `algovyn.com/bikri/*` (§5.3). Do **not** add a Custom Domain.
 4. Zero Trust → Access → Applications → Add → Self-hosted, name "Bikri admin" (the platform operator console). Destinations (public hostnames): `algovyn.com` path `bikri/admin`, `algovyn.com` path `bikri/admin/*`, `algovyn.com` path `bikri/api/admin`, `algovyn.com` path `bikri/api/admin/*` (Access path wildcards do not cover the parent path, so both forms are listed). Policy "Allow", Include → Emails → `adnan@yaqoob.org` (the only operator). Login method One-time PIN; session 24 h. Nothing else on `algovyn.com` is put behind Access. Copy the **AUD tag** → `wrangler secret put ACCESS_AUD`; `wrangler secret put OWNER_EMAILS` → `adnan@yaqoob.org`. The Worker's `accessAuth` check is authoritative regardless of how Access matched the path.
-5. Check `wrangler d1 migrations list bikri --remote` shows nothing applied (M0 schema was single-shop and is rewritten in place, D-072), then `wrangler d1 migrations apply bikri --remote`.
+5. Check `wrangler d1 migrations list bikri --remote` shows nothing applied (M0 schema was single-shop and is rewritten in place, D-077), then `wrangler d1 migrations apply bikri --remote`.
 6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the operator's age public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
-7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)).
+7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)).
 
 ### 7.2 CI/CD
 

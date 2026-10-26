@@ -104,7 +104,7 @@ All bytes hex. `n` etc. are single bytes.
 
 ## 4. Receipt templates
 
-**Branding is per shop (multi-tenant, [13](13-multi-tenancy.md)).** Every receipt, label and A4 invoice takes its shop name, address, phone, NTN, logo, header and footer only from the active shop's own `shop` / `branches` rows and `kv.logo_bitmap`, passed per call (`ReceiptShop`), never from module-level state or a deployment setting; a till holds one shop's database only (D-068), so there is nothing else to pick from. No "Bikri" or "Algovyn" branding is printed in v1 (open question 9 in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)). Printer settings (`kv.printer`) are per device.
+**Branding is per shop (multi-tenant, [13](13-multi-tenancy.md)).** Every receipt, label and A4 invoice takes its shop name, address, phone, NTN, logo, header and footer only from the active shop's own `shop` / `branches` rows and `kv.logo_bitmap`, passed per call (`ReceiptShop`), never from module-level state or a deployment setting; a till holds one shop's database only (D-073), so there is nothing else to pick from. No "Bikri" or "Algovyn" branding is printed in v1 (open question 9 in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)). Printer settings (`kv.printer`) are per device.
 
 Money format on receipts: `Rs 40,000` when whole rupees, `Rs 3,459.77` when paisa ≠ 0; grouping per `shop.number_grouping`. Text mode uses ASCII only (`x` not `×`, `-` not `·`).
 

@@ -96,7 +96,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 | Task | How |
 |---|---|
 | Deploy | merge to `main` → CI runs tests (including the isolation suite) → website check ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)) → `wrangler d1 migrations apply bikri --remote` (and each shard) → `wrangler deploy` |
-| Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)) |
+| Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) |
 | Suspend / reactivate a shop | console → tenant → Suspend / Reactivate |
 | Raise a shop's budget | console → tenant → daily write budget (keep Σ ≤ 70,000 on Free) |
 | Sync log retention | automatic: nightly cron deletes `change_log` rows older than 30 days per tenant and `applied_ops` older than 90 days ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); the console shows each tenant's `change_log_floor` and the last prune time |

@@ -778,7 +778,7 @@ INSERT INTO expense_category_templates (code, name_en, name_ur, icon, sort_order
  ('other','Other','دیگر','dots',99);
 ```
 
-No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)) runs one batch:
+No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) runs one batch:
 
 ```
 INSERT INTO tenants (id, slug, display_name, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, CAST(?4 AS TEXT), ?5, ?4, ?4);
@@ -795,7 +795,7 @@ The default branch (`name 'Main'`, `bill_prefix 'INV'`, `is_default 1`) and the 
 
 ## 3. Dexie schema (till)
 
-`packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-068). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
+`packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
 
 ```ts
 // Example only — exact index strings to implement.
