@@ -116,7 +116,7 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 | pdf-lib | 1.17 | pos | PDF report export |
 | zxing-wasm | 3.1 | pos | camera barcode fallback |
 | vitest | 5.0 | all | unit tests |
-| @cloudflare/vitest-pool-workers | 0.23 | api | Worker + D1 integration tests |
+| @cloudflare/vitest-plugin | 1.4.8 | api | Worker + D1 integration tests (renamed from vitest-pool-workers; [D-055](decisions.md)) |
 | fake-indexeddb | 6.2 | pos tests | Dexie in Node |
 | @playwright/test | 1.64 | e2e | |
 
@@ -325,12 +325,12 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 3. `algovyn.com` is already an active, proxied Cloudflare zone (the website). No DNS change: `wrangler deploy` creates the two Worker routes `algovyn.com/bikri` and `algovyn.com/bikri/*` (§5.3). Do **not** add a Custom Domain.
 4. Zero Trust → Access → Applications → Add → Self-hosted, name "Bikri admin". Destinations (public hostnames): `algovyn.com` path `bikri/admin`, `algovyn.com` path `bikri/admin/*`, `algovyn.com` path `bikri/api/admin`, `algovyn.com` path `bikri/api/admin/*` (Access path wildcards do not cover the parent path, so both forms are listed). Policy "Allow", Include → Emails → `adnan@yaqoob.org` (the only admin). Login method One-time PIN; session 24 h. Nothing else on `algovyn.com` is put behind Access. Copy the **AUD tag** → `wrangler secret put ACCESS_AUD`; `wrangler secret put OWNER_EMAILS` → `adnan@yaqoob.org`. The Worker's `accessAuth` check is authoritative regardless of how Access matched the path.
 5. `wrangler d1 migrations apply bikri --remote`.
-6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (public key).
+6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
 
 ### 7.2 CI/CD
 
 - `ci.yml` (PR): `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → build → Playwright against `wrangler dev` with local D1.
-- `deploy.yml` (push to `main`): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy`. A preview environment (`bikri-preview`, separate D1 `bikri-preview`, URL `https://bikri-preview.<account>.workers.dev/bikri/`, no routes on `algovyn.com`) deploys on PRs with label `preview`; its origin is added to `ALLOWED_ORIGINS` for that environment only.
+- `deploy.yml` (push to `main`): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy` → smoke test. The deploy job runs only when the repository variable `DEPLOY_ENABLED` is `true` (set after §7.1) and refuses the placeholder `database_id`; the website check runs on every push to `main` regardless (D-060). A preview environment (`bikri-preview`, separate D1 `bikri-preview`, URL `https://bikri-preview.<account>.workers.dev/bikri/`, no routes on `algovyn.com`) deploys on PRs with label `preview`; its origin is added to `ALLOWED_ORIGINS` for that environment only.
 - Migrations live in `packages/db/migrations/000N_<name>.sql` (the `migrations_dir` in `wrangler.jsonc`). They must stay backward compatible with tills running the previous app version for at least **14 days** (add columns nullable or with defaults; never rename/drop in v1), because tills may run the old cached app for a while. Bump `SCHEMA_VERSION` with every migration; raise `MIN_CLIENT_SCHEMA` only for a breaking one ([03 §4.1](03-sync.md#41-push--post-apisyncpush)). Dexie schema versions are bumped in the same PR (`db.version(n).stores(...)` with an `upgrade()` when local data must change).
 
 ## 8. Cloudflare free-tier budget

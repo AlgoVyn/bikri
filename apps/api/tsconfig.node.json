@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": "dist/types-node",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/types-node/tsconfig.tsbuildinfo",
+    "types": [],
+    "lib": ["ES2024"]
+  },
+  "include": ["vitest.config.ts"]
+}

@@ -16,11 +16,28 @@ Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale we
 
 ## Status
 
-Design phase. The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
+**M0 Foundations** (T-001–T-007) implemented: monorepo, Worker + static assets at `/bikri/`, D1 migrations, CI/CD workflows, PWA shell, Algovyn design tokens + UI kit, i18n. Next: M1 Local till (T-010 onward, see [roadmap](docs/11-roadmap.md)). The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
 
 The Dukaan POS reference screenshots in `docs/reference/dukaan/` are **local-only**: the folder is gitignored (third-party UI, and one screenshot set came from a real account), so links to them work only in the local checkout where they were captured, not on GitHub.
 
-## Repository layout (target)
+## Development
+
+Requires Node 24 (`.nvmrc`) and pnpm 12 (`corepack enable`).
+
+```sh
+pnpm install
+pnpm lint && pnpm typecheck && pnpm test   # Biome, tsc -b (TS 7), Vitest (incl. Worker + D1 in Miniflare)
+pnpm build                                   # apps/pos → apps/pos/dist/bikri (+ dist/index.html, dist/_headers)
+pnpm --filter @bikri/api dev                 # build + local D1 migrations + wrangler dev → http://localhost:8787/bikri/
+pnpm dev                                     # Vite dev server → http://localhost:5173/bikri/ (proxies /bikri/api to :8787)
+pnpm e2e                                     # Playwright against wrangler dev (first: pnpm --filter @bikri/e2e exec playwright install chromium)
+pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
+pnpm website:check                           # go-live gate for algovyn.com (01 §5.5)
+```
+
+CI/CD workflows are staged in [`tools/github-workflows/`](tools/github-workflows/README.md) until they are moved to `.github/workflows/` (D-063). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-owner) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
+
+## Repository layout
 
 ```
 apps/pos          React + Vite PWA (the till and back office)

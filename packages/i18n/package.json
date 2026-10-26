@@ -1,0 +1,16 @@
+{
+  "name": "@bikri/i18n",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "node src/check-keys.ts",
+    "test": "vitest run && node src/check-keys.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,49 @@
+# PR checks (docs/10-testing.md §7, roadmap T-004). Make the "ci" job a required status check on main.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint and format (Biome)
+        run: pnpm biome ci .
+      - name: Typecheck (tsc -b, TypeScript 7)
+        run: pnpm typecheck
+      - name: Unit + Worker integration tests
+        run: pnpm test
+      - name: i18n key parity
+        run: pnpm i18n:check
+      - name: Contrast check (08 §2 token pairs)
+        run: pnpm contrast:check
+      - name: Docs links + schema/doc sync
+        run: pnpm docs:check
+      - name: Build
+        run: pnpm build
+      - name: Bundle size (08 §7)
+        run: pnpm size
+      - name: Install Playwright browsers
+        run: pnpm --filter @bikri/e2e exec playwright install --with-deps chromium
+      - name: E2E (Playwright against wrangler dev + local D1)
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

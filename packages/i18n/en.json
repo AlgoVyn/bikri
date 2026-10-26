@@ -1,0 +1,82 @@
+{
+  "common": {
+    "app_name": "Bikri",
+    "app_title": "Bikri POS",
+    "cancel": "Cancel",
+    "close": "Close",
+    "coming_soon": "Coming soon",
+    "confirm": "Confirm",
+    "dismiss": "Dismiss",
+    "go_home": "Go to Home",
+    "not_found": "This page is not available."
+  },
+  "errors": {
+    "money_invalid": "Enter an amount with up to 2 decimals.",
+    "phone_invalid": "Enter a valid Pakistan phone number.",
+    "pin_invalid": "PIN not accepted.",
+    "pin_required": "Enter the PIN.",
+    "qty_invalid": "Enter a valid quantity."
+  },
+  "glossary": {
+    "baqaya": "Balance",
+    "bill": "Bill",
+    "kharcha": "Expense",
+    "khata": "Khata",
+    "rozana_hisaab": "Day close",
+    "supplier": "Supplier",
+    "udhaar": "Udhaar",
+    "wapsi": "Refund"
+  },
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "rail": "Main",
+    "sales": "Sales",
+    "sell": "Sell",
+    "settings": "Settings",
+    "udhaar": "Udhaar"
+  },
+  "shell": {
+    "lang_en": "English",
+    "lang_roman_ur": "Roman Urdu",
+    "lang_ur": "اردو",
+    "language": "Language",
+    "theme_dark": "Dark",
+    "theme_light": "Light",
+    "theme_rtl": "Urdu",
+    "ui_kit": "UI kit",
+    "update_ready": "Update ready"
+  },
+  "ui": {
+    "allow_negative": "Allow negative",
+    "confirm_action": "Delete",
+    "confirm_body": "This cannot be undone.",
+    "confirm_title": "Are you sure?",
+    "empty_action": "Add",
+    "empty_message": "Nothing here yet.",
+    "export": "Export",
+    "export_csv": "CSV",
+    "export_pdf": "PDF",
+    "export_share": "Share",
+    "money_label": "Amount",
+    "override_body": "A manager must approve this.",
+    "override_pin": "Manager PIN",
+    "override_profile": "Manager",
+    "override_submit": "Approve",
+    "override_title": "Manager PIN needed",
+    "phone_label": "Phone",
+    "phone_whatsapp": "WhatsApp",
+    "qty_decrease": "Decrease quantity",
+    "qty_increase": "Increase quantity",
+    "qty_label": "Quantity",
+    "qty_unit": "Unit",
+    "sample_error": "Something went wrong.",
+    "sample_manager_a": "Sana",
+    "sample_manager_b": "Bilal",
+    "sample_toast": "Saved.",
+    "search_label": "Search",
+    "search_placeholder": "Search",
+    "show_dialog": "Open confirm",
+    "show_override": "Open override"
+  }
+}

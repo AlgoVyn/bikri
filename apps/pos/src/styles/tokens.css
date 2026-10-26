@@ -1,0 +1,228 @@
+@import "tailwindcss";
+@import "./fonts.css";
+
+/*
+  Light values live on :root and [data-theme='light'].
+  Dark values live on [data-theme='dark'] and, when the OS asks for dark and
+  the root is not pinned to light, on :root. Tile colours stay the same.
+  Urdu size is set on html only so a 120% rule cannot compound.
+*/
+@theme {
+  --spacing: 4px;
+  --spacing-rail: 72px;
+  --spacing-topbar: 56px;
+  --spacing-tabbar: 72px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-urdu: "Noto Nastaliq Urdu", serif;
+  --text-body: 1rem;
+  --text-body--line-height: calc(22 / 15);
+  --text-small: calc(13 / 15 * 1rem);
+  --text-small--line-height: calc(18 / 13);
+  --text-title: calc(20 / 15 * 1rem);
+  --text-title--line-height: calc(28 / 20);
+  --text-total: calc(28 / 15 * 1rem);
+  --text-total--line-height: calc(34 / 28);
+  --text-figure: calc(32 / 15 * 1rem);
+  --text-figure--line-height: calc(40 / 32);
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-modal: 18px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-modal: 0 12px 32px rgb(0 0 0 / 0.18);
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #64748b;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-primary: #006bb3;
+  --color-primary-hover: #005a96;
+  --color-primary-ink: #ffffff;
+  --color-primary-subtle: #e0f2fe;
+  --color-primary-subtle-ink: #00497a;
+  --color-brand-navy: #182e55;
+  --color-accent: #4bc2bf;
+  --color-accent-ink: #182e55;
+  --color-danger: #dc2626;
+  --color-danger-ink: #ffffff;
+  --color-danger-subtle: #fee2e2;
+  --color-danger-subtle-ink: #991b1b;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef3c7;
+  --color-warning-subtle-ink: #92400e;
+  --color-success: #047857;
+  --color-success-subtle: #d1fae5;
+  --color-success-subtle-ink: #065f46;
+  --color-info: #005a96;
+  --color-info-subtle: #f0f9ff;
+  --color-info-subtle-ink: #00497a;
+  --color-tile-ink: #ffffff;
+  --color-t1: #006bb3;
+  --color-t2: #182e55;
+  --color-t3: #0f766e;
+  --color-t4: #047857;
+  --color-t5: #b45309;
+  --color-t6: #7c3aed;
+  --color-t7: #be185d;
+  --color-t8: #475569;
+}
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #64748b;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-primary: #006bb3;
+  --color-primary-hover: #005a96;
+  --color-primary-ink: #ffffff;
+  --color-primary-subtle: #e0f2fe;
+  --color-primary-subtle-ink: #00497a;
+  --color-brand-navy: #182e55;
+  --color-accent: #4bc2bf;
+  --color-accent-ink: #182e55;
+  --color-danger: #dc2626;
+  --color-danger-ink: #ffffff;
+  --color-danger-subtle: #fee2e2;
+  --color-danger-subtle-ink: #991b1b;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef3c7;
+  --color-warning-subtle-ink: #92400e;
+  --color-success: #047857;
+  --color-success-subtle: #d1fae5;
+  --color-success-subtle-ink: #065f46;
+  --color-info: #005a96;
+  --color-info-subtle: #f0f9ff;
+  --color-info-subtle-ink: #00497a;
+  --color-tile-ink: #ffffff;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-2: #273449;
+  --color-border: #334155;
+  --color-border-strong: #64748b;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-primary: #4da6ff;
+  --color-primary-hover: #7dd3fc;
+  --color-primary-ink: #00385d;
+  --color-primary-subtle: #00385d;
+  --color-primary-subtle-ink: #e0f2fe;
+  --color-brand-navy: #182e55;
+  --color-accent: #4bc2bf;
+  --color-accent-ink: #0f172a;
+  --color-danger: #f87171;
+  --color-danger-ink: #450a0a;
+  --color-danger-subtle: #450a0a;
+  --color-danger-subtle-ink: #fecaca;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #451a03;
+  --color-warning-subtle-ink: #fde68a;
+  --color-success: #34d399;
+  --color-success-subtle: #022c22;
+  --color-success-subtle-ink: #a7f3d0;
+  --color-info: #7dd3fc;
+  --color-info-subtle: #0c2a44;
+  --color-info-subtle-ink: #e0f2fe;
+  --color-tile-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-2: #273449;
+    --color-border: #334155;
+    --color-border-strong: #64748b;
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    --color-primary: #4da6ff;
+    --color-primary-hover: #7dd3fc;
+    --color-primary-ink: #00385d;
+    --color-primary-subtle: #00385d;
+    --color-primary-subtle-ink: #e0f2fe;
+    --color-brand-navy: #182e55;
+    --color-accent: #4bc2bf;
+    --color-accent-ink: #0f172a;
+    --color-danger: #f87171;
+    --color-danger-ink: #450a0a;
+    --color-danger-subtle: #450a0a;
+    --color-danger-subtle-ink: #fecaca;
+    --color-warning: #fbbf24;
+    --color-warning-subtle: #451a03;
+    --color-warning-subtle-ink: #fde68a;
+    --color-success: #34d399;
+    --color-success-subtle: #022c22;
+    --color-success-subtle-ink: #a7f3d0;
+    --color-info: #7dd3fc;
+    --color-info-subtle: #0c2a44;
+    --color-info-subtle-ink: #e0f2fe;
+    --color-tile-ink: #ffffff;
+  }
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: calc(22 / 15);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+html:lang(ur),
+[lang="ur"] {
+  font-family: var(--font-urdu);
+  line-height: 1.9;
+}
+
+/* Size is set on the document only. A :lang(ur) size on every element would compound. */
+html:lang(ur) {
+  font-size: 18px;
+}
+
+[lang="ur"] * {
+  line-height: 1.9;
+}
+
+html:lang(ur) * {
+  line-height: 1.9;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion has to win */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion has to win */
+    transition-duration: 0.01ms !important;
+  }
+}
