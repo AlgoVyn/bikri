@@ -7,13 +7,14 @@
 | Client | React 19 + Vite + TypeScript PWA (`apps/pos`) |
 | Local data | IndexedDB via Dexie 4 — the till's source of truth for reads and writes |
 | Server | One Cloudflare Worker (`apps/api`) running Hono: JSON API under `/bikri/api/*` + static assets for the PWA under `/bikri/` |
-| Database | Cloudflare D1 (SQLite), binding `DB` |
-| Files | Cloudflare R2 bucket `bikri-files`, binding `FILES` (logo, product photos only); separate bucket `bikri-backups`, binding `BACKUPS` (nightly D1 exports, admin-only) |
-| Auth | Device token (Bearer) for the till API; staff PIN on the device; Cloudflare Access (email OTP, only `adnan@yaqoob.org`) for `/bikri/admin*` and `/bikri/api/admin/*` |
+| Tenancy | **Multi-tenant**: many shops on one deployment, one shared D1 with `tenant_id` on every tenant row, composite keys, a tenant-scoped data layer; shard-ready ([13](13-multi-tenancy.md), D-064) |
+| Database | Cloudflare D1 (SQLite), binding `DB` (primary database: platform tables + all tenants in v1) |
+| Files | Cloudflare R2 bucket `bikri-files`, binding `FILES` (logo, product photos only, keys prefixed `t/<tenant_id>/`); separate bucket `bikri-backups`, binding `BACKUPS` (nightly D1 exports, admin-only) |
+| Auth | Device token (Bearer, identifies the tenant) for the till API; staff PIN on the device; admin devices for the shop-admin API `/bikri/api/shop/*`; Cloudflare Access (email OTP, only the platform operator `adnan@yaqoob.org`) for the operator console `/bikri/admin*` and `/bikri/api/admin/*` ([05](05-auth-and-roles.md)) |
 | Sync | Outbox push + cursor pull ([03-sync](03-sync.md)) |
 | Printing | Printer-agnostic ESC/POS over WebUSB **or** Web Serial, 58 mm or 80 mm paper; browser print (`window.print`) fallback ([06-printing](06-printing.md)) |
 | Hosting | Cloudflare free tier, **path-based at `https://algovyn.com/bikri/`** on the existing `algovyn.com` zone, via Worker routes (§5.3) |
-| Backups | GitHub Actions nightly `wrangler d1 export` → R2 + encrypted off-Cloudflare copy |
+| Backups | GitHub Actions nightly `wrangler d1 export` of the whole database (all tenants) → R2 + copy encrypted with the operator's `age` key; per-tenant export/restore in the console ([09](09-backups-and-ops.md)) |
 
 ### Why React (not Svelte)
 
@@ -32,9 +33,11 @@ Bikri lives at **`https://algovyn.com/bikri/`** (decision D-021). It is not a su
 | `https://algovyn.com/` and every path not under `/bikri` | the existing Algovyn website (unchanged) | Bikri never touches these paths |
 | `https://algovyn.com/bikri` | Bikri Worker (asset server) | redirected to `/bikri/` by the asset server's default `html_handling: "auto-trailing-slash"` (the Worker script does not run for it) |
 | `https://algovyn.com/bikri/` … (`/bikri/sell`, `/bikri/settings/printer` …) | Bikri Worker → static assets (SPA) | app routes |
-| `https://algovyn.com/bikri/api/*` | Bikri Worker → Hono | till API (device token) |
-| `https://algovyn.com/bikri/admin*` | Bikri Worker → static assets, behind Cloudflare Access | owner admin UI |
-| `https://algovyn.com/bikri/api/admin/*` | Bikri Worker → Hono, behind Cloudflare Access | owner admin API |
+| `https://algovyn.com/bikri/api/*` | Bikri Worker → Hono | till API (device token) and shop-admin API `/bikri/api/shop/*` (admin device) |
+| `https://algovyn.com/bikri/admin*` | Bikri Worker → static assets, behind Cloudflare Access | platform operator console |
+| `https://algovyn.com/bikri/api/admin/*` | Bikri Worker → Hono, behind Cloudflare Access | platform operator API |
+
+**No shop in the URL.** Every shop uses the same app URL `https://algovyn.com/bikri/`; a till knows its shop from its device token (the server) and from `localStorage['bikri.active_tenant']` → Dexie database `bikri-<tenant_id>` (the browser), see D-068. Shop slugs appear only in the operator console and backup manifests, so URLs never reveal which shops exist and the PWA has one scope and one install.
 
 **Convention:** everywhere else in these docs (screen specs, sync, API tables), app routes such as `/sell`, `/enrol`, `/admin` and API paths such as `/api/sync/push` are written **relative to the base path `/bikri`**. So `/sell` means `https://algovyn.com/bikri/sell` and `/api/sync/push` means `https://algovyn.com/bikri/api/sync/push`. Never hard-code `/bikri` in components or fetch calls; use the single constants below.
 
@@ -65,15 +68,15 @@ flowchart TB
   subgraph CF["Cloudflare (free tier)"]
     SITE["Algovyn website<br/>algovyn.com/* (unchanged)"]
     W["Worker 'bikri' (routes algovyn.com/bikri, /bikri/*)<br/>Hono: /bikri/api/*<br/>+ static assets /bikri/*"]
-    ACC["Cloudflare Access<br/>/bikri/admin*, /bikri/api/admin/*<br/>adnan@yaqoob.org only"]
-    D1[("D1 'bikri'<br/>SQLite")]
-    R2[("R2 'bikri-files' (logo, photos)<br/>+ 'bikri-backups' (D1 exports)")]
+    ACC["Cloudflare Access<br/>/bikri/admin*, /bikri/api/admin/*<br/>operator adnan@yaqoob.org only"]
+    D1[("D1 'bikri'<br/>tenants + every shop's rows (tenant_id)")]
+    R2[("R2 'bikri-files' t/&lt;tenant&gt;/… (logo, photos)<br/>+ 'bikri-backups' (D1 exports)")]
   end
 
   GH["GitHub Actions<br/>nightly backup + deploy"]
   OFF[("Off-Cloudflare copy<br/>private repo / Drive")]
 
-  IDB -- "push / pull (Bearer device token)" --> W
+  IDB -- "push / pull (Bearer device token → tenant)" --> W
   ACC -. guards .-> W
   W --> D1
   W --> R2
@@ -167,16 +170,18 @@ bikri/
 │       ├─ wrangler.jsonc
 │       └─ src/
 │           ├─ index.ts   Hono app, routes mount, static asset fallthrough
-│           ├─ middleware/  deviceAuth, accessAuth, errors, rateLimit
-│           ├─ routes/    health, devices, sync (push, pull, snapshot), files, admin
+│           ├─ middleware/  deviceAuth (sets tenant), shopAdmin, accessAuth, errors, rateLimit, tenantGate (status + quota)
+│           ├─ db/        tenantDb.ts: the only way to query tenant tables (13 §5)
+│           ├─ platform/  tenants, tenant_usage, operator console handlers
+│           ├─ routes/    health, devices, sync (push, pull, snapshot), files, shop (shop admin), admin (operator)
 │           ├─ sync/      applyOps, pull, snapshot, avgCost recompute
-│           └─ cron/      prune.ts (scheduled(): change_log / applied_ops retention, 03 §4.4)
+│           └─ cron/      prune.ts (scheduled(): per-tenant change_log floors, applied_ops retention, tenant deletion, 03 §4.4)
 ├─ packages/
 │   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/
 │   ├─ db/                drizzle schema (D1), migrations/*.sql, dexie.ts (Dexie schema), tables.ts (shared table metadata)
 │   ├─ printer/           layout.ts, escpos.ts, raster.ts, templates/, transports/webusb.ts, transports/webserial.ts, labels/ (code128.ts, label layouts, screens/20)
 │   └─ i18n/              en.json, ur.json, roman-ur.json, check-keys.ts
-├─ tools/backup/          export.sh, encrypt.sh, README.md
+├─ tools/backup/          export.sh, encrypt.sh, tenant-extract.mjs (one tenant from a backup, 09 §3.4), README.md
 ├─ tools/check-website.mjs  go-live gate: no third-party scripts, no service worker on algovyn.com (§5.5)
 ├─ e2e/                   Playwright tests + fixtures
 └─ docs/                  this specification
@@ -190,18 +195,25 @@ bikri/
 |---|---|---|
 | `GET /bikri/api/health` | none | liveness, returns version and schema version |
 | `/bikri/api/devices/enrol` | rate limit | exchange an enrolment code for a device token |
-| `/bikri/api/me`, `/bikri/api/sync/*` (push, pull, snapshot), `/bikri/api/files/*` | `deviceAuth` | till API |
-| `/bikri/api/admin/*` | `sameOrigin`, `accessAuth` | owner admin (Cloudflare Access JWT) |
+| `/bikri/api/me`, `/bikri/api/sync/*` (push, pull, snapshot), `/bikri/api/files/*` | `deviceAuth`, `tenantGate` | till API, scoped to the token's tenant |
+| `/bikri/api/shop/*` | `deviceAuth`, `tenantGate`, `shopAdmin` | shop admin on admin devices ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) |
+| `/bikri/api/admin/*` | `sameOrigin`, `accessAuth` | platform operator console (Cloudflare Access JWT) |
 | any other `/bikri/api/*` | — | `404 NOT_FOUND` JSON (never the SPA) |
 | everything else under `/bikri/` | — | static assets (SPA); the Worker script does not run (`run_worker_first` covers only the API) |
 
 The Hono app is created with `new Hono().basePath('/bikri/api')`, so route files declare `/health`, `/sync/push` etc. The Worker's default export is `{ fetch: app.fetch, scheduled }`; `scheduled()` runs the nightly prune ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)).
 
-`deviceAuth`: reads `Authorization: Bearer <token>`, computes SHA-256, looks up `devices.token_hash`, rejects if missing or `revoked_at` not null, sets `c.var.device`. Updates `devices.last_seen_at` at most once per 5 minutes (to save D1 writes).
+`deviceAuth`: reads `Authorization: Bearer <token>`, computes SHA-256, looks up `devices.token_hash` joined with `tenants` (one query), rejects if missing or `revoked_at` not null, sets `c.var.device` and **`c.var.tenant`** (id, status, db_shard, budget, restore_epoch). Nothing else in a till request can choose the tenant. Updates `devices.last_seen_at` at most once per 5 minutes (to save D1 writes).
 
-`accessAuth`: verifies the `Cf-Access-Jwt-Assertion` header against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` (cache keys 1 h; on an unknown `kid` refetch once) with `aud = ACCESS_AUD`, `iss = https://<team>.cloudflareaccess.com`, `exp` in the future, and checks the email is in `OWNER_EMAILS` (v1 value: `adnan@yaqoob.org`, the only admin).
+`tenantGate`: `status` `suspended`/`deleting` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`; on `/sync/push` also the daily write budget → `503 TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)).
 
-`sameOrigin`: for **every** `/bikri/api/admin/*` request, reject with `403 FORBIDDEN` when `Sec-Fetch-Site` is present and not `same-origin`; for all non-GET `/bikri/api/*` requests also reject unless the `Origin` header is `https://algovyn.com` (or the dev/preview origin from `ALLOWED_ORIGINS`). Device calls use a bearer token so CSRF is not possible there, but the admin API is authenticated by the Access cookie, so this check is required for it.
+`shopAdmin`: requires `c.var.device.is_admin = 1` and `X-Bikri-Staff` naming an active `owner` of `c.var.tenant`.
+
+`tenantDb(env, tenant)`: returns the D1 binding named by `tenant.db_shard` (v1 always `DB`) wrapped so that every statement binds `tenant_id` ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). Route code never touches `env.DB` for tenant tables.
+
+`accessAuth`: verifies the `Cf-Access-Jwt-Assertion` header against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` (cache keys 1 h; on an unknown `kid` refetch once) with `aud = ACCESS_AUD`, `iss = https://<team>.cloudflareaccess.com`, `exp` in the future, and checks the email is in `OWNER_EMAILS` (v1 value: `adnan@yaqoob.org`, the only platform operator).
+
+`sameOrigin`: for **every** `/bikri/api/admin/*` request, reject with `403 FORBIDDEN` when `Sec-Fetch-Site` is present and not `same-origin`; for all non-GET `/bikri/api/*` requests also reject unless the `Origin` header is `https://algovyn.com` (or the dev/preview origin from `ALLOWED_ORIGINS`). Device calls use a bearer token so CSRF is not possible there, but the operator API is authenticated by the Access cookie, so this check is required for it.
 
 Errors: a single `onError` handler maps thrown `ApiError(code, status, message, details)` to the JSON error shape in [04-api §2](04-api.md#2-conventions). Zod failures become `VALIDATION_FAILED` (400).
 
@@ -228,11 +240,12 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     { "pattern": "algovyn.com/bikri/*", "zone_name": "algovyn.com" }
   ],
   "d1_databases": [
+    // primary database: platform tables + every tenant in v1. Later shards (DB_2, …) are added here and named in tenants.db_shard (13 §4)
     { "binding": "DB", "database_name": "bikri", "database_id": "<filled by wrangler d1 create>", "migrations_dir": "../../packages/db/migrations" }
   ],
   "r2_buckets": [
-    { "binding": "FILES", "bucket_name": "bikri-files" },     // till file API: only keys under products/ and shop/
-    { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // admin API only
+    { "binding": "FILES", "bucket_name": "bikri-files" },     // till file API: keys t/<tenant_id>/products/… and t/<tenant_id>/shop/…
+    { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // operator API only
   ],
   "vars": {
     "APP_VERSION": "0.1.0",
@@ -242,11 +255,11 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
-    "SHOP_TIMEZONE": "Asia/Karachi"
+    "SHOP_TIMEZONE": "Asia/Karachi"      // default only; each tenant's shop.timezone is authoritative
   },
-  "triggers": { "crons": ["30 21 * * *"] },   // 02:30 Asia/Karachi: prune change_log > 30 days (03 §4.4); counts against the account's 5 free cron triggers
+  "triggers": { "crons": ["30 21 * * *"] },   // 02:30 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
   "observability": { "enabled": true }
-  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "adnan@yaqoob.org")
+  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "adnan@yaqoob.org", the platform operator)
 }
 ```
 
@@ -283,8 +296,8 @@ Checked on 27 Oct 2026: `https://algovyn.com/` is the Algovyn marketing site, se
 Path-based hosting means Bikri and the Algovyn website share **one browser origin, `https://algovyn.com`**. Consequences the implementation must respect (decision D-026):
 
 - **Website service worker:** the live website registers no service worker (checked 27 Oct 2026). It must never register one whose scope covers `/bikri/` (a site SW at `/` would intercept Bikri's requests). Enforced by the release gate in §5.5.
-- **Storage is per origin, not per path.** IndexedDB, Cache Storage, `localStorage` and the `navigator.storage.persist()` grant are shared with every page on `algovyn.com`. Prefix every Bikri store: Dexie DB name `bikri`, Workbox cache names `bikri-*` (`cacheId: 'bikri'`). Never clear origin-wide storage (no `caches.keys()` deletes without the `bikri-` prefix, no Clear-Site-Data header).
-- **Any script on any `algovyn.com` page can read Bikri's IndexedDB**, including the device token. Therefore: Bikri loads no third-party scripts (CSP `default-src 'self'`), and the Algovyn website should not load third-party JavaScript either. Note: as of 27 Oct 2026 the live site HTML still loads `<script src="https://cdn.tailwindcss.com">` and Google Fonts, while the `website` repo has already switched to a built `tailwind.css` — deploy that change before Bikri goes live (the release gate in §5.5 fails until then). If the website ever needs third-party JS, move Bikri to a subdomain (a new decision).
+- **Storage is per origin, not per path.** IndexedDB, Cache Storage, `localStorage` and the `navigator.storage.persist()` grant are shared with every page on `algovyn.com`. Prefix every Bikri store: Dexie DB names `bikri-<tenant_id>` (one per shop, D-068) and the pointer `localStorage['bikri.active_tenant']`, Workbox cache names `bikri-*` (`cacheId: 'bikri'`). Never clear origin-wide storage (no `caches.keys()` deletes without the `bikri-` prefix, no Clear-Site-Data header).
+- **Any script on any `algovyn.com` page can read Bikri's IndexedDB**, including the device tokens of every shop enrolled in that browser. Therefore: Bikri loads no third-party scripts (CSP `default-src 'self'`), and the Algovyn website should not load third-party JavaScript either. Note: as of 27 Oct 2026 the live site HTML still loads `<script src="https://cdn.tailwindcss.com">` and Google Fonts, while the `website` repo has already switched to a built `tailwind.css` — deploy that change before Bikri goes live (the release gate in §5.5 fails until then). If the website ever needs third-party JS, move Bikri to a subdomain (a new decision).
 - **WebUSB / Web Serial permissions** are granted per origin; a printer granted to Bikri is also visible to other pages on `algovyn.com`. Same mitigation as above.
 - **Secure context:** `https://algovyn.com` is HTTPS, so service workers, WebCrypto, WebUSB and Web Serial (all require a secure context) work. `http://localhost` is also a secure context for development.
 - **Cookies:** Bikri sets no cookies of its own (device token lives in IndexedDB, sent as a bearer header). If a cookie is ever added it must use `Path=/bikri; Secure; HttpOnly; SameSite=Strict`. Cloudflare Access sets its own `CF_Authorization` cookie for the protected admin paths; Bikri only reads the `Cf-Access-Jwt-Assertion` header.
@@ -318,14 +331,15 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 
 ## 7. Deployment
 
-### 7.1 One-time setup (owner)
+### 7.1 One-time setup (platform operator)
 
 1. `wrangler d1 create bikri` → put `database_id` in `wrangler.jsonc`.
 2. `wrangler r2 bucket create bikri-files` and `wrangler r2 bucket create bikri-backups`.
 3. `algovyn.com` is already an active, proxied Cloudflare zone (the website). No DNS change: `wrangler deploy` creates the two Worker routes `algovyn.com/bikri` and `algovyn.com/bikri/*` (§5.3). Do **not** add a Custom Domain.
-4. Zero Trust → Access → Applications → Add → Self-hosted, name "Bikri admin". Destinations (public hostnames): `algovyn.com` path `bikri/admin`, `algovyn.com` path `bikri/admin/*`, `algovyn.com` path `bikri/api/admin`, `algovyn.com` path `bikri/api/admin/*` (Access path wildcards do not cover the parent path, so both forms are listed). Policy "Allow", Include → Emails → `adnan@yaqoob.org` (the only admin). Login method One-time PIN; session 24 h. Nothing else on `algovyn.com` is put behind Access. Copy the **AUD tag** → `wrangler secret put ACCESS_AUD`; `wrangler secret put OWNER_EMAILS` → `adnan@yaqoob.org`. The Worker's `accessAuth` check is authoritative regardless of how Access matched the path.
-5. `wrangler d1 migrations apply bikri --remote`.
-6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
+4. Zero Trust → Access → Applications → Add → Self-hosted, name "Bikri admin" (the platform operator console). Destinations (public hostnames): `algovyn.com` path `bikri/admin`, `algovyn.com` path `bikri/admin/*`, `algovyn.com` path `bikri/api/admin`, `algovyn.com` path `bikri/api/admin/*` (Access path wildcards do not cover the parent path, so both forms are listed). Policy "Allow", Include → Emails → `adnan@yaqoob.org` (the only operator). Login method One-time PIN; session 24 h. Nothing else on `algovyn.com` is put behind Access. Copy the **AUD tag** → `wrangler secret put ACCESS_AUD`; `wrangler secret put OWNER_EMAILS` → `adnan@yaqoob.org`. The Worker's `accessAuth` check is authoritative regardless of how Access matched the path.
+5. Check `wrangler d1 migrations list bikri --remote` shows nothing applied (M0 schema was single-shop and is rewritten in place, D-072), then `wrangler d1 migrations apply bikri --remote`.
+6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the operator's age public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
+7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)).
 
 ### 7.2 CI/CD
 
@@ -335,25 +349,26 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 
 ## 8. Cloudflare free-tier budget
 
-Limits read from Cloudflare docs on 26 Oct 2026. Volume assumption: 2 tills, 13 h/day open, 150 bills/day, 3 lines/bill.
+Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-tenancy.md#2-cloudflare-facts-the-decision-rests-on-checked-27-oct-2026)). The row and request limits are **per account**, shared by every shop on the deployment and by the other Algovyn Workers; the per-shop budget, the number of shops that fit and how the daily limits are shared are in [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop). Volume assumption per shop: 2 tills, 13 h/day open, 150 bills/day, 3 lines/bill.
 
-| Resource | Free limit | Bikri estimate | Headroom |
+| Resource | Free limit | Per reference shop | Notes |
 |---|---|---|---|
-| Worker requests | 100,000/day (reset 00:00 UTC) | ~1,560 pulls (60 s × 2 tills × 13 h) + ~300 pushes + ~200 file/other ≈ 2,100/day | ~47× |
+| Worker requests | 100,000/day per account (reset 00:00 UTC) | ~1,560 pulls (60 s × 2 tills × 13 h) + ~300 pushes + ~200 file/other ≈ 2,100/day | ≈ 33 shops at 70 % of the limit |
 | Worker CPU | 10 ms per request | push of 200 ops ≈ 2–5 ms | watch |
 | Worker subrequests | 50/request (1,000 to internal services) | 1 D1 batch + ≤ 2 R2 calls | fine |
-| D1 rows written | 100,000/day | ≈ 30 rows per bill incl. indexes and change_log ≈ 4,500/day + masters | ~20× |
-| D1 rows read | 5,000,000/day | indexed pulls ≈ 20,000/day | huge |
-| D1 DB size | 500 MB per DB, 5 GB per account | ≈ 50 MB/year | ~10 years |
+| D1 rows written | 100,000/day per account | ≈ 6,500/day incl. indexes, `change_log`, usage counter and later prune deletes | **≈ 10 shops** at 70 % (the binding limit) |
+| D1 rows read | 5,000,000/day per account | indexed pulls ≈ 25,000/day | > 100 shops |
+| D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 50 MB/year (measure in T-062) | ≈ 10 shop-years per database, then a shard or Workers Paid |
 | D1 queries per Worker invocation | 50 | `db.batch()` counts as 1 | fine |
-| D1 Time Travel | 7 days | used for emergency restore | — |
-| Cron triggers | 5 per account (shared by all Workers on the account), 10 ms CPU each | 1 (nightly prune, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); backups run in GitHub Actions | check other Algovyn Workers use ≤ 4 |
-| R2 | 10 GB-month, 1M Class A, 10M Class B per month | 30 daily dumps × ~5 MB + 1,000 photos × 25 KB ≈ 0.2 GB | huge |
+| D1 Time Travel | 7 days, whole database | disaster recovery only (rolls back every shop) | per-shop restore is logical ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)) |
+| Cron triggers | 5 per account (shared by all Workers on the account), 10 ms CPU each | 1 for all shops (nightly prune + tenant deletion, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); backups run in GitHub Actions | check other Algovyn Workers use ≤ 4 |
+| R2 | 10 GB-month, 1M Class A, 10M Class B per month | ≈ 25 MB photos; daily dumps shared | fine |
 | Static assets | 20,000 files, 25 MiB each | ~150 files | fine |
-| Cloudflare Access | 50 users | 1–3 owners | fine |
+| Cloudflare Access | 50 users | 1 operator | fine |
 
 Rules that keep usage low:
 - Reports and lists are computed on the device from IndexedDB, never from D1.
-- Pull only when the app is visible (`document.visibilityState === 'visible'`), every 60 s, plus immediately after a push.
+- Pull only when the app is visible (`document.visibilityState === 'visible'`), every `poll_after_ms` (default 60 s, per tenant), plus immediately after a push.
 - `devices.last_seen_at` updated at most every 5 minutes.
-- The free limits are **shared with other Workers on the same Cloudflare account** (other Algovyn tools). If a limit is hit, D1 returns errors until 00:00 UTC (05:00 PKT); tills keep selling offline and sync later. Upgrade path: Workers Paid, USD 5/month.
+- Every query uses an index that starts with `tenant_id`, so one shop's queries never scan other shops' rows (D1 bills rows scanned).
+- Per-tenant daily write budget with `503 TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). If the account limit itself is hit, D1 returns errors until 00:00 UTC (05:00 PKT) for every shop; tills keep selling offline and sync later. Upgrade path: Workers Paid, USD 5/month.
