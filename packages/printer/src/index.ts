@@ -73,6 +73,7 @@ export type {
   Align,
   Block,
   CutMode,
+  Font,
   RasterFormat,
   RasterRenderer,
   RasterSource,

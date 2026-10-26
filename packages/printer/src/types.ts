@@ -5,6 +5,9 @@ export type Align = 'left' | 'center' | 'right';
  * `double` is width and height (`1D 21 11`).
  * `double-height` is height only (`1D 21 01`) so a full-width total still fits.
  */
+/** ESC/POS character font. B is about 3/4 the width of A. */
+export type Font = 'A' | 'B';
+
 export type TextSize = 'normal' | 'double' | 'double-height';
 
 export type RasterFormat = 'rgba' | 'gray';
@@ -51,6 +54,8 @@ export type Block =
       align?: Align;
       bold?: boolean;
       size?: TextSize;
+      /** Font B (`1B 4D 01`, 9×17 dots) for small print; default Font A (12×24). */
+      font?: Font;
     }
   | {
       t: 'pair';

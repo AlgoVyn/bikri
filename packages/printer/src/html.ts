@@ -43,7 +43,8 @@ const COMMON_CSS = [
   '.logo-wrap { text-align: center } img.logo { max-width: 60%; }',
   ".urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9; white-space: normal }",
   '.qr { text-align: center; font-size: 0.8em }',
-  '.powered { font-size: 0.8em }',
+  // Font B is 9×17 against Font A's 12×24.
+  '.fb { font-size: 0.75em }',
   '.feed { height: 1.35em }',
 ].join('\n');
 
@@ -93,7 +94,7 @@ export function renderReceiptHtml(
         if (command.bold) classes.push('b');
         if (command.size === 'double') classes.push('dw');
         if (command.size === 'double-height') classes.push('dh');
-        if (command.text === 'Powered by AlgoVyn') classes.push('powered');
+        if (command.font === 'B') classes.push('fb');
         let attrs = '';
         if (hasNonAscii(command.text)) {
           classes.push('urdu');

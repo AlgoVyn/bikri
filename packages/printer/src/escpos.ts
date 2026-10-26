@@ -16,6 +16,7 @@ import {
 import type {
   Block,
   CutMode,
+  Font,
   RasterRenderer,
   RasterSource,
   ReceiptLanguage,
@@ -47,9 +48,15 @@ type Style = {
   align: LaidText['align'];
   bold: boolean;
   size: TextSize;
+  font: Font;
 };
 
-const INITIAL_STYLE: Style = { align: 'left', bold: false, size: 'normal' };
+const INITIAL_STYLE: Style = {
+  align: 'left',
+  bold: false,
+  size: 'normal',
+  font: 'A',
+};
 
 class ByteBuf {
   private readonly chunks: Uint8Array[] = [];
@@ -260,6 +267,10 @@ function encodeCommands(
       buf.push(0x1d, 0x21, sizeByte(next.size));
       style = { ...style, size: next.size };
     }
+    if (style.font !== next.font) {
+      buf.push(0x1b, 0x4d, next.font === 'B' ? 0x01 : 0x00);
+      style = { ...style, font: next.font };
+    }
   };
 
   const resetStyle = (): void => {
@@ -274,7 +285,10 @@ function encodeCommands(
   for (const command of commands) {
     switch (command.kind) {
       case 'text': {
-        const raster = state.imageMode || hasNonAscii(command.text);
+        // Font B lines (the D-085 footer) stay printer text even on all-image Urdu receipts.
+        const raster =
+          (state.imageMode && command.font !== 'B') ||
+          hasNonAscii(command.text);
         if (raster) {
           const renderer = requireRenderer(state.renderer);
           const rendered = renderer.renderLine(command.text, {
@@ -293,6 +307,7 @@ function encodeCommands(
           align: command.align,
           bold: command.bold,
           size: command.size,
+          font: command.font ?? 'A',
         });
         buf.ascii(command.text);
         buf.push(0x0a);
@@ -317,10 +332,11 @@ function encodeCommands(
         break;
       }
       case 'qr':
-        applyStyle({ align: 'center', bold: false, size: 'normal' });
+        applyStyle({ align: 'center', bold: false, size: 'normal', font: 'A' });
         pushQr(buf, command.data, state.moduleSize);
         break;
       case 'feed':
+        resetStyle(); // the job ends in Font A, left, normal
         pushFeed(buf, command.lines);
         break;
       case 'cut':

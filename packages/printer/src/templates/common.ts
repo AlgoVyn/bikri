@@ -93,11 +93,11 @@ export function pushFooter(blocks: Block[], footer: string): void {
   pushCenter(blocks, trimmed);
 }
 
-/** D-085: the last line of every receipt (sale, refund; thermal and window.print). Exact text, not translated. */
+/** D-085: the last line of every receipt (sale, refund; thermal and window.print), in Font B. Exact text, not translated. */
 export const POWERED_BY = 'Powered by AlgoVyn';
 
 export function pushPoweredBy(blocks: Block[]): void {
-  blocks.push({ t: 'text', text: POWERED_BY, align: 'center' });
+  blocks.push({ t: 'text', text: POWERED_BY, align: 'center', font: 'B' });
 }
 
 export function pushJobEnd(blocks: Block[], drawer: boolean): void {
