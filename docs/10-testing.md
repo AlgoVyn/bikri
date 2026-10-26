@@ -78,6 +78,9 @@ Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-el
 20. Stale till: device context offline for a simulated 35 days (clock mocked, server prune run) → reconnect pushes, gets 410, snapshots, ends in sync.
 21. **Two shops** (`e2e/isolation.spec.ts`, two browser contexts enrolled in shop-basic and shop-other): the same barcode scans to each shop's own product and price; Products, Sales, Udhaar, Reports and photos show only the own shop's rows after sync; the receipt shows the own shop's name and logo; a context that was enrolled in shop A and "left" it cannot read A's data after enrolling in B (Dexie database `bikri-<A>` deleted).
 22. Quota: shop A's budget set to its usage so far → its sync badge shows "Daily sync limit reached" while it keeps selling; shop B keeps syncing.
+23. Read-only: a till of shop A goes offline and makes 2 sales; the operator makes A read-only with a reason; the till reconnects → both sales reach the server, the read-only banner appears (EN and UR), Sell and Pay are blocked with the toast, Reports and Sales history still work, `Download full export` works, and Activity shows the status change with the reason; shop B keeps selling; reactivating removes the banner.
+24. Owner email sign-in: on an admin device unlocked as owner, `Add a till` asks for the email code → the code read from the fake `EMAIL` binding signs in → the code is created; a wrong code 5 times kills it; Lock drops the session and the next action asks again; `Download from server` builds a zip whose row counts equal the server's.
+25. Support access: the operator starts support access for shop A (2 h, reason) → every till of A shows the support banner with the reason, B shows none; the support browser profile enrols, sees A's reports, cannot save a sale; the owner presses `End now` → the support device gets `DEVICE_REVOKED` and the banner disappears; Activity shows start and end.
 
 Visual snapshots: Playwright screenshots of every screen (light, dark, Urdu) stored in `e2e/__screenshots__`; diffs reviewed in PRs (threshold 0.2%).
 
@@ -112,7 +115,7 @@ Record results in `docs/releases/<version>-hardware.md`.
 
 Bikri is multi-tenant on one shared database ([13](13-multi-tenancy.md)), so leakage between shops is the most serious bug class. This suite is **required in CI on every PR** and part of the definition of done (AGENTS.md §5): any new endpoint, table, query, file path or export must extend it in the same PR.
 
-Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `shop-basic` and `shop-other`, with **colliding ids, SKUs, barcodes, invoice numbers and bill prefixes**, two devices each (one admin), plus a suspended tenant **S** and a tenant **D** in `deleting`.
+Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `shop-basic` and `shop-other`, with **colliding ids, SKUs, barcodes, invoice numbers and bill prefixes**, two devices each (one admin), plus a suspended tenant **S**, a tenant **D** in `deleting` and a read-only tenant **R** (one device that has already seen the status, one that has not). Each tenant has an `owner_email`; the `EMAIL` binding is a fake that records messages.
 
 | # | Case | Expected |
 |---|---|---|
@@ -135,6 +138,10 @@ Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `sh
 | I17 | Operator export of A | only A rows; an `operator_export` audit row in A only |
 | I18 | Tenant restore of A (purge + import) | B unchanged throughout; B pushes during A's maintenance are applied |
 | I19 | Static check: every statement built in `apps/api/src` (outside `platform/`) that touches a tenant table contains `tenant_id = ?1`; no `env.DB` use outside `db/tenantDb.ts` and `platform/` | test fails with the offending file and SQL |
-| I20 | Schema check: every tenant table has `tenant_id`, `PRIMARY KEY (tenant_id, id)` (or `(tenant_id, op_id)`), every FK to a tenant table is composite, every index starts with `tenant_id` (except `change_log_at`, `applied_ops_at`) — read from `sqlite_master` / `pragma_foreign_key_list` | test fails naming the table |
+| I21 | R (read-only): pull, snapshot, `/api/me`, file GET, enrol | work, only R rows; a push of new ops and a file PUT → `403 TENANT_READ_ONLY` (or ops omitted, per the cutoff); A and B pushes in the same minute applied; the `tenant_status_change` audit row exists in R only; `tenant_status` in A's and B's responses stays `active` |
+| I22 | Owner server export (`GET /api/shop/export`) with B's admin device and owner session | only B rows, no `tenant_id`, no `token_hash`, no `owner_email_codes`; an `export_id` started by A is refused on B's device; A's export limit does not affect B; a non-admin device, a manager or a missing session → `403` / `401`; `owner_export` audit row in B only |
+| I23 | Owner email sign-in | a code started on A's admin device is sent only to A's `owner_email`; verifying A's `code_id` from B's device → `400 BAD_SIGNIN_CODE` with the same body as an unknown id; A's owner session sent with B's device token → `401 OWNER_SIGNIN_REQUIRED`; B's sign-in limits are independent of A's |
+| I24 | Operator support access to A | the support code enrols into A only; the support device sees only A rows, cannot push or upload (`403`), stops at `expires_at`; `support` is non-null only in A's `/api/me`; start and end audit rows in A only; B's owner cannot end A's support access (`404`) |
+| I20 | Schema check: every tenant table has `tenant_id`, `PRIMARY KEY (tenant_id, id)` (or `(tenant_id, op_id)`), every FK to a tenant table is composite, every index starts with `tenant_id` (except `change_log_at`, `applied_ops_at` and the automatic indexes of the global `token_hash` / `code_hash` keys) — read from `sqlite_master` / `pragma_foreign_key_list` | test fails naming the table |
 
 Till side (`apps/pos`, fake-indexeddb): the Dexie database name is `bikri-<tenant_id>`; "Leave this shop" deletes it; enrolling into a second tenant never opens the first tenant's database; exports contain only the active tenant.

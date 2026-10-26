@@ -9,7 +9,7 @@ Step 2 of the pay modal. Shown after the sale is saved.
 | ![Dukaan web-sale-complete](../reference/dukaan/web-sale-complete.png) | Big tick, change to give, next sale |
 | ![Dukaan app-sale-done](../reference/dukaan/app-sale-done.png) | Desktop done screen with print/share |
 | ![Dukaan web-receipt-printed](../reference/dukaan/web-receipt-printed.png) | Receipt preview |
-| ![Dukaan app-receipt-exported](../reference/dukaan/app-receipt-exported.png) | Exported receipt (Bikri: no vendor branding, logo at top — REQ-B03) |
+| ![Dukaan app-receipt-exported](../reference/dukaan/app-receipt-exported.png) | Exported receipt (Bikri: shop logo at top — REQ-B03; only a small "Powered by AlgoVyn" line at the bottom, D-085) |
 
 ## Layout
 

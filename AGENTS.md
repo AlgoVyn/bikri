@@ -23,7 +23,7 @@ An offline-first, **multi-tenant** POS PWA: many independent shops (tenants), ea
 | 10 | [10-testing](docs/10-testing.md) | Unit, integration and Playwright e2e plan, fixtures |
 | 11 | [11-roadmap](docs/11-roadmap.md) | **Ordered task list with acceptance criteria — your build plan** |
 | 12 | [12-fbr-later](docs/12-fbr-later.md) | Optional FBR module (do not build in v1) |
-| 13 | [13-multi-tenancy](docs/13-multi-tenancy.md) | Tenancy model, tenant scoping rules, per-shop budget, onboarding/export/restore/delete, migration from M0, open questions |
+| 13 | [13-multi-tenancy](docs/13-multi-tenancy.md) | Tenancy model, tenant scoping rules, per-shop budget, onboarding, read-only/suspended status, export/restore/delete, operator support access, migration from M0, open questions |
 | — | [fixtures/](docs/fixtures/money-totals.json) | Machine-readable test vectors: money (`money-*.json`) used by `packages/core` tests, and Code 128 (`barcode-code128.json`) used by `packages/printer` |
 | — | [decisions](docs/decisions.md) | Design decisions log — append here when you resolve an unclear point |
 | — | [screens/](docs/screens/README.md) | One spec per screen: layout, fields, validation, states, hotkeys, acceptance criteria |
@@ -71,7 +71,9 @@ Follow [docs/11-roadmap.md](docs/11-roadmap.md) task by task (T-001, T-002, …)
 - Every new tenant table has `tenant_id TEXT NOT NULL REFERENCES tenants(id)`, `PRIMARY KEY (tenant_id, id)`, composite FKs `(tenant_id, x_id)`, uniques that include `tenant_id`, and indexes that start with `tenant_id` ([02 §1](docs/02-data-model.md#1-conventions)).
 - R2 keys are always `t/<tenant_id>/…` built on the server; clients send relative keys.
 - Return `404 NOT_FOUND` for another tenant's ids, with the same body as for ids that don't exist (no existence oracle).
-- Logs, errors and audit rows never include another tenant's data; operator actions on a tenant are audited in that tenant.
+- Logs, errors and audit rows never include another tenant's data; operator actions on a tenant (status changes with their reason, exports, imports, restores, support access) are audited in that tenant.
+- **Read-only shops** ([13 §7.2](docs/13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)): the server refuses new business data with `403 TENANT_READ_ONLY` but keeps ops made before the till learned the status; on the till, every repository write goes through one read-only guard (also on for operator support devices), so no screen can save data in a read-only shop. Never discard ops because a shop is read-only.
+- **Shop-admin API** (`/api/shop/*`) needs an admin device, an unlocked owner and an owner email sign-in session ([05 §3.2](docs/05-auth-and-roles.md#32-owner-email-sign-in-d-082)); never log sign-in codes, sessions or email addresses.
 
 **Data rules**
 - Money and stock records are **append-only**: `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log`. Never UPDATE or DELETE them; correct with a new row (refund, void, reversal, adjustment). The only allowed update on `sales` is the `status` field via a refund/void op.

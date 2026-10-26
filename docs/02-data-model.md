@@ -25,7 +25,7 @@ This document is the **source of truth** for table and column names. D1 (server)
 |---|---|---|
 | **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). |
-| **Server-owned** (tenant-scoped) | `devices`, `enrolment_codes`, `change_log`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills. |
+| **Server-owned** (tenant-scoped) | `devices`, `enrolment_codes`, `owner_email_codes`, `change_log`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash`); `owner_email_codes` is never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
 | **Local-only** (Dexie) | `outbox`, `kv`, `carts`, `held_bills`, `file_queue`, `print_jobs`, `stock_levels`, `party_balances`, `pull_shadow` | Never synced. |
 
@@ -49,7 +49,10 @@ CREATE TABLE tenants (
   id                  TEXT PRIMARY KEY,               -- ULID, created by the operator (13 §7.1)
   slug                TEXT NOT NULL UNIQUE CHECK (length(slug) BETWEEN 3 AND 30 AND slug NOT GLOB '*[^a-z0-9-]*'),
   display_name        TEXT NOT NULL CHECK (length(display_name) BETWEEN 1 AND 60),
-  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','maintenance','deleting','deleted')),
+  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','read_only','suspended','maintenance','deleting','deleted')),  -- 13 §7.2
+  status_reason       TEXT NOT NULL DEFAULT '' CHECK (length(status_reason) <= 200),  -- operator's reason for the last status change (also in the shop's audit_log)
+  status_changed_at   INTEGER,                        -- server time of the last status change; for 'read_only' it is the read-only start
+  status_changed_by   TEXT,                           -- 'operator:<email>' or 'cron'
   db_shard            TEXT NOT NULL DEFAULT 'DB',     -- D1 binding holding this tenant's rows (13 §4); v1 always 'DB'
   daily_write_budget  INTEGER NOT NULL DEFAULT 7000 CHECK (daily_write_budget >= 0),   -- D1 rows written per UTC day (13 §6)
   poll_after_ms       INTEGER NOT NULL DEFAULT 60000 CHECK (poll_after_ms BETWEEN 15000 AND 3600000),
@@ -57,10 +60,13 @@ CREATE TABLE tenants (
   restore_point_at    INTEGER NOT NULL DEFAULT 0,     -- epoch ms of the point in time this tenant's data was restored to
   change_log_floor    INTEGER NOT NULL DEFAULT 0,     -- highest change_log.seq of this tenant deleted by the prune (03 §4.4)
   note                TEXT NOT NULL DEFAULT '',
+  owner_email         TEXT CHECK (owner_email IS NULL OR (length(owner_email) <= 254 AND owner_email = lower(owner_email) AND owner_email LIKE '%_@_%')),  -- shop owner's sign-in email (05 §3.2); set by the operator
+  last_owner_export_at INTEGER,                       -- start of the last owner server export (rate limit, 13 §7.3)
+  support_until       INTEGER,                        -- operator support access active while > now (13 §7.5)
+  support_reason      TEXT NOT NULL DEFAULT '' CHECK (length(support_reason) <= 200),
   created_by_email    TEXT NOT NULL,
   created_at          INTEGER NOT NULL,
   updated_at          INTEGER NOT NULL,
-  suspended_at        INTEGER,
   deleted_at          INTEGER                         -- set when status becomes 'deleted' (tombstone)
 ) STRICT;
 
@@ -131,6 +137,9 @@ CREATE TABLE devices (
   device_code       TEXT NOT NULL,                  -- 'A'..'Z' then 'AA'.. ; unique per branch
   token_hash        TEXT NOT NULL UNIQUE,           -- hex SHA-256 of the bearer token; globally unique, identifies the tenant
   is_admin          INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0,1)),  -- may call the shop-admin API (05 §3)
+  kind              TEXT NOT NULL DEFAULT 'till' CHECK (kind IN ('till','support')),  -- 'support' = operator support browser (13 §7.5): never admin, never pushes
+  expires_at        INTEGER,                        -- support devices: token stops working after this (= tenants.support_until at enrolment)
+  read_only_seen_at INTEGER,                        -- server time this device was first told the shop is read-only (13 §7.2); NULL when active
   enrolled_at       INTEGER NOT NULL,
   enrolled_by       TEXT NOT NULL,                  -- 'operator:<email>' or 'device:<device id>' that created the code
   revoked_at        INTEGER,
@@ -153,6 +162,7 @@ CREATE TABLE enrolment_codes (
   device_name       TEXT NOT NULL,
   branch_id         TEXT NOT NULL,
   grants_admin      INTEGER NOT NULL DEFAULT 0 CHECK (grants_admin IN (0,1)),  -- owner pairing code (13 §7.1) or admin till
+  kind              TEXT NOT NULL DEFAULT 'till' CHECK (kind IN ('till','support')),  -- 'support': operator support access (13 §7.5), never grants_admin
   created_by        TEXT NOT NULL,                  -- 'operator:<email>' or 'device:<device id>'
   created_at        INTEGER NOT NULL,
   expires_at        INTEGER NOT NULL,               -- created_at + 15 min; owner pairing codes + 72 h
@@ -161,6 +171,22 @@ CREATE TABLE enrolment_codes (
   FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id)
 ) STRICT;
 CREATE INDEX enrolment_codes_tenant ON enrolment_codes (tenant_id, expires_at);
+
+CREATE TABLE owner_email_codes (                     -- one-time sign-in codes for shop owners (05 §3.2); never pulled by tills
+  tenant_id   TEXT NOT NULL REFERENCES tenants(id),
+  id          TEXT NOT NULL,                        -- ULID
+  device_id   TEXT NOT NULL,                        -- the admin device that asked; the code works only there
+  staff_id    TEXT NOT NULL,                        -- the owner staff row unlocked on that device
+  code_hash   TEXT NOT NULL,                        -- hex HMAC-SHA256(OWNER_CODE_KEY, tenant_id || id || code)
+  attempts    INTEGER NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,                     -- created_at + 10 min
+  used_at     INTEGER,
+  FOREIGN KEY (tenant_id, device_id) REFERENCES devices(tenant_id, id),
+  FOREIGN KEY (tenant_id, staff_id) REFERENCES staff(tenant_id, id),
+  PRIMARY KEY (tenant_id, id)
+) STRICT;
+CREATE INDEX owner_email_codes_time ON owner_email_codes (tenant_id, created_at);
 
 -- ============ master ============
 CREATE TABLE shop (
@@ -781,7 +807,7 @@ INSERT INTO expense_category_templates (code, name_en, name_ur, icon, sort_order
 No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) runs one batch:
 
 ```
-INSERT INTO tenants (id, slug, display_name, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, CAST(?4 AS TEXT), ?5, ?4, ?4);
+INSERT INTO tenants (id, slug, display_name, owner_email, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, ?7, CAST(?4 AS TEXT), ?5, ?4, ?4);
 INSERT INTO branches (tenant_id, id, name, bill_prefix, is_default, created_at, updated_at, updated_by) VALUES (?1, ?6, 'Main', 'INV', 1, ?4, ?4, 'server');
 INSERT INTO expense_categories (tenant_id, id, code, name_en, name_ur, icon, is_system, sort_order, created_at, updated_at)
   SELECT ?1, code, code, name_en, name_ur, icon, 1, sort_order, 0, 0 FROM expense_category_templates;   -- created_at/updated_at 0 = system seed (EpochMs allows 0)
@@ -848,7 +874,7 @@ export const DEXIE_SCHEMA_V1 = {
 | Table | Shape | Purpose |
 |---|---|---|
 | `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
-| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `display` (theme, text_size, font), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6) |
+| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `display` (theme, text_size, font), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
 | `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status }` | Images waiting for upload |

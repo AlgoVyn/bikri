@@ -1,11 +1,12 @@
 # 05 — Auth and roles
 
-Bikri is multi-tenant ([13](13-multi-tenancy.md)): every till, staff member, PIN and permission belongs to exactly one **tenant** (shop). There are four layers:
+Bikri is multi-tenant ([13](13-multi-tenancy.md)): every till, staff member, PIN and permission belongs to exactly one **tenant** (shop). There are five layers:
 
 1. **Device token** — proves a browser is an enrolled till **of one tenant**. Required for all till API calls; the Worker derives the tenant from it (`devices.token_hash` → `devices.tenant_id`).
 2. **Staff PIN** — says which person of that shop is using the till. Checked on the device, works offline. Staff, roles and PINs are per tenant.
-3. **Admin device** — a till with `devices.is_admin = 1` may also call the **shop-admin API** (`/api/shop/*`) for its own tenant: enrolment codes, devices, conflicts, unsynced-ops import (§3).
-4. **Cloudflare Access** — protects the **platform operator console** (`https://algovyn.com/bikri/admin*`, `https://algovyn.com/bikri/api/admin/*`) with email one-time PIN. The only allowed email is **`adnan@yaqoob.org`** (D-022). The operator is not a staff member of any shop.
+3. **Admin device** — a till with `devices.is_admin = 1` may also call the **shop-admin API** (`/api/shop/*`) for its own tenant: enrolment codes, devices, conflicts, unsynced-ops import, server export (§3).
+4. **Owner email sign-in** — a one-time code sent to the shop owner's email gives a short **owner session** on that admin device; the shop-admin API needs it **in addition to** the admin device and the owner PIN (§3.2, D-082).
+5. **Cloudflare Access** — protects the **platform operator console** (`https://algovyn.com/bikri/admin*`, `https://algovyn.com/bikri/api/admin/*`) with email one-time PIN. The only allowed email is **`adnan@yaqoob.org`** (D-022). The operator is not a staff member of any shop.
 
 Paths in this doc are relative to the `/bikri` base path ([01 §1.1](01-architecture.md#11-url-layout-and-the-path-convention-used-in-these-docs)). The till paths (`/bikri/`, `/bikri/api/sync/*`, `/bikri/api/files/*`, `/bikri/api/me`, `/bikri/api/shop/*`) and the rest of `algovyn.com` are **not** behind Access, because Access login redirects would break offline service-worker requests.
 
@@ -14,7 +15,7 @@ Paths in this doc are relative to the `/bikri` base path ([01 §1.1](01-architec
 | Role | Scope | Who | How they authenticate |
 |---|---|---|---|
 | **Platform operator** | the whole deployment | `adnan@yaqoob.org` | Cloudflare Access (email OTP) on `/admin*`; `OWNER_EMAILS` secret. Renamed in docs from "owner admin"; the secret keeps its name |
-| **Owner** | one tenant | shop owner | device token + PIN; shop-admin actions only on an admin device |
+| **Owner** | one tenant | shop owner | device token + PIN; shop-admin actions only on an admin device, with an owner email sign-in (§3.2) |
 | **Manager** | one tenant | senior staff | device token + PIN |
 | **Cashier** | one tenant | counter staff | device token + PIN |
 
@@ -31,14 +32,15 @@ A person who works in two shops has two separate `staff` rows (one per tenant) a
 | Stolen/lost till | Shop owner revokes it in Settings → Devices (admin device), or the operator in the console; token stops working immediately |
 | Cashier gives unauthorised discounts/refunds | Role permissions on device and server; manager PIN override; audit log |
 | Cashier sees cost/margin | `cost.view` permission; cost hidden in UI |
-| Cashier uses the shop-admin API (enrol extra devices, revoke tills) | Only admin devices may call `/api/shop/*`; the UI requires an owner PIN unlock on that device; every call writes an `audit_log` row. A cashier with technical skill and physical access to an **unlocked admin device's** browser could still call it (the PIN is checked only on the device): keep admin devices to the owner's own PC/phone. Stronger owner sign-in is an open question ([13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)) |
+| Cashier uses the shop-admin API (enrol extra devices, revoke tills) | Only admin devices may call `/api/shop/*`; the UI requires an owner PIN unlock on that device; every call writes an `audit_log` row. A cashier with technical skill and physical access to an **unlocked admin device's** browser could still call it (the PIN is checked only on the device): keep admin devices to the owner's own PC/phone. Closed by **owner email sign-in** (§3.2): `/api/shop/*` also needs an owner session that only someone who can read the owner's mailbox gets |
 | Someone with the PC reads IndexedDB | **Not defended** (no encryption at rest). Use a Windows account password. Documented risk. This includes the device token and every staff `pin_hash`: a 4–6 digit PIN hashed with PBKDF2 can be brute-forced offline in minutes, so the PIN only stops casual use at the counter. The operator console (Cloudflare Access) does not depend on PINs. |
 | Another page on `algovyn.com` reads Bikri's storage | Same origin as the website; mitigations in [01 §5.4](01-architecture.md#54-same-origin-as-the-website-storage-permissions-cookies-cors) (no third-party JS anywhere on `algovyn.com`). |
 | Cross-site request forgery on the operator API (cookie-authenticated) | `sameOrigin` check on `/api/admin/*` ([01 §5](01-architecture.md#5-worker-and-hono)); till and shop-admin APIs use bearer tokens, not cookies. |
 | A till claims another staff member's `staff_id` | Not defended server-side beyond "the staff row exists, is active and belongs to the same tenant" (PINs are checked only on the device); the audit trail records device + staff. Accepted for a shop's own trusted staff. |
 | Brute force of a 4-digit PIN on the device | Lockout after 5 wrong tries for 5 minutes, doubling each time (max 1 h). PIN is a convenience lock, not encryption. |
 | Brute force of enrolment codes | 8 chars from 30 symbols (≈ 6.6 × 10¹¹), 15-minute expiry (72 h for owner pairing codes), single use, WAF rate limit + per-IP counter. A code enrols into the tenant it was created for; a guessed code from another shop would join that shop, so codes are never shown in logs or URLs other than the enrol link |
-| The operator reads shop data | Not prevented technically (the operator runs D1 and holds the backup key). Operator exports and imports are logged in that tenant's `audit_log` (`operator_export`, `operator_import`), visible to the shop owner in Settings → Activity. Policy questions in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed) |
+| The operator reads shop data | Not prevented technically (the operator runs D1 and holds the backup key); stated to shop owners in the terms and privacy notes ([09 §6.1](09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)). Operator exports, imports, status changes and support access are logged in that tenant's `audit_log` (`operator_export`, `operator_import`, `tenant_status_change`, `support_access_start` / `_end`), visible to the shop owner in Settings → Activity; support access also shows a banner on every till while it lasts ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |
+| Someone requests email codes to spam the owner or guess a code | The request names no address: a code only ever goes to the tenant's own `owner_email`, and only when asked from that tenant's admin device by an unlocked owner. Rate limits, 10-minute expiry, 5 tries per code and single use (§3.2) |
 
 ## 2. Device enrolment
 
@@ -59,8 +61,8 @@ Device codes are assigned per branch (per tenant) in order A, B, … Z, AA, AB �
 
 ## 3. Shop admin on admin devices
 
-- Endpoints `/api/shop/*` ([04 §3.8](04-api.md#38-shop-admin-endpoints-admin-device)) require a valid device token **and** `devices.is_admin = 1`, and the header `X-Bikri-Staff: <staff_id>` naming an active `owner` of the same tenant (the UI sends it only after an owner PIN unlock). Otherwise `403 FORBIDDEN`.
-- Features: create/cancel enrolment codes (admin or not), list/rename/move/revoke devices, make a device admin or not (at least one non-revoked admin device must remain), import a revoked device's unsynced ops, list and acknowledge sync conflicts. Every call writes an `audit_log` row (`device_enrol_code`, `device_change`, `device_revoke`, `ops_import`), pulled to all tills like any other row.
+- Endpoints `/api/shop/*` ([04 §3.8](04-api.md#38-shop-admin-endpoints-admin-device)) require a valid device token **and** `devices.is_admin = 1`, the header `X-Bikri-Staff: <staff_id>` naming an active `owner` of the same tenant (the UI sends it only after an owner PIN unlock), **and** a valid owner session `X-Bikri-Owner-Session` for that device and owner (§3.2). Missing or wrong → `403 FORBIDDEN`; missing or expired session → `401 OWNER_SIGNIN_REQUIRED` (the UI then runs the email sign-in). Exceptions that need only the admin device and owner PIN: the email sign-in endpoints themselves and `POST /api/shop/support-access/end` (it only removes access).
+- Features: create/cancel enrolment codes (admin or not), list/rename/move/revoke devices, make a device admin or not (at least one non-revoked admin device must remain), import a revoked device's unsynced ops, list and acknowledge sync conflicts, the server export ([13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)), end operator support access. Every call writes an `audit_log` row (`device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `owner_export`, `support_access_end`), pulled to all tills like any other row.
 - Forgotten **owner** PIN: another `owner` of the shop resets it in Settings → Cashiers; if there is none, the operator resets it from the console after confirming the owner's identity out of band (`POST /api/admin/tenants/:id/reset-owner-pin`).
 
 ## 3.1 Platform operator via Cloudflare Access
@@ -72,7 +74,34 @@ Device codes are assigned per branch (per tenant) in order A, B, … Z, AA, AB �
 - Worker verification (`accessAuth` middleware): read `Cf-Access-Jwt-Assertion`; fetch JWKS from `https://${ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs` (cache 1 h in module scope); verify RS256 signature, `aud` contains `ACCESS_AUD`, `iss` = `https://${ACCESS_TEAM_DOMAIN}`, `exp` in the future, `email` in `OWNER_EMAILS`. Otherwise `401 UNAUTHENTICATED` / `403 FORBIDDEN`. Tenant-specific operator routes take the tenant from the path (`/api/admin/tenants/:id/…`) and check it exists.
 - Server-originated rows (default branch at tenant creation, PIN reset audit, operator imports) use `device_id = 'server'` and `staff_id` = the tenant's owner staff row (or `'server'` before setup), always with that tenant's `tenant_id`.
 
-Operator features (v1, [screens/19](screens/19-admin.md)): tenants (create with owner pairing code, edit budget/poll interval, suspend, reactivate, delete), per-tenant devices (list, revoke, issue a code), per-tenant usage vs budget and account-wide usage, backups (list, download), per-tenant export, restore and unsynced-ops import, per-tenant owner PIN reset, conflicts counts.
+Operator features (v1, [screens/19](screens/19-admin.md)): tenants (create with owner pairing code and owner email, edit budget/poll interval/owner email, make read-only, suspend, reactivate, delete — each status change with a reason), per-tenant devices (list, revoke, issue a code), per-tenant usage vs budget and account-wide usage, backups (list, download), per-tenant export, restore and unsynced-ops import, per-tenant owner PIN reset, operator support access (start, end), conflicts counts.
+
+## 3.2 Owner email sign-in (D-082)
+
+Owner's choice: **email sign-in** is the stronger sign-in for shop owners. It is added **on top of** the admin device and the owner PIN, not instead of them: the PIN still unlocks the till offline for everything local, and the email code is the extra step for the server-side shop-admin API (`/api/shop/*`), which is online anyway. Passkeys are not used.
+
+**Why a one-time code and not a magic link.** The owner uses Bikri as an installed PWA; a link in an email opens in whatever browser the mail app picks, which has no device token, and mail scanners often open links before the person does, using up a single-use link. A 6-digit code is typed on the admin device that asked for it, so the session is bound to that device.
+
+**Owner email.** `tenants.owner_email` (one per shop in v1, lowercase) is entered by the operator when creating the shop or later in the console (`PATCH /api/admin/tenants/:id`, audit `owner_email_change` in the shop). On the Cloudflare Free plan the Worker can only send to **verified destination addresses** ([13 §2](13-multi-tenancy.md#2-cloudflare-facts-the-decision-rests-on-checked-27-oct-2026)), so the operator also adds the address in the Cloudflare dashboard (Email Service → Email Routing → Destination addresses), and Cloudflare emails the owner a verification link that they click once. Owners can't change the address themselves in v1. Showing the address to the owner: masked (`a***@gmail.com`) on the sign-in screen.
+
+**Sending.** Worker binding `send_email: [{ "name": "EMAIL", "allowed_sender_addresses": ["bikri@algovyn.com"] }]` (`algovyn.com` is already an Email Routing domain). From `Bikri <bikri@algovyn.com>`, subject "Your Bikri sign-in code", plain-text body in English and Urdu: the code, the shop name, the device name, "expires in 10 minutes", and "If you did not ask for this, ignore this email; nobody can sign in without the code." The code is not in the subject (lock-screen previews). Sends to verified addresses are free and do not count toward any Cloudflare email quota. If sending fails (address not verified, Cloudflare error) the API answers `503 EMAIL_UNAVAILABLE` and the till says "Email sign-in isn't working for this shop. Contact Algovyn."; the operator can do any device action from the console meanwhile.
+
+**Flow.**
+1. On an admin device, unlocked as an owner, the first shop-admin action shows "Confirm it's you" with the masked email → `POST /api/shop/owner-signin/start` (headers as above, no session yet). The server checks the limits below, creates an `owner_email_codes` row (6 digits from `crypto.getRandomValues` with rejection sampling; only `HMAC-SHA256(OWNER_CODE_KEY, tenant_id ‖ id ‖ code)` stored), sends the email, and returns `{ code_id, expires_at, email_hint }`.
+2. The owner types the code → `POST /api/shop/owner-signin/verify { code_id, code }`. The server compares in constant time, counts the attempt, and on success marks the code used and returns `{ session, expires_at }`.
+3. The session is a stateless token `base64url(payload).HMAC-SHA256(OWNER_SESSION_KEY, payload)` with `{ tenant_id, device_id, staff_id, exp }` (12 hours). It costs no D1 write per request; the Worker checks the signature, `exp`, that `tenant_id` and `device_id` equal the token's device, and that `staff_id` is still an active owner. The till keeps it **in memory only**: Lock, Switch user, auto-lock and reload drop it, and the next shop-admin action asks for a new code. Revoking the device or deactivating the owner ends it at once.
+
+**Limits and abuse protection.**
+- Code: 6 digits, expires after **10 minutes**, single use, at most **5 wrong tries** (then dead).
+- Sending: one code per device per **60 seconds** (resend cooldown), at most **5 codes per shop per hour** and **20 per day** (counted from `owner_email_codes` by `(tenant_id, created_at)`); over the limit → `429 RATE_LIMITED` with `Retry-After`. Starting a new code kills the previous unused one.
+- Per-IP: Workers Rate Limiting binding `OWNER_SIGNIN_LIMIT` (`simple: { limit: 10, period: 60 }`, key `ip:<CF-Connecting-IP>`) on both endpoints; approximate, a second line of defence.
+- Only the shop's own owner can ask, only from the shop's own admin device, and the address is never in the request: nobody can make Bikri email an arbitrary address, and other shops' owners cannot be reached.
+- After 3 dead codes in an hour the shop's sign-in pauses for 1 hour and the console flags the shop.
+- Every successful sign-in writes `audit_log` `owner_signin` (staff, device) in the shop; failures are counted in Workers Logs (no codes, no addresses).
+- Rows in `owner_email_codes` are deleted by the nightly cron 1 day after they expire.
+- Secrets `OWNER_CODE_KEY` and `OWNER_SESSION_KEY` (32 random bytes each, `wrangler secret put`); rotating `OWNER_SESSION_KEY` signs every owner out.
+
+**Testing.** Worker tests use a fake `EMAIL` binding that records messages; E2E journey 24 reads the code from it ([10 §5](10-testing.md#5-e2e-journeys-each-in-en-and-ur-desktop-1280800-and-phone-390844)). Isolation case I23.
 
 ## 4. Staff PINs and session
 
@@ -132,11 +161,11 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 | `export.data` | CSV/PDF exports, backups | ✔ | ✔ | ✘ |
 | `settings.shop` | Shop profile, receipt/tax, categories, branches | ✔ | ✘ | ✘ |
 | `settings.staff` | Cashiers, PINs, permissions | ✔ | ✘ | ✘ |
-| `devices.manage` | Shop admin on an admin device: enrolment codes, devices, unsynced-ops import, conflicts (§3) | ✔ | ✘ | ✘ |
+| `devices.manage` | Shop admin on an admin device with owner email sign-in: enrolment codes, devices, unsynced-ops import, conflicts, server export (§3, §3.2) | ✔ | ✘ | ✘ |
 | `settings.device` | Printer, scanner, display, language (this device) | ✔ | ✔ | display/language; Printer and Scanner read-only (status, Test print, retry failed prints) |
 
 ## 7. Audit log actions
 
-`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `drawer_open`, `price_change`, `cost_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_import`, `tenant_restore`.
+`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `drawer_open`, `price_change`, `cost_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_import`, `tenant_restore`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
 
 Each row stores `before_json`/`after_json` with only the changed fields and belongs to one tenant. The shop owner sees that shop's log in Settings → Activity (filter by action, staff, date; CSV export).
