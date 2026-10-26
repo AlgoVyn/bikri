@@ -1,0 +1,318 @@
+export type TokenPair = {
+  name: string;
+  fg: string;
+  bg: string;
+  /** Documented ratio from docs/08 §2, or the measured tile ratio. */
+  ratio: number;
+  needed: number;
+};
+
+export const TILE_COLOURS = [
+  '#006BB3',
+  '#182E55',
+  '#0F766E',
+  '#047857',
+  '#B45309',
+  '#7C3AED',
+  '#BE185D',
+  '#475569',
+] as const;
+
+/** Documented tile band: white on each tile colour is inside this range. */
+export const TILE_RATIO_RANGE = { min: 5.02, max: 13.45 } as const;
+
+const textPairs: readonly TokenPair[] = [
+  {
+    name: 'light text on bg',
+    fg: '#0F172A',
+    bg: '#F8FAFC',
+    ratio: 17.06,
+    needed: 4.5,
+  },
+  {
+    name: 'light text-muted on surface-2',
+    fg: '#475569',
+    bg: '#F1F5F9',
+    ratio: 6.92,
+    needed: 4.5,
+  },
+  {
+    name: 'light text-muted on bg',
+    fg: '#475569',
+    bg: '#F8FAFC',
+    ratio: 7.24,
+    needed: 4.5,
+  },
+  {
+    name: 'light white on primary',
+    fg: '#FFFFFF',
+    bg: '#006BB3',
+    ratio: 5.59,
+    needed: 4.5,
+  },
+  {
+    name: 'light white on primary-hover',
+    fg: '#FFFFFF',
+    bg: '#005A96',
+    ratio: 7.23,
+    needed: 4.5,
+  },
+  {
+    name: 'light primary on bg',
+    fg: '#006BB3',
+    bg: '#F8FAFC',
+    ratio: 5.35,
+    needed: 4.5,
+  },
+  {
+    name: 'light primary-subtle-ink on primary-subtle',
+    fg: '#00497A',
+    bg: '#E0F2FE',
+    ratio: 8.19,
+    needed: 4.5,
+  },
+  {
+    name: 'light accent-ink on accent',
+    fg: '#182E55',
+    bg: '#4BC2BF',
+    ratio: 6.26,
+    needed: 4.5,
+  },
+  {
+    name: 'light white on brand-navy',
+    fg: '#FFFFFF',
+    bg: '#182E55',
+    ratio: 13.45,
+    needed: 4.5,
+  },
+  {
+    name: 'light danger on white',
+    fg: '#DC2626',
+    bg: '#FFFFFF',
+    ratio: 4.83,
+    needed: 4.5,
+  },
+  {
+    name: 'light white on danger',
+    fg: '#FFFFFF',
+    bg: '#DC2626',
+    ratio: 4.83,
+    needed: 4.5,
+  },
+  {
+    name: 'light danger-subtle ink',
+    fg: '#991B1B',
+    bg: '#FEE2E2',
+    ratio: 6.8,
+    needed: 4.5,
+  },
+  {
+    name: 'light warning on white',
+    fg: '#B45309',
+    bg: '#FFFFFF',
+    ratio: 5.02,
+    needed: 4.5,
+  },
+  {
+    name: 'light warning ink',
+    fg: '#92400E',
+    bg: '#FEF3C7',
+    ratio: 6.37,
+    needed: 4.5,
+  },
+  {
+    name: 'light success on white',
+    fg: '#047857',
+    bg: '#FFFFFF',
+    ratio: 5.48,
+    needed: 4.5,
+  },
+  {
+    name: 'light white on success',
+    fg: '#FFFFFF',
+    bg: '#047857',
+    ratio: 5.48,
+    needed: 4.5,
+  },
+  {
+    name: 'light success ink',
+    fg: '#065F46',
+    bg: '#D1FAE5',
+    ratio: 6.78,
+    needed: 4.5,
+  },
+  {
+    name: 'light info on white',
+    fg: '#005A96',
+    bg: '#FFFFFF',
+    ratio: 7.23,
+    needed: 4.5,
+  },
+  {
+    name: 'light info ink',
+    fg: '#00497A',
+    bg: '#F0F9FF',
+    ratio: 8.82,
+    needed: 4.5,
+  },
+  {
+    name: 'light border-strong on surface-2',
+    fg: '#64748B',
+    bg: '#F1F5F9',
+    ratio: 4.34,
+    needed: 3,
+  },
+  {
+    name: 'light focus on white',
+    fg: '#006BB3',
+    bg: '#FFFFFF',
+    ratio: 5.59,
+    needed: 3,
+  },
+  {
+    name: 'dark text on bg',
+    fg: '#F1F5F9',
+    bg: '#0F172A',
+    ratio: 16.3,
+    needed: 4.5,
+  },
+  {
+    name: 'dark text on surface',
+    fg: '#F1F5F9',
+    bg: '#1E293B',
+    ratio: 13.35,
+    needed: 4.5,
+  },
+  {
+    name: 'dark text-muted on surface-2',
+    fg: '#94A3B8',
+    bg: '#273449',
+    ratio: 4.89,
+    needed: 4.5,
+  },
+  {
+    name: 'dark primary-ink on primary',
+    fg: '#00385D',
+    bg: '#4DA6FF',
+    ratio: 4.77,
+    needed: 4.5,
+  },
+  {
+    name: 'dark primary on surface',
+    fg: '#4DA6FF',
+    bg: '#1E293B',
+    ratio: 5.72,
+    needed: 4.5,
+  },
+  {
+    name: 'dark accent-ink on accent',
+    fg: '#0F172A',
+    bg: '#4BC2BF',
+    ratio: 8.3,
+    needed: 4.5,
+  },
+  {
+    name: 'dark danger on surface',
+    fg: '#F87171',
+    bg: '#1E293B',
+    ratio: 5.29,
+    needed: 4.5,
+  },
+  {
+    name: 'dark warning on surface',
+    fg: '#FBBF24',
+    bg: '#1E293B',
+    ratio: 8.76,
+    needed: 4.5,
+  },
+  {
+    name: 'dark success on surface',
+    fg: '#34D399',
+    bg: '#1E293B',
+    ratio: 7.61,
+    needed: 4.5,
+  },
+  {
+    name: 'dark info on surface',
+    fg: '#7DD3FC',
+    bg: '#1E293B',
+    ratio: 8.77,
+    needed: 4.5,
+  },
+  {
+    name: 'dark border-strong on surface',
+    fg: '#64748B',
+    bg: '#1E293B',
+    ratio: 3.07,
+    needed: 3,
+  },
+  {
+    name: 'dark primary-ink on primary-hover',
+    fg: '#00385D',
+    bg: '#7DD3FC',
+    ratio: 7.31,
+    needed: 4.5,
+  },
+  {
+    name: 'dark primary-subtle-ink',
+    fg: '#E0F2FE',
+    bg: '#00385D',
+    ratio: 10.62,
+    needed: 4.5,
+  },
+  {
+    name: 'dark danger banner',
+    fg: '#FECACA',
+    bg: '#450A0A',
+    ratio: 11.16,
+    needed: 4.5,
+  },
+  {
+    name: 'dark warning banner',
+    fg: '#FDE68A',
+    bg: '#451A03',
+    ratio: 12.03,
+    needed: 4.5,
+  },
+  {
+    name: 'dark success banner',
+    fg: '#A7F3D0',
+    bg: '#022C22',
+    ratio: 11.81,
+    needed: 4.5,
+  },
+  {
+    name: 'dark info banner',
+    fg: '#E0F2FE',
+    bg: '#0C2A44',
+    ratio: 12.8,
+    needed: 4.5,
+  },
+  {
+    name: 'light danger-ink on danger',
+    fg: '#FFFFFF',
+    bg: '#DC2626',
+    ratio: 4.83,
+    needed: 4.5,
+  },
+  {
+    name: 'dark danger-ink on danger',
+    fg: '#450A0A',
+    bg: '#F87171',
+    ratio: 5.84,
+    needed: 4.5,
+  },
+];
+
+const tilePairs: readonly TokenPair[] = [
+  { name: 'tile t1', fg: '#FFFFFF', bg: '#006BB3', ratio: 5.59, needed: 4.5 },
+  { name: 'tile t2', fg: '#FFFFFF', bg: '#182E55', ratio: 13.45, needed: 4.5 },
+  { name: 'tile t3', fg: '#FFFFFF', bg: '#0F766E', ratio: 5.47, needed: 4.5 },
+  { name: 'tile t4', fg: '#FFFFFF', bg: '#047857', ratio: 5.48, needed: 4.5 },
+  { name: 'tile t5', fg: '#FFFFFF', bg: '#B45309', ratio: 5.02, needed: 4.5 },
+  { name: 'tile t6', fg: '#FFFFFF', bg: '#7C3AED', ratio: 5.7, needed: 4.5 },
+  { name: 'tile t7', fg: '#FFFFFF', bg: '#BE185D', ratio: 6.04, needed: 4.5 },
+  { name: 'tile t8', fg: '#FFFFFF', bg: '#475569', ratio: 7.58, needed: 4.5 },
+];
+
+export const tokenPairs: readonly TokenPair[] = [...textPairs, ...tilePairs];

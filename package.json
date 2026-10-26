@@ -1,0 +1,28 @@
+{
+  "name": "bikri",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -b",
+    "dev": "turbo dev --filter=@bikri/pos",
+    "e2e": "turbo e2e",
+    "i18n:check": "pnpm --filter @bikri/i18n check",
+    "contrast:check": "node tools/contrast-check.ts",
+    "docs:check": "node tools/check-docs.mjs",
+    "size": "node tools/check-bundle-size.mjs",
+    "website:check": "node tools/check-website.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "turbo": "2.11.10",
+    "typescript": "7.0.2"
+  }
+}

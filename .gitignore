@@ -1,2 +1,12 @@
 # Dukaan POS reference screenshots: local-only (third-party UI), see README.md / AGENTS.md
 docs/reference/dukaan/
+
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.turbo/

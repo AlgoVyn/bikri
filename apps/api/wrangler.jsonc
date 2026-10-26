@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bikri",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../pos/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/bikri/api/*"]
+  },
+  // Path routes on the existing algovyn.com zone (NOT a custom domain: that would take over the whole hostname)
+  "routes": [
+    { "pattern": "algovyn.com/bikri", "zone_name": "algovyn.com" },
+    { "pattern": "algovyn.com/bikri/*", "zone_name": "algovyn.com" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bikri",
+      // Placeholder so `wrangler dev` can use local D1. Owner replaces it with `wrangler d1 create bikri`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "bikri-files" }, // till file API: only keys under products/ and shop/
+    { "binding": "BACKUPS", "bucket_name": "bikri-backups" } // admin API only
+  ],
+  "vars": {
+    "APP_VERSION": "0.1.0",
+    "SCHEMA_VERSION": "1",
+    "MIN_CLIENT_SCHEMA": "1",
+    "MAINTENANCE": "0",
+    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+    "BASE_PATH": "/bikri",
+    "ALLOWED_ORIGINS": "https://algovyn.com",
+    "SHOP_TIMEZONE": "Asia/Karachi"
+  },
+  "triggers": { "crons": ["30 21 * * *"] },
+  "observability": { "enabled": true }
+  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com")
+}
