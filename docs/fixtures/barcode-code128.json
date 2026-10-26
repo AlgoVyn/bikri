@@ -1,0 +1,113 @@
+{
+ "_about": "Code 128 vectors for packages/printer/labels/code128.ts. Encoding rule (screens/20): all-digit values of length >= 2 use Start C (105) with digit pairs, and a trailing odd digit is sent as Code B (100) + the digit; every other value uses Start B (104). check = (start + sum(i * value_i)) mod 103, then Stop (106). modules_incl_quiet = bar/space modules including the 2-module stop bar end and a 10-module quiet zone on each side. Every vector was rendered and decoded back with zxing-cpp (the engine behind zxing-wasm) on 27 Oct 2026.",
+ "vectors": [
+  {
+   "value": "PJJ123C",
+   "symbols": [
+    104,
+    48,
+    42,
+    42,
+    17,
+    18,
+    19,
+    35
+   ],
+   "check": 55,
+   "modules_incl_quiet": 132
+  },
+  {
+   "value": "CAB-7K2Q",
+   "symbols": [
+    104,
+    35,
+    33,
+    34,
+    13,
+    23,
+    43,
+    18,
+    49
+   ],
+   "check": 14,
+   "modules_incl_quiet": 143
+  },
+  {
+   "value": "200000000017",
+   "symbols": [
+    105,
+    20,
+    0,
+    0,
+    0,
+    0,
+    17
+   ],
+   "check": 21,
+   "modules_incl_quiet": 121
+  },
+  {
+   "value": "8964000000011",
+   "symbols": [
+    105,
+    89,
+    64,
+    0,
+    0,
+    0,
+    1,
+    100,
+    17
+   ],
+   "check": 31,
+   "modules_incl_quiet": 143
+  },
+  {
+   "value": "1234",
+   "symbols": [
+    105,
+    12,
+    34
+   ],
+   "check": 82,
+   "modules_incl_quiet": 77
+  },
+  {
+   "value": "12345",
+   "symbols": [
+    105,
+    12,
+    34,
+    100,
+    21
+   ],
+   "check": 54,
+   "modules_incl_quiet": 99
+  },
+  {
+   "value": "Rs 1,250",
+   "symbols": [
+    104,
+    50,
+    83,
+    0,
+    17,
+    12,
+    18,
+    21,
+    16
+   ],
+   "check": 7,
+   "modules_incl_quiet": 143
+  },
+  {
+   "value": "a",
+   "symbols": [
+    104,
+    65
+   ],
+   "check": 66,
+   "modules_incl_quiet": 66
+  }
+ ]
+}

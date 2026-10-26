@@ -1,0 +1,457 @@
+[
+ {
+  "name": "T1 simple cash sale",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 2000,
+     "unit_price": 45000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 125000
+    }
+   ],
+   "bill_discount": null,
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 90000,
+     "discount": 0,
+     "net": 90000,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 90000,
+     "revenue": 90000
+    },
+    {
+     "gross": 125000,
+     "discount": 0,
+     "net": 125000,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 125000,
+     "revenue": 125000
+    }
+   ],
+   "gross_total": 215000,
+   "item_discount_total": 0,
+   "subtotal": 215000,
+   "bill_discount": 0,
+   "tax": 0,
+   "rounding": 0,
+   "total": 215000
+  }
+ },
+ {
+  "name": "T2 line Rs discount + bill Rs discount (Dukaan example)",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 4200000,
+     "discount_type": "rs",
+     "discount_value": 200000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 350000
+    }
+   ],
+   "bill_discount": {
+    "type": "rs",
+    "value": 50000
+   },
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 4200000,
+     "discount": 200000,
+     "net": 4000000,
+     "bill_discount_alloc": 45977,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 3954023,
+     "revenue": 3954023
+    },
+    {
+     "gross": 350000,
+     "discount": 0,
+     "net": 350000,
+     "bill_discount_alloc": 4023,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 345977,
+     "revenue": 345977
+    }
+   ],
+   "gross_total": 4550000,
+   "item_discount_total": 200000,
+   "subtotal": 4350000,
+   "bill_discount": 50000,
+   "tax": 0,
+   "rounding": 0,
+   "total": 4300000
+  }
+ },
+ {
+  "name": "T3 line percent discount with paisa, rounded to rupee",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 3000,
+     "unit_price": 149900,
+     "discount_type": "pct",
+     "discount_value": 500
+    }
+   ],
+   "bill_discount": null,
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 449700,
+     "discount": 22485,
+     "net": 427215,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": -15,
+     "final": 427200,
+     "revenue": 427215
+    }
+   ],
+   "gross_total": 449700,
+   "item_discount_total": 22485,
+   "subtotal": 427215,
+   "bill_discount": 0,
+   "tax": 0,
+   "rounding": -15,
+   "total": 427200
+  }
+ },
+ {
+  "name": "T4 bill percent discount + 17% tax",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 1000000
+    }
+   ],
+   "bill_discount": {
+    "type": "pct",
+    "value": 1000
+   },
+   "tax_rate_bp": 1700,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 1000000,
+     "discount": 0,
+     "net": 1000000,
+     "bill_discount_alloc": 100000,
+     "tax_alloc": 153000,
+     "rounding_alloc": 0,
+     "final": 1053000,
+     "revenue": 900000
+    }
+   ],
+   "gross_total": 1000000,
+   "item_discount_total": 0,
+   "subtotal": 1000000,
+   "bill_discount": 100000,
+   "tax": 153000,
+   "rounding": 0,
+   "total": 1053000
+  }
+ },
+ {
+  "name": "T5 three lines, bill discount allocation with remainders",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 10000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 10000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 10000
+    }
+   ],
+   "bill_discount": {
+    "type": "rs",
+    "value": 10000
+   },
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 10000,
+     "discount": 0,
+     "net": 10000,
+     "bill_discount_alloc": 3334,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 6666,
+     "revenue": 6666
+    },
+    {
+     "gross": 10000,
+     "discount": 0,
+     "net": 10000,
+     "bill_discount_alloc": 3333,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 6667,
+     "revenue": 6667
+    },
+    {
+     "gross": 10000,
+     "discount": 0,
+     "net": 10000,
+     "bill_discount_alloc": 3333,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 6667,
+     "revenue": 6667
+    }
+   ],
+   "gross_total": 30000,
+   "item_discount_total": 0,
+   "subtotal": 30000,
+   "bill_discount": 10000,
+   "tax": 0,
+   "rounding": 0,
+   "total": 20000
+  }
+ },
+ {
+  "name": "T6 decimal quantity (1.25 m cable at Rs 120/m)",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1250,
+     "unit_price": 12000
+    }
+   ],
+   "bill_discount": null,
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 15000,
+     "discount": 0,
+     "net": 15000,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 15000,
+     "revenue": 15000
+    }
+   ],
+   "gross_total": 15000,
+   "item_discount_total": 0,
+   "subtotal": 15000,
+   "bill_discount": 0,
+   "tax": 0,
+   "rounding": 0,
+   "total": 15000
+  }
+ },
+ {
+  "name": "T7 Rs discount larger than line is capped",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 50000,
+     "discount_type": "rs",
+     "discount_value": 80000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 20000
+    }
+   ],
+   "bill_discount": null,
+   "tax_rate_bp": 0,
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 50000,
+     "discount": 50000,
+     "net": 0,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 0,
+     "revenue": 0
+    },
+    {
+     "gross": 20000,
+     "discount": 0,
+     "net": 20000,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 20000,
+     "revenue": 20000
+    }
+   ],
+   "gross_total": 70000,
+   "item_discount_total": 50000,
+   "subtotal": 20000,
+   "bill_discount": 0,
+   "tax": 0,
+   "rounding": 0,
+   "total": 20000
+  }
+ },
+ {
+  "name": "T8 no rounding mode (round_total_to=1)",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 3000,
+     "unit_price": 149900,
+     "discount_type": "pct",
+     "discount_value": 500
+    }
+   ],
+   "bill_discount": null,
+   "tax_rate_bp": 0,
+   "round_total_to": 1
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 449700,
+     "discount": 22485,
+     "net": 427215,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 0,
+     "rounding_alloc": 0,
+     "final": 427215,
+     "revenue": 427215
+    }
+   ],
+   "gross_total": 449700,
+   "item_discount_total": 22485,
+   "subtotal": 427215,
+   "bill_discount": 0,
+   "tax": 0,
+   "rounding": 0,
+   "total": 427215
+  }
+ },
+ {
+  "name": "T9 tax-inclusive price (MRP) 17%",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 1170000
+    }
+   ],
+   "tax_rate_bp": 1700,
+   "tax_mode": "inclusive",
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 1170000,
+     "discount": 0,
+     "net": 1170000,
+     "bill_discount_alloc": 0,
+     "tax_alloc": 170000,
+     "rounding_alloc": 0,
+     "final": 1170000,
+     "revenue": 1000000
+    }
+   ],
+   "gross_total": 1170000,
+   "item_discount_total": 0,
+   "subtotal": 1170000,
+   "bill_discount": 0,
+   "tax": 170000,
+   "rounding": 0,
+   "total": 1170000
+  }
+ },
+ {
+  "name": "T10 tax-inclusive 17% with bill 10% discount, two lines",
+  "input": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 149900
+    },
+    {
+     "qty_milli": 2000,
+     "unit_price": 45000
+    }
+   ],
+   "bill_discount": {
+    "type": "pct",
+    "value": 1000
+   },
+   "tax_rate_bp": 1700,
+   "tax_mode": "inclusive",
+   "round_total_to": 100
+  },
+  "expected": {
+   "lines": [
+    {
+     "gross": 149900,
+     "discount": 0,
+     "net": 149900,
+     "bill_discount_alloc": 14990,
+     "tax_alloc": 19603,
+     "rounding_alloc": -6,
+     "final": 134904,
+     "revenue": 115307
+    },
+    {
+     "gross": 90000,
+     "discount": 0,
+     "net": 90000,
+     "bill_discount_alloc": 9000,
+     "tax_alloc": 11769,
+     "rounding_alloc": -4,
+     "final": 80996,
+     "revenue": 69231
+    }
+   ],
+   "gross_total": 239900,
+   "item_discount_total": 0,
+   "subtotal": 239900,
+   "bill_discount": 23990,
+   "tax": 31372,
+   "rounding": -10,
+   "total": 215900
+  }
+ }
+]

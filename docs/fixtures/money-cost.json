@@ -1,0 +1,34 @@
+[
+ {
+  "name": "C1 basic",
+  "on_hand_milli": 20000,
+  "avg_cost": 110000,
+  "qty_milli": 5000,
+  "unit_cost": 120000,
+  "expected_avg_cost": 112000
+ },
+ {
+  "name": "C2 negative stock resets to unit cost",
+  "on_hand_milli": -2000,
+  "avg_cost": 100000,
+  "qty_milli": 10000,
+  "unit_cost": 95000,
+  "expected_avg_cost": 95000
+ },
+ {
+  "name": "C3 rounding to paisa",
+  "on_hand_milli": 3000,
+  "avg_cost": 33333,
+  "qty_milli": 1000,
+  "unit_cost": 40000,
+  "expected_avg_cost": 35000
+ },
+ {
+  "name": "C4 zero stock",
+  "on_hand_milli": 0,
+  "avg_cost": 0,
+  "qty_milli": 10000,
+  "unit_cost": 3600000,
+  "expected_avg_cost": 3600000
+ }
+]
