@@ -49,6 +49,7 @@ function tenantRow(t: TenantFixture): Row {
     display_name: t.shopName,
     restore_epoch: String(T),
     created_by_email: 'adnan@yaqoob.org',
+    owner_email: `owner@${t.slug}.pk`,
     created_at: T,
     updated_at: T,
   };
@@ -115,6 +116,17 @@ function validRows(t: TenantFixture): ReadonlyArray<readonly [string, Row]> {
         created_by: 'operator:adnan@yaqoob.org',
         created_at: T,
         expires_at: T + 15 * 60_000,
+      },
+    ],
+    [
+      'owner_email_codes',
+      {
+        id: 'oec1',
+        device_id: 'dev1',
+        staff_id: 'st1',
+        code_hash: t.codeHash,
+        created_at: T,
+        expires_at: T + 10 * 60_000,
       },
     ],
     [
@@ -722,6 +734,115 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
           ...ledgerCtx,
         }),
         /CHECK constraint failed/,
+      );
+    });
+
+    it('applies the D-080–D-084 columns: read-only status, owner email, support devices and codes', async () => {
+      await insert('tenants', {
+        ...tenantRow(A),
+        id: 't-ro',
+        slug: 'read-only-shop',
+        status: 'read_only',
+        status_reason: 'Unpaid invoice',
+        status_changed_at: T,
+        status_changed_by: 'operator:adnan@yaqoob.org',
+        owner_email: null,
+        support_until: T + 3_600_000,
+        support_reason: 'Printer setup',
+      }).run();
+      const ro = await db
+        .prepare(
+          "SELECT status, owner_email, last_owner_export_at FROM tenants WHERE id = 't-ro'",
+        )
+        .first<{
+          status: string;
+          owner_email: string | null;
+          last_owner_export_at: number | null;
+        }>();
+      expect(ro).toEqual({
+        status: 'read_only',
+        owner_email: null,
+        last_owner_export_at: null,
+      });
+      const badTenants: Row[] = [
+        { status: 'paused' },
+        { owner_email: 'Owner@Shop.pk' },
+        { owner_email: 'no-at-sign' },
+        { status_reason: 'x'.repeat(201) },
+        { support_reason: 'x'.repeat(201) },
+      ];
+      for (const bad of badTenants) {
+        await expectRejected(
+          insert('tenants', {
+            ...tenantRow(A),
+            id: 't-x',
+            slug: 'bad-shop',
+            ...bad,
+          }),
+          /CHECK constraint failed/,
+        );
+      }
+
+      const device = await db
+        .prepare(
+          'SELECT kind, expires_at, read_only_seen_at FROM devices WHERE tenant_id = ?1 AND id = ?2',
+        )
+        .bind(A.id, 'dev1')
+        .first();
+      expect(device).toEqual({
+        kind: 'till',
+        expires_at: null,
+        read_only_seen_at: null,
+      });
+      await insert('devices', {
+        ...validFor(A, 'devices'),
+        id: 'sup1',
+        device_code: 'S',
+        token_hash: '77'.repeat(32),
+        is_admin: 0,
+        kind: 'support',
+        expires_at: T + 3_600_000,
+      }).run();
+      await expectRejected(
+        insert('devices', {
+          ...validFor(A, 'devices'),
+          id: 'dev9',
+          device_code: 'Z',
+          token_hash: '78'.repeat(32),
+          kind: 'kiosk',
+        }),
+        /CHECK constraint failed/,
+      );
+      await insert('enrolment_codes', {
+        ...validFor(A, 'enrolment_codes'),
+        code_hash: '79'.repeat(32),
+        kind: 'support',
+      }).run();
+      await expectRejected(
+        insert('enrolment_codes', {
+          ...validFor(A, 'enrolment_codes'),
+          code_hash: '7a'.repeat(32),
+          kind: 'other',
+        }),
+        /CHECK constraint failed/,
+      );
+
+      await expectRejected(
+        insert('owner_email_codes', {
+          ...validFor(A, 'owner_email_codes'),
+          id: 'oec2',
+          attempts: 6,
+        }),
+        /CHECK constraint failed/,
+      );
+      // B's code may not point at a device or owner that only exists in A.
+      await expectRejected(
+        insert('owner_email_codes', {
+          ...validFor(B, 'owner_email_codes'),
+          id: 'oec3',
+          device_id: 'sup1',
+        }),
+        /FOREIGN KEY constraint failed/,
       );
     });
 

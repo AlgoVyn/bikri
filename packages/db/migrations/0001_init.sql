@@ -14,7 +14,10 @@ CREATE TABLE tenants (
   id                  TEXT PRIMARY KEY,               -- ULID, created by the operator (13 §7.1)
   slug                TEXT NOT NULL UNIQUE CHECK (length(slug) BETWEEN 3 AND 30 AND slug NOT GLOB '*[^a-z0-9-]*'),
   display_name        TEXT NOT NULL CHECK (length(display_name) BETWEEN 1 AND 60),
-  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','maintenance','deleting','deleted')),
+  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','read_only','suspended','maintenance','deleting','deleted')),  -- 13 §7.2
+  status_reason       TEXT NOT NULL DEFAULT '' CHECK (length(status_reason) <= 200),  -- operator's reason for the last status change (also in the shop's audit_log)
+  status_changed_at   INTEGER,                        -- server time of the last status change; for 'read_only' it is the read-only start
+  status_changed_by   TEXT,                           -- 'operator:<email>' or 'cron'
   db_shard            TEXT NOT NULL DEFAULT 'DB',     -- D1 binding holding this tenant's rows (13 §4); v1 always 'DB'
   daily_write_budget  INTEGER NOT NULL DEFAULT 7000 CHECK (daily_write_budget >= 0),   -- D1 rows written per UTC day (13 §6)
   poll_after_ms       INTEGER NOT NULL DEFAULT 60000 CHECK (poll_after_ms BETWEEN 15000 AND 3600000),
@@ -22,10 +25,13 @@ CREATE TABLE tenants (
   restore_point_at    INTEGER NOT NULL DEFAULT 0,     -- epoch ms of the point in time this tenant's data was restored to
   change_log_floor    INTEGER NOT NULL DEFAULT 0,     -- highest change_log.seq of this tenant deleted by the prune (03 §4.4)
   note                TEXT NOT NULL DEFAULT '',
+  owner_email         TEXT CHECK (owner_email IS NULL OR (length(owner_email) <= 254 AND owner_email = lower(owner_email) AND owner_email LIKE '%_@_%')),  -- shop owner's sign-in email (05 §3.2); set by the operator
+  last_owner_export_at INTEGER,                       -- start of the last owner server export (rate limit, 13 §7.3)
+  support_until       INTEGER,                        -- operator support access active while > now (13 §7.5)
+  support_reason      TEXT NOT NULL DEFAULT '' CHECK (length(support_reason) <= 200),
   created_by_email    TEXT NOT NULL,
   created_at          INTEGER NOT NULL,
   updated_at          INTEGER NOT NULL,
-  suspended_at        INTEGER,
   deleted_at          INTEGER                         -- set when status becomes 'deleted' (tombstone)
 ) STRICT;
 
@@ -96,6 +102,9 @@ CREATE TABLE devices (
   device_code       TEXT NOT NULL,                  -- 'A'..'Z' then 'AA'.. ; unique per branch
   token_hash        TEXT NOT NULL UNIQUE,           -- hex SHA-256 of the bearer token; globally unique, identifies the tenant
   is_admin          INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0,1)),  -- may call the shop-admin API (05 §3)
+  kind              TEXT NOT NULL DEFAULT 'till' CHECK (kind IN ('till','support')),  -- 'support' = operator support browser (13 §7.5): never admin, never pushes
+  expires_at        INTEGER,                        -- support devices: token stops working after this (= tenants.support_until at enrolment)
+  read_only_seen_at INTEGER,                        -- server time this device was first told the shop is read-only (13 §7.2); NULL when active
   enrolled_at       INTEGER NOT NULL,
   enrolled_by       TEXT NOT NULL,                  -- 'operator:<email>' or 'device:<device id>' that created the code
   revoked_at        INTEGER,
@@ -118,6 +127,7 @@ CREATE TABLE enrolment_codes (
   device_name       TEXT NOT NULL,
   branch_id         TEXT NOT NULL,
   grants_admin      INTEGER NOT NULL DEFAULT 0 CHECK (grants_admin IN (0,1)),  -- owner pairing code (13 §7.1) or admin till
+  kind              TEXT NOT NULL DEFAULT 'till' CHECK (kind IN ('till','support')),  -- 'support': operator support access (13 §7.5), never grants_admin
   created_by        TEXT NOT NULL,                  -- 'operator:<email>' or 'device:<device id>'
   created_at        INTEGER NOT NULL,
   expires_at        INTEGER NOT NULL,               -- created_at + 15 min; owner pairing codes + 72 h
@@ -126,6 +136,22 @@ CREATE TABLE enrolment_codes (
   FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id)
 ) STRICT;
 CREATE INDEX enrolment_codes_tenant ON enrolment_codes (tenant_id, expires_at);
+
+CREATE TABLE owner_email_codes (                     -- one-time sign-in codes for shop owners (05 §3.2); never pulled by tills
+  tenant_id   TEXT NOT NULL REFERENCES tenants(id),
+  id          TEXT NOT NULL,                        -- ULID
+  device_id   TEXT NOT NULL,                        -- the admin device that asked; the code works only there
+  staff_id    TEXT NOT NULL,                        -- the owner staff row unlocked on that device
+  code_hash   TEXT NOT NULL,                        -- hex HMAC-SHA256(OWNER_CODE_KEY, tenant_id || id || code)
+  attempts    INTEGER NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,                     -- created_at + 10 min
+  used_at     INTEGER,
+  FOREIGN KEY (tenant_id, device_id) REFERENCES devices(tenant_id, id),
+  FOREIGN KEY (tenant_id, staff_id) REFERENCES staff(tenant_id, id),
+  PRIMARY KEY (tenant_id, id)
+) STRICT;
+CREATE INDEX owner_email_codes_time ON owner_email_codes (tenant_id, created_at);
 
 -- ============ master ============
 CREATE TABLE shop (

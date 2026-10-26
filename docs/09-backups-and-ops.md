@@ -13,7 +13,7 @@ There is still **one** nightly backup of the whole database (all tenants), encry
 | 3. D1 Time Travel | Point-in-time restore of the **whole** DB (every shop) | any minute, last 7 days (free plan) | Cloudflare; disaster only (§3.1) |
 | 4. Nightly export to R2 | `wrangler d1 export` SQL, gzipped | 24 h | R2 `bikri-backups/d1/` (separate bucket, never reachable by the till file API) |
 | 5. Off-Cloudflare copy | same file encrypted with `age` | 24 h | GitHub Actions artifact (90 days) + optional owner Google Drive |
-| 6. Shop owner manual export | JSON + CSV zip of **their shop** from Settings → Backup | on demand | owner's PC/phone |
+| 6. Shop owner manual export | JSON + CSV zip of **their shop** from Settings → Backup, built from the device's data, or from the server copy (`Download from server`, owner email sign-in, once per 24 h, [13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)) | on demand | owner's PC/phone |
 | 6b. Operator per-shop export | the same zip, built from the server copy in the console (§3.4) | on demand | operator's PC |
 | 7. R2 files (logo, photos) | weekly `rclone`-style listing + copy of new objects into the encrypted archive | 7 days | as layer 5 |
 
@@ -36,7 +36,7 @@ A running `wrangler d1 export` **blocks all other queries on the database** (Clo
 
 The repo is public, so GitHub Actions artifacts can be downloaded by other GitHub users: that is why the off-Cloudflare copy is always `age`-encrypted before upload; never upload the plain `.sql.gz` as an artifact.
 
-The `age` private key is generated once by the **platform operator** (`age-keygen`), kept offline (printed + password manager); only the public recipient is a GitHub secret (`BACKUP_AGE_RECIPIENT`). It is one key for the whole deployment: shop owners never create or hold one, and adding a shop changes nothing here. The operator can therefore decrypt every shop's data (see [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed) on telling shops).
+The `age` private key is generated once by the **platform operator** (`age-keygen`), kept offline (printed + password manager); only the public recipient is a GitHub secret (`BACKUP_AGE_RECIPIENT`). It is one key for the whole deployment: shop owners never create or hold one, and adding a shop changes nothing here. The operator can therefore decrypt every shop's data; shop owners are told so in the terms and privacy notes (§6.1).
 
 ## 3. Restore procedures
 
@@ -81,7 +81,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 
 ### 3.5 Delete one tenant
 
-[13 §7.4](13-multi-tenancy.md#74-delete-a-tenant): offer a final export, then `delete` (type the slug); devices are revoked immediately, rows and R2 files are removed by the nightly cron ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)), the `tenants` row stays as a tombstone. Copies remain in encrypted backups until they age out (30 days daily, 12 months monthly, 90 days GitHub artifacts).
+[13 §7.4](13-multi-tenancy.md#74-delete-a-tenant): offer a final export, then `delete` (type the slug); devices are revoked immediately, rows and R2 files are removed by the nightly cron ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)), the `tenants` row stays as a tombstone. Copies remain in encrypted backups until they age out (30 days daily, 12 months monthly, 90 days GitHub artifacts); the owner accepted this retention (D-083), and deleting a shop does not shorten it.
 
 ## 4. Monitoring and limits
 
@@ -97,7 +97,9 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 |---|---|
 | Deploy | merge to `main` → CI runs tests (including the isolation suite) → website check ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)) → `wrangler d1 migrations apply bikri --remote` (and each shard) → `wrangler deploy` |
 | Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) |
-| Suspend / reactivate a shop | console → tenant → Suspend / Reactivate |
+| Make a shop read-only (e.g. unpaid) / suspend / reactivate | console → tenant → `Make read-only` / `Suspend` / `Reactivate`, with a reason; recorded in the shop's Activity ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
+| Help a shop (support access) | console → tenant → `Support access` (reason, 1–24 h) → open the code in a separate browser profile; the shop sees a banner until it ends ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |
+| Add or change a shop owner's email | console → tenant → Edit → owner email, then Cloudflare → Email Routing → Destination addresses → add it; the owner clicks the verification email ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)) |
 | Raise a shop's budget | console → tenant → daily write budget (keep Σ ≤ 70,000 on Free) |
 | Sync log retention | automatic: nightly cron deletes `change_log` rows older than 30 days per tenant and `applied_ops` older than 90 days ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); the console shows each tenant's `change_log_floor` and the last prune time |
 | Rollback app | `wrangler rollback` (previous version); migrations are forward-only and additive (never drop/rename columns in v1) |
@@ -111,7 +113,20 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 
 ## 6. Data retention and privacy
 
-Customer data (names, phones) of every shop stays in the operator's Cloudflare account, the operator's encrypted backups and each shop's own exports. Shops never see each other's data. Only the sync change stream (`change_log`, 30 days), op receipts (`applied_ops`, 90 days) and usage counters (`tenant_usage`, 90 days) are pruned; business records are kept for the life of the shop and deleted with the shop (§3.5). No analytics, no third-party scripts, no telemetry. Deleting a customer is a soft delete (history is needed for accounts); a "Erase personal data" action (v2) replaces name/phone/address with `Deleted customer` while keeping amounts. What other shops are told about operator access is an open question ([13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)).
+Customer data (names, phones) of every shop stays in the operator's Cloudflare account, the operator's encrypted backups and each shop's own exports. Shops never see each other's data. Only the sync change stream (`change_log`, 30 days), op receipts (`applied_ops`, 90 days) and usage counters (`tenant_usage`, 90 days) are pruned; business records are kept for the life of the shop and deleted with the shop (§3.5). No analytics, no third-party scripts, no telemetry. Deleting a customer is a soft delete (history is needed for accounts); a "Erase personal data" action (v2) replaces name/phone/address with `Deleted customer` while keeping amounts. What shops are told is in §6.1.
+
+### 6.1 Terms and privacy notes for shop owners
+
+Plain-language notes shown to every shop owner: linked from the owner pairing step of the [enrol screen](screens/02-enrol.md) and from Settings → About, and repeated in `docs/owner-guide.md` (T-065). English, Urdu and Roman Urdu. Whether owners must tick to accept them, and a legal review, are open ([13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)).
+
+1. **Who runs Bikri.** Algovyn (the operator, Adnan) runs this Bikri deployment on Cloudflare for several shops. Your shop's data is kept apart from other shops; no other shop can see it.
+2. **What Algovyn can see.** Because Algovyn runs the database and holds the backup key, Algovyn can technically read your shop's data. Algovyn looks at it only to run the service, to restore it, or when you ask for help.
+3. **What you will always see.** Every time Algovyn exports, imports or restores your shop's data, changes your shop's status (for example to read-only) or uses support access, a row appears in Settings → Activity with the reason. Support access is time-limited (at most 24 hours at a time), shows a banner on all your tills while it lasts, and you can end it at any time.
+4. **Read-only.** If your shop is made read-only (for example for an unpaid bill), you can still sign in, see all your reports and history and export your data; you can't make new sales or changes until it is active again. Sales your tills made before they learned about it are kept.
+5. **Your copy.** You can download a full export of your shop at any time: from a till (Settings → Backup) or from the server (once a day).
+6. **Backups and deletion.** Algovyn makes an encrypted backup of all shops every night. If your shop is deleted, its data is removed from the live database, but copies stay in the encrypted backups until they expire: up to **30 days** in daily backups, up to **12 months** in monthly backups and up to **90 days** in the off-site copies. After that it is gone. Ask for an export before deletion if you want to keep it.
+7. **Email.** Your email address is used only to send you sign-in codes. Bikri has no analytics, ads or tracking.
+8. **Receipts.** Your receipts show your shop's name and logo, and a small "Powered by AlgoVyn" line at the bottom.
 
 ## 7. Go-live checklist
 

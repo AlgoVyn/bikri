@@ -20,6 +20,7 @@ export const TENANT_TABLES = [
   'sync_conflicts',
   'devices',
   'enrolment_codes',
+  'owner_email_codes',
   'shop',
   'branches',
   'staff',

@@ -9,7 +9,7 @@ No Dukaan screenshot: Dukaan uses a vendor account + trial activation, which Bik
 Centered card: Bikri wordmark, heading "Connect this device to your shop", two options as tabs (`?code=` in the URL pre-fills the code and opens tab 1; the code is removed from the address bar with `history.replaceState`):
 
 1. **I have a code** — 8 character input (auto-uppercase, groups of 4 shown as `ABCD-EFGH`, ambiguous characters `0 O 1 I L` not used by the generator; input normalises them), Device name (text, default from user agent, e.g. "Chrome on Windows"), `Connect` button. A "Scan QR" button opens the camera (zxing-wasm) to read the QR shown in Settings → Devices on an admin device (or in the operator console).
-2. **New shop** — explains "Setting up a new shop? Enter the owner pairing code you got from Algovyn. It works once and expires in 3 days." and switches to the same code field (owner pairing codes make this device an admin device, [05 §2](../05-auth-and-roles.md#2-device-enrolment)). There is no email or Access sign-in for shop owners.
+2. **New shop** — explains "Setting up a new shop? Enter the owner pairing code you got from Algovyn. It works once and expires in 3 days." and switches to the same code field (owner pairing codes make this device an admin device, [05 §2](../05-auth-and-roles.md#2-device-enrolment)). Below the code field a link "What Algovyn can see" opens the terms and privacy notes ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)). Enrolment itself needs no email or Access sign-in; the owner's email code is asked later, for shop-admin actions ([05 §3.2](../05-auth-and-roles.md#32-owner-email-sign-in-d-082)).
 
 Footer: language switcher; "Revoked?" helper text when the reason is `DEVICE_REVOKED`: "This device was disconnected by the owner. Unsynced sales were kept on this device." with button `Export unsynced data` ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
 
@@ -24,6 +24,7 @@ If the browser already belongs to another shop (`bikri.active_tenant` set, D-073
 | Code not 8 valid characters | "Enter the 8-character code from the owner" |
 | `BAD_ENROLMENT_CODE` | "That code is wrong or expired. Ask the owner for a new one." |
 | `TENANT_SUSPENDED` | "This shop's account is paused. Contact Algovyn." |
+| Shop is read-only (`tenant_status` in the response) | Enrolment succeeds; after the download the read-only banner shows ([13 §7.2](../13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 | `RATE_LIMITED` | "Too many tries. Wait a minute." |
 | Offline | Button disabled; "You need internet to connect a device." |
 
