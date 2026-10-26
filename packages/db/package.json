@@ -9,6 +9,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "fake-indexeddb": "6.2.6",
     "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "@bikri/core": "workspace:*",
+    "dexie": "4.4.7"
   }
 }

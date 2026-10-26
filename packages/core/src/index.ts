@@ -1,5 +1,6 @@
 export { contrastRatio } from './contrast.ts';
 export { normaliseDigits, normaliseNumericText } from './digits.ts';
+export { isUlid, newId } from './ids.ts';
 export type { AvgCostInput } from './money/cost.ts';
 export { nextAvgCost } from './money/cost.ts';
 export type {
@@ -76,6 +77,26 @@ export {
   QTY_UNITS,
   qtyAllowsDecimals,
 } from './qty.ts';
+export type {
+  DeleteOp,
+  InsertOp,
+  LedgerTable,
+  MasterTable,
+  Op,
+  OpRow,
+  SyncedTable,
+  UpsertOp,
+} from './schemas/sync.ts';
+export {
+  isLedgerTable,
+  isMasterTable,
+  LEDGER_TABLES,
+  MASTER_TABLES,
+  MAX_LINES_PER_DOCUMENT,
+  MAX_OPS_PER_TX,
+  opRow,
+  SERVER_MANAGED_COLUMNS,
+} from './schemas/sync.ts';
 export type { SecurityHeaderName } from './securityHeaders.ts';
 export {
   renderAssetHeaders,
