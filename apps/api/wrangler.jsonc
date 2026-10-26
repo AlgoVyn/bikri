@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "bikri",
+  // Cloudflare account "operator account" (not a secret)
+  "account_id": "e71e6ef868a1404888d1751c815913b5",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -19,8 +21,8 @@
     {
       "binding": "DB",
       "database_name": "bikri",
-      // Placeholder so `wrangler dev` can use local D1. Owner replaces it with `wrangler d1 create bikri`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Created 27 Oct 2026 (location hint APAC). `wrangler dev` still uses a local D1.
+      "database_id": "ce6212af-73a8-4955-b271-a54da06d07ff",
       "migrations_dir": "../../packages/db/migrations"
     }
   ],
@@ -33,7 +35,7 @@
     "SCHEMA_VERSION": "1",
     "MIN_CLIENT_SCHEMA": "1",
     "MAINTENANCE": "0",
-    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+    "ACCESS_TEAM_DOMAIN": "odd-rain-0287.cloudflareaccess.com", // Zero Trust team domain (Access app "Bikri admin")
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
     "SHOP_TIMEZONE": "Asia/Karachi"

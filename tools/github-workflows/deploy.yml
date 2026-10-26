@@ -60,6 +60,12 @@ jobs:
             echo "::error::apps/api/wrangler.jsonc still has the placeholder database_id. Run 'wrangler d1 create bikri' and commit the id (01 §7.1)."
             exit 1
           fi
+      - name: Refuse the placeholder ACCESS_TEAM_DOMAIN
+        run: |
+          if grep -q '<team>\.cloudflareaccess\.com' apps/api/wrangler.jsonc; then
+            echo "::error::apps/api/wrangler.jsonc still has the placeholder ACCESS_TEAM_DOMAIN. Set it to the Zero Trust team domain (01 §7.1)."
+            exit 1
+          fi
       - run: pnpm build
       - name: Apply D1 migrations (remote)
         working-directory: apps/api
