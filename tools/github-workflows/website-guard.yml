@@ -1,0 +1,19 @@
+# Nightly + manual go-live gate (01 §5.5, D-049): fails (and GitHub emails the owner) when any
+# page on algovyn.com loads third-party JavaScript or a service worker is registered outside /bikri/.
+name: website-guard
+on:
+  schedule:
+    - cron: "0 22 * * *" # 03:00 Asia/Karachi
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  website-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: node tools/check-website.mjs
