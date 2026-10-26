@@ -5,8 +5,9 @@
 1. **Local first.** The till reads and writes only IndexedDB. The network is used only to exchange ops.
 2. **Append-only money.** Ledger tables (see [02 §1.1](02-data-model.md#11-table-kinds)) never conflict: each row is created once on one device with a ULID.
 3. **Idempotent push.** Every op has a ULID `op_id`; the server records applied op IDs and ignores repeats.
-4. **Single ordered change stream.** The server appends every applied change to `change_log` with an autoincrement `seq`; tills pull by cursor.
+4. **One ordered change stream per database, read per tenant.** The server appends every applied change to `change_log` with an autoincrement `seq` and the tenant's `tenant_id`; a till pulls only its own tenant's rows by cursor (`seq` values of one tenant have gaps where other tenants' changes sit, which is fine).
 5. **Server is the meeting point, not the authority for selling.** The server never rejects a valid sale because of stock or credit.
+6. **A till belongs to exactly one tenant.** The tenant comes from the device token on every request (never from the body). Every read and write the sync handlers make is scoped to that tenant ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)); the till's Dexie database holds only that tenant ([02 §3](02-data-model.md#3-dexie-schema-till)).
 
 ## 2. Op format
 
@@ -20,7 +21,7 @@ type Op =
   | { op_id: string; tbl: MasterTable; kind: 'delete'; row_id: string; base_rev: number };
 ```
 
-- `row` contains **all columns of the table known to that app version** except server-managed ones (`rev`, and `products.avg_cost`, which the server ignores on input).
+- `row` contains **all columns of the table known to that app version** except server-managed ones (`rev`, and `products.avg_cost`, which the server ignores on input). `row` never contains `tenant_id`; if it does, the server drops the key and uses the token's tenant.
 - `kind: 'delete'` sets `deleted_at` (soft delete).
 - Ops are validated with the table's Zod schema on both sides.
 - Allowed `tbl` values: the master and ledger tables of [02 §1.1](02-data-model.md#11-table-kinds) only; any server-owned or unknown table → `rejected` / `UNKNOWN_TABLE`. On ledger inserts the server ignores client values for derived columns (`sales.status`).
@@ -55,21 +56,23 @@ Request:
 }
 ```
 
-Server algorithm (`apps/api/src/sync/applyOps.ts`):
+Server algorithm (`apps/api/src/sync/applyOps.ts`). `T` = the tenant of the authenticated device; every statement below binds `tenant_id = T` (through `tenantDb`, [13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)):
+0. Tenant gate: tenant `status` must be `active` (`suspended` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`); read today's `tenant_usage` row: at or above `daily_write_budget` → `503 TENANT_QUOTA` with `Retry-After` until 00:00 UTC ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). The client keeps its ops in all three cases.
 1. Reject if `schema_version` < server `MIN_CLIENT_SCHEMA` (Worker var) → `409 SCHEMA_OUTDATED` (client must update the app first; it keeps the ops). Clients with `MIN_CLIENT_SCHEMA ≤ schema_version ≤ SCHEMA_VERSION` are accepted, which is what makes additive migrations safe while old cached tills are still running ([09 §5](09-backups-and-ops.md#5-routine-operations)). `MIN_CLIENT_SCHEMA` is raised only when a migration is not backward compatible.
 2. Validate the whole body with Zod; reject the batch on structural errors (`400`).
-3. Look up which `op_id`s already exist in `applied_ops` (one `SELECT ... WHERE op_id IN (...)`, chunked by 100 because D1 allows 100 bound parameters). Those ops are answered `applied` without re-applying.
+3. Look up which `op_id`s already exist in `applied_ops` (one `SELECT ... WHERE tenant_id = ?1 AND op_id IN (...)`, chunked by 100 because D1 allows 100 bound parameters). Those ops are answered `applied` without re-applying.
 4. For each remaining op, build statements:
-   - **insert (ledger):** `INSERT INTO <tbl> (...) VALUES (...) ON CONFLICT(id) DO NOTHING`. Check-constraint failures abort the batch (step 5) and end up as op `rejected` with `CONSTRAINT_FAILED`.
+   - **insert (ledger):** `INSERT INTO <tbl> (tenant_id, ...) VALUES (?1, ...) ON CONFLICT(tenant_id, id) DO NOTHING`. A row whose references point at ids that exist only in another tenant fails the composite foreign keys and is `rejected` / `FOREIGN_KEY`. Check-constraint failures abort the batch (step 5) and end up as op `rejected` with `CONSTRAINT_FAILED`.
    - **upsert (master):** read current rows (one batched read before building writes). If absent → insert with `rev = 1`. If `current.rev == base_rev` → update **the columns present in `row`** (never columns the client did not send, so a till on an older schema cannot blank new columns), `rev = rev + 1`. If `current.rev != base_rev` → **merge**: update only `changed_fields`, `rev = rev + 1`, and insert a `sync_conflicts` row with `resolution = 'merged'`. Result `conflict_merged`.
-   - **Optimistic guard (D1 has no interactive transactions):** every UPDATE carries `WHERE id = ?1 AND rev = ?<rev read in this request>`. After the batch, any guarded UPDATE whose `meta.changes = 0` means another push changed the row in between; re-read and re-apply that op once (as a merge), else leave it pending (step 6).
+   - **Optimistic guard (D1 has no interactive transactions):** every UPDATE carries `WHERE tenant_id = ?1 AND id = ?2 AND rev = ?<rev read in this request>`. After the batch, any guarded UPDATE whose `meta.changes = 0` means another push changed the row in between; re-read and re-apply that op once (as a merge), else leave it pending (step 7).
    - **delete (master):** set `deleted_at = now`, `rev = rev + 1` (no-op if already deleted).
    - Permission check per op ([05 §5](05-auth-and-roles.md#5-server-side-enforcement)); failure → `rejected` / `FORBIDDEN`.
-   - Append `change_log (tbl, row_id, op, row_json, device_id, at)` with the row **as stored**, built inside the same batch with `INSERT INTO change_log (...) SELECT ?, id, ?, json_object('id', id, 'name_en', name_en, …all columns…), ?, ? FROM <tbl> WHERE id = ?` placed after the write (generated per table from `packages/db/src/tables.ts`; `json_object` takes at most 32 arguments per call in D1, so tables with more than 16 columns nest `json_patch(json_object(…), json_object(…))`).
-   - Append `applied_ops (op_id, device_id, applied_at, result, error_code)`.
+   - Append `change_log (tenant_id, tbl, row_id, op, row_json, device_id, at)` with the row **as stored**, built inside the same batch with `INSERT INTO change_log (...) SELECT tenant_id, ?, id, ?, json_object('id', id, 'name_en', name_en, …all columns except tenant_id…), ?, ? FROM <tbl> WHERE tenant_id = ?1 AND id = ?` placed after the write (generated per table from `packages/db/src/tables.ts`; `json_object` takes at most 32 arguments per call in D1, so tables with more than 16 columns nest `json_patch(json_object(…), json_object(…))`).
+   - Append `applied_ops (tenant_id, op_id, device_id, applied_at, result, error_code)`.
    - Side effects: recompute `sales.status` for refunds/voids; recompute `products.avg_cost` for movements with `unit_cost` ([07 §7](07-money-rules.md#7-cost-weighted-average)) and append their `change_log` rows; raise `devices.last_invoice_seq`.
 5. Execute everything with `PRAGMA defer_foreign_keys = ON` followed by all statements in **one `db.batch()`** (atomic; a batch counts as one query against the free plan's **50 queries per Worker invocation** limit). If the batch fails as a whole (e.g. a CHECK or FK violation), **bisect**: split the failing ops in halves and retry each half as its own batch, recursively, until the bad op(s) are isolated and marked `rejected` (record the rejection in `applied_ops` so it is not retried). Stop when the request has used 40 D1 calls.
-6. Ops that were not processed (call budget exhausted, or a guarded update lost twice) are simply **omitted from `results`**; the client keeps them `pending` and sends them again on the next push. The response always lists results in the same order as the processed ops.
+6. Usage: the last statement of every batch is `INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read) VALUES (?1, <UTC day>, 1, ?, ?) ON CONFLICT (tenant_id, day) DO UPDATE SET` the three counters `+ excluded.…`, with the rows the previous batches of this request reported in D1's `meta` (the counter lags by one batch; good enough for a budget).
+7. Ops that were not processed (call budget exhausted, or a guarded update lost twice) are simply **omitted from `results`**; the client keeps them `pending` and sends them again on the next push. The response always lists results in the same order as the processed ops.
 
 Response:
 ```json
@@ -86,10 +89,10 @@ Response:
 ### 4.2 Pull — `GET /api/sync/pull?since=<seq>&limit=500`
 
 ```sql
-SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE seq > ?1 ORDER BY seq LIMIT ?2;
+SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE tenant_id = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3;  -- index change_log_tenant_seq
 ```
 
-If `since < meta.change_log_floor` (those changes were pruned, [§4.4](#44-retention-pruning-and-stale-tills)), the server answers `410 SNAPSHOT_REQUIRED` with `details: { change_log_floor }` and the till runs a snapshot ([§4.3](#43-snapshot--get-apisyncsnapshot)) instead.
+If `since < tenants.change_log_floor` of the caller's tenant (those changes were pruned, [§4.4](#44-retention-pruning-and-stale-tills)), the server answers `410 SNAPSHOT_REQUIRED` with `details: { change_log_floor }` and the till runs a snapshot ([§4.3](#43-snapshot--get-apisyncsnapshot)) instead.
 
 Response:
 ```json
@@ -102,11 +105,12 @@ Response:
   "has_more": true,
   "server_time": 1793050000000,
   "restore_epoch": "1",
-  "restore_point_at": 0
+  "restore_point_at": 0,
+  "poll_after_ms": 60000
 }
 ```
 
-If `restore_epoch` differs from `kv.restore_epoch` (the pull response also carries `restore_point_at`, epoch ms of the data the server was restored to), the client runs **restore recovery** before anything else:
+`restore_epoch`, `restore_point_at` and `poll_after_ms` are the caller's tenant's values (`tenants` row); a restore of one shop never disturbs the tills of another. If `restore_epoch` differs from `kv.restore_epoch` (the pull response also carries `restore_point_at`, epoch ms of the data the server was restored to), the client runs **restore recovery** before anything else:
 1. Re-enqueue every ledger row **this device created** (`device_id` = own id) with `created_at ≥ restore_point_at` as fresh `insert` ops (new `op_id`s; the server ignores rows it already has via `ON CONFLICT(id) DO NOTHING`). Master rows are not re-sent (the restored server copy wins).
 2. Keep the outbox; clear all synced tables and caches; run a snapshot ([§4.3](#43-snapshot--get-apisyncsnapshot)); then push the outbox.
 3. Never lower the invoice counter: `kv.invoice_seq = max(kv.invoice_seq, max local sales.invoice_seq for this device, devices.last_invoice_seq)`, so no invoice number is ever issued twice.
@@ -127,22 +131,25 @@ Initial sync (new device, restore, or a till whose cursor is older than the prun
 
 A consistent-enough copy of every synced table, paged per table, followed by a normal pull from the snapshot's cursor.
 
-1. `GET /api/sync/snapshot` (no query) → `200 { "snapshot_seq": 48213, "tables": [ { "tbl": "shop", "rows": 1 }, { "tbl": "products", "rows": 812 }, … ] }`. `snapshot_seq` = `MAX(change_log.seq)` (or `change_log_floor` if the log is empty) read **before** any rows; `rows` are `COUNT(*)` per table for the progress bar (all counts in one `db.batch()`). Tables, in this order (parents before children): `shop`, `branches`, `devices`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, then every ledger table of [02 §1.1](02-data-model.md#11-table-kinds), then `sync_conflicts`. Soft-deleted master rows are included (history refers to them). `devices` rows exclude `token_hash`.
-2. For each table: `GET /api/sync/snapshot?tbl=<tbl>&after=<id>&limit=500` → `200 { "tbl": "products", "rows": [ {…}, … ], "next_after": "01J9…", "has_more": true }` from `SELECT * FROM <tbl> WHERE id > ?1 ORDER BY id LIMIT ?2` (`limit` 1–1000). Rows have exactly the shape of `change_log.row_json`.
+1. `GET /api/sync/snapshot` (no query) → `200 { "snapshot_seq": 48213, "tables": [ { "tbl": "shop", "rows": 1 }, { "tbl": "products", "rows": 812 }, … ] }`. `snapshot_seq` = `MAX(seq) FROM change_log WHERE tenant_id = ?1` (or the tenant's `change_log_floor` if it has no log rows) read **before** any rows; `rows` are `COUNT(*) … WHERE tenant_id = ?1` per table for the progress bar (all counts in one `db.batch()`). Tables, in this order (parents before children): `shop`, `branches`, `devices`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, then every ledger table of [02 §1.1](02-data-model.md#11-table-kinds), then `sync_conflicts`. Soft-deleted master rows are included (history refers to them). `devices` rows exclude `token_hash`. No row carries `tenant_id`.
+2. For each table: `GET /api/sync/snapshot?tbl=<tbl>&after=<id>&limit=500` → `200 { "tbl": "products", "rows": [ {…}, … ], "next_after": "01J9…", "has_more": true }` from `SELECT <columns except tenant_id> FROM <tbl> WHERE tenant_id = ?1 AND id > ?2 ORDER BY id LIMIT ?3` (primary key `(tenant_id, id)`) (`limit` 1–1000). Rows have exactly the shape of `change_log.row_json`.
 3. The till writes each page in one Dexie transaction with the **same merge rules as pull** (§4.2: rows with a pending outbox op are skipped into `pull_shadow`; nothing is deleted), and saves progress in `kv.snapshot_state = { snapshot_seq, tbl, after }` so an interrupted snapshot resumes where it stopped (also after a reload). Selling keeps working during a snapshot: the till's existing data stays in place and is only overwritten row by row.
 4. When all tables are done: rebuild `stock_levels` and `party_balances` (02 §3.2), set `kv.pull_cursor = snapshot_seq`, delete `kv.snapshot_state`, set `kv.last_full_sync_at`, then pull normally. Changes written while the snapshot was running have `seq > snapshot_seq`, so the pull re-applies them in order; pages read later may already contain newer rows, which the pull simply rewrites with the same or newer values.
 
-Progress UI: full-screen on a new device ("Downloading shop data… 12,400 of ~30,000 rows"), a non-blocking banner on a till that already has data. Cost: one Worker request per 500 rows; a 300,000-row database is ~600 requests and 300,000 D1 rows read (well inside the daily free limits).
+Progress UI: full-screen on a new device ("Downloading shop data… 12,400 of ~30,000 rows"), a non-blocking banner on a till that already has data. Cost: one Worker request per 500 rows; a 300,000-row shop is ~600 requests and 300,000 D1 rows read (inside the daily free limits, but 6 % of the account's read budget: snapshots of large shops count against the shared budget, [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)).
 
 ### 4.4 Retention, pruning and stale tills
 
 A Worker **Cron Trigger** (`"triggers": { "crons": ["30 21 * * *"] }` = 02:30 Asia/Karachi; 1 of the account's 5 free cron triggers) runs `apps/api/src/cron/prune.ts` in the Worker's `scheduled()` handler:
 
-1. `cutoff = now − 30 days`. `target = SELECT MAX(seq) FROM change_log WHERE at < cutoff`.
-2. Delete in chunks, each chunk one `db.batch()` that also moves the floor: `DELETE FROM change_log WHERE seq > ?floor AND seq <= ?upto` (`upto = min(floor + 5000, target)`) + `UPDATE meta SET value = ?upto WHERE key = 'change_log_floor'`. At most 10 chunks (50,000 rows) per night; the rest continues the next night.
-3. `DELETE FROM applied_ops WHERE applied_at < now − 90 days` (chunked the same way by `rowid`). Applied-op IDs are kept 3× longer than the change log so a till that was offline for weeks and re-sends ops whose acknowledgement it never received is still answered from `applied_ops`; ledger inserts would be harmless anyway (`ON CONFLICT(id) DO NOTHING`).
-4. `DELETE FROM enrolment_codes WHERE expires_at < now − 1 day`. `sync_conflicts`, `audit_log` and all ledger and master rows are never pruned.
-5. Log the counts (Workers Logs). The cron uses only I/O (no CPU-heavy work), within the 10 ms CPU limit; rows deleted count as D1 rows written (≈ 5,000/day at the volume in [01 §8](01-architecture.md#8-cloudflare-free-tier-budget)).
+The prune covers **all tenants in one run** (still one cron trigger), with per-tenant floors, and stays within the Free plan's 50 D1 queries per invocation by stopping after 40 calls and continuing the next night:
+
+1. `cutoff = now − 30 days`. Targets for every tenant in one query: `SELECT tenant_id, MAX(seq) AS target FROM change_log WHERE at < ?cutoff GROUP BY tenant_id` (index `change_log_at`).
+2. Per tenant, delete in chunks, each chunk one `db.batch()` that also moves that tenant's floor: `DELETE FROM change_log WHERE tenant_id = ?t AND seq > ?floor AND seq <= ?upto` (`upto` = the 5,000th seq above the floor, capped at `target`) + `UPDATE tenants SET change_log_floor = ?upto WHERE id = ?t`. At most 50,000 rows per night across tenants; tenants are served round-robin from where the last run stopped (`meta.prune_cursor`), so one big shop cannot starve the others.
+3. `DELETE FROM applied_ops WHERE applied_at < now − 90 days` (index `applied_ops_at`, chunked by `rowid`). Applied-op IDs are kept 3× longer than the change log so a till that was offline for weeks and re-sends ops whose acknowledgement it never received is still answered from `applied_ops`; ledger inserts would be harmless anyway (`ON CONFLICT(tenant_id, id) DO NOTHING`).
+4. `DELETE FROM enrolment_codes WHERE expires_at < now − 1 day`; `DELETE FROM tenant_usage WHERE day < <today − 90 days>`. `sync_conflicts`, `audit_log` and all ledger and master rows are never pruned.
+5. Tenant deletion ([13 §7.4](13-multi-tenancy.md#74-delete-a-tenant)): for tenants with `status = 'deleting'`, delete their rows child tables first (`DELETE FROM <tbl> WHERE rowid IN (SELECT rowid FROM <tbl> WHERE tenant_id = ?t LIMIT 2000)`), at most 20,000 rows per night in total, and their R2 objects under `t/<tenant_id>/` (list + delete). When every table is empty, set `status = 'deleted'`, `deleted_at = now`.
+6. Set `meta.last_prune_at`; log counts per tenant (Workers Logs). The cron uses only I/O (no CPU-heavy work), within the 10 ms CPU limit; rows deleted count as D1 rows written and are charged to the account's shared budget, not to a tenant's `daily_write_budget`.
 
 **A till offline for more than 30 days** keeps selling normally (everything is local). When it comes back online:
 1. If the server answers `409 SCHEMA_OUTDATED`, the PWA update is applied first (the rail already shows "Update ready"; it reloads when no cart is open).
@@ -160,13 +167,13 @@ A Worker **Cron Trigger** (`"triggers": { "crons": ["30 21 * * *"] }` = 02:30 As
 | `products.last_cost` | Set by the delivery recipe as a normal `upsert` with `changed_fields: ['last_cost']`. |
 | `sales.status` | Derived; recomputed on both sides; never pushed as a change. |
 | Stock count | Stored as a delta (`count` = counted − on-hand at that moment on that device), so concurrent offline sales elsewhere still add up correctly. |
-| Invoice numbers | `<bill_prefix>-<device_code>-<seq>`, `seq` comes from `kv.invoice_seq` (last issued number on this device; next bill uses +1). Set to `devices.last_invoice_seq` on enrolment (0 for a new device) and **never decreased** (restore recovery above). Two devices can never produce the same number because device codes are unique per branch and never reused. |
+| Invoice numbers | `<bill_prefix>-<device_code>-<seq>`, `seq` comes from `kv.invoice_seq` (last issued number on this device; next bill uses +1). Set to `devices.last_invoice_seq` on enrolment (0 for a new device) and **never decreased** (restore recovery above). Two devices of a shop can never produce the same number because device codes are unique per branch and never reused; numbers are unique per tenant (`UNIQUE (tenant_id, invoice_no)`), so two shops may both have `INV-A-1`. |
 | Staff, branches, shop, devices | Owner-only edits (server rejects others). `devices` is server-owned. |
 | Deletes vs. edits | A delete always wins over a concurrent edit (row stays soft-deleted; the edit's fields are applied but `deleted_at` stays set). |
 | Unique conflicts (same SKU or barcode created on two devices offline) | Second op is `rejected` with `UNIQUE_VIOLATION`; the till shows it in Settings → Sync and on the product with "Change SKU/barcode and retry". |
 | Negative stock | Allowed. Products with on-hand < 0 appear in Reports → Stock exceptions. |
-| Over-refund / refund-after-void (two tills act on the same bill offline) | Both rows are **accepted** (the money already left a drawer — real events are never rejected). The server records a `sync_conflicts` row (`kind = 'over_refund'` or `'refund_after_void'`, with both row IDs); the owner sees it in Admin → Conflicts and on the bill, and settles it manually (e.g. a pay-in). |
-| Over-return to a supplier (more returned against a delivery line than was received) | Accepted, `sync_conflicts` `kind = 'over_return'`, shown in Admin → Conflicts. |
+| Over-refund / refund-after-void (two tills act on the same bill offline) | Both rows are **accepted** (the money already left a drawer — real events are never rejected). The server records a `sync_conflicts` row (`kind = 'over_refund'` or `'refund_after_void'`, with both row IDs); the shop owner sees it in Settings → Sync → Conflicts and on the bill, and settles it manually (e.g. a pay-in). |
+| Over-return to a supplier (more returned against a delivery line than was received) | Accepted, `sync_conflicts` `kind = 'over_return'`, shown in Settings → Sync → Conflicts. |
 | Credit limit exceeded on two devices offline | Allowed (limit is a warning unless `hard_limit`); the second device's sale still syncs. |
 
 ## 6. Scheduling
@@ -185,7 +192,7 @@ No Background Sync in v1: pushes happen only while the app is open (the counter 
 
 **Clock check:** every response carries `server_time`. If `|device clock − server_time| > 5 min`, the rail shows "This PC's clock is wrong — fix the date/time" (amber) and Home shows an attention card. Ledger rows still use the device clock (`created_at`, `business_date` in `shop.timezone`), because selling must work offline; the warning stops a wrong clock from silently putting bills on the wrong business date.
 
-**Pending report:** every till request sends `X-Bikri-Pending: <pending_op_count>;<oldest_pending_created_at or 0>`; the Worker stores it in `devices.pending_ops` / `devices.oldest_pending_at` together with `last_seen_at` (at most once per 5 minutes) for Admin Overview.
+**Pending report:** every till request sends `X-Bikri-Pending: <pending_op_count>;<oldest_pending_created_at or 0>`; the Worker stores it in `devices.pending_ops` / `devices.oldest_pending_at` together with `last_seen_at` (at most once per 5 minutes) for Settings → Devices and the operator console.
 
 ## 7. Status shown to the user
 
@@ -204,7 +211,7 @@ If pending ops are older than 24 h, Home shows a warning card: "This till hasn't
 
 ## 8. Device revocation and data loss window
 
-A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device was removed by the owner", and offers "Export unsynced data" (`bikri-unsynced-<device_code>-<YYYYMMDD-HHmm>.json`: `{ format: 'bikri-unsynced', version: 1, device_id, ops: [...] }`) so nothing is silently lost. The owner imports that file in **Admin → Devices → Import unsynced ops** (`POST /api/admin/import-ops`, Cloudflare Access), not from a till: the till push path rejects rows whose `device_id` is not the caller's ([04 §5](04-api.md#5-server-side-checks-beyond-zod)). The admin endpoint accepts ops only for a **revoked** device, keeps the original `op_id`s (so a second import is a no-op) and validates them exactly like a push.
+A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device was removed by the owner", and offers "Export unsynced data" (`bikri-unsynced-<device_code>-<YYYYMMDD-HHmm>.json`: `{ format: 'bikri-unsynced', version: 2, tenant_id, device_id, ops: [...] }`) so nothing is silently lost. The shop owner imports that file on an **admin device** in **Settings → Devices → Import unsynced ops** (`POST /api/shop/import-ops`), or the operator in the console (`POST /api/admin/tenants/:id/import-ops`); not through a normal push, because the till push path rejects rows whose `device_id` is not the caller's ([04 §5](04-api.md#5-server-side-checks-beyond-zod)). Both endpoints accept ops only for a **revoked** device **of the same tenant** (a `device_id` of another tenant → `404 NOT_FOUND`), keep the original `op_id`s (so a second import is a no-op) and validate them exactly like a push.
 
 ## 9. Test cases (must exist in `apps/api` and `apps/pos` tests)
 
@@ -222,9 +229,12 @@ A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device
 12. Two pushes for the same product arrive concurrently with the same `base_rev` → exactly one full update; the other becomes a guarded-update miss and is re-applied as a merge (`rev` ends at base + 2, one `sync_conflicts` row).
 13. Restore recovery: server restored to a point before 3 sales of device A were synced; after the new `restore_epoch`, device A re-sends them, the server has all 3, and A's next invoice number is higher than any it issued before.
 14. A till on `schema_version = SCHEMA_VERSION − 1` (≥ `MIN_CLIENT_SCHEMA`) pushes a product upsert without a newly added column → accepted, the new column keeps its value.
-15. Import of a revoked device's unsynced-ops file through `/api/admin/import-ops` → applied with original `op_id`s; importing it twice changes nothing; the same ops pushed with another till's token → `FORBIDDEN`.
-16. Prune: with `change_log` rows older and newer than 30 days, running `scheduled()` deletes only the old ones, sets `meta.change_log_floor` to the highest deleted `seq`, and removes `applied_ops` older than 90 days only; a second run the same night deletes nothing.
+15. Import of a revoked device's unsynced-ops file through `/api/shop/import-ops` (admin device) or `/api/admin/tenants/:id/import-ops` → applied with original `op_id`s; importing it twice changes nothing; the same ops pushed with another till's token → `FORBIDDEN`; the file imported by another tenant's admin device → `404`.
+16. Prune: with `change_log` rows of two tenants older and newer than 30 days, running `scheduled()` deletes only the old ones, sets each tenant's `tenants.change_log_floor` to the highest `seq` deleted **for that tenant**, and removes `applied_ops` older than 90 days only; a second run the same night deletes nothing; a pull of tenant B is not sent `410` because of rows pruned for tenant A.
 17. Pull with `since` below `change_log_floor` → `410 SNAPSHOT_REQUIRED`; the till runs the snapshot and ends with the same row set and caches as a till that never went offline (compare table by table).
 18. Snapshot interrupted after 2 of 25 tables (network off) and the app reloaded → resumes from `kv.snapshot_state`, no row downloaded twice into a wrong state, pending local edits kept (`pull_shadow`).
 19. Till offline 35 days with 300 sales in the outbox → on reconnect it pushes all 300 first, then snapshots, then pulls; server and till agree on stock and balances.
 20. Rows written by another till while a snapshot is running (after `snapshot_seq`) are present on the snapshotting till after its first pull.
+21. Tenant isolation of sync (also part of [10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)): tenants A and B both create a product with the same ULID and an `INV-A-1` sale → both applied, each tenant pulls only its own rows; a pull or snapshot with B's token never returns an A row; a B push of a sale referencing A's customer id → `rejected` / `FOREIGN_KEY`; a B upsert with A's product id creates or edits only B's row; a `tenant_id: "A"` key inside a B row is ignored.
+22. Restore epoch per tenant: a new `restore_epoch` on tenant A triggers restore recovery on A's tills only.
+23. Quota: tenant A at its `daily_write_budget` gets `503 TENANT_QUOTA` and keeps its ops; tenant B's push in the same minute is applied.

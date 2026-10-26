@@ -1,6 +1,6 @@
 # 01 — Setup wizard (first run)
 
-**Route** `/setup`. Shown on the first enrolled device when `GET /api/me` returns `shop_setup_completed: false`. Not reachable afterwards (redirect to `/`). No PIN needed (the device was just enrolled by the owner via Access).
+**Route** `/setup`. Shown on the first enrolled device when `GET /api/me` returns `shop_setup_completed: false`. Not reachable afterwards (redirect to `/`). No PIN needed (the device was just enrolled by the shop owner with the owner pairing code from the operator, [13 §7.1](../13-multi-tenancy.md#71-onboarding-a-new-shop-d-067)). Each shop (tenant) runs this wizard once, on its first admin device; other shops' setups are unrelated.
 
 ## Reference
 
@@ -31,7 +31,7 @@ Step 0 (welcome): heading "Welcome to Bikri", three large language buttons, `Sta
 ### Step 1 — Shop
 | Field | Type | Rules | Error key |
 |---|---|---|---|
-| Shop name | text | required, 2–60 chars, trimmed | `setup.errors.shop_name` |
+| Shop name | text, pre-filled with the tenant's `display_name` from enrolment (`kv.tenant`) | required, 2–60 chars, trimmed | `setup.errors.shop_name` |
 | Business type | chips (single) | required; options: Electronics (default), Mobile shop, Grocery, General store, Pharmacy, Clothing, Bakery, Hardware, Other | — |
 | Currency | read-only | `PKR (Rs)` | — |
 | Phone | `PhoneInput kind="any"` | required; mobile or landline (`0xx xxxxxxx`) | `errors.phone_invalid` |
@@ -46,7 +46,7 @@ Step 0 (welcome): heading "Welcome to Bikri", three large language buttons, `Sta
 | PIN | 4 masked digit boxes, numeric keypad on touch | 4 digits; weak-PIN list rejected ([05 §4](../05-auth-and-roles.md#4-staff-pins-and-session)) → "Choose a less obvious PIN" |
 | Confirm PIN | same | must match → "PINs don't match" |
 
-Hint text: "You'll use this PIN to unlock the till. Your owner login (email) is only for the admin page."
+Hint text: "You'll use this PIN to unlock the till and to manage devices on this admin device. Don't share it."
 
 ### Step 3 — Receipt and tax
 | Field | Type | Default | Rules |
@@ -64,7 +64,7 @@ Two cards: **Add one product** (inline form = product form from [08](08-products
 
 ## Actions
 
-`Finish` writes, in one Dexie transaction + outbox: `shop` (with `setup_completed_at`), an **upsert of the existing default branch** (created by the Worker at enrolment, [04 §3.7](../04-api.md#37-admin-endpoints-cloudflare-access); never a second insert), owner `staff` (role owner, PIN hash), seed `expense_categories` (already server-seeded; skip if present), optional product + `stock_movements` `opening` with unit cost. Then forces a sync push and navigates to `/` (home) unlocked as the owner. Done screen: "Your shop is ready" with buttons `Start selling` (→ `/sell`) and `Set up printer` (→ `/settings/printer`).
+`Finish` writes, in one Dexie transaction + outbox: `shop` (with `setup_completed_at`), an **upsert of the existing default branch** (created by the Worker when the operator created the shop, [04 §3.7](../04-api.md#37-operator-endpoints-cloudflare-access); never a second insert), owner `staff` (role owner, PIN hash), seed `expense_categories` (already server-seeded; skip if present), optional product + `stock_movements` `opening` with unit cost. Then forces a sync push and navigates to `/` (home) unlocked as the owner. Done screen: "Your shop is ready" with buttons `Start selling` (→ `/sell`) and `Set up printer` (→ `/settings/printer`).
 
 ## States
 
@@ -86,4 +86,5 @@ Two cards: **Add one product** (inline form = product form from [08](08-products
 5. Tax 17 is stored as `tax_rate_bp = 1700`; preview shows a "Sales tax 17%" line.
 6. Uploading a 3000 px logo stores an image ≤ 576 px wide; preview shows it dithered.
 7. Skipping step 4 lands on Home with zero products and the "Add your first product" empty state.
-8. After Finish, `/setup` redirects to `/`; a second browser enrolled later never sees the wizard.
+8. After Finish, `/setup` redirects to `/`; a second browser enrolled later into the same shop never sees the wizard.
+9. Two shops set up on two browsers each get their own shop row, owner and logo; neither shop's Home, receipts or settings show the other's name, logo or data (E2E journey 21).
