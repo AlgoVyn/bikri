@@ -19,6 +19,8 @@
 - **Sync badge** states ([03 §7](../03-sync.md#7-status-shown-to-the-user)): `Synced` (green check), `Syncing…` (spinner), `n waiting` (amber, offline or pending), `Sync problem` (red; click opens Settings → Sync). Tooltip shows last successful sync time.
 - **Offline banner**: thin amber bar "Offline — sales are saved on this device" when `navigator.onLine` is false or 3 consecutive pushes fail.
 - **Update prompt**: toast "New version ready — Reload" (never auto-reload during a sale).
+- **Read-only banner** (warning colours, not dismissable, every screen including the PIN lock) while `kv.tenant_status.status = 'read_only'`, text `tenant.readOnly.banner`; actions that would save business data are hidden or disabled and show `tenant.readOnly.blocked` ([13 §7.2](../13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)).
+- **Support access banner** (info colours, every screen) while `kv.support.until` is in the future: `tenant.support.banner` with time and reason, and `End now` for an owner on an admin device ([13 §7.5](../13-multi-tenancy.md#75-operator-support-access-d-084)).
 
 ## Home layout
 

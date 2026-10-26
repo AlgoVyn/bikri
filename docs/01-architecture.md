@@ -203,11 +203,11 @@ bikri/
 
 The Hono app is created with `new Hono().basePath('/bikri/api')`, so route files declare `/health`, `/sync/push` etc. The Worker's default export is `{ fetch: app.fetch, scheduled }`; `scheduled()` runs the nightly prune ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)).
 
-`deviceAuth`: reads `Authorization: Bearer <token>`, computes SHA-256, looks up `devices.token_hash` joined with `tenants` (one query), rejects if missing or `revoked_at` not null, sets `c.var.device` and **`c.var.tenant`** (id, status, db_shard, budget, restore_epoch). Nothing else in a till request can choose the tenant. Updates `devices.last_seen_at` at most once per 5 minutes (to save D1 writes).
+`deviceAuth`: reads `Authorization: Bearer <token>`, computes SHA-256, looks up `devices.token_hash` joined with `tenants` (one query), rejects if missing, `revoked_at` not null, or a support device past `expires_at` (`401 DEVICE_REVOKED`), sets `c.var.device` and **`c.var.tenant`** (id, status, db_shard, budget, restore_epoch). Nothing else in a till request can choose the tenant. Updates `devices.last_seen_at` at most once per 5 minutes (to save D1 writes).
 
-`tenantGate`: `status` `suspended`/`deleting` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`; on `/sync/push` also the daily write budget → `503 TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)).
+`tenantGate`: `status` `suspended`/`deleting` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`; `read_only` → reads and sign-in pass, writes of business data get `403 TENANT_READ_ONLY` (push applies only ops made before the device learned it, [13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)); support devices may not push or upload (`403 FORBIDDEN`); on `/sync/push` also the daily write budget → `503 TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). Every `/me`, pull and push response carries `tenant_status` and `support`.
 
-`shopAdmin`: requires `c.var.device.is_admin = 1` and `X-Bikri-Staff` naming an active `owner` of `c.var.tenant`.
+`shopAdmin`: requires `c.var.device.is_admin = 1`, `X-Bikri-Staff` naming an active `owner` of `c.var.tenant`, and (except the owner sign-in endpoints and ending support access) a valid `X-Bikri-Owner-Session` HMAC token for that tenant, device and owner ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)).
 
 `tenantDb(env, tenant)`: returns the D1 binding named by `tenant.db_shard` (v1 always `DB`) wrapped so that every statement binds `tenant_id` ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). Route code never touches `env.DB` for tenant tables.
 
@@ -257,9 +257,13 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     "ALLOWED_ORIGINS": "https://algovyn.com",
     "SHOP_TIMEZONE": "Asia/Karachi"      // default only; each tenant's shop.timezone is authoritative
   },
+  // owner email sign-in (05 §3.2): free sends to verified destination addresses, from the algovyn.com routing domain
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["bikri@algovyn.com"] }],
+  "ratelimits": [{ "name": "OWNER_SIGNIN_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } }],
   "triggers": { "crons": ["30 21 * * *"] },   // 02:30 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
   "observability": { "enabled": true }
-  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com", the platform operator)
+  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com", the platform operator),
+  // OWNER_CODE_KEY and OWNER_SESSION_KEY (32 random bytes each, owner email sign-in, 05 §3.2)
 }
 ```
 
@@ -340,6 +344,7 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 5. Check `wrangler d1 migrations list bikri --remote` shows nothing applied (M0 schema was single-shop and is rewritten in place, D-077), then `wrangler d1 migrations apply bikri --remote`.
 6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the operator's age public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
 7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)).
+8. Owner email sign-in: `wrangler secret put OWNER_CODE_KEY` and `OWNER_SESSION_KEY` (e.g. `openssl rand -base64 32`). For each shop owner's email: Cloudflare dashboard → Email Service → Email Routing → Destination addresses → add it; the owner clicks Cloudflare's verification email once. `algovyn.com` is already an Email Routing domain, so no DNS change is needed ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)).
 
 ### 7.2 CI/CD
 
@@ -365,6 +370,7 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 | R2 | 10 GB-month, 1M Class A, 10M Class B per month | ≈ 25 MB photos; daily dumps shared | fine |
 | Static assets | 20,000 files, 25 MiB each | ~150 files | fine |
 | Cloudflare Access | 50 users | 1 operator | fine |
+| Email (owner sign-in codes) | Free: only to verified destination addresses, free and unmetered; 200 addresses per account | 1 address per shop, a few codes a week | fine; arbitrary recipients need Workers Paid ([13 §2](13-multi-tenancy.md#2-cloudflare-facts-the-decision-rests-on-checked-27-oct-2026)) |
 
 Rules that keep usage low:
 - Reports and lists are computed on the device from IndexedDB, never from D1.

@@ -18,7 +18,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 ## 3. Scope
 
-**In v1:** multiple shops (tenants) on one deployment with a platform operator console (create/suspend/delete shops, owner pairing codes, per-shop usage, export, restore), setup wizard, device enrolment, staff PINs and roles, catalogue with photos, barcode/HID/camera scanning, sell screen with 3 parallel carts and held bills, quick sale, line and bill discounts, cash/card/bank-wallet/udhaar and split payments, ESC/POS printing with cut and drawer, browser-print fallback, receipt logo, reprint, refunds (whole/partial), void-and-reissue, udhaar khata with limits/promises/chase list/WhatsApp, suppliers with deliveries, supplier ledger and returns to supplier, refunds on udhaar bills split automatically between money back and khata, Code 128 barcode labels printed from the browser, optional tax-inclusive (MRP) pricing when tax is enabled (tax off by default), one product per variant/SKU, stock adjustments with reason codes, weighted-average cost, expenses, cash pay-in/pay-out, day close, reports with CSV/PDF export, sync across tills, backups, English/Urdu/Roman Urdu, light/dark theme, text size.
+**In v1:** multiple shops (tenants) on one deployment with a platform operator console (create, make read-only, suspend and delete shops, owner pairing codes, per-shop usage, export, restore, time-limited and visible support access), owner email sign-in for shop administration, owners' own server export, setup wizard, device enrolment, staff PINs and roles, catalogue with photos, barcode/HID/camera scanning, sell screen with 3 parallel carts and held bills, quick sale, line and bill discounts, cash/card/bank-wallet/udhaar and split payments, ESC/POS printing with cut and drawer, browser-print fallback, receipt logo, reprint, refunds (whole/partial), void-and-reissue, udhaar khata with limits/promises/chase list/WhatsApp, suppliers with deliveries, supplier ledger and returns to supplier, refunds on udhaar bills split automatically between money back and khata, Code 128 barcode labels printed from the browser, optional tax-inclusive (MRP) pricing when tax is enabled (tax off by default), one product per variant/SKU, stock adjustments with reason codes, weighted-average cost, expenses, cash pay-in/pay-out, day close, reports with CSV/PDF export, sync across tills, backups, English/Urdu/Roman Urdu, light/dark theme, text size.
 
 **In v2:** multiple branches with branch reports and stock transfers, per-product tax rates, serial/IMEI tracking and warranty lookup by IMEI (v1 already prints a warranty-until date per line), pack quantities on purchases, product variants (option matrix such as colour × length), direct label-printer commands (TSPL/ZPL), electronics starter catalogue, customer loyalty notes.
 
@@ -26,7 +26,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 ## 4. Non-goals
 
-- No self-service sign-up: shops are created by the platform operator ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)). No in-app billing (open question in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed)).
+- No self-service sign-up: shops are created by the platform operator ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)). No in-app billing: the operator makes an unpaid shop read-only by hand (D-080); pricing is an open question in [13 §9](13-multi-tenancy.md#9-open-questions-owner-decision-needed).
 - No sharing of data between shops (no shared catalogue, customers or stock across tenants).
 - No double-entry accounting, payroll, restaurant/table features, e-commerce, loyalty points, multi-currency.
 - No batch/expiry tracking (pharmacy feature, not needed for electronics).
@@ -38,7 +38,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 | Role | Who | Can |
 |---|---|---|
-| Platform operator | Adnan (`operator@example.com`), not part of any shop | Creates, suspends and deletes shops, issues owner pairing codes, sees usage, exports/restores a shop, holds the backup key. Uses the console at `/admin` (Cloudflare Access) |
+| Platform operator | Adnan (`operator@example.com`), not part of any shop | Creates shops, makes them read-only, suspends and deletes them, issues owner pairing codes, sees usage, exports/restores a shop, joins a shop's devices for support (time-limited, visible, audited), holds the backup key. Uses the console at `/admin` (Cloudflare Access) |
 | Owner | The owner of one shop | Everything in **that shop**, including settings, staff, devices (on an admin device), cost prices, reports, deletes |
 | Manager | Trusted senior staff | Sell, refunds, discounts up to their limit, stock, suppliers, expenses, day close, reports; no staff/device/shop settings |
 | Cashier | Counter staff | Sell, discounts up to their limit, receive udhaar payments, price check, own day close; no refunds/voids by default |
@@ -53,7 +53,7 @@ Requirements are numbered so specs, tasks and tests can reference them.
 
 | ID | Requirement |
 |---|---|
-| REQ-C01 | Selling, printing, udhaar, stock adjustments, expenses and day close work with no network. |
+| REQ-C01 | Selling, printing, udhaar, stock adjustments, expenses and day close work with no network. (Exception: once a till has learned that the operator made its shop read-only, it stops creating business data; everything made before that is kept and synced, [13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080).) |
 | REQ-C02 | All money stored and computed as integer paisa; all rules in [07-money-rules](07-money-rules.md). |
 | REQ-C03 | Money and stock records are append-only; corrections are new records. |
 | REQ-C04 | Stock on hand and party balances are derived from movements/ledger entries. |
@@ -65,7 +65,7 @@ Requirements are numbered so specs, tasks and tests can reference them.
 | REQ-C10 | Every list and report can be exported (see REQ-B02). |
 | REQ-C11 | **Tenant isolation.** Every server read and write is scoped to the caller's tenant; no API, file, export or error reveals another tenant's data or whether it exists. Enforced by composite keys and the mandatory cross-tenant test suite ([10 §8](10-testing.md#8-cross-tenant-isolation-suite-mandatory)). |
 | REQ-C12 | **Fair share.** One shop reaching its daily free-tier budget never stops another shop's sync, and never blocks a sale on its own tills (they keep selling offline). |
-| REQ-C13 | **Per-shop lifecycle.** The operator can create, suspend, export, restore and delete one shop without affecting the others. |
+| REQ-C13 | **Per-shop lifecycle.** The operator can create, make read-only, suspend, export, restore and delete one shop without affecting the others; every status change is audited in that shop with the operator and a reason. A shop owner can export their whole shop from the server. |
 
 ### 6.2 "Where Bikri beats Dukaan" — explicit requirements
 
@@ -75,7 +75,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 |---|---|---|
 | REQ-B01 | **Correct day close.** Expected cash = opening + cash sales + udhaar received in cash + pay-ins + cash refunds received from suppliers − cash refunds − cash expenses − cash paid to suppliers (Pay supplier and "Paid now" on deliveries) − pay-outs. Dukaan omits supplier cash payouts. | [07 §8](07-money-rules.md#8-day-close), [screens/15](screens/15-day-close.md) |
 | REQ-B02 | **Report export.** Every report and every list (sales, products, customers, suppliers, expenses, stock history, day closes) exports to CSV; reports also export to PDF. Generated on the device, works offline. | [screens/16](screens/16-reports.md) |
-| REQ-B03 | **Receipt logo.** Owner uploads a logo (PNG/JPG/SVG); it is printed as a raster image at the top of thermal receipts and shown on shared images and A4. No vendor branding on receipts. | [06 §6](06-printing.md#6-logo-and-urdu-raster-rendering) |
+| REQ-B03 | **Receipt logo.** Owner uploads a logo (PNG/JPG/SVG); it is printed as a raster image at the top of thermal receipts and shown on shared images and A4. The only platform branding is one small "Powered by AlgoVyn" line at the bottom of customer receipts (D-085, [06 §4.4](06-printing.md#44-powered-by-algovyn-line-d-085)). | [06 §6](06-printing.md#6-logo-and-urdu-raster-rendering) |
 | REQ-B04 | **WhatsApp that works.** Reminders, statements and receipts open WhatsApp via `https://wa.me/<92number>?text=<urlencoded>` and, where supported, also share the PNG image via the Web Share API. Never opens an unrelated page. | [screens/12](screens/12-udhaar.md) |
 | REQ-B05 | **No install, no activation.** The till is a web app at `https://algovyn.com/bikri/`; the first device of a shop is enrolled with an owner pairing code from the operator, later tills with codes the shop owner creates in Bikri itself; there is no vendor account, trial or device cap. | [05 §2](05-auth-and-roles.md#2-device-enrolment) |
 | REQ-B06 | **Continuous multi-till sync**, not only manual backups. | [03-sync](03-sync.md) |

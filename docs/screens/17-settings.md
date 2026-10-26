@@ -32,7 +32,7 @@ Shop name, business type, phone, address, city, NTN/STRN — same rules as [01 s
 
 ## Receipt and tax (`settings.shop`)
 
-Header, footer, tax % (bp; default 0 = tax off), **Prices include tax** switch (only shown when tax % > 0; `shop.tax_mode`, default off = tax added on top; changing it shows "Applies to new bills only"), tax label (default "Sales tax"), round total to (No / Rs 1 / Rs 5 / Rs 10), refund rounding (Nearest rupee / Round down / Exact), show cashier name, show payment details, show "You saved Rs …" line (sum of discounts), print warranty line, receipt language (Same as app / English / Urdu), number grouping (International `124,500` or Lakh `1,24,500`). Live 58 mm and 80 mm preview. Never any "Powered by" line.
+Header, footer, tax % (bp; default 0 = tax off), **Prices include tax** switch (only shown when tax % > 0; `shop.tax_mode`, default off = tax added on top; changing it shows "Applies to new bills only"), tax label (default "Sales tax"), round total to (No / Rs 1 / Rs 5 / Rs 10), refund rounding (Nearest rupee / Round down / Exact), show cashier name, show payment details, show "You saved Rs …" line (sum of discounts), print warranty line, receipt language (Same as app / English / Urdu), number grouping (International `124,500` or Lakh `1,24,500`). Live 58 mm and 80 mm preview, which ends with the small "Powered by AlgoVyn" line that every customer receipt carries (not a shop setting, note "Added by AlgoVyn"; [06 §4.4](../06-printing.md#44-powered-by-algovyn-line-d-085), D-085).
 
 ## Cashiers (`settings.staff`)
 
@@ -76,10 +76,12 @@ System / English / اردو / Roman Urdu; immediate switch; affects UI and (if r
 
 ## Devices (admin devices, owner only)
 
-Shown only on an admin device (`kv.is_admin`) when unlocked as an `owner` (`devices.manage`); online only. Uses `/api/shop/*` with `X-Bikri-Staff` ([04 §3.8](../04-api.md#38-shop-admin-endpoints-admin-device)). Everything here is this shop's only.
+Shown only on an admin device (`kv.is_admin`) when unlocked as an `owner` (`devices.manage`); online only. Uses `/api/shop/*` with `X-Bikri-Staff` and the owner session ([04 §3.8](../04-api.md#38-shop-admin-endpoints-admin-device)). Everything here is this shop's only.
+
+**Confirm it's you (owner email sign-in, [05 §3.2](../05-auth-and-roles.md#32-owner-email-sign-in-d-082)).** The first action in this section (and in `Download from server`) opens a dialog: "We sent a 6-digit code to a***@gmail.com" → 6-digit input (Urdu digits normalised), `Confirm`, `Send again` (after 60 s), tries left after a wrong code, "Code expires in 10:00". `EMAIL_UNAVAILABLE` → "Email sign-in isn't working for this shop. Contact Algovyn." The session lasts until Lock, Switch user, reload or 12 hours.
 
 - **Add a till**: device name, branch, "Can manage devices" (admin, off) → code `XXXX-XXXX` + QR of the enrol link, 15:00 countdown; list of unused codes with `Cancel`.
-- **Devices list**: name, code (A, B…), branch, admin badge, last seen, app version, pending ops, status; `Rename`, `Move branch`, `Make admin` / `Remove admin` (not the last admin device), `Revoke` (confirm: "Unsynced sales on that device will stay on it and can be exported there").
+- **Devices list**: name, code (A, B…), branch, admin badge, "Algovyn support" badge with end time for a support device (`Revoke` ends support access), last seen, app version, pending ops, status; `Rename`, `Move branch`, `Make admin` / `Remove admin` (not the last admin device), `Revoke` (confirm: "Unsynced sales on that device will stay on it and can be exported there").
 - **Import unsynced ops** (revoked devices only): choose the `bikri-unsynced-*.json` file → preview (op count, date range, sales/payment totals) → `Import` → `POST /api/shop/import-ops` in chunks of 200 → summary ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)). A file from another shop is refused ("This file is from a different shop").
 
 ## This device
@@ -88,12 +90,13 @@ Shop name, device name/code/branch, admin or not. `Leave this shop` (owner PIN; 
 
 ## Sync (everyone sees status; actions need owner)
 
-Last push/pull time, pending ops count, failed ops with error and `Retry` / (owner) `Discard` (writes `audit_log sync_ops_discarded`), rejected unique conflicts with links to fix, **Conflicts** list from `sync_conflicts` (owner on an admin device can `Acknowledge`), "Daily sync limit reached — sales are safe on this device and will sync after <local time of 00:00 UTC>" when the shop is over its budget (`TENANT_QUOTA`), `Sync now`, device name/code/branch, storage used and persisted status, `Rebuild local data` (owner; re-pulls everything after pushing; `audit_log cache_rebuilt`).
+Last push/pull time, pending ops count, failed ops with error and `Retry` / (owner) `Discard` (writes `audit_log sync_ops_discarded`), rejected unique conflicts with links to fix, **Conflicts** list from `sync_conflicts` (owner on an admin device can `Acknowledge`), "Daily sync limit reached — sales are safe on this device and will sync after <local time of 00:00 UTC>" when the shop is over its budget (`TENANT_QUOTA`), "Waiting: this shop is read-only" next to ops held back while the shop is read-only, `Sync now`, device name/code/branch, storage used and persisted status, `Rebuild local data` (owner; re-pulls everything after pushing; `audit_log cache_rebuilt`).
 
 ## Backup and export (`export.data`)
 
 - Server backups: "Your data is backed up every night by Algovyn." (the nightly backup covers all shops and is run by the platform operator; shops don't see or download it, [09 §2](../09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)). To restore, contact the operator, who restores **this shop only** ([09 §3.4](../09-backups-and-ops.md#34-restore-one-tenant)).
 - `Download full export` (all of **this shop's** tables as JSON + CSV zip, generated from local data, REQ-B13).
+- `Download from server` (owner, admin device, email sign-in; once per 24 hours): the same zip built from the server copy, including every till's data ([13 §7.3](../13-multi-tenancy.md#73-per-tenant-export-and-restore)); progress per table, resumable for 2 hours. Works in a read-only shop.
 - `Restore from export` (owner; only into an empty shop, and only an export of the same shop or one without a tenant; the operator does restores of a live shop), see [09](../09-backups-and-ops.md).
 - Unsynced ops of a removed (revoked) till are imported in **Devices** above, not here ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
 
@@ -103,7 +106,7 @@ Audit log viewer: filters action, staff, device, date; rows show time, staff, ac
 
 ## About
 
-Version, build hash, licence (link to LICENSE), source link (GitHub), check for update.
+Version, build hash, licence (link to LICENSE), source link (GitHub), check for update, "Terms and privacy" ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)).
 
 ## Acceptance criteria
 
@@ -117,3 +120,5 @@ Version, build hash, licence (link to LICENSE), source link (GitHub), check for 
 8. With tax 0 the "Prices include tax" switch is hidden and `tax_mode` is `exclusive`; after setting 17% and switching it on, the next Rs 11,700 bill totals Rs 11,700 with "Includes Sales tax 17%: Rs 1,700" (T9), while bills saved earlier are unchanged.
 9. On an admin device unlocked as owner, `Add a till` produces a code that enrols a device into this shop only; on a non-admin device or as a manager the Devices section is hidden and `/api/shop/*` returns 403.
 10. `Leave this shop` removes every IndexedDB database and cache entry of this shop from the browser.
+11. Device actions and `Download from server` need a fresh email code after Lock; a manager or a non-admin device never sees them.
+12. In a read-only shop, every section still shows its data; only local device settings (printer, scanner, display, language) can be changed.
