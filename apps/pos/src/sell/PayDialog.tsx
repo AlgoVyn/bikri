@@ -54,6 +54,8 @@ const METHOD_KEY: Record<PayMethod, string> = {
 export type Done = {
   sale: SyncedRow;
   customerName: string;
+  /** Customer's phone for the WhatsApp share (screens/07). */
+  customerPhone: string | null;
   balance: number;
   print: boolean;
   whatsapp: boolean;
@@ -68,6 +70,8 @@ export function PayDialog({
   totals,
   money,
   requestOverride,
+  onScan,
+  onOpenBill,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,6 +83,9 @@ export function PayDialog({
     permission: 'udhaar.hard_limit',
     onApproved: (by: string) => void,
   ) => void;
+  /** A barcode scanned on Sale complete starts the next sale (screens/07 AC 1). */
+  onScan: (code: string) => void;
+  onOpenBill: (saleId: string) => void;
 }) {
   const { t } = useTranslation();
   const [done, setDone] = useState<Done | null>(null);
@@ -100,7 +107,12 @@ export function PayDialog({
       }
     >
       {done ? (
-        <SaleComplete done={done} onNewSale={() => onOpenChange(false)} />
+        <SaleComplete
+          done={done}
+          onNewSale={() => onOpenChange(false)}
+          onScan={onScan}
+          onOpenBill={() => onOpenBill(String(done.sale.id))}
+        />
       ) : open ? (
         <PayStep
           cartId={cartId}
@@ -232,6 +244,9 @@ function PayStep({
       onSaved({
         sale,
         customerName: customer ? String(customer.customer.name) : '',
+        customerPhone: customer?.customer.phone
+          ? String(customer.customer.phone)
+          : null,
         balance: after,
         print: printOn,
         whatsapp,

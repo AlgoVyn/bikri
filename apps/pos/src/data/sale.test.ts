@@ -1,14 +1,6 @@
-import type { Cart, MasterRow } from '@bikri/db';
+import type { Cart } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  addOverride,
-  addProduct,
-  emptyCart,
-  loadCarts,
-  shopMoney,
-  updateLine,
-} from './cart.ts';
-import { ledgerContext, saveNewProduct } from './catalog.ts';
+import { addOverride, addProduct, emptyCart, loadCarts } from './cart.ts';
 import { createCustomer } from './customers.ts';
 import {
   completeSale,
@@ -18,11 +10,9 @@ import {
   udhaarCheck,
 } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
-import { NOW, readyDb } from './testShop.ts';
+import { NOW, sale, shopWithStock, t2Cart } from './testShop.ts';
 
 afterEach(dropTestDbs);
-
-const money = shopMoney(null);
 
 describe('settle (07 §4)', () => {
   it('AC 1: cash 50,000 on 43,000 gives change 7,000', () => {
@@ -91,57 +81,6 @@ describe('settle (07 §4)', () => {
     ]);
   });
 });
-
-async function shopWithStock(prefix = 'sale') {
-  const db = await readyDb(prefix);
-  const ctx = await ledgerContext(db, 'st-1');
-  const phone = await saveNewProduct(
-    db,
-    {
-      name_en: 'Galaxy A15',
-      price: 4200000,
-      cost: 3800000,
-      opening_milli: 1000,
-      warranty_days: 365,
-    },
-    ctx,
-    { now: NOW },
-  );
-  const buds = await saveNewProduct(
-    db,
-    { name_en: 'Earbuds', price: 350000, cost: 200000, opening_milli: 5000 },
-    ctx,
-    { now: NOW },
-  );
-  await db.outbox.clear();
-  return { db, ctx, phone, buds };
-}
-
-function t2Cart(phone: MasterRow, buds: MasterRow): Cart {
-  let cart = addProduct(emptyCart('c1'), phone, 1000, 'avg');
-  cart = updateLine(cart, cart.lines[0]?.key ?? '', {
-    discount_type: 'amount',
-    discount_value: 200000,
-  });
-  cart = addProduct(cart, buds, 1000, 'avg');
-  return { ...cart, bill_discount: { type: 'amount', value: 50000 } };
-}
-
-const sale = (
-  cart: Cart,
-  rows: Parameters<typeof settle>[1],
-  extra: Partial<Parameters<typeof completeSale>[1]> = {},
-) =>
-  ({
-    saleId: `sale-${Math.random()}`,
-    cartId: 'c1' as const,
-    cart,
-    money,
-    rows,
-    print: false,
-    maxDiscountBp: 10000,
-    ...extra,
-  }) satisfies Parameters<typeof completeSale>[1];
 
 describe('sale recipe (02 §5)', () => {
   it('AC 1 + recipe: one transaction writes sale, lines, payment, stock; clears the cart; queues print', async () => {

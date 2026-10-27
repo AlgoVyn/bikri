@@ -161,6 +161,8 @@ export type PrintJob = {
   kind: 'sale' | 'refund' | 'test' | 'day_close' | 'statement' | 'supplier';
   status: 'queued' | 'printing' | 'done' | 'failed';
   error?: string;
+  /** Prints "REPRINT" under the title (screens/07 AC 3). */
+  reprint?: boolean;
   created_at: number;
 };
 

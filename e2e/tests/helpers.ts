@@ -124,6 +124,7 @@ declare global {
         hard?: boolean;
         balance?: number;
       }) => Promise<string>;
+      printJobText: (id: string) => Promise<string | null>;
     };
   }
 }

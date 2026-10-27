@@ -26,6 +26,20 @@
     "loading": "Load ho raha hai…",
     "not_found": "Yeh safha dastiyab nahi."
   },
+  "done": {
+    "download_pdf": "PDF download karein",
+    "image_saved": "Raseed ki tasveer save ho gayi. WhatsApp mein laga dein.",
+    "open_bill": "Bill kholein",
+    "print_again": "Dobara print",
+    "print_failed": "Print nahin hua",
+    "print_waiting": "Raseed printer ke intezar mein hai — Settings mein printer lagayein",
+    "printed": "Print ho gaya",
+    "printing": "Print ho raha hai…",
+    "retry": "Dobara koshish",
+    "share": "Share karein",
+    "share_failed": "Raseed ki tasveer nahin ban saki. Dobara koshish karein.",
+    "share_whatsapp": "WhatsApp par bhejein"
+  },
   "enrol": {
     "needed": "Ye till abhi kisi dukaan se munsalik nahin. Pairing code se jorein."
   },

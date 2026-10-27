@@ -26,6 +26,20 @@
     "loading": "Loading…",
     "not_found": "This page is not available."
   },
+  "done": {
+    "download_pdf": "Download PDF",
+    "image_saved": "Receipt picture saved. Attach it in WhatsApp.",
+    "open_bill": "Open bill",
+    "print_again": "Print again",
+    "print_failed": "Print failed",
+    "print_waiting": "Receipt waiting for a printer — set one up in Settings",
+    "printed": "Printed",
+    "printing": "Printing…",
+    "retry": "Retry",
+    "share": "Share",
+    "share_failed": "Could not make the receipt picture. Try again.",
+    "share_whatsapp": "Send on WhatsApp"
+  },
   "enrol": {
     "needed": "This till is not part of a shop yet. Enrol it with a pairing code."
   },
