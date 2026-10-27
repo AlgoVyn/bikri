@@ -51,6 +51,13 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await page.getByRole('button', { name: 'Cash' }).click();
     await page.getByRole('button', { name: 'Save delivery' }).click();
 
+    // AC 5: the saved-delivery toast opens the label dialog with received copies.
+    await page.getByRole('button', { name: 'Print labels' }).click();
+    const labels = page.getByRole('dialog', { name: 'Print labels' });
+    await expect(labels).toBeVisible();
+    await expect(labels.getByLabel('Copies Phone X')).toHaveValue('5');
+    await labels.getByRole('button', { name: 'Cancel' }).click();
+
     await expect(page.getByTestId('supplier-balance')).toContainText(
       'You owe Rs 500',
     );
