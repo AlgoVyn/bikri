@@ -10,6 +10,7 @@ import {
 import { enrol } from './routes/enrol.ts';
 import { health } from './routes/health.ts';
 import { me } from './routes/me.ts';
+import { pull, push, snapshot } from './routes/sync.ts';
 import type { AppEnv } from './types.ts';
 
 const app = new Hono<AppEnv>().basePath(API_BASE);
@@ -23,6 +24,9 @@ for (const path of ['/me', '/sync/*', '/files/*', '/shop/*']) {
   app.use(path, deviceAuth, tenantGate);
 }
 app.get('/me', me);
+app.post('/sync/push', push);
+app.get('/sync/pull', pull);
+app.get('/sync/snapshot', snapshot);
 
 app.notFound((c) => {
   applySecurityHeaders(c);
