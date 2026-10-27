@@ -16,8 +16,8 @@ import {
   discardCount,
   finishCount,
   loadCountDraft,
-  saveCountDraft,
   startCount,
+  updateCount,
 } from '../data/stock.ts';
 import { beep } from '../sell/beep.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -47,14 +47,11 @@ export function StockCountPage() {
   if (draft === undefined) return null;
 
   const setCounted = async (
-    d: CountDraft,
+    _d: CountDraft,
     id: string,
     milli: number | null,
   ) => {
-    const counted = { ...d.counted };
-    if (milli === null) delete counted[id];
-    else counted[id] = milli;
-    await saveCountDraft(getDb(), { ...d, counted });
+    await updateCount(getDb(), id, () => milli);
   };
 
   if (!draft) {
@@ -126,11 +123,7 @@ export function StockCountPage() {
       return;
     }
     beep();
-    await setCounted(
-      draft,
-      product.id,
-      (draft.counted[product.id] ?? 0) + 1000,
-    );
+    await updateCount(getDb(), product.id, (current) => (current ?? 0) + 1000);
   };
 
   return (

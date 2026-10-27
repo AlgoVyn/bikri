@@ -238,6 +238,32 @@ export async function saveCountDraft(
   await db.kv.put({ key: DRAFT_KEY, value: draft });
 }
 
+let draftChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Serialised read-modify-write of one product's count on the stored draft, so fast scans
+ * never lose a +1 (each change reads the latest draft, not a rendered copy).
+ */
+export function updateCount(
+  db: BikriDb,
+  productId: string,
+  next: (current: number | undefined) => number | null,
+): Promise<CountDraft | null> {
+  const run = draftChain.then(async () => {
+    const draft = await loadCountDraft(db);
+    if (!draft) return null;
+    const counted = { ...draft.counted };
+    const value = next(counted[productId]);
+    if (value === null) delete counted[productId];
+    else counted[productId] = value;
+    const updated = { ...draft, counted };
+    await saveCountDraft(db, updated);
+    return updated;
+  });
+  draftChain = run.catch(() => undefined);
+  return run;
+}
+
 export async function discardCount(db: BikriDb): Promise<void> {
   await db.kv.delete(DRAFT_KEY);
 }
