@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon } from '../components/icons.tsx';
+import { MoreIcon, SearchIcon } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
@@ -13,6 +13,8 @@ import { Banners } from './Banners.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
 import { ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
+import { PriceCheck } from './PriceCheck.tsx';
+import { usePriceCheck } from './priceCheckStore.ts';
 import {
   PrinterDot,
   StaffMenu,
@@ -34,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const shopName = useShopName();
   const language = isLocale(i18n.language) ? i18n.language : 'en';
   const [moreOpen, setMoreOpen] = useState(false);
+  const openPriceCheck = usePriceCheck((s) => s.setOpen);
 
   const allowed = (item: NavItem) => item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
@@ -54,6 +57,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-bound every render so the handler sees the current permissions
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Alt+P works everywhere, even while typing (screens/18).
+      if (
+        !event.defaultPrevented &&
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        event.code === 'KeyP'
+      ) {
+        event.preventDefault();
+        openPriceCheck(true);
+        return;
+      }
       if (
         event.defaultPrevented ||
         event.ctrlKey ||
@@ -160,6 +176,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
         ))}
+        <button
+          type="button"
+          className={`${navLink} max-lg:hidden`}
+          title={`${t('pricecheck.title')} (Alt+P)`}
+          onClick={() => openPriceCheck(true)}
+        >
+          <SearchIcon />
+          <span className="max-w-full truncate">{t('pricecheck.title')}</span>
+          <KeyBadge keys="Alt+P" />
+        </button>
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">
             <button
@@ -189,6 +215,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      openPriceCheck(true);
+                    }}
+                    className="flex min-h-11 w-full items-center gap-3 px-3 text-text"
+                  >
+                    <SearchIcon />
+                    {t('pricecheck.title')}
+                  </button>
+                </li>
               </ul>
             ) : null}
           </div>
@@ -198,6 +237,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Banners />
         {blocked ? null : children}
       </main>
+      <PriceCheck />
     </div>
   );
 }

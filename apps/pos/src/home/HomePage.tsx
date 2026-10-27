@@ -10,6 +10,7 @@ import { attentionItems, recentBills } from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
 import { NAV } from '../shell/nav.ts';
+import { usePriceCheck } from '../shell/priceCheckStore.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useSession } from '../state/session.ts';
@@ -73,6 +74,7 @@ export function HomePage() {
     timeZone: 'Asia/Karachi',
   });
 
+  const openPriceCheck = usePriceCheck((s) => s.setOpen);
   const tiles = [
     {
       to: '/sell',
@@ -221,6 +223,16 @@ export function HomePage() {
               </Link>
             </li>
           ))}
+          <li>
+            <button
+              type="button"
+              onClick={() => openPriceCheck(true)}
+              className="flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface p-2 text-center"
+            >
+              <span className="font-medium">{t('home.price_check')}</span>
+              <KeyBadge keys="Alt+P" />
+            </button>
+          </li>
         </ul>
       </section>
 

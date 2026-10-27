@@ -261,6 +261,22 @@
     "cash": "نقد",
     "udhaar": "ادھار"
   },
+  "pricecheck": {
+    "add_product": "پروڈکٹ شامل کریں",
+    "add_to_cart": "بل میں ڈالیں",
+    "added": "{{name}} بل میں ڈال دیا",
+    "barcodes": "بارکوڈ:",
+    "close": "بند کریں",
+    "cost": "اوسط لاگت",
+    "in_stock": "اسٹاک میں {{qty}}",
+    "margin": "منافع",
+    "matches": "ملتی جلتی پروڈکٹس",
+    "not_found": "نہیں ملا",
+    "out_of_stock": "اسٹاک ختم",
+    "scan_another": "اگلا اسکین کریں",
+    "search": "اسکین کریں یا نام لکھیں",
+    "title": "قیمت دیکھیں"
+  },
   "print": {
     "err_DISCONNECTED": "پرنٹر جڑا ہوا نہیں",
     "err_FAILED": "پرنٹنگ ناکام",

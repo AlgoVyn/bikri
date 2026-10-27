@@ -108,6 +108,7 @@ declare global {
       seedProducts: (
         list: {
           name: string;
+          name_ur?: string;
           price: number;
           cost?: number;
           barcode?: string;

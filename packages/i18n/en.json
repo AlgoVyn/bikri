@@ -261,6 +261,22 @@
     "cash": "Cash",
     "udhaar": "Udhaar"
   },
+  "pricecheck": {
+    "add_product": "Add product",
+    "add_to_cart": "Add to cart",
+    "added": "{{name}} added to the bill",
+    "barcodes": "Barcodes:",
+    "close": "Close",
+    "cost": "Avg cost",
+    "in_stock": "{{qty}} in stock",
+    "margin": "Margin",
+    "matches": "Matching products",
+    "not_found": "Not found",
+    "out_of_stock": "Out of stock",
+    "scan_another": "Scan another",
+    "search": "Scan or type a name",
+    "title": "Price check"
+  },
   "print": {
     "err_DISCONNECTED": "printer not connected",
     "err_FAILED": "printing failed",
