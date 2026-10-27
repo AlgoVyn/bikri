@@ -14,6 +14,7 @@ import {
   StockAdjustError,
   saveCountDraft,
   startCount,
+  updateCount,
 } from './stock.ts';
 import { dropTestDbs } from './testDb.ts';
 import { NOW, readyDb } from './testShop.ts';
@@ -320,5 +321,18 @@ describe('stock count (screens/09)', () => {
         .filter((m) => m.reason_code === 'count')
         .count(),
     ).toBe(0);
+  });
+});
+
+describe('count draft updates', () => {
+  it('rapid +1 updates are serialised and none is lost', async () => {
+    const { db, p } = await shop('stk-race');
+    await startCount(db, { kind: 'all' }, NOW);
+    await Promise.all(
+      Array.from({ length: 5 }, () =>
+        updateCount(db, p.id, (c) => (c ?? 0) + 1000),
+      ),
+    );
+    expect((await loadCountDraft(db))?.counted[p.id]).toBe(5000);
   });
 });
