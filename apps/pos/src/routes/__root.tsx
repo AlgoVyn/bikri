@@ -83,9 +83,8 @@ function Gate() {
 }
 
 function RootLayout() {
-  return (
-    <ToastProvider>
-      <Gate />
-    </ToastProvider>
-  );
+  const { pathname } = useLocation();
+  // The operator console never opens a shop database or the PIN lock (screens/19).
+  const admin = pathname === '/admin' || pathname.startsWith('/admin/');
+  return <ToastProvider>{admin ? <Outlet /> : <Gate />}</ToastProvider>;
 }
