@@ -772,7 +772,9 @@
     "sync_read_only": "Read-only",
     "sync_detail_read_only": "This shop is read-only · {{count}} changes waiting",
     "sync_quota": "Daily sync limit reached",
-    "lock": "Lock"
+    "lock": "Lock",
+    "sync_paused": "Sync paused",
+    "sync_detail_paused": "This shop's account is paused. Contact Algovyn. {{count}} changes are kept on this device."
   },
   "stock": {
     "reason": {
