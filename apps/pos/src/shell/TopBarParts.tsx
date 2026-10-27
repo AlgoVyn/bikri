@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useSyncState } from '../sync/state.ts';
 
 /** The shop's own name (shop row, else the tenant's display name). */
 export function useShopName(): string | null {
@@ -32,40 +33,102 @@ export function useOnline(): boolean {
   return online;
 }
 
-/** Outbox state (screens/04): Synced, n waiting, or Sync problem. Push itself is T-030. */
+/** Rail badge (03 §7): synced, pending, offline, error, outdated, downloading, read-only, quota. */
 export function SyncBadge() {
   const { t } = useTranslation();
+  const online = useOnline();
+  const sync = useSyncState();
   const counts = useLiveQuery(async () => {
     const db = getDb();
+    const [pending, failed, status, lastSync] = await Promise.all([
+      db.outbox.where('status').equals('pending').count(),
+      db.outbox.where('status').equals('failed').count(),
+      db.kv.get('tenant_status'),
+      db.kv.get('last_sync_at'),
+    ]);
     return {
-      pending: await db.outbox.where('status').equals('pending').count(),
-      failed: await db.outbox.where('status').equals('failed').count(),
+      pending,
+      failed,
+      readOnly:
+        (status?.value as { status?: string } | undefined)?.status ===
+        'read_only',
+      lastSync: (lastSync?.value as number | undefined) ?? null,
     };
   }, []);
   if (!counts) return null;
-  const tone =
-    counts.failed > 0
-      ? 'bg-danger-subtle text-danger-subtle-ink'
-      : counts.pending > 0
-        ? 'bg-warning-subtle text-warning-subtle-ink'
-        : 'bg-success-subtle text-success-subtle-ink';
-  const label =
-    counts.failed > 0
-      ? t('shell.sync_problem')
-      : counts.pending > 0
-        ? t('shell.sync_waiting', { count: counts.pending })
-        : t('shell.sync_synced');
+  const ago = (at: number | null) =>
+    at
+      ? t('shell.sync_ago', {
+          minutes: Math.max(0, Math.round((Date.now() - at) / 60_000)),
+        })
+      : t('shell.sync_never');
+  let tone = 'bg-success-subtle text-success-subtle-ink';
+  let label = t('shell.sync_synced');
+  let detail = t('shell.sync_detail_synced', {
+    ago: ago(counts.lastSync),
+    count: counts.pending,
+  });
+  let state = 'synced';
+  if (sync.phase === 'downloading') {
+    const pct =
+      sync.progress && sync.progress.total > 0
+        ? Math.round((sync.progress.done / sync.progress.total) * 100)
+        : 0;
+    state = 'downloading';
+    tone = 'bg-info-subtle text-info-subtle-ink';
+    label = t('shell.sync_downloading', { pct });
+    detail = label;
+  } else if (sync.phase === 'outdated') {
+    state = 'outdated';
+    tone = 'bg-info-subtle text-info-subtle-ink';
+    label = t('shell.sync_outdated');
+    detail = label;
+  } else if (counts.readOnly) {
+    state = 'read-only';
+    tone = 'bg-surface-2 text-text-muted';
+    label = t('shell.sync_read_only');
+    detail = t('shell.sync_detail_read_only', { count: counts.pending });
+  } else if (!online || sync.phase === 'offline') {
+    state = 'offline';
+    tone = 'bg-surface-2 text-text-muted';
+    label = t('shell.sync_offline');
+    detail = t('shell.sync_detail_offline', { count: counts.pending });
+  } else if (sync.phase === 'quota') {
+    state = 'quota';
+    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    label = t('shell.sync_quota');
+    detail = label;
+  } else if (counts.failed > 0 || sync.phase === 'error') {
+    state = 'error';
+    tone = 'bg-danger-subtle text-danger-subtle-ink';
+    label = t('shell.sync_problem');
+    detail = t('shell.sync_detail_error', {
+      message:
+        sync.error ?? t('shell.sync_failed_ops', { count: counts.failed }),
+    });
+  } else if (counts.pending > 0) {
+    state = 'pending';
+    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    label = t('shell.sync_waiting', { count: counts.pending });
+    detail = t('shell.sync_detail_pending', {
+      count: counts.pending,
+      ago: ago(counts.lastSync),
+    });
+  } else if (sync.phase === 'syncing') {
+    label = t('shell.sync_syncing');
+  }
   return (
     <Link
-      to="/settings"
+      to="/settings/sync"
       data-testid="sync-badge"
-      aria-label={label}
-      title={label}
+      data-state={state}
+      aria-label={detail}
+      title={detail}
       className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
     >
       <span aria-hidden="true" className="size-2 rounded-full bg-current" />
       <span className="max-lg:hidden">{label}</span>
-      {counts.failed === 0 && counts.pending > 0 ? (
+      {state === 'pending' ? (
         <bdi className="lg:hidden" aria-hidden="true">
           {counts.pending}
         </bdi>

@@ -126,6 +126,19 @@ export class SyncEngine {
       this.failures = 0;
       const now = Date.now();
       await setKv(this.db, 'last_sync_at', now);
+      if (serverTime !== null) {
+        const skew = now - serverTime;
+        const prev = await getKv<number>(this.db, 'clock_skew_ms', 0);
+        if (
+          Math.abs(skew - prev) > 60_000 ||
+          (prev !== 0 && Math.abs(skew) < 60_000)
+        )
+          await setKv(
+            this.db,
+            'clock_skew_ms',
+            Math.abs(skew) < 60_000 ? 0 : skew,
+          );
+      }
       useSyncState.getState().set({
         phase: 'idle',
         lastSyncAt: now,

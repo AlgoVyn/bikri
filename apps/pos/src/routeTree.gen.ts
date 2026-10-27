@@ -26,7 +26,9 @@ import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsDevicesRouteImport } from './routes/settings/devices.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as SettingsSyncRouteImport } from './routes/settings/sync.tsx';
 import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
 import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
 import { Route as ProductsIdAdjustRouteImport } from './routes/products/$id.adjust.tsx';
@@ -117,9 +119,19 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
+  id: '/settings/devices',
+  path: '/settings/devices',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   id: '/settings/printer',
   path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsSyncRoute = SettingsSyncRouteImport.update({
+  id: '/settings/sync',
+  path: '/settings/sync',
   getParentRoute: () => rootRouteImport,
 } as any);
 const StockCountRoute = StockCountRouteImport.update({
@@ -159,7 +171,9 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -183,7 +197,9 @@ export interface FileRoutesByTo {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/products': typeof ProductsIndexRoute;
   '/settings': typeof SettingsIndexRoute;
@@ -208,7 +224,9 @@ export interface FileRoutesById {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -234,7 +252,9 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
     | '/products/'
     | '/settings/'
@@ -258,7 +278,9 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
     | '/products'
     | '/settings'
@@ -282,7 +304,9 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
     | '/products/'
     | '/settings/'
@@ -307,7 +331,9 @@ export interface RootRouteChildren {
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  SettingsDevicesRoute: typeof SettingsDevicesRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  SettingsSyncRoute: typeof SettingsSyncRoute;
   StockCountRoute: typeof StockCountRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
@@ -437,11 +463,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/devices': {
+      id: '/settings/devices';
+      path: '/settings/devices';
+      fullPath: '/settings/devices';
+      preLoaderRoute: typeof SettingsDevicesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/printer': {
       id: '/settings/printer';
       path: '/settings/printer';
       fullPath: '/settings/printer';
       preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/sync': {
+      id: '/settings/sync';
+      path: '/settings/sync';
+      fullPath: '/settings/sync';
+      preLoaderRoute: typeof SettingsSyncRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/stock/count': {
@@ -491,7 +531,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsNewRoute: ProductsNewRoute,
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
+  SettingsDevicesRoute: SettingsDevicesRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
+  SettingsSyncRoute: SettingsSyncRoute,
   StockCountRoute: StockCountRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
