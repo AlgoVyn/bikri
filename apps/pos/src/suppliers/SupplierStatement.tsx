@@ -178,14 +178,13 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
             >
               {t('office.suppliers.pay_supplier')} <KeyBadge keys="P" />
             </button>
-            <button
-              type="button"
+            <Link
+              to="/suppliers/$supplierId/return/new"
+              params={{ supplierId }}
               className={buttonQuiet}
-              disabled
-              title={t('office.suppliers.return_soon')}
             >
               {t('office.suppliers.return_supplier')}
-            </button>
+            </Link>
           </>
         ) : null}
         {can('purchase.create') ? (
@@ -244,7 +243,19 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
                       tz,
                     )}
                   </td>
-                  <td className="p-2">{rows[index]?.description}</td>
+                  <td className="p-2">
+                    {rows[index]?.description}
+                    {row.kind === 'purchase' && row.entry.source_id ? (
+                      <Link
+                        to="/suppliers/$supplierId/return/new"
+                        params={{ supplierId }}
+                        search={{ purchase: String(row.entry.source_id) }}
+                        className="ms-2 text-small underline"
+                      >
+                        {t('office.suppliers.return_items')}
+                      </Link>
+                    ) : null}
+                  </td>
                   <td className="p-2 text-end">
                     {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
                   </td>

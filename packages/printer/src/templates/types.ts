@@ -194,3 +194,33 @@ export type DayCloseLabels = {
   note: string;
   closedBy: string;
 };
+
+/** Return-to-supplier slip (screens/13, 06 §4.3); an internal slip. */
+export type SupplierReturnReceipt = {
+  shop: ReceiptShop;
+  supplierName: string;
+  purchaseInvoice: string | null;
+  businessDate: string;
+  lines: { name: string; qty: string; unitCredit: number; lineTotal: number }[];
+  total: number;
+  refundReceived: number;
+  refundMethod: 'cash' | 'bank_wallet' | null;
+  reason: string;
+  note: string;
+  balanceAfter: number;
+  labels?: Partial<SupplierReturnLabels>;
+};
+
+export type SupplierReturnLabels = {
+  title: string;
+  supplier: string;
+  delivery: string;
+  date: string;
+  total: string;
+  received: string;
+  reason: string;
+  note: string;
+  balance: string;
+  methodCash: string;
+  methodBank: string;
+};
