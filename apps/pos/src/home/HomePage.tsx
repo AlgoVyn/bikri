@@ -23,7 +23,7 @@ const DAY_MS = 86_400_000;
 
 const ATTENTION_LINK: Record<string, string> = {
   low_stock: '/products',
-  promises_due: '/udhaar',
+  promises_due: '/udhaar/chase',
   over_limit: '/udhaar',
   failed_prints: '/settings',
   conflicts: '/settings/sync',
