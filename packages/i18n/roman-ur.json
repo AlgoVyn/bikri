@@ -231,7 +231,11 @@
     "suggested": "Tajweez karda fehrist se",
     "udhaar_given": "Diya {{amount}}",
     "udhaar_received": "Wasool {{amount}}",
-    "udhaar_today": "Aaj ka udhaar"
+    "udhaar_today": "Aaj ka udhaar",
+    "attn_sync_stale": "Is till ko {{days}} din se updates nahin milin",
+    "attn_sync_stale_severe": "Poora download dobara karne se bachne ke liye {{days}} din ke andar internet se jorein",
+    "attn_sync_pending_old": "Yeh till {{time}} se sync nahin hua. Internet se jorein taake aap ka data mehfooz ho.",
+    "attn_clock_wrong": "Is PC ki ghari ghalat hai — tareekh/waqt durust karein"
   },
   "import": {
     "action_error": "Chhor di",
@@ -640,7 +644,14 @@
   },
   "settings": {
     "more": "Dukaan, staff, raseed aur baqi settings",
-    "printer_hint": "Is device ka raseed printer aur cash daraz"
+    "printer_hint": "Is device ka raseed printer aur cash daraz",
+    "sync_hint": "Haalat, baqi tabdeeliyan aur takraao",
+    "devices_hint": "Till shamil karein, codes, device mansookh karein",
+    "this_device": "Yeh device",
+    "leave": "Yeh dukaan chhorein",
+    "leave_hint": "Is browser se yeh dukaan hatata hai; device mansookh nahin karta.",
+    "admin_device": "Admin device",
+    "till_device": "Till"
   },
   "setup": {
     "add_one": "Aik product shamil karein",
@@ -747,7 +758,20 @@
     "theme_light": "Light",
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
-    "update_ready": "Update tayyar hai"
+    "update_ready": "Update tayyar hai",
+    "sync_ago": "{{minutes}} minute pehle",
+    "sync_never": "kabhi nahin",
+    "sync_detail_synced": "Sync {{ago}} · {{count}} baqi",
+    "sync_detail_pending": "{{count}} tabdeeliyan baqi · aakhri sync {{ago}}",
+    "sync_offline": "Offline",
+    "sync_detail_offline": "Offline · {{count}} tabdeeliyan isi device par mehfooz",
+    "sync_detail_error": "Sync ka masla: {{message}} · tafseel kholein",
+    "sync_failed_ops": "{{count}} qabool nahin huin",
+    "sync_outdated": "Sync jari rakhne ke liye app update karein",
+    "sync_downloading": "Dukaan ka data download ho raha hai… {{pct}}%",
+    "sync_read_only": "Sirf dekhne ke liye",
+    "sync_detail_read_only": "Yeh dukaan sirf dekhne ke liye hai · {{count}} tabdeeliyan baqi",
+    "sync_quota": "Rozana sync ki had poori"
   },
   "stock": {
     "reason": {
@@ -787,7 +811,9 @@
       "blocked": "Dukaan sirf dekhne ke liye hai: yeh save nahin ho sakta."
     },
     "support": {
-      "banner": "Algovyn support ko {{time}} tak is dukaan tak rasai hasil hai. Wajah: {{reason}}."
+      "banner": "Algovyn support ko {{time}} tak is dukaan tak rasai hasil hai. Wajah: {{reason}}.",
+      "end_now": "Abhi khatam karein",
+      "ended": "Support rasai khatam ho gayi."
     }
   },
   "ui": {
@@ -834,5 +860,84 @@
     "pair": "jora",
     "pc": "adad",
     "set": "set"
+  },
+  "owner": {
+    "title": "Tasdeeq karein ke yeh aap hain",
+    "sending": "Maalik ki email par code bheja ja raha hai…",
+    "sent": "Hum ne {{email}} par 6 hindson ka code bheja hai",
+    "code_label": "6 hindson ka code",
+    "code_six": "Email se 6 hindse likhein",
+    "expires_in": "Code {{time}} mein khatam hoga",
+    "code_dead": "Yeh code ab kaam nahin karta. Dobara bhejein dabayein.",
+    "wrong_code_one": "Code durust nahin. {{count}} koshish baqi hai.",
+    "wrong_code_other": "Code durust nahin. {{count}} koshishein baqi hain.",
+    "send_again": "Dobara bhejein",
+    "send_again_in": "{{time}} baad dobara bhejein",
+    "email_unavailable": "Is dukaan ke liye email sign-in kaam nahin kar raha. Algovyn se raabta karein.",
+    "rate_limited": "Bohat zyada codes. {{minutes}} minute baad koshish karein.",
+    "offline": "Is ke liye internet chahiye."
+  },
+  "devices": {
+    "title": "Devices",
+    "admin_only": "Devices sirf maalik, admin device par, sambhaal sakta hai.",
+    "online_only": "Devices sirf online hone par sambhaali ja sakti hain.",
+    "add_title": "Till shamil karein",
+    "name": "Device ka naam",
+    "branch": "Branch",
+    "can_manage": "Devices sambhaal sakti hai",
+    "make_code": "Code lein",
+    "qr_label": "Naye till ko jorne ka QR code",
+    "code_expires": "{{time}} ke andar istemal karein",
+    "unused_codes": "Ghair istemal shuda codes",
+    "list_title": "Is dukaan ki devices",
+    "load": "Devices dikhayein",
+    "admin": "Admin",
+    "support": "Algovyn support {{time}} tak",
+    "this_device": "Yeh device",
+    "revoked": "Mansookh",
+    "meta": "{{branch}} · aakhri baar {{seen}} · app {{version}} · {{pending}} baqi",
+    "rename": "Naam badlein",
+    "save": "Mehfooz karein",
+    "move": "Branch badlein",
+    "make_admin": "Admin banayein",
+    "remove_admin": "Admin hatayein",
+    "revoke": "Mansookh karein",
+    "revoke_title": "{{name}} mansookh karein?",
+    "revoke_body": "Us device ki ghair sync sales usi par rahengi aur wahan se export ho sakti hain.",
+    "last_admin": "Kam az kam aik admin device rakhein.",
+    "import_title": "Ghair sync tabdeeliyan import karein",
+    "import_help": "Mansookh shuda device ke liye: us ki bikri-unsynced file chunein taake us ki sales dukaan mein shamil hon.",
+    "import_choose": "File chunein",
+    "import_invalid": "Yeh Bikri ki ghair sync file nahin hai.",
+    "import_other_shop": "Yeh file kisi aur dukaan ki hai",
+    "import_preview": "{{count}} tabdeeliyan, {{from}} se {{to}} · sales {{sales}} · adaigiyan {{payments}}",
+    "import_go": "Import karein",
+    "import_running": "Import ho raha hai… {{total}} mein se {{done}}",
+    "import_done": "Import mukammal: {{applied}} qabool, {{rejected}} mustarad."
+  },
+  "syncpage": {
+    "title": "Sync",
+    "not_enrolled": "Yeh till kisi dukaan ke server se nahin jura; data isi device par rehta hai.",
+    "last_sync": "Aakhri sync",
+    "waiting": "Baqi tabdeeliyan",
+    "device": "Yeh device",
+    "storage": "Storage",
+    "storage_value": "{{mb}} MB istemal · {{persisted}}",
+    "persisted_yes": "browser mehfooz rakhega",
+    "persisted_no": "browser mita sakta hai",
+    "quota": "Rozana sync ki had poori — sales isi device par mehfooz hain aur {{time}} ke baad sync hongi",
+    "read_only_waiting": "Intezar: yeh dukaan sirf dekhne ke liye hai",
+    "problem": "Sync ka masla: {{message}}",
+    "sync_now": "Abhi sync karein",
+    "failed_title": "Qabool nahin huin ({{count}})",
+    "retry": "Dobara koshish",
+    "discard": "Khatam karein",
+    "conflicts_title": "Takraao",
+    "no_conflicts": "Koi takraao nahin.",
+    "acknowledge": "Tasleem karein",
+    "conflict_field_merge": "Do tills ne aik hi cheez badli",
+    "conflict_over_refund": "Bill se zyada wapsi",
+    "conflict_refund_after_void": "Bill mansookh hone ke baad wapsi",
+    "conflict_over_return": "Wusool se zyada wapas kiya"
   }
 }

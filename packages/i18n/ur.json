@@ -231,7 +231,11 @@
     "suggested": "تجویز کردہ فہرست سے",
     "udhaar_given": "دیا {{amount}}",
     "udhaar_received": "وصول {{amount}}",
-    "udhaar_today": "آج کا ادھار"
+    "udhaar_today": "آج کا ادھار",
+    "attn_sync_stale": "اس ٹِل کو {{days}} دن سے اپڈیٹس نہیں ملیں",
+    "attn_sync_stale_severe": "پورا ڈاؤن لوڈ دوبارہ کرنے سے بچنے کے لیے {{days}} دن کے اندر انٹرنیٹ سے جوڑیں",
+    "attn_sync_pending_old": "یہ ٹِل {{time}} سے سنک نہیں ہوا۔ انٹرنیٹ سے جوڑیں تاکہ آپ کا ڈیٹا محفوظ ہو۔",
+    "attn_clock_wrong": "اس PC کی گھڑی غلط ہے — تاریخ/وقت درست کریں"
   },
   "import": {
     "action_error": "چھوڑ دی",
@@ -640,7 +644,14 @@
   },
   "settings": {
     "more": "دکان، عملہ، رسید اور باقی سیٹنگز",
-    "printer_hint": "اس ڈیوائس کا رسید پرنٹر اور کیش دراز"
+    "printer_hint": "اس ڈیوائس کا رسید پرنٹر اور کیش دراز",
+    "sync_hint": "حالت، باقی تبدیلیاں اور ٹکراؤ",
+    "devices_hint": "ٹِل شامل کریں، کوڈ، ڈیوائس منسوخ کریں",
+    "this_device": "یہ ڈیوائس",
+    "leave": "یہ دکان چھوڑیں",
+    "leave_hint": "اس براؤزر سے یہ دکان ہٹاتا ہے؛ ڈیوائس منسوخ نہیں کرتا۔",
+    "admin_device": "ایڈمن ڈیوائس",
+    "till_device": "ٹِل"
   },
   "setup": {
     "add_one": "ایک مصنوع شامل کریں",
@@ -747,7 +758,20 @@
     "theme_light": "روشن",
     "theme_rtl": "اردو",
     "ui_kit": "اجزاء",
-    "update_ready": "اپ ڈیٹ تیار ہے"
+    "update_ready": "اپ ڈیٹ تیار ہے",
+    "sync_ago": "{{minutes}} منٹ پہلے",
+    "sync_never": "کبھی نہیں",
+    "sync_detail_synced": "سنک {{ago}} · {{count}} باقی",
+    "sync_detail_pending": "{{count}} تبدیلیاں باقی · آخری سنک {{ago}}",
+    "sync_offline": "آف لائن",
+    "sync_detail_offline": "آف لائن · {{count}} تبدیلیاں اسی ڈیوائس پر محفوظ",
+    "sync_detail_error": "سنک کا مسئلہ: {{message}} · تفصیل کھولیں",
+    "sync_failed_ops": "{{count}} قبول نہیں ہوئیں",
+    "sync_outdated": "سنک جاری رکھنے کے لیے ایپ اپڈیٹ کریں",
+    "sync_downloading": "دکان کا ڈیٹا ڈاؤن لوڈ ہو رہا ہے… {{pct}}%",
+    "sync_read_only": "صرف دیکھنے کے لیے",
+    "sync_detail_read_only": "یہ دکان صرف دیکھنے کے لیے ہے · {{count}} تبدیلیاں باقی",
+    "sync_quota": "روزانہ سنک کی حد پوری"
   },
   "stock": {
     "reason": {
@@ -787,7 +811,9 @@
       "blocked": "دکان صرف دیکھنے کے لیے ہے: یہ محفوظ نہیں ہو سکتا۔"
     },
     "support": {
-      "banner": "الگوون سپورٹ کو {{time}} تک اس دکان تک رسائی حاصل ہے۔ وجہ: {{reason}}۔"
+      "banner": "الگوون سپورٹ کو {{time}} تک اس دکان تک رسائی حاصل ہے۔ وجہ: {{reason}}۔",
+      "end_now": "ابھی ختم کریں",
+      "ended": "سپورٹ رسائی ختم ہو گئی۔"
     }
   },
   "ui": {
@@ -834,5 +860,84 @@
     "pair": "جوڑا",
     "pc": "عدد",
     "set": "سیٹ"
+  },
+  "owner": {
+    "title": "تصدیق کریں کہ یہ آپ ہیں",
+    "sending": "مالک کی ای میل پر کوڈ بھیجا جا رہا ہے…",
+    "sent": "ہم نے {{email}} پر 6 ہندسوں کا کوڈ بھیجا ہے",
+    "code_label": "6 ہندسوں کا کوڈ",
+    "code_six": "ای میل سے 6 ہندسے لکھیں",
+    "expires_in": "کوڈ {{time}} میں ختم ہو گا",
+    "code_dead": "یہ کوڈ اب کام نہیں کرتا۔ دوبارہ بھیجیں دبائیں۔",
+    "wrong_code_one": "کوڈ درست نہیں۔ {{count}} کوشش باقی ہے۔",
+    "wrong_code_other": "کوڈ درست نہیں۔ {{count}} کوششیں باقی ہیں۔",
+    "send_again": "دوبارہ بھیجیں",
+    "send_again_in": "{{time}} بعد دوبارہ بھیجیں",
+    "email_unavailable": "اس دکان کے لیے ای میل سائن اِن کام نہیں کر رہا۔ Algovyn سے رابطہ کریں۔",
+    "rate_limited": "بہت زیادہ کوڈ۔ {{minutes}} منٹ بعد کوشش کریں۔",
+    "offline": "اس کے لیے انٹرنیٹ چاہیے۔"
+  },
+  "devices": {
+    "title": "ڈیوائسز",
+    "admin_only": "ڈیوائسز صرف مالک، ایڈمن ڈیوائس پر، سنبھال سکتا ہے۔",
+    "online_only": "ڈیوائسز صرف آن لائن ہونے پر سنبھالی جا سکتی ہیں۔",
+    "add_title": "ٹِل شامل کریں",
+    "name": "ڈیوائس کا نام",
+    "branch": "برانچ",
+    "can_manage": "ڈیوائسز سنبھال سکتی ہے",
+    "make_code": "کوڈ لیں",
+    "qr_label": "نئے ٹِل کو جوڑنے کا QR کوڈ",
+    "code_expires": "{{time}} کے اندر استعمال کریں",
+    "unused_codes": "غیر استعمال شدہ کوڈ",
+    "list_title": "اس دکان کی ڈیوائسز",
+    "load": "ڈیوائسز دکھائیں",
+    "admin": "ایڈمن",
+    "support": "Algovyn سپورٹ {{time}} تک",
+    "this_device": "یہ ڈیوائس",
+    "revoked": "منسوخ",
+    "meta": "{{branch}} · آخری بار {{seen}} · ایپ {{version}} · {{pending}} باقی",
+    "rename": "نام بدلیں",
+    "save": "محفوظ کریں",
+    "move": "برانچ بدلیں",
+    "make_admin": "ایڈمن بنائیں",
+    "remove_admin": "ایڈمن ہٹائیں",
+    "revoke": "منسوخ کریں",
+    "revoke_title": "{{name}} منسوخ کریں؟",
+    "revoke_body": "اس ڈیوائس کی غیر سنک سیلز اسی پر رہیں گی اور وہاں سے ایکسپورٹ ہو سکتی ہیں۔",
+    "last_admin": "کم از کم ایک ایڈمن ڈیوائس رکھیں۔",
+    "import_title": "غیر سنک تبدیلیاں امپورٹ کریں",
+    "import_help": "منسوخ شدہ ڈیوائس کے لیے: اس کی bikri-unsynced فائل چنیں تاکہ اس کی سیلز دکان میں شامل ہوں۔",
+    "import_choose": "فائل چنیں",
+    "import_invalid": "یہ Bikri کی غیر سنک فائل نہیں ہے۔",
+    "import_other_shop": "یہ فائل کسی اور دکان کی ہے",
+    "import_preview": "{{count}} تبدیلیاں، {{from}} سے {{to}} · سیلز {{sales}} · ادائیگیاں {{payments}}",
+    "import_go": "امپورٹ کریں",
+    "import_running": "امپورٹ ہو رہا ہے… {{total}} میں سے {{done}}",
+    "import_done": "امپورٹ مکمل: {{applied}} قبول، {{rejected}} مسترد۔"
+  },
+  "syncpage": {
+    "title": "سنک",
+    "not_enrolled": "یہ ٹِل کسی دکان کے سرور سے نہیں جڑا؛ ڈیٹا اسی ڈیوائس پر رہتا ہے۔",
+    "last_sync": "آخری سنک",
+    "waiting": "باقی تبدیلیاں",
+    "device": "یہ ڈیوائس",
+    "storage": "اسٹوریج",
+    "storage_value": "{{mb}} MB استعمال · {{persisted}}",
+    "persisted_yes": "براؤزر محفوظ رکھے گا",
+    "persisted_no": "براؤزر مٹا سکتا ہے",
+    "quota": "روزانہ سنک کی حد پوری — سیلز اسی ڈیوائس پر محفوظ ہیں اور {{time}} کے بعد سنک ہوں گی",
+    "read_only_waiting": "انتظار: یہ دکان صرف دیکھنے کے لیے ہے",
+    "problem": "سنک کا مسئلہ: {{message}}",
+    "sync_now": "ابھی سنک کریں",
+    "failed_title": "قبول نہیں ہوئیں ({{count}})",
+    "retry": "دوبارہ کوشش",
+    "discard": "ختم کریں",
+    "conflicts_title": "ٹکراؤ",
+    "no_conflicts": "کوئی ٹکراؤ نہیں۔",
+    "acknowledge": "تسلیم کریں",
+    "conflict_field_merge": "دو ٹِلز نے ایک ہی چیز بدلی",
+    "conflict_over_refund": "بل سے زیادہ واپسی",
+    "conflict_refund_after_void": "بل منسوخ ہونے کے بعد واپسی",
+    "conflict_over_return": "وصول سے زیادہ واپس کیا"
   }
 }

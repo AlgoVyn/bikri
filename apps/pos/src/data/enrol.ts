@@ -109,6 +109,7 @@ export async function enrolDevice(
     },
     { key: 'invoice_seq', value: res.device.last_invoice_seq },
     { key: 'pull_cursor', value: 0 },
+    { key: 'enrolled_at', value: Date.now() },
   ]);
   await applyStatus(db, res);
   setActiveTenantId(res.tenant.id);

@@ -231,7 +231,11 @@
     "suggested": "Add from suggested list",
     "udhaar_given": "Given {{amount}}",
     "udhaar_received": "Received {{amount}}",
-    "udhaar_today": "Udhaar today"
+    "udhaar_today": "Udhaar today",
+    "attn_sync_stale": "This till hasn't received updates for {{days}} days",
+    "attn_sync_stale_severe": "Connect to the internet within {{days}} days to avoid a full re-download",
+    "attn_sync_pending_old": "This till hasn't synced since {{time}}. Connect to the internet so your data is backed up.",
+    "attn_clock_wrong": "This PC's clock is wrong — fix the date/time"
   },
   "import": {
     "action_error": "Skipped",
@@ -640,7 +644,14 @@
   },
   "settings": {
     "more": "Shop, staff, receipt and other settings",
-    "printer_hint": "Receipt printer and cash drawer for this device"
+    "printer_hint": "Receipt printer and cash drawer for this device",
+    "sync_hint": "Status, waiting changes and conflicts",
+    "devices_hint": "Add tills, codes and revoke devices",
+    "this_device": "This device",
+    "leave": "Leave this shop",
+    "leave_hint": "Removes this shop from this browser; it does not revoke the device.",
+    "admin_device": "Admin device",
+    "till_device": "Till"
   },
   "setup": {
     "add_one": "Add one product",
@@ -747,7 +758,20 @@
     "theme_light": "Light",
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
-    "update_ready": "Update ready"
+    "update_ready": "Update ready",
+    "sync_ago": "{{minutes}} min ago",
+    "sync_never": "never",
+    "sync_detail_synced": "Synced {{ago}} · {{count}} waiting",
+    "sync_detail_pending": "{{count}} changes waiting · last sync {{ago}}",
+    "sync_offline": "Offline",
+    "sync_detail_offline": "Offline · {{count}} changes saved on this device",
+    "sync_detail_error": "Sync problem: {{message}} · Open details",
+    "sync_failed_ops": "{{count}} not accepted",
+    "sync_outdated": "Update the app to keep syncing",
+    "sync_downloading": "Downloading shop data… {{pct}}%",
+    "sync_read_only": "Read-only",
+    "sync_detail_read_only": "This shop is read-only · {{count}} changes waiting",
+    "sync_quota": "Daily sync limit reached"
   },
   "stock": {
     "reason": {
@@ -787,7 +811,9 @@
       "blocked": "Read-only shop: this can't be saved."
     },
     "support": {
-      "banner": "Algovyn support has access to this shop until {{time}}. Reason: {{reason}}."
+      "banner": "Algovyn support has access to this shop until {{time}}. Reason: {{reason}}.",
+      "end_now": "End now",
+      "ended": "Support access ended."
     }
   },
   "ui": {
@@ -834,5 +860,84 @@
     "pair": "pair",
     "pc": "pc",
     "set": "set"
+  },
+  "owner": {
+    "title": "Confirm it's you",
+    "sending": "Sending a code to the owner email…",
+    "sent": "We sent a 6-digit code to {{email}}",
+    "code_label": "6-digit code",
+    "code_six": "Enter the 6 digits from the email",
+    "expires_in": "Code expires in {{time}}",
+    "code_dead": "This code no longer works. Tap Send again.",
+    "wrong_code_one": "That code is not right. {{count}} try left.",
+    "wrong_code_other": "That code is not right. {{count}} tries left.",
+    "send_again": "Send again",
+    "send_again_in": "Send again in {{time}}",
+    "email_unavailable": "Email sign-in isn't working for this shop. Contact Algovyn.",
+    "rate_limited": "Too many codes. Try again in {{minutes}} min.",
+    "offline": "You need internet for this."
+  },
+  "devices": {
+    "title": "Devices",
+    "admin_only": "Only the owner can manage devices, on an admin device.",
+    "online_only": "Devices can be managed only while online.",
+    "add_title": "Add a till",
+    "name": "Device name",
+    "branch": "Branch",
+    "can_manage": "Can manage devices",
+    "make_code": "Get a code",
+    "qr_label": "QR code to connect the new till",
+    "code_expires": "Use within {{time}}",
+    "unused_codes": "Unused codes",
+    "list_title": "Devices of this shop",
+    "load": "Show devices",
+    "admin": "Admin",
+    "support": "Algovyn support until {{time}}",
+    "this_device": "This device",
+    "revoked": "Revoked",
+    "meta": "{{branch}} · last seen {{seen}} · app {{version}} · {{pending}} waiting",
+    "rename": "Rename",
+    "save": "Save",
+    "move": "Move branch",
+    "make_admin": "Make admin",
+    "remove_admin": "Remove admin",
+    "revoke": "Revoke",
+    "revoke_title": "Revoke {{name}}?",
+    "revoke_body": "Unsynced sales on that device will stay on it and can be exported there.",
+    "last_admin": "Keep at least one admin device.",
+    "import_title": "Import unsynced ops",
+    "import_help": "For a revoked device: choose its bikri-unsynced file to add its sales to the shop.",
+    "import_choose": "Choose file",
+    "import_invalid": "This is not a Bikri unsynced file.",
+    "import_other_shop": "This file is from a different shop",
+    "import_preview": "{{count}} changes from {{from}} to {{to}} · sales {{sales}} · payments {{payments}}",
+    "import_go": "Import",
+    "import_running": "Importing… {{done}} of {{total}}",
+    "import_done": "Imported: {{applied}} accepted, {{rejected}} rejected."
+  },
+  "syncpage": {
+    "title": "Sync",
+    "not_enrolled": "This till is not connected to a shop server; data stays on this device.",
+    "last_sync": "Last sync",
+    "waiting": "Changes waiting",
+    "device": "This device",
+    "storage": "Storage",
+    "storage_value": "{{mb}} MB used · {{persisted}}",
+    "persisted_yes": "kept by the browser",
+    "persisted_no": "may be cleared by the browser",
+    "quota": "Daily sync limit reached — sales are safe on this device and will sync after {{time}}",
+    "read_only_waiting": "Waiting: this shop is read-only",
+    "problem": "Sync problem: {{message}}",
+    "sync_now": "Sync now",
+    "failed_title": "Not accepted ({{count}})",
+    "retry": "Retry",
+    "discard": "Discard",
+    "conflicts_title": "Conflicts",
+    "no_conflicts": "No conflicts.",
+    "acknowledge": "Acknowledge",
+    "conflict_field_merge": "Two tills changed the same item",
+    "conflict_over_refund": "Refunded more than the bill",
+    "conflict_refund_after_void": "Refund after the bill was voided",
+    "conflict_over_return": "Returned more than received"
   }
 }

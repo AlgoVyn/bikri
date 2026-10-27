@@ -23,6 +23,7 @@
     "dexie-react-hooks": "4.4.0",
     "i18next": "26.5.11",
     "papaparse": "5.7.0",
+    "qrcode-generator": "^1.5.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-i18next": "17.1.9",
