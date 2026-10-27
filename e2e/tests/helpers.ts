@@ -97,6 +97,8 @@ declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
+      finishSetupHere: () => Promise<void>;
+      syncNow: () => Promise<void>;
       reset: () => Promise<void>;
       unlockAs: (
         role: 'owner' | 'manager' | 'cashier',

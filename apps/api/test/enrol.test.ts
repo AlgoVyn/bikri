@@ -99,6 +99,22 @@ describe('POST /api/devices/enrol', () => {
     expect(res.status).toBe(201);
   });
 
+  it('uses the typed device name when given, else the name on the code (D-107)', async () => {
+    const shop = await seedShop('Enrol Name');
+    const res = await api('/devices/enrol', {
+      method: 'POST',
+      json: { ...enrolBody(shop.ownerCode), device_name: '  Front counter ' },
+    });
+    expect(res.status).toBe(201);
+    const body = await json<EnrolResponse & { device: { name: string } }>(res);
+    expect(body.device.name).toBe('Front counter');
+    const bad = await api('/devices/enrol', {
+      method: 'POST',
+      json: { ...enrolBody(shop.ownerCode), device_name: 'x'.repeat(41) },
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it('refuses unknown and expired codes, and rate-limits failures per IP', async () => {
     const shop = await seedShop('Enrol Expired');
     await env.DB.prepare(

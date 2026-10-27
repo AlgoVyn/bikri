@@ -14,6 +14,11 @@ export async function seedReadyShop(): Promise<void> {
   await deleteTenantDb('dev');
   const db = getDb();
   await ensureLocalTenant(db);
+  await finishSetupHere(db);
+}
+
+/** Runs the wizard's Finish on the open shop (an enrolled one too: its ops then sync). */
+export async function finishSetupHere(db = getDb()): Promise<void> {
   await finishSetup(
     db,
     {

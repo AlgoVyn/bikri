@@ -33,11 +33,16 @@ export type EnrolPageProps = {
   onDone?: () => void;
 };
 
+let urlCode: string | null = null;
+
+/** Reads `?code=` once (StrictMode runs initialisers twice) and removes it from the address bar. */
 function codeFromUrl(): string {
+  if (urlCode !== null) return urlCode;
   if (typeof window === 'undefined') return '';
   const url = new URL(window.location.href);
   const code = url.searchParams.get('code');
   if (!code) return '';
+  urlCode = normaliseCodeInput(code);
   url.searchParams.delete('code');
   window.history.replaceState(window.history.state, '', url.toString());
   return normaliseCodeInput(code);
@@ -107,7 +112,8 @@ export function EnrolPage({
   const [initialCode] = useState(codeFromUrl);
   const [tab, setTab] = useState<'code' | 'new'>('code');
   const [code, setCode] = useState(initialCode);
-  const [name, setName] = useState(() => defaultDeviceName());
+  // Empty keeps the name the owner put on the code (D-107); the placeholder suggests one.
+  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: 'form' });
@@ -151,10 +157,7 @@ export function EnrolPage({
     setBusy(true);
     setError(null);
     try {
-      const { db: target, res } = await enrolDevice(
-        normalised,
-        name.trim() || defaultDeviceName(),
-      );
+      const { db: target, res } = await enrolDevice(normalised, name.trim());
       void download(target, res.tenant.display_name);
     } catch (e) {
       if (e instanceof OfflineError) setError(t('enrol.err_offline'));
@@ -373,6 +376,7 @@ export function EnrolPage({
             className={fieldClass}
             value={name}
             maxLength={60}
+            placeholder={defaultDeviceName()}
             onChange={(e) => setName(e.target.value)}
           />
         </label>

@@ -337,7 +337,16 @@ export function DevicesPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-h2 font-semibold">{t('devices.list_title')}</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-h2 font-semibold">{t('devices.list_title')}</h2>
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => void guard(load)}
+          >
+            {t('devices.load')}
+          </button>
+        </div>
         {devices === null ? (
           <button
             type="button"
