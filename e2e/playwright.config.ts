@@ -31,7 +31,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm --filter @bikri/pos build && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT}`,
+    command: `pnpm --filter @bikri/pos build:e2e && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT}`,
     url: `http://localhost:${PORT}/bikri/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

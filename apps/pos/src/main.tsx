@@ -8,6 +8,10 @@ import { registerAppUpdate } from './pwa/registerSW.ts';
 import './styles.css';
 
 await initI18n();
+if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev') {
+  const { installTestHooks } = await import('./dev/testHooks.ts');
+  installTestHooks();
+}
 registerAppUpdate();
 void rememberPersistentStorage();
 

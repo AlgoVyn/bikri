@@ -15,6 +15,7 @@ import { Route as ProductsRouteImport } from './routes/products.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SettingsRouteImport } from './routes/settings.tsx';
+import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 
@@ -48,6 +49,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const UdhaarRoute = UdhaarRouteImport.update({
   id: '/udhaar',
   path: '/udhaar',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sell'
     | '/settings'
+    | '/setup'
     | '/udhaar'
     | '/dev/ui';
   fileRoutesByTo: FileRoutesByTo;
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sell'
     | '/settings'
+    | '/setup'
     | '/udhaar'
     | '/dev/ui';
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sell'
     | '/settings'
+    | '/setup'
     | '/udhaar'
     | '/dev/ui';
   fileRoutesById: FileRoutesById;
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   SalesRoute: typeof SalesRoute;
   SellRoute: typeof SellRoute;
   SettingsRoute: typeof SettingsRoute;
+  SetupRoute: typeof SetupRoute;
   UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/setup': {
+      id: '/setup';
+      path: '/setup';
+      fullPath: '/setup';
+      preLoaderRoute: typeof SetupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/udhaar': {
       id: '/udhaar';
       path: '/udhaar';
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   SalesRoute: SalesRoute,
   SellRoute: SellRoute,
   SettingsRoute: SettingsRoute,
+  SetupRoute: SetupRoute,
   UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
 };
