@@ -27,6 +27,23 @@ export class TooManyOpsError extends Error {
   }
 }
 
+/** The shop is read-only (T-027, 13 §7.2): no new local writes. */
+export class ReadOnlyError extends Error {
+  constructor() {
+    super('This shop is read-only');
+    this.name = 'ReadOnlyError';
+  }
+}
+
+type WriteListener = (opCount: number) => void;
+const listeners = new Set<WriteListener>();
+
+/** Called after every committed write that queued ops; the sync engine debounces a push. */
+export function onLocalWrite(fn: WriteListener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 export class RowNotFoundError extends Error {
   readonly tbl: string;
   readonly id: string;
@@ -63,7 +80,12 @@ export interface Writer {
   remove(tbl: MasterTable, id: string): Promise<void>;
 }
 
-export type WriteOptions = { now?: number; actor?: string | null };
+export type WriteOptions = {
+  now?: number;
+  actor?: string | null;
+  /** Local-only fixups that must still run in a read-only shop. */
+  allowReadOnly?: boolean;
+};
 
 const SYSTEM_FIELDS = new Set([
   'id',
@@ -93,7 +115,7 @@ export async function writeAction<T>(
   const txId = newId(now);
   let opCount = 0;
 
-  const run = (tx: Transaction): Promise<T> => {
+  const run = async (tx: Transaction): Promise<T> => {
     const outbox = tx.table('outbox') as Table<OutboxEntry, number>;
     const queue = async (
       entry: Omit<
@@ -229,8 +251,23 @@ export async function writeAction<T>(
       },
     };
 
+    if (!options.allowReadOnly) {
+      const status = (await tx.table('kv').get('tenant_status')) as
+        | { value?: { status?: string } }
+        | undefined;
+      if (status?.value?.status === 'read_only') throw new ReadOnlyError();
+    }
     return fn(writer);
   };
 
-  return db.transaction('rw', db.tables, run);
+  let result: T;
+  try {
+    result = await db.transaction('rw', db.tables, run);
+  } catch (e) {
+    // Dexie wraps errors thrown inside a transaction; callers match on our classes.
+    const inner = (e as { inner?: unknown }).inner;
+    throw inner instanceof ReadOnlyError ? inner : e;
+  }
+  if (opCount > 0) for (const fn of listeners) fn(opCount);
+  return result;
 }

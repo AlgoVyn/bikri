@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getDb } from '../data/db.ts';
 import { getFile } from '../data/fileCache.ts';
+import { fetchRemoteFile } from '../sync/files.ts';
 import { tileBg } from './tiles.ts';
 
 /** Object URL of a cached photo for the active shop, or null (works offline, 01 §PWA). */
@@ -13,11 +14,14 @@ export function useFileUrl(key: string | null | undefined): string | null {
     }
     let alive = true;
     let made: string | null = null;
-    void getFile(getDb().tenantId, key).then((blob) => {
-      if (!alive || !blob) return;
-      made = URL.createObjectURL(blob);
-      setUrl(made);
-    });
+    const db = getDb();
+    void getFile(db.tenantId, key)
+      .then((hit) => hit ?? fetchRemoteFile(db, key))
+      .then((blob) => {
+        if (!alive || !blob) return;
+        made = URL.createObjectURL(blob);
+        setUrl(made);
+      });
     return () => {
       alive = false;
       if (made) URL.revokeObjectURL(made);

@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
 import { MoreIcon, SearchIcon } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
+import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { isLocale, setLanguage } from '../i18n/i18n.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -26,7 +27,7 @@ const navLink =
   'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted aria-[current=page]:text-primary lg:flex-none lg:py-1.5';
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const toast = useToast();
@@ -34,7 +35,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   usePrintService();
   const { can } = useCurrentStaff();
   const shopName = useShopName();
-  const language = isLocale(i18n.language) ? i18n.language : 'en';
   const [moreOpen, setMoreOpen] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
 
@@ -46,6 +46,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.title = t('common.app_title');
   }, [t]);
+
+  // T-027: a write attempted in a read-only shop shows one toast instead of a generic failure.
+  useEffect(() => {
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (!(event.reason instanceof ReadOnlyError)) return;
+      event.preventDefault();
+      toast.push(t('tenant.readOnly.blocked'), 'error');
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, [t, toast]);
 
   // screens/04 AC 2: a hidden screen opened by URL goes Home with a toast.
   useEffect(() => {
@@ -133,21 +144,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {t('shell.ui_kit')}
             </Link>
           ) : null}
-          <label className="inline-flex items-center">
-            <span className="sr-only">{t('shell.language')}</span>
-            <select
-              className="h-11 max-w-24 rounded-control border border-border-strong bg-surface px-1 text-text"
-              value={language}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (isLocale(next)) void setLanguage(next);
-              }}
-            >
-              <option value="en">{t('shell.lang_en')}</option>
-              <option value="ur">{t('shell.lang_ur')}</option>
-              <option value="roman-ur">{t('shell.lang_roman_ur')}</option>
-            </select>
-          </label>
+          <LanguageSelect />
           <StaffMenu />
         </div>
       </header>
