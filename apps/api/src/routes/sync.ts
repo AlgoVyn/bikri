@@ -201,15 +201,15 @@ export const SnapshotQuery = z.object({
 
 /** Snapshot start (counts) and pages, shared by the till snapshot and exports (03 §4.3). */
 export async function snapshotPayload(
-  c: Context<AppEnv>,
+  query: (key: string) => string | undefined,
   db: AppEnv['Variables']['db'],
   tenant: TenantRow,
   maxLimit = 1000,
 ): Promise<Record<string, unknown>> {
   const q = SnapshotQuery.parse({
-    tbl: c.req.query('tbl') || undefined,
-    after: c.req.query('after') ?? '',
-    limit: c.req.query('limit') ?? undefined,
+    tbl: query('tbl') || undefined,
+    after: query('after') ?? '',
+    limit: query('limit') ?? undefined,
   });
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
@@ -247,5 +247,5 @@ export async function snapshotPayload(
 /** `GET /api/sync/snapshot` (03 §4.3). */
 export async function snapshot(c: Context<AppEnv>): Promise<Response> {
   const { tenant, db } = c.var;
-  return c.json(await snapshotPayload(c, db, tenant));
+  return c.json(await snapshotPayload((k) => c.req.query(k), db, tenant));
 }

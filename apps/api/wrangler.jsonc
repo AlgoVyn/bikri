@@ -38,9 +38,28 @@
     "ACCESS_TEAM_DOMAIN": "odd-rain-0287.cloudflareaccess.com", // Zero Trust team domain (Access app "Bikri admin")
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
-    "SHOP_TIMEZONE": "Asia/Karachi"
+    "SHOP_TIMEZONE": "Asia/Karachi",
+    // "test" only in Worker tests and E2E (`--var ENV:test`); enables ACCESS_TEST_EMAIL and the fake email outbox.
+    // The Worker refuses requests if ENV=test while ALLOWED_ORIGINS contains https://algovyn.com (10 §5).
+    "ENV": "production"
   },
+  // Owner email sign-in (T-028, 05 §3.2). Config only: nothing is created by deploying this binding, but before the
+  // first deploy Adnan must (1) enable Email Routing on algovyn.com (already on) and (2) add each shop owner's address
+  // under Email Service -> Email Routing -> Destination addresses so Cloudflare sends them a verification link.
+  // Sending to unverified addresses fails and the API answers 503 EMAIL_UNAVAILABLE.
+  "send_email": [
+    { "name": "EMAIL", "allowed_sender_addresses": ["bikri@algovyn.com"] }
+  ],
+  // Workers Rate Limiting binding (approximate, per location); namespace_id is our own label, not a dashboard resource.
+  "ratelimits": [
+    {
+      "name": "OWNER_SIGNIN_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "triggers": { "crons": ["30 21 * * *"] },
   "observability": { "enabled": true }
-  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "adnan@yaqoob.org")
+  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "adnan@yaqoob.org"),
+  // OWNER_CODE_KEY and OWNER_SESSION_KEY (32 random bytes each, e.g. `openssl rand -base64 32`). Typed in src/secrets.d.ts.
 }

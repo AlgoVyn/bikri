@@ -1,9 +1,11 @@
 import { SELF } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { SECURITY_HEADERS } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ApiError } from '../src/errors.ts';
 import { app } from '../src/index.ts';
+import { TEST_ORIGIN } from './helpers/fixtures.ts';
 
 const API = 'https://algovyn.com/bikri/api';
 
@@ -68,11 +70,15 @@ describe('worker', () => {
       },
     });
 
-    const invalid = await app.request(`${API}/__test/zod`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 1 }),
-    });
+    const invalid = await app.request(
+      `${API}/__test/zod`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: TEST_ORIGIN },
+        body: JSON.stringify({ name: 1 }),
+      },
+      env,
+    );
     expect(invalid.status).toBe(400);
     expectSecurityHeaders(invalid.headers);
     const invalidBody: unknown = await invalid.json();
