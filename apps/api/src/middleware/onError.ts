@@ -28,8 +28,14 @@ function zodPath(path: ReadonlyArray<PropertyKey>): Array<string | number> {
   );
 }
 
-export function onError(err: Error, c: Context<{ Bindings: Env }>): Response {
+export function onError<E extends { Bindings: Env }>(
+  err: Error,
+  c: Context<E>,
+): Response {
   if (err instanceof ApiError) {
+    for (const [name, value] of Object.entries(err.headers)) {
+      c.header(name, value);
+    }
     return jsonError(c, err.status, {
       error: {
         code: err.code,

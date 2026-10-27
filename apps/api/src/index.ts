@@ -1,17 +1,28 @@
 import { API_BASE } from '@bikri/core';
 import { Hono } from 'hono';
 import { scheduled } from './cron/prune.ts';
+import { deviceAuth, tenantGate } from './middleware/deviceAuth.ts';
 import { onError } from './middleware/onError.ts';
 import {
   applySecurityHeaders,
   securityHeaders,
 } from './middleware/securityHeaders.ts';
+import { enrol } from './routes/enrol.ts';
 import { health } from './routes/health.ts';
+import { me } from './routes/me.ts';
+import type { AppEnv } from './types.ts';
 
-const app = new Hono<{ Bindings: Env }>().basePath(API_BASE);
+const app = new Hono<AppEnv>().basePath(API_BASE);
 
 app.use('*', securityHeaders);
 app.get('/health', health);
+app.post('/devices/enrol', enrol);
+
+// Device-authenticated routes: the tenant comes only from the token (13 §5).
+for (const path of ['/me', '/sync/*', '/files/*', '/shop/*']) {
+  app.use(path, deviceAuth, tenantGate);
+}
+app.get('/me', me);
 
 app.notFound((c) => {
   applySecurityHeaders(c);

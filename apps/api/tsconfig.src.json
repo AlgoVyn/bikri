@@ -12,5 +12,8 @@
     "lib": ["ES2024"]
   },
   "include": ["src/**/*.ts", "worker-configuration.d.ts"],
-  "references": [{ "path": "../../packages/core" }]
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/db" }
+  ]
 }
