@@ -147,7 +147,7 @@ test.describe('Udhaar (T-043, T-044)', () => {
     page,
   }) => {
     await openReadyShop(page, '/bikri/udhaar');
-    await page.getByRole('button', { name: 'New customer' }).click();
+    await page.getByRole('button', { name: 'New customer' }).first().click();
     const d = dialog(page, 'New customer');
     await d.getByLabel('Name').fill('Sana');
     await d.getByLabel('Credit limit').fill('1000');
