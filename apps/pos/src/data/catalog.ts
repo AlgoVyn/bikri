@@ -344,7 +344,7 @@ export async function ledgerContext(
   return { branch_id: branch.id, device_id: device.id, staff_id: staffId };
 }
 
-function audit(
+export function productAudit(
   w: Writer,
   ctx: LedgerContext,
   action: string,
@@ -440,7 +440,7 @@ export async function saveProductEdit(
       }
       const after = await w.update('products', id, patch);
       if (Number(before.price) !== input.price) {
-        await audit(
+        await productAudit(
           w,
           ctx,
           'price_change',
@@ -450,7 +450,7 @@ export async function saveProductEdit(
         );
       }
       if (input.cost !== undefined && Number(before.last_cost) !== input.cost) {
-        await audit(
+        await productAudit(
           w,
           ctx,
           'cost_change',
@@ -521,7 +521,7 @@ export async function removeProduct(
         await w.remove('product_barcodes', row.id);
       }
       await w.remove('products', id);
-      await audit(
+      await productAudit(
         w,
         ctx,
         'product_delete',
