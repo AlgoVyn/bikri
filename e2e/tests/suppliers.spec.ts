@@ -107,6 +107,47 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       payments2.filter((p) => p.purpose === 'supplier_payment'),
     ).toMatchObject([{ amount: 50000 }]);
 
+    await page.getByRole('link', { name: 'Return to supplier' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Return to supplier' }),
+    ).toBeVisible();
+    await page.getByLabel('Linked delivery').selectOption({ index: 1 });
+    await page.getByLabel('Return qty Phone X').fill('2');
+    await expect(page.getByText('Total credit')).toBeVisible();
+    await expect(page.getByText('Rs 2,400').first()).toBeVisible();
+    await expect(
+      page.getByText(/The supplier owes you Rs 2,400/),
+    ).toBeVisible();
+    await expect(page.getByLabel('Money received now')).toHaveValue('2400');
+    await page.getByRole('button', { name: 'Save return' }).click();
+    await expect(page.getByTestId('supplier-balance')).toContainText('Settled');
+    const returns = await idbAll<{ total: number; refund_received: number }>(
+      page,
+      'supplier_returns',
+    );
+    expect(returns).toMatchObject([{ total: 240000, refund_received: 240000 }]);
+    const returnLines = await idbAll<{
+      qty_milli: number;
+      unit_credit: number;
+    }>(page, 'supplier_return_lines');
+    expect(returnLines).toMatchObject([
+      { qty_milli: 2000, unit_credit: 120000 },
+    ]);
+    const refunds = await idbAll<{ purpose: string; amount: number }>(
+      page,
+      'payments',
+    );
+    expect(
+      refunds.filter((p) => p.purpose === 'supplier_refund'),
+    ).toMatchObject([{ amount: 240000 }]);
+    const levelsAfter = await idbAll<{
+      product_id: string;
+      on_hand_milli: number;
+    }>(page, 'stock_levels');
+    expect(
+      levelsAfter.find((l) => l.product_id === productId)?.on_hand_milli,
+    ).toBe(23000);
+
     await page.getByRole('button', { name: 'Export' }).click();
     const [statementPdf] = await Promise.all([
       page.waitForEvent('download'),
