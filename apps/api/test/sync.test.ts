@@ -11,6 +11,8 @@ import {
   saleOps,
 } from './helpers/ops.ts';
 
+type PushOpLike = ReturnType<typeof op>;
+
 const count = async (sql: string, ...params: unknown[]) =>
   Number(
     (
@@ -354,6 +356,36 @@ describe('push (03 §4.1, §9)', () => {
   });
 });
 
+function refundPayment(
+  shop: Awaited<ReturnType<typeof seedShop>>,
+  r: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    id: newId(),
+    direction: 'out',
+    method: r.method,
+    purpose: 'refund',
+    amount: r.amount,
+    cash_tendered: null,
+    change_given: null,
+    reference: '',
+    sale_id: r.sale_id,
+    refund_id: r.id,
+    purchase_id: null,
+    supplier_return_id: null,
+    party_type: null,
+    party_id: null,
+    note: '',
+    branch_id: shop.branchId,
+    device_id: shop.till.id,
+    staff_id: r.staff_id,
+    business_date: '2026-10-27',
+    created_at: Date.now(),
+    ...extra,
+  };
+}
+
 describe('void rules (05 §5, D-044)', () => {
   it('a manager voids only same-day bills; the owner any day', async () => {
     const shop = await seedShop('Voids');
@@ -410,6 +442,7 @@ describe('void rules (05 §5, D-044)', () => {
     const tx = newId();
     const approved = await pushOk(shop.till, [
       op('refunds', 'insert', row, { tx_id: tx }),
+      op('payments', 'insert', refundPayment(shop, row), { tx_id: tx }),
       op(
         'audit_log',
         'insert',
@@ -431,6 +464,7 @@ describe('void rules (05 §5, D-044)', () => {
       ),
     ]);
     expect(approved.results.map((r) => r.error_code ?? null)).toEqual([
+      null,
       null,
       null,
     ]);
@@ -489,5 +523,230 @@ describe('pull and snapshot', () => {
       token: shop.till.token,
     });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('refund payment rows and split (04 §5)', () => {
+  it('needs one matching payment for the paid part and one ledger row for the udhaar part', async () => {
+    const shop = await seedShop('Refund rows');
+    const [saleOp, lineOp] = saleOps(shop, shop.till, 1, {
+      customerId: IDS.customer,
+    });
+    const sale: Record<string, unknown> = {
+      ...(saleOp?.row as Record<string, unknown>),
+      paid_total: 50000,
+      udhaar_amount: 100000,
+      cash_tendered: 50000,
+    };
+    const tx = saleOp?.tx_id ?? newId();
+    await pushOk(shop.till, [
+      { ...(saleOp as PushOpLike), row: sale },
+      lineOp as PushOpLike,
+    ]);
+    const base = (over: Record<string, unknown>) => ({
+      id: newId(),
+      sale_id: sale.id,
+      kind: 'partial',
+      reason: 'Faulty',
+      method: 'cash',
+      exact_amount: 1000,
+      udhaar_part: 0,
+      rounding: 0,
+      amount: 1000,
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+      ...over,
+    });
+    const send = async (rows: [string, Record<string, unknown>][]) => {
+      const t = newId();
+      const res = await pushOk(
+        shop.till,
+        rows.map(([tbl, row]) => op(tbl, 'insert', row, { tx_id: t })),
+      );
+      return res.results[0]?.error_code ?? null;
+    };
+    // Paid part without its payment, or with a wrong amount → rejected.
+    expect(await send([['refunds', base({})]])).toBe('CONSTRAINT_FAILED');
+    const wrong = base({});
+    expect(
+      await send([
+        ['refunds', wrong],
+        ['payments', refundPayment(shop, wrong, { amount: 900 })],
+      ]),
+    ).toBe('CONSTRAINT_FAILED');
+    const good = base({});
+    expect(
+      await send([
+        ['refunds', good],
+        ['payments', refundPayment(shop, good)],
+      ]),
+    ).toBeNull();
+    // Udhaar part: needs exactly one customer ledger row of −udhaar_part.
+    const khata = base({
+      method: null,
+      exact_amount: 30000,
+      udhaar_part: 30000,
+      amount: 0,
+    });
+    expect(await send([['refunds', khata]])).toBe('CONSTRAINT_FAILED');
+    const entry = {
+      id: newId(),
+      party_type: 'customer',
+      party_id: IDS.customer,
+      amount: -30000,
+      source_type: 'refund',
+      source_id: khata.id,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+    };
+    expect(
+      await send([
+        ['refunds', khata],
+        ['ledger_entries', entry],
+      ]),
+    ).toBeNull();
+    // More udhaar than is left on the bill (100,000 − 30,000) → rejected.
+    const tooMuch = base({
+      method: null,
+      exact_amount: 80000,
+      udhaar_part: 80000,
+      amount: 0,
+    });
+    expect(
+      await send([
+        ['refunds', tooMuch],
+        [
+          'ledger_entries',
+          { ...entry, id: newId(), amount: -80000, source_id: tooMuch.id },
+        ],
+      ]),
+    ).toBe('CONSTRAINT_FAILED');
+    expect(tx).toBeTruthy();
+  });
+
+  it('a sale without a customer cannot take an udhaar part', async () => {
+    const shop = await seedShop('No customer');
+    const sale = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, sale);
+    const r = {
+      id: newId(),
+      sale_id: sale[0]?.row?.id,
+      kind: 'partial',
+      reason: 'x',
+      method: null,
+      exact_amount: 500,
+      udhaar_part: 500,
+      rounding: 0,
+      amount: 0,
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+    };
+    const res = await pushOk(shop.till, [op('refunds', 'insert', r)]);
+    expect(res.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+  });
+});
+
+describe('supplier return rows (04 §5)', () => {
+  it('checks line maths, total, line_count and the refund payment', async () => {
+    const shop = await seedShop('Supplier returns');
+    const send = async (
+      head: Record<string, unknown>,
+      lines: Record<string, unknown>[],
+      pays: Record<string, unknown>[] = [],
+    ) => {
+      const t = newId();
+      const res = await pushOk(shop.till, [
+        op('supplier_returns', 'insert', head, { tx_id: t }),
+        ...lines.map((l) =>
+          op('supplier_return_lines', 'insert', l, { tx_id: t }),
+        ),
+        ...pays.map((p) => op('payments', 'insert', p, { tx_id: t })),
+      ]);
+      return res.results[0]?.error_code ?? null;
+    };
+    const head = (over: Record<string, unknown> = {}) => ({
+      id: newId(),
+      supplier_id: IDS.supplier,
+      purchase_id: null,
+      reason: 'Damaged',
+      total: 3000,
+      refund_received: 0,
+      refund_method: null,
+      line_count: 1,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+      ...over,
+    });
+    const line = (returnId: unknown, over: Record<string, unknown> = {}) => ({
+      id: newId(),
+      return_id: returnId,
+      line_no: 1,
+      product_id: IDS.product,
+      purchase_line_id: null,
+      qty_milli: 1500,
+      unit_credit: 2000,
+      line_total: 3000,
+      cost_snapshot: 2000,
+      created_at: Date.now(),
+      ...over,
+    });
+    const pay = (
+      h: Record<string, unknown>,
+      over: Record<string, unknown> = {},
+    ) => ({
+      id: newId(),
+      direction: 'in',
+      method: h.refund_method,
+      purpose: 'supplier_refund',
+      amount: h.refund_received,
+      cash_tendered: null,
+      change_given: null,
+      reference: '',
+      sale_id: null,
+      refund_id: null,
+      purchase_id: null,
+      supplier_return_id: h.id,
+      party_type: 'supplier',
+      party_id: IDS.supplier,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+      ...over,
+    });
+    let h = head();
+    expect(await send(h, [line(h.id, { line_total: 2999 })])).toBe(
+      'CONSTRAINT_FAILED',
+    );
+    h = head({ total: 4000 });
+    expect(await send(h, [line(h.id)])).toBe('CONSTRAINT_FAILED');
+    h = head({ line_count: 2 });
+    expect(await send(h, [line(h.id)])).toBe('CONSTRAINT_FAILED');
+    h = head({ refund_received: 1000, refund_method: 'cash' });
+    expect(await send(h, [line(h.id)])).toBe('CONSTRAINT_FAILED');
+    h = head({ refund_received: 1000, refund_method: 'cash' });
+    expect(
+      await send(h, [line(h.id)], [pay(h, { method: 'bank_wallet' })]),
+    ).toBe('CONSTRAINT_FAILED');
+    h = head({ refund_received: 1000, refund_method: 'cash' });
+    expect(await send(h, [line(h.id)], [pay(h)])).toBeNull();
+    h = head();
+    expect(await send(h, [line(h.id)])).toBeNull();
   });
 });
