@@ -6,7 +6,7 @@ import {
   type Page,
 } from '@playwright/test';
 
-export const ORIGIN = 'http://localhost:8787';
+export const ORIGIN = `http://localhost:${process.env.E2E_PORT ?? 8787}`;
 export const API = '/bikri/api';
 
 export async function createShop(
