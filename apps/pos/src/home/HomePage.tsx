@@ -144,25 +144,18 @@ export function HomePage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {can('catalog.edit') ? (
               <>
-                <Link
-                  to="/products"
-                  search={{ new: 1 }}
-                  className={buttonPrimary}
-                >
+                <Link to="/products/new" className={buttonPrimary}>
                   {t('home.add_product')}
                 </Link>
-                <Link
-                  to="/products"
-                  search={{ import: 1 }}
+                <button
+                  type="button"
                   className={buttonQuiet}
+                  disabled
+                  title={t('common.coming_soon')}
                 >
                   {t('home.import')}
-                </Link>
-                <Link
-                  to="/products"
-                  search={{ suggested: 1 }}
-                  className={buttonQuiet}
-                >
+                </button>
+                <Link to="/products/suggested" className={buttonQuiet}>
                   {t('home.suggested')}
                 </Link>
               </>

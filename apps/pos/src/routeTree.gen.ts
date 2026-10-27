@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
-import { Route as ProductsRouteImport } from './routes/products.tsx';
 import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
@@ -21,6 +20,12 @@ import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
+import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
+import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
+import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
+import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
+import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,11 +40,6 @@ const SplatRoute = SplatRouteImport.update({
 const ExpensesRoute = ExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ProductsRoute = ProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any);
 const ReportsRoute = ReportsRouteImport.update({
@@ -82,12 +82,41 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ProductsIndexRoute = ProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsCategoriesRoute = ProductsCategoriesRouteImport.update({
+  id: '/products/categories',
+  path: '/products/categories',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsNewRoute = ProductsNewRouteImport.update({
+  id: '/products/new',
+  path: '/products/new',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
+  id: '/products/suggested',
+  path: '/products/suggested',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdIndexRoute = ProductsIdIndexRouteImport.update({
+  id: '/products/$id/',
+  path: '/products/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdEditRoute = ProductsIdEditRouteImport.update({
+  id: '/products/$id/edit',
+  path: '/products/$id/edit',
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/expenses': typeof ExpensesRoute;
-  '/products': typeof ProductsRoute;
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
@@ -96,12 +125,17 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/products/': typeof ProductsIndexRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/expenses': typeof ExpensesRoute;
-  '/products': typeof ProductsRoute;
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
@@ -110,13 +144,18 @@ export interface FileRoutesByTo {
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/products': typeof ProductsIndexRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/expenses': typeof ExpensesRoute;
-  '/products': typeof ProductsRoute;
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
@@ -125,6 +164,12 @@ export interface FileRoutesById {
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/products/': typeof ProductsIndexRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -132,7 +177,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/expenses'
-    | '/products'
     | '/reports'
     | '/sales'
     | '/sell'
@@ -140,13 +184,18 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/new'
+    | '/products/suggested'
+    | '/products/'
+    | '/products/$id/edit'
+    | '/products/$id/';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/$'
     | '/expenses'
-    | '/products'
     | '/reports'
     | '/sales'
     | '/sell'
@@ -154,13 +203,18 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/new'
+    | '/products/suggested'
+    | '/products'
+    | '/products/$id/edit'
+    | '/products/$id';
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/expenses'
-    | '/products'
     | '/reports'
     | '/sales'
     | '/sell'
@@ -168,14 +222,19 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/new'
+    | '/products/suggested'
+    | '/products/'
+    | '/products/$id/edit'
+    | '/products/$id/';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
   ExpensesRoute: typeof ExpensesRoute;
-  ProductsRoute: typeof ProductsRoute;
   ReportsRoute: typeof ReportsRoute;
   SalesRoute: typeof SalesRoute;
   SellRoute: typeof SellRoute;
@@ -184,6 +243,12 @@ export interface RootRouteChildren {
   SuppliersRoute: typeof SuppliersRoute;
   UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
+  ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
+  ProductsNewRoute: typeof ProductsNewRoute;
+  ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  ProductsIndexRoute: typeof ProductsIndexRoute;
+  ProductsIdEditRoute: typeof ProductsIdEditRoute;
+  ProductsIdIndexRoute: typeof ProductsIdIndexRoute;
 }
 
 declare module '@tanstack/react-router' {
@@ -207,13 +272,6 @@ declare module '@tanstack/react-router' {
       path: '/expenses';
       fullPath: '/expenses';
       preLoaderRoute: typeof ExpensesRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/products': {
-      id: '/products';
-      path: '/products';
-      fullPath: '/products';
-      preLoaderRoute: typeof ProductsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/reports': {
@@ -272,6 +330,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevUiRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/products/': {
+      id: '/products/';
+      path: '/products';
+      fullPath: '/products/';
+      preLoaderRoute: typeof ProductsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/categories': {
+      id: '/products/categories';
+      path: '/products/categories';
+      fullPath: '/products/categories';
+      preLoaderRoute: typeof ProductsCategoriesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/new': {
+      id: '/products/new';
+      path: '/products/new';
+      fullPath: '/products/new';
+      preLoaderRoute: typeof ProductsNewRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/suggested': {
+      id: '/products/suggested';
+      path: '/products/suggested';
+      fullPath: '/products/suggested';
+      preLoaderRoute: typeof ProductsSuggestedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/': {
+      id: '/products/$id/';
+      path: '/products/$id';
+      fullPath: '/products/$id/';
+      preLoaderRoute: typeof ProductsIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/edit': {
+      id: '/products/$id/edit';
+      path: '/products/$id/edit';
+      fullPath: '/products/$id/edit';
+      preLoaderRoute: typeof ProductsIdEditRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -279,7 +379,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   ExpensesRoute: ExpensesRoute,
-  ProductsRoute: ProductsRoute,
   ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
   SellRoute: SellRoute,
@@ -288,6 +387,12 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliersRoute: SuppliersRoute,
   UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
+  ProductsCategoriesRoute: ProductsCategoriesRoute,
+  ProductsNewRoute: ProductsNewRoute,
+  ProductsSuggestedRoute: ProductsSuggestedRoute,
+  ProductsIndexRoute: ProductsIndexRoute,
+  ProductsIdEditRoute: ProductsIdEditRoute,
+  ProductsIdIndexRoute: ProductsIdIndexRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -16,7 +16,8 @@ export async function searchAll(
 ): Promise<SearchHit[]> {
   const q = raw.trim().toLowerCase();
   if (q === '') return [];
-  const digits = q.replace(/\D/gu, '');
+  // 0300… and +92300… are the same number: drop a local leading 0.
+  const digits = q.replace(/\D/gu, '').replace(/^0/u, '');
   const words = q.split(/\s+/u);
   const products: SearchHit[] = [];
   const barcodeHits = new Set(
