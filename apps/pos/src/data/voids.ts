@@ -132,12 +132,24 @@ export async function computeVoid(
       .filter((p): p is MasterRow => p !== undefined)
       .map((p) => [p.id, p]),
   );
+  const tracked = new Set(
+    (
+      await (src.table('stock_movements') as Table<SyncedRow>)
+        .filter(
+          (row) =>
+            row.ref_type === 'sale' &&
+            String(row.ref_id) === saleId &&
+            n(row.qty_delta_milli) < 0,
+        )
+        .toArray()
+    ).map((row) => String(row.product_id)),
+  );
   const productOf = new Map<string, string>();
   for (const line of lines) {
     const product = line.product_id
       ? products.get(String(line.product_id))
       : undefined;
-    if (product && product.track_stock === 1)
+    if (product && tracked.has(product.id))
       productOf.set(line.id, String(line.product_id));
   }
   return { sale, payments, lines, udhaar: n(sale.udhaar_amount), productOf };

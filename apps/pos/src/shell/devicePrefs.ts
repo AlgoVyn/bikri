@@ -22,7 +22,18 @@ export const DEFAULT_PREFS: DevicePrefs = {
 
 export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
   const stored = await getKv<Partial<DevicePrefs>>(db, 'ui.prefs', {});
-  return { ...DEFAULT_PREFS, ...stored };
+  const autoLock = await getKv<number>(
+    db,
+    'auto_lock_minutes',
+    DEFAULT_PREFS.autoLockMinutes,
+  );
+  return {
+    ...DEFAULT_PREFS,
+    ...stored,
+    autoLockMinutes: Number(
+      stored.autoLockMinutes ?? autoLock ?? DEFAULT_PREFS.autoLockMinutes,
+    ),
+  };
 }
 
 export async function saveDevicePrefs(
@@ -32,6 +43,7 @@ export async function saveDevicePrefs(
   await setKv(db, 'ui.prefs', {
     theme: prefs.theme,
     textSize: prefs.textSize,
+    autoLockMinutes: prefs.autoLockMinutes,
     camera: prefs.camera,
     suffixEnter: prefs.suffixEnter,
   });

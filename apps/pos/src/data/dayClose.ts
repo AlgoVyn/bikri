@@ -102,7 +102,10 @@ export async function dayCloseData(
       .toArray()
   ).sort((a, b) => n(a.period_end) - n(b.period_end));
   const last = closes.at(-1) ?? null;
-  const periodStart = last ? n(last.period_end) : 0;
+  const deviceRow = await (src.table('devices') as Table<SyncedRow>).get(
+    deviceId,
+  );
+  const periodStart = last ? n(last.period_end) : n(deviceRow?.created_at);
   const payments = await sumPayments(src, deviceId, periodStart, now);
   const cash = payments.filter((p) => p.method === 'cash');
   const pick = (direction: string, purposes: string[], rows = cash) =>

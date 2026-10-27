@@ -27,10 +27,19 @@ export async function loadSupplierReturnReceipt(
       .map((product) => [product.id, product]),
   );
   const { shop } = await receiptShop(db);
-  const balance = await db.party_balances.get([
-    'supplier',
-    String(row.supplier_id),
-  ]);
+  const entries = await db.ledger_entries
+    .where('[party_type+party_id+created_at]')
+    .between(
+      ['supplier', String(row.supplier_id), -Infinity],
+      ['supplier', String(row.supplier_id), Number(row.created_at)],
+      false,
+      true,
+    )
+    .toArray();
+  const balanceAfter = entries.reduce(
+    (sum, entry) => sum + Number(entry.amount ?? 0),
+    0,
+  );
   return {
     shop,
     supplierName: String(supplier.name),
@@ -56,7 +65,7 @@ export async function loadSupplierReturnReceipt(
         : null,
     reason: String(row.reason),
     note: String(row.note ?? ''),
-    balanceAfter: balance?.balance ?? 0,
+    balanceAfter,
   };
 }
 

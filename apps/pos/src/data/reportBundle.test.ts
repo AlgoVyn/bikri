@@ -667,6 +667,14 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       'Case',
     );
     expect(reportCsv('products', bundle)).toContain('66.67');
+    const summaryHeader = reportCsv('summary', bundle, {
+      includeCost: false,
+    }).split('\r\n')[0];
+    expect(summaryHeader).not.toContain('gross_profit');
+    expect(summaryHeader).not.toContain('net_profit');
+    expect(reportCsv('summary', bundle).split('\r\n')[0]).toContain(
+      'gross_profit',
+    );
     expect(reportCsv('udhaar', bundle)).toContain('Sixty Plus');
     expect(reportCsv('staff', bundle)).toContain('Adnan');
     const closesCsv = reportCsv('day_closes', bundle);

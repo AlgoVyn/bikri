@@ -124,6 +124,20 @@ export async function computeRefund(
       .filter((p): p is MasterRow => p !== undefined)
       .map((p) => [p.id, p]),
   );
+  // Restock only what the sale actually took out of stock; a product's current
+  // `track_stock` flag may have changed since the sale.
+  const tracked = new Set(
+    (
+      await (src.table('stock_movements') as Table<SyncedRow>)
+        .filter(
+          (row) =>
+            row.ref_type === 'sale' &&
+            String(row.ref_id) === saleId &&
+            n(row.qty_delta_milli) < 0,
+        )
+        .toArray()
+    ).map((row) => String(row.product_id)),
+  );
 
   const requested = new Map(input.map((line) => [line.saleLineId, line]));
   const planLines: RefundPlanLine[] = [];
@@ -159,7 +173,7 @@ export async function computeRefund(
       soldMilli: sold,
       priorMilli: prior,
       amount,
-      trackStock: product?.track_stock === 1,
+      trackStock: product !== undefined && tracked.has(product.id),
     });
   }
   if (planLines.length === 0) throw new RefundNotAllowedError('nothing');

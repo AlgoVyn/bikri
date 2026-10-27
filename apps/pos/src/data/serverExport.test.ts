@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unzip } from '../admin/zip.ts';
+import { SyncHttpError } from '../sync/client.ts';
 import { shopRequest } from '../sync/shopApi.ts';
 import {
   buildServerExport,
@@ -98,6 +99,34 @@ describe('owner server export (T-053, 13 §7.3)', () => {
     expect(salesCsv).toContain('10.00');
     clearServerExportSession();
     expect(sessionStorage.getItem('bikri.server_export')).toBeNull();
+  });
+
+  it('starts a fresh export when a resumed token has expired', async () => {
+    const db = await readyDb('server-expired');
+    await addShop(db, { name: 'Server Shop' });
+    let starts = 0;
+    request.mockImplementation(async (_db, _staff, path) => {
+      if (path === '/export') {
+        starts += 1;
+        return { ...start, export_id: `token-${starts}` } as never;
+      }
+      const url = new URL(path, 'http://bikri');
+      if (url.searchParams.get('export_id') === 'token-1')
+        throw new SyncHttpError(
+          'VALIDATION_FAILED',
+          400,
+          'This export has expired; start a new one',
+          {},
+          null,
+        );
+      return page(
+        url.searchParams.get('tbl') ?? '',
+        url.searchParams.get('after') ?? '',
+      ) as never;
+    });
+    const result = await buildServerExport(db, 'st-1');
+    expect(starts).toBe(2);
+    expect(result.manifest.snapshot_seq).toBe(7);
   });
 
   it('resumes the same server export token after a failed page', async () => {

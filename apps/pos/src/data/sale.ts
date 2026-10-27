@@ -405,10 +405,10 @@ export async function startReissue(
   if (refunds > 0) throw new ReissueNotAllowedError('refunded');
   const target = await db.carts.get(input.cartId);
   if (target && target.lines.length > 0) throw new CartNotEmptyError();
-  const lines = await db.sale_lines
-    .where('sale_id')
-    .equals(input.saleId)
-    .sortBy('line_no');
+  // The cart stores newest-first and `createSale` reverses it back to line order.
+  const lines = (
+    await db.sale_lines.where('sale_id').equals(input.saleId).sortBy('line_no')
+  ).reverse();
   const products = new Map(
     (
       await db.products.bulkGet([

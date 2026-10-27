@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { unzip } from '../admin/zip.ts';
 import { seedSampleDay } from '../dev/sampleDay.ts';
-import { buildShopExport, SHOP_EXPORT_TABLES } from './shopExport.ts';
+import { buildShopExport, SHOP_EXPORT_TABLES, tableCsv } from './shopExport.ts';
 import { dropTestDbs } from './testDb.ts';
 import { addShop, NOW, readyDb } from './testShop.ts';
 
@@ -81,5 +81,29 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     expect(rows.some((row) => row.includes('1000.00'))).toBe(true);
     expect(rows.some((row) => row.includes(',50000,'))).toBe(false);
     expect(rows[0]).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:00/u);
+  });
+
+  it('hardens CSV cells and converts percent, paisa and timestamp fields', () => {
+    const csv = tableCsv([
+      {
+        id: 'row-1',
+        note: '=HYPERLINK("https://evil")',
+        discount_type: 'pct',
+        discount_value: 1000,
+        amount: -12345,
+        cost_snapshot: 500,
+        created_at: NOW,
+        deleted_at: null,
+        details: { a: 1 },
+      },
+    ]).replace(/^\uFEFF/u, '');
+    const [header, row] = csv.trim().split('\r\n');
+    expect(header).toContain('cost_snapshot');
+    expect(row).toContain("'=HYPERLINK");
+    expect(row).toContain(',10.00,');
+    expect(row).toContain(',-123.45,');
+    expect(row).toContain(',5.00,');
+    expect(row).toContain('""a"":1');
+    expect(row).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:00/u);
   });
 });

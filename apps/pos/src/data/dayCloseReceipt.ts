@@ -23,6 +23,16 @@ export async function loadDayCloseReceipt(
     Number(row.period_start),
     Number(row.period_end),
   );
+  let denominations: Record<string, number> | null = null;
+  if (typeof row.denominations_json === 'string') {
+    try {
+      const parsed = JSON.parse(row.denominations_json) as unknown;
+      if (parsed !== null && typeof parsed === 'object')
+        denominations = parsed as Record<string, number>;
+    } catch {
+      denominations = null;
+    }
+  }
   return {
     shop,
     staffName: staff ? String(staff.name) : null,
@@ -41,6 +51,7 @@ export async function loadDayCloseReceipt(
     expectedCash: Number(row.expected_cash),
     countedCash: Number(row.counted_cash),
     difference: Number(row.difference),
+    denominations,
     ...info,
     note: String(row.note ?? ''),
   };
