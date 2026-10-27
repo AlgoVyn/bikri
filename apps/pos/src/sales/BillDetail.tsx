@@ -414,8 +414,8 @@ export function BillDetail({ saleId }: { saleId: string }) {
           value={
             detail.customer ? (
               <Link
-                to="/udhaar"
-                search={{ customer: String(detail.customer.id) }}
+                to="/udhaar/$customerId"
+                params={{ customerId: String(detail.customer.id) }}
                 className="underline"
               >
                 {String(detail.customer.name)}
