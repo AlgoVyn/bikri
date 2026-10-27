@@ -383,6 +383,58 @@ describe('void rules (05 §5, D-044)', () => {
     const owner = await pushOk(shop.till, [voidOf(2, IDS.owner, '2026-10-29')]);
     expect(owner.results[0]?.error_code ?? null).toBeNull();
   });
+
+  it('T-035 AC: a cashier refund needs an owner override in the same push', async () => {
+    const shop = await seedShop('Refunds');
+    const sale = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, sale);
+    const refund = () => ({
+      id: newId(),
+      sale_id: sale[0]?.row?.id,
+      kind: 'partial',
+      reason: 'Faulty',
+      method: 'cash',
+      exact_amount: 1000,
+      udhaar_part: 0,
+      rounding: 0,
+      amount: 1000,
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.cashier,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+    });
+    const alone = await pushOk(shop.till, [op('refunds', 'insert', refund())]);
+    expect(alone.results[0]?.error_code).toBe('FORBIDDEN');
+    const row = refund();
+    const tx = newId();
+    const approved = await pushOk(shop.till, [
+      op('refunds', 'insert', row, { tx_id: tx }),
+      op(
+        'audit_log',
+        'insert',
+        {
+          id: newId(),
+          action: 'override',
+          entity: 'refunds',
+          entity_id: row.id,
+          before_json: null,
+          after_json: JSON.stringify({
+            permission: 'refund.create',
+            approved_by: IDS.owner,
+          }),
+          device_id: shop.till.id,
+          staff_id: IDS.cashier,
+          created_at: Date.now(),
+        },
+        { tx_id: tx },
+      ),
+    ]);
+    expect(approved.results.map((r) => r.error_code ?? null)).toEqual([
+      null,
+      null,
+    ]);
+  });
 });
 
 describe('pull and snapshot', () => {
