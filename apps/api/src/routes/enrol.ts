@@ -20,6 +20,8 @@ export const EnrolBody = z.object({
   code: z.string().regex(/^[2-9A-HJKMNP-TV-Z]{4}-?[2-9A-HJKMNP-TV-Z]{4}$/i),
   user_agent: z.string().max(400),
   app_version: z.string().max(20),
+  /** Name typed on the enrol screen (screens/02); falls back to the name on the code (D-107). */
+  device_name: z.string().trim().min(1).max(40).optional(),
 });
 
 export const SUPPORT_DEVICE_NAME = 'Algovyn support';
@@ -84,7 +86,9 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
   const token = newDeviceToken();
   const device: DeviceRow = {
     id: newId(now),
-    name: support ? SUPPORT_DEVICE_NAME : code.device_name,
+    name: support
+      ? SUPPORT_DEVICE_NAME
+      : (parsed.data.device_name ?? code.device_name),
     branch_id: code.branch_id,
     device_code: '',
     token_hash: await sha256Hex(token),

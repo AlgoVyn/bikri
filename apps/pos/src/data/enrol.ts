@@ -74,11 +74,11 @@ export async function enrolDevice(
     method: 'POST',
     json: {
       code: normaliseCodeInput(code),
-      user_agent:
-        `${deviceName} | ${typeof navigator === 'undefined' ? '' : navigator.userAgent}`.slice(
-          0,
-          400,
-        ),
+      user_agent: (typeof navigator === 'undefined'
+        ? ''
+        : navigator.userAgent
+      ).slice(0, 400),
+      device_name: deviceName.trim().slice(0, 40) || undefined,
       app_version: APP_VERSION,
     },
   });

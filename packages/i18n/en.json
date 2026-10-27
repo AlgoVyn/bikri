@@ -890,7 +890,7 @@
     "code_expires": "Use within {{time}}",
     "unused_codes": "Unused codes",
     "list_title": "Devices of this shop",
-    "load": "Show devices",
+    "load": "Refresh",
     "admin": "Admin",
     "support": "Algovyn support until {{time}}",
     "this_device": "This device",

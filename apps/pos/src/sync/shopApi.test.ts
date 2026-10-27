@@ -63,7 +63,7 @@ describe('owner sign-in client (T-028)', () => {
     expect(start.email_hint).toBe('a***@x.com');
     expect(server.log.at(-1)?.headers.get('x-bikri-staff')).toBe('st1');
     await verifyOwnerSignin(db, 'st1', start.code_id, '۱۲۳۴۵۶');
-    expect((server.log.at(-1)?.body as { code: string }).code).toBe('123456');
+    expect(server.log.at(-1)?.body).toMatchObject({ code: '123456' });
     expect(ownerSessionValid('st1')).toBe(true);
     expect(ownerSessionValid('st2')).toBe(false);
     expect(await shopRequest(db, 'st1', '/devices')).toEqual({ devices: [] });
