@@ -164,12 +164,7 @@ describe('push (03 §3, §4.1)', () => {
       row: { id: 'c-ok' },
     });
     server.results = (op) =>
-      op.op_id &&
-      (
-        server.log.at(-1)?.body as {
-          ops: { row?: { id: string }; op_id: string }[];
-        }
-      ).ops.find((o) => o.op_id === op.op_id)?.row?.id === 'c-bad'
+      op.row?.id === 'c-bad'
         ? { result: 'rejected', error_code: 'UNIQUE_VIOLATION' }
         : { result: 'applied' };
     const out = await pushAll(db);
@@ -237,7 +232,8 @@ describe('push (03 §3, §4.1)', () => {
       actor: 'st-1',
     });
     await pushAll(db);
-    const op = (server.log.at(-1)?.body as { ops: unknown[] }).ops[0];
+    const last = server.log.at(-1)?.body as { ops: unknown[] } | undefined;
+    const op = last?.ops[0];
     expect(op).toMatchObject({
       kind: 'delete',
       row_id: 'c-1',

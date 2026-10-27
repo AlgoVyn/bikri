@@ -29,7 +29,7 @@ export class FakeServer {
     since: null,
   };
   support: { until: number; reason: string } | null = null;
-  results: (op: { op_id: string; tbl: string }) => {
+  results: (op: { op_id: string; tbl: string; row?: { id?: string } }) => {
     result: string;
     error_code?: string;
   } = () => ({ result: 'applied' });
@@ -95,7 +95,9 @@ export class FakeServer {
       });
     }
     if (path === '/sync/push') {
-      const ops = (body as { ops: { op_id: string; tbl: string }[] }).ops;
+      const ops = (
+        body as { ops: { op_id: string; tbl: string; row?: { id?: string } }[] }
+      ).ops;
       return respond(200, {
         results: ops.map((op) => ({ op_id: op.op_id, ...this.results(op) })),
         server_time: now,
