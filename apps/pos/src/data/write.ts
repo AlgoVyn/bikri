@@ -256,6 +256,11 @@ export async function writeAction<T>(
         | { value?: { status?: string } }
         | undefined;
       if (status?.value?.status === 'read_only') throw new ReadOnlyError();
+      // Support devices are always view-only (13 §7.5).
+      const kind = (await tx.table('kv').get('device_kind')) as
+        | { value?: string }
+        | undefined;
+      if (kind?.value === 'support') throw new ReadOnlyError();
     }
     return fn(writer);
   };

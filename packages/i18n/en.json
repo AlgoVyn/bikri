@@ -771,7 +771,8 @@
     "sync_downloading": "Downloading shop data… {{pct}}%",
     "sync_read_only": "Read-only",
     "sync_detail_read_only": "This shop is read-only · {{count}} changes waiting",
-    "sync_quota": "Daily sync limit reached"
+    "sync_quota": "Daily sync limit reached",
+    "lock": "Lock"
   },
   "stock": {
     "reason": {
@@ -939,5 +940,19 @@
     "conflict_over_refund": "Refunded more than the bill",
     "conflict_refund_after_void": "Refund after the bill was voided",
     "conflict_over_return": "Returned more than received"
+  },
+  "lock": {
+    "who": "Who's selling?",
+    "wrong_one": "Wrong PIN, {{count}} try left before a 5-minute lock",
+    "wrong_other": "Wrong PIN, {{count}} tries left before a 5-minute lock",
+    "locked_for": "Locked for {{time}}",
+    "clear": "Clear",
+    "backspace": "Delete last digit",
+    "forgot": "Forgot PIN?",
+    "forgot_staff": "Ask the owner to reset it in Settings → Cashiers.",
+    "forgot_owner": "Another owner of your shop can reset it in Settings → Cashiers. If you are the only owner, contact Algovyn to reset it after checking it's you.",
+    "kept": "Carts and held bills are kept while locked.",
+    "support_profile": "Algovyn support",
+    "pin_entered": "{{count}} of {{total}} digits"
   }
 }
