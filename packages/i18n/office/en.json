@@ -642,15 +642,19 @@
       "error": "Could not build the export.",
       "finished": "Downloaded {{filename}}",
       "hint": "Download a zip of every table: JSON is the restore source, CSV is for Excel.",
+      "nav_hint": "Download a full copy of this shop",
       "nightly": "Your data is backed up every night by Algovyn.",
       "no_permission": "You can't export this shop's data.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} rows)",
       "restore": "Restore from export",
       "restore_hint": "Restoring is only enabled for an empty shop; it arrives with the remaining Settings sections.",
       "server": "Download from server",
+      "server_building": "Building from server…",
+      "server_done": "Server export downloaded.",
+      "server_finished": "Downloaded {{filename}} from the server",
       "server_hint": "The server copy, including every till, needs owner email sign-in and arrives with the server export task.",
-      "title": "Backup & export",
-      "nav_hint": "Download a full copy of this shop"
+      "server_unavailable": "Only an owner on an admin device can download the server copy.",
+      "title": "Backup & export"
     },
     "settings": {
       "add_branch": "Add branch",

@@ -76,6 +76,8 @@ export type ShopExportManifest = {
   app_version: string;
   tenant: { id: string; display_name: string };
   tables: Record<string, number>;
+  source?: 'device' | 'server';
+  snapshot_seq?: number;
 };
 
 export type ShopExportProgress = {
@@ -131,7 +133,7 @@ function csvCell(value: string): string {
   return /[",\n\r]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
 }
 
-function tableCsv(rows: readonly Record<string, unknown>[]): string {
+export function tableCsv(rows: readonly Record<string, unknown>[]): string {
   if (rows.length === 0) return '\uFEFF';
   const fields: string[] = [];
   const seen = new Set<string>();
@@ -149,6 +151,25 @@ function tableCsv(rows: readonly Record<string, unknown>[]): string {
     );
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`;
+}
+
+function exportStamp(now: number): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(now)
+    .replaceAll(/[^0-9]/gu, '')
+    .slice(0, 12);
+}
+
+export function shopExportFilename(displayName: string, now: number): string {
+  return `bikri-export-${slugify(displayName)}-${exportStamp(now)}.zip`;
 }
 
 /** All of this shop's synced tables as a `bikri-export` v2 zip (09 §3.3). */
@@ -205,21 +226,9 @@ export async function buildShopExport(
     name: 'manifest.json',
     data: encoder.encode(JSON.stringify(manifest, null, 2)),
   });
-  const stamp = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-    .format(now)
-    .replaceAll(/[^0-9]/gu, '')
-    .slice(0, 12);
   return {
     bytes: zipStore(files, now),
-    filename: `bikri-export-${slugify(displayName)}-${stamp}.zip`,
+    filename: shopExportFilename(displayName, now),
     manifest,
   };
 }

@@ -1,8 +1,14 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
+import { deviceInfo } from '../data/localTenant.ts';
+import {
+  buildServerExport,
+  clearServerExportSession,
+} from '../data/serverExport.ts';
 import {
   buildShopExport,
   SHOP_EXPORT_TABLES,
@@ -11,6 +17,8 @@ import {
 import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { OwnerSigninRequired } from '../sync/shopApi.ts';
+import { shopErrorMessage, useShopAdmin } from './OwnerSignin.tsx';
 
 /** Settings → Backup and export (screens/17); the server copy arrives with T-053. */
 export function BackupPage() {
@@ -24,10 +32,25 @@ export function BackupPage() {
 function BackupContent() {
   const { t } = useTranslation();
   const toast = useToast();
-  const { can } = useCurrentStaff();
+  const { staff, can, role } = useCurrentStaff();
+  const db = getDb();
+  const device = useLiveQuery(() => deviceInfo(db), []);
+  const enrolled = useLiveQuery(
+    async () => Boolean((await db.kv.get('device_token'))?.value),
+    [],
+  );
+  const { run, dialog } = useShopAdmin(db, staff?.id ?? null);
+  const serverAllowed =
+    can('export.data') &&
+    role === 'owner' &&
+    device?.is_admin === true &&
+    enrolled;
   const [building, setBuilding] = useState(false);
   const [progress, setProgress] = useState<ShopExportProgress | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [serverBuilding, setServerBuilding] = useState(false);
+  const [serverDone, setServerDone] = useState<string | null>(null);
+  const [serverProgress, setServerProgress] = useState<string | null>(null);
 
   if (!can('export.data'))
     return (
@@ -56,6 +79,36 @@ function BackupContent() {
     } finally {
       setBuilding(false);
       setProgress(null);
+    }
+  };
+
+  const downloadServer = async () => {
+    if (!serverAllowed || serverBuilding || !staff) return;
+    setServerBuilding(true);
+    setServerDone(null);
+    setServerProgress(null);
+    try {
+      await run(async () => {
+        const result = await buildServerExport(db, staff.id, {
+          onProgress: (progress) =>
+            setServerProgress(
+              `${progress.table} (${progress.done}/${progress.rows})`,
+            ),
+        });
+        downloadBlob(
+          new Blob([result.bytes as BlobPart], { type: 'application/zip' }),
+          result.filename,
+        );
+        clearServerExportSession();
+        setServerDone(result.filename);
+        toast.push(t('office.backup.server_done'));
+      });
+    } catch (error) {
+      if (error instanceof OwnerSigninRequired) return;
+      toast.push(shopErrorMessage(t, error), 'error');
+    } finally {
+      setServerBuilding(false);
+      setServerProgress(null);
     }
   };
 
@@ -110,12 +163,31 @@ function BackupContent() {
           {t('office.backup.server')}
         </h2>
         <p className="mt-1 text-small text-text-muted">
-          {t('office.backup.server_hint')}
+          {serverAllowed
+            ? t('office.backup.server_hint')
+            : t('office.backup.server_unavailable')}
         </p>
-        <button type="button" className={buttonQuiet} disabled>
-          {t('office.backup.server')}
+        <button
+          type="button"
+          className={buttonQuiet}
+          disabled={!serverAllowed || serverBuilding}
+          aria-busy={serverBuilding}
+          onClick={() => void downloadServer()}
+        >
+          {serverBuilding
+            ? t('office.backup.server_building')
+            : t('office.backup.server')}
         </button>
+        {serverProgress ? (
+          <p className="mt-1 text-small text-text-muted">{serverProgress}</p>
+        ) : null}
+        {serverDone ? (
+          <p className="mt-1 text-small text-success-subtle-ink" role="status">
+            {t('office.backup.server_finished', { filename: serverDone })}
+          </p>
+        ) : null}
       </section>
+      {dialog}
 
       <section className="rounded-card border border-border bg-surface p-4">
         <h2 className="text-title font-semibold">
