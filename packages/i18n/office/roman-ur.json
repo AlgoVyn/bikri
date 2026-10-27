@@ -107,7 +107,9 @@
       "void_reissue": "Mansookh kar ke dobara banayein",
       "void_same_day": "Manager sirf aaj ke bill mansookh kar sakta hai. Malik se kahein.",
       "voided_body": "Mansookh — {{reason}}",
-      "voided_title": "Mansookh"
+      "voided_title": "Mansookh",
+      "tendered": "Wasool {{amount}}",
+      "change": "Baqaya {{amount}}"
     },
     "void": {
       "body": "Bill list mein mansookh ke nishan ke sath rahega. Cash wapas, stock wapas aur udhaar khatay se kam ho jayega.",
@@ -504,7 +506,8 @@
       "total_counted": "Total ginti",
       "total_mode": "Total",
       "udhaar_given": "Diya gaya udhaar",
-      "udhaar_in": "Udhaar cash wasool"
+      "udhaar_in": "Udhaar cash wasool",
+      "next": "Aage"
     },
     "reports": {
       "age_days": "Umar (din)",
@@ -644,7 +647,7 @@
       "hint": "Har table ki zip download karein: JSON restore ke liye, CSV Excel ke liye.",
       "nav_hint": "Is dukan ki mukammal copy download karein",
       "nightly": "Aap ka data har raat Algovyn ki taraf se backup hota hai.",
-      "no_permission": "Aap is dukan ka data export nahi kar sakte.",
+      "no_permission": "Mukammal dukan ki copy sirf malik download kar sakta hai.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} satrein)",
       "restore": "Export se restore karein",
       "restore_hint": "Restore sirf khali dukan ke liye hai; yeh baqi Settings ke saath aayegi.",
@@ -812,7 +815,14 @@
       "summary": "Khulasa",
       "time": "Waqt",
       "title": "Activity",
-      "to": "Tak"
+      "to": "Tak",
+      "action_device_change": "Device tabdeeliyan",
+      "action_device_enrol_code": "Enrolment code",
+      "action_device_revoke": "Device mansookh",
+      "action_drawer_open": "Daraz khuli",
+      "action_ops_import": "Pending changes import",
+      "action_pin_reset": "Malik ka PIN reset",
+      "action_supplier_return": "Supplier ko wapsi"
     },
     "about": {
       "built_note": "App online hone par khud update hoti hai.",

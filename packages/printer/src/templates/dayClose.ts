@@ -29,6 +29,7 @@ const DEFAULTS: DayCloseLabels = {
   expected: 'Expected in drawer',
   counted: 'Counted',
   difference: 'Difference',
+  denominations: 'Cash counted',
   correct: 'Drawer is correct',
   short: 'Short',
   over: 'Over',
@@ -99,6 +100,20 @@ export function buildDayClose(
       ? labels.correct
       : `${input.difference < 0 ? labels.short : labels.over} ${money(Math.abs(input.difference))}`;
   pushPair(blocks, labels.difference, state, { bold: true });
+  const notes = Object.entries(input.denominations ?? {})
+    .map(([value, count]) => [Number(value), Number(count)] as const)
+    .filter(([value, count]) => value > 0 && count > 0)
+    .sort((a, b) => b[0] - a[0]);
+  if (notes.length > 0) {
+    blocks.push({ t: 'rule', char: '-' });
+    blocks.push({ t: 'text', text: labels.denominations, bold: true });
+    for (const [value, count] of notes)
+      pushPair(
+        blocks,
+        `${money(value * 100)} × ${count}`,
+        money(value * count * 100),
+      );
+  }
   blocks.push({ t: 'rule', char: '-' });
   pushPair(blocks, labels.card, money(input.cardTotal));
   pushPair(blocks, labels.bank, money(input.bankTotal));

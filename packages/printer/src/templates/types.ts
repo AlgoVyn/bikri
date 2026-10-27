@@ -157,6 +157,7 @@ export type DayCloseReceipt = {
   expectedCash: number;
   countedCash: number;
   difference: number;
+  denominations?: Record<string, number> | null;
   cardTotal: number;
   bankTotal: number;
   udhaarGiven: number;
@@ -183,6 +184,7 @@ export type DayCloseLabels = {
   expected: string;
   counted: string;
   difference: string;
+  denominations: string;
   correct: string;
   short: string;
   over: string;
@@ -221,6 +223,7 @@ export type SupplierReturnLabels = {
   reason: string;
   note: string;
   balance: string;
+  advance: string;
   methodCash: string;
   methodBank: string;
 };

@@ -1,3 +1,4 @@
+import { barcodeLabelSvg, LABEL_SIZES } from '@bikri/printer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +7,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { printLabelHtml } from '../labels/printLabels.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
 
@@ -50,6 +52,26 @@ function LabelsContent() {
   const save = async () => {
     await setKv(getDb(), 'label', form);
     toast.push(t('office.labels.saved'));
+  };
+  const printTest = () => {
+    try {
+      const barcode = 'BIKRI-TEST';
+      const svg = barcodeLabelSvg(barcode, LABEL_SIZES[form.size], form.dpi);
+      printLabelHtml(
+        [
+          `<div class="label">
+            ${form.showShop ? `<div class="shop"></div>` : ''}
+            <div class="name">${t('office.labels.print_test')}</div>
+            ${form.showPrice ? '<div class="price">Rs 1,000.00</div>' : ''}
+            <div class="bars">${svg.svg}</div>
+            <div class="value">${barcode}</div>
+          </div>`,
+        ],
+        form,
+      );
+    } catch {
+      toast.push(t('office.labels.charset'), 'error');
+    }
   };
   const field =
     'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
@@ -136,17 +158,12 @@ function LabelsContent() {
           >
             {t('office.labels.save')}
           </button>
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled
-            title={t('office.labels.print_soon')}
-          >
+          <button type="button" className={buttonQuiet} onClick={printTest}>
             {t('office.labels.print_test')}
           </button>
         </div>
         <p className="text-small text-text-muted">
-          {t('office.labels.print_soon')}
+          {t('office.labels.print_hint')}
         </p>
       </section>
     </SettingsPageLayout>

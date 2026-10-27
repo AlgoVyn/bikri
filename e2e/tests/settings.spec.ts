@@ -115,6 +115,17 @@ test.describe('Settings (T-050)', () => {
     }
   });
 
+  test('a manager cannot download the full shop copy with staff PIN verifiers', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.evaluate(() => window.__bikriTest?.unlockAs('manager'));
+    await navigate(page, '/settings/backup');
+    await expect(
+      page.getByText('Only the owner can download a full shop copy.'),
+    ).toBeVisible();
+  });
+
   test('AC 7: the #printer link opens the Printer section directly', async ({
     page,
   }) => {

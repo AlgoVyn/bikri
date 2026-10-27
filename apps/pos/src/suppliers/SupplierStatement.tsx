@@ -19,6 +19,7 @@ import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { statementPdf, statementPng } from '../udhaar/statementFile.ts';
 import {
   dateText,
@@ -35,6 +36,7 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const data = useLiveQuery(async () => {
@@ -59,10 +61,10 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
         to: '/suppliers/$supplierId/delivery/new',
         params: { supplierId },
       }),
-    { enabled: can('purchase.create') },
+    { enabled: can('purchase.create') && !readOnly },
   );
   useHotkey(plainKey('p'), () => setPayOpen(true), {
-    enabled: can('purchase.create'),
+    enabled: can('purchase.create') && !readOnly,
   });
 
   if (data === null)
@@ -167,13 +169,15 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
             <Link
               to="/suppliers/$supplierId/delivery/new"
               params={{ supplierId }}
-              className={`${buttonPrimary} gap-2`}
+              className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
+              aria-disabled={readOnly}
             >
               {t('office.suppliers.record_delivery')} <KeyBadge keys="D" />
             </Link>
             <button
               type="button"
               className={`${buttonQuiet} gap-2`}
+              disabled={readOnly}
               onClick={() => setPayOpen(true)}
             >
               {t('office.suppliers.pay_supplier')} <KeyBadge keys="P" />
@@ -181,7 +185,8 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
             <Link
               to="/suppliers/$supplierId/return/new"
               params={{ supplierId }}
-              className={buttonQuiet}
+              className={`${buttonQuiet} ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
+              aria-disabled={readOnly}
             >
               {t('office.suppliers.return_supplier')}
             </Link>
@@ -191,6 +196,7 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
           <button
             type="button"
             className={buttonQuiet}
+            disabled={readOnly}
             onClick={() => setEditOpen(true)}
           >
             {t('office.suppliers.edit')}
@@ -245,7 +251,10 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
                   </td>
                   <td className="p-2">
                     {rows[index]?.description}
-                    {row.kind === 'purchase' && row.entry.source_id ? (
+                    {row.kind === 'purchase' &&
+                    row.entry.source_id &&
+                    can('purchase.create') &&
+                    !readOnly ? (
                       <Link
                         to="/suppliers/$supplierId/return/new"
                         params={{ supplierId }}

@@ -44,6 +44,7 @@ const input = (counted: number): DayCloseReceipt => ({
   bills: 12,
   refunds: 1,
   note: counted === 3924000 ? '' : 'Short by 40',
+  denominations: { 5000: 2, 1000: 5 },
 });
 
 describe('day close slip (screens/15 AC 7)', () => {
@@ -61,6 +62,8 @@ describe('day close slip (screens/15 AC 7)', () => {
     expect(text).toContain('39,240');
     expect(text).toContain('Drawer is correct');
     expect(text).toContain('Closed by');
+    expect(text).toContain('Cash counted');
+    expect(text).toContain('Rs 5,000 × 2');
     expect(text).not.toContain('Powered by AlgoVyn');
     for (const line of text.split('\n'))
       expect(line.length).toBeLessThanOrEqual(48);

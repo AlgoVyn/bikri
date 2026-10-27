@@ -21,12 +21,15 @@ export function ApprovalDialog({
   permission,
   body,
   onApproved,
+  roles,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   permission: Permission;
   body?: string;
   onApproved: (approvedBy: string) => void;
+  /** Restrict who may approve (e.g. expense limits are manager/owner only). */
+  roles?: readonly Role[];
 }) {
   const { t } = useTranslation();
   const { staff } = useCurrentStaff();
@@ -35,6 +38,7 @@ export function ApprovalDialog({
     everyone,
     (s) =>
       s.id !== staff?.id &&
+      (!roles || roles.includes(s.role as Role)) &&
       canDo(s.role as Role, String(s.permissions_json ?? '{}'), permission),
   ).map((s) => ({ id: s.id, label: String(s.name) }));
 

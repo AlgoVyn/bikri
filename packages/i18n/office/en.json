@@ -107,7 +107,9 @@
       "void_reissue": "Void & reissue",
       "void_same_day": "Managers can void only bills from today. Ask the owner.",
       "voided_body": "Voided — {{reason}}",
-      "voided_title": "VOID"
+      "voided_title": "VOID",
+      "tendered": "Tendered {{amount}}",
+      "change": "Change {{amount}}"
     },
     "void": {
       "body": "The bill stays in the list with a VOID stamp. Cash goes back, stock returns, and udhaar is removed from the khata.",
@@ -504,7 +506,8 @@
       "total_counted": "Total counted",
       "total_mode": "Total",
       "udhaar_given": "Udhaar given",
-      "udhaar_in": "Udhaar received in cash"
+      "udhaar_in": "Udhaar received in cash",
+      "next": "Next"
     },
     "reports": {
       "age_days": "Age (days)",
@@ -644,7 +647,7 @@
       "hint": "Download a zip of every table: JSON is the restore source, CSV is for Excel.",
       "nav_hint": "Download a full copy of this shop",
       "nightly": "Your data is backed up every night by Algovyn.",
-      "no_permission": "You can't export this shop's data.",
+      "no_permission": "Only the owner can download a full shop copy.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} rows)",
       "restore": "Restore from export",
       "restore_hint": "Restoring is only enabled for an empty shop; it arrives with the remaining Settings sections.",
@@ -812,7 +815,14 @@
       "summary": "Summary",
       "time": "Time",
       "title": "Activity",
-      "to": "To"
+      "to": "To",
+      "action_device_change": "Device changes",
+      "action_device_enrol_code": "Enrolment code",
+      "action_device_revoke": "Device revoked",
+      "action_drawer_open": "Drawer opened",
+      "action_ops_import": "Pending changes imported",
+      "action_pin_reset": "Owner PIN reset",
+      "action_supplier_return": "Return to supplier"
     },
     "about": {
       "built_note": "The app updates itself when online.",

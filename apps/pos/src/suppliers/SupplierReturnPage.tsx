@@ -1,7 +1,7 @@
 import { formatMoney, mulDivRound, newId } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
@@ -67,27 +67,31 @@ export function SupplierReturnPage({
   const data = useLiveQuery(async () => {
     const db = getDb();
     const tz = await shopTimeZone(db);
-    const today = new Date().toISOString().slice(0, 10);
-    // Use the shop's business date for the 180-day delivery cutoff.
-    const parts = new Intl.DateTimeFormat('en-CA', {
+    const today = new Intl.DateTimeFormat('en-CA', {
       timeZone: tz,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     }).format(new Date());
-    const result = await supplierReturnData(db, supplierId, parts);
+    const result = await supplierReturnData(db, supplierId, today);
     if (!result) return null;
     const barcodes = await db.product_barcodes.toArray();
     const printer = await getKv<PrinterKv | null>(db, 'printer', null);
     return { ...result, today, tz, barcodes, printer };
   }, [supplierId]);
 
+  const initializedPurchase = useRef<string | null>(null);
   useEffect(() => {
-    if (!purchaseId || !data) return;
+    if (!purchaseId) {
+      initializedPurchase.current = null;
+      return;
+    }
+    if (!data || initializedPurchase.current === purchaseId) return;
     const purchase = data.purchases.find(
       (row) => String(row.purchase.id) === purchaseId,
     );
     if (!purchase) return;
+    initializedPurchase.current = purchaseId;
     setLinkedQty({});
     setLinkedCredit(
       Object.fromEntries(

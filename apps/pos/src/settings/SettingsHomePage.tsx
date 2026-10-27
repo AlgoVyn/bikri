@@ -174,7 +174,7 @@ function SettingsHomeContent() {
                 </Link>
               </li>
             ) : null}
-            {can('export.data') ? (
+            {can('export.data') && role === 'owner' ? (
               <li>
                 <Link to="/settings/backup" className={rowLink}>
                   <span className="font-medium">

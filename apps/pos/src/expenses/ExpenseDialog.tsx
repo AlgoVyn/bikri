@@ -260,6 +260,7 @@ export function ExpenseDialog({
           if (!next) setApproving(false);
         }}
         permission="expense.create"
+        roles={['owner', 'manager']}
         body={t('office.expenses.override_body')}
         onApproved={(approvedBy) => {
           setApproving(false);

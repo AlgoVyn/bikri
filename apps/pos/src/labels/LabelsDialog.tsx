@@ -20,6 +20,7 @@ import { AreaStrings } from '../i18n/areas.tsx';
 import { Modal } from '../sell/Modal.tsx';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { printLabelHtml } from './printLabels.ts';
 
 export type LabelSeed = { productId: string; copies: number };
 
@@ -69,7 +70,7 @@ function LabelsDialogContent({
   onOpenChange: (open: boolean) => void;
   initial: LabelSeed[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const [rows, setRows] = useState<LabelSeed[]>([]);
@@ -100,6 +101,7 @@ function LabelsDialogContent({
       products,
       barcodes,
       shopName: String(shop?.name ?? ''),
+      receiptLanguage: String(shop?.receipt_language ?? 'app'),
       label: { ...DEFAULT, ...label },
     };
   }, []);
@@ -132,6 +134,14 @@ function LabelsDialogContent({
       (row): row is typeof row & { product: MasterRow } => row.product !== null,
     );
 
+  const urduLabels =
+    data?.receiptLanguage === 'ur' ||
+    (data?.receiptLanguage === 'app' && i18n.language === 'ur');
+  const labelName = (product: MasterRow): string => {
+    const ur = String(product.name_ur ?? '').trim();
+    return urduLabels && ur !== '' ? ur : String(product.name_en);
+  };
+
   const searchMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -139,6 +149,9 @@ function LabelsDialogContent({
       .filter(
         (product) =>
           String(product.name_en).toLowerCase().includes(q) ||
+          String(product.name_ur ?? '')
+            .toLowerCase()
+            .includes(q) ||
           String(product.sku).toLowerCase().includes(q),
       )
       .filter((product) => !rows.some((row) => row.productId === product.id))
@@ -211,7 +224,7 @@ function LabelsDialogContent({
         const product = row.product;
         labels.push(`<div class="label">
           ${settings.showShop ? `<div class="shop">${escapeHtml(data?.shopName ?? '')}</div>` : ''}
-          <div class="name">${escapeHtml(String(product.name_en))}</div>
+          <div class="name">${escapeHtml(labelName(product))}</div>
           ${settings.showPrice ? `<div class="price">${formatMoney(Number(product.price))}</div>` : ''}
           <div class="bars">${svg.svg}</div>
           <div class="value">${escapeHtml(row.barcode)}</div>
@@ -225,7 +238,7 @@ function LabelsDialogContent({
     setError(null);
     setPrinting(true);
     try {
-      printHtml(labels, settings);
+      printLabelHtml(labels, settings);
     } finally {
       setPrinting(false);
     }
@@ -249,7 +262,7 @@ function LabelsDialogContent({
           >
             <span className="min-w-0 flex-[2_1_12rem]">
               <span className="block truncate font-medium">
-                {String(row.product.name_en)}
+                {labelName(row.product)}
               </span>
               <span className="block text-small text-text-muted">
                 {row.barcode ?? t('office.labels.no_barcode')}
@@ -272,7 +285,7 @@ function LabelsDialogContent({
             )}
             <div className="w-28">
               <QtyInput
-                label={`${t('office.labels.copies')} ${String(row.product.name_en)}`}
+                label={`${t('office.labels.copies')} ${labelName(row.product)}`}
                 unit="pc"
                 value={row.copies * 1000}
                 onChange={(value) =>
@@ -313,7 +326,7 @@ function LabelsDialogContent({
             className={`${buttonQuiet} px-3`}
             onClick={() => addRow(product)}
           >
-            {String(product.name_en)}
+            {labelName(product)}
           </button>
         ))}
       </div>
@@ -404,56 +417,4 @@ function LabelsDialogContent({
       </div>
     </Modal>
   );
-}
-
-function printHtml(labels: string[], settings: LabelSettings): void {
-  const size = LABEL_SIZES[settings.size];
-  const frame = document.createElement('iframe');
-  frame.style.position = 'fixed';
-  frame.style.inset = '0';
-  frame.style.width = '0';
-  frame.style.height = '0';
-  frame.style.border = '0';
-  document.body.append(frame);
-  const doc = frame.contentDocument;
-  if (!doc) {
-    frame.remove();
-    return;
-  }
-  const page =
-    settings.size === 'a4'
-      ? '@page { size: A4; margin: 12.9mm 9mm; }'
-      : `@page { size: ${size.widthMm}mm ${size.heightMm}mm; margin: 0; }`;
-  const skip =
-    settings.size === 'a4'
-      ? Array.from(
-          { length: Math.min(23, settings.start) },
-          () => '<div></div>',
-        ).join('')
-      : '';
-  const grid =
-    settings.size === 'a4'
-      ? 'display:grid;grid-template-columns:repeat(3,64mm);grid-auto-rows:33.9mm;gap:0;'
-      : '';
-  const labelCss =
-    settings.size === 'a4'
-      ? 'width:64mm;height:33.9mm;box-sizing:border-box;padding:1.5mm;overflow:hidden;break-inside:avoid;'
-      : `width:${size.widthMm}mm;height:${size.heightMm}mm;box-sizing:border-box;padding:1mm;overflow:hidden;break-after:page;`;
-  doc.open();
-  doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    ${page}
-    .sheet{${grid}}
-    .label{${labelCss}display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3mm;text-align:center}
-    .shop{font-size:7pt;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
-    .name{font-size:8pt;font-weight:700;line-height:1.1;max-height:2.2em;overflow:hidden;width:100%}
-    .price{font-size:10pt;font-weight:700;line-height:1.1}
-    .bars{width:100%;display:flex;justify-content:center}
-    .bars svg{display:block;max-width:100%;height:${size.barHeightMm}mm}
-    .value{font-family:"JetBrains Mono",monospace;font-size:7pt;line-height:1.1;white-space:nowrap;max-width:100%;overflow:hidden}
-  </style></head><body><div class="sheet">${skip}${labels.join('')}</div></body></html>`);
-  doc.close();
-  frame.contentWindow?.focus();
-  frame.contentWindow?.print();
-  setTimeout(() => frame.remove(), 60_000);
 }

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readBarcodes } from 'zxing-wasm/reader';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, idbUpdate, openReadyShop } from './helpers.ts';
 
 // T-052: barcode labels (screens/20 ACs 1, 2, 4, 5; journey 18).
 
@@ -20,6 +20,80 @@ test.describe('Barcode labels (T-052)', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('Cable', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
+  });
+
+  test('Settings prints a test label', async ({ page }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.goto('/bikri/settings/labels');
+    const button = page.getByRole('button', { name: 'Print test label' });
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect
+      .poll(async () => {
+        for (const frame of page.frames()) {
+          if ((await frame.locator('.label').count()) === 1) return true;
+        }
+        return false;
+      })
+      .toBe(true);
+    let labelFrame = page.mainFrame();
+    for (const candidate of page.frames()) {
+      if ((await candidate.locator('.label').count()) === 1) {
+        labelFrame = candidate;
+        break;
+      }
+    }
+    expect(await labelFrame.locator('.label .name').textContent()).toContain(
+      'Print test label',
+    );
+  });
+
+  test('A4 start position and the Urdu product name', async ({ page }) => {
+    await openReadyShop(page, '/bikri/');
+    const [productId] =
+      (await page.evaluate(() =>
+        window.__bikriTest?.seedProducts([
+          { name: 'Cable', name_ur: 'کیبل', price: 50000, stock: 3 },
+        ]),
+      )) ?? [];
+    if (!productId) throw new Error('missing product');
+    await idbUpdate(page, 'shop', 'shop', { receipt_language: 'ur' });
+    await page.evaluate(() =>
+      window.__bikriTest?.setKv('label', {
+        size: 'a4',
+        showShop: false,
+        showPrice: true,
+        dpi: 203,
+        start: 2,
+      }),
+    );
+    await page.goto(`/bikri/products/${productId}`);
+    await page.getByRole('button', { name: /Print label/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Print labels' });
+    await dialog.getByRole('button', { name: 'Generate barcode' }).click();
+    await dialog.getByRole('button', { name: /Print 1 label/ }).click();
+    await expect
+      .poll(async () => {
+        for (const frame of page.frames()) {
+          if ((await frame.locator('.label').count()) === 1) return true;
+        }
+        return false;
+      })
+      .toBe(true);
+    let labelFrame = page.mainFrame();
+    for (const candidate of page.frames()) {
+      if ((await candidate.locator('.label').count()) === 1) {
+        labelFrame = candidate;
+        break;
+      }
+    }
+    expect(
+      await labelFrame.locator('.label').first().locator('.name').textContent(),
+    ).toContain('کیبل');
+    expect(await labelFrame.locator('style').textContent()).toContain(
+      'size: A4',
+    );
+    expect(await labelFrame.locator('.sheet > div').count()).toBe(3);
   });
 
   test('AC 1, 2, 4, 5: generate, decode, print 3 and scan', async ({
