@@ -20,7 +20,7 @@ import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { marginText, qtyWithUnit } from './format.ts';
-import { tileBg } from './tiles.ts';
+import { ProductThumb } from './ProductThumb.tsx';
 
 const timeFmt = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -89,12 +89,12 @@ export function ProductDetailPage({ id }: { id: string }) {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
       <header className="flex flex-wrap items-start gap-4">
-        <span
-          aria-hidden="true"
-          className={`flex size-20 shrink-0 items-center justify-center rounded-card text-h1 font-semibold text-tile-ink ${tileBg(detail.category?.color)}`}
-        >
-          {String(p.name_en).slice(0, 1).toUpperCase()}
-        </span>
+        <ProductThumb
+          name={String(p.name_en)}
+          imageKey={p.image_key}
+          color={detail.category?.color}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <h1 className="text-h1 font-semibold break-words">
             {String(p.name_en)}

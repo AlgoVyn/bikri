@@ -20,7 +20,7 @@ import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { marginText, qtyWithUnit } from './format.ts';
-import { tileBg } from './tiles.ts';
+import { ProductThumb } from './ProductThumb.tsx';
 
 const ROW_PX = 72;
 const OVERSCAN = 8;
@@ -292,12 +292,11 @@ function ProductRow({
         params={{ id: p.id }}
         className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost)}`}
       >
-        <span
-          aria-hidden="true"
-          className={`flex size-10 items-center justify-center rounded-control ${tileBg(row.category?.color)} text-tile-ink font-semibold`}
-        >
-          {String(p.name_en).slice(0, 1).toUpperCase()}
-        </span>
+        <ProductThumb
+          name={String(p.name_en)}
+          imageKey={p.image_key}
+          color={row.category?.color}
+        />
         <span className="min-w-0">
           <span className="block truncate font-medium">
             {String(p.name_en)}
