@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { makePng } from './helpers.ts';
 import {
   API,
   createShop,
@@ -170,6 +171,20 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
       { name: 'Type-C cable 1 m', price: 149_900, cost: 110_000, stock: 5 },
     ]),
   );
+  // A product photo taken on A uploads after the push (T-033) and shows on the other device.
+  const png = await makePng(a.page, 800, 800);
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/products/new'));
+  await a.page.getByLabel('Name (English)').fill('Earbuds Pro');
+  await a.page.getByLabel('Sale price').fill('2500');
+  await a.page
+    .getByText('Take or choose photo')
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'earbuds.png', mimeType: 'image/png', buffer: png });
+  await expect(a.page.getByTestId('form-photo')).toBeVisible();
+  await a.page.keyboard.press('Control+s');
+  await expect(
+    a.page.getByRole('heading', { name: 'Earbuds Pro' }),
+  ).toBeVisible();
   await syncNow(a.page);
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
     'data-state',
@@ -198,6 +213,12 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     .getByRole('button', { name: 'Algovyn support' })
     .click();
   await expect(s.page.getByText('Type-C cable 1 m')).toBeVisible();
+  await s.page.getByText('Earbuds Pro').click();
+  const photo = s.page.getByTestId('product-photo');
+  await expect(photo).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(() => photo.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBe(512);
   // Writes are refused on a support device.
   const supportWrite = await s.page.evaluate(() =>
     window.__bikriTest
