@@ -91,6 +91,8 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 
 **T-026 Operator support access (MT, new, D-084).** `POST /api/admin/tenants/:id/support-access` (+ `/end`), `kind = 'support'` codes and devices with `expires_at`, the view-only "Algovyn support" profile, `403 FORBIDDEN` on pushes and uploads from support devices, `support` in `/me` and pull, the support banner with owner `End now` (`POST /api/shop/support-access/end`), `support_access_start` / `_end` audit rows, expiry handling in `deviceAuth` and the cron ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)). AC: sync test 25; E2E journey 25; isolation I24; screen 19 AC 10.
 
+**Phase 3 extras (owner, 27 Oct 2026).** Translations load per active language (D-100), and receipts with `shop.receipt_language = 'ur'` print Urdu labels (D-101). Both were found in M1 and are done at the start of phase 3.
+
 ## M3 — Back office
 
 **T-040 Sales history + bill detail.** [screens/10](screens/10-sales-and-bill-detail.md). AC: ACs 1, 4, 5.

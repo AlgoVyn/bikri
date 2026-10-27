@@ -37,13 +37,21 @@ for (const rel of jsFiles) {
     );
   }
 }
+// The active language's catalog is loaded before the first render (D-100): count the largest.
+const locale = Math.max(
+  0,
+  ...jsFiles
+    .filter((rel) => /^assets\/(en|ur|roman-ur)-[\w-]+\.js$/.test(rel))
+    .map(gz),
+);
+initialTotal += locale;
 if (initialTotal > INITIAL_BUDGET) {
   problems.push(
     `initial JS is ${kb(initialTotal)} gz (budget ${kb(INITIAL_BUDGET)})`,
   );
 }
 console.log(
-  `initial JS: ${kb(initialTotal)} gz across ${initial.size} file(s); ${jsFiles.length} JS file(s) total`,
+  `initial JS: ${kb(initialTotal)} gz across ${initial.size} file(s) + the largest language catalog (${kb(locale)}); ${jsFiles.length} JS file(s) total`,
 );
 if (problems.length > 0) {
   console.error(problems.join('\n'));
