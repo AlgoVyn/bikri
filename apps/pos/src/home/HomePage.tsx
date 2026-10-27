@@ -271,8 +271,8 @@ export function HomePage() {
             {data.recent.map(({ sale, methods }) => (
               <li key={sale.id}>
                 <Link
-                  to="/sales"
-                  search={{ bill: sale.id }}
+                  to="/sales/$id"
+                  params={{ id: sale.id }}
                   className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
                 >
                   <bdi dir="ltr" className="font-mono">

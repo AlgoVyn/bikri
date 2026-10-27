@@ -138,6 +138,9 @@ export type CartLine = {
 /** A manager approval given on this cart (05 §4.1); written to audit_log with the sale. */
 export type CartOverride = { permission: string; approved_by: string };
 
+/** A cart opened by "Void & reissue": on payment the old bill is voided in the same action. */
+export type CartReissue = { sale_id: string; void_id: string; reason: string };
+
 export type Cart = {
   id: 'c1' | 'c2' | 'c3';
   customer_id?: string | null;
@@ -146,6 +149,7 @@ export type Cart = {
   note: string;
   updated_at: number;
   overrides?: CartOverride[];
+  reissue?: CartReissue | null;
 };
 
 export type HeldBill = Omit<Cart, 'id'> & {
