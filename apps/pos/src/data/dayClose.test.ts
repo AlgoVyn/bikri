@@ -3,7 +3,12 @@ import type { SyncedRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobReceipt } from '../print/receiptFiles.ts';
 import { ledgerContext } from './catalog.ts';
-import { closeDay, dayCloseData, queueDayClosePrint } from './dayClose.ts';
+import {
+  closeDay,
+  dayCloseCsv,
+  dayCloseData,
+  queueDayClosePrint,
+} from './dayClose.ts';
 import { loadDayCloseReceipt } from './dayCloseReceipt.ts';
 import { dropTestDbs } from './testDb.ts';
 import { addShop, NOW, readyDb } from './testShop.ts';
@@ -156,6 +161,12 @@ describe('day close (T-047)', () => {
       cardTotal: 100000,
       bankTotal: 200000,
     });
+    const csv = dayCloseCsv(receipt as NonNullable<typeof receipt>, TODAY, TZ);
+    expect(csv.split('\r\n')[0]).toBe(
+      'date,device,cashier,period_start,period_end,opening,cash_sales,udhaar_in,pay_ins,supplier_in,refunds,expenses,supplier_out,pay_outs,expected,counted,difference,card,bank,udhaar_given,bills,refunds_count,note',
+    );
+    expect(csv).toContain('39240.00');
+    expect(csv).toContain('-40.00');
     const job = await db.print_jobs
       .filter((j) => j.day_close_id === 'close-d1')
       .first();

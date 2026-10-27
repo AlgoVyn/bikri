@@ -703,7 +703,9 @@ describe('udhaar branch coverage', () => {
     expect(later.rows).toEqual([]);
     expect(later.openingBalance).toBe(5000);
     const chase = await chaseList(db, { today: TODAY, now: NOW });
-    expect(chaseCsv(chase, (key) => key)).toContain('name,phone,balance');
+    expect(chaseCsv(chase, (key) => key).split('\r\n')[0]).toBe(
+      'group,name,phone,balance,age_days,last_payment',
+    );
     expect(reminderLink('not-a-phone', 'x')).toBeNull();
   });
 });

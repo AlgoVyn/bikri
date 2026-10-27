@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import { idbAll, openReadyShop } from './helpers.ts';
 
@@ -40,6 +41,22 @@ test.describe('Day close (T-047)', () => {
     ).toBeDefined();
     await page.getByRole('button', { name: 'Print Z-report' }).click();
     await expect(page.getByText('Z-report queued.')).toBeVisible();
+
+    const [csv] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'CSV' }).click(),
+    ]);
+    const csvText = await readFile((await csv.path()) ?? '', 'utf8');
+    expect(csvText).toContain(
+      'date,device,cashier,period_start,period_end,opening,cash_sales,udhaar_in,pay_ins,supplier_in,refunds,expenses,supplier_out,pay_outs,expected,counted,difference,card,bank,udhaar_given,bills,refunds_count,note',
+    );
+    expect(csvText).toContain('750.00');
+    const [pdf] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'PDF' }).click(),
+    ]);
+    const pdfBytes = await readFile((await pdf.path()) ?? '');
+    expect(pdfBytes.subarray(0, 8).toString('latin1')).toBe('%PDF-1.4');
   });
 
   test('AC 4: a cashier sees the expected amount only after entering the count', async ({
