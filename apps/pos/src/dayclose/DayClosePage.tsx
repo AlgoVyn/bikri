@@ -23,6 +23,7 @@ import { downloadText } from '../lib/download.ts';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 
 const NOTES = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1];
 const COMMEMORATIVE = 75;
@@ -32,9 +33,11 @@ export function DayClosePage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [notes, setNotes] = useState<Record<number, number>>({});
   const [show75, setShow75] = useState(false);
   const [mode, setMode] = useState<'notes' | 'total'>('notes');
+  const [countTouched, setCountTouched] = useState(false);
   const [totalInput, setTotalInput] = useState<number | null>(null);
   const [opening, setOpening] = useState(0);
   const [note, setNote] = useState('');
@@ -87,6 +90,15 @@ export function DayClosePage() {
     counted_cash: counted,
   });
   const blind = !can('dayclose.view_expected') && !revealed;
+  const resetForm = () => {
+    setNotes({});
+    setTotalInput(null);
+    setNote('');
+    setRevealed(false);
+    setMode('notes');
+    setCountTouched(false);
+    setOpening(data?.firstClose ? data.openingCash : 0);
+  };
   const noteNeeded =
     Math.abs(result.difference) >= 10_000 && note.trim() === '';
   const period = (at: number) =>
@@ -228,7 +240,10 @@ export function DayClosePage() {
           <button
             type="button"
             className={buttonQuiet}
-            onClick={() => setClosed(null)}
+            onClick={() => {
+              resetForm();
+              setClosed(null);
+            }}
           >
             {t('office.dayclose.new_close')}
           </button>
@@ -326,7 +341,10 @@ export function DayClosePage() {
           <MoneyInput
             label={t('office.dayclose.total_counted')}
             value={totalInput}
-            onChange={setTotalInput}
+            onChange={(value) => {
+              setCountTouched(true);
+              setTotalInput(value);
+            }}
           />
         )}
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border pt-2">
@@ -349,6 +367,7 @@ export function DayClosePage() {
         <button
           type="button"
           className={buttonPrimary}
+          disabled={!countTouched}
           onClick={() => setRevealed(true)}
         >
           {t('office.dayclose.next')}
@@ -466,7 +485,7 @@ export function DayClosePage() {
       <button
         type="button"
         className={`${buttonPrimary} min-h-14`}
-        disabled={pending || noteNeeded || blind}
+        disabled={pending || noteNeeded || blind || readOnly}
         onClick={() => void close()}
       >
         {t('office.dayclose.close')}

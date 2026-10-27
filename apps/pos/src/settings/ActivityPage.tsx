@@ -63,7 +63,11 @@ function ActivityContent() {
   );
   const update = (patch: Partial<AuditFilters>) =>
     setFilters((current) => ({ ...current, ...patch }));
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZone =
+    useLiveQuery(async () => {
+      const shop = await getDb().shop.get('shop');
+      return String(shop?.timezone ?? 'Asia/Karachi');
+    }, []) ?? 'Asia/Karachi';
   return (
     <SettingsPageLayout title={t('office.activity.title')}>
       <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">

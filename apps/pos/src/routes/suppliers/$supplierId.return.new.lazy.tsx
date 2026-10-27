@@ -1,4 +1,5 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
+import { PermissionGate } from '../../components/PermissionGate.tsx';
 import { AreaStrings } from '../../i18n/areas.tsx';
 import { SupplierReturnPage } from '../../suppliers/SupplierReturnPage.tsx';
 
@@ -11,10 +12,12 @@ function ReturnRoute() {
   const { purchase } = Route.useSearch();
   return (
     <AreaStrings area="office">
-      <SupplierReturnPage
-        supplierId={supplierId}
-        initialPurchaseId={purchase}
-      />
+      <PermissionGate permission="purchase.create">
+        <SupplierReturnPage
+          supplierId={supplierId}
+          initialPurchaseId={purchase}
+        />
+      </PermissionGate>
     </AreaStrings>
   );
 }

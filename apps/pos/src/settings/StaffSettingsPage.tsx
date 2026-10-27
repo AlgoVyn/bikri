@@ -23,6 +23,7 @@ import {
 import { AreaStrings } from '../i18n/areas.tsx';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
 
@@ -43,6 +44,7 @@ export function StaffSettingsPage() {
 
 function StaffList() {
   const { t } = useTranslation();
+  const readOnly = useReadOnly();
   const [editing, setEditing] = useState<MasterRow | null>(null);
   const [adding, setAdding] = useState(false);
   const rows = useLiveQuery(() => staffList(getDb()), []) ?? [];
@@ -52,6 +54,7 @@ function StaffList() {
         <button
           type="button"
           className={buttonPrimary}
+          disabled={readOnly}
           onClick={() => setAdding(true)}
         >
           {t('office.staff.add')}
@@ -66,6 +69,7 @@ function StaffList() {
               <button
                 type="button"
                 className="flex min-h-14 w-full flex-wrap items-center gap-2 p-3 text-start hover:bg-surface-2"
+                disabled={readOnly}
                 onClick={() => setEditing(row.staff)}
               >
                 <span className="min-w-0 flex-1">
@@ -126,6 +130,7 @@ function StaffDialog({
   const { t } = useTranslation();
   const toast = useToast();
   const { staff: actor } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('cashier');
   const [active, setActive] = useState(true);
@@ -347,7 +352,7 @@ function StaffDialog({
         <button
           type="button"
           className={buttonPrimary}
-          disabled={pending || name.trim() === ''}
+          disabled={pending || name.trim() === '' || readOnly}
           onClick={() => void save()}
         >
           {t('office.staff.save')}

@@ -1,4 +1,5 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
+import { PermissionGate } from '../../components/PermissionGate.tsx';
 import { AreaStrings } from '../../i18n/areas.tsx';
 import { DeliveryPage } from '../../suppliers/DeliveryPage.tsx';
 
@@ -12,7 +13,9 @@ function DeliveryRoute() {
   const { supplierId } = Route.useParams();
   return (
     <AreaStrings area="office">
-      <DeliveryPage supplierId={supplierId} />
+      <PermissionGate permission="purchase.create">
+        <DeliveryPage supplierId={supplierId} />
+      </PermissionGate>
     </AreaStrings>
   );
 }

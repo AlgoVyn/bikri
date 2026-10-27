@@ -52,7 +52,7 @@ function BackupContent() {
   const [serverDone, setServerDone] = useState<string | null>(null);
   const [serverProgress, setServerProgress] = useState<string | null>(null);
 
-  if (!can('export.data'))
+  if (!can('export.data') || role !== 'owner')
     return (
       <p className="p-6 text-center text-text-muted">
         {t('office.backup.no_permission')}

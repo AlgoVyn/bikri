@@ -28,6 +28,7 @@ import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   localeOf,
@@ -43,6 +44,7 @@ export function BillDetail({ saleId }: { saleId: string }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
+  const readOnly = useReadOnly();
   const { staff, role, can } = useCurrentStaff();
   const [voidOpen, setVoidOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
@@ -126,6 +128,7 @@ export function BillDetail({ saleId }: { saleId: string }) {
   };
 
   const canRefund =
+    !readOnly &&
     data !== null &&
     data !== undefined &&
     data.detail.sale.status !== 'void' &&
@@ -134,6 +137,7 @@ export function BillDetail({ saleId }: { saleId: string }) {
     ? voidBlocker(data.detail, role, data.today, can('sale.void'), false)
     : null;
   const canVoid =
+    !readOnly &&
     data !== undefined &&
     data !== null &&
     (data.detail.sale.status === 'paid' ||
@@ -171,11 +175,12 @@ export function BillDetail({ saleId }: { saleId: string }) {
   }).format(Number(sale.created_at));
 
   const askVoid = (mode: 'void' | 'reissue') => {
-    if (blocker === 'same_day') {
+    // A manager's previous-day void needs another manager/owner to approve it (05 §5).
+    if (blocker === 'same_day' && role !== 'manager') {
       toast.push(t('office.bill.void_same_day'), 'error');
       return;
     }
-    if (!can('sale.void')) {
+    if (!can('sale.void') || blocker === 'same_day') {
       setApproving(mode);
       return;
     }
@@ -590,6 +595,17 @@ export function BillDetail({ saleId }: { saleId: string }) {
                       {p.reference ? (
                         <span className="block text-text-muted">
                           {String(p.reference)}
+                        </span>
+                      ) : null}
+                      {Number(p.cash_tendered ?? 0) > 0 ? (
+                        <span className="block text-small text-text-muted">
+                          {t('office.bill.tendered', {
+                            amount: formatMoney(Number(p.cash_tendered)),
+                          })}{' '}
+                          ·{' '}
+                          {t('office.bill.change', {
+                            amount: formatMoney(Number(p.change_given ?? 0)),
+                          })}
                         </span>
                       ) : null}
                     </span>

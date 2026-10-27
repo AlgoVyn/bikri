@@ -107,7 +107,9 @@
       "void_reissue": "منسوخ کر کے دوبارہ بنائیں",
       "void_same_day": "منیجر صرف آج کے بل منسوخ کر سکتا ہے۔ مالک سے کہیں۔",
       "voided_body": "منسوخ — {{reason}}",
-      "voided_title": "منسوخ"
+      "voided_title": "منسوخ",
+      "tendered": "وصول {{amount}}",
+      "change": "بقایا {{amount}}"
     },
     "void": {
       "body": "بل فہرست میں منسوخ کے نشان کے ساتھ رہے گا۔ نقد واپس، اسٹاک واپس اور ادھار کھاتے سے کم ہو جائے گا۔",
@@ -504,7 +506,8 @@
       "total_counted": "کل گنتی",
       "total_mode": "کل",
       "udhaar_given": "دیا گیا ادھار",
-      "udhaar_in": "ادھار نقد وصول"
+      "udhaar_in": "ادھار نقد وصول",
+      "next": "آگے"
     },
     "reports": {
       "age_days": "عمر (دن)",
@@ -644,7 +647,7 @@
       "hint": "ہر ٹیبل کی zip ڈاؤن لوڈ کریں: JSON بحالی کے لیے، CSV ایکسل کے لیے۔",
       "nav_hint": "اس دکان کی مکمل کاپی ڈاؤن لوڈ کریں",
       "nightly": "آپ کا ڈیٹا ہر رات Algovyn کی طرف سے بیک اپ ہوتا ہے۔",
-      "no_permission": "آپ اس دکان کا ڈیٹا ایکسپورٹ نہیں کر سکتے۔",
+      "no_permission": "مکمل دکان کی کاپی صرف مالک ڈاؤن لوڈ کر سکتا ہے۔",
       "progress": "{{table}} ({{index}}/{{total}}، {{rows}} سطریں)",
       "restore": "ایکسپورٹ سے بحال کریں",
       "restore_hint": "بحالی صرف خالی دکان کے لیے ہے؛ یہ باقی سیٹنگز کے ساتھ آئے گی۔",
@@ -812,7 +815,14 @@
       "summary": "خلاصہ",
       "time": "وقت",
       "title": "سرگرمی",
-      "to": "تک"
+      "to": "تک",
+      "action_device_change": "ڈیوائس تبدیلیاں",
+      "action_device_enrol_code": "انرولمنٹ کوڈ",
+      "action_device_revoke": "ڈیوائس منسوخ",
+      "action_drawer_open": "دراز کھلی",
+      "action_ops_import": "زیرِ التوا تبدیلیاں درآمد",
+      "action_pin_reset": "مالک کا پن ری سیٹ",
+      "action_supplier_return": "سپلائر کو واپسی"
     },
     "about": {
       "built_note": "ایپ آن لائن ہونے پر خود اپ ڈیٹ ہوتی ہے۔",

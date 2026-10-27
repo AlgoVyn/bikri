@@ -55,7 +55,8 @@
     "no": "Nahin",
     "not_found": "Yeh safha dastiyab nahi.",
     "required": "zaroori",
-    "yes": "Haan"
+    "yes": "Haan",
+    "back": "Wapas"
   },
   "count": {
     "category": "Category",

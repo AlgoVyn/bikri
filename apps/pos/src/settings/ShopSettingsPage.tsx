@@ -22,6 +22,7 @@ import { AreaStrings } from '../i18n/areas.tsx';
 import { ditheredPreview, LogoError, processLogo } from '../setup/logo.ts';
 import { ReceiptPreview } from '../setup/ReceiptPreview.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
 
@@ -45,12 +46,14 @@ function ShopForm() {
   const { t } = useTranslation();
   const toast = useToast();
   const { staff } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const data = useLiveQuery(async () => {
     const db = getDb();
     return {
       shop: await db.shop.get('shop'),
       branch: await defaultBranch(db),
       logo: await getKv<LogoData | null>(db, 'logo_bitmap', null),
+      printer: await getKv<{ paper_mm?: number } | null>(db, 'printer', null),
     };
   }, []);
   const [form, setForm] = useState<ShopSettings>(() => shopSettings(undefined));
@@ -101,6 +104,8 @@ function ShopForm() {
       footer: form.receipt_footer,
       tax_rate_bp: form.tax_rate_bp,
       inclusive: form.tax_mode === 'inclusive',
+      tax_label: form.tax_label,
+      receipt_language: form.receipt_language,
     }),
     [form],
   );
@@ -281,6 +286,7 @@ function ShopForm() {
             <button
               type="button"
               className={buttonQuiet}
+              disabled={readOnly}
               onClick={() => void saveLogo()}
             >
               {t('office.settings.save_logo')}
@@ -502,11 +508,15 @@ function ShopForm() {
             {t('office.settings.print_warranty')}
           </label>
         </div>
-        <ReceiptPreview shop={preview} logoUrl={logoUrl} />
+        <ReceiptPreview
+          shop={preview}
+          logoUrl={logoUrl}
+          paperMm={data?.printer?.paper_mm === 58 ? 58 : 80}
+        />
         <button
           type="button"
           className={`${buttonPrimary} self-start`}
-          disabled={saving}
+          disabled={saving || readOnly}
           onClick={() => void saveShop()}
         >
           {t('office.settings.save')}
@@ -568,6 +578,7 @@ function ShopForm() {
             <button
               type="button"
               className={buttonPrimary}
+              disabled={readOnly}
               onClick={() => void saveBranch()}
             >
               {t('office.settings.save')}

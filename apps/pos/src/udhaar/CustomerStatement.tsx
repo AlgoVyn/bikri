@@ -23,6 +23,7 @@ import { downloadBlob } from '../print/receiptImage.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
 import {
   ageLabel,
@@ -41,7 +42,8 @@ export function CustomerStatement({ customerId }: { customerId: string }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { can } = useCurrentStaff();
+  const { can, role } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [promiseOpen, setPromiseOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -228,6 +230,7 @@ export function CustomerStatement({ customerId }: { customerId: string }) {
           <button
             type="button"
             className={`${buttonPrimary} gap-2`}
+            disabled={readOnly}
             onClick={() => setReceiveOpen(true)}
           >
             {t('office.udhaar.receive_money')} <KeyBadge keys="R" />
@@ -256,17 +259,21 @@ export function CustomerStatement({ customerId }: { customerId: string }) {
             <button
               type="button"
               className={buttonQuiet}
+              disabled={readOnly}
               onClick={() => setPromiseOpen(true)}
             >
               {t('office.udhaar.add_promise')}
             </button>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => setEditOpen(true)}
-            >
-              {t('office.udhaar.edit')}
-            </button>
+            {role !== 'cashier' ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={readOnly}
+                onClick={() => setEditOpen(true)}
+              >
+                {t('office.udhaar.edit')}
+              </button>
+            ) : null}
           </>
         ) : null}
         {can('sale.create') ? (

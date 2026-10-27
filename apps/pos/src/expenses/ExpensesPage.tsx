@@ -22,6 +22,7 @@ import { shopTimeZone } from '../data/salesHistory.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { CashMoveDialog } from './CashMoveDialog.tsx';
 import { ExpenseDialog } from './ExpenseDialog.tsx';
 import { categoryName, dateText, timeText } from './format.ts';
@@ -39,6 +40,7 @@ export function ExpensesPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [preset, setPreset] = useState<Preset>('month');
   const [newOpen, setNewOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
@@ -67,11 +69,12 @@ export function ExpensesPage() {
   );
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
-    enabled: can('expense.create'),
+    enabled: can('expense.create') && !readOnly,
   });
 
   const canReverse = (row: ExpenseRow) =>
     can('expense.create') &&
+    !readOnly &&
     !row.reversed &&
     !row.expense.reverses_id &&
     (role !== 'cashier' || String(row.expense.business_date) === today);
@@ -116,6 +119,7 @@ export function ExpensesPage() {
           <button
             type="button"
             className={buttonQuiet}
+            disabled={readOnly}
             onClick={() => setCashOpen(true)}
           >
             {t('office.expenses.cash_in_out')}
@@ -138,6 +142,7 @@ export function ExpensesPage() {
           <button
             type="button"
             className={`${buttonPrimary} gap-2`}
+            disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
             {t('office.expenses.new_expense')} <KeyBadge keys="N" />
@@ -194,7 +199,11 @@ export function ExpensesPage() {
           actionLabel={
             can('expense.create') ? t('office.expenses.new_expense') : undefined
           }
-          onAction={can('expense.create') ? () => setNewOpen(true) : undefined}
+          onAction={
+            can('expense.create') && !readOnly
+              ? () => setNewOpen(true)
+              : undefined
+          }
         />
       ) : null}
 

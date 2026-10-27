@@ -20,6 +20,7 @@ import {
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
 import { ageLabel, balanceLabel, balanceTone, limitPercent } from './format.ts';
 
@@ -34,6 +35,7 @@ export function UdhaarList({
 }) {
   const { t } = useTranslation();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
   const [sort, setSort] = useState<CustomerSort>('balance');
@@ -58,7 +60,7 @@ export function UdhaarList({
   }, [query, filter, sort]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
-    enabled: can('party.edit'),
+    enabled: can('party.edit') && !readOnly,
   });
 
   const filters: CustomerFilter[] = [
@@ -96,6 +98,7 @@ export function UdhaarList({
           <button
             type="button"
             className={`${buttonPrimary} gap-2`}
+            disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
             {t('office.udhaar.new_customer')} <KeyBadge keys="N" />

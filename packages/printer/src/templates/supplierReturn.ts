@@ -22,6 +22,7 @@ const DEFAULTS: SupplierReturnLabels = {
   reason: 'Reason',
   note: 'Note',
   balance: 'You owe now',
+  advance: 'Advance with supplier',
   methodCash: 'Cash',
   methodBank: 'Bank/wallet',
 };
@@ -73,7 +74,12 @@ export function buildSupplierReturn(
         input.refundMethod === 'cash' ? labels.methodCash : labels.methodBank,
       );
   }
-  pushPair(blocks, labels.balance, money(input.balanceAfter), { bold: true });
+  pushPair(
+    blocks,
+    input.balanceAfter < 0 ? labels.advance : labels.balance,
+    money(Math.abs(input.balanceAfter)),
+    { bold: true },
+  );
   blocks.push({ t: 'rule', char: '-' });
   pushCenter(blocks, `${labels.reason}: ${input.reason}`);
   if (input.note.trim() !== '')

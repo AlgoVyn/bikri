@@ -89,8 +89,9 @@ export function CustomerDialog({
         phone,
         address,
         note,
-        credit_limit: limit,
-        hard_limit: hard,
+        // 05 §6: cashiers may create a customer but never set or change a credit limit.
+        credit_limit: role === 'cashier' ? null : limit,
+        hard_limit: role === 'owner' ? hard : false,
       };
       if (editing) await updateCustomer(db, editing.id, fields, ctx);
       else
@@ -184,11 +185,13 @@ export function CustomerDialog({
               onChange={(e) => setNote(e.target.value)}
             />
           </label>
-          <MoneyInput
-            label={t('office.udhaar.credit_limit')}
-            value={limit}
-            onChange={setLimit}
-          />
+          {role !== 'cashier' ? (
+            <MoneyInput
+              label={t('office.udhaar.credit_limit')}
+              value={limit}
+              onChange={setLimit}
+            />
+          ) : null}
           {role === 'owner' ? (
             <label className="flex min-h-11 items-center gap-2 self-end text-small">
               <input

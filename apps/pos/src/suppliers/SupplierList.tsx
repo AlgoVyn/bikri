@@ -13,6 +13,7 @@ import { supplierList, suppliersCsv } from '../data/suppliers.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import {
   dateText,
   supplierBalanceLabel,
@@ -24,6 +25,7 @@ import { SupplierDialog } from './SupplierDialog.tsx';
 export function SupplierList() {
   const { t, i18n } = useTranslation();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [query, setQuery] = useState('');
   const [newOpen, setNewOpen] = useState(false);
   const data = useLiveQuery(async () => {
@@ -33,7 +35,7 @@ export function SupplierList() {
   }, [query]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
-    enabled: can('purchase.create'),
+    enabled: can('purchase.create') && !readOnly,
   });
 
   return (
@@ -62,6 +64,7 @@ export function SupplierList() {
           <button
             type="button"
             className={`${buttonPrimary} gap-2`}
+            disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
             {t('office.suppliers.new_supplier')} <KeyBadge keys="N" />
@@ -106,11 +109,15 @@ export function SupplierList() {
               : t('office.suppliers.no_suppliers')
           }
           actionLabel={
-            can('purchase.create')
+            can('purchase.create') && !readOnly
               ? t('office.suppliers.new_supplier')
               : undefined
           }
-          onAction={can('purchase.create') ? () => setNewOpen(true) : undefined}
+          onAction={
+            can('purchase.create') && !readOnly
+              ? () => setNewOpen(true)
+              : undefined
+          }
         />
       ) : null}
 

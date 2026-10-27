@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PermissionGate } from '../components/PermissionGate.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { type LabelSeed, LabelsDialog } from './LabelsDialog.tsx';
 
@@ -8,7 +9,9 @@ type Seed = { rows: LabelSeed[]; returnTo: string };
 export function LabelsRoutePage() {
   return (
     <AreaStrings area="office">
-      <LabelsRouteContent />
+      <PermissionGate permission="catalog.edit">
+        <LabelsRouteContent />
+      </PermissionGate>
     </AreaStrings>
   );
 }

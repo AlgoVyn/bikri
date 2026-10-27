@@ -459,7 +459,11 @@ function SummaryTab({
     summary.bills > 0 ||
     summary.refundCount > 0 ||
     summary.expenses !== 0 ||
-    summary.sold !== 0;
+    summary.sold !== 0 ||
+    summary.udhaarGiven !== 0 ||
+    summary.udhaarReceived !== 0 ||
+    summary.paymentMix.card !== 0 ||
+    summary.paymentMix.bank_wallet !== 0;
   return (
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
