@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobReceipt } from '../print/receiptFiles.ts';
-import { addProduct, emptyCart } from './cart.ts';
+import { addProduct, addQuickSale, emptyCart } from './cart.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
 import { computeRefund, RefundNotAllowedError, refundSale } from './refunds.ts';
 import { completeSale } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
-import { NOW, readyDb, sale, shopWithStock, t2Cart } from './testShop.ts';
+import {
+  addShop,
+  NOW,
+  readyDb,
+  sale,
+  shopWithStock,
+  t2Cart,
+} from './testShop.ts';
 
 afterEach(dropTestDbs);
 
@@ -359,5 +366,288 @@ describe('refund plan and split (07 §6)', () => {
         'cash',
       ),
     ).rejects.toBeInstanceOf(RefundNotAllowedError);
+  });
+});
+
+describe('refund branches', () => {
+  it('honours refund_rounding modes and derives whole bills', async () => {
+    const fx = await shopWithStock('refund-modes');
+    await addShop(fx.db, { refund_rounding: 'down' });
+    const saleId = 'mode-sale';
+    await completeSale(
+      fx.db,
+      sale(t2Cart(fx.phone, fx.buds), [{ method: 'cash', amount: 5000000 }], {
+        saleId,
+      }),
+      fx.ctx,
+      NOW,
+    );
+    const line = (
+      await fx.db.sale_lines.where('sale_id').equals(saleId).toArray()
+    ).find((l) => l.name_snapshot === 'Earbuds');
+    const request = [
+      { saleLineId: line?.id ?? '', qtyMilli: 1000, restock: true },
+    ];
+    expect(await computeRefund(fx.db, saleId, request, 'cash')).toMatchObject({
+      exact: 345977,
+      amount: 345900,
+      rounding: -77,
+    });
+    await addShop(fx.db, { refund_rounding: 'none' });
+    expect((await computeRefund(fx.db, saleId, request, 'cash')).amount).toBe(
+      345977,
+    );
+    await addShop(fx.db, { refund_rounding: 'weird' });
+    expect((await computeRefund(fx.db, saleId, request, 'cash')).amount).toBe(
+      346000,
+    );
+    await addShop(fx.db, { refund_rounding: 'nearest' });
+    expect((await computeRefund(fx.db, saleId, request, 'cash')).rounding).toBe(
+      23,
+    );
+
+    const whole = await shopWithStock('refund-whole');
+    await addShop(whole.db);
+    const budsOnly = addProduct(emptyCart('c1'), whole.buds, 1000, 'avg');
+    await completeSale(
+      whole.db,
+      sale(budsOnly, [{ method: 'cash', amount: 350000 }], {
+        saleId: 'whole-sale',
+      }),
+      whole.ctx,
+      NOW,
+    );
+    const wholeLine = (await whole.db.sale_lines
+      .where('sale_id')
+      .equals('whole-sale')
+      .first()) as { id: string };
+    const plan = await computeRefund(
+      whole.db,
+      'whole-sale',
+      [{ saleLineId: wholeLine.id, qtyMilli: 1000, restock: true }],
+      'cash',
+    );
+    expect(plan.kind).toBe('whole');
+    const result = await refundSale(
+      whole.db,
+      {
+        refundId: 'whole-refund',
+        saleId: 'whole-sale',
+        lines: [{ saleLineId: wholeLine.id, qtyMilli: 1000, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+      },
+      whole.ctx,
+      NOW + 1000,
+    );
+    expect(result.refund.kind).toBe('whole');
+  });
+
+  it('does not return stock for untracked or quick-sale lines', async () => {
+    const db = await readyDb('refund-untracked');
+    await addShop(db);
+    const ctx = await ledgerContext(db, 'st-1');
+    const service = await saveNewProduct(
+      db,
+      { name_en: 'Service', price: 100000, track_stock: false },
+      ctx,
+      { now: NOW },
+    );
+    const untracked = addProduct(emptyCart('c1'), service, 1000, 'avg');
+    const input = sale(untracked, [{ method: 'cash', amount: 100000 }], {
+      saleId: 'untracked-sale',
+    });
+    await completeSale(db, input, ctx, NOW);
+    const serviceLine = (await db.sale_lines
+      .where('sale_id')
+      .equals('untracked-sale')
+      .first()) as { id: string };
+    const plan = await computeRefund(
+      db,
+      'untracked-sale',
+      [{ saleLineId: serviceLine.id, qtyMilli: 1000, restock: true }],
+      'cash',
+    );
+    expect(plan.lines[0]?.trackStock).toBe(false);
+    await refundSale(
+      db,
+      {
+        refundId: 'untracked-refund',
+        saleId: 'untracked-sale',
+        lines: [{ saleLineId: serviceLine.id, qtyMilli: 1000, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+      },
+      ctx,
+      NOW + 1000,
+    );
+    expect(
+      await db.stock_movements
+        .filter((m) => m.ref_id === 'untracked-refund')
+        .count(),
+    ).toBe(0);
+
+    const quick = addQuickSale(emptyCart('c1'), {
+      name: 'Quick item',
+      price: 100000,
+      qtyMilli: 1000,
+    });
+    const quickSale = sale(quick, [{ method: 'cash', amount: 100000 }], {
+      saleId: 'quick-refund-sale',
+    });
+    await completeSale(db, quickSale, ctx, NOW + 2000);
+    const quickLine = (await db.sale_lines
+      .where('sale_id')
+      .equals('quick-refund-sale')
+      .first()) as { id: string };
+    expect(
+      await computeRefund(
+        db,
+        'quick-refund-sale',
+        [{ saleLineId: quickLine.id, qtyMilli: 1000, restock: true }],
+        'cash',
+      ),
+    ).toMatchObject({
+      lines: [{ trackStock: false, unit: 'pc' }],
+    });
+  });
+
+  it('covers refund errors, a repeated refund id and an override', async () => {
+    const fx = await shopWithStock('refund-errors');
+    await addShop(fx.db);
+    const saleId = 'error-sale';
+    await completeSale(
+      fx.db,
+      sale(t2Cart(fx.phone, fx.buds), [{ method: 'cash', amount: 5000000 }], {
+        saleId,
+      }),
+      fx.ctx,
+      NOW,
+    );
+    const line = (
+      await fx.db.sale_lines.where('sale_id').equals(saleId).toArray()
+    ).find((l) => l.name_snapshot === 'Earbuds') as { id: string };
+    const request = [{ saleLineId: line.id, qtyMilli: 1000, restock: true }];
+    await expect(
+      computeRefund(fx.db, 'missing', request, 'cash'),
+    ).rejects.toMatchObject({ code: 'missing' });
+    await expect(
+      computeRefund(
+        fx.db,
+        saleId,
+        [...request, { saleLineId: 'nope', qtyMilli: 1000, restock: true }],
+        'cash',
+      ),
+    ).rejects.toMatchObject({ code: 'line' });
+    await expect(
+      refundSale(
+        fx.db,
+        {
+          refundId: 'blank',
+          saleId,
+          lines: request,
+          reason: ' ',
+          method: 'cash',
+        },
+        fx.ctx,
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: 'reason' });
+    await expect(
+      refundSale(
+        fx.db,
+        {
+          refundId: 'long',
+          saleId,
+          lines: request,
+          reason: 'x'.repeat(121),
+          method: 'cash',
+        },
+        fx.ctx,
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: 'reason' });
+
+    const first = await refundSale(
+      fx.db,
+      {
+        refundId: 'override-refund',
+        saleId,
+        lines: request,
+        reason: 'Faulty',
+        method: 'cash',
+        override: { approved_by: 'st-1' },
+      },
+      fx.ctx,
+      NOW + 1000,
+    );
+    expect(first.created).toBe(true);
+    const again = await refundSale(
+      fx.db,
+      {
+        refundId: 'override-refund',
+        saleId,
+        lines: request,
+        reason: 'Again',
+        method: 'cash',
+      },
+      fx.ctx,
+      NOW + 2000,
+    );
+    expect(again.created).toBe(false);
+    expect(
+      await fx.db.audit_log
+        .where('[entity+entity_id]')
+        .equals(['refunds', 'override-refund'])
+        .toArray(),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'override' }),
+        expect.objectContaining({ action: 'refund' }),
+      ]),
+    );
+
+    // A bill with no lines left cannot be refunded.
+    const empty = await readyDb('refund-empty');
+    await addShop(empty);
+    await empty.sales.add({
+      id: 'empty-sale',
+      invoice_no: 'A-A-empty',
+      invoice_seq: 9,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      customer_id: null,
+      business_date: '2026-10-27',
+      created_at: NOW,
+      line_count: 0,
+      items_qty_milli: 0,
+      gross_total: 0,
+      item_discount_total: 0,
+      subtotal: 0,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      total: 0,
+      paid_total: 0,
+      udhaar_amount: 0,
+      cash_tendered: 0,
+      change_given: 0,
+      status: 'paid',
+      replaces_sale_id: null,
+      note: '',
+    });
+    await expect(
+      computeRefund(
+        empty,
+        'empty-sale',
+        [{ saleLineId: 'x', qtyMilli: 1000, restock: true }],
+        'cash',
+      ),
+    ).rejects.toMatchObject({ code: 'missing' });
   });
 });
