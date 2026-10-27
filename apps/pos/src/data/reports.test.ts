@@ -157,7 +157,12 @@ describe('Home attention and recent bills (screens/04)', () => {
       status: 'failed',
       created_at: NOW,
     } as never);
-    await db.sync_conflicts.add({ id: 'c1', row_id: 'x', at: NOW });
+    await db.sync_conflicts.add({
+      id: 'c1',
+      row_id: 'x',
+      at: NOW,
+      resolution: 'needs_owner',
+    });
     const opts = {
       today: '2026-10-27',
       yesterday: '2026-10-26',

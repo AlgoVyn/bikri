@@ -1,10 +1,5 @@
-/** Saves text as a file through a temporary link (CSV exports, REQ-B02). */
-export function downloadText(
-  filename: string,
-  text: string,
-  type = 'text/csv;charset=utf-8',
-): void {
-  const blob = new Blob([`\uFEFF${text}`], { type });
+/** Saves a blob through a temporary link (exports, zip downloads). */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -13,4 +8,13 @@ export function downloadText(
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Saves text as a file through a temporary link (CSV exports, REQ-B02). */
+export function downloadText(
+  filename: string,
+  text: string,
+  type = 'text/csv;charset=utf-8',
+): void {
+  downloadBlob(filename, new Blob([`\uFEFF${text}`], { type }));
 }

@@ -6,7 +6,11 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
-import { attentionItems, recentBills } from '../data/home.ts';
+import {
+  type AttentionItem,
+  attentionItems,
+  recentBills,
+} from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
 import { NAV } from '../shell/nav.ts';
@@ -22,7 +26,10 @@ const ATTENTION_LINK: Record<string, string> = {
   promises_due: '/udhaar',
   over_limit: '/udhaar',
   failed_prints: '/settings',
-  conflicts: '/settings',
+  conflicts: '/settings/sync',
+  sync_stale: '/settings/sync',
+  sync_pending_old: '/settings/sync',
+  clock_wrong: '/settings/sync',
   day_not_closed: '/sales',
   held_expiring: '/sell',
 };
@@ -241,13 +248,10 @@ export function HomePage() {
               <li key={item.kind}>
                 <Link
                   to={ATTENTION_LINK[item.kind] ?? '/'}
-                  className="flex min-h-11 items-center px-3 py-2"
+                  className={`flex min-h-11 items-center px-3 py-2 ${attentionTone(item)}`}
+                  data-testid={`attn-${item.kind}`}
                 >
-                  {item.kind === 'day_not_closed'
-                    ? t('home.attn_day_not_closed', { date: item.date })
-                    : t(`home.attn_${attentionKey(item.kind)}`, {
-                        count: item.count,
-                      })}
+                  {attentionText(t, i18n.language, item)}
                 </Link>
               </li>
             ))}
@@ -302,6 +306,43 @@ export function HomePage() {
 
 function attentionKey(kind: string): string {
   return kind === 'promises_due' ? 'promises' : kind;
+}
+
+function attentionTone(item: AttentionItem): string {
+  if (item.kind === 'sync_stale')
+    return item.severe ? 'text-danger' : 'text-warning-subtle-ink';
+  if (item.kind === 'clock_wrong' || item.kind === 'sync_pending_old')
+    return 'text-warning-subtle-ink';
+  return '';
+}
+
+function attentionText(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  lang: string,
+  item: AttentionItem,
+): string {
+  switch (item.kind) {
+    case 'day_not_closed':
+      return t('home.attn_day_not_closed', { date: item.date });
+    case 'sync_stale':
+      return item.severe
+        ? t('home.attn_sync_stale_severe', {
+            days: Math.max(30 - item.days, 0),
+          })
+        : t('home.attn_sync_stale', { days: item.days });
+    case 'sync_pending_old':
+      return t('home.attn_sync_pending_old', {
+        time: new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: 'Asia/Karachi',
+        }).format(item.since),
+      });
+    case 'clock_wrong':
+      return t('home.attn_clock_wrong');
+    default:
+      return t(`home.attn_${attentionKey(item.kind)}`, { count: item.count });
+  }
 }
 
 function TodayCard({

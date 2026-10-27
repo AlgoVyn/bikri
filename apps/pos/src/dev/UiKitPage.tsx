@@ -1,4 +1,4 @@
-import { catalogs, type LocaleCode } from '@bikri/i18n';
+import { type LocaleCode, loadAllCatalogs } from '@bikri/i18n';
 import { createInstance, type i18n as I18nInstance } from 'i18next';
 import { useState } from 'react';
 import {
@@ -20,6 +20,7 @@ import { QtyInput } from '../components/QtyInput.tsx';
 import { SearchBox } from '../components/SearchBox.tsx';
 import { ToastProvider, useToast } from '../components/Toast.tsx';
 
+const catalogs = await loadAllCatalogs();
 const resources = {
   en: { translation: catalogs.en },
   ur: { translation: catalogs.ur },

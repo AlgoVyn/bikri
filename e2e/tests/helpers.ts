@@ -27,7 +27,9 @@ export async function idbCount(page: Page, store: string): Promise<number> {
   return page.evaluate(
     (s) =>
       new Promise<number>((resolve, reject) => {
-        const open = indexedDB.open('bikri-dev');
+        const open = indexedDB.open(
+          `bikri-${localStorage.getItem('bikri.active_tenant') ?? 'dev'}`,
+        );
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const req = open.result
@@ -44,7 +46,7 @@ export async function idbCount(page: Page, store: string): Promise<number> {
   );
 }
 
-/** All rows of a store in the dev shop's database. */
+/** All rows of a store in the open shop's database (the dev shop unless enrolled). */
 export async function idbAll<T = Record<string, unknown>>(
   page: Page,
   store: string,
@@ -52,7 +54,9 @@ export async function idbAll<T = Record<string, unknown>>(
   return page.evaluate(
     (s) =>
       new Promise<T[]>((resolve, reject) => {
-        const open = indexedDB.open('bikri-dev');
+        const open = indexedDB.open(
+          `bikri-${localStorage.getItem('bikri.active_tenant') ?? 'dev'}`,
+        );
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const req = open.result
@@ -97,6 +101,8 @@ declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
+      finishSetupHere: () => Promise<void>;
+      syncNow: () => Promise<void>;
       reset: () => Promise<void>;
       unlockAs: (
         role: 'owner' | 'manager' | 'cashier',

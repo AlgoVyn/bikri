@@ -52,7 +52,7 @@ Hint text: "You'll use this PIN to unlock the till and to manage devices on this
 | Field | Type | Default | Rules |
 |---|---|---|---|
 | Logo | image picker (PNG/JPG/SVG, ≤ 2 MB) | none | resized to ≤ 576 px wide, stored to R2 via `file_queue`; preview shows the 1-bit dithered thermal look |
-| Receipt header | textarea | shop name + address | ≤ 120 chars, up to 3 lines |
+| Receipt header | textarea | empty (the receipt already prints the shop name and address above it, D-102) | ≤ 120 chars, up to 3 lines |
 | Receipt footer | textarea | "Shukriya! Phir tashreef laiye." | ≤ 160 chars, up to 3 lines |
 | Sales tax % | `MoneyInput`-like percent, 0–25, 2 decimals | 0 (tax off) | stored as bp; hint "Applied after discounts. 0 hides the tax line." |
 | Prices include tax | switch, **shown only when Sales tax % > 0** | off | `shop.tax_mode = 'inclusive'` when on (MRP pricing, [07 §3](../07-money-rules.md#3-bill-totals)); hint "On: the price on the product is what the customer pays, tax is inside it." Hidden and reset to off when the rate is set back to 0 |

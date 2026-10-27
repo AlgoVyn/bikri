@@ -4,31 +4,76 @@ import {
   Outlet,
   useLocation,
 } from '@tanstack/react-router';
+import { lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '../components/EmptyState.tsx';
 import { ToastProvider } from '../components/Toast.tsx';
 import { useAppGate } from '../data/useAppGate.ts';
+import { useAutoLock } from '../lock/autoLock.ts';
 import { AppShell } from '../shell/AppShell.tsx';
+import { useSession } from '../state/session.ts';
+import type { SyncEngine } from '../sync/engine.ts';
 
 export const Route = createRootRoute({
   component: RootLayout,
 });
 
+const LockScreen = lazy(() =>
+  import('../lock/LockScreen.tsx').then((m) => ({ default: m.LockScreen })),
+);
+
+const EnrolPage = lazy(() =>
+  import('../enrol/EnrolPage.tsx').then((m) => ({ default: m.EnrolPage })),
+);
+
 function Gate() {
   const { t } = useTranslation();
-  const { gate } = useAppGate();
+  const { gate, db, revoked, enrolled, shopName } = useAppGate();
+  const session = useSession((s) => s.session);
+  // T-035: an enrolled shop starts locked; the local dev/e2e shop keeps acting as owner (D-090).
+  useAutoLock(enrolled && !revoked);
+  // T-033/T-036: sync runs whenever this browser holds a device token for the open shop.
+  useEffect(() => {
+    if (!db || !enrolled || revoked) return;
+    let engine: SyncEngine | null = null;
+    let cancelled = false;
+    void import('../sync/engine.ts')
+      .then((m) => m.SyncEngine.start(db))
+      .then((e) => {
+        if (cancelled) e?.stop();
+        else engine = e;
+      });
+    return () => {
+      cancelled = true;
+      engine?.stop();
+    };
+  }, [db, enrolled, revoked]);
+  const afterSetup = useSession((s) => s.afterSetup);
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';
   const devUi = pathname.startsWith('/dev/');
   if (gate === 'loading')
     return <p className="sr-only">{t('common.loading')}</p>;
-  if (gate === 'enrol')
+  const onEnrol = pathname === '/enrol' || pathname === '/enrol/';
+  if (gate === 'enrol' || revoked || onEnrol)
     return (
-      <EmptyState heading={t('common.app_name')} message={t('enrol.needed')} />
+      <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+        <EnrolPage
+          db={enrolled || revoked ? db : null}
+          shopName={shopName}
+          revoked={revoked}
+        />
+      </Suspense>
+    );
+  if (gate === 'ready' && enrolled && !session && !devUi)
+    return (
+      <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+        <LockScreen />
+      </Suspense>
     );
   if (gate === 'setup' && !onSetup && !devUi)
     return <Navigate to="/setup" replace />;
-  if (gate === 'ready' && onSetup) return <Navigate to="/" replace />;
+  // Finishing the wizard flips the gate to 'ready' while still on /setup: go where Finish asked.
+  if (gate === 'ready' && onSetup) return <Navigate to={afterSetup} replace />;
   if (onSetup) return <Outlet />;
   return (
     <AppShell>
@@ -38,9 +83,8 @@ function Gate() {
 }
 
 function RootLayout() {
-  return (
-    <ToastProvider>
-      <Gate />
-    </ToastProvider>
-  );
+  const { pathname } = useLocation();
+  // The operator console never opens a shop database or the PIN lock (screens/19).
+  const admin = pathname === '/admin' || pathname.startsWith('/admin/');
+  return <ToastProvider>{admin ? <Outlet /> : <Gate />}</ToastProvider>;
 }

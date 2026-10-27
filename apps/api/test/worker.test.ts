@@ -1,9 +1,11 @@
 import { SELF } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
 import { SECURITY_HEADERS } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ApiError } from '../src/errors.ts';
 import { app } from '../src/index.ts';
+import { TEST_ORIGIN } from './helpers/fixtures.ts';
 
 const API = 'https://algovyn.com/bikri/api';
 
@@ -18,6 +20,12 @@ app.post('/__test/zod', async (c) => {
 
 app.get('/__test/boom', () => {
   throw new Error('database exploded');
+});
+
+app.get('/__test/d1-limit', () => {
+  throw new Error(
+    "D1_ERROR: Your account has exceeded D1's free tier daily row write limit. Upgrade to a paid plan or wait until tomorrow (midnight UTC) to continue.",
+  );
 });
 
 function expectSecurityHeaders(headers: Headers): void {
@@ -68,11 +76,15 @@ describe('worker', () => {
       },
     });
 
-    const invalid = await app.request(`${API}/__test/zod`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 1 }),
-    });
+    const invalid = await app.request(
+      `${API}/__test/zod`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: TEST_ORIGIN },
+        body: JSON.stringify({ name: 1 }),
+      },
+      env,
+    );
     expect(invalid.status).toBe(400);
     expectSecurityHeaders(invalid.headers);
     const invalidBody: unknown = await invalid.json();
@@ -102,5 +114,15 @@ describe('worker', () => {
     }
     expect(typeof internalBody.error.details.request_id).toBe('string');
     expect(JSON.stringify(internalBody)).not.toContain('database exploded');
+
+    // D1's account-wide daily limit → 503 D1_LIMIT with Retry-After (04 §3).
+    const limit = await app.request(`${API}/__test/d1-limit`);
+    expect(limit.status).toBe(503);
+    const wait = Number(limit.headers.get('retry-after'));
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(86_400);
+    await expect(limit.json()).resolves.toMatchObject({
+      error: { code: 'D1_LIMIT' },
+    });
   });
 });

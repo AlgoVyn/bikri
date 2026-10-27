@@ -2,6 +2,20 @@ import { defineConfig, devices } from '@playwright/test';
 
 // E2E runs against `wrangler dev` serving the built PWA + local D1 (docs/10-testing.md §1).
 const PORT = 8787;
+// `--local-upstream` keeps the browser's Origin (wrangler dev otherwise rewrites it to the route's
+// host, https://algovyn.com, and the CSRF check refuses every POST).
+// Test-only Worker vars (10 §5): the Access bypass and fake email outbox need ENV=test, which the
+// Worker refuses next to the production origin.
+const TEST_VARS = [
+  'ENV:test',
+  `ALLOWED_ORIGINS:http://localhost:${PORT}`,
+  'ACCESS_TEST_EMAIL:operator@example.com',
+  'OWNER_EMAILS:operator@example.com',
+  'OWNER_CODE_KEY:e2e-owner-code-key',
+  'OWNER_SESSION_KEY:e2e-owner-session-key',
+]
+  .map((v) => `--var ${v}`)
+  .join(' ');
 
 export default defineConfig({
   testDir: './tests',
@@ -31,7 +45,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm --filter @bikri/pos build:e2e && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT}`,
+    command: `pnpm --filter @bikri/pos build:e2e && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT} --local-upstream localhost:${PORT} ${TEST_VARS}`,
     url: `http://localhost:${PORT}/bikri/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

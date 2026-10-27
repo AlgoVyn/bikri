@@ -9,7 +9,17 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: './wrangler.jsonc' },
       miniflare: {
-        bindings: { TEST_MIGRATIONS: migrations },
+        // Test-only values (10 §5): ENV=test enables ACCESS_TEST_EMAIL; never the production origin.
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          ENV: 'test',
+          ALLOWED_ORIGINS: 'https://bikri.test',
+          ACCESS_TEST_EMAIL: 'operator@example.com',
+          ACCESS_AUD: 'test-aud',
+          OWNER_EMAILS: 'operator@example.com',
+          OWNER_CODE_KEY: 'test-owner-code-key-0123456789abcdef',
+          OWNER_SESSION_KEY: 'test-owner-session-key-0123456789abcdef',
+        },
       },
     }),
   ],

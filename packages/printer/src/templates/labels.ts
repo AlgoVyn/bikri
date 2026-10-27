@@ -48,6 +48,62 @@ export const englishReceiptLabels: ReceiptLabels = {
   salesTax: '{label} {rate}%',
 };
 
+/** Urdu labels for `shop.receipt_language = 'ur'`: the whole receipt is rasterised (06 §6). */
+export const urduReceiptLabels: ReceiptLabels = {
+  saleTitle: 'رسید',
+  refundTitle: 'واپسی کی رسید',
+  testTitle: 'بکری ٹیسٹ پرنٹ',
+  bill: 'بل',
+  date: 'تاریخ',
+  cashier: 'کیشیئر',
+  customer: 'گاہک',
+  item: 'چیز',
+  qty: 'تعداد',
+  amount: 'رقم',
+  discount: 'رعایت',
+  total: 'کل',
+  rounding: 'راؤنڈنگ',
+  cash: 'نقد',
+  card: 'کارڈ',
+  bankWallet: 'بینک/والیٹ',
+  amountTendered: 'وصول رقم',
+  tenderedShort: 'وصول',
+  change: 'بقایا',
+  udhaar: 'ادھار (کھاتے میں)',
+  khataBalance: 'کھاتے کا بیلنس',
+  takenOffKhata: 'کھاتے سے کم',
+  youSaved: 'آپ کی بچت',
+  reason: 'وجہ',
+  exact: 'اصل رقم',
+  paidBack: 'واپس دیے',
+  originalBill: 'اصل بل',
+  originalDate: 'اصل تاریخ',
+  reprint: 'دوبارہ پرنٹ',
+  telPrefix: 'فون:',
+  ntn: 'NTN',
+  strn: 'STRN',
+  each: 'فی',
+  less: 'کم',
+  drawerWorks: 'اگر دراز کھلی تو دراز ٹھیک ہے',
+  boldSample: 'موٹا متن',
+  doubleSample: 'بڑا',
+  urduSample: 'اردو ٹیسٹ پرنٹ',
+  warrantyOne: 'وارنٹی: {name} - {days} دن ({date} تک)',
+  warrantyMany: 'وارنٹی: {name} - {days} دن ({date} تک)',
+  subtotalItems: 'ذیلی کل ({n} چیزیں)',
+  subtotalItem: 'ذیلی کل ({n} چیز)',
+  subtotalCount: 'ذیلی کل ({n})',
+  includesTax: 'شامل {label} {rate}%:',
+  salesTax: '{label} {rate}%',
+};
+
+/** Labels for a receipt language: Urdu for `ur`, English otherwise. */
+export function receiptLabelsFor(
+  language: string | null | undefined,
+): ReceiptLabels {
+  return language === 'ur' ? urduReceiptLabels : englishReceiptLabels;
+}
+
 export function resolveLabels(partial?: Partial<ReceiptLabels>): ReceiptLabels {
   return { ...englishReceiptLabels, ...partial };
 }

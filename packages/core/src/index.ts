@@ -111,3 +111,4 @@ export {
 export { generateSku } from './sku.ts';
 export type { TokenPair } from './tokenPairs.ts';
 export { TILE_COLOURS, TILE_RATIO_RANGE, tokenPairs } from './tokenPairs.ts';
+export { APP_VERSION, CLIENT_SCHEMA_VERSION } from './version.ts';

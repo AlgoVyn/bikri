@@ -390,7 +390,7 @@ export async function saveNewProduct(
       if (photo) await queuePhoto(w, id, photo);
       return created;
     },
-    opts,
+    { actor: ctx.staff_id, ...opts },
   );
   return product;
 }
@@ -478,7 +478,7 @@ export async function saveProductEdit(
         await w.create('product_barcodes', { product_id: id, barcode: code });
       return after;
     },
-    opts,
+    { actor: ctx.staff_id, ...opts },
   );
 }
 
@@ -530,7 +530,7 @@ export async function removeProduct(
         null,
       );
     },
-    opts,
+    { actor: ctx.staff_id, ...opts },
   );
 }
 
