@@ -62,6 +62,8 @@ export type DeviceVars = {
   tenant: TenantRow;
   device: DeviceRow;
   db: TenantDb;
+  /** Set by shopAdmin: the owner unlocked on the admin device (X-Bikri-Staff). */
+  ownerId: string;
 };
 
 export type AppEnv = { Bindings: Env; Variables: DeviceVars };

@@ -31,6 +31,7 @@ export type Shop = {
   admin: { id: string; token: string; code: string };
   till: { id: string; token: string; code: string };
   ownerCode: string;
+  ownerEmail: string | null;
 };
 
 let counter = 0;
@@ -178,6 +179,7 @@ export async function seedShop(
     admin,
     till,
     ownerCode: owner_code.code,
+    ownerEmail: tenant.owner_email,
   };
 }
 

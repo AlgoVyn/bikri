@@ -1,5 +1,6 @@
 import { API_BASE } from '@bikri/core';
 import { Hono } from 'hono';
+import { testOutbox } from './auth/mailer.ts';
 import { scheduled } from './cron/prune.ts';
 import { accessAuth } from './middleware/accessAuth.ts';
 import { deviceAuth, tenantGate } from './middleware/deviceAuth.ts';
@@ -9,11 +10,13 @@ import {
   applySecurityHeaders,
   securityHeaders,
 } from './middleware/securityHeaders.ts';
+import { shopAdmin } from './middleware/shopAdmin.ts';
 import { admin } from './routes/admin.ts';
 import { enrol } from './routes/enrol.ts';
 import { getFile, putFile } from './routes/files.ts';
 import { health } from './routes/health.ts';
 import { me } from './routes/me.ts';
+import { shop } from './routes/shop.ts';
 import { pull, push, snapshot } from './routes/sync.ts';
 import type { AppEnv } from './types.ts';
 
@@ -33,6 +36,15 @@ app.get('/sync/pull', pull);
 app.get('/sync/snapshot', snapshot);
 app.put('/files/:kind/:id/:sha256', putFile);
 app.get('/files/*', getFile);
+app.use('/shop/*', shopAdmin);
+app.route('/shop', shop);
+
+// E2E only (journey 24 reads the sign-in code): never served unless ENV=test.
+app.get('/__test/outbox', (c) => {
+  if (String(c.env.ENV) !== 'test')
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+  return c.json({ messages: testOutbox });
+});
 
 // Operator console API: Cloudflare Access only, never a device token (screens/19 AC 7).
 app.use('/admin/*', accessAuth);
