@@ -21,6 +21,7 @@ export function GlobalSearch() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
+        event.defaultPrevented ||
         event.key !== '/' ||
         event.altKey ||
         event.ctrlKey ||
@@ -41,7 +42,7 @@ export function GlobalSearch() {
     setOpen(false);
     setPhoneOpen(false);
     if (hit.kind === 'product')
-      void navigate({ to: '/products', search: { id: hit.id } });
+      void navigate({ to: '/products/$id', params: { id: hit.id } });
     else if (hit.kind === 'customer')
       void navigate({ to: '/udhaar', search: { customer: hit.id } });
     else void navigate({ to: '/sales', search: { bill: hit.id } });

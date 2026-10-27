@@ -16,6 +16,9 @@ export type NewProduct = {
   /** Opening stock in milli-units; with `cost` it becomes an `opening` movement (02 §5). */
   opening_milli?: number;
   warranty_days?: number;
+  /** Low-stock alert (0 = off). */
+  min_stock_milli?: number;
+  notes?: string;
 };
 
 export type LedgerContext = {
@@ -42,11 +45,11 @@ export async function createProduct(
     price: input.price,
     last_cost: input.cost ?? 0,
     avg_cost: input.cost ?? 0,
-    min_stock_milli: 0,
+    min_stock_milli: input.min_stock_milli ?? 0,
     track_stock: input.track_stock === false ? 0 : 1,
     warranty_days: input.warranty_days ?? 0,
     image_key: null,
-    notes: '',
+    notes: input.notes?.trim() ?? '',
   };
   const product = await w.create('products', row);
   for (const barcode of input.barcodes ?? []) {

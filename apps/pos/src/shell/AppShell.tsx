@@ -52,7 +52,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-bound every render so the handler sees the current permissions
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || ignoresHotkey(event.target)) return;
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        ignoresHotkey(event.target)
+      )
+        return;
       if (
         !event.altKey &&
         !event.shiftKey &&
