@@ -84,7 +84,7 @@ export async function loadSaleReceipt(
 ): Promise<SaleReceiptInput | null> {
   const sale = await db.sales.get(saleId);
   if (!sale) return null;
-  const shop = (await db.shop.get('shop')) as MasterRow | undefined;
+  const { shop, receiptLanguage } = await receiptShop(db);
   const lines = await db.sale_lines
     .where('sale_id')
     .equals(saleId)
@@ -100,24 +100,7 @@ export async function loadSaleReceipt(
   const udhaar = Number(sale.udhaar_amount ?? 0);
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
   return {
-    shop: {
-      name: text(shop?.name),
-      address: text(shop?.address),
-      phone: text(shop?.phone),
-      receiptHeader: text(shop?.receipt_header),
-      receiptFooter: text(shop?.receipt_footer),
-      showPaymentDetails: shop?.show_payment_details !== 0,
-      showCashierOnReceipt: shop?.show_cashier_on_receipt !== 0,
-      taxLabel:
-        text(shop?.tax_label) ||
-        (shop?.receipt_language === 'ur' ? 'سیلز ٹیکس' : 'Sales tax'),
-      numberGrouping: shop?.number_grouping === 'lakh' ? 'lakh' : 'intl',
-      ntn: text(shop?.ntn),
-      strn: text(shop?.strn),
-      printWarranty: shop?.print_warranty !== 0,
-      showYouSaved: shop?.show_you_saved === 1,
-      timeZone: text(shop?.timezone) || 'Asia/Karachi',
-    },
+    shop,
     sale: {
       id: saleId,
       invoiceNo: String(sale.invoice_no),
@@ -159,7 +142,37 @@ export async function loadSaleReceipt(
     ),
     staffName: staff ? String(staff.name) : null,
     // Urdu receipts get Urdu labels (the whole receipt is rasterised, 06 §6).
-    labels: receiptLabelsFor(text(shop?.receipt_language)),
+    labels: receiptLabelsFor(receiptLanguage),
+  };
+}
+
+/** Shop fields every receipt prints, plus the receipt language (D-101). */
+export async function receiptShop(
+  db: BikriDb,
+): Promise<{ shop: SaleReceiptInput['shop']; receiptLanguage: string }> {
+  const row = (await db.shop.get('shop')) as MasterRow | undefined;
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  const receiptLanguage = text(row?.receipt_language);
+  return {
+    receiptLanguage,
+    shop: {
+      name: text(row?.name),
+      address: text(row?.address),
+      phone: text(row?.phone),
+      receiptHeader: text(row?.receipt_header),
+      receiptFooter: text(row?.receipt_footer),
+      showPaymentDetails: row?.show_payment_details !== 0,
+      showCashierOnReceipt: row?.show_cashier_on_receipt !== 0,
+      taxLabel:
+        text(row?.tax_label) ||
+        (receiptLanguage === 'ur' ? 'سیلز ٹیکس' : 'Sales tax'),
+      numberGrouping: row?.number_grouping === 'lakh' ? 'lakh' : 'intl',
+      ntn: text(row?.ntn),
+      strn: text(row?.strn),
+      printWarranty: row?.print_warranty !== 0,
+      showYouSaved: row?.show_you_saved === 1,
+      timeZone: text(row?.timezone) || 'Asia/Karachi',
+    },
   };
 }
 
@@ -193,11 +206,6 @@ export async function latestSaleJob(
   return jobs.sort(
     (a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id),
   )[0];
-}
-
-/** Puts a failed job back in the queue. */
-export async function retryPrintJob(db: BikriDb, id: string): Promise<void> {
-  await db.print_jobs.update(id, { status: 'queued', error: undefined });
 }
 
 /** Pakistani number as wa.me wants it: digits only, country code 92, no leading 0 or +. */

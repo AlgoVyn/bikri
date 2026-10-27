@@ -1,5 +1,6 @@
 import { businessDate, generateSku, newId, type OpRow } from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
+import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { type Photo, photoKey } from '../products/photo.ts';
 import { putFile } from './fileCache.ts';
 import { defaultBranch, deviceInfo } from './localTenant.ts';
@@ -654,16 +655,8 @@ export async function removeCategory(
 
 // CSV export (REQ-B02); cost columns only with cost.view (AC 4).
 
-function csvCell(value: unknown): string {
-  let s = String(value ?? '');
-  // Spreadsheet formula injection: text starting with = + - @ is prefixed with '.
-  if (typeof value === 'string' && /^[=+\-@]/u.test(s)) s = `'${s}`;
-  return /[",\n\r]/u.test(s) ? `"${s.replace(/"/gu, '""')}"` : s;
-}
-
-const rupees = (paisa: number) =>
-  (paisa / 100).toFixed(2).replace(/\.00$/u, '');
-const qty = (milli: number) => String(milli / 1000);
+const rupees = rupeesCsv;
+const qty = qtyCsv;
 
 export function productsCsv(rows: ProductListRow[], withCost: boolean): string {
   const header = [

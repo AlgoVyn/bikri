@@ -47,6 +47,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     document.title = t('common.app_title');
   }, [t]);
 
+  // Warm the lazily loaded sale-completion screen as soon as the shell is up, so the first
+  // offline sale on a freshly loaded till can still show "Sale complete" (D-114).
+  useEffect(() => {
+    void import('../sell/SaleComplete.tsx').catch(() => undefined);
+  }, []);
+
   // T-027: a write attempted in a read-only shop shows one toast instead of a generic failure.
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {
