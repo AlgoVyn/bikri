@@ -3,6 +3,10 @@ import type { MasterRow } from '@bikri/db';
 import type { Writer } from './write.ts';
 
 export type NewProduct = {
+  /** Pre-chosen id (photo keys need it before the row exists). */
+  id?: string;
+  /** Relative photo key (`products/<id>/<sha256>.webp`). */
+  image_key?: string | null;
   name_en: string;
   name_ur?: string;
   brand?: string;
@@ -48,10 +52,13 @@ export async function createProduct(
     min_stock_milli: input.min_stock_milli ?? 0,
     track_stock: input.track_stock === false ? 0 : 1,
     warranty_days: input.warranty_days ?? 0,
-    image_key: null,
+    image_key: input.image_key ?? null,
     notes: input.notes?.trim() ?? '',
   };
-  const product = await w.create('products', row);
+  const product = await w.create(
+    'products',
+    input.id ? { ...row, id: input.id } : row,
+  );
   for (const barcode of input.barcodes ?? []) {
     const code = barcode.trim();
     if (code)

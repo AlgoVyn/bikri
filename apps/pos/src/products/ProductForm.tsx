@@ -31,6 +31,8 @@ import {
 import { getDb } from '../data/db.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useFileUrl } from './ProductThumb.tsx';
+import { type Photo, PhotoError, processPhoto } from './photo.ts';
 
 const WARRANTY_PRESETS = ['0', '7', '30', '90', '180', '365'] as const;
 const textField =
@@ -52,6 +54,8 @@ type Draft = {
   warranty: string;
   warranty_days: string;
   notes: string;
+  /** New photo; null = removed; undefined = unchanged. */
+  photo?: Photo | null;
 };
 
 type Errors = Partial<
@@ -125,6 +129,10 @@ export function ProductFormPage({
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const pendingAnother = useRef(false);
+  const [existingKey, setExistingKey] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState(false);
+  const existingUrl = useFileUrl(existingKey);
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const brands =
     useLiveQuery(async () => {
@@ -170,6 +178,7 @@ export function ProductFormPage({
           .map((b) => String(b.barcode));
         base.sku = String(p.sku);
         base.barcodes = codes;
+        setExistingKey(typeof p.image_key === 'string' ? p.image_key : null);
       }
       const loaded = draftFrom(base);
       setDraft(loaded);
@@ -305,6 +314,7 @@ export function ProductFormPage({
         min_stock_milli: draft.track_stock ? (draft.min_stock ?? 0) : 0,
         warranty_days: warrantyDays(),
         notes: draft.notes,
+        photo: draft.photo,
         opening_milli: draft.track_stock ? (draft.opening ?? 0) : 0,
       };
       if (!showCost && !isEdit) input.cost = 0;
@@ -313,6 +323,7 @@ export function ProductFormPage({
         : await saveNewProduct(db, input, ctx);
       toast.push(t('form.saved'));
       if (another) {
+        setPhotoUrl(null);
         setDraft(EMPTY);
         setErrors({});
         void navigate({ to: '/products/new', search: {} });
@@ -353,6 +364,72 @@ export function ProductFormPage({
       <h1 className="text-h1 font-semibold">
         {isEdit ? t('form.edit_title') : t('form.new_title')}
       </h1>
+
+      <fieldset className="flex flex-wrap items-center gap-3">
+        <legend className="mb-1 text-small">{t('form.photo')}</legend>
+        {(draft.photo === undefined ? existingUrl : photoUrl) ? (
+          <img
+            src={(draft.photo === undefined ? existingUrl : photoUrl) ?? ''}
+            alt={t('form.photo_preview')}
+            data-testid="form-photo"
+            className="size-20 rounded-card object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="size-20 rounded-card border border-dashed border-border-strong"
+          />
+        )}
+        <label
+          className={`${buttonQuiet} cursor-pointer focus-within:outline-2`}
+        >
+          {t('form.photo_pick')}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            aria-describedby={
+              photoError ? `${fieldId('photo')}-error` : undefined
+            }
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              try {
+                const photo = await processPhoto(file);
+                setPhotoError(false);
+                if (photoUrl) URL.revokeObjectURL(photoUrl);
+                setPhotoUrl(URL.createObjectURL(photo.blob));
+                set('photo', photo);
+              } catch (error) {
+                if (error instanceof PhotoError) setPhotoError(true);
+                else throw error;
+              }
+            }}
+          />
+        </label>
+        {(draft.photo === undefined && existingKey) || draft.photo ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => {
+              set('photo', existingKey ? null : undefined);
+              setPhotoUrl(null);
+            }}
+          >
+            {t('form.photo_remove')}
+          </button>
+        ) : null}
+        {photoError ? (
+          <p
+            id={`${fieldId('photo')}-error`}
+            className="w-full text-small text-danger"
+          >
+            {t('form.photo_error')}
+          </p>
+        ) : null}
+      </fieldset>
 
       <div>
         <label htmlFor={fieldId('name_en')} className="mb-1 block text-small">

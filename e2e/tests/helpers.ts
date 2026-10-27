@@ -22,6 +22,52 @@ export async function expectNoHorizontalScroll(page: Page): Promise<void> {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+/** Row count of a store in the dev shop's database. */
+export async function idbCount(page: Page, store: string): Promise<number> {
+  return page.evaluate(
+    (s) =>
+      new Promise<number>((resolve, reject) => {
+        const open = indexedDB.open('bikri-dev');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result
+            .transaction(s, 'readonly')
+            .objectStore(s)
+            .count();
+          req.onsuccess = () => {
+            open.result.close();
+            resolve(req.result);
+          };
+        };
+      }),
+    store,
+  );
+}
+
+/** A PNG made in the page (w×h, two colours) for file inputs. */
+export async function makePng(
+  page: Page,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const b64 = await page.evaluate(
+    ([w, h]) => {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      if (!ctx) throw new Error('no canvas');
+      ctx.fillStyle = '#006bb3';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(w / 4, h / 4, w / 2, h / 2);
+      return c.toDataURL('image/png').split(',')[1] ?? '';
+    },
+    [width, height] as const,
+  );
+  return Buffer.from(b64, 'base64');
+}
+
 declare global {
   interface Window {
     __bikriTest?: {

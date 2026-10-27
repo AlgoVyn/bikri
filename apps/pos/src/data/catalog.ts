@@ -1,5 +1,7 @@
 import { businessDate, generateSku, newId, type OpRow } from '@bikri/core';
-import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
+import { type Photo, photoKey } from '../products/photo.ts';
+import { putFile } from './fileCache.ts';
 import { defaultBranch, deviceInfo } from './localTenant.ts';
 import {
   createProduct,
@@ -311,7 +313,24 @@ async function checkCodes(
     throw new DuplicateSkuError(sku.trim());
 }
 
-export type ProductInput = NewProduct;
+export type ProductInput = NewProduct & {
+  /** New photo to store; `null` removes the photo on edit; `undefined` keeps it. */
+  photo?: Photo | null;
+};
+
+async function queuePhoto(
+  w: Writer,
+  productId: string,
+  photo: Photo,
+): Promise<void> {
+  await w.table<FileQueueEntry, number>('file_queue').add({
+    kind: 'product_image',
+    target_id: productId,
+    blob: photo.blob,
+    sha256: photo.sha256,
+    status: 'pending',
+  });
+}
 
 /** Ledger context for this till and the current staff member. */
 export async function ledgerContext(
@@ -355,7 +374,25 @@ export async function saveNewProduct(
 ): Promise<MasterRow> {
   const sku = input.sku?.trim() || (await uniqueSku(db, input.name_en));
   await checkCodes(db, input.barcodes ?? [], sku);
-  return writeAction(db, (w) => createProduct(w, { ...input, sku }, ctx), opts);
+  const { photo, ...rest } = input;
+  const id = input.id ?? newId(opts.now);
+  const imageKey = photo ? photoKey(id, photo) : null;
+  // Cache first, so the thumbnail can render as soon as the row appears.
+  if (photo && imageKey) await putFile(db.tenantId, imageKey, photo.blob);
+  const product = await writeAction(
+    db,
+    async (w) => {
+      const created = await createProduct(
+        w,
+        { ...rest, id, sku, image_key: imageKey },
+        ctx,
+      );
+      if (photo) await queuePhoto(w, id, photo);
+      return created;
+    },
+    opts,
+  );
+  return product;
 }
 
 /**
@@ -375,6 +412,8 @@ export async function saveProductEdit(
     throw new Error(`Product ${id} not found`);
   const sku = input.sku?.trim() || String(current.sku);
   await checkCodes(db, input.barcodes ?? [], sku, id);
+  if (input.photo)
+    await putFile(db.tenantId, photoKey(id, input.photo), input.photo.blob);
   return writeAction(
     db,
     async (w) => {
@@ -394,6 +433,11 @@ export async function saveProductEdit(
         notes: input.notes?.trim() ?? '',
       };
       if (input.cost !== undefined) patch.last_cost = input.cost;
+      if (input.photo === null) patch.image_key = null;
+      if (input.photo) {
+        patch.image_key = photoKey(id, input.photo);
+        await queuePhoto(w, id, input.photo);
+      }
       const after = await w.update('products', id, patch);
       if (Number(before.price) !== input.price) {
         await audit(
