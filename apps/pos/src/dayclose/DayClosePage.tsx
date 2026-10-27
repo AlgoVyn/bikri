@@ -11,12 +11,17 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import {
   closeDay,
+  dayCloseCsv,
   dayCloseData,
   queueDayClosePrint,
 } from '../data/dayClose.ts';
+import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
+import { downloadText } from '../lib/download.ts';
+import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
+import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 const NOTES = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1];
@@ -134,6 +139,25 @@ export function DayClosePage() {
     }
   };
 
+  const exportCsv = async () => {
+    if (!closed) return;
+    const receipt = await loadDayCloseReceipt(getDb(), String(closed.id));
+    if (!receipt) return;
+    downloadText(
+      `day-close-${String(closed.business_date)}.csv`,
+      dayCloseCsv(receipt, String(closed.business_date), data.tz),
+    );
+  };
+  const exportPdf = async () => {
+    if (!closed) return;
+    const receipt = await dayCloseReceipt(getDb(), String(closed.id));
+    if (!receipt) return;
+    downloadBlob(
+      await receiptPdf(receipt),
+      `day-close-${String(closed.business_date)}.pdf`,
+    );
+  };
+
   if (closed) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
@@ -183,6 +207,24 @@ export function DayClosePage() {
           >
             {t('office.dayclose.print_z')}
           </button>
+          {can('export.data') ? (
+            <>
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => void exportCsv()}
+              >
+                {t('ui.export_csv')}
+              </button>
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => void exportPdf()}
+              >
+                {t('ui.export_pdf')}
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             className={buttonQuiet}

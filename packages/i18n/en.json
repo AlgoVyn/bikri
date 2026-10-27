@@ -655,7 +655,9 @@
     "leave": "Leave this shop",
     "leave_hint": "Removes this shop from this browser; it does not revoke the device.",
     "admin_device": "Admin device",
-    "till_device": "Till"
+    "till_device": "Till",
+    "backup": "Backup & export",
+    "backup_hint": "Download a full copy of this shop"
   },
   "setup": {
     "add_one": "Add one product",

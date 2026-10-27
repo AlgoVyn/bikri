@@ -711,3 +711,43 @@ export const SUGGESTED_PRODUCTS = [
   'Screen protector',
   'Back cover',
 ] as const;
+
+export type StockHistoryCsvRow = {
+  at: number;
+  reason: string;
+  qty: string;
+  balanceAfter: string;
+  by: string;
+};
+
+/** One product's stock history (screens/08). */
+export function stockHistoryCsv(
+  rows: readonly StockHistoryCsvRow[],
+  timeZone: string,
+): string {
+  const when = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const header = ['date', 'reason', 'qty', 'balance_after', 'by'];
+  return `${[header.join(',')]
+    .concat(
+      rows.map((row) =>
+        [
+          when.format(row.at).replace(', ', ' '),
+          row.reason,
+          row.qty,
+          row.balanceAfter,
+          row.by,
+        ]
+          .map(csvCell)
+          .join(','),
+      ),
+    )
+    .join('\r\n')}\r\n`;
+}

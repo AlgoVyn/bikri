@@ -29,6 +29,7 @@ import { Route as ReportsIndexRouteImport } from './routes/reports/index.tsx';
 import { Route as SalesIndexRouteImport } from './routes/sales/index.tsx';
 import { Route as SalesIdRouteImport } from './routes/sales/$id.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsBackupRouteImport } from './routes/settings/backup.tsx';
 import { Route as SettingsDevicesRouteImport } from './routes/settings/devices.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
 import { Route as SettingsSyncRouteImport } from './routes/settings/sync.tsx';
@@ -162,6 +163,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsBackupRoute = SettingsBackupRouteImport.update({
+  id: '/settings/backup',
+  path: '/settings/backup',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
   id: '/settings/devices',
   path: '/settings/devices',
@@ -293,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/backup': typeof SettingsBackupRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/settings/sync': typeof SettingsSyncRoute;
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/backup': typeof SettingsBackupRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/settings/sync': typeof SettingsSyncRoute;
@@ -372,6 +380,7 @@ export interface FileRoutesById {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/backup': typeof SettingsBackupRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/settings/sync': typeof SettingsSyncRoute;
@@ -414,6 +423,7 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/backup'
     | '/settings/devices'
     | '/settings/printer'
     | '/settings/sync'
@@ -453,6 +463,7 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/backup'
     | '/settings/devices'
     | '/settings/printer'
     | '/settings/sync'
@@ -492,6 +503,7 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/backup'
     | '/settings/devices'
     | '/settings/printer'
     | '/settings/sync'
@@ -532,6 +544,7 @@ export interface RootRouteChildren {
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
   SalesIdRoute: typeof SalesIdRouteWithChildren;
+  SettingsBackupRoute: typeof SettingsBackupRoute;
   SettingsDevicesRoute: typeof SettingsDevicesRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
   SettingsSyncRoute: typeof SettingsSyncRoute;
@@ -692,6 +705,13 @@ declare module '@tanstack/react-router' {
       path: '/settings';
       fullPath: '/settings/';
       preLoaderRoute: typeof SettingsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/backup': {
+      id: '/settings/backup';
+      path: '/settings/backup';
+      fullPath: '/settings/backup';
+      preLoaderRoute: typeof SettingsBackupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/settings/devices': {
@@ -878,6 +898,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
   SalesIdRoute: SalesIdRouteWithChildren,
+  SettingsBackupRoute: SettingsBackupRoute,
   SettingsDevicesRoute: SettingsDevicesRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsSyncRoute: SettingsSyncRoute,

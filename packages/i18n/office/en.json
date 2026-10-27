@@ -294,6 +294,7 @@
       "address": "Address",
       "advance": "Advance {{amount}}",
       "amount": "Amount",
+      "as_of": "As of {{date}}",
       "back": "Back to suppliers",
       "balance": "Balance",
       "balance_after": "Balance after {{amount}}",
@@ -359,6 +360,7 @@
       "search_placeholder": "Name or phone",
       "search_product": "Search name, SKU or barcode",
       "settled": "Settled",
+      "statement": "Supplier statement",
       "supplier_added": "Supplier added.",
       "supplier_invoice": "Supplier invoice no",
       "supplier_saved": "Supplier saved.",
@@ -542,6 +544,8 @@
       "out_qty": "Out",
       "overs": "Overs",
       "payment_mix": "Payment mix",
+      "pdf_generated": "Generated",
+      "pdf_range": "Range",
       "phone": "Phone",
       "product": "Product",
       "profit": "Profit",
@@ -597,6 +601,22 @@
       "uncategorized": "Uncategorized",
       "voided_amount": "Voided",
       "voids": "Voids"
+    },
+    "backup": {
+      "building": "Building export…",
+      "done": "Full export downloaded.",
+      "download": "Download full export",
+      "error": "Could not build the export.",
+      "finished": "Downloaded {{filename}}",
+      "hint": "Download a zip of every table: JSON is the restore source, CSV is for Excel.",
+      "nightly": "Your data is backed up every night by Algovyn.",
+      "no_permission": "You can't export this shop's data.",
+      "progress": "{{table}} ({{index}}/{{total}}, {{rows}} rows)",
+      "restore": "Restore from export",
+      "restore_hint": "Restoring is only enabled for an empty shop; it arrives with the remaining Settings sections.",
+      "server": "Download from server",
+      "server_hint": "The server copy, including every till, needs owner email sign-in and arrives with the server export task.",
+      "title": "Backup & export"
     }
   }
 }

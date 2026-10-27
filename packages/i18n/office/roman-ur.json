@@ -294,6 +294,7 @@
       "address": "Pata",
       "advance": "{{amount}} peshgi",
       "amount": "Raqam",
+      "as_of": "{{date}} tak",
       "back": "Suppliers par wapas",
       "balance": "Baqaya",
       "balance_after": "Baad mein baqaya {{amount}}",
@@ -359,6 +360,7 @@
       "search_placeholder": "Naam ya phone",
       "search_product": "Naam, SKU ya barcode talash karein",
       "settled": "Hisab saaf",
+      "statement": "Supplier hisab",
       "supplier_added": "Supplier shamil ho gaya.",
       "supplier_invoice": "Supplier ka invoice no",
       "supplier_saved": "Supplier mehfooz ho gaya.",
@@ -542,6 +544,8 @@
       "out_qty": "Bahar",
       "overs": "Zyada",
       "payment_mix": "Payment ki taqseem",
+      "pdf_generated": "Taiyar shuda",
+      "pdf_range": "Arsa",
       "phone": "Phone",
       "product": "Product",
       "profit": "Munafa",
@@ -597,6 +601,22 @@
       "uncategorized": "Baghair qism",
       "voided_amount": "Mansookh shuda",
       "voids": "Mansookh"
+    },
+    "backup": {
+      "building": "Export ban raha hai…",
+      "done": "Mukammal export download ho gayi.",
+      "download": "Mukammal export download karein",
+      "error": "Export nahi ban saki.",
+      "finished": "{{filename}} download ho gayi",
+      "hint": "Har table ki zip download karein: JSON restore ke liye, CSV Excel ke liye.",
+      "nightly": "Aap ka data har raat Algovyn ki taraf se backup hota hai.",
+      "no_permission": "Aap is dukan ka data export nahi kar sakte.",
+      "progress": "{{table}} ({{index}}/{{total}}, {{rows}} satrein)",
+      "restore": "Export se restore karein",
+      "restore_hint": "Restore sirf khali dukan ke liye hai; yeh baqi Settings ke saath aayegi.",
+      "server": "Server se download karein",
+      "server_hint": "Server ki copy (sab tills samet) ke liye malik ka email sign-in zaroori hai; yeh server export task ke saath aayegi.",
+      "title": "Backup aur export"
     }
   }
 }

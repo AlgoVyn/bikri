@@ -16,7 +16,7 @@ const rowLink = 'flex min-h-14 flex-col justify-center p-3';
 /** Settings (screens/17): printer, sync, devices (admin device + owner) and this device. */
 function SettingsPage() {
   const { t } = useTranslation();
-  const { role } = useCurrentStaff();
+  const { role, can } = useCurrentStaff();
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const info = useLiveQuery(async () => {
     const db = getDb();
@@ -74,6 +74,16 @@ function SettingsPage() {
               <span className="font-medium">{t('devices.title')}</span>
               <span className="text-small text-text-muted">
                 {t('settings.devices_hint')}
+              </span>
+            </Link>
+          </li>
+        ) : null}
+        {can('export.data') ? (
+          <li>
+            <Link to="/settings/backup" className={rowLink}>
+              <span className="font-medium">{t('settings.backup')}</span>
+              <span className="text-small text-text-muted">
+                {t('settings.backup_hint')}
               </span>
             </Link>
           </li>
