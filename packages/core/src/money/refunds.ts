@@ -112,6 +112,30 @@ function cumulativeShare(
   );
 }
 
+/**
+ * `line_final` of a stored sale line (07 §3): Σ line_final = sales.total. The UI and the refund
+ * repository read it from here instead of re-deriving the per-line allocation rules.
+ */
+export function saleLineFinal(
+  line: {
+    net: number;
+    bill_discount_alloc: number;
+    tax_alloc: number;
+    rounding_alloc: number;
+  },
+  taxInclusive: boolean,
+): number {
+  const net = line.net;
+  const billDiscount = line.bill_discount_alloc;
+  const tax = line.tax_alloc;
+  const rounding = line.rounding_alloc;
+  for (const value of [net, billDiscount, tax, rounding])
+    assertSafeInteger(value, 'sale line amount');
+  return taxInclusive
+    ? net - billDiscount + rounding
+    : net - billDiscount + tax + rounding;
+}
+
 /** Paisa refunded for `refundMilli` more units of a line (07 §6). */
 export function computeRefundLine(
   lineFinal: number,

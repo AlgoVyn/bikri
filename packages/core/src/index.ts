@@ -37,6 +37,7 @@ export {
   refundedRevenue,
   refundedTax,
   roundCashRefund,
+  saleLineFinal,
   splitRefund,
 } from './money/refunds.ts';
 export type { StockValueInput } from './money/stock.ts';
