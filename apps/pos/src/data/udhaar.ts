@@ -5,7 +5,7 @@ import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
 import { waLink } from './receipt.ts';
-import { writeAction } from './write.ts';
+import { type Writer, writeAction } from './write.ts';
 
 const DAY = 86_400_000;
 const n = (v: unknown): number => Number(v ?? 0);
@@ -520,10 +520,7 @@ export async function receivePayment(
 }
 
 /** Marks open promises kept when this payment covered them (07 §5, screens/12). */
-async function keepPromises(
-  w: { table: TableSource['table'] },
-  customerId: string,
-): Promise<void> {
+async function keepPromises(w: Writer, customerId: string): Promise<void> {
   const promises = (
     await (w.table('promises') as Table<SyncedRow>)
       .where('customer_id')
