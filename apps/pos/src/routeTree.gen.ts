@@ -29,9 +29,15 @@ import { Route as ReportsIndexRouteImport } from './routes/reports/index.tsx';
 import { Route as SalesIndexRouteImport } from './routes/sales/index.tsx';
 import { Route as SalesIdRouteImport } from './routes/sales/$id.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsAboutRouteImport } from './routes/settings/about.tsx';
+import { Route as SettingsActivityRouteImport } from './routes/settings/activity.tsx';
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup.tsx';
+import { Route as SettingsCashiersRouteImport } from './routes/settings/cashiers.tsx';
 import { Route as SettingsDevicesRouteImport } from './routes/settings/devices.tsx';
+import { Route as SettingsDisplayRouteImport } from './routes/settings/display.tsx';
+import { Route as SettingsLabelsRouteImport } from './routes/settings/labels.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as SettingsShopRouteImport } from './routes/settings/shop.tsx';
 import { Route as SettingsSyncRouteImport } from './routes/settings/sync.tsx';
 import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
 import { Route as SuppliersIndexRouteImport } from './routes/suppliers/index.tsx';
@@ -163,9 +169,24 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsAboutRoute = SettingsAboutRouteImport.update({
+  id: '/settings/about',
+  path: '/settings/about',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsActivityRoute = SettingsActivityRouteImport.update({
+  id: '/settings/activity',
+  path: '/settings/activity',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsBackupRoute = SettingsBackupRouteImport.update({
   id: '/settings/backup',
   path: '/settings/backup',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsCashiersRoute = SettingsCashiersRouteImport.update({
+  id: '/settings/cashiers',
+  path: '/settings/cashiers',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
@@ -173,9 +194,24 @@ const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
   path: '/settings/devices',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
+  id: '/settings/display',
+  path: '/settings/display',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsLabelsRoute = SettingsLabelsRouteImport.update({
+  id: '/settings/labels',
+  path: '/settings/labels',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   id: '/settings/printer',
   path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsShopRoute = SettingsShopRouteImport.update({
+  id: '/settings/shop',
+  path: '/settings/shop',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SettingsSyncRoute = SettingsSyncRouteImport.update({
@@ -299,9 +335,15 @@ export interface FileRoutesByFullPath {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
   '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/suppliers/$supplierId': typeof SuppliersSupplierIdRouteWithChildren;
@@ -339,9 +381,15 @@ export interface FileRoutesByTo {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
   '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
@@ -380,9 +428,15 @@ export interface FileRoutesById {
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
   '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
   '/suppliers/$supplierId': typeof SuppliersSupplierIdRouteWithChildren;
@@ -423,9 +477,15 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
     | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
     | '/suppliers/$supplierId'
@@ -463,9 +523,15 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
     | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
     | '/udhaar/$customerId'
@@ -503,9 +569,15 @@ export interface FileRouteTypes {
     | '/products/prices'
     | '/products/suggested'
     | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
     | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
     | '/suppliers/$supplierId'
@@ -544,9 +616,15 @@ export interface RootRouteChildren {
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
   SalesIdRoute: typeof SalesIdRouteWithChildren;
+  SettingsAboutRoute: typeof SettingsAboutRoute;
+  SettingsActivityRoute: typeof SettingsActivityRoute;
   SettingsBackupRoute: typeof SettingsBackupRoute;
+  SettingsCashiersRoute: typeof SettingsCashiersRoute;
   SettingsDevicesRoute: typeof SettingsDevicesRoute;
+  SettingsDisplayRoute: typeof SettingsDisplayRoute;
+  SettingsLabelsRoute: typeof SettingsLabelsRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  SettingsShopRoute: typeof SettingsShopRoute;
   SettingsSyncRoute: typeof SettingsSyncRoute;
   StockCountRoute: typeof StockCountRoute;
   SuppliersSupplierIdRoute: typeof SuppliersSupplierIdRouteWithChildren;
@@ -707,11 +785,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/about': {
+      id: '/settings/about';
+      path: '/settings/about';
+      fullPath: '/settings/about';
+      preLoaderRoute: typeof SettingsAboutRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/activity': {
+      id: '/settings/activity';
+      path: '/settings/activity';
+      fullPath: '/settings/activity';
+      preLoaderRoute: typeof SettingsActivityRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/backup': {
       id: '/settings/backup';
       path: '/settings/backup';
       fullPath: '/settings/backup';
       preLoaderRoute: typeof SettingsBackupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/cashiers': {
+      id: '/settings/cashiers';
+      path: '/settings/cashiers';
+      fullPath: '/settings/cashiers';
+      preLoaderRoute: typeof SettingsCashiersRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/settings/devices': {
@@ -721,11 +820,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDevicesRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/display': {
+      id: '/settings/display';
+      path: '/settings/display';
+      fullPath: '/settings/display';
+      preLoaderRoute: typeof SettingsDisplayRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/labels': {
+      id: '/settings/labels';
+      path: '/settings/labels';
+      fullPath: '/settings/labels';
+      preLoaderRoute: typeof SettingsLabelsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/printer': {
       id: '/settings/printer';
       path: '/settings/printer';
       fullPath: '/settings/printer';
       preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/shop': {
+      id: '/settings/shop';
+      path: '/settings/shop';
+      fullPath: '/settings/shop';
+      preLoaderRoute: typeof SettingsShopRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/settings/sync': {
@@ -898,9 +1018,15 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
   SalesIdRoute: SalesIdRouteWithChildren,
+  SettingsAboutRoute: SettingsAboutRoute,
+  SettingsActivityRoute: SettingsActivityRoute,
   SettingsBackupRoute: SettingsBackupRoute,
+  SettingsCashiersRoute: SettingsCashiersRoute,
   SettingsDevicesRoute: SettingsDevicesRoute,
+  SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsLabelsRoute: SettingsLabelsRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
+  SettingsShopRoute: SettingsShopRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   StockCountRoute: StockCountRoute,
   SuppliersSupplierIdRoute: SuppliersSupplierIdRouteWithChildren,
