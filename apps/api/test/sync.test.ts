@@ -631,6 +631,70 @@ describe('refund payment rows and split (04 §5)', () => {
     expect(tx).toBeTruthy();
   });
 
+  it('over-refund from two devices → both accepted + over_refund (10 §3)', async () => {
+    const shop = await seedShop('Over refund');
+    const sale = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, sale);
+    const saleId = sale[0]?.row?.id;
+    const lineId = sale[1]?.row?.id;
+    const total = Number(sale[0]?.row?.total);
+    const full = (device: string) => {
+      const t = newId();
+      const r = {
+        id: newId(),
+        sale_id: saleId,
+        kind: 'whole',
+        reason: 'Faulty',
+        method: 'cash',
+        exact_amount: total,
+        udhaar_part: 0,
+        rounding: 0,
+        amount: total,
+        branch_id: shop.branchId,
+        device_id: device,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: Date.now(),
+      };
+      return [
+        op('refunds', 'insert', r, { tx_id: t }),
+        op(
+          'refund_lines',
+          'insert',
+          {
+            id: newId(),
+            refund_id: r.id,
+            sale_line_id: lineId,
+            qty_milli: 1000,
+            amount: total,
+            restock: 1,
+            created_at: Date.now(),
+          },
+          { tx_id: t },
+        ),
+        op(
+          'payments',
+          'insert',
+          refundPayment(shop, r, { device_id: device }),
+          {
+            tx_id: t,
+          },
+        ),
+      ];
+    };
+    const a = await pushOk(shop.till, full(shop.till.id));
+    const b = await pushOk(shop.admin, full(shop.admin.id));
+    expect(
+      [...a.results, ...b.results].map((r) => r.error_code ?? null),
+    ).toEqual([null, null, null, null, null, null]);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM sync_conflicts WHERE tenant_id = ?1 AND kind = 'over_refund'",
+        shop.tenantId,
+      ),
+    ).toBe(1);
+  });
+
   it('a sale without a customer cannot take an udhaar part', async () => {
     const shop = await seedShop('No customer');
     const sale = saleOps(shop, shop.till, 1);
@@ -748,5 +812,91 @@ describe('supplier return rows (04 §5)', () => {
     expect(await send(h, [line(h.id)], [pay(h)])).toBeNull();
     h = head();
     expect(await send(h, [line(h.id)])).toBeNull();
+  });
+
+  it('a line linked to another supplier’s delivery is rejected; over-return from two tills is flagged', async () => {
+    const shop = await seedShop('Return links');
+    const other = newId();
+    const purchase = newId();
+    const pline = newId();
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO suppliers (tenant_id, id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)',
+      ).bind(shop.tenantId, other, 'Other supplier', now),
+      env.DB.prepare(
+        `INSERT INTO purchases (tenant_id, id, supplier_id, total, line_count, branch_id, device_id, staff_id, business_date, created_at)
+         VALUES (?1, ?2, ?3, 4000, 1, ?4, ?5, ?6, '2026-10-26', ?7)`,
+      ).bind(
+        shop.tenantId,
+        purchase,
+        IDS.supplier,
+        shop.branchId,
+        shop.till.id,
+        IDS.owner,
+        now,
+      ),
+      env.DB.prepare(
+        `INSERT INTO purchase_lines (tenant_id, id, purchase_id, line_no, product_id, qty_milli, unit_cost, line_total, landed_unit_cost, created_at)
+         VALUES (?1, ?2, ?3, 1, ?4, 2000, 2000, 4000, 2000, ?5)`,
+      ).bind(shop.tenantId, pline, purchase, IDS.product, now),
+    ]);
+    const ret = (supplier: string, device: string = shop.till.id) => {
+      const id = newId();
+      const t = newId();
+      return [
+        op(
+          'supplier_returns',
+          'insert',
+          {
+            id,
+            supplier_id: supplier,
+            purchase_id: null,
+            reason: 'Damaged',
+            total: 3000,
+            refund_received: 0,
+            refund_method: null,
+            line_count: 1,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: device,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: Date.now(),
+          },
+          { tx_id: t },
+        ),
+        op(
+          'supplier_return_lines',
+          'insert',
+          {
+            id: newId(),
+            return_id: id,
+            line_no: 1,
+            product_id: IDS.product,
+            purchase_line_id: pline,
+            qty_milli: 1500,
+            unit_credit: 2000,
+            line_total: 3000,
+            cost_snapshot: 2000,
+            created_at: Date.now(),
+          },
+          { tx_id: t },
+        ),
+      ];
+    };
+    const wrong = await pushOk(shop.till, ret(other));
+    expect(wrong.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    const a = await pushOk(shop.till, ret(IDS.supplier));
+    const b = await pushOk(shop.admin, ret(IDS.supplier, shop.admin.id));
+    expect(
+      [...a.results, ...b.results].map((r) => r.error_code ?? null),
+    ).toEqual([null, null, null, null]);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM sync_conflicts WHERE tenant_id = ?1 AND kind = 'over_return'",
+        shop.tenantId,
+      ),
+    ).toBe(1);
   });
 });
