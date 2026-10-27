@@ -137,3 +137,60 @@ export type RefundReceipt = {
   khataBalancePaisa: number | null;
   reason: string;
 };
+
+/** Day close / Z-report (screens/15); an internal slip, so no "Powered by AlgoVyn". */
+export type DayCloseReceipt = {
+  shop: ReceiptShop;
+  staffName: string | null;
+  deviceName: string;
+  periodStart: number;
+  periodEnd: number;
+  openingCash: number;
+  cashSales: number;
+  udhaarCashIn: number;
+  payIns: number;
+  supplierCashIn: number;
+  cashRefunds: number;
+  cashExpenses: number;
+  supplierCashOut: number;
+  payOuts: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+  cardTotal: number;
+  bankTotal: number;
+  udhaarGiven: number;
+  bills: number;
+  refunds: number;
+  note: string;
+  labels?: Partial<DayCloseLabels>;
+};
+
+export type DayCloseLabels = {
+  title: string;
+  device: string;
+  from: string;
+  to: string;
+  opening: string;
+  cashSales: string;
+  udhaarIn: string;
+  payIns: string;
+  supplierIn: string;
+  cashRefunds: string;
+  cashExpenses: string;
+  supplierOut: string;
+  payOuts: string;
+  expected: string;
+  counted: string;
+  difference: string;
+  correct: string;
+  short: string;
+  over: string;
+  card: string;
+  bank: string;
+  udhaarGiven: string;
+  bills: string;
+  refunds: string;
+  note: string;
+  closedBy: string;
+};

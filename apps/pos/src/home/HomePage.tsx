@@ -30,7 +30,7 @@ const ATTENTION_LINK: Record<string, string> = {
   sync_stale: '/settings/sync',
   sync_pending_old: '/settings/sync',
   clock_wrong: '/settings/sync',
-  day_not_closed: '/sales',
+  day_not_closed: '/day-close',
   held_expiring: '/sell',
 };
 
@@ -88,6 +88,12 @@ export function HomePage() {
       label: 'home.new_sale',
       keys: 'N',
       perm: 'sale.create' as const,
+    },
+    {
+      to: '/day-close',
+      label: 'home.day_close',
+      keys: 'D',
+      perm: 'dayclose.create' as const,
     },
     ...NAV.slice(2).map((item) => ({
       to: item.to,

@@ -2,13 +2,16 @@
 import type { BikriDb, PrintJob } from '@bikri/db';
 import {
   type Block,
+  buildDayClose,
   buildRefundReceipt,
   buildSaleReceipt,
+  type DayCloseReceipt,
   type RasterSource,
   type ReceiptLabels,
   type RefundReceipt,
   type SaleReceiptInput,
 } from '@bikri/printer';
+import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import {
   loadSaleReceipt,
   type PrinterKv,
@@ -32,6 +35,8 @@ export type SaleReceipt = ReceiptLayout & { input: SaleReceiptInput };
 export type RefundPrint = ReceiptLayout & {
   input: RefundReceipt & { labels?: Partial<ReceiptLabels> };
 };
+
+export type DayClosePrint = ReceiptLayout & { input: DayCloseReceipt };
 
 async function layoutOf(db: BikriDb) {
   const printer = ((await db.kv.get('printer'))?.value ??
@@ -80,14 +85,31 @@ export async function refundReceipt(
   return { input, blocks, paper, logo, printer };
 }
 
+export async function dayCloseReceipt(
+  db: BikriDb,
+  dayCloseId: string,
+): Promise<DayClosePrint | null> {
+  const input = await loadDayCloseReceipt(db, dayCloseId);
+  if (!input) return null;
+  const { printer, paper, logo } = await layoutOf(db);
+  const blocks = buildDayClose(input, {
+    paperMm: paper.paperMm,
+    charsPerLine: paper.charsPerLine,
+    dots: paper.dots,
+    printLogo: printer?.print_logo !== false,
+  });
+  return { input, blocks, paper, logo, printer };
+}
+
 /** What a print job prints (the print service, T-020, sends these blocks). */
 export function jobReceipt(
   db: BikriDb,
   job: PrintJob,
-): Promise<SaleReceipt | RefundPrint | null> {
+): Promise<SaleReceipt | RefundPrint | DayClosePrint | null> {
   if (job.sale_id)
     return saleReceipt(db, job.sale_id, { reprint: job.reprint === true });
   if (job.refund_id) return refundReceipt(db, job.refund_id);
+  if (job.day_close_id) return dayCloseReceipt(db, job.day_close_id);
   return Promise.resolve(null);
 }
 
