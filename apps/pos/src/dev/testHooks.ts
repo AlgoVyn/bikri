@@ -4,6 +4,7 @@ import { setKv } from '../data/kv.ts';
 import { beepCount } from '../sell/beep.ts';
 import {
   resetDevDb,
+  seedCustomer,
   seedManyProducts,
   seedProducts,
   seedReadyShop,
@@ -24,6 +25,7 @@ declare global {
       seedProducts: typeof seedProducts;
       seedManyProducts: typeof seedManyProducts;
       beeps: () => number;
+      seedCustomer: typeof seedCustomer;
     };
   }
 }
@@ -40,5 +42,6 @@ export function installTestHooks(): void {
     seedProducts,
     seedManyProducts,
     beeps: beepCount,
+    seedCustomer,
   };
 }

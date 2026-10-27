@@ -65,8 +65,9 @@ import {
   useShopMoney,
 } from './useSell.ts';
 
+type OverridePermission = Permission | 'udhaar.hard_limit';
 type OverrideRequest = {
-  permission: Permission;
+  permission: OverridePermission;
   onApproved: (approvedBy: string) => void;
 };
 
@@ -213,8 +214,12 @@ export function SellPage() {
   };
 
   // --- overrides (05 §4.1) ---
-  const approvers = (permission: Permission) =>
+  const approvers = (permission: OverridePermission) =>
     approversFor(allStaff, (s) => {
+      if (permission === 'udhaar.hard_limit')
+        return (
+          s.id !== staff?.id && (s.role === 'owner' || s.role === 'manager')
+        );
       if (s.id === staff?.id) return false;
       const ok = canDo(
         s.role as Role,
@@ -701,6 +706,9 @@ export function SellPage() {
         cart={cart}
         totals={totals}
         money={money}
+        requestOverride={(permission, onApproved) =>
+          setOverride({ permission, onApproved })
+        }
       />
       <OverrideDialog
         open={override !== null}

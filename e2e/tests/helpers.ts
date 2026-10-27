@@ -44,6 +44,31 @@ export async function idbCount(page: Page, store: string): Promise<number> {
   );
 }
 
+/** All rows of a store in the dev shop's database. */
+export async function idbAll<T = Record<string, unknown>>(
+  page: Page,
+  store: string,
+): Promise<T[]> {
+  return page.evaluate(
+    (s) =>
+      new Promise<T[]>((resolve, reject) => {
+        const open = indexedDB.open('bikri-dev');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result
+            .transaction(s, 'readonly')
+            .objectStore(s)
+            .getAll();
+          req.onsuccess = () => {
+            open.result.close();
+            resolve(req.result as T[]);
+          };
+        };
+      }),
+    store,
+  );
+}
+
 /** A PNG made in the page (w×h, two colours) for file inputs. */
 export async function makePng(
   page: Page,
@@ -92,6 +117,13 @@ declare global {
       ) => Promise<string[]>;
       seedManyProducts: (n: number) => Promise<void>;
       beeps: () => number;
+      seedCustomer: (c: {
+        name: string;
+        phone?: string;
+        limit?: number | null;
+        hard?: boolean;
+        balance?: number;
+      }) => Promise<string>;
     };
   }
 }
