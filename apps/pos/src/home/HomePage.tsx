@@ -23,6 +23,7 @@ const ATTENTION_LINK: Record<string, string> = {
   failed_prints: '/settings',
   conflicts: '/settings',
   day_not_closed: '/sales',
+  held_expiring: '/sell',
 };
 
 /** Home (screens/04). */

@@ -109,9 +109,12 @@ function draftFrom(input: ProductInput): Draft {
 export function ProductFormPage({
   editId,
   duplicateOf,
+  barcode,
 }: {
   editId?: string;
   duplicateOf?: string;
+  /** Pre-filled from Sell's "No product with barcode …" toast (screens/05). */
+  barcode?: string;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -120,7 +123,11 @@ export function ProductFormPage({
   const formId = useId();
   const nameRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Draft | null>(
-    editId || duplicateOf ? null : EMPTY,
+    editId || duplicateOf
+      ? null
+      : barcode
+        ? { ...EMPTY, barcodes: [barcode] }
+        : EMPTY,
   );
   const [initial, setInitial] = useState<Draft>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});

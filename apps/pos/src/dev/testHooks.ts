@@ -1,7 +1,15 @@
 import { router } from '../app.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
-import { resetDevDb, seedReadyShop, seedTodaySales, unlockAs } from './seed.ts';
+import { beepCount } from '../sell/beep.ts';
+import {
+  resetDevDb,
+  seedManyProducts,
+  seedProducts,
+  seedReadyShop,
+  seedTodaySales,
+  unlockAs,
+} from './seed.ts';
 
 declare global {
   interface Window {
@@ -13,6 +21,9 @@ declare global {
       setKv: (key: string, value: unknown) => Promise<void>;
       /** Client-side navigation (keeps the in-memory session, unlike page.goto). */
       navigate: (to: string) => Promise<void>;
+      seedProducts: typeof seedProducts;
+      seedManyProducts: typeof seedManyProducts;
+      beeps: () => number;
     };
   }
 }
@@ -26,5 +37,8 @@ export function installTestHooks(): void {
     seedTodaySales,
     setKv: (key, value) => setKv(getDb(), key, value),
     navigate: (to) => router.navigate({ to }),
+    seedProducts,
+    seedManyProducts,
+    beeps: beepCount,
   };
 }

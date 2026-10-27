@@ -80,6 +80,18 @@ declare global {
       seedTodaySales: () => Promise<void>;
       setKv: (key: string, value: unknown) => Promise<void>;
       navigate: (to: string) => Promise<void>;
+      seedProducts: (
+        list: {
+          name: string;
+          price: number;
+          cost?: number;
+          barcode?: string;
+          stock?: number;
+          track?: boolean;
+        }[],
+      ) => Promise<string[]>;
+      seedManyProducts: (n: number) => Promise<void>;
+      beeps: () => number;
     };
   }
 }
