@@ -174,6 +174,11 @@ describe('udhaar data', () => {
       { role: 'owner', today: TODAY, now: NOW + 1000 },
     );
     expect((await db.promises.get(promise.id))?.status).toBe('kept');
+    expect(
+      await db.outbox
+        .filter((op) => op.tbl === 'promises' && op.row_id === promise.id)
+        .count(),
+    ).toBeGreaterThan(0);
   });
 
   it('refreshes promises to broken the day after the date', async () => {
