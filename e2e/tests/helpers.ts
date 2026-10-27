@@ -73,6 +73,65 @@ export async function idbAll<T = Record<string, unknown>>(
   );
 }
 
+/** Inserts (or replaces) one row in a store of the open shop's database. */
+export async function idbPut<T = Record<string, unknown>>(
+  page: Page,
+  store: string,
+  value: T,
+): Promise<void> {
+  await page.evaluate(
+    ([s, v]) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open(
+          `bikri-${localStorage.getItem('bikri.active_tenant') ?? 'dev'}`,
+        );
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction(s, 'readwrite');
+          tx.objectStore(s).put(v);
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    [store, value] as const,
+  );
+}
+
+/** Updates one row by key in a store of the open shop's database. */
+export async function idbUpdate(
+  page: Page,
+  store: string,
+  key: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  await page.evaluate(
+    ({ store: s, key: k, patch: p }) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open(
+          `bikri-${localStorage.getItem('bikri.active_tenant') ?? 'dev'}`,
+        );
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction(s, 'readwrite');
+          const os = tx.objectStore(s);
+          const get = os.get(k);
+          get.onsuccess = () => {
+            os.put({ ...get.result, ...p });
+          };
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    { store, key, patch },
+  );
+}
+
 /** A PNG made in the page (w×h, two colours) for file inputs. */
 export async function makePng(
   page: Page,

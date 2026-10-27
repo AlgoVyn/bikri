@@ -21,6 +21,7 @@ import {
   removeProduct,
   saveNewProduct,
   saveProductEdit,
+  stockHistoryCsv,
   updateCategory,
 } from './catalog.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
@@ -276,7 +277,12 @@ describe('products (screens/08)', () => {
     const rows = await listProducts(db);
     const owner = productsCsv(rows, true);
     const cashier = productsCsv(rows, false);
-    expect(owner.split('\r\n')[0]).toContain('cost,avg_cost');
+    expect(owner.split('\r\n')[0]).toBe(
+      'name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,sold_30_days',
+    );
+    expect(cashier.split('\r\n')[0]).toBe(
+      'name_en,name_ur,category,brand,barcode,sku,price,stock,unit,min_stock,track_stock,sold_30_days',
+    );
     expect(cashier).not.toContain('cost');
     expect(cashier).not.toContain('1100');
     expect(owner.split('\r\n')[1]).toBe(
@@ -352,4 +358,21 @@ it('writeAction is used for each catalog change (one outbox tx per save)', async
   await saveNewProduct(db, cable, await ledgerContext(db, 'st-1'));
   const txs = new Set((await db.outbox.toArray()).map((o) => o.tx_id));
   expect(txs.size).toBe(1);
+});
+
+it('exports the documented stock-history CSV header', () => {
+  const csv = stockHistoryCsv(
+    [
+      {
+        at: NOW,
+        reason: 'sale',
+        qty: '-1',
+        balanceAfter: '4',
+        by: 'Adnan',
+      },
+    ],
+    'Asia/Karachi',
+  );
+  expect(csv.split('\r\n')[0]).toBe('date,reason,qty,balance_after,by');
+  expect(csv).toContain('Adnan');
 });

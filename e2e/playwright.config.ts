@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // E2E runs against `wrangler dev` serving the built PWA + local D1 (docs/10-testing.md §1).
-const PORT = 8787;
+// E2E_PORT lets several worktrees run their own `wrangler dev` side by side.
+const PORT = Number(process.env.E2E_PORT ?? 8787);
 // `--local-upstream` keeps the browser's Origin (wrangler dev otherwise rewrites it to the route's
 // host, https://algovyn.com, and the CSRF check refuses every POST).
 // Test-only Worker vars (10 §5): the Access bypass and fake email outbox need ENV=test, which the
@@ -20,6 +21,9 @@ const TEST_VARS = [
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
+  // One worker keeps the 10 s import and 50 ms keystroke budgets (T-023/T-016) measuring the
+  // app, not a starved CI runner; the suite is already mostly serial.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
@@ -45,7 +49,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm --filter @bikri/pos build:e2e && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT} --local-upstream localhost:${PORT} ${TEST_VARS}`,
+    command: `pnpm --filter @bikri/pos build:e2e && pnpm --filter @bikri/api exec wrangler d1 migrations apply bikri --local && pnpm --filter @bikri/api exec wrangler dev --port ${PORT} --inspector-port ${PORT + 1000} --local-upstream localhost:${PORT} ${TEST_VARS}`,
     url: `http://localhost:${PORT}/bikri/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

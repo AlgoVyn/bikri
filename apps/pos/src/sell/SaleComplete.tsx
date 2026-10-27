@@ -7,11 +7,11 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
+import { retryPrintJob } from '../data/printJobs.ts';
 import {
   latestSaleJob,
   queueSalePrint,
   receiptShareText,
-  retryPrintJob,
   waLink,
 } from '../data/receipt.ts';
 import { ignoresHotkey } from '../shell/hotkeys.ts';

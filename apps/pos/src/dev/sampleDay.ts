@@ -197,6 +197,9 @@ export async function seedSampleDay(
           refund_id: r1,
         }),
       );
+      await w
+        .table<Record<string, unknown>, string>('sales')
+        .update(s1, { status: 'part_refunded' });
       await w.insert(
         'payments',
         pay(10000, now + 3, {

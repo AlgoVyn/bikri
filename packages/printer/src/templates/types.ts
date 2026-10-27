@@ -137,3 +137,93 @@ export type RefundReceipt = {
   khataBalancePaisa: number | null;
   reason: string;
 };
+
+/** Day close / Z-report (screens/15); an internal slip, so no "Powered by AlgoVyn". */
+export type DayCloseReceipt = {
+  shop: ReceiptShop;
+  staffName: string | null;
+  deviceName: string;
+  periodStart: number;
+  periodEnd: number;
+  openingCash: number;
+  cashSales: number;
+  udhaarCashIn: number;
+  payIns: number;
+  supplierCashIn: number;
+  cashRefunds: number;
+  cashExpenses: number;
+  supplierCashOut: number;
+  payOuts: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+  denominations?: Record<string, number> | null;
+  cardTotal: number;
+  bankTotal: number;
+  udhaarGiven: number;
+  bills: number;
+  refunds: number;
+  note: string;
+  labels?: Partial<DayCloseLabels>;
+};
+
+export type DayCloseLabels = {
+  title: string;
+  device: string;
+  from: string;
+  to: string;
+  opening: string;
+  cashSales: string;
+  udhaarIn: string;
+  payIns: string;
+  supplierIn: string;
+  cashRefunds: string;
+  cashExpenses: string;
+  supplierOut: string;
+  payOuts: string;
+  expected: string;
+  counted: string;
+  difference: string;
+  denominations: string;
+  correct: string;
+  short: string;
+  over: string;
+  card: string;
+  bank: string;
+  udhaarGiven: string;
+  bills: string;
+  refunds: string;
+  note: string;
+  closedBy: string;
+};
+
+/** Return-to-supplier slip (screens/13, 06 §4.3); an internal slip. */
+export type SupplierReturnReceipt = {
+  shop: ReceiptShop;
+  supplierName: string;
+  purchaseInvoice: string | null;
+  businessDate: string;
+  lines: { name: string; qty: string; unitCredit: number; lineTotal: number }[];
+  total: number;
+  refundReceived: number;
+  refundMethod: 'cash' | 'bank_wallet' | null;
+  reason: string;
+  note: string;
+  balanceAfter: number;
+  labels?: Partial<SupplierReturnLabels>;
+};
+
+export type SupplierReturnLabels = {
+  title: string;
+  supplier: string;
+  delivery: string;
+  date: string;
+  total: string;
+  received: string;
+  reason: string;
+  note: string;
+  balance: string;
+  advance: string;
+  methodCash: string;
+  methodBank: string;
+};

@@ -394,6 +394,7 @@ describe('shop admin (T-038, 04 §3.8)', () => {
       ).status,
     ).toBe(403);
     expect((await shopApi(a, s, '/shop/devices')).status).toBe(200);
+    expect((await shopApi(a, s, '/shop/export')).status).toBe(200);
   });
 
   it('conflict acknowledge', async () => {

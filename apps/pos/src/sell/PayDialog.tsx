@@ -3,6 +3,8 @@ import type { Cart, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   type FormEvent,
+  lazy,
+  Suspense,
   useEffect,
   useId,
   useMemo,
@@ -40,7 +42,11 @@ import {
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Modal } from './Modal.tsx';
-import { SaleComplete } from './SaleComplete.tsx';
+
+const SaleComplete = lazy(() =>
+  import('./SaleComplete.tsx').then((m) => ({ default: m.SaleComplete })),
+);
+
 import { CustomerDialog } from './SellDialogs.tsx';
 import { mutateCart, useCustomer } from './useSell.ts';
 
@@ -107,12 +113,14 @@ export function PayDialog({
       }
     >
       {done ? (
-        <SaleComplete
-          done={done}
-          onNewSale={() => onOpenChange(false)}
-          onScan={onScan}
-          onOpenBill={() => onOpenBill(String(done.sale.id))}
-        />
+        <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+          <SaleComplete
+            done={done}
+            onNewSale={() => onOpenChange(false)}
+            onScan={onScan}
+            onOpenBill={() => onOpenBill(String(done.sale.id))}
+          />
+        </Suspense>
       ) : open ? (
         <PayStep
           cartId={cartId}

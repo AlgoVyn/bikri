@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
     environment: 'jsdom',
+    // Coverage + many jsdom files starve each other on 2-core CI runners; keep the workers
+    // and timeouts stable so the performance and axe checks measure the app, not the machine.
+    maxWorkers: 2,
+    testTimeout: 15_000,
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',

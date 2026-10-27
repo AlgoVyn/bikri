@@ -67,12 +67,21 @@ export function compareCatalogs(
 }
 
 export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
-  const catalogs: Record<string, unknown> = {};
-  for (const locale of LOCALE_FILES) {
-    const file = resolve(rootDir, `${locale}.json`);
-    catalogs[locale] = JSON.parse(await readFile(file, 'utf8')) as unknown;
+  const errors: string[] = [];
+  // The app catalogs and the operator console's own catalogs (D-112) are checked separately.
+  for (const [dir, label] of [
+    [rootDir, ''],
+    [resolve(rootDir, 'admin'), 'admin/'],
+    [resolve(rootDir, 'office'), 'office/'],
+  ] as const) {
+    const catalogs: Record<string, unknown> = {};
+    for (const locale of LOCALE_FILES) {
+      const file = resolve(dir, `${locale}.json`);
+      catalogs[locale] = JSON.parse(await readFile(file, 'utf8')) as unknown;
+    }
+    errors.push(...compareCatalogs(catalogs).map((e) => `${label}${e}`));
   }
-  return compareCatalogs(catalogs);
+  return errors.sort();
 }
 
 const entry = process.argv[1];

@@ -101,7 +101,7 @@ test.describe('Home and shell (T-013)', () => {
     await search.fill('A-A-1');
     await expect(page.getByRole('option', { name: /A-A-1/ })).toBeVisible();
     await search.press('Enter');
-    await expect(page).toHaveURL(/\/bikri\/sales\?bill=/);
+    await expect(page).toHaveURL(/\/bikri\/sales\/[A-Z0-9]+$/);
 
     await page
       .getByRole('navigation', { name: 'Main' })
@@ -142,6 +142,8 @@ test.describe('Home and shell (T-013)', () => {
     await page.evaluate(() => window.__bikriTest?.navigate('/suppliers'));
     await expect(page.getByText("You don't have access")).toBeVisible();
     await expect(page).toHaveURL(/\/bikri\/$/);
+    await page.evaluate(() => window.__bikriTest?.navigate('/labels'));
+    await expect(page.getByTestId('permission-no-access')).toBeVisible();
   });
 
   test('read-only, support and offline banners', async ({ page, context }) => {
@@ -162,6 +164,19 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByTestId('banner-support')).toContainText(
       'Reason: Fix stock.',
     );
+    await page.evaluate(() => window.__bikriTest?.navigate('/udhaar'));
+    await expect(
+      page.getByRole('button', { name: /New customer/ }),
+    ).toBeDisabled();
+    await page.evaluate(() => window.__bikriTest?.navigate('/expenses'));
+    await expect(
+      page.getByRole('button', { name: /New expense/ }),
+    ).toBeDisabled();
+    await page.evaluate(() => window.__bikriTest?.navigate('/day-close'));
+    await expect(
+      page.getByRole('button', { name: /Close day/ }),
+    ).toBeDisabled();
+    await page.evaluate(() => window.__bikriTest?.navigate('/'));
     await context.setOffline(true);
     await expect(page.getByTestId('banner-offline')).toContainText(
       'Offline — sales are saved on this device',

@@ -20,6 +20,21 @@ export {
   renderReceiptHtml,
 } from './html.ts';
 export {
+  BarcodeError,
+  encodeCode128,
+} from './labels/code128.ts';
+export {
+  a4Slots,
+  barcodeLabelSvg,
+  LABEL_SIZES,
+  type LabelCode,
+  LabelError,
+  type LabelSize,
+  type LabelSizeId,
+  moduleMm,
+  type RenderDpi,
+} from './labels/layout.ts';
+export {
   columnWidths,
   formatColumnHeader,
   formatItemLines,
@@ -55,6 +70,7 @@ export {
   POWERED_BY,
   type TemplateSettings,
 } from './templates/common.ts';
+export { buildDayClose } from './templates/dayClose.ts';
 export {
   englishReceiptLabels,
   receiptLabelsFor,
@@ -64,8 +80,11 @@ export {
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
 export { saleBasicInput } from './templates/saleBasicFixture.ts';
+export { buildSupplierReturn } from './templates/supplierReturn.ts';
 export { buildTestPrint, type TestPrintInput } from './templates/testPrint.ts';
 export type {
+  DayCloseLabels,
+  DayCloseReceipt,
   ReceiptLabels,
   ReceiptLine,
   ReceiptPayment,
@@ -73,6 +92,8 @@ export type {
   ReceiptShop,
   RefundLine,
   RefundReceipt,
+  SupplierReturnLabels,
+  SupplierReturnReceipt,
 } from './templates/types.ts';
 export type {
   Align,

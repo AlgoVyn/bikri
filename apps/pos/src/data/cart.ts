@@ -64,6 +64,7 @@ export function emptyCart(id: CartId, now = Date.now()): Cart {
     bill_discount: null,
     note: '',
     updated_at: now,
+    reissue: null,
   };
 }
 
@@ -88,7 +89,7 @@ export async function saveCart(
   await db.carts.put({ ...cart, updated_at: now });
 }
 
-function unitCostOf(product: MasterRow, method: CostMethod): number {
+export function unitCostOf(product: MasterRow, method: CostMethod): number {
   const avg = Number(product.avg_cost ?? 0);
   const last = Number(product.last_cost ?? 0);
   return method === 'last' ? last || avg : avg || last;

@@ -5,6 +5,7 @@ import {
   formatTaxRate,
   itemLayoutFor,
   POWERED_BY,
+  receiptLabelsFor,
   renderReceiptText,
 } from '@bikri/printer';
 import { useTranslation } from 'react-i18next';
@@ -17,12 +18,18 @@ export type PreviewShop = {
   footer: string;
   tax_rate_bp: number;
   inclusive: boolean;
+  tax_label?: string;
+  receipt_language?: string;
 };
 
 const SAMPLE_PRICE = 4_200_000;
 
 /** Sample 80 mm receipt for the wizard and Settings → Receipt (screens/01 step 3). */
 export function previewBlocks(shop: PreviewShop): Block[] {
+  const labels = receiptLabelsFor(shop.receipt_language);
+  const taxLabel =
+    shop.tax_label?.trim() ||
+    (shop.receipt_language === 'ur' ? 'سیلز ٹیکس' : 'Sales tax');
   const tax =
     shop.tax_rate_bp > 0 && !shop.inclusive
       ? Math.round((SAMPLE_PRICE * shop.tax_rate_bp) / 10_000)
@@ -40,7 +47,7 @@ export function previewBlocks(shop: PreviewShop): Block[] {
   if (shop.phone)
     blocks.push({
       t: 'text',
-      text: `Tel: ${formatReceiptPhone(shop.phone)}`,
+      text: `${labels.telPrefix} ${formatReceiptPhone(shop.phone)}`,
       align: 'center',
     });
   for (const line of shop.header.split('\n').filter((l) => l.trim())) {
@@ -57,21 +64,23 @@ export function previewBlocks(shop: PreviewShop): Block[] {
     { t: 'rule', char: '-' },
     {
       t: 'pair',
-      left: 'Subtotal (1 item)',
+      left: labels.subtotalItem.replace('{n}', '1'),
       right: formatReceiptMoney(SAMPLE_PRICE),
     },
   );
   if (tax > 0)
     blocks.push({
       t: 'pair',
-      left: `Sales tax ${formatTaxRate(shop.tax_rate_bp)}%`,
+      left: labels.salesTax
+        .replace('{label}', taxLabel)
+        .replace('{rate}', formatTaxRate(shop.tax_rate_bp)),
       right: formatReceiptMoney(tax),
     });
   blocks.push(
     { t: 'rule', char: '=' },
     {
       t: 'pair',
-      left: 'TOTAL',
+      left: labels.total,
       right: formatReceiptMoney(SAMPLE_PRICE + tax),
       bold: true,
     },
@@ -82,7 +91,9 @@ export function previewBlocks(shop: PreviewShop): Block[] {
     );
     blocks.push({
       t: 'pair',
-      left: `Includes Sales tax ${formatTaxRate(shop.tax_rate_bp)}%`,
+      left: labels.includesTax
+        .replace('{label}', taxLabel)
+        .replace('{rate}', formatTaxRate(shop.tax_rate_bp)),
       right: formatReceiptMoney(inside),
     });
   }
@@ -97,14 +108,17 @@ export function previewBlocks(shop: PreviewShop): Block[] {
 export function ReceiptPreview({
   shop,
   logoUrl,
+  paperMm = 80,
 }: {
   shop: PreviewShop;
   logoUrl: string | null;
+  paperMm?: 58 | 80;
 }) {
   const { t } = useTranslation();
+  const charsPerLine = paperMm === 58 ? 32 : 48;
   const text = renderReceiptText(previewBlocks(shop), {
-    charsPerLine: 48,
-    itemLayout: itemLayoutFor(48, 80),
+    charsPerLine,
+    itemLayout: itemLayoutFor(charsPerLine, paperMm),
   });
   return (
     <figure

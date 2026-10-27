@@ -12,33 +12,50 @@ import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as AdminRouteImport } from './routes/admin.tsx';
-import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
-import { Route as ReportsRouteImport } from './routes/reports.tsx';
-import { Route as SalesRouteImport } from './routes/sales.tsx';
+import { Route as LabelsRouteImport } from './routes/labels.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
-import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
-import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
 import { Route as AdminBackupsRouteImport } from './routes/admin/backups.tsx';
+import { Route as DayCloseIndexRouteImport } from './routes/day-close/index.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
+import { Route as ExpensesIndexRouteImport } from './routes/expenses/index.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
 import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
 import { Route as ProductsImportRouteImport } from './routes/products/import.tsx';
 import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as ReportsIndexRouteImport } from './routes/reports/index.tsx';
+import { Route as SalesIndexRouteImport } from './routes/sales/index.tsx';
+import { Route as SalesIdRouteImport } from './routes/sales/$id.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsAboutRouteImport } from './routes/settings/about.tsx';
+import { Route as SettingsActivityRouteImport } from './routes/settings/activity.tsx';
+import { Route as SettingsBackupRouteImport } from './routes/settings/backup.tsx';
+import { Route as SettingsCashiersRouteImport } from './routes/settings/cashiers.tsx';
 import { Route as SettingsDevicesRouteImport } from './routes/settings/devices.tsx';
+import { Route as SettingsDisplayRouteImport } from './routes/settings/display.tsx';
+import { Route as SettingsLabelsRouteImport } from './routes/settings/labels.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as SettingsShopRouteImport } from './routes/settings/shop.tsx';
 import { Route as SettingsSyncRouteImport } from './routes/settings/sync.tsx';
 import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
+import { Route as SuppliersIndexRouteImport } from './routes/suppliers/index.tsx';
+import { Route as SuppliersSupplierIdRouteImport } from './routes/suppliers/$supplierId.tsx';
+import { Route as UdhaarIndexRouteImport } from './routes/udhaar/index.tsx';
+import { Route as UdhaarCustomerIdRouteImport } from './routes/udhaar/$customerId.tsx';
+import { Route as UdhaarChaseRouteImport } from './routes/udhaar/chase.tsx';
 import { Route as AdminTenantsIndexRouteImport } from './routes/admin/tenants/index.tsx';
 import { Route as AdminTenantsIdRouteImport } from './routes/admin/tenants/$id.tsx';
 import { Route as AdminTenantsNewRouteImport } from './routes/admin/tenants/new.tsx';
 import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
 import { Route as ProductsIdAdjustRouteImport } from './routes/products/$id.adjust.tsx';
 import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
+import { Route as SalesIdRefundRouteImport } from './routes/sales/$id.refund.tsx';
+import { Route as SuppliersSupplierIdIndexRouteImport } from './routes/suppliers/$supplierId.index.tsx';
+import { Route as SuppliersSupplierIdDeliveryNewRouteImport } from './routes/suppliers/$supplierId.delivery.new.tsx';
+import { Route as SuppliersSupplierIdReturnNewRouteImport } from './routes/suppliers/$supplierId.return.new.tsx';
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -55,19 +72,9 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/admin.lazy.tsx').then((d) => d.Route));
-const ExpensesRoute = ExpensesRouteImport.update({
-  id: '/expenses',
-  path: '/expenses',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const SalesRoute = SalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
+const LabelsRoute = LabelsRouteImport.update({
+  id: '/labels',
+  path: '/labels',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SellRoute = SellRouteImport.update({
@@ -78,16 +85,6 @@ const SellRoute = SellRouteImport.update({
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const SuppliersRoute = SuppliersRouteImport.update({
-  id: '/suppliers',
-  path: '/suppliers',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const UdhaarRoute = UdhaarRouteImport.update({
-  id: '/udhaar',
-  path: '/udhaar',
   getParentRoute: () => rootRouteImport,
 } as any);
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -104,11 +101,25 @@ const AdminBackupsRoute = AdminBackupsRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/backups.lazy.tsx').then((d) => d.Route),
 );
+const DayCloseIndexRoute = DayCloseIndexRouteImport.update({
+  id: '/day-close/',
+  path: '/day-close/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/day-close/index.lazy.tsx').then((d) => d.Route),
+);
 const DevUiRoute = DevUiRouteImport.update({
   id: '/dev/ui',
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ExpensesIndexRoute = ExpensesIndexRouteImport.update({
+  id: '/expenses/',
+  path: '/expenses/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/expenses/index.lazy.tsx').then((d) => d.Route),
+);
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -139,9 +150,50 @@ const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
   path: '/products/suggested',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/reports/index.lazy.tsx').then((d) => d.Route),
+);
+const SalesIndexRoute = SalesIndexRouteImport.update({
+  id: '/sales/',
+  path: '/sales/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/sales/index.lazy.tsx').then((d) => d.Route),
+);
+const SalesIdRoute = SalesIdRouteImport.update({
+  id: '/sales/$id',
+  path: '/sales/$id',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/sales/$id.lazy.tsx').then((d) => d.Route),
+);
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsAboutRoute = SettingsAboutRouteImport.update({
+  id: '/settings/about',
+  path: '/settings/about',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsActivityRoute = SettingsActivityRouteImport.update({
+  id: '/settings/activity',
+  path: '/settings/activity',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsBackupRoute = SettingsBackupRouteImport.update({
+  id: '/settings/backup',
+  path: '/settings/backup',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsCashiersRoute = SettingsCashiersRouteImport.update({
+  id: '/settings/cashiers',
+  path: '/settings/cashiers',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
@@ -149,9 +201,24 @@ const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
   path: '/settings/devices',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
+  id: '/settings/display',
+  path: '/settings/display',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsLabelsRoute = SettingsLabelsRouteImport.update({
+  id: '/settings/labels',
+  path: '/settings/labels',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   id: '/settings/printer',
   path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsShopRoute = SettingsShopRouteImport.update({
+  id: '/settings/shop',
+  path: '/settings/shop',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SettingsSyncRoute = SettingsSyncRouteImport.update({
@@ -164,6 +231,39 @@ const StockCountRoute = StockCountRouteImport.update({
   path: '/stock/count',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SuppliersIndexRoute = SuppliersIndexRouteImport.update({
+  id: '/suppliers/',
+  path: '/suppliers/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/suppliers/index.lazy.tsx').then((d) => d.Route),
+);
+const SuppliersSupplierIdRoute = SuppliersSupplierIdRouteImport.update({
+  id: '/suppliers/$supplierId',
+  path: '/suppliers/$supplierId',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const UdhaarIndexRoute = UdhaarIndexRouteImport.update({
+  id: '/udhaar/',
+  path: '/udhaar/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/udhaar/index.lazy.tsx').then((d) => d.Route),
+);
+const UdhaarCustomerIdRoute = UdhaarCustomerIdRouteImport.update({
+  id: '/udhaar/$customerId',
+  path: '/udhaar/$customerId',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/udhaar/$customerId.lazy.tsx').then((d) => d.Route),
+);
+const UdhaarChaseRoute = UdhaarChaseRouteImport.update({
+  id: '/udhaar/chase',
+  path: '/udhaar/chase',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/udhaar/chase.lazy.tsx').then((d) => d.Route),
+);
 const AdminTenantsIndexRoute = AdminTenantsIndexRouteImport.update({
   id: '/tenants/',
   path: '/tenants/',
@@ -200,18 +300,51 @@ const ProductsIdEditRoute = ProductsIdEditRouteImport.update({
   path: '/products/$id/edit',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SalesIdRefundRoute = SalesIdRefundRouteImport.update({
+  id: '/refund',
+  path: '/refund',
+  getParentRoute: () => SalesIdRoute,
+} as any).lazy(() =>
+  import('./routes/sales/$id.refund.lazy.tsx').then((d) => d.Route),
+);
+const SuppliersSupplierIdIndexRoute =
+  SuppliersSupplierIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SuppliersSupplierIdRoute,
+  } as any).lazy(() =>
+    import('./routes/suppliers/$supplierId.index.lazy.tsx').then(
+      (d) => d.Route,
+    ),
+  );
+const SuppliersSupplierIdDeliveryNewRoute =
+  SuppliersSupplierIdDeliveryNewRouteImport.update({
+    id: '/delivery/new',
+    path: '/delivery/new',
+    getParentRoute: () => SuppliersSupplierIdRoute,
+  } as any).lazy(() =>
+    import('./routes/suppliers/$supplierId.delivery.new.lazy.tsx').then(
+      (d) => d.Route,
+    ),
+  );
+const SuppliersSupplierIdReturnNewRoute =
+  SuppliersSupplierIdReturnNewRouteImport.update({
+    id: '/return/new',
+    path: '/return/new',
+    getParentRoute: () => SuppliersSupplierIdRoute,
+  } as any).lazy(() =>
+    import('./routes/suppliers/$supplierId.return.new.lazy.tsx').then(
+      (d) => d.Route,
+    ),
+  );
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/expenses': typeof ExpensesRoute;
-  '/reports': typeof ReportsRoute;
-  '/sales': typeof SalesRoute;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
-  '/suppliers': typeof SuppliersRoute;
-  '/udhaar': typeof UdhaarRoute;
   '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
@@ -219,30 +352,47 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
+  '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/suppliers/$supplierId': typeof SuppliersSupplierIdRouteWithChildren;
+  '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
+  '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/day-close/': typeof DayCloseIndexRoute;
+  '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/reports/': typeof ReportsIndexRoute;
+  '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/suppliers/': typeof SuppliersIndexRoute;
+  '/udhaar/': typeof UdhaarIndexRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/sales/$id/refund': typeof SalesIdRefundRoute;
   '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
+  '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
+  '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/expenses': typeof ExpensesRoute;
-  '/reports': typeof ReportsRoute;
-  '/sales': typeof SalesRoute;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
-  '/suppliers': typeof SuppliersRoute;
-  '/udhaar': typeof UdhaarRoute;
   '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
@@ -250,32 +400,48 @@ export interface FileRoutesByTo {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
+  '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
+  '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin': typeof AdminIndexRoute;
+  '/day-close': typeof DayCloseIndexRoute;
+  '/expenses': typeof ExpensesIndexRoute;
   '/products': typeof ProductsIndexRoute;
+  '/reports': typeof ReportsIndexRoute;
+  '/sales': typeof SalesIndexRoute;
   '/settings': typeof SettingsIndexRoute;
+  '/suppliers': typeof SuppliersIndexRoute;
+  '/udhaar': typeof UdhaarIndexRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/sales/$id/refund': typeof SalesIdRefundRoute;
   '/admin/tenants': typeof AdminTenantsIndexRoute;
   '/products/$id': typeof ProductsIdIndexRoute;
+  '/suppliers/$supplierId': typeof SuppliersSupplierIdIndexRoute;
+  '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/expenses': typeof ExpensesRoute;
-  '/reports': typeof ReportsRoute;
-  '/sales': typeof SalesRoute;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
-  '/suppliers': typeof SuppliersRoute;
-  '/udhaar': typeof UdhaarRoute;
   '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
@@ -283,19 +449,40 @@ export interface FileRoutesById {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/sales/$id': typeof SalesIdRouteWithChildren;
+  '/settings/about': typeof SettingsAboutRoute;
+  '/settings/activity': typeof SettingsActivityRoute;
+  '/settings/backup': typeof SettingsBackupRoute;
+  '/settings/cashiers': typeof SettingsCashiersRoute;
   '/settings/devices': typeof SettingsDevicesRoute;
+  '/settings/display': typeof SettingsDisplayRoute;
+  '/settings/labels': typeof SettingsLabelsRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/shop': typeof SettingsShopRoute;
   '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/suppliers/$supplierId': typeof SuppliersSupplierIdRouteWithChildren;
+  '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
+  '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/day-close/': typeof DayCloseIndexRoute;
+  '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/reports/': typeof ReportsIndexRoute;
+  '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/suppliers/': typeof SuppliersIndexRoute;
+  '/udhaar/': typeof UdhaarIndexRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/sales/$id/refund': typeof SalesIdRefundRoute;
   '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
+  '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
+  '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -303,13 +490,9 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
-    | '/expenses'
-    | '/reports'
-    | '/sales'
+    | '/labels'
     | '/sell'
     | '/setup'
-    | '/suppliers'
-    | '/udhaar'
     | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
@@ -317,30 +500,47 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
+    | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
+    | '/suppliers/$supplierId'
+    | '/udhaar/$customerId'
+    | '/udhaar/chase'
     | '/admin/'
+    | '/day-close/'
+    | '/expenses/'
     | '/products/'
+    | '/reports/'
+    | '/sales/'
     | '/settings/'
+    | '/suppliers/'
+    | '/udhaar/'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/sales/$id/refund'
     | '/admin/tenants/'
-    | '/products/$id/';
+    | '/products/$id/'
+    | '/suppliers/$supplierId/'
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/$'
-    | '/expenses'
-    | '/reports'
-    | '/sales'
+    | '/labels'
     | '/sell'
     | '/setup'
-    | '/suppliers'
-    | '/udhaar'
     | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
@@ -348,31 +548,47 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
+    | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
+    | '/udhaar/$customerId'
+    | '/udhaar/chase'
     | '/admin'
+    | '/day-close'
+    | '/expenses'
     | '/products'
+    | '/reports'
+    | '/sales'
     | '/settings'
+    | '/suppliers'
+    | '/udhaar'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/sales/$id/refund'
     | '/admin/tenants'
-    | '/products/$id';
+    | '/products/$id'
+    | '/suppliers/$supplierId'
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/admin'
-    | '/expenses'
-    | '/reports'
-    | '/sales'
+    | '/labels'
     | '/sell'
     | '/setup'
-    | '/suppliers'
-    | '/udhaar'
     | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
@@ -380,44 +596,78 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/sales/$id'
+    | '/settings/about'
+    | '/settings/activity'
+    | '/settings/backup'
+    | '/settings/cashiers'
     | '/settings/devices'
+    | '/settings/display'
+    | '/settings/labels'
     | '/settings/printer'
+    | '/settings/shop'
     | '/settings/sync'
     | '/stock/count'
+    | '/suppliers/$supplierId'
+    | '/udhaar/$customerId'
+    | '/udhaar/chase'
     | '/admin/'
+    | '/day-close/'
+    | '/expenses/'
     | '/products/'
+    | '/reports/'
+    | '/sales/'
     | '/settings/'
+    | '/suppliers/'
+    | '/udhaar/'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/sales/$id/refund'
     | '/admin/tenants/'
-    | '/products/$id/';
+    | '/products/$id/'
+    | '/suppliers/$supplierId/'
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
   AdminRoute: typeof AdminRouteWithChildren;
-  ExpensesRoute: typeof ExpensesRoute;
-  ReportsRoute: typeof ReportsRoute;
-  SalesRoute: typeof SalesRoute;
+  LabelsRoute: typeof LabelsRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
-  SuppliersRoute: typeof SuppliersRoute;
-  UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
   ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
   ProductsImportRoute: typeof ProductsImportRoute;
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  SalesIdRoute: typeof SalesIdRouteWithChildren;
+  SettingsAboutRoute: typeof SettingsAboutRoute;
+  SettingsActivityRoute: typeof SettingsActivityRoute;
+  SettingsBackupRoute: typeof SettingsBackupRoute;
+  SettingsCashiersRoute: typeof SettingsCashiersRoute;
   SettingsDevicesRoute: typeof SettingsDevicesRoute;
+  SettingsDisplayRoute: typeof SettingsDisplayRoute;
+  SettingsLabelsRoute: typeof SettingsLabelsRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  SettingsShopRoute: typeof SettingsShopRoute;
   SettingsSyncRoute: typeof SettingsSyncRoute;
   StockCountRoute: typeof StockCountRoute;
+  SuppliersSupplierIdRoute: typeof SuppliersSupplierIdRouteWithChildren;
+  UdhaarCustomerIdRoute: typeof UdhaarCustomerIdRoute;
+  UdhaarChaseRoute: typeof UdhaarChaseRoute;
+  DayCloseIndexRoute: typeof DayCloseIndexRoute;
+  ExpensesIndexRoute: typeof ExpensesIndexRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
+  ReportsIndexRoute: typeof ReportsIndexRoute;
+  SalesIndexRoute: typeof SalesIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
+  SuppliersIndexRoute: typeof SuppliersIndexRoute;
+  UdhaarIndexRoute: typeof UdhaarIndexRoute;
   ProductsIdAdjustRoute: typeof ProductsIdAdjustRoute;
   ProductsIdEditRoute: typeof ProductsIdEditRoute;
   ProductsIdIndexRoute: typeof ProductsIdIndexRoute;
@@ -446,25 +696,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/expenses': {
-      id: '/expenses';
-      path: '/expenses';
-      fullPath: '/expenses';
-      preLoaderRoute: typeof ExpensesRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/reports': {
-      id: '/reports';
-      path: '/reports';
-      fullPath: '/reports';
-      preLoaderRoute: typeof ReportsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/sales': {
-      id: '/sales';
-      path: '/sales';
-      fullPath: '/sales';
-      preLoaderRoute: typeof SalesRouteImport;
+    '/labels': {
+      id: '/labels';
+      path: '/labels';
+      fullPath: '/labels';
+      preLoaderRoute: typeof LabelsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sell': {
@@ -481,20 +717,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/suppliers': {
-      id: '/suppliers';
-      path: '/suppliers';
-      fullPath: '/suppliers';
-      preLoaderRoute: typeof SuppliersRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/udhaar': {
-      id: '/udhaar';
-      path: '/udhaar';
-      fullPath: '/udhaar';
-      preLoaderRoute: typeof UdhaarRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     '/admin/': {
       id: '/admin/';
       path: '/';
@@ -509,11 +731,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBackupsRouteImport;
       parentRoute: typeof AdminRoute;
     };
+    '/day-close/': {
+      id: '/day-close/';
+      path: '/day-close';
+      fullPath: '/day-close/';
+      preLoaderRoute: typeof DayCloseIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/dev/ui': {
       id: '/dev/ui';
       path: '/dev/ui';
       fullPath: '/dev/ui';
       preLoaderRoute: typeof DevUiRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/expenses/': {
+      id: '/expenses/';
+      path: '/expenses';
+      fullPath: '/expenses/';
+      preLoaderRoute: typeof ExpensesIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/products/': {
@@ -558,11 +794,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsSuggestedRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/reports/': {
+      id: '/reports/';
+      path: '/reports';
+      fullPath: '/reports/';
+      preLoaderRoute: typeof ReportsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/sales/': {
+      id: '/sales/';
+      path: '/sales';
+      fullPath: '/sales/';
+      preLoaderRoute: typeof SalesIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/sales/$id': {
+      id: '/sales/$id';
+      path: '/sales/$id';
+      fullPath: '/sales/$id';
+      preLoaderRoute: typeof SalesIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/': {
       id: '/settings/';
       path: '/settings';
       fullPath: '/settings/';
       preLoaderRoute: typeof SettingsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/about': {
+      id: '/settings/about';
+      path: '/settings/about';
+      fullPath: '/settings/about';
+      preLoaderRoute: typeof SettingsAboutRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/activity': {
+      id: '/settings/activity';
+      path: '/settings/activity';
+      fullPath: '/settings/activity';
+      preLoaderRoute: typeof SettingsActivityRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/backup': {
+      id: '/settings/backup';
+      path: '/settings/backup';
+      fullPath: '/settings/backup';
+      preLoaderRoute: typeof SettingsBackupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/cashiers': {
+      id: '/settings/cashiers';
+      path: '/settings/cashiers';
+      fullPath: '/settings/cashiers';
+      preLoaderRoute: typeof SettingsCashiersRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/settings/devices': {
@@ -572,11 +857,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDevicesRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/display': {
+      id: '/settings/display';
+      path: '/settings/display';
+      fullPath: '/settings/display';
+      preLoaderRoute: typeof SettingsDisplayRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/labels': {
+      id: '/settings/labels';
+      path: '/settings/labels';
+      fullPath: '/settings/labels';
+      preLoaderRoute: typeof SettingsLabelsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/printer': {
       id: '/settings/printer';
       path: '/settings/printer';
       fullPath: '/settings/printer';
       preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/shop': {
+      id: '/settings/shop';
+      path: '/settings/shop';
+      fullPath: '/settings/shop';
+      preLoaderRoute: typeof SettingsShopRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/settings/sync': {
@@ -591,6 +897,41 @@ declare module '@tanstack/react-router' {
       path: '/stock/count';
       fullPath: '/stock/count';
       preLoaderRoute: typeof StockCountRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/suppliers/': {
+      id: '/suppliers/';
+      path: '/suppliers';
+      fullPath: '/suppliers/';
+      preLoaderRoute: typeof SuppliersIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/suppliers/$supplierId': {
+      id: '/suppliers/$supplierId';
+      path: '/suppliers/$supplierId';
+      fullPath: '/suppliers/$supplierId';
+      preLoaderRoute: typeof SuppliersSupplierIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/udhaar/': {
+      id: '/udhaar/';
+      path: '/udhaar';
+      fullPath: '/udhaar/';
+      preLoaderRoute: typeof UdhaarIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/udhaar/$customerId': {
+      id: '/udhaar/$customerId';
+      path: '/udhaar/$customerId';
+      fullPath: '/udhaar/$customerId';
+      preLoaderRoute: typeof UdhaarCustomerIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/udhaar/chase': {
+      id: '/udhaar/chase';
+      path: '/udhaar/chase';
+      fullPath: '/udhaar/chase';
+      preLoaderRoute: typeof UdhaarChaseRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/admin/tenants/': {
@@ -635,6 +976,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsIdEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/sales/$id/refund': {
+      id: '/sales/$id/refund';
+      path: '/refund';
+      fullPath: '/sales/$id/refund';
+      preLoaderRoute: typeof SalesIdRefundRouteImport;
+      parentRoute: typeof SalesIdRoute;
+    };
+    '/suppliers/$supplierId/': {
+      id: '/suppliers/$supplierId/';
+      path: '/';
+      fullPath: '/suppliers/$supplierId/';
+      preLoaderRoute: typeof SuppliersSupplierIdIndexRouteImport;
+      parentRoute: typeof SuppliersSupplierIdRoute;
+    };
+    '/suppliers/$supplierId/delivery/new': {
+      id: '/suppliers/$supplierId/delivery/new';
+      path: '/delivery/new';
+      fullPath: '/suppliers/$supplierId/delivery/new';
+      preLoaderRoute: typeof SuppliersSupplierIdDeliveryNewRouteImport;
+      parentRoute: typeof SuppliersSupplierIdRoute;
+    };
+    '/suppliers/$supplierId/return/new': {
+      id: '/suppliers/$supplierId/return/new';
+      path: '/return/new';
+      fullPath: '/suppliers/$supplierId/return/new';
+      preLoaderRoute: typeof SuppliersSupplierIdReturnNewRouteImport;
+      parentRoute: typeof SuppliersSupplierIdRoute;
+    };
   }
 }
 
@@ -656,29 +1025,68 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren);
 
+interface SalesIdRouteChildren {
+  SalesIdRefundRoute: typeof SalesIdRefundRoute;
+}
+
+const SalesIdRouteChildren: SalesIdRouteChildren = {
+  SalesIdRefundRoute: SalesIdRefundRoute,
+};
+
+const SalesIdRouteWithChildren =
+  SalesIdRoute._addFileChildren(SalesIdRouteChildren);
+
+interface SuppliersSupplierIdRouteChildren {
+  SuppliersSupplierIdIndexRoute: typeof SuppliersSupplierIdIndexRoute;
+  SuppliersSupplierIdDeliveryNewRoute: typeof SuppliersSupplierIdDeliveryNewRoute;
+  SuppliersSupplierIdReturnNewRoute: typeof SuppliersSupplierIdReturnNewRoute;
+}
+
+const SuppliersSupplierIdRouteChildren: SuppliersSupplierIdRouteChildren = {
+  SuppliersSupplierIdIndexRoute: SuppliersSupplierIdIndexRoute,
+  SuppliersSupplierIdDeliveryNewRoute: SuppliersSupplierIdDeliveryNewRoute,
+  SuppliersSupplierIdReturnNewRoute: SuppliersSupplierIdReturnNewRoute,
+};
+
+const SuppliersSupplierIdRouteWithChildren =
+  SuppliersSupplierIdRoute._addFileChildren(SuppliersSupplierIdRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
-  ExpensesRoute: ExpensesRoute,
-  ReportsRoute: ReportsRoute,
-  SalesRoute: SalesRoute,
+  LabelsRoute: LabelsRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
-  SuppliersRoute: SuppliersRoute,
-  UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
   ProductsCategoriesRoute: ProductsCategoriesRoute,
   ProductsImportRoute: ProductsImportRoute,
   ProductsNewRoute: ProductsNewRoute,
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
+  SalesIdRoute: SalesIdRouteWithChildren,
+  SettingsAboutRoute: SettingsAboutRoute,
+  SettingsActivityRoute: SettingsActivityRoute,
+  SettingsBackupRoute: SettingsBackupRoute,
+  SettingsCashiersRoute: SettingsCashiersRoute,
   SettingsDevicesRoute: SettingsDevicesRoute,
+  SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsLabelsRoute: SettingsLabelsRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
+  SettingsShopRoute: SettingsShopRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   StockCountRoute: StockCountRoute,
+  SuppliersSupplierIdRoute: SuppliersSupplierIdRouteWithChildren,
+  UdhaarCustomerIdRoute: UdhaarCustomerIdRoute,
+  UdhaarChaseRoute: UdhaarChaseRoute,
+  DayCloseIndexRoute: DayCloseIndexRoute,
+  ExpensesIndexRoute: ExpensesIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
+  SalesIndexRoute: SalesIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  SuppliersIndexRoute: SuppliersIndexRoute,
+  UdhaarIndexRoute: UdhaarIndexRoute,
   ProductsIdAdjustRoute: ProductsIdAdjustRoute,
   ProductsIdEditRoute: ProductsIdEditRoute,
   ProductsIdIndexRoute: ProductsIdIndexRoute,

@@ -23,14 +23,14 @@ const DAY_MS = 86_400_000;
 
 const ATTENTION_LINK: Record<string, string> = {
   low_stock: '/products',
-  promises_due: '/udhaar',
+  promises_due: '/udhaar/chase',
   over_limit: '/udhaar',
   failed_prints: '/settings',
   conflicts: '/settings/sync',
   sync_stale: '/settings/sync',
   sync_pending_old: '/settings/sync',
   clock_wrong: '/settings/sync',
-  day_not_closed: '/sales',
+  day_not_closed: '/day-close',
   held_expiring: '/sell',
 };
 
@@ -88,6 +88,12 @@ export function HomePage() {
       label: 'home.new_sale',
       keys: 'N',
       perm: 'sale.create' as const,
+    },
+    {
+      to: '/day-close',
+      label: 'home.day_close',
+      keys: 'D',
+      perm: 'dayclose.create' as const,
     },
     ...NAV.slice(2).map((item) => ({
       to: item.to,
@@ -271,8 +277,8 @@ export function HomePage() {
             {data.recent.map(({ sale, methods }) => (
               <li key={sale.id}>
                 <Link
-                  to="/sales"
-                  search={{ bill: sale.id }}
+                  to="/sales/$id"
+                  params={{ id: sale.id }}
                   className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
                 >
                   <bdi dir="ltr" className="font-mono">
