@@ -88,6 +88,11 @@ export function ProductList() {
             {t('products.manage_categories')}
           </Link>
         ) : null}
+        {can('stock.adjust') ? (
+          <Link to="/stock/count" className={buttonQuiet}>
+            {t('count.title')}
+          </Link>
+        ) : null}
       </div>
 
       <search className="flex flex-wrap items-end gap-2">

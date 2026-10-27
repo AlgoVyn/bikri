@@ -25,7 +25,9 @@ import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
 import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
+import { Route as ProductsIdAdjustRouteImport } from './routes/products/$id.adjust.tsx';
 import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
 
 const IndexRoute = IndexRouteImport.update({
@@ -108,9 +110,19 @@ const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   path: '/settings/printer',
   getParentRoute: () => rootRouteImport,
 } as any);
+const StockCountRoute = StockCountRouteImport.update({
+  id: '/stock/count',
+  path: '/stock/count',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ProductsIdIndexRoute = ProductsIdIndexRouteImport.update({
   id: '/products/$id/',
   path: '/products/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdAdjustRoute = ProductsIdAdjustRouteImport.update({
+  id: '/products/$id/adjust',
+  path: '/products/$id/adjust',
   getParentRoute: () => rootRouteImport,
 } as any);
 const ProductsIdEditRoute = ProductsIdEditRouteImport.update({
@@ -134,8 +146,10 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
@@ -154,8 +168,10 @@ export interface FileRoutesByTo {
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
   '/products': typeof ProductsIndexRoute;
   '/settings': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id': typeof ProductsIdIndexRoute;
 }
@@ -175,8 +191,10 @@ export interface FileRoutesById {
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
@@ -197,8 +215,10 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/suggested'
     | '/settings/printer'
+    | '/stock/count'
     | '/products/'
     | '/settings/'
+    | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/products/$id/';
   fileRoutesByTo: FileRoutesByTo;
@@ -217,8 +237,10 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/suggested'
     | '/settings/printer'
+    | '/stock/count'
     | '/products'
     | '/settings'
+    | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/products/$id';
   id:
@@ -237,8 +259,10 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/suggested'
     | '/settings/printer'
+    | '/stock/count'
     | '/products/'
     | '/settings/'
+    | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/products/$id/';
   fileRoutesById: FileRoutesById;
@@ -258,8 +282,10 @@ export interface RootRouteChildren {
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  StockCountRoute: typeof StockCountRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
+  ProductsIdAdjustRoute: typeof ProductsIdAdjustRoute;
   ProductsIdEditRoute: typeof ProductsIdEditRoute;
   ProductsIdIndexRoute: typeof ProductsIdIndexRoute;
 }
@@ -378,11 +404,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsPrinterRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/stock/count': {
+      id: '/stock/count';
+      path: '/stock/count';
+      fullPath: '/stock/count';
+      preLoaderRoute: typeof StockCountRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/products/$id/': {
       id: '/products/$id/';
       path: '/products/$id';
       fullPath: '/products/$id/';
       preLoaderRoute: typeof ProductsIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/adjust': {
+      id: '/products/$id/adjust';
+      path: '/products/$id/adjust';
+      fullPath: '/products/$id/adjust';
+      preLoaderRoute: typeof ProductsIdAdjustRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/products/$id/edit': {
@@ -410,8 +450,10 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsNewRoute: ProductsNewRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
+  StockCountRoute: StockCountRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  ProductsIdAdjustRoute: ProductsIdAdjustRoute,
   ProductsIdEditRoute: ProductsIdEditRoute,
   ProductsIdIndexRoute: ProductsIdIndexRoute,
 };
