@@ -261,6 +261,22 @@
     "cash": "Naqd",
     "udhaar": "Udhaar"
   },
+  "pricecheck": {
+    "add_product": "Product shamil karein",
+    "add_to_cart": "Bill mein daalein",
+    "added": "{{name}} bill mein daal diya",
+    "barcodes": "Barcode:",
+    "close": "Band karein",
+    "cost": "Ausat laagat",
+    "in_stock": "Stock mein {{qty}}",
+    "margin": "Munafa",
+    "matches": "Milti julti products",
+    "not_found": "Nahin mila",
+    "out_of_stock": "Stock khatam",
+    "scan_another": "Agla scan karein",
+    "search": "Scan karein ya naam likhein",
+    "title": "Qeemat dekhein"
+  },
   "print": {
     "err_DISCONNECTED": "printer jura hua nahin",
     "err_FAILED": "printing nakaam",

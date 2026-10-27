@@ -78,6 +78,7 @@ export async function seedTodaySales(): Promise<void> {
 
 export type TestProduct = {
   name: string;
+  name_ur?: string;
   price: number;
   cost?: number;
   barcode?: string;
@@ -96,6 +97,7 @@ export async function seedProducts(list: TestProduct[]): Promise<string[]> {
       db,
       {
         name_en: p.name,
+        ...(p.name_ur ? { name_ur: p.name_ur } : {}),
         price: p.price,
         cost: p.cost,
         barcodes: p.barcode ? [p.barcode] : [],
