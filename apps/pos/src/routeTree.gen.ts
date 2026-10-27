@@ -21,7 +21,9 @@ import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
 import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
+import { Route as ProductsImportRouteImport } from './routes/products/import.tsx';
 import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
+import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
@@ -90,9 +92,19 @@ const ProductsCategoriesRoute = ProductsCategoriesRouteImport.update({
   path: '/products/categories',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ProductsImportRoute = ProductsImportRouteImport.update({
+  id: '/products/import',
+  path: '/products/import',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ProductsNewRoute = ProductsNewRouteImport.update({
   id: '/products/new',
   path: '/products/new',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsPricesRoute = ProductsPricesRouteImport.update({
+  id: '/products/prices',
+  path: '/products/prices',
   getParentRoute: () => rootRouteImport,
 } as any);
 const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
@@ -143,7 +155,9 @@ export interface FileRoutesByFullPath {
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/stock/count': typeof StockCountRoute;
@@ -165,7 +179,9 @@ export interface FileRoutesByTo {
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/stock/count': typeof StockCountRoute;
@@ -188,7 +204,9 @@ export interface FileRoutesById {
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
   '/stock/count': typeof StockCountRoute;
@@ -212,7 +230,9 @@ export interface FileRouteTypes {
     | '/udhaar'
     | '/dev/ui'
     | '/products/categories'
+    | '/products/import'
     | '/products/new'
+    | '/products/prices'
     | '/products/suggested'
     | '/settings/printer'
     | '/stock/count'
@@ -234,7 +254,9 @@ export interface FileRouteTypes {
     | '/udhaar'
     | '/dev/ui'
     | '/products/categories'
+    | '/products/import'
     | '/products/new'
+    | '/products/prices'
     | '/products/suggested'
     | '/settings/printer'
     | '/stock/count'
@@ -256,7 +278,9 @@ export interface FileRouteTypes {
     | '/udhaar'
     | '/dev/ui'
     | '/products/categories'
+    | '/products/import'
     | '/products/new'
+    | '/products/prices'
     | '/products/suggested'
     | '/settings/printer'
     | '/stock/count'
@@ -279,7 +303,9 @@ export interface RootRouteChildren {
   UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
   ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
+  ProductsImportRoute: typeof ProductsImportRoute;
   ProductsNewRoute: typeof ProductsNewRoute;
+  ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
   StockCountRoute: typeof StockCountRoute;
@@ -376,11 +402,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsCategoriesRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/products/import': {
+      id: '/products/import';
+      path: '/products/import';
+      fullPath: '/products/import';
+      preLoaderRoute: typeof ProductsImportRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/products/new': {
       id: '/products/new';
       path: '/products/new';
       fullPath: '/products/new';
       preLoaderRoute: typeof ProductsNewRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/prices': {
+      id: '/products/prices';
+      path: '/products/prices';
+      fullPath: '/products/prices';
+      preLoaderRoute: typeof ProductsPricesRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/products/suggested': {
@@ -447,7 +487,9 @@ const rootRouteChildren: RootRouteChildren = {
   UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
   ProductsCategoriesRoute: ProductsCategoriesRoute,
+  ProductsImportRoute: ProductsImportRoute,
   ProductsNewRoute: ProductsNewRoute,
+  ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   StockCountRoute: StockCountRoute,

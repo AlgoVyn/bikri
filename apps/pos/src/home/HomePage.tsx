@@ -150,14 +150,9 @@ export function HomePage() {
                 <Link to="/products/new" className={buttonPrimary}>
                   {t('home.add_product')}
                 </Link>
-                <button
-                  type="button"
-                  className={buttonQuiet}
-                  disabled
-                  title={t('common.coming_soon')}
-                >
+                <Link to="/products/import" className={buttonQuiet}>
                   {t('home.import')}
-                </button>
+                </Link>
                 <Link to="/products/suggested" className={buttonQuiet}>
                   {t('home.suggested')}
                 </Link>
