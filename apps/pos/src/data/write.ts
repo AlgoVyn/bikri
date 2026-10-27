@@ -224,6 +224,7 @@ export async function writeAction<T>(
           kind: 'delete',
           row_id: id,
           base_rev: existing.rev,
+          updated_by: actor,
         });
       },
     };
