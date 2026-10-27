@@ -646,19 +646,6 @@
     "view_cart_one": "Cart dekhein · 1 cheez",
     "walk_in": "Aam gahak"
   },
-  "settings": {
-    "more": "Dukaan, staff, raseed aur baqi settings",
-    "printer_hint": "Is device ka raseed printer aur cash daraz",
-    "sync_hint": "Haalat, baqi tabdeeliyan aur takraao",
-    "devices_hint": "Till shamil karein, codes, device mansookh karein",
-    "this_device": "Yeh device",
-    "leave": "Yeh dukaan chhorein",
-    "leave_hint": "Is browser se yeh dukaan hatata hai; device mansookh nahin karta.",
-    "admin_device": "Admin device",
-    "till_device": "Till",
-    "backup": "Backup aur export",
-    "backup_hint": "Is dukan ki mukammal copy download karein"
-  },
   "setup": {
     "add_one": "Aik product shamil karein",
     "address": "Pata",

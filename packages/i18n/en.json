@@ -646,19 +646,6 @@
     "view_cart_one": "View cart · 1 item",
     "walk_in": "Walk-in customer"
   },
-  "settings": {
-    "more": "Shop, staff, receipt and other settings",
-    "printer_hint": "Receipt printer and cash drawer for this device",
-    "sync_hint": "Status, waiting changes and conflicts",
-    "devices_hint": "Add tills, codes and revoke devices",
-    "this_device": "This device",
-    "leave": "Leave this shop",
-    "leave_hint": "Removes this shop from this browser; it does not revoke the device.",
-    "admin_device": "Admin device",
-    "till_device": "Till",
-    "backup": "Backup & export",
-    "backup_hint": "Download a full copy of this shop"
-  },
   "setup": {
     "add_one": "Add one product",
     "address": "Address",

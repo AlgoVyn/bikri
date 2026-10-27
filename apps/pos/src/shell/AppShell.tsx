@@ -6,6 +6,7 @@ import { MoreIcon, SearchIcon } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
@@ -27,7 +28,7 @@ const navLink =
   'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted aria-[current=page]:text-primary lg:flex-none lg:py-1.5';
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const toast = useToast();
@@ -46,6 +47,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.title = t('common.app_title');
   }, [t]);
+
+  // Device-level display preferences (screens/17).
+  useEffect(() => {
+    let alive = true;
+    void import('./devicePrefs.ts').then(async (module) => {
+      const prefs = await module.loadDevicePrefs(getDb());
+      if (alive) module.applyDevicePrefs(prefs, i18n.language);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [i18n.language]);
 
   // Warm the lazily loaded sale-completion screen as soon as the shell is up, so the first
   // offline sale on a freshly loaded till can still show "Sale complete" (D-114).
