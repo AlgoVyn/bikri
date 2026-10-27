@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as AdminRouteImport } from './routes/admin.tsx';
-import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
@@ -26,6 +25,7 @@ import { Route as ProductsImportRouteImport } from './routes/products/import.tsx
 import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as ReportsIndexRouteImport } from './routes/reports/index.tsx';
 import { Route as SalesIndexRouteImport } from './routes/sales/index.tsx';
 import { Route as SalesIdRouteImport } from './routes/sales/$id.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
@@ -63,11 +63,6 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/admin.lazy.tsx').then((d) => d.Route));
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any);
 const SellRoute = SellRouteImport.update({
   id: '/sell',
   path: '/sell',
@@ -141,6 +136,13 @@ const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
   path: '/products/suggested',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/reports/index.lazy.tsx').then((d) => d.Route),
+);
 const SalesIndexRoute = SalesIndexRouteImport.update({
   id: '/sales/',
   path: '/sales/',
@@ -281,7 +283,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -303,6 +304,7 @@ export interface FileRoutesByFullPath {
   '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/reports/': typeof ReportsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
   '/suppliers/': typeof SuppliersIndexRoute;
@@ -320,7 +322,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -341,6 +342,7 @@ export interface FileRoutesByTo {
   '/day-close': typeof DayCloseIndexRoute;
   '/expenses': typeof ExpensesIndexRoute;
   '/products': typeof ProductsIndexRoute;
+  '/reports': typeof ReportsIndexRoute;
   '/sales': typeof SalesIndexRoute;
   '/settings': typeof SettingsIndexRoute;
   '/suppliers': typeof SuppliersIndexRoute;
@@ -360,7 +362,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -382,6 +383,7 @@ export interface FileRoutesById {
   '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/reports/': typeof ReportsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
   '/suppliers/': typeof SuppliersIndexRoute;
@@ -402,7 +404,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
-    | '/reports'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -424,6 +425,7 @@ export interface FileRouteTypes {
     | '/day-close/'
     | '/expenses/'
     | '/products/'
+    | '/reports/'
     | '/sales/'
     | '/settings/'
     | '/suppliers/'
@@ -441,7 +443,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/reports'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -462,6 +463,7 @@ export interface FileRouteTypes {
     | '/day-close'
     | '/expenses'
     | '/products'
+    | '/reports'
     | '/sales'
     | '/settings'
     | '/suppliers'
@@ -480,7 +482,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
-    | '/reports'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -502,6 +503,7 @@ export interface FileRouteTypes {
     | '/day-close/'
     | '/expenses/'
     | '/products/'
+    | '/reports/'
     | '/sales/'
     | '/settings/'
     | '/suppliers/'
@@ -521,7 +523,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
   AdminRoute: typeof AdminRouteWithChildren;
-  ReportsRoute: typeof ReportsRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
   DevUiRoute: typeof DevUiRoute;
@@ -541,6 +542,7 @@ export interface RootRouteChildren {
   DayCloseIndexRoute: typeof DayCloseIndexRoute;
   ExpensesIndexRoute: typeof ExpensesIndexRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
+  ReportsIndexRoute: typeof ReportsIndexRoute;
   SalesIndexRoute: typeof SalesIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
   SuppliersIndexRoute: typeof SuppliersIndexRoute;
@@ -571,13 +573,6 @@ declare module '@tanstack/react-router' {
       path: '/admin';
       fullPath: '/admin';
       preLoaderRoute: typeof AdminRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/reports': {
-      id: '/reports';
-      path: '/reports';
-      fullPath: '/reports';
-      preLoaderRoute: typeof ReportsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sell': {
@@ -669,6 +664,13 @@ declare module '@tanstack/react-router' {
       path: '/products/suggested';
       fullPath: '/products/suggested';
       preLoaderRoute: typeof ProductsSuggestedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/reports/': {
+      id: '/reports/';
+      path: '/reports';
+      fullPath: '/reports/';
+      preLoaderRoute: typeof ReportsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sales/': {
@@ -867,7 +869,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
-  ReportsRoute: ReportsRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
   DevUiRoute: DevUiRoute,
@@ -887,6 +888,7 @@ const rootRouteChildren: RootRouteChildren = {
   DayCloseIndexRoute: DayCloseIndexRoute,
   ExpensesIndexRoute: ExpensesIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
   SalesIndexRoute: SalesIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   SuppliersIndexRoute: SuppliersIndexRoute,

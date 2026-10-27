@@ -26,7 +26,7 @@ function inRange(row: SyncedRow, range: ReportRange): boolean {
 }
 
 /** 07 §1: profit uses revenue ex-tax and ex-rounding. */
-function lineRevenue(line: SyncedRow, taxInclusive: boolean): number {
+export function lineRevenue(line: SyncedRow, taxInclusive: boolean): number {
   return (
     n(line.net) -
     n(line.bill_discount_alloc) -
