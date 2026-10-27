@@ -655,7 +655,9 @@
     "leave": "Yeh dukaan chhorein",
     "leave_hint": "Is browser se yeh dukaan hatata hai; device mansookh nahin karta.",
     "admin_device": "Admin device",
-    "till_device": "Till"
+    "till_device": "Till",
+    "backup": "Backup aur export",
+    "backup_hint": "Is dukan ki mukammal copy download karein"
   },
   "setup": {
     "add_one": "Aik product shamil karein",

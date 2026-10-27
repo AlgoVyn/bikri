@@ -5,7 +5,9 @@ import {
   newId,
 } from '@bikri/core';
 import type { BikriDb, SyncedRow } from '@bikri/db';
+import type { DayCloseReceipt } from '@bikri/printer';
 import type { Table } from 'dexie';
+import { csvCell, rupeesCsv2 } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
@@ -271,4 +273,78 @@ export async function queueDayClosePrint(
     created_at: now,
   });
   return id;
+}
+
+/** CSV of one closed drawer; amounts in rupees with two decimals (screens/15). */
+export function dayCloseCsv(
+  receipt: DayCloseReceipt,
+  businessDateValue: string,
+  timeZone: string,
+): string {
+  const when = (at: number): string =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .format(at)
+      .replace(', ', ' ');
+  const header = [
+    'date',
+    'device',
+    'cashier',
+    'period_start',
+    'period_end',
+    'opening',
+    'cash_sales',
+    'udhaar_in',
+    'pay_ins',
+    'supplier_in',
+    'refunds',
+    'expenses',
+    'supplier_out',
+    'pay_outs',
+    'expected',
+    'counted',
+    'difference',
+    'card',
+    'bank',
+    'udhaar_given',
+    'bills',
+    'refunds_count',
+    'note',
+  ];
+  const row = [
+    businessDateValue,
+    receipt.deviceName,
+    receipt.staffName ?? '',
+    when(receipt.periodStart),
+    when(receipt.periodEnd),
+    rupeesCsv2(receipt.openingCash),
+    rupeesCsv2(receipt.cashSales),
+    rupeesCsv2(receipt.udhaarCashIn),
+    rupeesCsv2(receipt.payIns),
+    rupeesCsv2(receipt.supplierCashIn),
+    rupeesCsv2(receipt.cashRefunds),
+    rupeesCsv2(receipt.cashExpenses),
+    rupeesCsv2(receipt.supplierCashOut),
+    rupeesCsv2(receipt.payOuts),
+    rupeesCsv2(receipt.expectedCash),
+    rupeesCsv2(receipt.countedCash),
+    rupeesCsv2(receipt.difference),
+    rupeesCsv2(receipt.cardTotal),
+    rupeesCsv2(receipt.bankTotal),
+    rupeesCsv2(receipt.udhaarGiven),
+    String(receipt.bills),
+    String(receipt.refunds),
+    receipt.note,
+  ];
+  return `${[header.join(',')]
+    .concat([row.map(csvCell).join(',')])
+    .join('\r\n')}\r\n`;
 }

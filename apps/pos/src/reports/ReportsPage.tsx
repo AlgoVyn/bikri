@@ -4,13 +4,16 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
+import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { type ReportBundle, reportBundle } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { downloadText } from '../lib/download.ts';
+import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { DailyChart, PaymentDonut } from './charts.tsx';
 import {
@@ -22,6 +25,7 @@ import {
   percentText,
   qtyText,
 } from './format.ts';
+import { type ReportFileMeta, reportPdf, reportPng } from './reportFile.ts';
 
 type Preset =
   | 'today'
@@ -58,6 +62,7 @@ const field =
 /** Reports for one range, computed on the device (screens/16). */
 export function ReportsPage() {
   const { t, i18n } = useTranslation();
+  const toast = useToast();
   const { role, can, support } = useCurrentStaff();
   const limited = role === 'cashier' && !support;
   const cost = can('cost.view');
@@ -90,7 +95,14 @@ export function ReportsPage() {
     const devices = (await db.devices.toArray())
       .filter((device) => !device.deleted_at)
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    return { bundle, today, timeZone, devices };
+    const shop = await db.shop.get('shop');
+    return {
+      bundle,
+      today,
+      timeZone,
+      devices,
+      shopName: String(shop?.name ?? ''),
+    };
   }, [preset, custom.from, custom.to, deviceId, limited]);
 
   if (!can('report.view'))
@@ -114,12 +126,73 @@ export function ReportsPage() {
 
   const bundle = data.bundle;
   const lang = i18n.language;
+  const meta: ReportFileMeta = {
+    shopName: data.shopName,
+    from: bundle.range.from,
+    to: bundle.range.to,
+    generatedAt: Date.now(),
+    lang,
+    showProfit: cost,
+    bundle,
+    labels: {
+      title: t('office.reports.title'),
+      range: t('office.reports.pdf_range'),
+      generated: t('office.reports.pdf_generated'),
+      sold: t('office.reports.sold'),
+      bills: t('office.reports.bills'),
+      avgBill: t('office.reports.avg_bill'),
+      grossProfit: t('office.reports.gross_profit'),
+      expenses: t('office.reports.expenses'),
+      netProfit: t('office.reports.net_profit'),
+      margin: t('office.reports.margin'),
+      tax: t('office.reports.tax_collected'),
+      paymentMix: t('office.reports.payment_mix'),
+      chartSold: t('office.reports.chart_sold'),
+      chartProfit: t('office.reports.chart_profit'),
+      udhaarGiven: t('office.reports.udhaar_given'),
+      udhaarReceived: t('office.reports.udhaar_received'),
+      methods: {
+        cash: t('payment.cash'),
+        card: t('payment.card'),
+        bank_wallet: t('payment.bank_wallet'),
+        udhaar: t('payment.udhaar'),
+      },
+    },
+  };
   const exportCurrent = () => {
     const csv = reportCsv(tab, bundle, { includeCost: cost });
     downloadText(
       `bikri-report-${tab}-${bundle.range.from}-${bundle.range.to}.csv`,
       csv,
     );
+  };
+  const exportPdf = async () => {
+    downloadBlob(
+      await reportPdf(meta),
+      `bikri-report-${bundle.range.from}-${bundle.range.to}.pdf`,
+    );
+  };
+  const share = async () => {
+    try {
+      const png = await reportPng(meta);
+      const file = new File(
+        [png],
+        `bikri-report-${bundle.range.from}-${bundle.range.to}.png`,
+        { type: 'image/png' },
+      );
+      if (navigator.canShare?.({ files: [file] }))
+        await navigator.share({
+          files: [file],
+          title: t('office.reports.title'),
+        });
+      else {
+        downloadBlob(png, file.name);
+        toast.push(t('done.image_saved'));
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError')
+        toast.push(t('done.share_failed'), 'error');
+    }
   };
 
   return (
@@ -147,9 +220,11 @@ export function ReportsPage() {
           </select>
         </label>
         {exportable ? (
-          <button type="button" className={buttonQuiet} onClick={exportCurrent}>
-            {t('office.reports.export_csv')}
-          </button>
+          <ExportMenu
+            onCsv={exportCurrent}
+            onPdf={() => void exportPdf()}
+            onShare={() => void share()}
+          />
         ) : null}
       </div>
 

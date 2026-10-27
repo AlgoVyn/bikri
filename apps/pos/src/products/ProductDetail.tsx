@@ -14,6 +14,7 @@ import {
   ProductInUseError,
   productDetail,
   removeProduct,
+  stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { downloadText } from '../lib/download.ts';
@@ -76,21 +77,18 @@ export function ProductDetailPage({
   const totalRevenue = detail.last14.reduce((s, d) => s + d.revenue, 0);
 
   const exportHistory = () => {
-    const lines = ['date,reason,qty,balance_after,by'];
-    for (const h of detail.history) {
-      lines.push(
-        [
-          timeFmt.format(Number(h.movement.created_at)),
-          String(h.movement.reason_code),
-          formatQtyFromMilli(Number(h.movement.qty_delta_milli), unit),
-          formatQtyFromMilli(h.balanceAfter, unit),
-          h.staffName.replace(/[",]/gu, ' '),
-        ].join(','),
-      );
-    }
     downloadText(
       `stock-history-${String(p.sku)}.csv`,
-      `${lines.join('\r\n')}\r\n`,
+      stockHistoryCsv(
+        detail.history.map((h) => ({
+          at: Number(h.movement.created_at),
+          reason: String(h.movement.reason_code),
+          qty: formatQtyFromMilli(Number(h.movement.qty_delta_milli), unit),
+          balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
+          by: h.staffName,
+        })),
+        'Asia/Karachi',
+      ),
     );
   };
 
