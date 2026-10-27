@@ -97,6 +97,8 @@ export type OutboxEntry = {
   row?: OpRow;
   base_rev?: number;
   changed_fields?: string[];
+  /** Delete ops: who deleted (the server checks the permission, D-104). */
+  updated_by?: string | null;
   created_at: number;
   status: OutboxStatus;
   attempts: number;

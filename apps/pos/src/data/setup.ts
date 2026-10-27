@@ -1,4 +1,4 @@
-import { hashPin, type PinHash } from '@bikri/core';
+import { hashPin, newId, type PinHash } from '@bikri/core';
 import {
   type BikriDb,
   EXPENSE_CATEGORY_TEMPLATES,
@@ -100,12 +100,16 @@ export async function finishSetup(
   if (!branch || !device) throw new Error('enrol this till first');
   const logo = options.logo ?? null;
   const logoKey = logo ? `shop/logo-${logo.sha256}.png` : null;
+  // Every row of the wizard is written by the new owner: the server accepts staff, shop and branch
+  // changes only from an owner (05 §5), including the first one (D-106).
+  const ownerId = newId(now);
 
   const result = await writeAction(
     db,
     async (w) => {
       if (await w.table('shop').get('shop')) throw new SetupAlreadyDoneError();
       const owner = await w.create('staff', {
+        id: ownerId,
         name: input.owner.name.trim(),
         role: 'owner',
         ...pin,
@@ -178,7 +182,7 @@ export async function finishSetup(
       await w.table('kv').delete('setup_draft');
       return { owner, product };
     },
-    { now, actor: null },
+    { now, actor: ownerId },
   );
   return result;
 }

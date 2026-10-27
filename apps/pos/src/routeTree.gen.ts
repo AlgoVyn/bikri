@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
+import { Route as AdminRouteImport } from './routes/admin.tsx';
 import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
 import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
@@ -18,6 +19,8 @@ import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
+import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
+import { Route as AdminBackupsRouteImport } from './routes/admin/backups.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
 import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
@@ -26,8 +29,13 @@ import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
 import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsDevicesRouteImport } from './routes/settings/devices.tsx';
 import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as SettingsSyncRouteImport } from './routes/settings/sync.tsx';
 import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
+import { Route as AdminTenantsIndexRouteImport } from './routes/admin/tenants/index.tsx';
+import { Route as AdminTenantsIdRouteImport } from './routes/admin/tenants/$id.tsx';
+import { Route as AdminTenantsNewRouteImport } from './routes/admin/tenants/new.tsx';
 import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
 import { Route as ProductsIdAdjustRouteImport } from './routes/products/$id.adjust.tsx';
 import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
@@ -42,6 +50,11 @@ const SplatRoute = SplatRouteImport.update({
   path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any);
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/admin.lazy.tsx').then((d) => d.Route));
 const ExpensesRoute = ExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
@@ -77,6 +90,20 @@ const UdhaarRoute = UdhaarRouteImport.update({
   path: '/udhaar',
   getParentRoute: () => rootRouteImport,
 } as any);
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/index.lazy.tsx').then((d) => d.Route),
+);
+const AdminBackupsRoute = AdminBackupsRouteImport.update({
+  id: '/backups',
+  path: '/backups',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/backups.lazy.tsx').then((d) => d.Route),
+);
 const DevUiRoute = DevUiRouteImport.update({
   id: '/dev/ui',
   path: '/dev/ui',
@@ -117,9 +144,19 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
+  id: '/settings/devices',
+  path: '/settings/devices',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   id: '/settings/printer',
   path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsSyncRoute = SettingsSyncRouteImport.update({
+  id: '/settings/sync',
+  path: '/settings/sync',
   getParentRoute: () => rootRouteImport,
 } as any);
 const StockCountRoute = StockCountRouteImport.update({
@@ -127,6 +164,27 @@ const StockCountRoute = StockCountRouteImport.update({
   path: '/stock/count',
   getParentRoute: () => rootRouteImport,
 } as any);
+const AdminTenantsIndexRoute = AdminTenantsIndexRouteImport.update({
+  id: '/tenants/',
+  path: '/tenants/',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/tenants/index.lazy.tsx').then((d) => d.Route),
+);
+const AdminTenantsIdRoute = AdminTenantsIdRouteImport.update({
+  id: '/tenants/$id',
+  path: '/tenants/$id',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/tenants/$id.lazy.tsx').then((d) => d.Route),
+);
+const AdminTenantsNewRoute = AdminTenantsNewRouteImport.update({
+  id: '/tenants/new',
+  path: '/tenants/new',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/tenants/new.lazy.tsx').then((d) => d.Route),
+);
 const ProductsIdIndexRoute = ProductsIdIndexRouteImport.update({
   id: '/products/$id/',
   path: '/products/$id/',
@@ -146,6 +204,7 @@ const ProductsIdEditRoute = ProductsIdEditRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/admin': typeof AdminRouteWithChildren;
   '/expenses': typeof ExpensesRoute;
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
@@ -153,18 +212,25 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
+  '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/admin/': typeof AdminIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/admin/tenants/$id': typeof AdminTenantsIdRoute;
+  '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesByTo {
@@ -177,24 +243,32 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
+  '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/admin': typeof AdminIndexRoute;
   '/products': typeof ProductsIndexRoute;
   '/settings': typeof SettingsIndexRoute;
+  '/admin/tenants/$id': typeof AdminTenantsIdRoute;
+  '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/admin/tenants': typeof AdminTenantsIndexRoute;
   '/products/$id': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/admin': typeof AdminRouteWithChildren;
   '/expenses': typeof ExpensesRoute;
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
@@ -202,18 +276,25 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
+  '/admin/backups': typeof AdminBackupsRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/devices': typeof SettingsDevicesRoute;
   '/settings/printer': typeof SettingsPrinterRoute;
+  '/settings/sync': typeof SettingsSyncRoute;
   '/stock/count': typeof StockCountRoute;
+  '/admin/': typeof AdminIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
+  '/admin/tenants/$id': typeof AdminTenantsIdRoute;
+  '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRouteTypes {
@@ -221,6 +302,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/admin'
     | '/expenses'
     | '/reports'
     | '/sales'
@@ -228,18 +310,25 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
+    | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
+    | '/admin/'
     | '/products/'
     | '/settings/'
+    | '/admin/tenants/$id'
+    | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/admin/tenants/'
     | '/products/$id/';
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -252,23 +341,31 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
+    | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
+    | '/admin'
     | '/products'
     | '/settings'
+    | '/admin/tenants/$id'
+    | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/admin/tenants'
     | '/products/$id';
   id:
     | '__root__'
     | '/'
     | '/$'
+    | '/admin'
     | '/expenses'
     | '/reports'
     | '/sales'
@@ -276,24 +373,32 @@ export interface FileRouteTypes {
     | '/setup'
     | '/suppliers'
     | '/udhaar'
+    | '/admin/backups'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/settings/devices'
     | '/settings/printer'
+    | '/settings/sync'
     | '/stock/count'
+    | '/admin/'
     | '/products/'
     | '/settings/'
+    | '/admin/tenants/$id'
+    | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
+    | '/admin/tenants/'
     | '/products/$id/';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
+  AdminRoute: typeof AdminRouteWithChildren;
   ExpensesRoute: typeof ExpensesRoute;
   ReportsRoute: typeof ReportsRoute;
   SalesRoute: typeof SalesRoute;
@@ -307,7 +412,9 @@ export interface RootRouteChildren {
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  SettingsDevicesRoute: typeof SettingsDevicesRoute;
   SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  SettingsSyncRoute: typeof SettingsSyncRoute;
   StockCountRoute: typeof StockCountRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
@@ -330,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/$';
       fullPath: '/$';
       preLoaderRoute: typeof SplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/admin': {
+      id: '/admin';
+      path: '/admin';
+      fullPath: '/admin';
+      preLoaderRoute: typeof AdminRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/expenses': {
@@ -380,6 +494,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/udhaar';
       preLoaderRoute: typeof UdhaarRouteImport;
       parentRoute: typeof rootRouteImport;
+    };
+    '/admin/': {
+      id: '/admin/';
+      path: '/';
+      fullPath: '/admin/';
+      preLoaderRoute: typeof AdminIndexRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
+    '/admin/backups': {
+      id: '/admin/backups';
+      path: '/backups';
+      fullPath: '/admin/backups';
+      preLoaderRoute: typeof AdminBackupsRouteImport;
+      parentRoute: typeof AdminRoute;
     };
     '/dev/ui': {
       id: '/dev/ui';
@@ -437,11 +565,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/devices': {
+      id: '/settings/devices';
+      path: '/settings/devices';
+      fullPath: '/settings/devices';
+      preLoaderRoute: typeof SettingsDevicesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/settings/printer': {
       id: '/settings/printer';
       path: '/settings/printer';
       fullPath: '/settings/printer';
       preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/sync': {
+      id: '/settings/sync';
+      path: '/settings/sync';
+      fullPath: '/settings/sync';
+      preLoaderRoute: typeof SettingsSyncRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/stock/count': {
@@ -450,6 +592,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/stock/count';
       preLoaderRoute: typeof StockCountRouteImport;
       parentRoute: typeof rootRouteImport;
+    };
+    '/admin/tenants/': {
+      id: '/admin/tenants/';
+      path: '/tenants';
+      fullPath: '/admin/tenants/';
+      preLoaderRoute: typeof AdminTenantsIndexRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
+    '/admin/tenants/$id': {
+      id: '/admin/tenants/$id';
+      path: '/tenants/$id';
+      fullPath: '/admin/tenants/$id';
+      preLoaderRoute: typeof AdminTenantsIdRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
+    '/admin/tenants/new': {
+      id: '/admin/tenants/new';
+      path: '/tenants/new';
+      fullPath: '/admin/tenants/new';
+      preLoaderRoute: typeof AdminTenantsNewRouteImport;
+      parentRoute: typeof AdminRoute;
     };
     '/products/$id/': {
       id: '/products/$id/';
@@ -475,9 +638,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminBackupsRoute: typeof AdminBackupsRoute;
+  AdminIndexRoute: typeof AdminIndexRoute;
+  AdminTenantsIdRoute: typeof AdminTenantsIdRoute;
+  AdminTenantsNewRoute: typeof AdminTenantsNewRoute;
+  AdminTenantsIndexRoute: typeof AdminTenantsIndexRoute;
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBackupsRoute: AdminBackupsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminTenantsIdRoute: AdminTenantsIdRoute,
+  AdminTenantsNewRoute: AdminTenantsNewRoute,
+  AdminTenantsIndexRoute: AdminTenantsIndexRoute,
+};
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  AdminRoute: AdminRouteWithChildren,
   ExpensesRoute: ExpensesRoute,
   ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
@@ -491,7 +673,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsNewRoute: ProductsNewRoute,
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
+  SettingsDevicesRoute: SettingsDevicesRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
+  SettingsSyncRoute: SettingsSyncRoute,
   StockCountRoute: StockCountRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,

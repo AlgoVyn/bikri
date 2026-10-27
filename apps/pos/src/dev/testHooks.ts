@@ -5,6 +5,7 @@ import { setKv } from '../data/kv.ts';
 import { jobReceipt } from '../print/receiptFiles.ts';
 import { beepCount } from '../sell/beep.ts';
 import {
+  finishSetupHere,
   resetDevDb,
   seedCustomer,
   seedManyProducts,
@@ -18,6 +19,9 @@ declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
+      finishSetupHere: () => Promise<void>;
+      /** Push + pull now (T-030 engine). */
+      syncNow: () => Promise<void>;
       reset: () => Promise<void>;
       unlockAs: typeof unlockAs;
       seedTodaySales: () => Promise<void>;
@@ -38,6 +42,8 @@ declare global {
 export function installTestHooks(): void {
   window.__bikriTest = {
     seedReadyShop,
+    finishSetupHere: () => finishSetupHere(),
+    syncNow: async () => (await import('../sync/engine.ts')).syncNow(),
     reset: resetDevDb,
     unlockAs,
     seedTodaySales,

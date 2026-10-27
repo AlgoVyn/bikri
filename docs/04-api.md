@@ -43,6 +43,12 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/admin/tenants/:id/reset-owner-pin` | Access | Set a new owner PIN when no other owner can |
 | GET | `/admin/backups` | Access | List backup objects in R2 |
 | GET | `/admin/backups/*key` | Access | Download a backup |
+| GET | `/admin/usage` | Access | Account overview: tenants by status, last backup, shops over 80 % of their budget (D-105) |
+| GET | `/admin/slug-available?slug=` | Access | Whether a slug is free (D-105) |
+| GET | `/admin/tenants/:id/devices` | Access | A shop's devices (D-105) |
+| POST | `/admin/tenants/:id/devices/:deviceId/revoke` | Access | Revoke one of a shop's devices (D-105) |
+| GET | `/admin/tenants/:id/owners` | Access | A shop's owner staff, for PIN reset (D-105) |
+| GET | `/admin/backups/download?key=` | Access | Download a backup by query key (D-105) |
 
 ## 2. Conventions
 
@@ -93,8 +99,10 @@ Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNI
 ### 3.2 `POST /api/devices/enrol`
 Request:
 ```json
-{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "0.1.0" }
+{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "0.1.0", "device_name": "Counter 2" }
 ```
+`device_name` is optional (≤ 40); without it the device gets the name on the code (D-107). The response also carries `tenant_status`, `support` and `poll_after_ms` (D-105).
+
 Response `201`:
 ```json
 {

@@ -260,7 +260,7 @@ test.describe('Update prices (T-023)', () => {
       window.__bikriTest?.seedProducts([{ name: 'Cover', price: 50000 }]),
     );
     await page.getByLabel('Language').selectOption('ur');
-    await page.getByLabel('تبدیلی').selectOption('set');
+    await page.getByRole('main').getByLabel('تبدیلی').selectOption('set');
     await page.getByLabel('روپے', { exact: true }).fill('600');
     await page.getByRole('button', { name: 'پیش نظارہ' }).click();
     await expect(page.getByTestId('price-row')).toContainText('Rs 600');
@@ -270,5 +270,24 @@ test.describe('Update prices (T-023)', () => {
       .poll(async () => (await idbAll<Row>(page, 'products'))[0]?.price)
       .toBe(60000);
     expect(products).toHaveLength(1);
+  });
+});
+
+test.describe('Import column mapper (manual run-through of M1)', () => {
+  test('Roman Urdu headers auto-match', async ({ page }) => {
+    await openReadyShop(page, '/bikri/products/import');
+    await chooseFile(
+      page,
+      csvFile([
+        'Naam,Qeemat (Rs),Laagat,Miqdar,Barcode',
+        'Chai,250,200,10,8961000000011',
+      ]),
+    );
+    await expect(page.getByText('products.csv: 1 rows')).toBeVisible();
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('0');
+    await expect(page.getByLabel('Price', { exact: true })).toHaveValue('1');
+    await expect(page.getByLabel('Cost', { exact: true })).toHaveValue('2');
+    await expect(page.getByLabel('Stock', { exact: true })).toHaveValue('3');
+    await expect(page.getByLabel('Barcode', { exact: true })).toHaveValue('4');
   });
 });

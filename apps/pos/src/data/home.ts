@@ -8,7 +8,36 @@ export type AttentionItem =
   | { kind: 'failed_prints'; count: number }
   | { kind: 'conflicts'; count: number }
   | { kind: 'held_expiring'; count: number }
-  | { kind: 'day_not_closed'; date: string };
+  | { kind: 'day_not_closed'; date: string }
+  | { kind: 'sync_stale'; days: number; severe: boolean }
+  | { kind: 'sync_pending_old'; since: number }
+  | { kind: 'clock_wrong' };
+
+const DAY = 86_400_000;
+export const CLOCK_WARN_MS = 5 * 60_000;
+
+/** Sync warnings for an enrolled till (03 §4.4, §6, §7; T-037). */
+export async function syncAttention(
+  db: BikriDb,
+  now = Date.now(),
+): Promise<AttentionItem[]> {
+  const kv = async <T>(key: string) =>
+    (await db.kv.get(key))?.value as T | undefined;
+  if (!(await kv<string>('device_token'))) return [];
+  const items: AttentionItem[] = [];
+  const skew = (await kv<number>('clock_skew_ms')) ?? 0;
+  if (Math.abs(skew) > CLOCK_WARN_MS) items.push({ kind: 'clock_wrong' });
+  const last =
+    (await kv<number>('last_sync_at')) ?? (await kv<number>('enrolled_at'));
+  if (last !== undefined) {
+    const days = Math.floor((now - last) / DAY);
+    if (days >= 7) items.push({ kind: 'sync_stale', days, severe: days >= 25 });
+  }
+  const oldest = await db.outbox.where('status').equals('pending').first();
+  if (oldest && now - oldest.created_at > DAY)
+    items.push({ kind: 'sync_pending_old', since: oldest.created_at });
+  return items;
+}
 
 /** Products with track_stock = 1 at or below their low-stock alert (min 0 = off; screens/04 AC 4). */
 export async function lowStockCount(db: BikriDb): Promise<number> {
@@ -34,7 +63,7 @@ export async function attentionItems(
     now?: number;
   },
 ): Promise<AttentionItem[]> {
-  const items: AttentionItem[] = [];
+  const items: AttentionItem[] = await syncAttention(db, opts.now);
   const low = await lowStockCount(db);
   if (low > 0) items.push({ kind: 'low_stock', count: low });
   const promises = (await db.promises.toArray()).filter(
@@ -55,7 +84,9 @@ export async function attentionItems(
   const failed = await db.print_jobs.where('status').equals('failed').count();
   if (failed > 0) items.push({ kind: 'failed_prints', count: failed });
   if (opts.isOwner) {
-    const conflicts = await db.sync_conflicts.count();
+    const conflicts = (await db.sync_conflicts.toArray()).filter(
+      (c) => c.resolution === 'needs_owner',
+    ).length;
     if (conflicts > 0) items.push({ kind: 'conflicts', count: conflicts });
   }
   const held = await heldExpiringCount(db, opts.now);

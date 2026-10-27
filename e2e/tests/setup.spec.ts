@@ -246,3 +246,48 @@ test.describe('setup wizard (T-012)', () => {
     expect(shop.phone).toBe('+924235761234');
   });
 });
+
+test.describe('setup wizard fixes (manual run-through of M1)', () => {
+  test('required fields are marked, the receipt shows the address once, Import opens the import page after Finish', async ({
+    page,
+  }) => {
+    await page.goto('/bikri/');
+    await expect(page).toHaveURL(/\/bikri\/setup$/);
+    await page.getByRole('button', { name: 'Start' }).click();
+
+    // Name, phone and address are required (screens/01) and say so before Next.
+    for (const label of ['Shop name', 'Phone', 'Address']) {
+      const field = page.locator('label', { hasText: label }).first();
+      await expect(field).toContainText('*');
+      await expect(field).toContainText('(required)');
+    }
+
+    await page.getByLabel('Shop name').fill('Algovyn Mobiles');
+    await page.getByLabel('Phone').fill('0300-1234567');
+    await page.getByLabel('Address').fill('Shop 12, Hall Road, Lahore');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByLabel('Your name').fill('Adnan');
+    await typePin(page, 'PIN', '4826');
+    await typePin(page, 'Confirm PIN', '4826');
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Receipt and tax' }),
+    ).toBeVisible();
+    const preview = page.getByTestId('receipt-preview');
+    await expect(preview).toContainText('Shop 12, Hall Road, Lahore');
+    const text = (await preview.textContent()) ?? '';
+    expect(text.split('Shop 12, Hall Road, Lahore')).toHaveLength(2);
+    expect(text.split('ALGOVYN MOBILES')).toHaveLength(2);
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'First products' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: /Import a spreadsheet/ }).click();
+    await expect(page).toHaveURL(/\/bikri\/products\/import$/);
+    await expect(
+      page.getByRole('heading', { name: 'Import spreadsheet' }),
+    ).toBeVisible();
+  });
+});

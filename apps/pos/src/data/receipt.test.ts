@@ -67,6 +67,20 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(await loadSaleReceipt(db, 'nope')).toBeNull();
   });
 
+  it('Urdu receipts print Urdu labels; Powered by AlgoVyn stays as is', async () => {
+    const { db, saleId } = await soldShop('rcpt-ur', {
+      receipt_language: 'ur',
+    });
+    const r = await loadSaleReceipt(db, saleId, { reprint: true });
+    const out = text(r as NonNullable<typeof r>);
+    expect(out).toContain('رسید');
+    expect(out).toContain('دوبارہ پرنٹ');
+    expect(out).toContain('کیشیئر');
+    expect(out).not.toContain('SALE RECEIPT');
+    expect(out).not.toContain('Cashier');
+    expect(out).toContain('Powered by AlgoVyn');
+  });
+
   it('AC 3: a reprint carries REPRINT right under the title', async () => {
     const { db, saleId } = await soldShop();
     const r = await loadSaleReceipt(db, saleId, { reprint: true });
