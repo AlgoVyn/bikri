@@ -17,6 +17,7 @@ import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
 import { Route as AdminBackupsRouteImport } from './routes/admin/backups.tsx';
+import { Route as DayCloseIndexRouteImport } from './routes/day-close/index.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 import { Route as ExpensesIndexRouteImport } from './routes/expenses/index.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
@@ -90,6 +91,13 @@ const AdminBackupsRoute = AdminBackupsRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/backups.lazy.tsx').then((d) => d.Route),
+);
+const DayCloseIndexRoute = DayCloseIndexRouteImport.update({
+  id: '/day-close/',
+  path: '/day-close/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/day-close/index.lazy.tsx').then((d) => d.Route),
 );
 const DevUiRoute = DevUiRouteImport.update({
   id: '/dev/ui',
@@ -292,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
@@ -329,6 +338,7 @@ export interface FileRoutesByTo {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin': typeof AdminIndexRoute;
+  '/day-close': typeof DayCloseIndexRoute;
   '/expenses': typeof ExpensesIndexRoute;
   '/products': typeof ProductsIndexRoute;
   '/sales': typeof SalesIndexRoute;
@@ -369,6 +379,7 @@ export interface FileRoutesById {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin/'
+    | '/day-close/'
     | '/expenses/'
     | '/products/'
     | '/sales/'
@@ -447,6 +459,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin'
+    | '/day-close'
     | '/expenses'
     | '/products'
     | '/sales'
@@ -486,6 +499,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin/'
+    | '/day-close/'
     | '/expenses/'
     | '/products/'
     | '/sales/'
@@ -524,6 +538,7 @@ export interface RootRouteChildren {
   SuppliersSupplierIdRoute: typeof SuppliersSupplierIdRouteWithChildren;
   UdhaarCustomerIdRoute: typeof UdhaarCustomerIdRoute;
   UdhaarChaseRoute: typeof UdhaarChaseRoute;
+  DayCloseIndexRoute: typeof DayCloseIndexRoute;
   ExpensesIndexRoute: typeof ExpensesIndexRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
   SalesIndexRoute: typeof SalesIndexRoute;
@@ -592,6 +607,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/backups';
       preLoaderRoute: typeof AdminBackupsRouteImport;
       parentRoute: typeof AdminRoute;
+    };
+    '/day-close/': {
+      id: '/day-close/';
+      path: '/day-close';
+      fullPath: '/day-close/';
+      preLoaderRoute: typeof DayCloseIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     '/dev/ui': {
       id: '/dev/ui';
@@ -862,6 +884,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliersSupplierIdRoute: SuppliersSupplierIdRouteWithChildren,
   UdhaarCustomerIdRoute: UdhaarCustomerIdRoute,
   UdhaarChaseRoute: UdhaarChaseRoute,
+  DayCloseIndexRoute: DayCloseIndexRoute,
   ExpensesIndexRoute: ExpensesIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   SalesIndexRoute: SalesIndexRoute,

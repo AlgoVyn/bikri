@@ -55,6 +55,7 @@ export {
   POWERED_BY,
   type TemplateSettings,
 } from './templates/common.ts';
+export { buildDayClose } from './templates/dayClose.ts';
 export {
   englishReceiptLabels,
   receiptLabelsFor,
@@ -66,6 +67,8 @@ export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
 export { saleBasicInput } from './templates/saleBasicFixture.ts';
 export { buildTestPrint, type TestPrintInput } from './templates/testPrint.ts';
 export type {
+  DayCloseLabels,
+  DayCloseReceipt,
   ReceiptLabels,
   ReceiptLine,
   ReceiptPayment,
