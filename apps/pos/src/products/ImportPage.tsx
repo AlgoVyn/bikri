@@ -315,14 +315,13 @@ function MapColumns({
       <p>{t('import.map_hint', { file, count: rows })}</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {TEMPLATE_COLUMNS.map((field) => (
-          <label
-            key={field}
-            htmlFor={`${base}-${field}`}
-            className="flex flex-col gap-1"
-          >
-            <span className="text-small font-medium">
+          <div key={field} className="flex flex-col gap-1">
+            <label
+              htmlFor={`${base}-${field}`}
+              className="text-small font-medium"
+            >
               {t(`import.field.${field}`)}
-            </span>
+            </label>
             <select
               id={`${base}-${field}`}
               className={selectClass}
@@ -337,7 +336,7 @@ function MapColumns({
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         ))}
       </div>
       {canMatch ? null : (
