@@ -59,7 +59,10 @@ export class FakeServer {
     if (!this.online) throw new TypeError('Failed to fetch');
     const url = new URL(String(input), 'https://algovyn.com');
     const path = url.pathname.replace(/^\/bikri\/api/, '');
-    const body = init.body ? JSON.parse(String(init.body)) : null;
+    const body =
+      typeof init.body === 'string'
+        ? JSON.parse(init.body)
+        : (init.body ?? null);
     const headers = new Headers(init.headers);
     const method = init.method ?? 'GET';
     this.log.push({ method, path, body, headers });

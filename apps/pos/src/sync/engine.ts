@@ -4,7 +4,9 @@
  */
 import type { BikriDb } from '@bikri/db';
 import { getKv, setKv } from '../data/kv.ts';
+import { onLocalWrite } from '../data/write.ts';
 import { deviceToken, OfflineError, SyncHttpError } from './client.ts';
+import { uploadQueued } from './files.ts';
 import { refreshMe } from './me.ts';
 import { pullAll } from './pull.ts';
 import { pushAll } from './push.ts';
@@ -32,6 +34,7 @@ export function syncNow(): Promise<void> {
 }
 
 let current: SyncEngine | null = null;
+onLocalWrite(() => notifyLocalWrite());
 
 export class SyncEngine {
   readonly db: BikriDb;
@@ -110,6 +113,7 @@ export class SyncEngine {
       if (kind !== 'pull') {
         const pushed = await pushAll(this.db);
         serverTime = pushed.serverTime ?? serverTime;
+        await uploadQueued(this.db);
       }
       if (kind !== 'push') {
         const pulled = await pullAll(this.db, (done, total) =>

@@ -13,6 +13,7 @@ import { ApiError } from '../errors.ts';
 import { enrolmentCodeByHash, getTenant } from '../platform/tenants.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { allocateDeviceCode, publicDevice } from '../sync/devices.ts';
+import { supportPayload, tenantStatusPayload } from '../sync/status.ts';
 import type { AppEnv, DeviceRow } from '../types.ts';
 
 export const EnrolBody = z.object({
@@ -144,6 +145,9 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
       device: publicDevice(device),
       token,
       shop_setup_completed: Boolean(shop?.setup_completed_at),
+      tenant_status: tenantStatusPayload(tenant),
+      support: supportPayload(tenant, now),
+      poll_after_ms: tenant.poll_after_ms,
     },
     201,
   );
