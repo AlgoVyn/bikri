@@ -549,7 +549,11 @@
     "stock_out": "ختم",
     "stock_untracked": "ٹریک نہیں",
     "stock_value": "اسٹاک کی مالیت",
-    "title": "مصنوعات"
+    "title": "مصنوعات",
+    "print_label": "لیبل پرنٹ کریں",
+    "select": "منتخب کریں",
+    "print_labels_one": "{{count}} لیبل پرنٹ کریں",
+    "print_labels_other": "{{count}} لیبل پرنٹ کریں"
   },
   "sell": {
     "add_discount": "رعایت شامل کریں",

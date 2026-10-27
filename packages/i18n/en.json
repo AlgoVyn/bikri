@@ -549,7 +549,11 @@
     "stock_out": "Out",
     "stock_untracked": "Not tracked",
     "stock_value": "Stock value",
-    "title": "Products"
+    "title": "Products",
+    "print_label": "Print label",
+    "select": "Select",
+    "print_labels_one": "Print {{count}} label",
+    "print_labels_other": "Print {{count}} labels"
   },
   "sell": {
     "add_discount": "Add discount",

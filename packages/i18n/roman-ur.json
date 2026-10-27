@@ -549,7 +549,11 @@
     "stock_out": "Khatam",
     "stock_untracked": "Track nahin",
     "stock_value": "Stock ki maaliyat",
-    "title": "Products"
+    "title": "Products",
+    "print_label": "Label print karein",
+    "select": "Select",
+    "print_labels_one": "{{count}} label print karein",
+    "print_labels_other": "{{count}} labels print karein"
   },
   "sell": {
     "add_discount": "Discount lagayein",

@@ -13,12 +13,16 @@ export type LabelSettings = {
   size: '50x25' | '38x25' | '40x30' | 'a4';
   showShop: boolean;
   showPrice: boolean;
+  dpi: 203 | 300;
+  start: number;
 };
 
 const DEFAULT: LabelSettings = {
   size: '50x25',
-  showShop: true,
+  showShop: false,
   showPrice: true,
+  dpi: 203,
+  start: 0,
 };
 
 /** Label size/contents for this device (screens/17/20; printing lands with T-052). */
@@ -90,6 +94,40 @@ function LabelsContent() {
           />
           {t('office.labels.show_price')}
         </label>
+        <label className="flex flex-col gap-1 text-small">
+          {t('office.labels.dpi')}
+          <select
+            className={field}
+            value={form.dpi}
+            onChange={(event) =>
+              setForm({ ...form, dpi: Number(event.target.value) as 203 | 300 })
+            }
+          >
+            <option value={203}>203 dpi</option>
+            <option value={300}>300 dpi</option>
+          </select>
+        </label>
+        {form.size === 'a4' ? (
+          <label className="flex flex-col gap-1 text-small">
+            {t('office.labels.start')}
+            <input
+              type="number"
+              min={0}
+              max={23}
+              className={field}
+              value={form.start}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  start: Math.max(
+                    0,
+                    Math.min(23, Number(event.target.value) || 0),
+                  ),
+                })
+              }
+            />
+          </label>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

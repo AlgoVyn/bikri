@@ -1,7 +1,7 @@
 import { formatMoney, formatQtyFromMilli, mulDivRound } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonDanger, buttonQuiet } from '../components/classes.ts';
@@ -23,6 +23,12 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
 import { marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
+
+const LabelsDialog = lazy(() =>
+  import('../labels/LabelsDialog.tsx').then((module) => ({
+    default: module.LabelsDialog,
+  })),
+);
 
 const timeFmt = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -46,8 +52,13 @@ export function ProductDetailPage({
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const detail = useLiveQuery(() => productDetail(getDb(), id), [id]);
   const canEdit = can('catalog.edit');
+
+  useHotkey(plainKey('l'), () => setLabelsOpen(true), {
+    enabled: can('catalog.edit') || can('purchase.create'),
+  });
 
   useHotkey(
     plainKey('e'),
@@ -147,6 +158,16 @@ export function ProductDetailPage({
               {t('products.edit')}
               <KeyBadge keys="E" />
             </Link>
+          ) : null}
+          {can('catalog.edit') || can('purchase.create') ? (
+            <button
+              type="button"
+              className={`${buttonQuiet} gap-2`}
+              onClick={() => setLabelsOpen(true)}
+            >
+              {t('products.print_label')}
+              <KeyBadge keys="L" />
+            </button>
           ) : null}
           {canEdit ? (
             <Link
@@ -364,6 +385,13 @@ export function ProductDetailPage({
           }
         }}
       />
+      <Suspense fallback={null}>
+        <LabelsDialog
+          open={labelsOpen}
+          onOpenChange={setLabelsOpen}
+          initial={[{ productId: p.id, copies: 1 }]}
+        />
+      </Suspense>
       {adjust && p.track_stock === 1 && can('stock.adjust') ? (
         <AdjustDialog
           product={p}

@@ -20,6 +20,21 @@ export {
   renderReceiptHtml,
 } from './html.ts';
 export {
+  BarcodeError,
+  encodeCode128,
+} from './labels/code128.ts';
+export {
+  a4Slots,
+  barcodeLabelSvg,
+  LABEL_SIZES,
+  type LabelCode,
+  LabelError,
+  type LabelSize,
+  type LabelSizeId,
+  moduleMm,
+  type RenderDpi,
+} from './labels/layout.ts';
+export {
   columnWidths,
   formatColumnHeader,
   formatItemLines,
