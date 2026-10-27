@@ -1,15 +1,18 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAreaStrings } from '../i18n/areas.tsx';
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-control px-3 aria-[current=page]:bg-primary-subtle aria-[current=page]:text-primary-subtle-ink';
 
 export function AdminShell() {
   const { t } = useTranslation();
+  const ready = useAreaStrings('admin');
   useEffect(() => {
-    document.title = t('admin.title');
-  }, [t]);
+    if (ready) document.title = t('admin.title');
+  }, [t, ready]);
+  if (!ready) return <p className="sr-only">{t('common.loading')}</p>;
   return (
     <div className="min-h-screen bg-bg text-text">
       <header className="border-b border-border bg-surface">
