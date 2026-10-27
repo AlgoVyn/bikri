@@ -38,7 +38,7 @@ test.describe('worker routing (T-002)', () => {
   });
 
   test('a deep link reloads into the app', async ({ page }) => {
-    await openReadyShop(page, '/bikri/sales/01JC0Z8K3V7R1M2Q4S6T8V0X2Y');
+    await openReadyShop(page, '/bikri/not-a-page');
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'This page is not available.' }),
