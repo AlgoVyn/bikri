@@ -11,11 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
+import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
 import { Route as ProductsRouteImport } from './routes/products.tsx';
+import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SettingsRouteImport } from './routes/settings.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
+import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 
@@ -29,9 +32,19 @@ const SplatRoute = SplatRouteImport.update({
   path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ExpensesRoute = ExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SalesRoute = SalesRouteImport.update({
@@ -54,6 +67,11 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SuppliersRoute = SuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const UdhaarRoute = UdhaarRouteImport.update({
   id: '/udhaar',
   path: '/udhaar',
@@ -68,22 +86,28 @@ const DevUiRoute = DevUiRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/expenses': typeof ExpensesRoute;
   '/products': typeof ProductsRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/expenses': typeof ExpensesRoute;
   '/products': typeof ProductsRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
@@ -91,11 +115,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/expenses': typeof ExpensesRoute;
   '/products': typeof ProductsRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
   '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
 }
@@ -104,33 +131,42 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/expenses'
     | '/products'
+    | '/reports'
     | '/sales'
     | '/sell'
     | '/settings'
     | '/setup'
+    | '/suppliers'
     | '/udhaar'
     | '/dev/ui';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/$'
+    | '/expenses'
     | '/products'
+    | '/reports'
     | '/sales'
     | '/sell'
     | '/settings'
     | '/setup'
+    | '/suppliers'
     | '/udhaar'
     | '/dev/ui';
   id:
     | '__root__'
     | '/'
     | '/$'
+    | '/expenses'
     | '/products'
+    | '/reports'
     | '/sales'
     | '/sell'
     | '/settings'
     | '/setup'
+    | '/suppliers'
     | '/udhaar'
     | '/dev/ui';
   fileRoutesById: FileRoutesById;
@@ -138,11 +174,14 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
+  ExpensesRoute: typeof ExpensesRoute;
   ProductsRoute: typeof ProductsRoute;
+  ReportsRoute: typeof ReportsRoute;
   SalesRoute: typeof SalesRoute;
   SellRoute: typeof SellRoute;
   SettingsRoute: typeof SettingsRoute;
   SetupRoute: typeof SetupRoute;
+  SuppliersRoute: typeof SuppliersRoute;
   UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
 }
@@ -163,11 +202,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/expenses': {
+      id: '/expenses';
+      path: '/expenses';
+      fullPath: '/expenses';
+      preLoaderRoute: typeof ExpensesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/products': {
       id: '/products';
       path: '/products';
       fullPath: '/products';
       preLoaderRoute: typeof ProductsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/reports': {
+      id: '/reports';
+      path: '/reports';
+      fullPath: '/reports';
+      preLoaderRoute: typeof ReportsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sales': {
@@ -198,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/suppliers': {
+      id: '/suppliers';
+      path: '/suppliers';
+      fullPath: '/suppliers';
+      preLoaderRoute: typeof SuppliersRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/udhaar': {
       id: '/udhaar';
       path: '/udhaar';
@@ -218,11 +278,14 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  ExpensesRoute: ExpensesRoute,
   ProductsRoute: ProductsRoute,
+  ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
   SellRoute: SellRoute,
   SettingsRoute: SettingsRoute,
   SetupRoute: SetupRoute,
+  SuppliersRoute: SuppliersRoute,
   UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
 };

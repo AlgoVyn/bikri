@@ -12,11 +12,28 @@ export async function openReadyShop(
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 }
 
+/** No element may stick out past the viewport (screens/04 AC 5). */
+export async function expectNoHorizontalScroll(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
 declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
       reset: () => Promise<void>;
+      unlockAs: (
+        role: 'owner' | 'manager' | 'cashier',
+        name?: string,
+      ) => Promise<string>;
+      seedTodaySales: () => Promise<void>;
+      setKv: (key: string, value: unknown) => Promise<void>;
+      navigate: (to: string) => Promise<void>;
     };
   }
 }

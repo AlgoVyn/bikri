@@ -32,16 +32,52 @@
     "wapsi": "واپسی"
   },
   "home": {
+    "add_product": "مصنوع شامل کریں",
+    "as_of_device": "اس ڈیوائس کے مطابق",
+    "attention": "توجہ طلب",
+    "attn_conflicts": "{{count}} سنک تنازعات دیکھیں",
+    "attn_day_not_closed": "{{date}} کا حساب اس ڈیوائس پر بند نہیں ہوا",
+    "attn_failed_prints": "{{count}} رسیدیں پرنٹ نہیں ہوئیں",
+    "attn_low_stock": "{{count}} اشیاء کا اسٹاک کم ہے",
+    "attn_over_limit": "{{count}} گاہک حد سے زیادہ",
+    "attn_promises": "{{count}} ادھار وعدے آج کے",
+    "bills_count": "{{count}} بل",
+    "cash_drawer": "دراز میں نقد",
+    "day_close": "روزانہ حساب",
     "first_product": "اپنی پہلی مصنوع شامل کریں",
-    "no_products": "ابھی کوئی مصنوع نہیں۔ بیچنے کے لیے ایک شامل کریں۔"
+    "first_products": "اپنی پہلی مصنوعات شامل کریں",
+    "greeting": "السلام علیکم، {{name}}",
+    "import": "اسپریڈشیٹ سے لائیں",
+    "new_sale": "نئی سیل",
+    "no_bills": "اس ڈیوائس پر ابھی کوئی بل نہیں۔",
+    "no_products": "ابھی کوئی مصنوع نہیں۔ بیچنے کے لیے ایک شامل کریں۔",
+    "price_check": "قیمت دیکھیں",
+    "profit_today": "آج کا منافع",
+    "quick_actions": "فوری کام",
+    "recent_bills": "حالیہ بل",
+    "sold_today": "آج کی فروخت",
+    "suggested": "تجویز کردہ فہرست سے",
+    "udhaar_given": "دیا {{amount}}",
+    "udhaar_received": "وصول {{amount}}",
+    "udhaar_today": "آج کا ادھار"
   },
   "nav": {
+    "expenses": "اخراجات",
     "home": "ہوم",
+    "more": "مزید",
     "products": "مصنوعات",
     "rail": "مرکزی",
+    "reports": "رپورٹس",
     "sales": "فروخت",
     "sell": "بیچیں",
     "settings": "ترتیبات",
+    "suppliers": "سپلائرز",
+    "udhaar": "ادھار"
+  },
+  "payment": {
+    "bank_wallet": "بینک/والیٹ",
+    "card": "کارڈ",
+    "cash": "نقد",
     "udhaar": "ادھار"
   },
   "setup": {
@@ -128,11 +164,37 @@
     "lang_roman_ur": "Roman Urdu",
     "lang_ur": "اردو",
     "language": "زبان",
+    "no_access": "آپ کو اجازت نہیں",
+    "offline": "آف لائن — سیل اسی ڈیوائس پر محفوظ ہو رہی ہے",
+    "printer_none": "پرنٹر سیٹ نہیں",
+    "printer_ready": "پرنٹر تیار ہے",
+    "role_cashier": "کیشیئر",
+    "role_manager": "مینیجر",
+    "role_owner": "مالک",
+    "search_bills": "بل",
+    "search_customers": "گاہک",
+    "search_label": "مصنوعات، گاہک، بل تلاش کریں",
+    "search_none": "کچھ نہیں ملا",
+    "search_products": "مصنوعات",
+    "staff_menu": "اسٹاف مینو",
+    "sync_problem": "سنک میں مسئلہ",
+    "sync_synced": "سنک ہو گیا",
+    "sync_syncing": "سنک ہو رہا ہے…",
+    "sync_waiting": "{{count}} باقی",
     "theme_dark": "گہرا",
     "theme_light": "روشن",
     "theme_rtl": "اردو",
     "ui_kit": "اجزاء",
     "update_ready": "اپ ڈیٹ تیار ہے"
+  },
+  "tenant": {
+    "readOnly": {
+      "banner": "یہ دکان صرف دیکھنے کے لیے ہے۔ آپ رپورٹس اور ریکارڈ دیکھ سکتے ہیں اور اپنا ڈیٹا ایکسپورٹ کر سکتے ہیں، لیکن نئی سیل یا کوئی تبدیلی نہیں کر سکتے۔ الگوون سے رابطہ کریں۔",
+      "blocked": "دکان صرف دیکھنے کے لیے ہے: یہ محفوظ نہیں ہو سکتا۔"
+    },
+    "support": {
+      "banner": "الگوون سپورٹ کو {{time}} تک اس دکان تک رسائی حاصل ہے۔ وجہ: {{reason}}۔"
+    }
   },
   "ui": {
     "allow_negative": "منفی رقم",

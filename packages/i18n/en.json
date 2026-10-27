@@ -32,16 +32,52 @@
     "wapsi": "Refund"
   },
   "home": {
+    "add_product": "Add product",
+    "as_of_device": "As of this device",
+    "attention": "Needs attention",
+    "attn_conflicts": "{{count}} sync conflicts to review",
+    "attn_day_not_closed": "Day {{date}} was not closed on this device",
+    "attn_failed_prints": "{{count}} receipts failed to print",
+    "attn_low_stock": "{{count}} items low on stock",
+    "attn_over_limit": "{{count}} customers over their limit",
+    "attn_promises": "{{count}} udhaar promises due today",
+    "bills_count": "{{count}} bills",
+    "cash_drawer": "Cash in drawer",
+    "day_close": "Day close",
     "first_product": "Add your first product",
-    "no_products": "No products yet. Add one to start selling."
+    "first_products": "Add your first products",
+    "greeting": "Assalam-o-Alaikum, {{name}}",
+    "import": "Import spreadsheet",
+    "new_sale": "New sale",
+    "no_bills": "No bills yet on this device.",
+    "no_products": "No products yet. Add one to start selling.",
+    "price_check": "Price check",
+    "profit_today": "Profit today",
+    "quick_actions": "Quick actions",
+    "recent_bills": "Recent bills",
+    "sold_today": "Sold today",
+    "suggested": "Add from suggested list",
+    "udhaar_given": "Given {{amount}}",
+    "udhaar_received": "Received {{amount}}",
+    "udhaar_today": "Udhaar today"
   },
   "nav": {
+    "expenses": "Expenses",
     "home": "Home",
+    "more": "More",
     "products": "Products",
     "rail": "Main",
+    "reports": "Reports",
     "sales": "Sales",
     "sell": "Sell",
     "settings": "Settings",
+    "suppliers": "Suppliers",
+    "udhaar": "Udhaar"
+  },
+  "payment": {
+    "bank_wallet": "Bank/wallet",
+    "card": "Card",
+    "cash": "Cash",
     "udhaar": "Udhaar"
   },
   "setup": {
@@ -128,11 +164,37 @@
     "lang_roman_ur": "Roman Urdu",
     "lang_ur": "اردو",
     "language": "Language",
+    "no_access": "You don't have access",
+    "offline": "Offline — sales are saved on this device",
+    "printer_none": "Printer not set up",
+    "printer_ready": "Printer ready",
+    "role_cashier": "Cashier",
+    "role_manager": "Manager",
+    "role_owner": "Owner",
+    "search_bills": "Bills",
+    "search_customers": "Customers",
+    "search_label": "Search products, customers, bills",
+    "search_none": "No matches",
+    "search_products": "Products",
+    "staff_menu": "Staff menu",
+    "sync_problem": "Sync problem",
+    "sync_synced": "Synced",
+    "sync_syncing": "Syncing…",
+    "sync_waiting": "{{count}} waiting",
     "theme_dark": "Dark",
     "theme_light": "Light",
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
     "update_ready": "Update ready"
+  },
+  "tenant": {
+    "readOnly": {
+      "banner": "This shop is read-only. You can view reports and history and export your data, but you can't make sales or changes. Contact Algovyn.",
+      "blocked": "Read-only shop: this can't be saved."
+    },
+    "support": {
+      "banner": "Algovyn support has access to this shop until {{time}}. Reason: {{reason}}."
+    }
   },
   "ui": {
     "allow_negative": "Allow negative",
