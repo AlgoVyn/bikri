@@ -223,7 +223,8 @@ export async function computeRefund(
 
 export type RefundResult = {
   refund: SyncedRow;
-  plan: RefundPlan;
+  /** The split that was written; null when this id was already applied (a double click). */
+  plan: RefundPlan | null;
   created: boolean;
 };
 
@@ -235,13 +236,7 @@ export async function refundSale(
   now = Date.now(),
 ): Promise<RefundResult> {
   const existing = await db.refunds.get(input.refundId);
-  if (existing) {
-    return {
-      refund: existing,
-      plan: await computeRefund(db, input.saleId, input.lines, input.method),
-      created: false,
-    };
-  }
+  if (existing) return { refund: existing, plan: null, created: false };
   const reason = input.reason.trim();
   if (reason.length === 0 || reason.length > 120)
     throw new RefundNotAllowedError('reason');
