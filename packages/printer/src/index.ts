@@ -55,7 +55,12 @@ export {
   POWERED_BY,
   type TemplateSettings,
 } from './templates/common.ts';
-export { englishReceiptLabels, resolveLabels } from './templates/labels.ts';
+export {
+  englishReceiptLabels,
+  receiptLabelsFor,
+  resolveLabels,
+  urduReceiptLabels,
+} from './templates/labels.ts';
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
 export { saleBasicInput } from './templates/saleBasicFixture.ts';

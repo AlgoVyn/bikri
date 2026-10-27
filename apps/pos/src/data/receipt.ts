@@ -10,6 +10,7 @@ import {
   type ItemLayout,
   itemLayoutFor,
   type ReceiptPayment,
+  receiptLabelsFor,
   type SaleReceiptInput,
 } from '@bikri/printer';
 import { customerBalance } from './customers.ts';
@@ -107,7 +108,9 @@ export async function loadSaleReceipt(
       receiptFooter: text(shop?.receipt_footer),
       showPaymentDetails: shop?.show_payment_details !== 0,
       showCashierOnReceipt: shop?.show_cashier_on_receipt !== 0,
-      taxLabel: text(shop?.tax_label) || 'Sales tax',
+      taxLabel:
+        text(shop?.tax_label) ||
+        (shop?.receipt_language === 'ur' ? 'سیلز ٹیکس' : 'Sales tax'),
       numberGrouping: shop?.number_grouping === 'lakh' ? 'lakh' : 'intl',
       ntn: text(shop?.ntn),
       strn: text(shop?.strn),
@@ -155,6 +158,8 @@ export async function loadSaleReceipt(
       }),
     ),
     staffName: staff ? String(staff.name) : null,
+    // Urdu receipts get Urdu labels (the whole receipt is rasterised, 06 §6).
+    labels: receiptLabelsFor(text(shop?.receipt_language)),
   };
 }
 
