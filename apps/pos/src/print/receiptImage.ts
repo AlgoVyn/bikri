@@ -249,3 +249,17 @@ export function downloadBlob(
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** Gray/RGBA bitmap as a PNG data URL (logo for system printing). */
+export function bitmapDataUrl(
+  source: RasterSource,
+  doc: Document = document,
+): string | null {
+  const canvas = doc.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.putImageData(toImageData(ctx, source), 0, 0);
+  return canvas.toDataURL('image/png');
+}

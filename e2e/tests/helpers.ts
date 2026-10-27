@@ -128,3 +128,114 @@ declare global {
     };
   }
 }
+
+/**
+ * Fake WebUSB and Web Serial receipt printers (T-020). Bytes land in `window.__printed`;
+ * `window.__printerUnplugged = true` makes the next write fail like a pulled cable.
+ * A granted device survives reloads (like Chrome's permission) through localStorage.
+ */
+export async function installFakePrinters(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      __printed: { via: string; bytes: number[] }[];
+      __printerUnplugged: boolean;
+    };
+    w.__printed = [];
+    w.__printerUnplugged = false;
+    const record = (via: string, data: ArrayBufferView) => {
+      if (w.__printerUnplugged)
+        throw new DOMException('device gone', 'NotFoundError');
+      w.__printed.push({
+        via,
+        bytes: Array.from(
+          new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        ),
+      });
+    };
+    const device = {
+      vendorId: 0x0416,
+      productId: 0x5011,
+      serialNumber: 'P1',
+      productName: 'POS-80',
+      opened: false,
+      configuration: null as unknown,
+      async open() {
+        device.opened = true;
+      },
+      async selectConfiguration() {
+        device.configuration = {
+          interfaces: [
+            {
+              interfaceNumber: 0,
+              alternates: [
+                {
+                  interfaceClass: 7,
+                  endpoints: [
+                    { endpointNumber: 2, direction: 'out', type: 'bulk' },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+      },
+      async claimInterface() {},
+      async transferOut(_ep: number, data: ArrayBufferView) {
+        record('usb', data);
+        return { status: 'ok' };
+      },
+    };
+    const usbGranted = () => localStorage.getItem('fake-usb') === '1';
+    Object.defineProperty(navigator, 'usb', {
+      configurable: true,
+      value: {
+        async requestDevice() {
+          localStorage.setItem('fake-usb', '1');
+          return device;
+        },
+        async getDevices() {
+          return usbGranted() ? [device] : [];
+        },
+      },
+    });
+    const port = {
+      readable: null,
+      writable: null as unknown,
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      async open() {
+        port.writable = {
+          getWriter: () => ({
+            write: async (b: Uint8Array) => record('serial', b),
+            releaseLock: () => {},
+          }),
+        };
+      },
+    };
+    Object.defineProperty(navigator, 'serial', {
+      configurable: true,
+      value: {
+        async requestPort() {
+          localStorage.setItem('fake-serial', '1');
+          return port;
+        },
+        async getPorts() {
+          return localStorage.getItem('fake-serial') === '1' ? [port] : [];
+        },
+      },
+    });
+  });
+}
+
+/** Everything the fake printers received, as latin1 text. */
+export async function printedText(page: Page, via?: string): Promise<string> {
+  return page.evaluate(
+    (v) =>
+      (
+        window as unknown as { __printed: { via: string; bytes: number[] }[] }
+      ).__printed
+        .filter((p) => !v || p.via === v)
+        .map((p) => String.fromCharCode(...p.bytes))
+        .join(''),
+    via,
+  );
+}

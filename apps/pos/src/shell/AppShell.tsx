@@ -6,6 +6,7 @@ import { MoreIcon } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
+import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Banners } from './Banners.tsx';
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const toast = useToast();
   const { updateReady, applyUpdate } = useUpdateReady();
+  usePrintService();
   const { can } = useCurrentStaff();
   const shopName = useShopName();
   const language = isLocale(i18n.language) ? i18n.language : 'en';
