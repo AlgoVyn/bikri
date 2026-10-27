@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { makePng } from './helpers.ts';
 import {
@@ -102,6 +103,30 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   // A sees B in its devices list; a browser already in a shop shows Open / Leave on /enrol.
   await a.page.getByRole('button', { name: 'Refresh' }).click();
   await expect(a.page.getByTestId('device-list')).toContainText('Counter 2');
+
+  // Owner server export (journey 24, T-053): paged from the server and zipped in the browser.
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/settings/backup'));
+  await expect(
+    a.page.getByRole('heading', { name: 'Backup & export' }),
+  ).toBeVisible();
+  const [serverZip] = await Promise.all([
+    a.page.waitForEvent('download'),
+    a.page.getByRole('button', { name: 'Download from server' }).click(),
+  ]);
+  const serverBytes = await readFile((await serverZip.path()) ?? '');
+  expect(serverBytes.subarray(0, 2).toString('latin1')).toBe('PK');
+  const serverText = serverBytes.toString('latin1');
+  expect(serverText).toContain('manifest.json');
+  expect(serverText).toContain('json/shop.json');
+  expect(serverText).toContain('"source": "server"');
+  expect(serverText).toContain('"snapshot_seq"');
+  await expect(
+    a.page.getByText(/Downloaded bikri-export-.* from the server/u),
+  ).toBeVisible();
+  await a.page.evaluate(() =>
+    window.__bikriTest?.navigate('/settings/devices'),
+  );
+
   await b.page.goto('/bikri/enrol');
   await expect(b.page.getByText(/This browser is connected to/)).toBeVisible();
 
