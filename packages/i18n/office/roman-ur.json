@@ -642,15 +642,19 @@
       "error": "Export nahi ban saki.",
       "finished": "{{filename}} download ho gayi",
       "hint": "Har table ki zip download karein: JSON restore ke liye, CSV Excel ke liye.",
+      "nav_hint": "Is dukan ki mukammal copy download karein",
       "nightly": "Aap ka data har raat Algovyn ki taraf se backup hota hai.",
       "no_permission": "Aap is dukan ka data export nahi kar sakte.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} satrein)",
       "restore": "Export se restore karein",
       "restore_hint": "Restore sirf khali dukan ke liye hai; yeh baqi Settings ke saath aayegi.",
       "server": "Server se download karein",
+      "server_building": "Server se ban rahi hai…",
+      "server_done": "Server export download ho gayi.",
+      "server_finished": "Server se {{filename}} download ho gayi",
       "server_hint": "Server ki copy (sab tills samet) ke liye malik ka email sign-in zaroori hai; yeh server export task ke saath aayegi.",
-      "title": "Backup aur export",
-      "nav_hint": "Is dukan ki mukammal copy download karein"
+      "server_unavailable": "Server copy sirf admin device par malik download kar sakta hai.",
+      "title": "Backup aur export"
     },
     "settings": {
       "add_branch": "Branch shamil karein",
