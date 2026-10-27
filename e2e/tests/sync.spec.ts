@@ -116,7 +116,10 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
   await a.page.goto('/bikri/');
   // Wrong PIN shows tries left; the right one opens the app.
-  await a.page.getByTestId('lock-screen').getByRole('button', { name: /Adnan/ }).click();
+  await a.page
+    .getByTestId('lock-screen')
+    .getByRole('button', { name: /Adnan/ })
+    .click();
   await a.page.keyboard.type('1111');
   await expect(a.page.getByRole('alert')).toContainText('4 tries left');
   await a.page.keyboard.type('4826');
@@ -219,6 +222,115 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   expect(dbs).not.toContain(`bikri-${shop.tenant.id}`);
   await a.ctx.close();
   await b.ctx.close();
+});
+
+test('catalog syncs to a support till that is view-only; operator read-only blocks writes (T-027, T-026)', async ({
+  browser,
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const email = `owner-ro-${Date.now()}@e2e.test`;
+  const shop = await createShop(request, email);
+  const admin = `${API}/admin/tenants/${shop.tenant.id}`;
+  const headers = { origin: ORIGIN };
+
+  const a = await newTill(browser);
+  await enrol(a.page, shop.owner_code.code, 'Counter 1');
+  await a.page.waitForFunction(() => window.__bikriTest !== undefined);
+  await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
+  await a.page.goto('/bikri/');
+  await unlock(a.page);
+  await a.page.evaluate(() =>
+    window.__bikriTest?.seedProducts([
+      { name: 'Type-C cable 1 m', price: 149_900, cost: 110_000, stock: 5 },
+    ]),
+  );
+  await syncNow(a.page);
+  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
+    'data-state',
+    'synced',
+  );
+
+  // Support access (13 §7.5): the operator's code enrols a support device with a view-only profile.
+  const sa = await request.post(`${admin}/support-access`, {
+    headers,
+    data: { reason: 'Owner asked for help with prices', hours: 1 },
+  });
+  expect(sa.status(), await sa.text()).toBe(201);
+  const supportCode = ((await sa.json()) as { code: string }).code;
+  const s = await newTill(browser);
+  await enrol(s.page, supportCode);
+  const lock = s.page.getByTestId('lock-screen');
+  await expect(lock).toBeVisible({ timeout: 20_000 });
+  await lock.getByRole('button', { name: 'Algovyn support' }).click();
+  await expect(s.page.getByTestId('banner-support')).toContainText(
+    'Owner asked for help with prices',
+  );
+  // The catalog reached the support device (push from A → pull/snapshot).
+  await s.page.goto('/bikri/products');
+  await s.page
+    .getByTestId('lock-screen')
+    .getByRole('button', { name: 'Algovyn support' })
+    .click();
+  await expect(s.page.getByText('Type-C cable 1 m')).toBeVisible();
+  // Writes are refused on a support device.
+  const supportWrite = await s.page.evaluate(() =>
+    window.__bikriTest
+      ?.seedProducts([{ name: 'Nope', price: 100 }])
+      .then(() => 'saved')
+      .catch((e: Error) => e.name),
+  );
+  expect(supportWrite).toBe('ReadOnlyError');
+
+  // The owner sees the banner and ends support access; the support device is then revoked.
+  await syncNow(a.page);
+  const banner = a.page.getByTestId('banner-support');
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: 'End now' }).click();
+  const dialog = a.page.getByTestId('owner-signin');
+  if (await dialog.isVisible().catch(() => false)) {
+    await dialog
+      .getByLabel('6-digit code')
+      .fill(await lastCode(request, email));
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await banner.getByRole('button', { name: 'End now' }).click();
+  }
+  await expect(a.page.getByText('Support access ended.')).toBeVisible();
+  await expect(banner).toBeHidden();
+  await syncNow(s.page);
+  await expect(
+    s.page.getByRole('heading', { name: 'Connect this device to your shop' }),
+  ).toBeVisible();
+  await s.ctx.close();
+
+  // Operator makes the shop read-only (T-027): banner + badge, writes refused with one toast.
+  const ro = await request.post(`${admin}/read-only`, {
+    headers,
+    data: { reason: 'Payment overdue, e2e check' },
+  });
+  expect(ro.status(), await ro.text()).toBe(200);
+  await syncNow(a.page);
+  await expect(a.page.getByTestId('banner-read-only')).toBeVisible();
+  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
+    'data-state',
+    'read-only',
+  );
+  await a.page.evaluate(() => {
+    void window.__bikriTest?.seedProducts([{ name: 'Blocked', price: 100 }]);
+  });
+  await expect(
+    a.page.getByText("Read-only shop: this can't be saved."),
+  ).toBeVisible();
+
+  // Reactivate → the till leaves read-only on its next sync.
+  const re = await request.post(`${admin}/reactivate`, {
+    headers,
+    data: { reason: 'Paid, e2e check', to: 'active' },
+  });
+  expect(re.status(), await re.text()).toBe(200);
+  await syncNow(a.page);
+  await expect(a.page.getByTestId('banner-read-only')).toBeHidden();
+  await a.ctx.close();
 });
 
 test('operator console needs Access; till tokens never open /admin (I17)', async ({
