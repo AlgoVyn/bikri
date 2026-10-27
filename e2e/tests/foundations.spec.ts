@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { openReadyShop } from './helpers.ts';
 
 // M0 smoke journeys: T-002 routing, T-005 PWA/offline, T-006 a11y, T-007 language switching.
 
@@ -37,7 +38,7 @@ test.describe('worker routing (T-002)', () => {
   });
 
   test('a deep link reloads into the app', async ({ page }) => {
-    await page.goto('/bikri/sales/01JC0Z8K3V7R1M2Q4S6T8V0X2Y');
+    await openReadyShop(page, '/bikri/sales/01JC0Z8K3V7R1M2Q4S6T8V0X2Y');
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'This page is not available.' }),
@@ -49,7 +50,7 @@ test.describe('shell and languages (T-006, T-007)', () => {
   test('English shell flips to Urdu RTL and back, and passes axe', async ({
     page,
   }) => {
-    await page.goto('/bikri/');
+    await openReadyShop(page, '/bikri/');
     await expect(page).toHaveTitle('Bikri POS');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     const nav = page.getByRole('navigation', { name: 'Main' });
@@ -82,7 +83,7 @@ test.describe('shell and languages (T-006, T-007)', () => {
   });
 
   test('Alt+3 opens Products from the rail', async ({ page }) => {
-    await page.goto('/bikri/');
+    await openReadyShop(page, '/bikri/');
     await page.keyboard.press('Alt+Digit3');
     await expect(page).toHaveURL(/\/bikri\/products$/);
   });
@@ -93,7 +94,7 @@ test.describe('PWA (T-005)', () => {
     page,
     context,
   }) => {
-    await page.goto('/bikri/');
+    await openReadyShop(page, '/bikri/');
     const scope = await page.evaluate(async () => {
       const reg = await (window as Window).navigator.serviceWorker.ready;
       return reg.scope;

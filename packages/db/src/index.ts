@@ -23,3 +23,4 @@ export {
   type SyncedRow,
   tenantDbName,
 } from './dexie.ts';
+export { EXPENSE_CATEGORY_TEMPLATES } from './seed.ts';

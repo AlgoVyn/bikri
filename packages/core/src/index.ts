@@ -1,4 +1,5 @@
 export { contrastRatio } from './contrast.ts';
+export { businessDate } from './dates.ts';
 export { normaliseDigits, normaliseNumericText } from './digits.ts';
 export { isUlid, newId } from './ids.ts';
 export type { AvgCostInput } from './money/cost.ts';
@@ -67,6 +68,8 @@ export { formatMoney, groupLakh, parseMoneyToPaisa } from './moneyFormat.ts';
 export { API_BASE, BASE_PATH } from './paths.ts';
 export type { ParsedPhone, PhoneKind } from './phone.ts';
 export { parsePkPhone, whatsAppUrl } from './phone.ts';
+export type { PinHash } from './pin.ts';
+export { hashPin, isWeakPin, PIN_ITERATIONS, verifyPin } from './pin.ts';
 export type { QtyUnit } from './qty.ts';
 export {
   DECIMAL_QTY_UNITS,
@@ -103,5 +106,6 @@ export {
   SECURITY_HEADERS,
   securityHeaderEntries,
 } from './securityHeaders.ts';
+export { generateSku } from './sku.ts';
 export type { TokenPair } from './tokenPairs.ts';
 export { TILE_COLOURS, TILE_RATIO_RANGE, tokenPairs } from './tokenPairs.ts';

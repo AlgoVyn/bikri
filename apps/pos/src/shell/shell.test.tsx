@@ -7,6 +7,7 @@ import {
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { seedReadyShop } from '../dev/seed.ts';
 import { initI18n, setLanguage } from '../i18n/i18n.ts';
 import { resetUpdateStore, setUpdateReady } from '../pwa/updateStore.ts';
 import { routeTree } from '../routeTree.gen.ts';
@@ -23,6 +24,7 @@ beforeEach(async () => {
   localStorage.clear();
   resetUpdateStore();
   await initI18n('en');
+  await seedReadyShop();
 });
 
 describe('app shell', () => {
@@ -31,27 +33,29 @@ describe('app shell', () => {
     await renderAt(`${BASE_PATH}/`);
     expect(document.documentElement.dir).toBe('ltr');
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeTruthy();
-    expect(screen.getByText('Coming soon')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeTruthy();
+    expect(await screen.findByText('Add your first product')).toBeTruthy();
     await user.selectOptions(screen.getByLabelText('Language'), 'ur');
     expect(await screen.findByRole('heading', { name: 'ہوم' })).toBeTruthy();
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.documentElement.lang).toBe('ur');
-    expect(screen.getByText('جلد آ رہا ہے۔')).toBeTruthy();
-    expect(screen.queryByText('Coming soon')).toBeNull();
+    expect(screen.getByText('اپنی پہلی مصنوع شامل کریں')).toBeTruthy();
+    expect(screen.queryByText('Add your first product')).toBeNull();
   });
 
   it('opens a stub from the rail and keeps unknown paths on the not-found page', async () => {
     const user = userEvent.setup();
     await renderAt(`${BASE_PATH}/`);
-    await user.click(screen.getByRole('link', { name: /Sell/ }));
+    await user.click(await screen.findByRole('link', { name: /Sell/ }));
     expect(await screen.findByRole('heading', { name: 'Sell' })).toBeTruthy();
   });
 
   it('renders the not-found copy for an unknown path', async () => {
     await renderAt(`${BASE_PATH}/missing-page`);
     expect(
-      screen.getByRole('heading', { name: 'This page is not available.' }),
+      await screen.findByRole('heading', {
+        name: 'This page is not available.',
+      }),
     ).toBeTruthy();
   });
 
@@ -61,14 +65,18 @@ describe('app shell', () => {
     setUpdateReady(true, apply);
     await renderAt(`${BASE_PATH}/`);
     expect(apply).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Update ready' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Update ready' }),
+    );
     expect(apply).toHaveBeenCalledOnce();
   });
 
   it('moves with Alt+2 and ignores the shortcut inside a field', async () => {
     const user = userEvent.setup();
     await renderAt(`${BASE_PATH}/settings`);
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: 'Settings' }),
+    ).toBeTruthy();
     const language = screen.getByLabelText('Language');
     language.focus();
     await user.keyboard('{Alt>}{Digit2}{/Alt}');
