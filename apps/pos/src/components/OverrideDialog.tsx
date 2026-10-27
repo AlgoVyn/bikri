@@ -27,7 +27,8 @@ export function OverrideDialog({
   title?: string;
   body?: string;
   profiles?: readonly OverrideProfile[];
-  verify: (pin: string) => Promise<boolean>;
+  /** Checks the PIN of the chosen approver (profile id; '' when there are no profiles). */
+  verify: (pin: string, profileId: string) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const pinId = useId();
@@ -61,7 +62,7 @@ export function OverrideDialog({
     setPending(true);
     setError(null);
     try {
-      const accepted = await verify(pin);
+      const accepted = await verify(pin, profileIdValue);
       if (!accepted) {
         setError(t('errors.pin_invalid'));
         return;

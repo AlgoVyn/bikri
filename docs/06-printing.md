@@ -112,45 +112,46 @@ Money format on receipts: `Rs 40,000` when whole rupees, `Rs 3,459.77` when pais
 ### 4.1 Sale receipt, 80 mm (48 columns)
 
 ```
-                 [ LOGO raster ]
-              BIKRI ELECTRONICS            <- double size, bold, centre
-          Shop 12, Hall Road, Lahore       <- address, centre
-              Tel: 0300 1234567            <- phone, centre
-        Open daily 11am to 10pm            <- receipt_header (if set)
+                [ LOGO raster ]
+               BIKRI ELECTRONICS                  <- double size, bold, centre
+           Shop 12, Hall Road, Lahore             <- address, centre
+               Tel: 0300 1234567                  <- phone, centre
+            Open daily 11am to 10pm               <- receipt_header (if set)
 ------------------------------------------------
                   SALE RECEIPT
 ------------------------------------------------
 Bill                                  INV-A-1042
-Date                           27-10-2026 14:05
-Cashier                                   Adnan
-Customer                          Bilal Hussain
+Date                            27-10-2026 14:05
+Cashier                                    Adnan
+Customer                           Bilal Hussain
 ------------------------------------------------
-ITEM                          QTY        AMOUNT
-Samsung A15 4/128 Blue          1     Rs 40,000
+ITEM                          QTY         AMOUNT
+Samsung A15 4/128 Blue          1      Rs 40,000
   Rs 42,000 each - less Rs 2,000
-USB-C cable 1m                  2        Rs 900
+USB-C cable 1m                  2         Rs 900
   Rs 450 each
 ------------------------------------------------
-Subtotal (3 items)                    Rs 40,900
-Discount                                -Rs 500
+Subtotal (3 items)                     Rs 40,900
+Discount                                 -Rs 500
 ================================================
-TOTAL                                 Rs 40,400   <- bold, double height
+TOTAL                                  Rs 40,400  <- bold, double height
 ================================================
-Cash                                  Rs 40,400   <- one row per method (if show_payment_details)
-Amount tendered                       Rs 41,000
-Change                                   Rs 600
+Cash                                   Rs 40,400  <- one row per method (if show_payment_details)
+Amount tendered                        Rs 41,000
+Change                                    Rs 600
 ------------------------------------------------
-Warranty: Samsung A15 - 365 days (till 27-10-2027)  <- lines with sale_lines.warranty_until set
+Warranty: Samsung A15 - 365 days (till            <- lines with sale_lines.warranty_until set,
+27-10-2027)                                       <- wrapped at 48 like any text block
 ------------------------------------------------
-      Shukriya! Phir tashreef laiye.       <- receipt_footer, centre
-               [ QR: bill id ]             <- optional setting "QR on receipt"
-               Powered by AlgoVyn          <- always; Font B (small), centre, last line (§4.4)
+         Shukriya! Phir tashreef laiye.           <- receipt_footer, centre
+                [ QR: bill id ]                   <- optional setting "QR on receipt"
+               Powered by AlgoVyn                 <- always; Font B (small), centre, last line (§4.4)
 <feed 3><cut><drawer if cash and drawer enabled>
 ```
 
 Conditional rows: `Sales tax 17%` after Discount when `tax_rate_bp > 0` and the sale is tax-exclusive; for a tax-inclusive sale (`sales.tax_inclusive = 1`) no tax row is added, instead `Includes Sales tax 17%   Rs 1,700` is printed right after `TOTAL`; `Rounding` when `rounding ≠ 0`; `Udhaar (on khata)` plus `Khata balance now` when the bill has an udhaar part; `Card`/`Bank/wallet` rows with reference when used; `Customer` row only when a customer is attached; payment rows are hidden when `show_payment_details = 0`.
 
-Column layout (48): item name cols 1–28 (wrap to further lines, max 2), qty cols 29–33 right-aligned, amount cols 34–48 right-aligned. Detail line indented 2 spaces, max 46 chars. `pair` blocks: label left, value right, at least one space between; if too long, value on the next line right-aligned.
+Column layout (48): item name cols 1–28 (wrap to further lines, max 2), qty cols 29–33 right-aligned, amount cols 34–48 right-aligned (the sample above follows it exactly; text before `<-` is the printed line, at most 48 columns). Detail line indented 2 spaces, max 46 chars. `pair` blocks: label left, value right, at least one space between; if too long, value on the next line right-aligned.
 
 ### 4.2 Sale receipt, 58 mm (32 columns)
 
@@ -243,10 +244,10 @@ Baud choices: 9600 (default), 19200, 38400, 115200; flow control none (default) 
 ### 5.3 System printing (fallback; also for A4/office printers)
 
 - Render `renderReceiptHtml(model, { widthMm })` into a hidden iframe and call `iframe.contentWindow.print()` (i.e. `window.print()` of the receipt document).
-- CSS by paper width (`apps/pos/src/print/receipt-80.css`, `receipt-58.css`):
+- CSS by paper width, embedded by `renderReceiptHtml` (`packages/printer/src/html.ts`); the font size is `body width ÷ (chars_per_line × 0.6)` so exactly `chars_per_line` monospace columns fit, and before printing the till appends `fitPageCss()` so the page is as long as the receipt (`80mm auto` is not valid CSS) (D-087):
   ```css
-  /* 80 mm */ @page { size: 80mm auto; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 12px/1.35 'JetBrains Mono', monospace }
-  /* 58 mm */ @page { size: 58mm auto; margin: 0 } body { width: 48mm; margin: 0 5mm; font: 10px/1.35 'JetBrains Mono', monospace }
+  /* 80 mm */ @page { size: 80mm 297mm; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 72mm ÷ (48 × 0.6) */
+  /* 58 mm */ @page { size: 58mm 297mm; margin: 0 } body { width: 48mm; margin: 0 5mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 48mm ÷ (32 × 0.6) */
   img.logo { max-width: 60%; } .urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9 }
   ```
   Urdu prints as real text here (the OS driver rasterises it), so no bitmap step is needed. A4: `@page { size: A4; margin: 15mm }` with a proper invoice layout (shop block, table of lines, totals block).

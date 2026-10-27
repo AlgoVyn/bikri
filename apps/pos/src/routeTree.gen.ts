@@ -11,12 +11,26 @@
 import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
-import { Route as ProductsRouteImport } from './routes/products.tsx';
+import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
+import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
-import { Route as SettingsRouteImport } from './routes/settings.tsx';
+import { Route as SetupRouteImport } from './routes/setup.tsx';
+import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
+import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
+import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
+import { Route as ProductsImportRouteImport } from './routes/products/import.tsx';
+import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
+import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
+import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
+import { Route as StockCountRouteImport } from './routes/stock/count.tsx';
+import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
+import { Route as ProductsIdAdjustRouteImport } from './routes/products/$id.adjust.tsx';
+import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,9 +42,14 @@ const SplatRoute = SplatRouteImport.update({
   path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any);
-const ProductsRoute = ProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
+const ExpensesRoute = ExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SalesRoute = SalesRouteImport.update({
@@ -43,9 +62,14 @@ const SellRoute = SellRouteImport.update({
   path: '/sell',
   getParentRoute: () => rootRouteImport,
 } as any);
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SuppliersRoute = SuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
   getParentRoute: () => rootRouteImport,
 } as any);
 const UdhaarRoute = UdhaarRouteImport.update({
@@ -58,80 +82,238 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ProductsIndexRoute = ProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsCategoriesRoute = ProductsCategoriesRouteImport.update({
+  id: '/products/categories',
+  path: '/products/categories',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsImportRoute = ProductsImportRouteImport.update({
+  id: '/products/import',
+  path: '/products/import',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsNewRoute = ProductsNewRouteImport.update({
+  id: '/products/new',
+  path: '/products/new',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsPricesRoute = ProductsPricesRouteImport.update({
+  id: '/products/prices',
+  path: '/products/prices',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
+  id: '/products/suggested',
+  path: '/products/suggested',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
+  id: '/settings/printer',
+  path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const StockCountRoute = StockCountRouteImport.update({
+  id: '/stock/count',
+  path: '/stock/count',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdIndexRoute = ProductsIdIndexRouteImport.update({
+  id: '/products/$id/',
+  path: '/products/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdAdjustRoute = ProductsIdAdjustRouteImport.update({
+  id: '/products/$id/adjust',
+  path: '/products/$id/adjust',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProductsIdEditRoute = ProductsIdEditRouteImport.update({
+  id: '/products/$id/edit',
+  path: '/products/$id/edit',
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/products': typeof ProductsRoute;
+  '/expenses': typeof ExpensesRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
+  '/products/': typeof ProductsIndexRoute;
+  '/settings/': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/products': typeof ProductsRoute;
+  '/expenses': typeof ExpensesRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
+  '/products': typeof ProductsIndexRoute;
+  '/settings': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id': typeof ProductsIdIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/products': typeof ProductsRoute;
+  '/expenses': typeof ExpensesRoute;
+  '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
+  '/setup': typeof SetupRoute;
+  '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
   '/dev/ui': typeof DevUiRoute;
+  '/products/categories': typeof ProductsCategoriesRoute;
+  '/products/import': typeof ProductsImportRoute;
+  '/products/new': typeof ProductsNewRoute;
+  '/products/prices': typeof ProductsPricesRoute;
+  '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
+  '/stock/count': typeof StockCountRoute;
+  '/products/': typeof ProductsIndexRoute;
+  '/settings/': typeof SettingsIndexRoute;
+  '/products/$id/adjust': typeof ProductsIdAdjustRoute;
+  '/products/$id/edit': typeof ProductsIdEditRoute;
+  '/products/$id/': typeof ProductsIdIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | '/'
     | '/$'
-    | '/products'
+    | '/expenses'
+    | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
+    | '/setup'
+    | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/import'
+    | '/products/new'
+    | '/products/prices'
+    | '/products/suggested'
+    | '/settings/printer'
+    | '/stock/count'
+    | '/products/'
+    | '/settings/'
+    | '/products/$id/adjust'
+    | '/products/$id/edit'
+    | '/products/$id/';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/$'
-    | '/products'
+    | '/expenses'
+    | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
+    | '/setup'
+    | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/import'
+    | '/products/new'
+    | '/products/prices'
+    | '/products/suggested'
+    | '/settings/printer'
+    | '/stock/count'
+    | '/products'
+    | '/settings'
+    | '/products/$id/adjust'
+    | '/products/$id/edit'
+    | '/products/$id';
   id:
     | '__root__'
     | '/'
     | '/$'
-    | '/products'
+    | '/expenses'
+    | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
+    | '/setup'
+    | '/suppliers'
     | '/udhaar'
-    | '/dev/ui';
+    | '/dev/ui'
+    | '/products/categories'
+    | '/products/import'
+    | '/products/new'
+    | '/products/prices'
+    | '/products/suggested'
+    | '/settings/printer'
+    | '/stock/count'
+    | '/products/'
+    | '/settings/'
+    | '/products/$id/adjust'
+    | '/products/$id/edit'
+    | '/products/$id/';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
-  ProductsRoute: typeof ProductsRoute;
+  ExpensesRoute: typeof ExpensesRoute;
+  ReportsRoute: typeof ReportsRoute;
   SalesRoute: typeof SalesRoute;
   SellRoute: typeof SellRoute;
-  SettingsRoute: typeof SettingsRoute;
+  SetupRoute: typeof SetupRoute;
+  SuppliersRoute: typeof SuppliersRoute;
   UdhaarRoute: typeof UdhaarRoute;
   DevUiRoute: typeof DevUiRoute;
+  ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
+  ProductsImportRoute: typeof ProductsImportRoute;
+  ProductsNewRoute: typeof ProductsNewRoute;
+  ProductsPricesRoute: typeof ProductsPricesRoute;
+  ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  SettingsPrinterRoute: typeof SettingsPrinterRoute;
+  StockCountRoute: typeof StockCountRoute;
+  ProductsIndexRoute: typeof ProductsIndexRoute;
+  SettingsIndexRoute: typeof SettingsIndexRoute;
+  ProductsIdAdjustRoute: typeof ProductsIdAdjustRoute;
+  ProductsIdEditRoute: typeof ProductsIdEditRoute;
+  ProductsIdIndexRoute: typeof ProductsIdIndexRoute;
 }
 
 declare module '@tanstack/react-router' {
@@ -150,11 +332,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/products': {
-      id: '/products';
-      path: '/products';
-      fullPath: '/products';
-      preLoaderRoute: typeof ProductsRouteImport;
+    '/expenses': {
+      id: '/expenses';
+      path: '/expenses';
+      fullPath: '/expenses';
+      preLoaderRoute: typeof ExpensesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/reports': {
+      id: '/reports';
+      path: '/reports';
+      fullPath: '/reports';
+      preLoaderRoute: typeof ReportsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sales': {
@@ -171,11 +360,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SellRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/settings': {
-      id: '/settings';
-      path: '/settings';
-      fullPath: '/settings';
-      preLoaderRoute: typeof SettingsRouteImport;
+    '/setup': {
+      id: '/setup';
+      path: '/setup';
+      fullPath: '/setup';
+      preLoaderRoute: typeof SetupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/suppliers': {
+      id: '/suppliers';
+      path: '/suppliers';
+      fullPath: '/suppliers';
+      preLoaderRoute: typeof SuppliersRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/udhaar': {
@@ -192,18 +388,116 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevUiRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/products/': {
+      id: '/products/';
+      path: '/products';
+      fullPath: '/products/';
+      preLoaderRoute: typeof ProductsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/categories': {
+      id: '/products/categories';
+      path: '/products/categories';
+      fullPath: '/products/categories';
+      preLoaderRoute: typeof ProductsCategoriesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/import': {
+      id: '/products/import';
+      path: '/products/import';
+      fullPath: '/products/import';
+      preLoaderRoute: typeof ProductsImportRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/new': {
+      id: '/products/new';
+      path: '/products/new';
+      fullPath: '/products/new';
+      preLoaderRoute: typeof ProductsNewRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/prices': {
+      id: '/products/prices';
+      path: '/products/prices';
+      fullPath: '/products/prices';
+      preLoaderRoute: typeof ProductsPricesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/suggested': {
+      id: '/products/suggested';
+      path: '/products/suggested';
+      fullPath: '/products/suggested';
+      preLoaderRoute: typeof ProductsSuggestedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/': {
+      id: '/settings/';
+      path: '/settings';
+      fullPath: '/settings/';
+      preLoaderRoute: typeof SettingsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/printer': {
+      id: '/settings/printer';
+      path: '/settings/printer';
+      fullPath: '/settings/printer';
+      preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/stock/count': {
+      id: '/stock/count';
+      path: '/stock/count';
+      fullPath: '/stock/count';
+      preLoaderRoute: typeof StockCountRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/': {
+      id: '/products/$id/';
+      path: '/products/$id';
+      fullPath: '/products/$id/';
+      preLoaderRoute: typeof ProductsIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/adjust': {
+      id: '/products/$id/adjust';
+      path: '/products/$id/adjust';
+      fullPath: '/products/$id/adjust';
+      preLoaderRoute: typeof ProductsIdAdjustRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/products/$id/edit': {
+      id: '/products/$id/edit';
+      path: '/products/$id/edit';
+      fullPath: '/products/$id/edit';
+      preLoaderRoute: typeof ProductsIdEditRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
-  ProductsRoute: ProductsRoute,
+  ExpensesRoute: ExpensesRoute,
+  ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
   SellRoute: SellRoute,
-  SettingsRoute: SettingsRoute,
+  SetupRoute: SetupRoute,
+  SuppliersRoute: SuppliersRoute,
   UdhaarRoute: UdhaarRoute,
   DevUiRoute: DevUiRoute,
+  ProductsCategoriesRoute: ProductsCategoriesRoute,
+  ProductsImportRoute: ProductsImportRoute,
+  ProductsNewRoute: ProductsNewRoute,
+  ProductsPricesRoute: ProductsPricesRoute,
+  ProductsSuggestedRoute: ProductsSuggestedRoute,
+  SettingsPrinterRoute: SettingsPrinterRoute,
+  StockCountRoute: StockCountRoute,
+  ProductsIndexRoute: ProductsIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+  ProductsIdAdjustRoute: ProductsIdAdjustRoute,
+  ProductsIdEditRoute: ProductsIdEditRoute,
+  ProductsIdIndexRoute: ProductsIdIndexRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

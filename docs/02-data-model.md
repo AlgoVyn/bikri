@@ -857,7 +857,7 @@ export const DEXIE_SCHEMA_V1 = {
   day_closes: 'id, [device_id+period_end], business_date',
   audit_log: 'id, [entity+entity_id], created_at',
   // local-only
-  outbox: '++seq, &op_id, status, created_at',
+  outbox: '++seq, &op_id, status, created_at, [tbl+row_id]', // [tbl+row_id]: coalescing lookup (D-088)
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',

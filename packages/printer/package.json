@@ -6,9 +6,15 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@bikri/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
     "vitest": "5.0.5"
   }
 }
