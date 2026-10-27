@@ -12,13 +12,13 @@ import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as AdminRouteImport } from './routes/admin.tsx';
-import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
 import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
 import { Route as AdminBackupsRouteImport } from './routes/admin/backups.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
+import { Route as ExpensesIndexRouteImport } from './routes/expenses/index.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
 import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
 import { Route as ProductsImportRouteImport } from './routes/products/import.tsx';
@@ -62,11 +62,6 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/admin.lazy.tsx').then((d) => d.Route));
-const ExpensesRoute = ExpensesRouteImport.update({
-  id: '/expenses',
-  path: '/expenses',
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -101,6 +96,13 @@ const DevUiRoute = DevUiRouteImport.update({
   path: '/dev/ui',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ExpensesIndexRoute = ExpensesIndexRouteImport.update({
+  id: '/expenses/',
+  path: '/expenses/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/expenses/index.lazy.tsx').then((d) => d.Route),
+);
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -271,7 +273,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/expenses': typeof ExpensesRoute;
   '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
@@ -291,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -309,7 +311,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
-  '/expenses': typeof ExpensesRoute;
   '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
@@ -328,6 +329,7 @@ export interface FileRoutesByTo {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin': typeof AdminIndexRoute;
+  '/expenses': typeof ExpensesIndexRoute;
   '/products': typeof ProductsIndexRoute;
   '/sales': typeof SalesIndexRoute;
   '/settings': typeof SettingsIndexRoute;
@@ -348,7 +350,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
-  '/expenses': typeof ExpensesRoute;
   '/reports': typeof ReportsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
@@ -368,6 +369,7 @@ export interface FileRoutesById {
   '/udhaar/$customerId': typeof UdhaarCustomerIdRoute;
   '/udhaar/chase': typeof UdhaarChaseRoute;
   '/admin/': typeof AdminIndexRoute;
+  '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -389,7 +391,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
-    | '/expenses'
     | '/reports'
     | '/sell'
     | '/setup'
@@ -409,6 +410,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin/'
+    | '/expenses/'
     | '/products/'
     | '/sales/'
     | '/settings/'
@@ -427,7 +429,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/expenses'
     | '/reports'
     | '/sell'
     | '/setup'
@@ -446,6 +447,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin'
+    | '/expenses'
     | '/products'
     | '/sales'
     | '/settings'
@@ -465,7 +467,6 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
-    | '/expenses'
     | '/reports'
     | '/sell'
     | '/setup'
@@ -485,6 +486,7 @@ export interface FileRouteTypes {
     | '/udhaar/$customerId'
     | '/udhaar/chase'
     | '/admin/'
+    | '/expenses/'
     | '/products/'
     | '/sales/'
     | '/settings/'
@@ -505,7 +507,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
   AdminRoute: typeof AdminRouteWithChildren;
-  ExpensesRoute: typeof ExpensesRoute;
   ReportsRoute: typeof ReportsRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
@@ -523,6 +524,7 @@ export interface RootRouteChildren {
   SuppliersSupplierIdRoute: typeof SuppliersSupplierIdRouteWithChildren;
   UdhaarCustomerIdRoute: typeof UdhaarCustomerIdRoute;
   UdhaarChaseRoute: typeof UdhaarChaseRoute;
+  ExpensesIndexRoute: typeof ExpensesIndexRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
   SalesIndexRoute: typeof SalesIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
@@ -554,13 +556,6 @@ declare module '@tanstack/react-router' {
       path: '/admin';
       fullPath: '/admin';
       preLoaderRoute: typeof AdminRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/expenses': {
-      id: '/expenses';
-      path: '/expenses';
-      fullPath: '/expenses';
-      preLoaderRoute: typeof ExpensesRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/reports': {
@@ -603,6 +598,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/ui';
       fullPath: '/dev/ui';
       preLoaderRoute: typeof DevUiRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/expenses/': {
+      id: '/expenses/';
+      path: '/expenses';
+      fullPath: '/expenses/';
+      preLoaderRoute: typeof ExpensesIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/products/': {
@@ -843,7 +845,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
-  ExpensesRoute: ExpensesRoute,
   ReportsRoute: ReportsRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
@@ -861,6 +862,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliersSupplierIdRoute: SuppliersSupplierIdRouteWithChildren,
   UdhaarCustomerIdRoute: UdhaarCustomerIdRoute,
   UdhaarChaseRoute: UdhaarChaseRoute,
+  ExpensesIndexRoute: ExpensesIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
   SalesIndexRoute: SalesIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
