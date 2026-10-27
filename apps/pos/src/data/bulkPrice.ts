@@ -96,7 +96,7 @@ export async function applyPrices(
           );
         }
       },
-      opts,
+      { actor: ctx.staff_id, ...opts },
     );
   }
   return changed.length;
