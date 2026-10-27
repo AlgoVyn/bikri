@@ -114,6 +114,12 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
     .getByRole('button', { name: 'Revoke' })
     .click();
   await expect(row).toContainText('Revoked');
+  // Lock (Ctrl+L) drops the owner session: the next server action asks for a code again (journey 24).
+  await a.page.keyboard.press('Control+l');
+  await unlock(a.page);
+  const again = a.page.getByTestId('owner-signin');
+  await expect(again).toBeVisible();
+  await again.getByRole('button', { name: 'Cancel' }).click();
   await b.page.goto('/bikri/');
   await syncNow(b.page);
   await expect(
