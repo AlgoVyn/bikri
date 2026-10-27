@@ -169,8 +169,9 @@ test.describe('setup wizard (T-012)', () => {
       page.getByRole('heading', { name: 'Your shop is ready' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Add your first product' }),
+      page.getByRole('heading', { name: 'Add your first products' }),
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Add product' })).toBeVisible();
 
     // AC3, AC5, AC6 in storage.
     const shop = (await idbGet(page, 'shop', 'shop')) as Record<

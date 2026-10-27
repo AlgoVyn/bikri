@@ -66,6 +66,8 @@ export { computeCart, isBelowCost } from './money/totals.ts';
 export type { NumberGrouping } from './moneyFormat.ts';
 export { formatMoney, groupLakh, parseMoneyToPaisa } from './moneyFormat.ts';
 export { API_BASE, BASE_PATH } from './paths.ts';
+export type { Permission, Role } from './permissions.ts';
+export { can, PERMISSIONS, roleAllows } from './permissions.ts';
 export type { ParsedPhone, PhoneKind } from './phone.ts';
 export { parsePkPhone, whatsAppUrl } from './phone.ts';
 export type { PinHash } from './pin.ts';

@@ -32,16 +32,52 @@
     "wapsi": "Wapsi"
   },
   "home": {
+    "add_product": "Product shamil karein",
+    "as_of_device": "Is device ke mutabiq",
+    "attention": "Tawajjo talab",
+    "attn_conflicts": "{{count}} sync tanaze dekhein",
+    "attn_day_not_closed": "{{date}} ka hisaab is device par band nahin hua",
+    "attn_failed_prints": "{{count}} raseedein print nahin huin",
+    "attn_low_stock": "{{count}} items ka stock kam hai",
+    "attn_over_limit": "{{count}} gahak had se zyada",
+    "attn_promises": "{{count}} udhaar waday aaj ke",
+    "bills_count": "{{count}} bill",
+    "cash_drawer": "Daraz mein naqd",
+    "day_close": "Rozana hisaab",
     "first_product": "Apni pehli product shamil karein",
-    "no_products": "Abhi koi product nahin. Bechne ke liye aik shamil karein."
+    "first_products": "Apni pehli products shamil karein",
+    "greeting": "Assalam-o-Alaikum, {{name}}",
+    "import": "Spreadsheet se layein",
+    "new_sale": "Nayi sale",
+    "no_bills": "Is device par abhi koi bill nahin.",
+    "no_products": "Abhi koi product nahin. Bechne ke liye aik shamil karein.",
+    "price_check": "Qeemat dekhein",
+    "profit_today": "Aaj ka munafa",
+    "quick_actions": "Fori kaam",
+    "recent_bills": "Haaliya bill",
+    "sold_today": "Aaj ki farokht",
+    "suggested": "Tajweez karda fehrist se",
+    "udhaar_given": "Diya {{amount}}",
+    "udhaar_received": "Wasool {{amount}}",
+    "udhaar_today": "Aaj ka udhaar"
   },
   "nav": {
+    "expenses": "Kharchay",
     "home": "Home",
+    "more": "Mazeed",
     "products": "Products",
     "rail": "Main",
+    "reports": "Reports",
     "sales": "Sales",
     "sell": "Sale",
     "settings": "Settings",
+    "suppliers": "Suppliers",
+    "udhaar": "Udhaar"
+  },
+  "payment": {
+    "bank_wallet": "Bank/wallet",
+    "card": "Card",
+    "cash": "Naqd",
     "udhaar": "Udhaar"
   },
   "setup": {
@@ -128,11 +164,37 @@
     "lang_roman_ur": "Roman Urdu",
     "lang_ur": "اردو",
     "language": "Zubaan",
+    "no_access": "Aap ko ijazat nahin",
+    "offline": "Offline — sale isi device par save ho rahi hai",
+    "printer_none": "Printer set nahin",
+    "printer_ready": "Printer tayyar hai",
+    "role_cashier": "Cashier",
+    "role_manager": "Manager",
+    "role_owner": "Maalik",
+    "search_bills": "Bill",
+    "search_customers": "Gahak",
+    "search_label": "Products, gahak, bill talash karein",
+    "search_none": "Kuch nahin mila",
+    "search_products": "Products",
+    "staff_menu": "Staff menu",
+    "sync_problem": "Sync mein masla",
+    "sync_synced": "Sync ho gaya",
+    "sync_syncing": "Sync ho raha hai…",
+    "sync_waiting": "{{count}} baqi",
     "theme_dark": "Dark",
     "theme_light": "Light",
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
     "update_ready": "Update tayyar hai"
+  },
+  "tenant": {
+    "readOnly": {
+      "banner": "Yeh dukaan sirf dekhne ke liye hai. Aap reports aur record dekh sakte hain aur apna data export kar sakte hain, lekin nayi sale ya koi tabdeeli nahin kar sakte. Algovyn se rabta karein.",
+      "blocked": "Dukaan sirf dekhne ke liye hai: yeh save nahin ho sakta."
+    },
+    "support": {
+      "banner": "Algovyn support ko {{time}} tak is dukaan tak rasai hasil hai. Wajah: {{reason}}."
+    }
   },
   "ui": {
     "allow_negative": "Manfi raqam",
