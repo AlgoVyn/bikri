@@ -68,3 +68,41 @@ export function rowJsonExpr(tbl: D1Table, alias = ''): string {
 export function selectList(tbl: D1Table): string {
   return clientColumns(tbl).join(', ');
 }
+
+/**
+ * Parents before children for applying one push without deferred foreign keys (D-104): every
+ * foreign key of a synced table points to a table earlier in this list (or to itself).
+ */
+export const APPLY_ORDER = [
+  'shop',
+  'branches',
+  'staff',
+  'categories',
+  'products',
+  'product_barcodes',
+  'customers',
+  'suppliers',
+  'expense_categories',
+  'promises',
+  'sales',
+  'sale_lines',
+  'refunds',
+  'refund_lines',
+  'sale_voids',
+  'purchases',
+  'purchase_lines',
+  'supplier_returns',
+  'supplier_return_lines',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
+  'expenses',
+  'cash_moves',
+  'day_closes',
+  'audit_log',
+] as const;
+
+const RANK = new Map<string, number>(APPLY_ORDER.map((t, i) => [t, i]));
+export function applyRank(tbl: string): number {
+  return RANK.get(tbl) ?? APPLY_ORDER.length;
+}

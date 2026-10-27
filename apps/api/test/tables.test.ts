@@ -36,3 +36,24 @@ describe('packages/db/src/tables.ts', () => {
     expect(parsed).not.toHaveProperty('token_hash');
   });
 });
+
+describe('APPLY_ORDER', () => {
+  it('lists parents before children for every synced foreign key', async () => {
+    const { APPLY_ORDER } = await import('../src/sync/tables.ts');
+    const rank = new Map<string, number>(APPLY_ORDER.map((t, i) => [t, i]));
+    for (const tbl of APPLY_ORDER) {
+      const fks = await env.DB.prepare(
+        'SELECT "table" AS parent FROM pragma_foreign_key_list(?1)',
+      )
+        .bind(tbl)
+        .all<{ parent: string }>();
+      for (const { parent } of fks.results) {
+        if (parent === 'tenants' || parent === tbl || parent === 'devices')
+          continue;
+        expect(rank.get(parent), `${tbl} → ${parent}`).toBeLessThan(
+          rank.get(tbl) ?? -1,
+        );
+      }
+    }
+  });
+});
