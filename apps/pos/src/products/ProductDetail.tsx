@@ -19,6 +19,7 @@ import { getDb } from '../data/db.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { AdjustDialog } from './AdjustDialog.tsx';
 import { marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
@@ -31,7 +32,14 @@ const timeFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Karachi',
 });
 
-export function ProductDetailPage({ id }: { id: string }) {
+export function ProductDetailPage({
+  id,
+  adjust = false,
+}: {
+  id: string;
+  /** `/products/:id/adjust` opens the stock adjust dialog (screens/09). */
+  adjust?: boolean;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -149,6 +157,15 @@ export function ProductDetailPage({ id }: { id: string }) {
               className={buttonQuiet}
             >
               {t('products.duplicate')}
+            </Link>
+          ) : null}
+          {p.track_stock === 1 && can('stock.adjust') ? (
+            <Link
+              to="/products/$id/adjust"
+              params={{ id }}
+              className={buttonQuiet}
+            >
+              {t('adjust.button')}
             </Link>
           ) : null}
           {can('catalog.delete') ? (
@@ -349,6 +366,14 @@ export function ProductDetailPage({ id }: { id: string }) {
           }
         }}
       />
+      {adjust && p.track_stock === 1 && can('stock.adjust') ? (
+        <AdjustDialog
+          product={p}
+          onHand={detail.onHand}
+          open
+          onClose={() => void navigate({ to: '/products/$id', params: { id } })}
+        />
+      ) : null}
     </div>
   );
 }
