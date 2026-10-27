@@ -17,3 +17,8 @@ export function rupeesCsv(paisa: number): string {
 export function qtyCsv(milli: number): string {
   return String(milli / 1000);
 }
+
+/** Paisa → rupees with exactly two decimals (`43000.00`), for report exports (screens/16 AC 6). */
+export function rupeesCsv2(paisa: number): string {
+  return (paisa / 100).toFixed(2);
+}
