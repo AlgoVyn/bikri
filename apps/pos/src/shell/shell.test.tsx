@@ -197,6 +197,8 @@ describe('app shell', () => {
   it('counts waiting outbox ops in the sync badge', async () => {
     await renderAt(`${BASE_PATH}/`);
     const badge = await screen.findByTestId('sync-badge');
-    expect(badge.getAttribute('aria-label')).toMatch(/^\d+ changes waiting/u);
+    expect(badge.getAttribute('aria-label')).toMatch(
+      /^\d+ waiting\. \d+ changes waiting/u,
+    );
   });
 });
