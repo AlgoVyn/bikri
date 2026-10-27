@@ -174,6 +174,7 @@ function wrangler(args) {
     cwd: join(ROOT, 'apps/api'),
     encoding: 'utf8',
     env: process.env,
+    maxBuffer: 64 * 1024 * 1024,
   });
   if (res.error) throw res.error;
   if (res.status !== 0)
