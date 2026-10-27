@@ -1,6 +1,7 @@
 import { APP_VERSION } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { zipStore } from '../admin/zip.ts';
+import { SyncHttpError } from '../sync/client.ts';
 import { shopRequest } from '../sync/shopApi.ts';
 import { tenantInfo } from './localTenant.ts';
 import {
@@ -33,7 +34,20 @@ type Session = {
   tables: ServerExportTable[];
   after: Record<string, string>;
   done: string[];
+  /** A server export token is valid for 2 h (04 §3.8). */
+  started_at: number;
+  tenant_id: string;
 };
+
+const EXPORT_TTL = 2 * 60 * 60 * 1000;
+
+function expired(error: unknown): boolean {
+  return (
+    error instanceof SyncHttpError &&
+    error.status === 400 &&
+    /expired/iu.test(error.message)
+  );
+}
 
 function readSession(): Session | null {
   try {
@@ -82,18 +96,23 @@ export type ServerExportProgress = {
 };
 
 /** Pages the server export and builds the same zip as the device export (T-053). */
-export async function buildServerExport(
+async function buildOnce(
   db: BikriDb,
   staffId: string,
-  options: { onProgress?: (progress: ServerExportProgress) => void } = {},
+  options: { onProgress?: (progress: ServerExportProgress) => void },
 ): Promise<{
   bytes: Uint8Array;
   filename: string;
   manifest: ShopExportManifest;
 }> {
   let session = readSession();
-  if (session) session = { ...session, after: {}, done: [] };
+  const fresh =
+    session !== null &&
+    session.tenant_id === db.tenantId &&
+    Date.now() - session.started_at < EXPORT_TTL;
+  if (session && fresh) session = { ...session, after: {}, done: [] };
   else {
+    clearServerExportSession();
     const start = await shopRequest<ServerExportStart>(db, staffId, '/export');
     session = {
       export_id: start.export_id,
@@ -101,6 +120,8 @@ export async function buildServerExport(
       tables: start.tables,
       after: {},
       done: [],
+      started_at: Date.now(),
+      tenant_id: db.tenantId,
     };
     writeSession(session);
   }
@@ -180,4 +201,25 @@ export async function buildServerExport(
     filename: shopExportFilename(displayName, now),
     manifest,
   };
+}
+
+/** Pages the server export and builds the same zip as the device export (T-053). */
+export async function buildServerExport(
+  db: BikriDb,
+  staffId: string,
+  options: { onProgress?: (progress: ServerExportProgress) => void } = {},
+): Promise<{
+  bytes: Uint8Array;
+  filename: string;
+  manifest: ShopExportManifest;
+}> {
+  try {
+    return await buildOnce(db, staffId, options);
+  } catch (error) {
+    // A resumed token can have expired between sessions; start once more, then surface
+    // the server's rate-limit message if the shop already exported today.
+    if (!expired(error)) throw error;
+    clearServerExportSession();
+    return buildOnce(db, staffId, options);
+  }
 }

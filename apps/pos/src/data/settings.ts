@@ -405,6 +405,13 @@ for (const action of [
   'void',
   'refund',
   'stock_count',
+  'supplier_return',
+  'drawer_open',
+  'device_change',
+  'device_enrol_code',
+  'device_revoke',
+  'ops_import',
+  'pin_reset',
   'day_close_difference',
   'sync_ops_discarded',
   'cache_rebuilt',
@@ -460,9 +467,31 @@ export function auditSummary(row: SyncedRow): string {
   return '';
 }
 
-function rangeEpochs(filters: AuditFilters): { start: number; end: number } {
-  const start = Date.parse(`${filters.from}T00:00:00+05:00`);
-  const end = Date.parse(`${filters.to}T23:59:59.999+05:00`);
+function zoneOffsetMs(at: number, timeZone: string): number {
+  const name =
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      timeZoneName: 'longOffset',
+    })
+      .formatToParts(new Date(at))
+      .find((part) => part.type === 'timeZoneName')?.value ?? 'GMT+00:00';
+  const match = /GMT([+-])(\d{2}):(\d{2})/u.exec(name);
+  if (!match) return 0;
+  const sign = match[1] === '-' ? -1 : 1;
+  return sign * (Number(match[2]) * 60 + Number(match[3])) * 60_000;
+}
+
+function rangeEpochs(
+  filters: AuditFilters,
+  timeZone: string,
+): { start: number; end: number } {
+  const from = Date.parse(`${filters.from}T12:00:00Z`);
+  const to = Date.parse(`${filters.to}T12:00:00Z`);
+  // The shop's local day boundaries, not a fixed +05:00 (screens/17 Activity).
+  const start =
+    Date.parse(`${filters.from}T00:00:00Z`) - zoneOffsetMs(from, timeZone);
+  const end =
+    Date.parse(`${filters.to}T23:59:59.999Z`) - zoneOffsetMs(to, timeZone);
   return { start, end };
 }
 
@@ -470,7 +499,9 @@ export async function auditList(
   db: BikriDb,
   filters: AuditFilters,
 ): Promise<AuditRow[]> {
-  const { start, end } = rangeEpochs(filters);
+  const shop = await db.shop.get('shop');
+  const timeZone = String(shop?.timezone ?? 'Asia/Karachi');
+  const { start, end } = rangeEpochs(filters, timeZone);
   const rows = (
     await db.audit_log
       .where('created_at')

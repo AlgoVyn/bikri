@@ -190,6 +190,69 @@ describe('suppliers and deliveries (T-045)', () => {
     expect(purchase).toMatchObject({ total: 930000, other_charges: 30000 });
   });
 
+  it('averages duplicate product lines in order and accepts a zero-total delivery', async () => {
+    const { db, ctx } = await setup('dupes');
+    const item = await saveNewProduct(
+      db,
+      { name_en: 'Free sample', price: 100000, cost: 0, opening_milli: 0 },
+      ctx,
+      { now: NOW },
+    );
+    const supplier = await createSupplier(
+      db,
+      { name: 'Dup Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'delivery-dupes',
+        supplierId: supplier.id,
+        date: TODAY,
+        lines: [
+          { productId: item.id, qtyMilli: 1000, unitCost: 100 },
+          { productId: item.id, qtyMilli: 1000, unitCost: 300 },
+        ],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 1000 },
+    );
+    expect(await db.products.get(item.id)).toMatchObject({
+      avg_cost: 200,
+      last_cost: 300,
+    });
+    expect((await db.stock_levels.get(item.id))?.on_hand_milli).toBe(2000);
+
+    const free = await saveDelivery(
+      db,
+      {
+        purchaseId: 'delivery-free',
+        supplierId: supplier.id,
+        date: TODAY,
+        lines: [{ productId: item.id, qtyMilli: 1000, unitCost: 0 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 2000 },
+    );
+    expect(free.total).toBe(0);
+    expect(
+      await db.ledger_entries
+        .filter((row) => row.source_id === 'delivery-free')
+        .count(),
+    ).toBe(0);
+    expect(
+      await db.stock_movements
+        .filter((row) => row.ref_id === 'delivery-free')
+        .count(),
+    ).toBe(1);
+  });
+
   it('AC 4: no supplier expense category exists', async () => {
     const { db } = await setup('categories');
     expect(

@@ -139,6 +139,12 @@ export async function saveDelivery(
         created_at: now,
       };
       await w.insert('purchases', purchase);
+      // Duplicate product lines are allowed; average against the running state so the
+      // second line does not reuse the pre-action average.
+      const costState = new Map<
+        string,
+        { on_hand: number; avg_cost: number }
+      >();
       let lineNo = 0;
       for (const [index, line] of input.lines.entries()) {
         lineNo += 1;
@@ -156,24 +162,35 @@ export async function saveDelivery(
           landed_unit_cost: priced.landed_unit_cost,
           created_at: now,
         });
-        const onHand =
-          (
-            await w
-              .table<{ product_id: string; on_hand_milli: number }>(
-                'stock_levels',
-              )
-              .get(line.productId)
-          )?.on_hand_milli ?? 0;
+        let state = costState.get(line.productId);
+        if (!state) {
+          const onHand =
+            (
+              await w
+                .table<{ product_id: string; on_hand_milli: number }>(
+                  'stock_levels',
+                )
+                .get(line.productId)
+            )?.on_hand_milli ?? 0;
+          state = {
+            on_hand: onHand,
+            avg_cost: Number(product.avg_cost ?? 0),
+          };
+          costState.set(line.productId, state);
+        }
         const patch: Record<string, unknown> = {
-          last_cost: line.unitCost,
+          // 07 §7: every costed movement sets last_cost to its (landed) unit cost.
+          last_cost: priced.landed_unit_cost,
         };
         if (product.track_stock === 1) {
           patch.avg_cost = nextAvgCost({
-            on_hand_milli: onHand,
-            avg_cost: Number(product.avg_cost ?? 0),
+            on_hand_milli: state.on_hand,
+            avg_cost: state.avg_cost,
             qty_milli: line.qtyMilli,
             unit_cost: priced.landed_unit_cost,
           });
+          state.on_hand += line.qtyMilli;
+          state.avg_cost = Number(patch.avg_cost);
           await w.insert('stock_movements', {
             id: newId(now),
             product_id: line.productId,
@@ -209,20 +226,22 @@ export async function saveDelivery(
         }
         await w.update('products', line.productId, patch);
       }
-      await w.insert('ledger_entries', {
-        id: newId(now),
-        party_type: 'supplier',
-        party_id: input.supplierId,
-        amount: result.total,
-        source_type: 'purchase',
-        source_id: input.purchaseId,
-        note: purchase.supplier_invoice_no,
-        branch_id: ctx.branch_id,
-        device_id: ctx.device_id,
-        staff_id: ctx.staff_id,
-        business_date: date,
-        created_at: now,
-      });
+      // A free-of-charge delivery must not write the zero amount the ledger CHECK forbids.
+      if (result.total > 0)
+        await w.insert('ledger_entries', {
+          id: newId(now),
+          party_type: 'supplier',
+          party_id: input.supplierId,
+          amount: result.total,
+          source_type: 'purchase',
+          source_id: input.purchaseId,
+          note: purchase.supplier_invoice_no,
+          branch_id: ctx.branch_id,
+          device_id: ctx.device_id,
+          staff_id: ctx.staff_id,
+          business_date: date,
+          created_at: now,
+        });
       if (input.paidNow > 0 && input.paidMethod) {
         const paymentId = newId(now);
         await w.insert('payments', {

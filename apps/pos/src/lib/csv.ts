@@ -3,8 +3,15 @@
 /** One cell: quotes separators and neutralises spreadsheet formula injection. */
 export function csvCell(value: unknown): string {
   let s = String(value ?? '');
-  // Spreadsheet formula injection: text starting with = + - @ is prefixed with '.
-  if (typeof value === 'string' && /^[=+\-@]/u.test(s)) s = `'${s}`;
+  // Spreadsheet formula injection: text starting with = + - @ (or tab/CR) is prefixed
+  // with '. A plain number, including a negative amount, is left as a number so Excel
+  // still sums the column.
+  if (
+    typeof value === 'string' &&
+    /^[=+\-@\t\r]/u.test(s) &&
+    !/^-?\d+(?:\.\d+)?$/u.test(s)
+  )
+    s = `'${s}`;
   return /[",\n\r]/u.test(s) ? `"${s.replace(/"/gu, '""')}"` : s;
 }
 

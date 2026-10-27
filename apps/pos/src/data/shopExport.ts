@@ -1,6 +1,7 @@
 import { APP_VERSION } from '@bikri/core';
 import { type BikriDb, DEXIE_SCHEMA_V1, LOCAL_ONLY_TABLES } from '@bikri/db';
 import { zipStore } from '../admin/zip.ts';
+import { csvCell } from '../lib/csv.ts';
 import { tenantInfo } from './localTenant.ts';
 
 /** Money columns in 02 (all paisa) — the full export CSV shows rupees with two decimals. */
@@ -15,6 +16,7 @@ const MONEY_FIELDS = new Set([
   'cash_sales',
   'cash_tendered',
   'change_given',
+  'cost_snapshot',
   'charges_alloc',
   'counted_cash',
   'credit_limit',
@@ -58,8 +60,12 @@ const MONEY_FIELDS = new Set([
 const TIME_FIELDS = new Set([
   'created_at',
   'deleted_at',
+  'enrolled_at',
+  'expires_at',
+  'last_seen_at',
   'period_end',
   'period_start',
+  'revoked_at',
   'updated_at',
 ]);
 
@@ -119,18 +125,26 @@ function localIso(at: number): string {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+05:00`;
 }
 
-function csvValue(field: string, value: unknown): string {
+function csvValue(
+  field: string,
+  value: unknown,
+  row: Record<string, unknown>,
+): string {
   if (value === null || value === undefined) return '';
   if (TIME_FIELDS.has(field) && typeof value === 'number')
     return localIso(value);
+  // Discount values are basis points when the same row says `pct`; showing paisa there
+  // would silently divide a percentage by 100.
+  if (
+    typeof value === 'number' &&
+    ((field === 'discount_value' && row.discount_type === 'pct') ||
+      (field === 'bill_discount_value' && row.bill_discount_type === 'pct'))
+  )
+    return (value / 100).toFixed(2);
   if (MONEY_FIELDS.has(field) && typeof value === 'number')
     return (value / 100).toFixed(2);
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
-}
-
-function csvCell(value: string): string {
-  return /[",\n\r]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
 }
 
 export function tableCsv(rows: readonly Record<string, unknown>[]): string {
@@ -147,7 +161,9 @@ export function tableCsv(rows: readonly Record<string, unknown>[]): string {
   const lines = [fields.map(csvCell).join(',')];
   for (const row of rows) {
     lines.push(
-      fields.map((field) => csvCell(csvValue(field, row[field]))).join(','),
+      fields
+        .map((field) => csvCell(csvValue(field, row[field], row)))
+        .join(','),
     );
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`;

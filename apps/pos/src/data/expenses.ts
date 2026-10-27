@@ -117,18 +117,18 @@ export async function expenseList(
     .filter((row) => row.net !== 0)
     .sort((a, b) => b.net - a.net);
 
-  const days: ExpenseDay[] = [];
+  // Group by business date, not by adjacent created_at: reversing an old expense must not
+  // split one day into two sections.
+  const byDay = new Map<string, ExpenseDay>();
   for (const row of rows) {
     const date = String(row.expense.business_date);
-    const last = days.at(-1);
     const amount = n(row.expense.amount) * (row.expense.reverses_id ? -1 : 1);
-    if (!last || last.date !== date) {
-      days.push({ date, total: amount, rows: [row] });
-      continue;
-    }
-    last.total += amount;
-    last.rows.push(row);
+    const day = byDay.get(date) ?? { date, total: 0, rows: [] };
+    day.total += amount;
+    day.rows.push(row);
+    byDay.set(date, day);
   }
+  const days = [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
   return {
     rows,
     days,

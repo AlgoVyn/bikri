@@ -174,11 +174,12 @@ describe('udhaar data', () => {
       { role: 'owner', today: TODAY, now: NOW + 1000 },
     );
     expect((await db.promises.get(promise.id))?.status).toBe('kept');
-    expect(
+    const queued = (
       await db.outbox
         .filter((op) => op.tbl === 'promises' && op.row_id === promise.id)
-        .count(),
-    ).toBeGreaterThan(0);
+        .toArray()
+    ).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+    expect(queued.at(-1)?.row?.status).toBe('kept');
   });
 
   it('refreshes promises to broken the day after the date', async () => {
@@ -259,9 +260,11 @@ describe('udhaar data', () => {
         (r) => r.customer.name,
       ),
     ).toEqual(['Bilal']);
-    expect(
-      (await customerList(db, { today: TODAY, query: 'ali' })).rows,
-    ).toHaveLength(1);
+    const searched = await customerList(db, { today: TODAY, query: 'ali' });
+    expect(searched.rows).toHaveLength(1);
+    // Header cards are shop totals, not search results.
+    expect(searched.totalOwed).toBe(all.totalOwed);
+    expect(searched.owingCount).toBe(all.owingCount);
     expect(
       (await customerList(db, { today: TODAY, query: '3001234567' })).rows,
     ).toHaveLength(1);

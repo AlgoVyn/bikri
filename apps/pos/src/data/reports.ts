@@ -124,7 +124,8 @@ export async function expectedCash(
     .between([deviceId, 0], [deviceId, now])
     .toArray();
   const last = closes.at(-1);
-  const start = last ? n(last.period_end) : 0;
+  const device = await db.devices.get(deviceId);
+  const start = last ? n(last.period_end) : n(device?.created_at);
   const since = <T extends SyncedRow>(rows: T[]) =>
     rows.filter((r) => n(r.created_at) > start && n(r.created_at) <= now);
   const payments = since(

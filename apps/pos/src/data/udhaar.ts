@@ -2,6 +2,7 @@ import { businessDate, formatMoney, newId, type Role } from '@bikri/core';
 import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
+import { isReadOnly } from '../sync/status.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
 import { waLink } from './receipt.ts';
@@ -144,33 +145,31 @@ export async function customerList(
     await (src.table('customers') as Table<MasterRow>).toArray()
   ).filter((c) => !c.deleted_at);
 
-  const rows: CustomerRow[] = [];
-  for (const customer of customers) {
-    const name = String(customer.name ?? '').toLowerCase();
-    const phone = String(customer.phone ?? '').replace(/\D/gu, '');
-    if (
-      query !== '' &&
-      !(
-        words.every((word) => name.includes(word)) ||
-        (digits.length >= 3 && phone.includes(digits))
-      )
-    )
-      continue;
+  const rows: CustomerRow[] = customers.map((customer) => {
     const balance = balances.get(customer.id);
     const promise = promises.get(customer.id)?.[0] ?? null;
-    rows.push({
+    return {
       customer,
       balance: balance?.balance ?? 0,
       oldestUnpaidAt: balance?.oldest_unpaid_at ?? null,
       lastActivityAt: balance?.last_activity_at ?? 0,
       promise,
-    });
-  }
+    };
+  });
+  const matching = rows.filter((row) => {
+    if (query === '') return true;
+    const name = String(row.customer.name ?? '').toLowerCase();
+    const phone = String(row.customer.phone ?? '').replace(/\D/gu, '');
+    return (
+      words.every((word) => name.includes(word)) ||
+      (digits.length >= 3 && phone.includes(digits))
+    );
+  });
 
   const dueToday = (row: CustomerRow) =>
     row.promise !== null && String(row.promise.promised_on) <= options.today;
   const filter = options.filter ?? 'all';
-  const filtered = rows.filter((row) => {
+  const filtered = matching.filter((row) => {
     if (filter === 'owes') return row.balance > 0;
     if (filter === 'in_credit') return row.balance < 0;
     if (filter === 'over_limit')
@@ -281,6 +280,7 @@ export async function customerStatement(
       .toArray()
   ).sort(
     (a, b) =>
+      String(a.business_date).localeCompare(String(b.business_date)) ||
       n(a.created_at) - n(b.created_at) ||
       String(a.id).localeCompare(String(b.id)),
   );
@@ -546,9 +546,7 @@ async function keepPromises(w: Writer, customerId: string): Promise<void> {
       .reduce((sum, e) => sum - n(e.amount), 0);
     const amount = promise.amount === null ? null : Number(promise.amount ?? 0);
     if (balance <= 0 || (amount !== null && since >= amount))
-      await (w.table('promises') as Table<SyncedRow>).update(promise.id, {
-        status: 'kept',
-      });
+      await w.update('promises', promise.id, { status: 'kept' });
   }
 }
 
@@ -603,6 +601,9 @@ export async function refreshPromises(
   db: BikriDb,
   options: { today: string; now?: number },
 ): Promise<number> {
+  // Opening the chase list must never write in a read-only shop or on a support device.
+  if (await isReadOnly(db)) return 0;
+  if ((await db.kv.get('device_kind'))?.value === 'support') return 0;
   const promises = (await db.promises.toArray()).filter(
     (p) => !p.deleted_at && p.status === 'open',
   );

@@ -204,6 +204,45 @@ describe('expenses and cash moves (T-046)', () => {
     ).rejects.toMatchObject({ code: 'same_day' });
   });
 
+  it('groups one business date together when an old expense is reversed later', async () => {
+    const { db, ctx } = await setup('grouping');
+    const yesterday = businessDate(NOW - 86_400_000, TZ);
+    const old = await createExpense(
+      db,
+      {
+        expenseId: 'group-old',
+        categoryId: 'ec-1',
+        amount: 10000,
+        method: 'cash',
+        date: yesterday,
+      },
+      ctx,
+      { role: 'owner', today: TODAY, now: NOW + 1000 },
+    );
+    await createExpense(
+      db,
+      {
+        expenseId: 'group-today',
+        categoryId: 'ec-1',
+        amount: 20000,
+        method: 'cash',
+        date: TODAY,
+      },
+      ctx,
+      { role: 'owner', today: TODAY, now: NOW + 2000 },
+    );
+    await reverseExpense(
+      db,
+      { expenseId: old.id, reversalId: 'group-reversal' },
+      ctx,
+      { role: 'owner', today: TODAY, now: NOW + 3000 },
+    );
+    const list = await expenseList(db, { from: yesterday, to: TODAY });
+    expect(list.days.map((day) => day.date)).toEqual([TODAY, yesterday]);
+    expect(list.days.find((day) => day.date === yesterday)?.total).toBe(0);
+    expect(list.days.find((day) => day.date === TODAY)?.total).toBe(20000);
+  });
+
   it('cash moves are appended and counted in expected cash', async () => {
     const { db, ctx } = await setup('cash');
     await cashMove(
