@@ -114,14 +114,19 @@ describe('Home attention and recent bills (screens/04)', () => {
     const db = await readyDb();
     await writeAction(db, async (w) => {
       await w.create('products', {
-        name: 'Tracked',
+        name_en: 'Tracked',
         track_stock: 1,
         min_stock_milli: 2000,
       });
       await w.create('products', {
-        name: 'Service',
+        name_en: 'Service',
         track_stock: 0,
         min_stock_milli: 2000,
+      });
+      await w.create('products', {
+        name_en: 'No alert',
+        track_stock: 1,
+        min_stock_milli: 0,
       });
     });
     expect(await lowStockCount(db)).toBe(1);

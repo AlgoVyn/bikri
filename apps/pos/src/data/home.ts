@@ -8,14 +8,15 @@ export type AttentionItem =
   | { kind: 'conflicts'; count: number }
   | { kind: 'day_not_closed'; date: string };
 
-/** Products with track_stock = 1 at or below their minimum (screens/04 AC 4). */
+/** Products with track_stock = 1 at or below their low-stock alert (min 0 = off; screens/04 AC 4). */
 export async function lowStockCount(db: BikriDb): Promise<number> {
   let count = 0;
   const products = await db.products.toArray();
   for (const p of products) {
-    if (p.deleted_at || p.track_stock !== 1) continue;
+    const min = Number(p.min_stock_milli ?? 0);
+    if (p.deleted_at || p.track_stock !== 1 || min <= 0) continue;
     const level = (await db.stock_levels.get(p.id))?.on_hand_milli ?? 0;
-    if (level <= Number(p.min_stock_milli ?? 0)) count += 1;
+    if (level <= min) count += 1;
   }
   return count;
 }
