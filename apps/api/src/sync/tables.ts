@@ -48,7 +48,7 @@ const MAX_FN_ARGS = 32;
 
 /**
  * `json_object(...)` of a table's client columns, nested with `json_insert` when it would pass
- * D1's 32-argument limit. (`json_patch` would drop null values, so it is not used: D-102.)
+ * D1's 32-argument limit. (`json_patch` would drop null values, so it is not used: D-103.)
  */
 export function rowJsonExpr(tbl: D1Table, alias = ''): string {
   const cols = clientColumns(tbl);
