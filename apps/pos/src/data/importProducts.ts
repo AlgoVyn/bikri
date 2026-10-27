@@ -583,7 +583,7 @@ export async function runImport(
           result.updated += 1;
         }
       },
-      opts,
+      { actor: ctx.staff_id, ...opts },
     );
     opts.onProgress?.(
       Math.min(start + IMPORT_CHUNK, valid.length),
