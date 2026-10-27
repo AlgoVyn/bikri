@@ -9,5 +9,13 @@
     "rootDir": ".",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src", "vitest.config.ts", "en.json", "ur.json", "roman-ur.json"]
+  "include": [
+    "src",
+    "vitest.config.ts",
+    "en.json",
+    "ur.json",
+    "roman-ur.json",
+    "admin/*.json",
+    "office/*.json"
+  ]
 }
