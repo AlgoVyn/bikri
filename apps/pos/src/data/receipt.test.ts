@@ -1,13 +1,13 @@
 import { buildSaleReceipt, renderReceiptText } from '@bikri/printer';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCustomer } from './customers.ts';
+import { retryPrintJob } from './printJobs.ts';
 import {
   latestSaleJob,
   loadSaleReceipt,
   queueSalePrint,
   receiptPaper,
   receiptShareText,
-  retryPrintJob,
   waLink,
   waNumber,
 } from './receipt.ts';

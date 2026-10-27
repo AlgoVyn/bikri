@@ -101,7 +101,7 @@ test.describe('Home and shell (T-013)', () => {
     await search.fill('A-A-1');
     await expect(page.getByRole('option', { name: /A-A-1/ })).toBeVisible();
     await search.press('Enter');
-    await expect(page).toHaveURL(/\/bikri\/sales\?bill=/);
+    await expect(page).toHaveURL(/\/bikri\/sales\/[A-Z0-9]+$/);
 
     await page
       .getByRole('navigation', { name: 'Main' })

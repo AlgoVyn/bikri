@@ -219,7 +219,7 @@ test.describe('Sale complete (T-018)', () => {
     expect(jobs.filter((j) => j.reprint === true)).toHaveLength(2);
 
     await page.getByRole('button', { name: 'Open bill' }).click();
-    await expect(page).toHaveURL(/\/bikri\/sales\?bill=/u);
+    await expect(page).toHaveURL(/\/bikri\/sales\/[A-Z0-9]+$/u);
   });
 
   test('Urdu: scan after the sale starts the next one; change matches', async ({
