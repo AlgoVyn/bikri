@@ -8,6 +8,7 @@ import {
   securityHeaders,
 } from './middleware/securityHeaders.ts';
 import { enrol } from './routes/enrol.ts';
+import { getFile, putFile } from './routes/files.ts';
 import { health } from './routes/health.ts';
 import { me } from './routes/me.ts';
 import { pull, push, snapshot } from './routes/sync.ts';
@@ -27,6 +28,8 @@ app.get('/me', me);
 app.post('/sync/push', push);
 app.get('/sync/pull', pull);
 app.get('/sync/snapshot', snapshot);
+app.put('/files/:kind/:id/:sha256', putFile);
+app.get('/files/*', getFile);
 
 app.notFound((c) => {
   applySecurityHeaders(c);
