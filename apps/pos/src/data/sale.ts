@@ -315,18 +315,21 @@ export async function completeSale(
               ?.approved_by ?? null,
         });
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
-      if (input.print)
-        await w.table('print_jobs').put({
-          id: newId(now),
-          sale_id: input.saleId,
-          kind: 'sale',
-          status: 'queued',
-          created_at: now,
-        });
       return saleRow;
     },
     { now, actor: ctx.staff_id },
   );
+  // 06 §9: the print job is a separate, best-effort write; the sale is already committed.
+  if (input.print)
+    await db.print_jobs
+      .put({
+        id: newId(now),
+        sale_id: input.saleId,
+        kind: 'sale',
+        status: 'queued',
+        created_at: now,
+      })
+      .catch(() => undefined);
   return { sale, created: true };
 }
 

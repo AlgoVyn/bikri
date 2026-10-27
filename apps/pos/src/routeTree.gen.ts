@@ -15,7 +15,6 @@ import { Route as ExpensesRouteImport } from './routes/expenses.tsx';
 import { Route as ReportsRouteImport } from './routes/reports.tsx';
 import { Route as SalesRouteImport } from './routes/sales.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
-import { Route as SettingsRouteImport } from './routes/settings.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as SuppliersRouteImport } from './routes/suppliers.tsx';
 import { Route as UdhaarRouteImport } from './routes/udhaar.tsx';
@@ -24,6 +23,8 @@ import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
 import { Route as ProductsCategoriesRouteImport } from './routes/products/categories.tsx';
 import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as SettingsIndexRouteImport } from './routes/settings/index.tsx';
+import { Route as SettingsPrinterRouteImport } from './routes/settings/printer.tsx';
 import { Route as ProductsIdIndexRouteImport } from './routes/products/$id.index.tsx';
 import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.tsx';
 
@@ -55,11 +56,6 @@ const SalesRoute = SalesRouteImport.update({
 const SellRoute = SellRouteImport.update({
   id: '/sell',
   path: '/sell',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any);
 const SetupRoute = SetupRouteImport.update({
@@ -102,6 +98,16 @@ const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
   path: '/products/suggested',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
+  id: '/settings/printer',
+  path: '/settings/printer',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ProductsIdIndexRoute = ProductsIdIndexRouteImport.update({
   id: '/products/$id/',
   path: '/products/$id/',
@@ -120,7 +126,6 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
@@ -128,7 +133,9 @@ export interface FileRoutesByFullPath {
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/settings/': typeof SettingsIndexRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
@@ -139,7 +146,6 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
@@ -147,7 +153,9 @@ export interface FileRoutesByTo {
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
   '/products': typeof ProductsIndexRoute;
+  '/settings': typeof SettingsIndexRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id': typeof ProductsIdIndexRoute;
 }
@@ -159,7 +167,6 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute;
   '/sales': typeof SalesRoute;
   '/sell': typeof SellRoute;
-  '/settings': typeof SettingsRoute;
   '/setup': typeof SetupRoute;
   '/suppliers': typeof SuppliersRoute;
   '/udhaar': typeof UdhaarRoute;
@@ -167,7 +174,9 @@ export interface FileRoutesById {
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/new': typeof ProductsNewRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/settings/printer': typeof SettingsPrinterRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/settings/': typeof SettingsIndexRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
 }
@@ -180,7 +189,6 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
     | '/setup'
     | '/suppliers'
     | '/udhaar'
@@ -188,7 +196,9 @@ export interface FileRouteTypes {
     | '/products/categories'
     | '/products/new'
     | '/products/suggested'
+    | '/settings/printer'
     | '/products/'
+    | '/settings/'
     | '/products/$id/edit'
     | '/products/$id/';
   fileRoutesByTo: FileRoutesByTo;
@@ -199,7 +209,6 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
     | '/setup'
     | '/suppliers'
     | '/udhaar'
@@ -207,7 +216,9 @@ export interface FileRouteTypes {
     | '/products/categories'
     | '/products/new'
     | '/products/suggested'
+    | '/settings/printer'
     | '/products'
+    | '/settings'
     | '/products/$id/edit'
     | '/products/$id';
   id:
@@ -218,7 +229,6 @@ export interface FileRouteTypes {
     | '/reports'
     | '/sales'
     | '/sell'
-    | '/settings'
     | '/setup'
     | '/suppliers'
     | '/udhaar'
@@ -226,7 +236,9 @@ export interface FileRouteTypes {
     | '/products/categories'
     | '/products/new'
     | '/products/suggested'
+    | '/settings/printer'
     | '/products/'
+    | '/settings/'
     | '/products/$id/edit'
     | '/products/$id/';
   fileRoutesById: FileRoutesById;
@@ -238,7 +250,6 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute;
   SalesRoute: typeof SalesRoute;
   SellRoute: typeof SellRoute;
-  SettingsRoute: typeof SettingsRoute;
   SetupRoute: typeof SetupRoute;
   SuppliersRoute: typeof SuppliersRoute;
   UdhaarRoute: typeof UdhaarRoute;
@@ -246,7 +257,9 @@ export interface RootRouteChildren {
   ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  SettingsPrinterRoute: typeof SettingsPrinterRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
+  SettingsIndexRoute: typeof SettingsIndexRoute;
   ProductsIdEditRoute: typeof ProductsIdEditRoute;
   ProductsIdIndexRoute: typeof ProductsIdIndexRoute;
 }
@@ -293,13 +306,6 @@ declare module '@tanstack/react-router' {
       path: '/sell';
       fullPath: '/sell';
       preLoaderRoute: typeof SellRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/settings': {
-      id: '/settings';
-      path: '/settings';
-      fullPath: '/settings';
-      preLoaderRoute: typeof SettingsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/setup': {
@@ -358,6 +364,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsSuggestedRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/settings/': {
+      id: '/settings/';
+      path: '/settings';
+      fullPath: '/settings/';
+      preLoaderRoute: typeof SettingsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/settings/printer': {
+      id: '/settings/printer';
+      path: '/settings/printer';
+      fullPath: '/settings/printer';
+      preLoaderRoute: typeof SettingsPrinterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/products/$id/': {
       id: '/products/$id/';
       path: '/products/$id';
@@ -382,7 +402,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
   SellRoute: SellRoute,
-  SettingsRoute: SettingsRoute,
   SetupRoute: SetupRoute,
   SuppliersRoute: SuppliersRoute,
   UdhaarRoute: UdhaarRoute,
@@ -390,7 +409,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsCategoriesRoute: ProductsCategoriesRoute,
   ProductsNewRoute: ProductsNewRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
+  SettingsPrinterRoute: SettingsPrinterRoute,
   ProductsIndexRoute: ProductsIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
   ProductsIdEditRoute: ProductsIdEditRoute,
   ProductsIdIndexRoute: ProductsIdIndexRoute,
 };

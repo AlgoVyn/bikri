@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { SetupWizard } from '../setup/SetupWizard.tsx';
+import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/setup')({
-  component: SetupWizard,
+  component: lazyRouteComponent(
+    () => import('../setup/SetupWizard.tsx'),
+    'SetupWizard',
+  ),
 });

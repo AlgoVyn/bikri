@@ -13,15 +13,41 @@ import {
   type SaleReceiptInput,
 } from '@bikri/printer';
 import { customerBalance } from './customers.ts';
+import { writeAction } from './write.ts';
 
-/** `kv.printer` (06 §8); every field optional until the printer setup (T-020) saves it. */
+/** `kv.printer` (06 §8, screens/17 Printer). Missing fields take the defaults noted. */
 export type PrinterKv = {
   transport?: 'usb' | 'serial' | 'system';
   paper_mm?: 58 | 80;
   chars_per_line?: number;
   dots?: number;
+  usb?: {
+    vendorId: number;
+    productId: number;
+    serialNumber?: string | null;
+    name?: string;
+  };
+  serial?: {
+    usbVendorId?: number;
+    usbProductId?: number;
+    baudRate: number;
+    flowControl: 'none' | 'hardware';
+  };
+  /** Default partial. */
+  cut?: 'partial' | 'full' | 'none';
+  /** QR with the bill id. Default off. */
   qr?: boolean;
+  /** Default 2. */
+  drawer_pin?: 2 | 5;
+  status_query?: boolean;
+  /** Print after every sale. Default on. */
   auto_print?: boolean;
+  /** 1–3, default 1. */
+  copies?: number;
+  /** Default on. */
+  print_logo?: boolean;
+  /** Open the drawer for sales with cash. Default on. */
+  drawer?: boolean;
 };
 
 export type ReceiptPaper = {
@@ -210,4 +236,28 @@ export function waLink(phone: string, text: string): string | null {
   return number
     ? `https://wa.me/${number}?text=${encodeURIComponent(text)}`
     : null;
+}
+
+/** F9 "Open drawer" is audited (06 §7, permission `drawer.open`). */
+export async function logDrawerOpen(
+  db: BikriDb,
+  ctx: { device_id: string; staff_id: string | null },
+  now = Date.now(),
+): Promise<void> {
+  await writeAction(
+    db,
+    (w) =>
+      w.insert('audit_log', {
+        id: newId(now),
+        action: 'drawer_open',
+        entity: 'device',
+        entity_id: ctx.device_id,
+        before_json: null,
+        after_json: null,
+        device_id: ctx.device_id,
+        staff_id: ctx.staff_id,
+        created_at: now,
+      }),
+    { now, actor: ctx.staff_id },
+  );
 }

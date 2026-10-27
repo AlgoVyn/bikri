@@ -378,6 +378,29 @@ export function SellPage() {
     },
     { inFields: true, enabled: ready },
   );
+  useHotkey(
+    fKey('F9'),
+    () => {
+      if (!can('drawer.open')) {
+        toast.push(t('sell.drawer_denied'), 'error');
+        return;
+      }
+      void (async () => {
+        const [{ errorCode, openDrawer }, { browserPrintDeps }] =
+          await Promise.all([
+            import('../print/printService.ts'),
+            import('../print/printDeps.ts'),
+          ]);
+        try {
+          await openDrawer(getDb(), browserPrintDeps(), staff?.id ?? null);
+          toast.push(t('printer.drawer_opened'), 'info');
+        } catch (err) {
+          toast.push(t(`print.err_${errorCode(err)}`), 'error');
+        }
+      })();
+    },
+    { inFields: true, enabled: ready },
+  );
   useHotkey(fKey('F8'), () => void takePayment(), {
     inFields: true,
     enabled: ready,

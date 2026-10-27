@@ -21,6 +21,7 @@ export type SaleReceipt = {
   blocks: Block[];
   paper: ReceiptPaper;
   logo: RasterSource | null;
+  printer: PrinterKv | null;
 };
 
 export async function saleReceipt(
@@ -30,9 +31,9 @@ export async function saleReceipt(
 ): Promise<SaleReceipt | null> {
   const input = await loadSaleReceipt(db, saleId, options);
   if (!input) return null;
-  const paper = receiptPaper(
-    ((await db.kv.get('printer'))?.value ?? null) as PrinterKv | null,
-  );
+  const printer = ((await db.kv.get('printer'))?.value ??
+    null) as PrinterKv | null;
+  const paper = receiptPaper(printer);
   const logo = ((await db.kv.get('logo_bitmap'))?.value ??
     null) as RasterSource | null;
   const blocks = buildSaleReceipt(input, {
@@ -40,8 +41,11 @@ export async function saleReceipt(
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
     qr: paper.qr,
+    printLogo: printer?.print_logo !== false,
+    // A reprint never opens the drawer (06 §7: cash sales only, once).
+    drawer: printer?.drawer !== false && options.reprint !== true,
   });
-  return { input, blocks, paper, logo };
+  return { input, blocks, paper, logo, printer };
 }
 
 /** What a sale print job prints (the print service, T-020, sends these blocks). */
