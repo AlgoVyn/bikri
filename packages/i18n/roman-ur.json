@@ -772,7 +772,9 @@
     "sync_read_only": "Sirf dekhne ke liye",
     "sync_detail_read_only": "Yeh dukaan sirf dekhne ke liye hai · {{count}} tabdeeliyan baqi",
     "sync_quota": "Rozana sync ki had poori",
-    "lock": "Lock karein"
+    "lock": "Lock karein",
+    "sync_paused": "Sync ruka hua hai",
+    "sync_detail_paused": "Is dukaan ka account rok diya gaya hai. Algovyn se raabta karein. {{count}} tabdeeliyan isi device par mehfooz hain."
   },
   "stock": {
     "reason": {

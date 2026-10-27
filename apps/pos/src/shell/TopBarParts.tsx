@@ -94,6 +94,12 @@ export function SyncBadge() {
     tone = 'bg-surface-2 text-text-muted';
     label = t('shell.sync_offline');
     detail = t('shell.sync_detail_offline', { count: counts.pending });
+  } else if (sync.phase === 'suspended') {
+    // 13 §7.2: a suspended shop keeps selling offline; ops stay on the device.
+    state = 'paused';
+    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    label = t('shell.sync_paused');
+    detail = t('shell.sync_detail_paused', { count: counts.pending });
   } else if (sync.phase === 'quota') {
     state = 'quota';
     tone = 'bg-warning-subtle text-warning-subtle-ink';
