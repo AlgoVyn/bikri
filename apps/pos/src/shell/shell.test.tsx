@@ -181,7 +181,9 @@ describe('app shell', () => {
     );
     expect(await screen.findByRole('option', { name: /A-A-1/ })).toBeTruthy();
     await user.keyboard('{Enter}');
-    expect(await screen.findByRole('heading', { name: 'Sales' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: 'A-A-1' }, { timeout: 5000 }),
+    ).toBeTruthy();
   });
 
   it('shows the read-only and support banners from kv', async () => {

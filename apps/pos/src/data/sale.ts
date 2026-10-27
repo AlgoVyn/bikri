@@ -4,10 +4,19 @@ import {
   creditLimitCheck,
   newId,
 } from '@bikri/core';
-import type { BikriDb, Cart, MasterRow, SyncedRow } from '@bikri/db';
-import { type CartId, cartTotals, emptyCart, type ShopMoney } from './cart.ts';
+import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
+import {
+  type CartId,
+  CartNotEmptyError,
+  cartTotals,
+  emptyCart,
+  type ShopMoney,
+  shopMoney,
+  unitCostOf,
+} from './cart.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
+import { computeVoid, writeVoidRows } from './voids.ts';
 import { writeAction } from './write.ts';
 
 export type PayMethod = 'cash' | 'bank_wallet' | 'card' | 'udhaar';
@@ -140,7 +149,14 @@ export async function completeSale(
   const device = await deviceInfo(db);
   const branch = await db.branches.get(ctx.branch_id);
   if (!device || !branch) throw new SaleInvalidError('device not set up');
-  const date = businessDate(now, ctx.timeZone);
+  const shop = await db.shop.get('shop');
+  const timeZone =
+    ctx.timeZone ?? (String(shop?.timezone ?? '').trim() || 'Asia/Karachi');
+  const date = businessDate(now, timeZone);
+  const reissue = cart.reissue ?? null;
+  const voidOverride = cart.overrides?.find(
+    (o) => o.permission === 'sale.void',
+  );
   const base = {
     branch_id: ctx.branch_id,
     device_id: ctx.device_id,
@@ -162,6 +178,14 @@ export async function completeSale(
   const sale = await writeAction(
     db,
     async (w) => {
+      // Void & reissue (screens/10): the old bill's reversal is part of this same action.
+      const reissuePlan = reissue
+        ? await computeVoid(w, reissue.sale_id, {
+            staffId: ctx.staff_id,
+            override: voidOverride !== undefined,
+            now,
+          })
+        : null;
       const kv = w.table<{ key: string; value: unknown }>('kv');
       const seq = Number((await kv.get('invoice_seq'))?.value ?? 0) + 1;
       await kv.put({ key: 'invoice_seq', value: seq });
@@ -197,7 +221,7 @@ export async function completeSale(
         cash_tendered: s.cashTendered,
         change_given: s.change,
         status: 'paid',
-        replaces_sale_id: null,
+        replaces_sale_id: reissue ? reissue.sale_id : null,
         note: (input.note ?? '').trim().slice(0, 120),
       };
       await w.insert('sales', saleRow);
@@ -305,7 +329,8 @@ export async function completeSale(
           staff_id: ctx.staff_id,
           created_at: now,
         });
-      for (const o of cart.overrides ?? []) await audit('override', o);
+      for (const o of cart.overrides ?? [])
+        if (o.permission !== 'sale.void') await audit('override', o);
       if (totals.discount_share_bp > input.maxDiscountBp)
         await audit('discount_over_limit', {
           discount_share_bp: totals.discount_share_bp,
@@ -314,6 +339,17 @@ export async function completeSale(
             cart.overrides?.find((o) => o.permission === 'sale.discount')
               ?.approved_by ?? null,
         });
+      if (reissue && reissuePlan) {
+        await writeVoidRows(w, reissuePlan, ctx, {
+          voidId: reissue.void_id,
+          reason: reissue.reason,
+          timeZone,
+          replacementSaleId: input.saleId,
+          override: voidOverride
+            ? { approved_by: voidOverride.approved_by }
+            : null,
+        });
+      }
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
       return saleRow;
     },
@@ -331,6 +367,111 @@ export async function completeSale(
       })
       .catch(() => undefined);
   return { sale, created: true };
+}
+
+export class ReissueNotAllowedError extends Error {
+  readonly code: 'missing' | 'voided' | 'refunded' | 'reason' | 'cart';
+  constructor(code: ReissueNotAllowedError['code']) {
+    super(code);
+    this.name = 'ReissueNotAllowedError';
+    this.code = code;
+  }
+}
+
+/**
+ * Opens "Void & reissue" (screens/10): writes the original bill's lines and discounts into a free
+ * cart tab. Nothing is voided until the new sale is paid, so Cancel writes nothing.
+ */
+export async function startReissue(
+  db: BikriDb,
+  input: {
+    saleId: string;
+    cartId: CartId;
+    reason: string;
+    now?: number;
+  },
+): Promise<Cart> {
+  const now = input.now ?? Date.now();
+  const reason = input.reason.trim();
+  if (reason.length === 0 || reason.length > 120)
+    throw new ReissueNotAllowedError('reason');
+  const sale = await db.sales.get(input.saleId);
+  if (!sale) throw new ReissueNotAllowedError('missing');
+  if (sale.status === 'void') throw new ReissueNotAllowedError('voided');
+  const refunds = await db.refunds
+    .where('sale_id')
+    .equals(input.saleId)
+    .count();
+  if (refunds > 0) throw new ReissueNotAllowedError('refunded');
+  const target = await db.carts.get(input.cartId);
+  if (target && target.lines.length > 0) throw new CartNotEmptyError();
+  // The cart stores newest-first and `createSale` reverses it back to line order.
+  const lines = (
+    await db.sale_lines.where('sale_id').equals(input.saleId).sortBy('line_no')
+  ).reverse();
+  const products = new Map(
+    (
+      await db.products.bulkGet([
+        ...new Set(
+          lines
+            .map((l) => l.product_id)
+            .filter((id): id is string => typeof id === 'string'),
+        ),
+      ])
+    )
+      .filter((p): p is MasterRow => p !== undefined)
+      .map((p) => [p.id, p]),
+  );
+  const shop = await db.shop.get('shop');
+  const money = shopMoney(shop);
+  const cartLines: CartLine[] = lines.map((line) => {
+    const product = line.product_id
+      ? products.get(String(line.product_id))
+      : undefined;
+    return {
+      key: newId(now),
+      product_id: line.product_id ? String(line.product_id) : null,
+      name: String(line.name_snapshot),
+      sku: String(line.sku_snapshot),
+      qty_milli: Number(line.qty_milli),
+      unit_price: Number(line.unit_price),
+      ...(line.discount_type === 'pct'
+        ? { discount_type: 'percent' as const }
+        : line.discount_type === 'rs'
+          ? { discount_type: 'amount' as const }
+          : {}),
+      discount_value: Number(line.discount_value ?? 0),
+      unit_cost: product
+        ? unitCostOf(product, money.cost_method)
+        : Number(line.unit_cost_snapshot ?? 0),
+      ...(product?.image_key ? { image_key: String(product.image_key) } : {}),
+      list_price: product ? Number(product.price) : Number(line.unit_price),
+      ...(line.serial ? { note: String(line.serial) } : {}),
+      track_stock: product?.track_stock === 1 ? 1 : 0,
+      unit: String(product?.unit ?? 'pc'),
+    };
+  });
+  const discountValue = Number(sale.bill_discount_value ?? 0);
+  const cart: Cart = {
+    id: input.cartId,
+    customer_id: sale.customer_id ? String(sale.customer_id) : null,
+    lines: cartLines,
+    bill_discount:
+      sale.bill_discount_type === 'pct' && discountValue > 0
+        ? { type: 'percent', value: discountValue }
+        : sale.bill_discount_type === 'rs' && discountValue > 0
+          ? { type: 'amount', value: discountValue }
+          : null,
+    note: String(sale.note ?? ''),
+    updated_at: now,
+    reissue: {
+      sale_id: input.saleId,
+      void_id: newId(now),
+      reason,
+    },
+  };
+  await db.carts.put(cart);
+  return cart;
 }
 
 /** Credit check for the udhaar part (07 §4.1). */

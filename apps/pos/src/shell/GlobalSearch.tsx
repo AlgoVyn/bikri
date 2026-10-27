@@ -44,8 +44,11 @@ export function GlobalSearch() {
     if (hit.kind === 'product')
       void navigate({ to: '/products/$id', params: { id: hit.id } });
     else if (hit.kind === 'customer')
-      void navigate({ to: '/udhaar', search: { customer: hit.id } });
-    else void navigate({ to: '/sales', search: { bill: hit.id } });
+      void navigate({
+        to: '/udhaar/$customerId',
+        params: { customerId: hit.id },
+      });
+    else void navigate({ to: '/sales/$id', params: { id: hit.id } });
   };
 
   const groups: { kind: SearchHit['kind']; label: string }[] = [

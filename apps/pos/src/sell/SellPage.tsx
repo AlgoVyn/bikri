@@ -30,6 +30,7 @@ import {
   deleteHeld,
   emptyCart,
   findByCode,
+  hasOverride,
   holdCart,
   isEmptyCart,
   parseQtyPrefix,
@@ -260,11 +261,17 @@ export function SellPage() {
       canBelowCost: can('sale.below_cost'),
       canDiscount: can('sale.discount'),
     });
-    const need: Permission | null = checks.belowCost
+    const voidNeeded =
+      current.reissue != null &&
+      !can('sale.void') &&
+      !hasOverride(current, 'sale.void');
+    const need: OverridePermission | null = checks.belowCost
       ? 'sale.below_cost'
       : checks.discount
         ? 'sale.discount'
-        : null;
+        : voidNeeded
+          ? 'sale.void'
+          : null;
     if (need) {
       setOverride({
         permission: need,
@@ -307,6 +314,15 @@ export function SellPage() {
         ? String((await getDb().customers.get(cart.customer_id))?.name ?? '')
         : '',
     [cart.customer_id],
+  );
+  const reissueInvoice = useLiveQuery(
+    async () =>
+      cart.reissue
+        ? String(
+            (await getDb().sales.get(cart.reissue.sale_id))?.invoice_no ?? '',
+          )
+        : '',
+    [cart.reissue?.sale_id],
   );
   const holdLabel =
     customerName ||
@@ -640,6 +656,35 @@ export function SellPage() {
             {t('sell.back_to_products')}
           </button>
         ) : null}
+        {cart.reissue ? (
+          <div
+            data-testid="reissue-banner"
+            className="mb-2 rounded-control border border-warning bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">
+                {t('sell.reissue_of', { invoice: reissueInvoice ?? '' })}
+              </span>
+              <button
+                type="button"
+                className="underline"
+                onClick={() => {
+                  const saleId = cart.reissue?.sale_id;
+                  void mutate((c) => emptyCart(c.id as CartId)).then(() => {
+                    if (saleId)
+                      void navigate({
+                        to: '/sales/$id',
+                        params: { id: saleId },
+                      });
+                  });
+                }}
+              >
+                {t('sell.reissue_cancel')}
+              </button>
+            </div>
+            <p>{t('sell.reissue_hint')}</p>
+          </div>
+        ) : null}
         {carts ? (
           <CartPanel
             carts={carts}
@@ -741,7 +786,7 @@ export function SellPage() {
         }}
         onOpenBill={(bill) => {
           setDialog(null);
-          void navigate({ to: '/sales', search: { bill } });
+          void navigate({ to: '/sales/$id', params: { id: bill } });
         }}
       />
       <OverrideDialog

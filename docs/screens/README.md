@@ -35,6 +35,27 @@ Copy text in specs is the English source string; the implementer adds `en`, `ur`
 | 19 | Operator console (platform operator, Cloudflare Access) | `/admin/*` | [19-admin.md](19-admin.md) |
 | 20 | Barcode labels (browser print) | `/labels` (modal) | [20-barcode-labels.md](20-barcode-labels.md) |
 
+## CSV headers (REQ-B02, T-049)
+
+Every list exports locally, offline. Amounts are rupees (list exports are compact; report and full-export CSVs always have two decimals), quantities are decimal, and text is quoted when needed. The Reports tab headers are in [16-reports](16-reports.md#csv-columns).
+
+| List | Header |
+|---|---|
+| Products | `name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,sold_30_days` (`cost,avg_cost` only with `cost.view`) |
+| Product stock history | `date,reason,qty,balance_after,by` |
+| Sales | `invoice_no,date,time,customer,items,subtotal,discounts,tax,total,cash,card,bank_wallet,udhaar,refunded,status,cashier,device` |
+| Customers | `name,phone,balance,oldest_unpaid_days,credit_limit,promise_on,last_activity` |
+| Customer statement | `date,description,debit,credit,balance` |
+| Chase list | `group,name,phone,balance,age_days,last_payment` |
+| Suppliers | `name,phone,balance,last_delivery` |
+| Supplier statement | `date,description,got,paid,balance` |
+| Expenses | `date,category,payee,note,amount,method,staff,device` |
+| Day close | `date,device,cashier,period_start,period_end,opening,cash_sales,udhaar_in,pay_ins,supplier_in,refunds,expenses,supplier_out,pay_outs,expected,counted,difference,card,bank,udhaar_given,bills,refunds_count,note` |
+| Reports | per-tab headers in [16-reports](16-reports.md#csv-columns) |
+| Activity (T-050) | `time,staff,device,action,entity,summary` |
+
+The full export zip adds `manifest.json`, `json/<table>.json` (paisa, no `tenant_id`) and `csv/<table>.csv` (all columns, amounts in rupees with two decimals, timestamps ISO in Asia/Karachi) for every synced table.
+
 ## Shared building blocks (implement once in `apps/pos/src/components`)
 
 | Component | Behaviour |

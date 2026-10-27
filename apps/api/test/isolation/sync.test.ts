@@ -241,6 +241,224 @@ describe('sync isolation', () => {
     });
   });
 
+  it('I25: M3 purchases, returns, refunds and day closes stay inside their tenant', async () => {
+    const a = await seedShop('M3 A');
+    const b = await seedShop('M3 B');
+    const now = Date.now();
+    const ids = {
+      purchase: newId(now),
+      line: newId(now),
+      supplierReturn: newId(now),
+      returnLine: newId(now),
+      dayClose: newId(now),
+      sale: newId(now),
+      refund: newId(now),
+      refundPayment: newId(now),
+    };
+    const rows = (shop: Awaited<ReturnType<typeof seedShop>>, mark: string) => {
+      const purchase = {
+        id: ids.purchase,
+        supplier_id: IDS.supplier,
+        supplier_invoice_no: `SUP-${mark}`,
+        other_charges: 0,
+        total: 500,
+        paid_now: 0,
+        paid_method: null,
+        line_count: 1,
+        note: mark,
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      };
+      const line = {
+        id: ids.line,
+        purchase_id: ids.purchase,
+        line_no: 1,
+        product_id: IDS.product,
+        qty_milli: 1000,
+        unit_cost: 500,
+        line_total: 500,
+        charges_alloc: 0,
+        landed_unit_cost: 500,
+        created_at: now,
+      };
+      const supplierReturn = {
+        id: ids.supplierReturn,
+        supplier_id: IDS.supplier,
+        purchase_id: ids.purchase,
+        reason: mark,
+        total: 500,
+        refund_received: 0,
+        refund_method: null,
+        line_count: 1,
+        note: mark,
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      };
+      const returnLine = {
+        id: ids.returnLine,
+        return_id: ids.supplierReturn,
+        line_no: 1,
+        product_id: IDS.product,
+        purchase_line_id: ids.line,
+        qty_milli: 1000,
+        unit_credit: 500,
+        line_total: 500,
+        cost_snapshot: 0,
+        created_at: now,
+      };
+      const dayClose = {
+        id: ids.dayClose,
+        device_id: shop.till.id,
+        branch_id: shop.branchId,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        period_start: 0,
+        period_end: now,
+        opening_cash: 0,
+        cash_sales: 0,
+        udhaar_cash_in: 0,
+        pay_ins: 0,
+        supplier_cash_in: 0,
+        cash_refunds: 0,
+        cash_expenses: 0,
+        supplier_cash_out: 0,
+        pay_outs: 0,
+        expected_cash: 0,
+        counted_cash: 0,
+        difference: 0,
+        denominations_json: null,
+        note: mark,
+        created_at: now,
+      };
+      const sale = saleOps(shop, shop.till, 1)[0]!.row as Record<
+        string,
+        unknown
+      >;
+      const refund = {
+        id: ids.refund,
+        sale_id: ids.sale,
+        kind: 'partial',
+        reason: mark,
+        method: 'cash',
+        exact_amount: 1000,
+        udhaar_part: 0,
+        rounding: 0,
+        amount: 1000,
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      };
+      const refundPayment = {
+        id: ids.refundPayment,
+        direction: 'out',
+        method: 'cash',
+        purpose: 'refund',
+        amount: 1000,
+        cash_tendered: null,
+        change_given: null,
+        reference: '',
+        sale_id: ids.sale,
+        refund_id: ids.refund,
+        purchase_id: null,
+        supplier_return_id: null,
+        party_type: null,
+        party_id: null,
+        note: '',
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      };
+      return [
+        op(
+          'sales',
+          'insert',
+          { ...sale, id: ids.sale, note: mark },
+          { tx_id: ids.sale },
+        ),
+        op(
+          'sale_lines',
+          'insert',
+          {
+            id: newId(now),
+            sale_id: ids.sale,
+            line_no: 1,
+            product_id: IDS.product,
+            name_snapshot: 'Phone',
+            sku_snapshot: 'PHN-0001',
+            qty_milli: 1000,
+            unit_price: 150000,
+            gross: 150000,
+            discount_type: null,
+            discount_value: 0,
+            discount: 0,
+            net: 150000,
+            bill_discount_alloc: 0,
+            tax_alloc: 0,
+            rounding_alloc: 0,
+            unit_cost_snapshot: 0,
+            below_cost: 0,
+            serial: '',
+            warranty_until: null,
+            created_at: now,
+          },
+          { tx_id: ids.sale },
+        ),
+        op('refunds', 'insert', refund, { tx_id: ids.refund }),
+        op('payments', 'insert', refundPayment, { tx_id: ids.refund }),
+        op('purchases', 'insert', purchase, { tx_id: ids.purchase }),
+        op('purchase_lines', 'insert', line, { tx_id: ids.purchase }),
+        op('supplier_returns', 'insert', supplierReturn, {
+          tx_id: ids.supplierReturn,
+        }),
+        op('supplier_return_lines', 'insert', returnLine, {
+          tx_id: ids.supplierReturn,
+        }),
+        op('day_closes', 'insert', dayClose),
+      ];
+    };
+    const firstA = rows(a, 'A');
+    const firstB = rows(b, 'B');
+    await pushOk(a.till, [...firstA.slice(0, 6), firstA[8]!]);
+    await pushOk(b.till, [...firstB.slice(0, 6), firstB[8]!]);
+    await pushOk(a.till, firstA.slice(6, 8));
+    await pushOk(b.till, firstB.slice(6, 8));
+
+    const pa = await pullAll(a.till);
+    const pb = await pullAll(b.till);
+    const own = (changes: typeof pa, tbl: string, id: string) =>
+      changes.find((c) => c.tbl === tbl && c.row.id === id)?.row;
+    expect(own(pa, 'purchases', ids.purchase)?.supplier_invoice_no).toBe(
+      'SUP-A',
+    );
+    expect(own(pb, 'purchases', ids.purchase)?.supplier_invoice_no).toBe(
+      'SUP-B',
+    );
+    expect(own(pa, 'supplier_returns', ids.supplierReturn)?.reason).toBe('A');
+    expect(own(pb, 'supplier_returns', ids.supplierReturn)?.reason).toBe('B');
+    expect(own(pa, 'refunds', ids.refund)?.reason).toBe('A');
+    expect(own(pb, 'refunds', ids.refund)?.reason).toBe('B');
+    expect(own(pa, 'day_closes', ids.dayClose)?.note).toBe('A');
+    expect(own(pb, 'day_closes', ids.dayClose)?.note).toBe('B');
+    for (const shop of [a, b]) {
+      const count = await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM purchases WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, ids.purchase)
+        .first<{ n: number }>();
+      expect(count).toEqual({ n: 1 });
+    }
+  });
+
   it('I13 / 22: a new restore_epoch for A changes only A pull responses', async () => {
     const a = await seedShop('Epoch A');
     const b = await seedShop('Epoch B');

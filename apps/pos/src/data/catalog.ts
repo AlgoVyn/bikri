@@ -1,5 +1,6 @@
 import { businessDate, generateSku, newId, type OpRow } from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
+import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { type Photo, photoKey } from '../products/photo.ts';
 import { putFile } from './fileCache.ts';
 import { defaultBranch, deviceInfo } from './localTenant.ts';
@@ -654,16 +655,8 @@ export async function removeCategory(
 
 // CSV export (REQ-B02); cost columns only with cost.view (AC 4).
 
-function csvCell(value: unknown): string {
-  let s = String(value ?? '');
-  // Spreadsheet formula injection: text starting with = + - @ is prefixed with '.
-  if (typeof value === 'string' && /^[=+\-@]/u.test(s)) s = `'${s}`;
-  return /[",\n\r]/u.test(s) ? `"${s.replace(/"/gu, '""')}"` : s;
-}
-
-const rupees = (paisa: number) =>
-  (paisa / 100).toFixed(2).replace(/\.00$/u, '');
-const qty = (milli: number) => String(milli / 1000);
+const rupees = rupeesCsv;
+const qty = qtyCsv;
 
 export function productsCsv(rows: ProductListRow[], withCost: boolean): string {
   const header = [
@@ -718,3 +711,62 @@ export const SUGGESTED_PRODUCTS = [
   'Screen protector',
   'Back cover',
 ] as const;
+
+export type StockHistoryCsvRow = {
+  at: number;
+  reason: string;
+  qty: string;
+  balanceAfter: string;
+  by: string;
+};
+
+/** One product's stock history (screens/08). */
+export function stockHistoryCsv(
+  rows: readonly StockHistoryCsvRow[],
+  timeZone: string,
+): string {
+  const when = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const header = ['date', 'reason', 'qty', 'balance_after', 'by'];
+  return `${[header.join(',')]
+    .concat(
+      rows.map((row) =>
+        [
+          when.format(row.at).replace(', ', ' '),
+          row.reason,
+          row.qty,
+          row.balanceAfter,
+          row.by,
+        ]
+          .map(csvCell)
+          .join(','),
+      ),
+    )
+    .join('\r\n')}\r\n`;
+}
+
+/** Stores a generated in-store barcode as a normal product upsert (screens/20). */
+export async function addProductBarcode(
+  db: BikriDb,
+  productId: string,
+  barcode: string,
+  actor: string | null,
+  now = Date.now(),
+): Promise<MasterRow> {
+  return writeAction(
+    db,
+    (w) =>
+      w.create('product_barcodes', {
+        product_id: productId,
+        barcode,
+      }),
+    { now, actor },
+  );
+}

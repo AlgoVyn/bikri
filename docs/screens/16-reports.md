@@ -29,6 +29,22 @@ Tabs:
 
 Charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.
 
+## CSV columns
+
+`Export CSV` exports the current tab. Amounts are always rupees with two decimals (`43000.00`), quantities are decimal (`2.5`), and text is quoted when needed. Without `cost.view` the cost/profit columns are omitted.
+
+| Tab | Header |
+|---|---|
+| Summary | `date,bills,sold,gross_profit,expenses,net_profit,udhaar_given,udhaar_received,tax_collected,cash,card,bank_wallet,udhaar` (one row per day, then `TOTAL`) |
+| Products | `product,sku,qty_sold,revenue,cost,profit,margin_pct` (without `cost.view`: `product,sku,qty_sold,revenue`) |
+| Stock | `product,sku,on_hand,min_stock,avg_cost,stock_value,status` (without `cost.view`: `product,sku,on_hand,min_stock,status`) |
+| Udhaar | `bucket,name,phone,balance,age_days,promise_date` |
+| Staff | `cashier,bills,sold,discounts,refunds,refunded_amount,voids,voided_amount,net_sold` |
+| Day closes | `date,device,cashier,expected,counted,difference,note` |
+| Expenses | `category,amount,share_pct` |
+
+The summary PDF (and Share) is built with the other exports in T-049; this screen ships the CSV of every tab.
+
 ## PDF
 
 Generated with pdf-lib on the device: A4 portrait, shop logo + name, range, generated at/by, summary table, chart as embedded PNG, page numbers; Urdu text rendered via embedded Noto Nastaliq subset.
