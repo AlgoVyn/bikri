@@ -91,13 +91,26 @@ type Lookups = {
   onHand: Map<string, { on_hand: number; avg_cost: number }>;
   /** Sales that pushed voids and refunds refer to (D-044 same-day voids, 04 §5 refund split). */
   sales: Map<string, SaleInfo>;
+  /** Sales created by this push, not in D1 yet. */
+  pushedSales: Map<string, SaleInfo>;
   /** Σ refunds.udhaar_part already stored per sale. */
   refundUdhaar: Map<string, number>;
+  /** Σ refunds.udhaar_part earlier in this push, per refund row id. */
+  pushedRefundBefore: Map<string, number>;
+  /** Sale ids that already have a void in D1. */
+  existingVoids: Set<string>;
   /** Stored payments / ledger rows linked to pushed refunds and supplier returns (04 §5). */
   linkedPayments: Map<string, LinkedPayment[]>;
   linkedLedger: Map<string, LinkedLedger[]>;
   /** purchase_line_id → supplier_id of its purchase. */
   purchaseLineSupplier: Map<string, string>;
+  /** Original expenses referenced by a reversal row in this push. */
+  expenses: Map<
+    string,
+    { amount: number; method: string; reverses_id: string | null }
+  >;
+  /** Expense ids that already have a stored reversal. */
+  existingReversals: Set<string>;
 };
 
 type SaleInfo = {
@@ -210,6 +223,7 @@ function overrideFor(
   entityId: string,
   permission: Permission,
   staff: Map<string, StaffRow>,
+  roles: readonly Role[] = ['owner', 'manager', 'cashier'],
 ): boolean {
   return group.some((o) => {
     if (o.tbl !== 'audit_log' || o.kind !== 'insert' || !o.row) return false;
@@ -233,6 +247,7 @@ function overrideFor(
       return Boolean(
         approver &&
           approver.active === 1 &&
+          roles.includes(approver.role as Role) &&
           can(approver.role, approver.permissions_json, permission),
       );
     } catch {
@@ -274,14 +289,17 @@ function saleOf(
   const pushed = group.find(
     (o) => o.tbl === 'sales' && o.kind === 'insert' && o.row?.id === saleId,
   )?.row;
-  if (pushed)
-    return {
-      business_date: String(pushed.business_date),
-      customer_id:
-        typeof pushed.customer_id === 'string' ? pushed.customer_id : null,
-      udhaar_amount: Number(pushed.udhaar_amount ?? 0),
-    };
-  return look.sales.get(saleId);
+  return (
+    look.sales.get(saleId) ??
+    (pushed
+      ? {
+          business_date: String(pushed.business_date),
+          customer_id:
+            typeof pushed.customer_id === 'string' ? pushed.customer_id : null,
+          udhaar_amount: Number(pushed.udhaar_amount ?? 0),
+        }
+      : look.pushedSales.get(saleId))
+  );
 }
 
 /** Rows of `tbl` in this transaction whose `field` points at `id`. */
@@ -343,8 +361,10 @@ function checkRefund(
   const amount = Number(row.amount ?? 0);
   if (sale && udhaar > 0) {
     if (!sale.customer_id) throw new Reject('CONSTRAINT_FAILED');
-    const earlier = look.refundUdhaar.get(saleId) ?? 0;
-    if (udhaar > sale.udhaar_amount - earlier)
+    const earlier =
+      (look.refundUdhaar.get(saleId) ?? 0) +
+      (look.pushedRefundBefore.get(id) ?? 0);
+    if (udhaar > sale.udhaar_amount - Math.max(0, earlier))
       throw new Reject('CONSTRAINT_FAILED');
   }
   const pays = [
@@ -544,9 +564,36 @@ function checkOp(
           row.id,
           'expense.create',
           look.staff,
+          ['owner', 'manager'],
         );
         if (!allowed('expense.create') && !over) throw new Reject('FORBIDDEN');
-        if (staff?.role === 'cashier' && !over) {
+        if (typeof row.reverses_id === 'string') {
+          const originalId = row.reverses_id;
+          const inGroup = group.find(
+            (candidate) =>
+              candidate.tbl === 'expenses' &&
+              candidate.kind !== 'delete' &&
+              candidate.row?.id === originalId,
+          )?.row;
+          const original = look.expenses.get(originalId) ?? inGroup;
+          if (!original || original.reverses_id)
+            throw new Reject('CONSTRAINT_FAILED');
+          if (
+            Number(row.amount) !== Number(original.amount) ||
+            row.method !== original.method
+          )
+            throw new Reject('CONSTRAINT_FAILED');
+          const duplicate =
+            look.existingReversals.has(originalId) ||
+            group.some(
+              (candidate) =>
+                candidate !== op &&
+                candidate.tbl === 'expenses' &&
+                candidate.kind === 'insert' &&
+                candidate.row?.reverses_id === originalId,
+            );
+          if (duplicate) throw new Reject('CONSTRAINT_FAILED');
+        } else if (staff?.role === 'cashier' && !over) {
           if (row.method !== 'cash' || Number(row.amount) > 200_000)
             throw new Reject('FORBIDDEN');
         }
@@ -556,6 +603,45 @@ function checkOp(
         if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
         checkSupplierReturn(look, group, row);
         break;
+      case 'purchases':
+        if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
+        break;
+      case 'cash_moves':
+        if (!allowed('cash.move')) throw new Reject('FORBIDDEN');
+        break;
+      case 'payments': {
+        const purpose = String(row.purpose);
+        const ok =
+          purpose === 'supplier_payment' ||
+          purpose === 'purchase_paid_now' ||
+          purpose === 'supplier_refund'
+            ? allowed('purchase.create')
+            : purpose === 'customer_payment'
+              ? allowed('payment.receive')
+              : purpose === 'sale'
+                ? allowed('sale.create')
+                : purpose === 'refund'
+                  ? allowed('refund.create') ||
+                    overrideFor(
+                      group,
+                      'refunds',
+                      String(row.refund_id),
+                      'refund.create',
+                      look.staff,
+                    )
+                  : purpose === 'void'
+                    ? allowed('sale.void') ||
+                      overrideFor(
+                        group,
+                        'sale_voids',
+                        String(row.sale_id),
+                        'sale.void',
+                        look.staff,
+                      )
+                    : true;
+        if (!ok) throw new Reject('FORBIDDEN');
+        break;
+      }
       default:
         break;
     }
@@ -594,6 +680,14 @@ function checkOp(
           can(updater.role, updater.permissions_json, 'purchase.create'))
       )
     )
+      throw new Reject('FORBIDDEN');
+  }
+  if (op.tbl === 'customers' || op.tbl === 'suppliers') {
+    const partyId = String(row.id);
+    if (!updater || !can(updater.role, updater.permissions_json, 'party.edit'))
+      throw new Reject('FORBIDDEN');
+    // 05 §6: a cashier may create a party, but not edit an existing one or its limits.
+    if (updater.role === 'cashier' && look.current.has(key(op.tbl, partyId)))
       throw new Reject('FORBIDDEN');
   }
 }
@@ -645,6 +739,26 @@ function planOp(
   const cols = writableColumns(tbl, row).filter((c) => c !== 'id');
 
   if (op.kind === 'insert') {
+    if (op.tbl === 'sale_voids' && typeof row.sale_id === 'string') {
+      const saleId = row.sale_id;
+      const duplicateInGroup =
+        group
+          .filter(
+            (candidate) =>
+              candidate.tbl === 'sale_voids' &&
+              candidate.kind === 'insert' &&
+              candidate.row?.sale_id === saleId,
+          )
+          .findIndex((candidate) => candidate === op) > 0;
+      if (look.existingVoids.has(saleId) || duplicateInGroup) {
+        return {
+          op,
+          stmts: [appliedOp(db, op, deviceId, now, 'applied', null, false)],
+          result: { op_id: op.op_id, result: 'applied' },
+          guard: null,
+        };
+      }
+    }
     const stmts = [
       db.prepare(
         `INSERT INTO ${tbl} (tenant_id, id${cols.map((c) => `, ${c}`).join('')}) VALUES (?1, ?2${cols.map((_, i) => `, ?${i + 3}`).join('')}) ON CONFLICT (tenant_id, id) DO NOTHING`,
@@ -844,9 +958,10 @@ function sideEffects(
         });
         out.push(
           db.prepare(
-            'UPDATE products SET avg_cost = ?2 WHERE tenant_id = ?1 AND id = ?3 AND avg_cost <> ?2',
+            'UPDATE products SET avg_cost = ?2, last_cost = ?4 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
             state.avg_cost,
             row.product_id,
+            Number(row.unit_cost),
           ),
           changeLog(db, 'products', row.product_id, 'upsert', null, now, true),
         );
@@ -874,7 +989,35 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const refundIds = new Set<string>();
   const returnIds = new Set<string>();
   const purchaseLineIds = new Set<string>();
+  const expenseIds = new Set<string>();
+  const reversalIds = new Set<string>();
+  const pushedSales = new Map<string, SaleInfo>();
+  const pushedRefundBefore = new Map<string, number>();
+  const refundRunning = new Map<string, number>();
   for (const op of ops) {
+    if (
+      op.tbl === 'sales' &&
+      op.kind !== 'delete' &&
+      typeof op.row?.id === 'string'
+    )
+      pushedSales.set(op.row.id, {
+        business_date: String(op.row.business_date ?? ''),
+        customer_id:
+          typeof op.row.customer_id === 'string' ? op.row.customer_id : null,
+        udhaar_amount: Number(op.row.udhaar_amount ?? 0),
+      });
+    if (
+      op.tbl === 'refunds' &&
+      op.kind === 'insert' &&
+      typeof op.row?.sale_id === 'string'
+    ) {
+      const saleId = op.row.sale_id;
+      pushedRefundBefore.set(String(op.row.id), refundRunning.get(saleId) ?? 0);
+      refundRunning.set(
+        saleId,
+        (refundRunning.get(saleId) ?? 0) + Number(op.row.udhaar_part ?? 0),
+      );
+    }
     if (
       (op.tbl === 'sale_voids' || op.tbl === 'refunds') &&
       typeof op.row?.sale_id === 'string'
@@ -904,6 +1047,14 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     }
     if (op.tbl === 'stock_movements' && typeof op.row?.product_id === 'string')
       products.add(op.row.product_id);
+    if (
+      op.tbl === 'expenses' &&
+      op.kind === 'insert' &&
+      typeof op.row?.reverses_id === 'string'
+    ) {
+      reversalIds.add(op.row.reverses_id);
+      expenseIds.add(op.row.reverses_id);
+    }
   }
   const stmts: D1PreparedStatement[] = [
     db.prepare(
@@ -919,6 +1070,9 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { payments: 'refund' | 'sret' }
     | { ledger: true }
     | { purchaseLines: true }
+    | { voids: true }
+    | { expenses: true }
+    | { reversals: true }
   > = [];
   for (const [tbl, ids] of byTable) {
     const list = [...ids];
@@ -991,16 +1145,37 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     { ledger: true },
   );
   chunked(
+    saleIds,
+    (p) =>
+      `SELECT sale_id AS id FROM sale_voids WHERE tenant_id = ?1 AND sale_id IN (${p})`,
+    { voids: true },
+  );
+  chunked(
     purchaseLineIds,
     (p) =>
       `SELECT pl.id AS id, pu.supplier_id AS supplier_id FROM purchase_lines pl JOIN purchases pu ON pu.tenant_id = ?1 AND pu.id = pl.purchase_id WHERE pl.tenant_id = ?1 AND pl.id IN (${p})`,
     { purchaseLines: true },
   );
+  chunked(
+    expenseIds,
+    (p) =>
+      `SELECT id, amount, method, reverses_id FROM expenses WHERE tenant_id = ?1 AND id IN (${p})`,
+    { expenses: true },
+  );
+  chunked(
+    reversalIds,
+    (p) =>
+      `SELECT reverses_id AS id FROM expenses WHERE tenant_id = ?1 AND reverses_id IN (${p})`,
+    { reversals: true },
+  );
   ctx.budget.take();
   const res = await db.batch(stmts);
   const look: Lookups = {
     sales: new Map(),
+    pushedSales,
     refundUdhaar: new Map(),
+    pushedRefundBefore,
+    existingVoids: new Set(),
     linkedPayments: new Map(),
     linkedLedger: new Map(),
     purchaseLineSupplier: new Map(),
@@ -1008,6 +1183,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     branches: new Map(),
     current: new Map(),
     onHand: new Map(),
+    expenses: new Map(),
+    existingReversals: new Set(),
   };
   for (const s of (res[0]?.results ?? []) as StaffRow[])
     look.staff.set(s.id, s);
@@ -1019,6 +1196,22 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   kinds.forEach((k, i) => {
     const rows = (res[i + 2]?.results ?? []) as Array<Record<string, unknown>>;
     for (const r of rows) {
+      if ('voids' in k) {
+        look.existingVoids.add(String(r.id));
+        continue;
+      }
+      if ('reversals' in k) {
+        look.existingReversals.add(String(r.id));
+        continue;
+      }
+      if ('expenses' in k) {
+        look.expenses.set(String(r.id), {
+          amount: Number(r.amount),
+          method: String(r.method),
+          reverses_id: typeof r.reverses_id === 'string' ? r.reverses_id : null,
+        });
+        continue;
+      }
       if ('tbl' in k) {
         look.current.set(key(k.tbl, String(r.id)), {
           id: String(r.id),
@@ -1135,6 +1328,21 @@ export async function applyOps(
     const look = await loadLookups(ctx, pending.flat());
     const avg = new Map<string, { on_hand: number; avg_cost: number }>();
     for (const [id, v] of look.onHand) avg.set(id, { ...v });
+    // Products created by this push are not in D1 yet, but their opening/purchase movements
+    // are planned after them; seed a zero state so the server can compute avg_cost (07 §7).
+    for (const op of pending.flat()) {
+      if (
+        op.tbl !== 'products' ||
+        op.kind === 'delete' ||
+        typeof op.row?.id !== 'string' ||
+        avg.has(op.row.id)
+      )
+        continue;
+      avg.set(op.row.id, {
+        on_hand: 0,
+        avg_cost: Number(op.row.avg_cost ?? 0),
+      });
+    }
 
     const groups: Group[] = [];
     for (const ops of pending) {
