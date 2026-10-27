@@ -31,7 +31,7 @@ export async function seedSampleDay(
     db,
     async (w) => {
       const product = await w.create('products', {
-        name: 'Charger',
+        name_en: 'Charger',
         sku: 'CHG-1',
         price: 50000,
         track_stock: 0,

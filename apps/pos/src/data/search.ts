@@ -17,6 +17,7 @@ export async function searchAll(
   const q = raw.trim().toLowerCase();
   if (q === '') return [];
   const digits = q.replace(/\D/gu, '');
+  const words = q.split(/\s+/u);
   const products: SearchHit[] = [];
   const barcodeHits = new Set(
     (
@@ -25,11 +26,12 @@ export async function searchAll(
   );
   for (const p of await db.products.toArray()) {
     if (p.deleted_at) continue;
-    const name = String(p.name ?? '');
+    const name = String(p.name_en ?? '');
     const sku = String(p.sku ?? '');
+    const haystack =
+      `${name} ${String(p.name_ur ?? '')} ${String(p.brand ?? '')} ${sku}`.toLowerCase();
     if (
-      name.toLowerCase().includes(q) ||
-      sku.toLowerCase().includes(q) ||
+      words.every((word) => haystack.includes(word)) ||
       barcodeHits.has(p.id)
     ) {
       products.push({ kind: 'product', id: p.id, title: name, detail: sku });
