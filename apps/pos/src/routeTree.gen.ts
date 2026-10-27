@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root.tsx';
 import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as AdminRouteImport } from './routes/admin.tsx';
+import { Route as LabelsRouteImport } from './routes/labels.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
@@ -71,6 +72,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/admin.lazy.tsx').then((d) => d.Route));
+const LabelsRoute = LabelsRouteImport.update({
+  id: '/labels',
+  path: '/labels',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SellRoute = SellRouteImport.update({
   id: '/sell',
   path: '/sell',
@@ -336,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -383,6 +390,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -431,6 +439,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
+  '/labels': typeof LabelsRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -481,6 +490,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
+    | '/labels'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -528,6 +538,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
+    | '/labels'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -575,6 +586,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/admin'
+    | '/labels'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -624,6 +636,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   SplatRoute: typeof SplatRoute;
   AdminRoute: typeof AdminRouteWithChildren;
+  LabelsRoute: typeof LabelsRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
   DevUiRoute: typeof DevUiRoute;
@@ -681,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/admin';
       fullPath: '/admin';
       preLoaderRoute: typeof AdminRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/labels': {
+      id: '/labels';
+      path: '/labels';
+      fullPath: '/labels';
+      preLoaderRoute: typeof LabelsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sell': {
@@ -1035,6 +1055,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
+  LabelsRoute: LabelsRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
   DevUiRoute: DevUiRoute,

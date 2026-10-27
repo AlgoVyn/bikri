@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
@@ -22,6 +22,12 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
+const LabelsDialog = lazy(() =>
+  import('../labels/LabelsDialog.tsx').then((module) => ({
+    default: module.LabelsDialog,
+  })),
+);
+
 const ROW_PX = 72;
 const OVERSCAN = 8;
 
@@ -37,6 +43,9 @@ export function ProductList() {
   const [categoryId, setCategoryId] = useState('');
   const [stock, setStock] = useState<StockFilter>('all');
   const [sort, setSort] = useState<ProductSort>('name');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const rows = useLiveQuery(
     () =>
       listProducts(getDb(), {
@@ -57,6 +66,14 @@ export function ProductList() {
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const showCost = can('cost.view');
   const canEdit = can('catalog.edit');
+  const canLabel = canEdit || can('purchase.create');
+  const toggle = (id: string) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   useHotkey(plainKey('n'), () => void navigate({ to: '/products/new' }), {
     enabled: canEdit,
@@ -66,6 +83,27 @@ export function ProductList() {
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="me-auto text-h1 font-semibold">{t('products.title')}</h1>
+        {canLabel ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => {
+              setSelecting((value) => !value);
+              setSelected(new Set());
+            }}
+          >
+            {selecting ? t('common.cancel') : t('products.select')}
+          </button>
+        ) : null}
+        {selecting && selected.size > 0 ? (
+          <button
+            type="button"
+            className={buttonPrimary}
+            onClick={() => setLabelsOpen(true)}
+          >
+            {t('products.print_labels', { count: selected.size })}
+          </button>
+        ) : null}
         {canEdit ? (
           <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
             {t('products.add')}
@@ -183,9 +221,22 @@ export function ProductList() {
             {t('products.count', { count: rows.length })}
           </p>
           <ListHeader showCost={showCost} />
-          <VirtualRows rows={rows} showCost={showCost} />
+          <VirtualRows
+            rows={rows}
+            showCost={showCost}
+            selecting={selecting}
+            selected={selected}
+            onToggle={toggle}
+          />
         </>
       ) : null}
+      <Suspense fallback={null}>
+        <LabelsDialog
+          open={labelsOpen}
+          onOpenChange={setLabelsOpen}
+          initial={[...selected].map((productId) => ({ productId, copies: 1 }))}
+        />
+      </Suspense>
     </div>
   );
 }
@@ -222,9 +273,15 @@ function ListHeader({ showCost }: { showCost: boolean }) {
 function VirtualRows({
   rows,
   showCost,
+  selecting,
+  selected,
+  onToggle,
 }: {
   rows: ProductListRow[];
   showCost: boolean;
+  selecting: boolean;
+  selected: ReadonlySet<string>;
+  onToggle: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLUListElement>(null);
@@ -268,6 +325,9 @@ function VirtualRows({
           showCost={showCost}
           index={range.start + i}
           setSize={rows.length}
+          selecting={selecting}
+          selected={selected.has(row.product.id)}
+          onToggle={() => onToggle(row.product.id)}
         />
       ))}
     </ul>
@@ -279,11 +339,17 @@ function ProductRow({
   showCost,
   index,
   setSize,
+  selecting,
+  selected,
+  onToggle,
 }: {
   row: ProductListRow;
   showCost: boolean;
   index: number;
   setSize: number;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const p = row.product;
@@ -302,54 +368,107 @@ function ProductRow({
       aria-setsize={setSize}
       aria-posinset={index + 1}
     >
-      <Link
-        to="/products/$id"
-        params={{ id: p.id }}
-        className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost)}`}
-      >
-        <ProductThumb
-          name={String(p.name_en)}
-          imageKey={p.image_key}
-          color={row.category?.color}
-        />
-        <span className="min-w-0">
-          <span className="block truncate font-medium">
-            {String(p.name_en)}
+      {selecting ? (
+        <button
+          type="button"
+          aria-pressed={selected}
+          onClick={onToggle}
+          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start hover:bg-surface-2 ${gridCols(showCost)}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`flex size-5 items-center justify-center rounded border ${selected ? 'border-primary bg-primary text-primary-ink' : 'border-border-strong'}`}
+          >
+            {selected ? '✓' : ''}
           </span>
-          <span className="block truncate text-small text-text-muted">
-            {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
+          <span className="min-w-0">
+            <span className="block truncate font-medium">
+              {String(p.name_en)}
+            </span>
+            <span className="block truncate text-small text-text-muted">
+              {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
+            </span>
           </span>
-        </span>
-        <span className="hidden truncate text-text-muted lg:block">
-          {String(row.category?.name_en ?? '')}
-        </span>
-        <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
-          <MoneyText paisa={Number(p.price)} />
-          <span className={`block text-small lg:hidden ${stockTone}`}>
+          <span className="hidden truncate text-text-muted lg:block">
+            {String(row.category?.name_en ?? '')}
+          </span>
+          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+            <MoneyText paisa={Number(p.price)} />
+            <span className={`block text-small lg:hidden ${stockTone}`}>
+              {row.stockState === 'untracked'
+                ? t('products.not_tracked')
+                : qtyWithUnit(t, row.onHand, unit)}
+            </span>
+          </span>
+          <span className={`hidden text-end lg:block ${stockTone}`}>
             {row.stockState === 'untracked'
               ? t('products.not_tracked')
               : qtyWithUnit(t, row.onHand, unit)}
           </span>
-        </span>
-        <span className={`hidden text-end lg:block ${stockTone}`}>
-          {row.stockState === 'untracked'
-            ? t('products.not_tracked')
-            : qtyWithUnit(t, row.onHand, unit)}
-        </span>
-        {showCost ? (
+          {showCost ? (
+            <span className="hidden text-end lg:block">
+              <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+            </span>
+          ) : null}
+          {showCost ? (
+            <span className="hidden text-end lg:block">
+              <bdi dir="ltr">{margin ?? '—'}</bdi>
+            </span>
+          ) : null}
           <span className="hidden text-end lg:block">
-            <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+            {qtyWithUnit(t, row.sold30, unit)}
           </span>
-        ) : null}
-        {showCost ? (
+        </button>
+      ) : (
+        <Link
+          to="/products/$id"
+          params={{ id: p.id }}
+          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost)}`}
+        >
+          <ProductThumb
+            name={String(p.name_en)}
+            imageKey={p.image_key}
+            color={row.category?.color}
+          />
+          <span className="min-w-0">
+            <span className="block truncate font-medium">
+              {String(p.name_en)}
+            </span>
+            <span className="block truncate text-small text-text-muted">
+              {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
+            </span>
+          </span>
+          <span className="hidden truncate text-text-muted lg:block">
+            {String(row.category?.name_en ?? '')}
+          </span>
+          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+            <MoneyText paisa={Number(p.price)} />
+            <span className={`block text-small lg:hidden ${stockTone}`}>
+              {row.stockState === 'untracked'
+                ? t('products.not_tracked')
+                : qtyWithUnit(t, row.onHand, unit)}
+            </span>
+          </span>
+          <span className={`hidden text-end lg:block ${stockTone}`}>
+            {row.stockState === 'untracked'
+              ? t('products.not_tracked')
+              : qtyWithUnit(t, row.onHand, unit)}
+          </span>
+          {showCost ? (
+            <span className="hidden text-end lg:block">
+              <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+            </span>
+          ) : null}
+          {showCost ? (
+            <span className="hidden text-end lg:block">
+              <bdi dir="ltr">{margin ?? '—'}</bdi>
+            </span>
+          ) : null}
           <span className="hidden text-end lg:block">
-            <bdi dir="ltr">{margin ?? '—'}</bdi>
+            {qtyWithUnit(t, row.sold30, unit)}
           </span>
-        ) : null}
-        <span className="hidden text-end lg:block">
-          {qtyWithUnit(t, row.sold30, unit)}
-        </span>
-      </Link>
+        </Link>
+      )}
     </li>
   );
 }

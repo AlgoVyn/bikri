@@ -152,12 +152,36 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         { today },
       );
       const after = await supplierBalance(db, supplierId);
+      const labelRows = valid.map((line) => {
+        const unit = String(line.product.unit ?? 'pc');
+        const whole = ['pc', 'pair', 'set', 'box', 'pack', 'dozen'].includes(
+          unit,
+        );
+        return {
+          productId: line.product.id,
+          copies: whole ? Math.max(1, Math.floor(line.qtyMilli / 1000)) : 1,
+        };
+      });
+      sessionStorage.setItem(
+        'bikri.label_seed',
+        JSON.stringify({
+          rows: labelRows,
+          returnTo: `/suppliers/${supplierId}`,
+        }),
+      );
       toast.push(
         t('office.suppliers.delivery_saved', {
           count: valid.length,
           total: formatMoney(total),
           balance: formatMoney(after),
         }),
+        'info',
+        [
+          {
+            label: t('office.suppliers.print_labels'),
+            onClick: () => void navigate({ to: '/labels' }),
+          },
+        ],
       );
       void navigate({
         to: '/suppliers/$supplierId',

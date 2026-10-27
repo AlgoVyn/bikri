@@ -751,3 +751,22 @@ export function stockHistoryCsv(
     )
     .join('\r\n')}\r\n`;
 }
+
+/** Stores a generated in-store barcode as a normal product upsert (screens/20). */
+export async function addProductBarcode(
+  db: BikriDb,
+  productId: string,
+  barcode: string,
+  actor: string | null,
+  now = Date.now(),
+): Promise<MasterRow> {
+  return writeAction(
+    db,
+    (w) =>
+      w.create('product_barcodes', {
+        product_id: productId,
+        barcode,
+      }),
+    { now, actor },
+  );
+}
