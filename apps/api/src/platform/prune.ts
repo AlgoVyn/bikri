@@ -59,20 +59,32 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   // 1–2. change_log older than 30 days, per tenant, round-robin from meta.prune_cursor.
   const [targets, cursorRow] = await calls.run(() =>
     DB.batch([
-      DB.prepare('SELECT tenant_id, MAX(seq) AS target FROM change_log WHERE at < ?1 GROUP BY tenant_id ORDER BY tenant_id').bind(cutoff),
+      DB.prepare(
+        'SELECT tenant_id, MAX(seq) AS target FROM change_log WHERE at < ?1 GROUP BY tenant_id ORDER BY tenant_id',
+      ).bind(cutoff),
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
     ]),
   );
-  const list = (targets?.results ?? []) as Array<{ tenant_id: string; target: number }>;
-  const cursor = String((cursorRow?.results?.[0] as { value?: string } | undefined)?.value ?? '');
-  const startAt = Math.max(0, list.findIndex((t) => t.tenant_id > cursor));
+  const list = (targets?.results ?? []) as Array<{
+    tenant_id: string;
+    target: number;
+  }>;
+  const cursor = String(
+    (cursorRow?.results?.[0] as { value?: string } | undefined)?.value ?? '',
+  );
+  const startAt = Math.max(
+    0,
+    list.findIndex((t) => t.tenant_id > cursor),
+  );
   const ordered = [...list.slice(startAt), ...list.slice(0, startAt)];
   let budget = LOG_MAX_PER_RUN;
   let lastTenant = cursor;
   for (const { tenant_id, target } of ordered) {
     if (budget <= 0 || !calls.ok(3)) break;
     const floorRow = await calls.run(() =>
-      DB.prepare('SELECT change_log_floor FROM tenants WHERE id = ?1').bind(tenant_id).first<{ change_log_floor: number }>(),
+      DB.prepare('SELECT change_log_floor FROM tenants WHERE id = ?1')
+        .bind(tenant_id)
+        .first<{ change_log_floor: number }>(),
     );
     let floor = floorRow?.change_log_floor ?? 0;
     while (floor < target && budget > 0 && calls.ok(2)) {
@@ -86,8 +98,12 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       const next = upto?.upto ?? target;
       const [del] = await calls.run(() =>
         DB.batch([
-          DB.prepare('DELETE FROM change_log WHERE tenant_id = ?1 AND seq > ?2 AND seq <= ?3').bind(tenant_id, floor, next),
-          DB.prepare('UPDATE tenants SET change_log_floor = ?2 WHERE id = ?1 AND change_log_floor < ?2').bind(tenant_id, next),
+          DB.prepare(
+            'DELETE FROM change_log WHERE tenant_id = ?1 AND seq > ?2 AND seq <= ?3',
+          ).bind(tenant_id, floor, next),
+          DB.prepare(
+            'UPDATE tenants SET change_log_floor = ?2 WHERE id = ?1 AND change_log_floor < ?2',
+          ).bind(tenant_id, next),
         ]),
       );
       const n = del?.meta.changes ?? 0;
@@ -99,7 +115,9 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   }
   if (calls.ok()) {
     await calls.run(() =>
-      DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'prune_cursor'").bind(budget <= 0 ? lastTenant : '').run(),
+      DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'prune_cursor'")
+        .bind(budget <= 0 ? lastTenant : '')
+        .run(),
     );
   }
 
@@ -111,8 +129,12 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
         DB.prepare(
           'DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT 5000)',
         ).bind(now - 90 * DAY),
-        DB.prepare('DELETE FROM enrolment_codes WHERE expires_at < ?1').bind(now - DAY),
-        DB.prepare('DELETE FROM owner_email_codes WHERE expires_at < ?1').bind(now - DAY),
+        DB.prepare('DELETE FROM enrolment_codes WHERE expires_at < ?1').bind(
+          now - DAY,
+        ),
+        DB.prepare('DELETE FROM owner_email_codes WHERE expires_at < ?1').bind(
+          now - DAY,
+        ),
         DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
       ]),
     );
@@ -133,7 +155,14 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       const db = tenantDb(env, tenant);
       const revoke = await calls.run(() => revokeSupportDevices(db, now));
       await calls.run(() =>
-        db.batch([...revoke, ...auditStatements(db, { action: 'support_access_end', after: { ended_by: 'expiry' }, now })]),
+        db.batch([
+          ...revoke,
+          ...auditStatements(db, {
+            action: 'support_access_end',
+            after: { ended_by: 'expiry' },
+            now,
+          }),
+        ]),
       );
       report.support_ended.push(tenant.id);
     }
@@ -142,7 +171,9 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   // 5. tenant deletion, children first, ≤ 20,000 rows per night (13 §7.4).
   if (calls.ok()) {
     const deleting = await calls.run(() =>
-      DB.prepare("SELECT id, db_shard FROM tenants WHERE status = 'deleting' ORDER BY id").all<{ id: string; db_shard: string }>(),
+      DB.prepare(
+        "SELECT id, db_shard FROM tenants WHERE status = 'deleting' ORDER BY id",
+      ).all<{ id: string; db_shard: string }>(),
     );
     let left = DELETE_MAX_PER_RUN;
     for (const t of deleting.results) {
@@ -150,7 +181,9 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       for (const tbl of DELETE_ORDER) {
         while (left > 0 && calls.ok(2)) {
           const res = await calls.run(() =>
-            DB.prepare(`DELETE FROM ${tbl} WHERE rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 LIMIT ?2)`)
+            DB.prepare(
+              `DELETE FROM ${tbl} WHERE rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 LIMIT ?2)`,
+            )
               .bind(t.id, Math.min(DELETE_CHUNK, left))
               .run(),
           );
@@ -168,14 +201,21 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       // R2 objects under t/<tenant>/ (list + delete; deletes are free).
       let more = true;
       while (more && calls.ok(3)) {
-        const listed = await calls.run(() => env.FILES.list({ prefix: `t/${t.id}/`, limit: 1000 }));
-        if (listed.objects.length > 0) await calls.run(() => env.FILES.delete(listed.objects.map((o) => o.key)));
+        const listed = await calls.run(() =>
+          env.FILES.list({ prefix: `t/${t.id}/`, limit: 1000 }),
+        );
+        if (listed.objects.length > 0)
+          await calls.run(() =>
+            env.FILES.delete(listed.objects.map((o) => o.key)),
+          );
         more = listed.truncated;
       }
       if (more || !calls.ok(2)) break;
       const usage = await calls.run(() =>
         DB.batch([
-          DB.prepare('DELETE FROM tenant_usage WHERE tenant_id = ?1').bind(t.id),
+          DB.prepare('DELETE FROM tenant_usage WHERE tenant_id = ?1').bind(
+            t.id,
+          ),
           DB.prepare(
             "UPDATE tenants SET status = 'deleted', deleted_at = ?2, owner_email = NULL, updated_at = ?2, status_changed_at = ?2, status_changed_by = 'cron' WHERE id = ?1",
           ).bind(t.id, now),
@@ -186,7 +226,11 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   }
 
   if (calls.ok()) {
-    await calls.run(() => DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'last_prune_at'").bind(String(now)).run());
+    await calls.run(() =>
+      DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'last_prune_at'")
+        .bind(String(now))
+        .run(),
+    );
   }
   report.calls = calls.used;
   return report;

@@ -193,12 +193,16 @@ export async function setStatus(
     .run();
 }
 
+/** The allowed origin in Worker tests (vitest.config.ts). */
+export const TEST_ORIGIN = 'https://bikri.test';
+
 export function api(
   path: string,
   init: RequestInit & { token?: string; json?: unknown } = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.token) headers.set('authorization', `Bearer ${init.token}`);
+  if (!headers.has('origin')) headers.set('origin', TEST_ORIGIN);
   let body = init.body;
   if (init.json !== undefined) {
     headers.set('content-type', 'application/json');
