@@ -54,6 +54,7 @@
     "loading": "Loading…",
     "no": "No",
     "not_found": "This page is not available.",
+    "required": "required",
     "yes": "Yes"
   },
   "count": {

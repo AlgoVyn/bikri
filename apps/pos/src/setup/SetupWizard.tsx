@@ -89,17 +89,27 @@ function Field({
   id,
   label,
   error,
+  required = false,
   children,
 }: {
   id: string;
   label: string;
   error?: string;
+  /** Shows a visible required mark (screens/01: name, phone and address are required). */
+  required?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-small text-text">
         {label}
+        {required ? (
+          <span className="text-danger">
+            <span aria-hidden="true"> *</span>
+            <span className="sr-only"> ({t('common.required')})</span>
+          </span>
+        ) : null}
       </label>
       {children}
       {error ? (
@@ -204,14 +214,8 @@ export function SetupWizard() {
 
   const goTo = (next: Step) => {
     setErrors({});
-    if (next === 3 && receipt.header === '') {
-      setReceipt((r) => ({
-        ...r,
-        header: [shop.name.trim(), shop.address.trim()]
-          .filter(Boolean)
-          .join('\n'),
-      }));
-    }
+    // No header pre-fill: the receipt already prints the shop name and address above the
+    // header, so pre-filling them printed the address twice (D-102).
     setStep(next);
   };
 
@@ -223,6 +227,7 @@ export function SetupWizard() {
     setErrors(found);
     if (Object.keys(found).length > 0) return focusFirstError(found);
     setBusy(true);
+    useSession.getState().setAfterSetup(then);
     try {
       const input: SetupInput = {
         shop,
@@ -374,12 +379,14 @@ export function SetupWizard() {
               id={id('shop_name')}
               label={t('setup.shop_name')}
               error={err('shop_name')}
+              required
             >
               <input
                 id={id('shop_name')}
                 className={fieldClass}
                 value={shop.name}
                 maxLength={60}
+                required
                 onChange={(e) => setShop({ ...shop, name: e.target.value })}
                 {...described('shop_name')}
               />
@@ -411,6 +418,7 @@ export function SetupWizard() {
               <PhoneInput
                 id={id('phone')}
                 label={t('setup.phone')}
+                required
                 kind="any"
                 value={shop.phone}
                 onChange={(e164) => setShop({ ...shop, phone: e164 ?? '' })}
@@ -428,6 +436,7 @@ export function SetupWizard() {
               id={id('address')}
               label={t('setup.address')}
               error={err('address')}
+              required
             >
               <textarea
                 id={id('address')}
@@ -435,6 +444,7 @@ export function SetupWizard() {
                 maxLength={120}
                 className={`${fieldClass} h-auto py-2 font-sans`}
                 value={shop.address}
+                required
                 onChange={(e) => setShop({ ...shop, address: e.target.value })}
                 {...described('address')}
               />

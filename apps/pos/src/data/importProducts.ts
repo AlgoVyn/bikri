@@ -35,7 +35,11 @@ export const IMPORT_CHUNK = 50;
 export const MAX_NAME = 120;
 export const TEMPLATE_FILE = 'bikri-products-template.csv';
 
-/** Header names (lower-case, spaces/underscores/dashes removed) that map to each field. */
+/**
+ * Header names that map to each field, in English, Roman Urdu (common spellings) and Urdu
+ * script, compared after `norm` (lower-case, no spaces, punctuation, brackets or a currency
+ * suffix such as "(Rs)").
+ */
 const SYNONYMS: Record<ImportField, readonly string[]> = {
   name_en: [
     'nameen',
@@ -45,13 +49,38 @@ const SYNONYMS: Record<ImportField, readonly string[]> = {
     'item',
     'itemname',
     'naam',
+    'nam',
     'englishname',
+    'naamenglish',
+    'cheez',
+    'cheezkanaam',
+    'maalkanaam',
+    'نام',
+    'آئٹم',
+    'چیز',
   ],
-  name_ur: ['nameur', 'urdu', 'urduname', 'urdunaam', 'naamurdu'],
-  category: ['category', 'categoryname', 'qisam', 'group'],
-  brand: ['brand', 'company', 'make'],
-  barcode: ['barcode', 'barcodes', 'ean', 'upc'],
-  sku: ['sku', 'code', 'itemcode', 'productcode'],
+  name_ur: [
+    'nameur',
+    'urdu',
+    'urduname',
+    'urdunaam',
+    'naamurdu',
+    'urdumeinnaam',
+    'اردونام',
+    'ناماردو',
+  ],
+  category: [
+    'category',
+    'categoryname',
+    'qisam',
+    'qism',
+    'group',
+    'قسم',
+    'کیٹیگری',
+  ],
+  brand: ['brand', 'company', 'make', 'kampani', 'برانڈ', 'کمپنی'],
+  barcode: ['barcode', 'barcodes', 'ean', 'upc', 'barcod', 'بارکوڈ'],
+  sku: ['sku', 'code', 'itemcode', 'productcode', 'کوڈ'],
   price: [
     'price',
     'saleprice',
@@ -59,9 +88,30 @@ const SYNONYMS: Record<ImportField, readonly string[]> = {
     'rate',
     'qeemat',
     'qimat',
+    'keemat',
+    'kimat',
+    'qeematfarokht',
+    'farokhtqeemat',
+    'bechnekiqeemat',
     'retailprice',
+    'قیمت',
+    'قیمتفروخت',
+    'ریٹ',
   ],
-  cost: ['cost', 'costprice', 'purchaseprice', 'laagat', 'lagat', 'buyprice'],
+  cost: [
+    'cost',
+    'costprice',
+    'purchaseprice',
+    'laagat',
+    'lagat',
+    'buyprice',
+    'khareed',
+    'khareedqeemat',
+    'qeematkhareed',
+    'لاگت',
+    'قیمتخرید',
+    'خرید',
+  ],
   stock: [
     'stock',
     'qty',
@@ -69,9 +119,16 @@ const SYNONYMS: Record<ImportField, readonly string[]> = {
     'openingstock',
     'onhand',
     'miqdar',
+    'miqdaar',
+    'tadaad',
+    'tadad',
     'maal',
+    'مقدار',
+    'تعداد',
+    'اسٹاک',
+    'سٹاک',
   ],
-  unit: ['unit', 'uom'],
+  unit: ['unit', 'uom', 'ikai', 'اکائی', 'یونٹ'],
   min_stock: [
     'minstock',
     'lowstock',
@@ -79,23 +136,40 @@ const SYNONYMS: Record<ImportField, readonly string[]> = {
     'reorder',
     'alert',
     'lowstockalert',
+    'kamazkam',
+    'کمازکم',
   ],
   track_stock: ['trackstock', 'track'],
 };
 
-const norm = (h: string) => h.toLowerCase().replace(/[\s_\-.]/gu, '');
+/** Lower-case letters and digits only (any script), without a currency suffix or BOM. */
+const norm = (h: string) =>
+  h
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .replace(/(?:rs|pkr|روپے)$/u, '');
 
-/** Matches headers to fields by English / Roman Urdu names; each column used once. */
+/** The same without bracketed parts: "Qeemat (Rs)" → "qeemat". */
+const normBare = (h: string) => norm(h.replace(/\([^)]*\)|\[[^\]]*\]/gu, ''));
+
+/**
+ * Matches headers to fields by English / Roman Urdu / Urdu names; each column used once.
+ * Whole headers match first ("Naam (Urdu)" → name_ur), then without brackets.
+ */
 export function autoMap(headers: readonly string[]): Mapping {
   const mapping: Mapping = {};
   const used = new Set<number>();
-  for (const field of TEMPLATE_COLUMNS) {
-    const index = headers.findIndex(
-      (h, i) => !used.has(i) && SYNONYMS[field].includes(norm(h)),
-    );
-    if (index >= 0) {
-      mapping[field] = index;
-      used.add(index);
+  for (const form of [norm, normBare]) {
+    for (const field of TEMPLATE_COLUMNS) {
+      if (mapping[field] !== undefined) continue;
+      const index = headers.findIndex(
+        (h, i) => !used.has(i) && SYNONYMS[field].includes(form(h)),
+      );
+      if (index >= 0) {
+        mapping[field] = index;
+        used.add(index);
+      }
     }
   }
   return mapping;

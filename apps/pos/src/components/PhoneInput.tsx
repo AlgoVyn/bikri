@@ -10,6 +10,7 @@ export function PhoneInput({
   value,
   onChange,
   name,
+  required = false,
 }: {
   id?: string;
   label: string;
@@ -17,6 +18,8 @@ export function PhoneInput({
   value: string;
   onChange: (e164: string | null) => void;
   name?: string;
+  /** Visible required mark next to the label. */
+  required?: boolean;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -34,6 +37,12 @@ export function PhoneInput({
     <div>
       <label htmlFor={inputId} className="mb-1 block text-small text-text">
         {label}
+        {required ? (
+          <span className="text-danger">
+            <span aria-hidden="true"> *</span>
+            <span className="sr-only"> ({t('common.required')})</span>
+          </span>
+        ) : null}
       </label>
       <input
         id={inputId}
