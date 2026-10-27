@@ -179,9 +179,13 @@ export function UdhaarList({
               : t('office.udhaar.no_customers')
           }
           actionLabel={
-            can('party.edit') ? t('office.udhaar.new_customer') : undefined
+            can('party.edit') && !readOnly
+              ? t('office.udhaar.new_customer')
+              : undefined
           }
-          onAction={can('party.edit') ? () => setNewOpen(true) : undefined}
+          onAction={
+            can('party.edit') && !readOnly ? () => setNewOpen(true) : undefined
+          }
         />
       ) : null}
 
