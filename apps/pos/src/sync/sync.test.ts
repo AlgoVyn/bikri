@@ -489,6 +489,18 @@ describe('status, me and engine (03 §6–7)', () => {
     await engine?.run('full');
     expect(useSyncState.getState().phase).toBe('quota');
     expect(useSyncState.getState().quotaUntil).toBeGreaterThan(Date.now());
+    // The account-wide D1 limit waits the same way (04 §3).
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? {
+            status: 503,
+            json: { error: { code: 'D1_LIMIT', message: 'd1' } },
+            headers: { 'retry-after': '120' },
+          }
+        : undefined;
+    useSyncState.getState().set({ phase: 'idle', quotaUntil: null });
+    await engine?.run('full');
+    expect(useSyncState.getState().phase).toBe('quota');
 
     server.tenantStatus = { status: 'read_only', since: 7 };
     server.override = ({ path }) =>

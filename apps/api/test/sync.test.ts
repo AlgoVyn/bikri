@@ -354,6 +354,37 @@ describe('push (03 §4.1, §9)', () => {
   });
 });
 
+describe('void rules (05 §5, D-044)', () => {
+  it('a manager voids only same-day bills; the owner any day', async () => {
+    const shop = await seedShop('Voids');
+    const manager = newId();
+    await env.DB.prepare(
+      `INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, 'Manager', 'manager', 'h', 's', ?3, ?3)`,
+    )
+      .bind(shop.tenantId, manager, Date.now())
+      .run();
+    const sales = [1, 2].map((seq) => saleOps(shop, shop.till, seq));
+    await pushOk(shop.till, sales.flat());
+    const voidOf = (seq: number, staff: string, date: string) =>
+      op('sale_voids', 'insert', {
+        id: newId(),
+        sale_id: sales[seq - 1]?.[0]?.row?.id,
+        reason: 'Wrong item',
+        replacement_sale_id: null,
+        device_id: shop.till.id,
+        staff_id: staff,
+        business_date: date,
+        created_at: Date.now(),
+      });
+    const late = await pushOk(shop.till, [voidOf(1, manager, '2026-10-28')]);
+    expect(late.results[0]?.error_code).toBe('FORBIDDEN');
+    const same = await pushOk(shop.till, [voidOf(1, manager, '2026-10-27')]);
+    expect(same.results[0]?.error_code ?? null).toBeNull();
+    const owner = await pushOk(shop.till, [voidOf(2, IDS.owner, '2026-10-29')]);
+    expect(owner.results[0]?.error_code ?? null).toBeNull();
+  });
+});
+
 describe('pull and snapshot', () => {
   it('8: pull pages by cursor and ends at the max seq', async () => {
     const shop = await seedShop('Pages');
