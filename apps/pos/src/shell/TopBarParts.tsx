@@ -123,7 +123,8 @@ export function SyncBadge() {
       to="/settings/sync"
       data-testid="sync-badge"
       data-state={state}
-      aria-label={detail}
+      // axe label-content-name-mismatch: the accessible name starts with the visible text.
+      aria-label={detail === label ? label : `${label}. ${detail}`}
       title={detail}
       className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
     >
