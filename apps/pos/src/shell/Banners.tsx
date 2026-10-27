@@ -4,7 +4,6 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { shopRequest } from '../sync/shopApi.ts';
 import { useOnline } from './TopBarParts.tsx';
 
 type TenantStatus = { status: string; since?: number; learned_at?: number };
@@ -34,6 +33,7 @@ export function Banners() {
     if (!staff) return;
     const db = getDb();
     try {
+      const { shopRequest } = await import('../sync/shopApi.ts');
       const res = await shopRequest<{ ended: boolean }>(
         db,
         String(staff.id),

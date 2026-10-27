@@ -10,7 +10,7 @@ import { ToastProvider } from '../components/Toast.tsx';
 import { useAppGate } from '../data/useAppGate.ts';
 import { AppShell } from '../shell/AppShell.tsx';
 import { useSession } from '../state/session.ts';
-import { SyncEngine } from '../sync/engine.ts';
+import type { SyncEngine } from '../sync/engine.ts';
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -28,10 +28,12 @@ function Gate() {
     if (!db || !enrolled || revoked) return;
     let engine: SyncEngine | null = null;
     let cancelled = false;
-    void SyncEngine.start(db).then((e) => {
-      if (cancelled) e?.stop();
-      else engine = e;
-    });
+    void import('../sync/engine.ts')
+      .then((m) => m.SyncEngine.start(db))
+      .then((e) => {
+        if (cancelled) e?.stop();
+        else engine = e;
+      });
     return () => {
       cancelled = true;
       engine?.stop();
