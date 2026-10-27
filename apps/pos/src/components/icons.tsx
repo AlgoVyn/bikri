@@ -91,3 +91,45 @@ export function SearchIcon() {
     </Svg>
   );
 }
+
+export function SuppliersIcon() {
+  return (
+    <Svg>
+      <path d="M3 7h11v9H3z" />
+      <path d="M14 10h4l3 3v3h-7" />
+      <circle cx="7" cy="18" r="1.6" />
+      <circle cx="17" cy="18" r="1.6" />
+    </Svg>
+  );
+}
+
+export function ExpensesIcon() {
+  return (
+    <Svg>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 14h4" />
+    </Svg>
+  );
+}
+
+export function ReportsIcon() {
+  return (
+    <Svg>
+      <path d="M4 20V10" />
+      <path d="M10 20V4" />
+      <path d="M16 20v-7" />
+      <path d="M21 20H3" />
+    </Svg>
+  );
+}
+
+export function MoreIcon() {
+  return (
+    <Svg>
+      <circle cx="5" cy="12" r="1.4" />
+      <circle cx="12" cy="12" r="1.4" />
+      <circle cx="19" cy="12" r="1.4" />
+    </Svg>
+  );
+}

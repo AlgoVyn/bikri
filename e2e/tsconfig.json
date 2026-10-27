@@ -11,5 +11,10 @@
     "types": ["node"],
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["src", "tests", "vitest.config.ts", "playwright.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts", "playwright.config.ts"],
+  "references": [
+    {
+      "path": "../packages/printer"
+    }
+  ]
 }

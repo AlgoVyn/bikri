@@ -15,14 +15,21 @@ const TOAST_LIMIT = 3;
 
 export type ToastTone = 'info' | 'error';
 
+export type ToastAction = { label: string; onClick: () => void };
+
 type ToastItem = {
   id: number;
   message: string;
   tone: ToastTone;
+  actions: readonly ToastAction[];
 };
 
 type ToastApi = {
-  push: (message: string, tone?: ToastTone) => void;
+  push: (
+    message: string,
+    tone?: ToastTone,
+    actions?: readonly ToastAction[],
+  ) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -43,11 +50,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const push = useCallback(
-    (message: string, tone: ToastTone = 'info') => {
+    (
+      message: string,
+      tone: ToastTone = 'info',
+      actions: readonly ToastAction[] = [],
+    ) => {
       const id = nextId.current;
       nextId.current += 1;
       setItems((current) => {
-        const next = [...current, { id, message, tone }];
+        const next = [...current, { id, message, tone, actions }];
         const overflow = next.length - TOAST_LIMIT;
         if (overflow <= 0) {
           return next;
@@ -98,6 +109,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             }
           >
             <span className="min-w-0 flex-1">{item.message}</span>
+            {item.actions.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                className="min-h-11 shrink-0 px-2 font-medium underline"
+                onClick={() => {
+                  dismiss(item.id);
+                  action.onClick();
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
             <button
               type="button"
               className="min-h-11 shrink-0 px-2"

@@ -231,7 +231,7 @@ describe('dialogs, export, toast, and key hints', () => {
     await user.clear(pin);
     await user.type(pin, '1234');
     await user.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(verify).toHaveBeenCalledWith('1234');
+    expect(verify).toHaveBeenCalledWith('1234', expect.any(String));
     expect(await screen.findByText('PIN not accepted.')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
