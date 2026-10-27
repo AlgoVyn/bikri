@@ -4,6 +4,7 @@ import { ledgerContext, saveNewProduct } from '../data/catalog.ts';
 import { closeDb, getDb } from '../data/db.ts';
 import { ensureLocalTenant } from '../data/localTenant.ts';
 import { finishSetup } from '../data/setup.ts';
+import { writeAction } from '../data/write.ts';
 import { useSession } from '../state/session.ts';
 import { seedSampleDay } from './sampleDay.ts';
 
@@ -146,4 +147,45 @@ export async function seedManyProducts(n: number): Promise<void> {
     rev: 1,
   }));
   await db.products.bulkAdd(rows);
+}
+
+/** A customer with an optional credit limit and opening balance (paisa), e2e only. */
+export async function seedCustomer(c: {
+  name: string;
+  phone?: string;
+  limit?: number | null;
+  hard?: boolean;
+  balance?: number;
+}): Promise<string> {
+  const db = getDb();
+  const owner = (await db.staff.toArray()).find((s) => s.role === 'owner');
+  const ctx = await ledgerContext(db, owner?.id ?? '');
+  return writeAction(db, async (w) => {
+    const row = await w.create('customers', {
+      name: c.name,
+      phone: c.phone ?? '',
+      address: '',
+      note: '',
+      credit_limit: c.limit ?? null,
+      hard_limit: c.hard ? 1 : 0,
+    });
+    if (c.balance) {
+      const now = Date.now();
+      await w.insert('ledger_entries', {
+        id: newId(now),
+        party_type: 'customer',
+        party_id: row.id,
+        amount: c.balance,
+        source_type: 'opening',
+        source_id: null,
+        note: '',
+        branch_id: ctx.branch_id,
+        device_id: ctx.device_id,
+        staff_id: ctx.staff_id,
+        business_date: businessDate(now),
+        created_at: now,
+      });
+    }
+    return row.id;
+  });
 }
