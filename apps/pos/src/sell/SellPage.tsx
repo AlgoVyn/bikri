@@ -709,6 +709,17 @@ export function SellPage() {
         requestOverride={(permission, onApproved) =>
           setOverride({ permission, onApproved })
         }
+        onScan={(code) => {
+          setDialog(null);
+          setTimeout(() => {
+            focusSearch();
+            void onEnter(code, true);
+          }, 0);
+        }}
+        onOpenBill={(bill) => {
+          setDialog(null);
+          void navigate({ to: '/sales', search: { bill } });
+        }}
       />
       <OverrideDialog
         open={override !== null}
