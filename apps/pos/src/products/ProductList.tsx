@@ -84,6 +84,16 @@ export function ProductList() {
           {t('products.export_csv')}
         </button>
         {canEdit ? (
+          <>
+            <Link to="/products/import" className={buttonQuiet}>
+              {t('import.button')}
+            </Link>
+            <Link to="/products/prices" className={buttonQuiet}>
+              {t('prices.button')}
+            </Link>
+          </>
+        ) : null}
+        {canEdit ? (
           <Link to="/products/categories" className={buttonQuiet}>
             {t('products.manage_categories')}
           </Link>

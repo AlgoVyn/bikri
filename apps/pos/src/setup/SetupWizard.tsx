@@ -215,7 +215,10 @@ export function SetupWizard() {
     setStep(next);
   };
 
-  const finish = async (withProduct: boolean) => {
+  const finish = async (
+    withProduct: boolean,
+    then: '/' | '/products/import' = '/',
+  ) => {
     const found = withProduct ? validate(4) : {};
     setErrors(found);
     if (Object.keys(found).length > 0) return focusFirstError(found);
@@ -243,7 +246,7 @@ export function SetupWizard() {
       unlock({ staff_id: owner.id, role: 'owner', unlocked_at: Date.now() });
       if (!navigator.onLine) toast.push(t('setup.saved_offline'));
       useSession.getState().setJustSetUp(true);
-      await navigate({ to: '/' });
+      await navigate({ to: then });
     } catch (error) {
       if (error instanceof SetupAlreadyDoneError) {
         toast.push(t('setup.already_done'));
@@ -702,7 +705,8 @@ export function SetupWizard() {
               <button
                 type="button"
                 className={`${buttonQuiet} min-h-16 flex-col`}
-                disabled
+                disabled={busy}
+                onClick={() => void finish(false, '/products/import')}
               >
                 {t('setup.import')}
                 <span className="text-small text-text-muted">
