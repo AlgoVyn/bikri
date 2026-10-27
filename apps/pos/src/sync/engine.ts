@@ -192,7 +192,8 @@ export class SyncEngine {
         await this.scheduleNext(300_000);
         return;
       }
-      if (error.code === 'TENANT_QUOTA') {
+      // D1_LIMIT: the whole account is out of daily rows; same wait as a shop quota (04 §3).
+      if (error.code === 'TENANT_QUOTA' || error.code === 'D1_LIMIT') {
         const wait = (error.retryAfter ?? 3600) * 1000;
         set({ phase: 'quota', quotaUntil: Date.now() + wait, progress: null });
         await this.scheduleNext(Math.min(wait, 3_600_000));

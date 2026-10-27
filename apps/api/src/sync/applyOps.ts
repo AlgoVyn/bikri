@@ -88,6 +88,8 @@ type Lookups = {
   branches: Map<string, { bill_prefix: string }>;
   current: Map<string, Current>;
   onHand: Map<string, { on_hand: number; avg_cost: number }>;
+  /** business_date of sales that pushed voids refer to (manager same-day voids, D-044). */
+  saleDates: Map<string, string>;
 };
 
 const key = (tbl: string, id: string) => `${tbl}:${id}`;
@@ -302,13 +304,26 @@ function checkOp(
         )
           throw new Reject('FORBIDDEN');
         break;
-      case 'sale_voids':
-        if (
-          !allowed('sale.void') &&
-          !overrideFor(group, 'sale_voids', row.id, 'sale.void', look.staff)
-        )
-          throw new Reject('FORBIDDEN');
+      case 'sale_voids': {
+        const over = overrideFor(
+          group,
+          'sale_voids',
+          row.id,
+          'sale.void',
+          look.staff,
+        );
+        if (!allowed('sale.void') && !over) throw new Reject('FORBIDDEN');
+        // 05 §5: a manager voids only bills of the same business day (D-044).
+        if (staff?.role === 'manager' && !over) {
+          const saleId = String(row.sale_id);
+          const saleDate =
+            group.find((o) => o.tbl === 'sales' && o.row?.id === saleId)?.row
+              ?.business_date ?? look.saleDates.get(saleId);
+          if (saleDate !== undefined && saleDate !== row.business_date)
+            throw new Reject('FORBIDDEN');
+        }
         break;
+      }
       case 'sale_lines': {
         if (row.below_cost === 1) {
           const sale = group.find(
@@ -661,7 +676,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const { db } = ctx;
   const byTable = new Map<string, Set<string>>();
   const products = new Set<string>();
+  const voidedSales = new Set<string>();
   for (const op of ops) {
+    if (op.tbl === 'sale_voids' && typeof op.row?.sale_id === 'string')
+      voidedSales.add(op.row.sale_id);
     if (isMasterTable(op.tbl)) {
       const id =
         op.kind === 'delete'
@@ -684,7 +702,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     ),
     db.prepare('SELECT id, bill_prefix FROM branches WHERE tenant_id = ?1'),
   ];
-  const kinds: Array<{ tbl: string } | { onHand: true }> = [];
+  const kinds: Array<{ tbl: string } | { onHand: true } | { sales: true }> = [];
   for (const [tbl, ids] of byTable) {
     const list = [...ids];
     for (let i = 0; i < list.length; i += 90) {
@@ -711,9 +729,21 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     );
     kinds.push({ onHand: true });
   }
+  const saleList = [...voidedSales];
+  for (let i = 0; i < saleList.length; i += 90) {
+    const chunk = saleList.slice(i, i + 90);
+    stmts.push(
+      db.prepare(
+        `SELECT id, business_date FROM sales WHERE tenant_id = ?1 AND id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
+        ...chunk,
+      ),
+    );
+    kinds.push({ sales: true });
+  }
   ctx.budget.take();
   const res = await db.batch(stmts);
   const look: Lookups = {
+    saleDates: new Map(),
     staff: new Map(),
     branches: new Map(),
     current: new Map(),
@@ -737,6 +767,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           setup_completed_at:
             (r.setup_completed_at as number | null | undefined) ?? null,
         });
+      } else if ('sales' in k) {
+        look.saleDates.set(String(r.id), String(r.business_date));
       } else {
         look.onHand.set(String(r.id), {
           on_hand: Number(r.on_hand),

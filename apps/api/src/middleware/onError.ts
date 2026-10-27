@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { ZodError } from 'zod';
 import { ApiError } from '../errors.ts';
+import { secondsToUtcMidnight } from '../platform/tenants.ts';
 import { applySecurityHeaders } from './securityHeaders.ts';
 
 type ErrorBody = {
@@ -28,6 +29,10 @@ function zodPath(path: ReadonlyArray<PropertyKey>): Array<string | number> {
   );
 }
 
+/** D1's own refusal once the account's free daily rows are used (Cloudflare D1 debug docs). */
+export const D1_LIMIT_RE =
+  /exceeded D1's free tier daily row (?:read|write) limit/iu;
+
 export function onError<E extends { Bindings: Env }>(
   err: Error,
   c: Context<E>,
@@ -52,6 +57,20 @@ export function onError<E extends { Bindings: Env }>(
         code: 'VALIDATION_FAILED',
         message: issue?.message ?? 'Validation failed',
         details: { path: zodPath(issue?.path ?? []) },
+      },
+    });
+  }
+
+  // Account-wide D1 free-tier limit (04 §3, 13 §6): every shop waits for 00:00 UTC.
+  if (D1_LIMIT_RE.test(err.message)) {
+    const wait = secondsToUtcMidnight(Date.now());
+    c.header('Retry-After', String(wait));
+    return jsonError(c, 503, {
+      error: {
+        code: 'D1_LIMIT',
+        message:
+          'The daily database limit is reached; sync resumes after 00:00 UTC',
+        details: { retry_after: wait },
       },
     });
   }
