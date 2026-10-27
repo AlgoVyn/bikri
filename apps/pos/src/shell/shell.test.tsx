@@ -38,7 +38,12 @@ describe('app shell', () => {
     expect(document.documentElement.dir).toBe('ltr');
     expect(document.documentElement.lang).toBe('en');
     expect(
-      await screen.findByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
+      // First render of the file loads the lazy routes: allow a slow CI runner.
+      await screen.findByRole(
+        'heading',
+        { name: 'Assalam-o-Alaikum, Adnan' },
+        { timeout: 5000 },
+      ),
     ).toBeTruthy();
     expect(await screen.findByText('Add your first products')).toBeTruthy();
     await user.selectOptions(screen.getByLabelText('Language'), 'ur');
