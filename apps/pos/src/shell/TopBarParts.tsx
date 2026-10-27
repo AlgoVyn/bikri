@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useSession } from '../state/session.ts';
 import { useSyncState } from '../sync/state.ts';
 
 /** The shop's own name (shop row, else the tenant's display name). */
@@ -160,10 +161,15 @@ export function PrinterDot() {
   );
 }
 
-/** Staff avatar with name and role. Switch staff and Lock arrive with the PIN lock (T-035). */
+function KeyHint({ keys }: { keys: string }) {
+  return <span className="ms-auto text-small text-text-muted">{keys}</span>;
+}
+
+/** Staff avatar with name, role and Lock (T-035; unlocking another profile switches user). */
 export function StaffMenu() {
   const { t } = useTranslation();
-  const { staff, role } = useCurrentStaff();
+  const { staff, role, support } = useCurrentStaff();
+  const lock = useSession((s) => s.lock);
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -176,7 +182,7 @@ export function StaffMenu() {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
-  const name = String(staff?.name ?? '');
+  const name = support ? t('lock.support_profile') : String(staff?.name ?? '');
   return (
     <div ref={ref} className="relative">
       <button
@@ -201,8 +207,18 @@ export function StaffMenu() {
         >
           <p className="font-medium">{name}</p>
           <p className="text-small text-text-muted">
-            {t(`shell.role_${role}`)}
+            {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
           </p>
+          <button
+            type="button"
+            className="mt-2 flex min-h-11 w-full items-center rounded-control px-2 text-start hover:bg-surface-2"
+            onClick={() => {
+              setOpen(false);
+              lock();
+            }}
+          >
+            {t('shell.lock')} <KeyHint keys="Ctrl+L" />
+          </button>
         </div>
       ) : null}
     </div>

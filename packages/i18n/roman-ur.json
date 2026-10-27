@@ -771,7 +771,8 @@
     "sync_downloading": "Dukaan ka data download ho raha hai… {{pct}}%",
     "sync_read_only": "Sirf dekhne ke liye",
     "sync_detail_read_only": "Yeh dukaan sirf dekhne ke liye hai · {{count}} tabdeeliyan baqi",
-    "sync_quota": "Rozana sync ki had poori"
+    "sync_quota": "Rozana sync ki had poori",
+    "lock": "Lock karein"
   },
   "stock": {
     "reason": {
@@ -939,5 +940,19 @@
     "conflict_over_refund": "Bill se zyada wapsi",
     "conflict_refund_after_void": "Bill mansookh hone ke baad wapsi",
     "conflict_over_return": "Wusool se zyada wapas kiya"
+  },
+  "lock": {
+    "who": "Kaun bech raha hai?",
+    "wrong_one": "Ghalat PIN, 5 minute ke lock se pehle {{count}} koshish baqi",
+    "wrong_other": "Ghalat PIN, 5 minute ke lock se pehle {{count}} koshishein baqi",
+    "locked_for": "{{time}} ke liye lock",
+    "clear": "Saaf karein",
+    "backspace": "Aakhri hindsa mitayein",
+    "forgot": "PIN bhool gaye?",
+    "forgot_staff": "Maalik se kahein ke Settings → Cashiers mein isay dobara set kare.",
+    "forgot_owner": "Aap ki dukaan ka koi aur maalik Settings → Cashiers mein isay dobara set kar sakta hai. Agar aap akele maalik hain to Algovyn se raabta karein, woh tasdeeq ke baad isay set karega.",
+    "kept": "Lock ke dauran cart aur roke hue bill mehfooz rehte hain.",
+    "support_profile": "Algovyn support",
+    "pin_entered": "{{total}} mein se {{count}} hindse"
   }
 }

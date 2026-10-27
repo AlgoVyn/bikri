@@ -3,7 +3,8 @@ import { create } from 'zustand';
 /** Unlocked staff (05 §4): kept in memory only, never persisted. */
 export type Session = {
   staff_id: string;
-  role: 'owner' | 'manager' | 'cashier';
+  /** `support`: the view-only "Algovyn support" profile of a support device (13 §7.5). */
+  role: 'owner' | 'manager' | 'cashier' | 'support';
   unlocked_at: number;
 };
 

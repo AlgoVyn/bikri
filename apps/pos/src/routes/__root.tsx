@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ToastProvider } from '../components/Toast.tsx';
 import { useAppGate } from '../data/useAppGate.ts';
+import { useAutoLock } from '../lock/autoLock.ts';
 import { AppShell } from '../shell/AppShell.tsx';
 import { useSession } from '../state/session.ts';
 import type { SyncEngine } from '../sync/engine.ts';
@@ -16,6 +17,10 @@ export const Route = createRootRoute({
   component: RootLayout,
 });
 
+const LockScreen = lazy(() =>
+  import('../lock/LockScreen.tsx').then((m) => ({ default: m.LockScreen })),
+);
+
 const EnrolPage = lazy(() =>
   import('../enrol/EnrolPage.tsx').then((m) => ({ default: m.EnrolPage })),
 );
@@ -23,6 +28,9 @@ const EnrolPage = lazy(() =>
 function Gate() {
   const { t } = useTranslation();
   const { gate, db, revoked, enrolled, shopName } = useAppGate();
+  const session = useSession((s) => s.session);
+  // T-035: an enrolled shop starts locked; the local dev/e2e shop keeps acting as owner (D-090).
+  useAutoLock(enrolled && !revoked);
   // T-033/T-036: sync runs whenever this browser holds a device token for the open shop.
   useEffect(() => {
     if (!db || !enrolled || revoked) return;
@@ -54,6 +62,12 @@ function Gate() {
           shopName={shopName}
           revoked={revoked}
         />
+      </Suspense>
+    );
+  if (gate === 'ready' && enrolled && !session && !devUi)
+    return (
+      <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+        <LockScreen />
       </Suspense>
     );
   if (gate === 'setup' && !onSetup && !devUi)

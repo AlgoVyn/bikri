@@ -57,6 +57,15 @@ async function enrol(page: Page, code: string, name?: string) {
   await expect(page).not.toHaveURL(/\/enrol/, { timeout: 20_000 });
 }
 
+/** An enrolled till starts on the PIN lock (T-035): unlock as the owner set up by finishSetupHere. */
+async function unlock(page: Page, name = 'Adnan', pin = '4826') {
+  const lock = page.getByTestId('lock-screen');
+  await expect(lock).toBeVisible({ timeout: 20_000 });
+  await lock.getByRole('button', { name: new RegExp(name) }).click();
+  await page.keyboard.type(pin);
+  await expect(lock).toBeHidden();
+}
+
 async function syncNow(page: Page) {
   await page.waitForFunction(() => window.__bikriTest !== undefined);
   await page.evaluate(() => window.__bikriTest?.syncNow());
@@ -106,6 +115,11 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   await a.page.waitForFunction(() => window.__bikriTest !== undefined);
   await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
   await a.page.goto('/bikri/');
+  // Wrong PIN shows tries left; the right one opens the app.
+  await a.page.getByTestId('lock-screen').getByRole('button', { name: /Adnan/ }).click();
+  await a.page.keyboard.type('1111');
+  await expect(a.page.getByRole('alert')).toContainText('4 tries left');
+  await a.page.keyboard.type('4826');
   await expect(a.page.getByRole('navigation', { name: 'Main' })).toBeVisible();
   await syncNow(a.page);
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
@@ -119,6 +133,7 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
 
   // Settings → Devices asks "Confirm it's you" and mails a code.
   await a.page.goto('/bikri/settings/devices');
+  await unlock(a.page);
   const dialog = a.page.getByTestId('owner-signin');
   await expect(dialog.getByText(/We sent a 6-digit code to/)).toBeVisible();
   await dialog.getByLabel('6-digit code').fill('000000');
@@ -143,6 +158,7 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   // Till B: lowercase dashed code works (AC 3); shop already set up → straight into the app.
   const b = await newTill(browser);
   await enrol(b.page, tillCode.toLowerCase());
+  await unlock(b.page);
   await expect(b.page.getByRole('navigation', { name: 'Main' })).toBeVisible({
     timeout: 20_000,
   });
@@ -191,6 +207,7 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
 
   // Leave this shop on A removes its database (AC 7).
   await a.page.goto('/bikri/settings');
+  await unlock(a.page);
   a.page.once('dialog', (d) => void d.accept());
   await a.page.getByRole('button', { name: 'Leave this shop' }).click();
   await expect(
