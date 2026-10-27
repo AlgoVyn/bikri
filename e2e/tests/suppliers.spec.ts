@@ -107,6 +107,26 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       payments2.filter((p) => p.purpose === 'supplier_payment'),
     ).toMatchObject([{ amount: 50000 }]);
 
+    await page.getByRole('button', { name: 'Export' }).click();
+    const [statementPdf] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'PDF' }).click(),
+    ]);
+    const statementPdfBytes = await readFile((await statementPdf.path()) ?? '');
+    expect(statementPdfBytes.subarray(0, 8).toString('latin1')).toBe(
+      '%PDF-1.4',
+    );
+    await page.getByRole('button', { name: 'Export' }).click();
+    const [statementCsv] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'CSV' }).click(),
+    ]);
+    const statementText = await readFile(
+      (await statementCsv.path()) ?? '',
+      'utf8',
+    );
+    expect(statementText).toContain('date,description,got,paid,balance');
+
     await page.getByRole('link', { name: 'Back to suppliers' }).click();
     await expect(page.getByText('Total you owe suppliers')).toBeVisible();
     const [csv] = await Promise.all([

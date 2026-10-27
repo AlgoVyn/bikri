@@ -26,9 +26,10 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByTestId('report-expenses-total')).toHaveCount(0);
     await expectNoHorizontalScroll(page);
 
+    await page.getByRole('button', { name: 'Export' }).click();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      page.getByRole('menuitem', { name: 'CSV' }).click(),
     ]);
     const text = await readFile((await download.path()) ?? '', 'utf8');
     expect(text).toContain(
@@ -37,6 +38,14 @@ test.describe('Reports (T-048)', () => {
     expect(text).toContain('1000.00');
     expect(text).toContain('TOTAL');
     expect(text).not.toMatch(/,100000(,|\r)/);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const [pdf] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'PDF' }).click(),
+    ]);
+    const pdfBytes = await readFile((await pdf.path()) ?? '');
+    expect(pdfBytes.subarray(0, 5).toString()).toBe('%PDF-');
 
     await page.getByRole('tab', { name: 'Products' }).click();
     await expect(page.getByTestId('report-best-qty')).toContainText('Charger');
@@ -91,9 +100,7 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByRole('button', { name: 'Yesterday' })).toHaveCount(
       0,
     );
-    await expect(page.getByRole('button', { name: 'Export CSV' })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole('button', { name: 'Export' })).toHaveCount(0);
     await page.getByRole('tab', { name: 'Products' }).click();
     await expect(page.getByText('Gross profit')).toHaveCount(0);
   });
