@@ -260,7 +260,7 @@ test.describe('Update prices (T-023)', () => {
       window.__bikriTest?.seedProducts([{ name: 'Cover', price: 50000 }]),
     );
     await page.getByLabel('Language').selectOption('ur');
-    await page.getByLabel('تبدیلی').selectOption('set');
+    await page.getByRole('main').getByLabel('تبدیلی').selectOption('set');
     await page.getByLabel('روپے', { exact: true }).fill('600');
     await page.getByRole('button', { name: 'پیش نظارہ' }).click();
     await expect(page.getByTestId('price-row')).toContainText('Rs 600');
