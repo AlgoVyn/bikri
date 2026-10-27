@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState.tsx';
 import { ToastProvider } from '../components/Toast.tsx';
 import { useAppGate } from '../data/useAppGate.ts';
 import { AppShell } from '../shell/AppShell.tsx';
+import { useSession } from '../state/session.ts';
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -17,6 +18,7 @@ export const Route = createRootRoute({
 function Gate() {
   const { t } = useTranslation();
   const { gate } = useAppGate();
+  const afterSetup = useSession((s) => s.afterSetup);
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';
   const devUi = pathname.startsWith('/dev/');
@@ -28,7 +30,8 @@ function Gate() {
     );
   if (gate === 'setup' && !onSetup && !devUi)
     return <Navigate to="/setup" replace />;
-  if (gate === 'ready' && onSetup) return <Navigate to="/" replace />;
+  // Finishing the wizard flips the gate to 'ready' while still on /setup: go where Finish asked.
+  if (gate === 'ready' && onSetup) return <Navigate to={afterSetup} replace />;
   if (onSetup) return <Outlet />;
   return (
     <AppShell>

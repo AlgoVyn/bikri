@@ -42,6 +42,28 @@ describe('import spreadsheet (screens/08)', () => {
       barcode: 4,
       category: 5,
     });
+    // Manual run-through: Roman Urdu headers with units, case, a BOM and Urdu script.
+    expect(
+      autoMap([
+        '\ufeffNAAM',
+        'Qeemat (Rs)',
+        'Laagat Rs.',
+        'Miqdar',
+        'Bar-code',
+      ]),
+    ).toEqual({ name_en: 0, price: 1, cost: 2, stock: 3, barcode: 4 });
+    expect(autoMap(['Naam (Urdu)', 'Naam', 'Keemat'])).toEqual({
+      name_ur: 0,
+      name_en: 1,
+      price: 2,
+    });
+    expect(autoMap(['نام', 'قیمت', 'لاگت', 'مقدار', 'بارکوڈ'])).toEqual({
+      name_en: 0,
+      price: 1,
+      cost: 2,
+      stock: 3,
+      barcode: 4,
+    });
     expect(autoMap(['Product Name', 'Sale Price', 'Opening Stock'])).toEqual({
       name_en: 0,
       price: 1,
