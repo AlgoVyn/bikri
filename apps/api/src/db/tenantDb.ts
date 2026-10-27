@@ -158,8 +158,6 @@ export type TenantDb = {
   insert(table: TenantTable, row: Row): D1PreparedStatement;
   upsert(table: TenantTable, row: Row): D1PreparedStatement;
   batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
-  /** `PRAGMA defer_foreign_keys = ON`, the first statement of a push batch (03 §4.1 step 5). */
-  deferForeignKeys(): D1PreparedStatement;
 };
 
 /** Resolves the tenant's shard binding (v1: always `DB`). */
@@ -201,9 +199,6 @@ export function tenantDb(env: Env, tenant: TenantRef): TenantDb {
     },
     batch(statements) {
       return db.batch(statements);
-    },
-    deferForeignKeys() {
-      return db.prepare('PRAGMA defer_foreign_keys = ON');
     },
   };
 }

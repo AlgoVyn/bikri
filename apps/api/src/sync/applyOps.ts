@@ -16,7 +16,7 @@ import type { D1Table } from '@bikri/db/tables';
 import type { SqlValue, TenantDb } from '../db/tenantDb.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
 import type { OpResult, PushOp } from './opSchema.ts';
-import { columnsOf, rowJsonExpr } from './tables.ts';
+import { applyRank, columnsOf, rowJsonExpr } from './tables.ts';
 
 /** D1 calls one push may make (Free plan: 50 per invocation; 03 §4.1 step 5). */
 export const MAX_D1_CALLS = 40;
@@ -840,21 +840,31 @@ export async function applyOps(
       if (ctx.budget.used >= ctx.budget.max - 1) return; // keep one call for the final batch
       ctx.budget.take();
       try {
-        const stmts = [
-          db.deferForeignKeys(),
-          ...list.flatMap((g) => g.planned.flatMap((p) => p.stmts)),
-        ];
-        const res = await db.batch(stmts);
-        let at = 1;
+        // Parents first (stable), so references inside one push resolve without deferred FKs.
+        const ordered = list
+          .flatMap((g) => g.planned)
+          .map((p, i) => ({ p, i }))
+          .sort(
+            (x, y) =>
+              applyRank(x.p.op.tbl) - applyRank(y.p.op.tbl) || x.i - y.i,
+          )
+          .map((x) => x.p);
+        const res = await db.batch(ordered.flatMap((p) => p.stmts));
+        const start = new Map<Planned, number>();
+        let at = 0;
+        for (const p of ordered) {
+          start.set(p, at);
+          at += p.stmts.length;
+        }
         for (const g of list) {
           let lostGroup = false;
           for (const p of g.planned) {
+            const s0 = start.get(p) ?? 0;
             if (
               p.guard !== null &&
-              (res[at + p.guard]?.meta.changes ?? 0) !== 1
+              (res[s0 + p.guard]?.meta.changes ?? 0) !== 1
             )
               lostGroup = true;
-            at += p.stmts.length;
           }
           for (const p of g.planned) {
             if (lostGroup && p.guard !== null) continue;
