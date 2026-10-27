@@ -5,6 +5,7 @@ export {
   BikriDb,
   type Cart,
   type CartLine,
+  type CartOverride,
   DEXIE_SCHEMA_V1,
   type DexieTableName,
   deleteTenantDb,

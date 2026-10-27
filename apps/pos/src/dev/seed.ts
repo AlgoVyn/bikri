@@ -1,5 +1,6 @@
 import { businessDate, hashPin, newId } from '@bikri/core';
 import { deleteTenantDb } from '@bikri/db';
+import { ledgerContext, saveNewProduct } from '../data/catalog.ts';
 import { closeDb, getDb } from '../data/db.ts';
 import { ensureLocalTenant } from '../data/localTenant.ts';
 import { finishSetup } from '../data/setup.ts';
@@ -72,4 +73,77 @@ export async function unlockAs(
 /** seedSampleDay on today's business date in the dev shop. */
 export async function seedTodaySales(): Promise<void> {
   await seedSampleDay(getDb(), businessDate(Date.now()));
+}
+
+export type TestProduct = {
+  name: string;
+  price: number;
+  cost?: number;
+  barcode?: string;
+  stock?: number;
+  track?: boolean;
+};
+
+/** Products through the real save path (e2e only). Prices and costs in paisa, stock in units. */
+export async function seedProducts(list: TestProduct[]): Promise<string[]> {
+  const db = getDb();
+  const owner = (await db.staff.toArray()).find((s) => s.role === 'owner');
+  const ctx = await ledgerContext(db, owner?.id ?? '');
+  const ids: string[] = [];
+  for (const p of list) {
+    const row = await saveNewProduct(
+      db,
+      {
+        name_en: p.name,
+        price: p.price,
+        cost: p.cost,
+        barcodes: p.barcode ? [p.barcode] : [],
+        opening_milli: (p.stock ?? 0) * 1000,
+        track_stock: p.track ?? true,
+      },
+      ctx,
+    );
+    ids.push(row.id);
+  }
+  return ids;
+}
+
+/** `n` products in one bulk write for the Sell performance check (screens/05 AC 2). */
+export async function seedManyProducts(n: number): Promise<void> {
+  const db = getDb();
+  const now = Date.now();
+  const words = [
+    'Cable',
+    'Charger',
+    'Cover',
+    'Earbuds',
+    'Glass',
+    'Battery',
+    'Stand',
+    'Card',
+    'Adapter',
+    'Speaker',
+  ];
+  const rows = Array.from({ length: n }, (_, i) => ({
+    id: newId(),
+    name_en: `${words[i % words.length]} ${String(i).padStart(4, '0')}`,
+    name_ur: '',
+    brand: '',
+    category_id: null,
+    sku: `BULK-${i}`,
+    unit: 'pc',
+    price: 10000 + i * 100,
+    last_cost: 0,
+    avg_cost: 0,
+    min_stock_milli: 0,
+    track_stock: 0,
+    warranty_days: 0,
+    image_key: null,
+    notes: '',
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    rev: 1,
+  }));
+  await db.products.bulkAdd(rows);
 }

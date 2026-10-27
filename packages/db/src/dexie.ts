@@ -125,7 +125,16 @@ export type CartLine = {
   discount_value: number;
   unit_cost: number;
   image_key?: string;
+  /** Product price when added; `unit_price` below it is a price override (screens/05). */
+  list_price?: number;
+  /** Serial no / IMEI (0–60 chars). A line with a note never merges. */
+  note?: string;
+  track_stock?: 0 | 1;
+  unit?: string;
 };
+
+/** A manager approval given on this cart (05 §4.1); written to audit_log with the sale. */
+export type CartOverride = { permission: string; approved_by: string };
 
 export type Cart = {
   id: 'c1' | 'c2' | 'c3';
@@ -134,6 +143,7 @@ export type Cart = {
   bill_discount?: { type: 'amount' | 'percent'; value: number } | null;
   note: string;
   updated_at: number;
+  overrides?: CartOverride[];
 };
 
 export type HeldBill = Omit<Cart, 'id'> & {

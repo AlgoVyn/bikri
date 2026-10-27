@@ -1,4 +1,5 @@
 import type { BikriDb, SyncedRow } from '@bikri/db';
+import { heldExpiringCount } from './cart.ts';
 
 export type AttentionItem =
   | { kind: 'low_stock'; count: number }
@@ -6,6 +7,7 @@ export type AttentionItem =
   | { kind: 'over_limit'; count: number }
   | { kind: 'failed_prints'; count: number }
   | { kind: 'conflicts'; count: number }
+  | { kind: 'held_expiring'; count: number }
   | { kind: 'day_not_closed'; date: string };
 
 /** Products with track_stock = 1 at or below their low-stock alert (min 0 = off; screens/04 AC 4). */
@@ -29,6 +31,7 @@ export async function attentionItems(
     yesterday: string;
     deviceId: string;
     isOwner: boolean;
+    now?: number;
   },
 ): Promise<AttentionItem[]> {
   const items: AttentionItem[] = [];
@@ -55,6 +58,8 @@ export async function attentionItems(
     const conflicts = await db.sync_conflicts.count();
     if (conflicts > 0) items.push({ kind: 'conflicts', count: conflicts });
   }
+  const held = await heldExpiringCount(db, opts.now);
+  if (held > 0) items.push({ kind: 'held_expiring', count: held });
   const soldYesterday = (
     await db.sales.where('business_date').equals(opts.yesterday).toArray()
   ).some((s) => s.device_id === opts.deviceId);
