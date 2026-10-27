@@ -54,6 +54,7 @@ import { Route as ProductsIdEditRouteImport } from './routes/products/$id.edit.t
 import { Route as SalesIdRefundRouteImport } from './routes/sales/$id.refund.tsx';
 import { Route as SuppliersSupplierIdIndexRouteImport } from './routes/suppliers/$supplierId.index.tsx';
 import { Route as SuppliersSupplierIdDeliveryNewRouteImport } from './routes/suppliers/$supplierId.delivery.new.tsx';
+import { Route as SuppliersSupplierIdReturnNewRouteImport } from './routes/suppliers/$supplierId.return.new.tsx';
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -320,6 +321,16 @@ const SuppliersSupplierIdDeliveryNewRoute =
       (d) => d.Route,
     ),
   );
+const SuppliersSupplierIdReturnNewRoute =
+  SuppliersSupplierIdReturnNewRouteImport.update({
+    id: '/return/new',
+    path: '/return/new',
+    getParentRoute: () => SuppliersSupplierIdRoute,
+  } as any).lazy(() =>
+    import('./routes/suppliers/$supplierId.return.new.lazy.tsx').then(
+      (d) => d.Route,
+    ),
+  );
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
@@ -367,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/products/$id/': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
   '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
@@ -412,6 +424,7 @@ export interface FileRoutesByTo {
   '/products/$id': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId': typeof SuppliersSupplierIdIndexRoute;
   '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -460,6 +473,7 @@ export interface FileRoutesById {
   '/products/$id/': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
   '/suppliers/$supplierId/delivery/new': typeof SuppliersSupplierIdDeliveryNewRoute;
+  '/suppliers/$supplierId/return/new': typeof SuppliersSupplierIdReturnNewRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -508,7 +522,8 @@ export interface FileRouteTypes {
     | '/admin/tenants/'
     | '/products/$id/'
     | '/suppliers/$supplierId/'
-    | '/suppliers/$supplierId/delivery/new';
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
@@ -553,7 +568,8 @@ export interface FileRouteTypes {
     | '/admin/tenants'
     | '/products/$id'
     | '/suppliers/$supplierId'
-    | '/suppliers/$supplierId/delivery/new';
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   id:
     | '__root__'
     | '/'
@@ -600,7 +616,8 @@ export interface FileRouteTypes {
     | '/admin/tenants/'
     | '/products/$id/'
     | '/suppliers/$supplierId/'
-    | '/suppliers/$supplierId/delivery/new';
+    | '/suppliers/$supplierId/delivery/new'
+    | '/suppliers/$supplierId/return/new';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -960,6 +977,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersSupplierIdDeliveryNewRouteImport;
       parentRoute: typeof SuppliersSupplierIdRoute;
     };
+    '/suppliers/$supplierId/return/new': {
+      id: '/suppliers/$supplierId/return/new';
+      path: '/return/new';
+      fullPath: '/suppliers/$supplierId/return/new';
+      preLoaderRoute: typeof SuppliersSupplierIdReturnNewRouteImport;
+      parentRoute: typeof SuppliersSupplierIdRoute;
+    };
   }
 }
 
@@ -995,11 +1019,13 @@ const SalesIdRouteWithChildren =
 interface SuppliersSupplierIdRouteChildren {
   SuppliersSupplierIdIndexRoute: typeof SuppliersSupplierIdIndexRoute;
   SuppliersSupplierIdDeliveryNewRoute: typeof SuppliersSupplierIdDeliveryNewRoute;
+  SuppliersSupplierIdReturnNewRoute: typeof SuppliersSupplierIdReturnNewRoute;
 }
 
 const SuppliersSupplierIdRouteChildren: SuppliersSupplierIdRouteChildren = {
   SuppliersSupplierIdIndexRoute: SuppliersSupplierIdIndexRoute,
   SuppliersSupplierIdDeliveryNewRoute: SuppliersSupplierIdDeliveryNewRoute,
+  SuppliersSupplierIdReturnNewRoute: SuppliersSupplierIdReturnNewRoute,
 };
 
 const SuppliersSupplierIdRouteWithChildren =

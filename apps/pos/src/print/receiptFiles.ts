@@ -5,11 +5,13 @@ import {
   buildDayClose,
   buildRefundReceipt,
   buildSaleReceipt,
+  buildSupplierReturn,
   type DayCloseReceipt,
   type RasterSource,
   type ReceiptLabels,
   type RefundReceipt,
   type SaleReceiptInput,
+  type SupplierReturnReceipt,
 } from '@bikri/printer';
 import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import {
@@ -19,6 +21,7 @@ import {
   receiptPaper,
 } from '../data/receipt.ts';
 import { loadRefundReceipt } from '../data/refundReceipt.ts';
+import { loadSupplierReturnReceipt } from '../data/supplierReturnReceipt.ts';
 import { canvasBlob, jpegToPdf, renderReceiptCanvas } from './receiptImage.ts';
 
 export { downloadBlob } from './receiptImage.ts';
@@ -37,6 +40,10 @@ export type RefundPrint = ReceiptLayout & {
 };
 
 export type DayClosePrint = ReceiptLayout & { input: DayCloseReceipt };
+
+export type SupplierReturnPrint = ReceiptLayout & {
+  input: SupplierReturnReceipt;
+};
 
 async function layoutOf(db: BikriDb) {
   const printer = ((await db.kv.get('printer'))?.value ??
@@ -101,15 +108,35 @@ export async function dayCloseReceipt(
   return { input, blocks, paper, logo, printer };
 }
 
+export async function supplierReturnReceipt(
+  db: BikriDb,
+  returnId: string,
+): Promise<SupplierReturnPrint | null> {
+  const input = await loadSupplierReturnReceipt(db, returnId);
+  if (!input) return null;
+  const { printer, paper, logo } = await layoutOf(db);
+  const blocks = buildSupplierReturn(input, {
+    paperMm: paper.paperMm,
+    charsPerLine: paper.charsPerLine,
+    dots: paper.dots,
+    printLogo: printer?.print_logo !== false,
+  });
+  return { input, blocks, paper, logo, printer };
+}
+
 /** What a print job prints (the print service, T-020, sends these blocks). */
 export function jobReceipt(
   db: BikriDb,
   job: PrintJob,
-): Promise<SaleReceipt | RefundPrint | DayClosePrint | null> {
+): Promise<
+  SaleReceipt | RefundPrint | DayClosePrint | SupplierReturnPrint | null
+> {
   if (job.sale_id)
     return saleReceipt(db, job.sale_id, { reprint: job.reprint === true });
   if (job.refund_id) return refundReceipt(db, job.refund_id);
   if (job.day_close_id) return dayCloseReceipt(db, job.day_close_id);
+  if (job.supplier_return_id)
+    return supplierReturnReceipt(db, job.supplier_return_id);
   return Promise.resolve(null);
 }
 

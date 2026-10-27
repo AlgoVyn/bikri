@@ -65,6 +65,7 @@ export {
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
 export { saleBasicInput } from './templates/saleBasicFixture.ts';
+export { buildSupplierReturn } from './templates/supplierReturn.ts';
 export { buildTestPrint, type TestPrintInput } from './templates/testPrint.ts';
 export type {
   DayCloseLabels,
@@ -76,6 +77,8 @@ export type {
   ReceiptShop,
   RefundLine,
   RefundReceipt,
+  SupplierReturnLabels,
+  SupplierReturnReceipt,
 } from './templates/types.ts';
 export type {
   Align,

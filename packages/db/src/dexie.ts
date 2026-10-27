@@ -165,6 +165,7 @@ export type PrintJob = {
   sale_id?: string;
   refund_id?: string;
   day_close_id?: string;
+  supplier_return_id?: string;
   kind: 'sale' | 'refund' | 'test' | 'day_close' | 'statement' | 'supplier';
   status: 'queued' | 'printing' | 'done' | 'failed';
   error?: string;
