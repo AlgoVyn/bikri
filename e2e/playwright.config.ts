@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // E2E runs against `wrangler dev` serving the built PWA + local D1 (docs/10-testing.md §1).
-const PORT = 8787;
+// E2E_PORT lets several worktrees run their own `wrangler dev` side by side.
+const PORT = Number(process.env.E2E_PORT ?? 8787);
 // `--local-upstream` keeps the browser's Origin (wrangler dev otherwise rewrites it to the route's
 // host, https://algovyn.com, and the CSRF check refuses every POST).
 // Test-only Worker vars (10 §5): the Access bypass and fake email outbox need ENV=test, which the
