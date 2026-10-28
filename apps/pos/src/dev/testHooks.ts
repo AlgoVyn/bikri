@@ -11,6 +11,7 @@ import {
   seedManyProducts,
   seedProducts,
   seedReadyShop,
+  seedSupplier,
   seedTodaySales,
   unlockAs,
 } from './seed.ts';
@@ -32,6 +33,7 @@ declare global {
       seedManyProducts: typeof seedManyProducts;
       beeps: () => number;
       seedCustomer: typeof seedCustomer;
+      seedSupplier: typeof seedSupplier;
       /** Text the print service would print for a print job (null when it has no sale). */
       printJobText: (id: string) => Promise<string | null>;
     };
@@ -53,6 +55,7 @@ export function installTestHooks(): void {
     seedManyProducts,
     beeps: beepCount,
     seedCustomer,
+    seedSupplier,
     printJobText: async (id) => {
       const job = await getDb().print_jobs.get(id);
       const r = job ? await jobReceipt(getDb(), job) : null;

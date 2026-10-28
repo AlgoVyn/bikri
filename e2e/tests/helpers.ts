@@ -20,6 +20,7 @@ export async function expectNoSeriousAxe(page: Page): Promise<void> {
     axe.violations.filter(
       (v) => v.impact === 'serious' || v.impact === 'critical',
     ),
+    page.url(),
   ).toEqual([]);
 }
 
@@ -200,6 +201,11 @@ declare global {
         limit?: number | null;
         hard?: boolean;
         balance?: number;
+      }) => Promise<string>;
+      seedSupplier: (s: {
+        name: string;
+        phone?: string;
+        opening?: number;
       }) => Promise<string>;
       printJobText: (id: string) => Promise<string | null>;
     };

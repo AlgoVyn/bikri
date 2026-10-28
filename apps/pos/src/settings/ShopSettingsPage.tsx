@@ -268,6 +268,7 @@ function ShopForm() {
             ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/svg+xml"
+            aria-label={t('office.settings.logo')}
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];
