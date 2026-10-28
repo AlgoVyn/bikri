@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
 
 /** Opens the app with a finished setup (bikri-dev, owner PIN 4826) and waits for the shell. */
@@ -10,6 +11,16 @@ export async function openReadyShop(
   await page.evaluate(() => window.__bikriTest?.seedReadyShop());
   await page.goto(path);
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
+}
+
+/** No serious/critical axe violation (08 §8; T-063). */
+export async function expectNoSeriousAxe(page: Page): Promise<void> {
+  const axe = await new AxeBuilder({ page }).analyze();
+  expect(
+    axe.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    ),
+  ).toEqual([]);
 }
 
 /** No element may stick out past the viewport (screens/04 AC 5). */
