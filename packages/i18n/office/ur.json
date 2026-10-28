@@ -39,7 +39,14 @@
       "today": "آج",
       "walk_in": "عام گاہک",
       "yesterday": "کل",
-      "subtitle": "ہر بل، نیا پہلے"
+      "subtitle": "ہر بل، نیا پہلے",
+      "col_time": "وقت",
+      "col_invoice": "بل",
+      "col_customer": "گاہک",
+      "col_items": "اشیاء",
+      "col_total": "کل",
+      "col_method": "طریقہ",
+      "col_status": "حالت"
     },
     "bill": {
       "audit": "آڈٹ",
@@ -464,7 +471,12 @@
       "supplier_hint": "سپلائر کو ادائیگی؟ سپلائر → ادائیگی استعمال کریں۔",
       "title": "اخراجات",
       "total": "کل",
-      "subtitle": "دراز سے خرچ"
+      "subtitle": "دراز سے خرچ",
+      "range_last_month": "پچھلا مہینہ",
+      "range_custom": "حسب ضرورت",
+      "from": "سے",
+      "to": "تک",
+      "range_invalid": "سے تاریخ تک تاریخ سے پہلے ہونی چاہیے۔"
     },
     "dayclose": {
       "bank": "بینک/والٹ کل",

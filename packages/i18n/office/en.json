@@ -39,7 +39,14 @@
       "today": "Today",
       "walk_in": "Walk-in customer",
       "yesterday": "Yesterday",
-      "subtitle": "Every bill, newest first"
+      "subtitle": "Every bill, newest first",
+      "col_time": "Time",
+      "col_invoice": "Invoice",
+      "col_customer": "Customer",
+      "col_items": "Items",
+      "col_total": "Total",
+      "col_method": "Method",
+      "col_status": "Status"
     },
     "bill": {
       "audit": "Audit",
@@ -464,7 +471,12 @@
       "supplier_hint": "Paying a supplier? Use Suppliers → Pay supplier.",
       "title": "Expenses",
       "total": "Total",
-      "subtitle": "Money out of the till"
+      "subtitle": "Money out of the till",
+      "range_last_month": "Last month",
+      "range_custom": "Custom",
+      "from": "From",
+      "to": "To",
+      "range_invalid": "From must be on or before To."
     },
     "dayclose": {
       "bank": "Bank/wallet total",

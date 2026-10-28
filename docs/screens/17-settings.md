@@ -2,7 +2,7 @@
 
 **Route** `/settings` with subpages `/settings/<section>`. Left list of sections (top tabs on mobile); sections the user can't access are hidden. Device-level settings live in Dexie `kv` (not synced); shop-level settings are `shop` / `branches` / `staff` rows (synced).
 
-The index has a settings icon, title and one-line subtitle. Each row has an icon, title, hint and chevron, grouped under Shop / This device / Data and help.
+The index has a settings icon, title and one-line subtitle. Each row has an icon, title, hint and chevron, grouped under Shop / This device / Data and help. On ≥ 1024 px the groups use a two-column layout; Printer and Sync subpages both have a Back button to Settings.
 
 ## Reference
 

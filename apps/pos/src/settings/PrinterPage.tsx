@@ -1,4 +1,5 @@
 import type { PrintJob } from '@bikri/db';
+import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -104,7 +105,12 @@ export function PrinterPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <h1 className="text-h1 font-semibold">{t('printer.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/settings" className={buttonQuiet}>
+          {t('common.back')}
+        </Link>
+        <h1 className="text-h1 font-semibold">{t('printer.title')}</h1>
+      </div>
       <section
         className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4"
         aria-labelledby="printer-status"
