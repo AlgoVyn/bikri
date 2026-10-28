@@ -23,6 +23,7 @@ import {
   salesHistory,
   shopTimeZone,
 } from '../data/salesHistory.ts';
+import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import {
@@ -35,6 +36,16 @@ import {
 } from './format.ts';
 
 const PAGE = 50;
+const SALES_PRESETS: SalesPreset[] = [
+  'today',
+  'yesterday',
+  '7d',
+  '30d',
+  'month',
+  'custom',
+];
+const SALE_GRID =
+  'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1.4fr)_3.5rem_6rem_minmax(0,1.4fr)_7.5rem]';
 
 const PRESETS: { id: SalesPreset; key: string }[] = [
   { id: 'today', key: 'office.sales.range_today' },
@@ -67,8 +78,14 @@ export function SalesList({ bill }: { bill?: string }) {
   const now = Date.now();
   const today = businessDate(now);
   const yesterday = businessDate(now - 86_400_000);
-  const [preset, setPreset] = useState<SalesPreset>('today');
-  const [custom, setCustom] = useState({ from: today, to: today });
+  const [stored] = useState(() =>
+    readDateFilter('sales', SALES_PRESETS, 'today', today),
+  );
+  const [preset, setPreset] = useState<SalesPreset>(stored.preset);
+  const [custom, setCustom] = useState({
+    from: stored.from,
+    to: stored.to,
+  });
   const [query, setQuery] = useState('');
   const [method, setMethod] = useState<MethodFilter | ''>('');
   const [status, setStatus] = useState<SaleStatus | ''>('');
@@ -81,6 +98,10 @@ export function SalesList({ bill }: { bill?: string }) {
   useEffect(() => {
     if (bill) void navigate({ to: '/sales/$id', params: { id: bill } });
   }, [bill, navigate]);
+
+  useEffect(() => {
+    if (!limited) rememberDateFilter('sales', preset, custom.from, custom.to);
+  }, [preset, custom.from, custom.to, limited]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -373,6 +394,18 @@ export function SalesList({ bill }: { bill?: string }) {
             </p>
           </div>
           <ul className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card">
+            <li
+              className={`${SALE_GRID} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
+              aria-hidden="true"
+            >
+              <span>{t('office.sales.col_time')}</span>
+              <span>{t('office.sales.col_invoice')}</span>
+              <span>{t('office.sales.col_customer')}</span>
+              <span className="text-end">{t('office.sales.col_items')}</span>
+              <span className="text-end">{t('office.sales.col_total')}</span>
+              <span>{t('office.sales.col_method')}</span>
+              <span className="text-end">{t('office.sales.col_status')}</span>
+            </li>
             {day.rows.map((row) => (
               <SaleRow
                 key={row.sale.id}
@@ -429,7 +462,7 @@ function SaleRow({
       <Link
         to="/sales/$id"
         params={{ id: sale.id }}
-        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-2 py-2 pe-12 hover:bg-surface-2 sm:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1.4fr)_auto_auto_minmax(0,1.4fr)_auto]"
+        className={`${SALE_GRID} px-2 py-2 pe-12 hover:bg-surface-2`}
       >
         <span className="font-mono text-small text-text-muted">
           {timeText(Number(sale.created_at), i18n.language, timeZone)}
@@ -462,7 +495,7 @@ function SaleRow({
           ))}
         </span>
         <span
-          className={`justify-self-start rounded-full px-2 text-small font-medium sm:justify-self-end ${statusTone(status)}`}
+          className={`justify-self-start whitespace-nowrap rounded-full px-2 text-small font-medium sm:justify-self-end ${statusTone(status)}`}
         >
           {statusLabel(t, status)}
         </span>

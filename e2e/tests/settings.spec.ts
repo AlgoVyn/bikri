@@ -93,18 +93,26 @@ test.describe('Settings (T-050)', () => {
     await openReadyShop(page, '/bikri/');
     await page.evaluate(() => window.__bikriTest?.unlockAs('cashier'));
     await navigate(page, '/settings');
-    await expect(page.getByRole('link', { name: /Printer/ })).toBeVisible();
+    // Scope to the page: the top-bar printer pill is also a link to Printer.
+    const settings = page.getByRole('main');
+    await expect(settings.getByRole('link', { name: /Printer/ })).toBeVisible();
     await expect(
-      page.getByRole('link', { name: /Scanner & display/ }),
+      settings.getByRole('link', { name: /Scanner & display/ }),
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: /Language/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Sync/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /About/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Cashiers/ })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /Activity/ })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /Shop profile/ })).toHaveCount(
+    await expect(
+      settings.getByRole('link', { name: /Language/ }),
+    ).toBeVisible();
+    await expect(settings.getByRole('link', { name: /Sync/ })).toBeVisible();
+    await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
+    await expect(settings.getByRole('link', { name: /Cashiers/ })).toHaveCount(
       0,
     );
+    await expect(settings.getByRole('link', { name: /Activity/ })).toHaveCount(
+      0,
+    );
+    await expect(
+      settings.getByRole('link', { name: /Shop profile/ }),
+    ).toHaveCount(0);
     for (const path of [
       '/settings/shop',
       '/settings/cashiers',
@@ -124,6 +132,17 @@ test.describe('Settings (T-050)', () => {
     await expect(
       page.getByText('Only the owner can download a full shop copy.'),
     ).toBeVisible();
+  });
+
+  test('Printer and Sync have a Back button to Settings', async ({ page }) => {
+    await openReadyShop(page, '/bikri/settings/printer');
+    await page.getByRole('link', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings$/u);
+
+    await page.goto('/bikri/settings/sync');
+    await expect(page.getByTestId('sync-page')).toBeVisible();
+    await page.getByRole('link', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings$/u);
   });
 
   test('AC 7: the #printer link opens the Printer section directly', async ({

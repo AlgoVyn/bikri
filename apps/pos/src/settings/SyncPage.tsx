@@ -1,6 +1,8 @@
 /** Settings → Sync (screens/17, T-036): status, failed ops, conflicts, Sync now. */
+
 import { newId } from '@bikri/core';
 import type { OutboxEntry, SyncedRow } from '@bikri/db';
+import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,7 +131,12 @@ export function SyncPage() {
       className="mx-auto flex max-w-3xl flex-col gap-4 p-4"
       data-testid="sync-page"
     >
-      <h1 className="text-h1 font-semibold">{t('syncpage.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/settings" className={buttonQuiet}>
+          {t('common.back')}
+        </Link>
+        <h1 className="text-h1 font-semibold">{t('syncpage.title')}</h1>
+      </div>
       {!data.enrolled ? (
         <p className="text-text-muted">{t('syncpage.not_enrolled')}</p>
       ) : null}

@@ -154,17 +154,23 @@ export function PrinterDot() {
   );
   const label = printer ? t('shell.printer_ready') : t('shell.printer_none');
   return (
-    <span
-      role="img"
+    <Link
+      to="/settings/printer"
       data-testid="printer-dot"
       aria-label={label}
       title={label}
-      className="flex size-8 items-center justify-center"
+      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${
+        printer
+          ? 'bg-success-subtle text-success-subtle-ink'
+          : 'bg-surface-2 text-text-muted'
+      }`}
     >
       <span
-        className={`size-3 rounded-full ${printer ? 'bg-success' : 'bg-border-strong'}`}
+        aria-hidden="true"
+        className={`size-2 rounded-full ${printer ? 'bg-success' : 'bg-border-strong'}`}
       />
-    </span>
+      <span className="max-lg:hidden">{label}</span>
+    </Link>
   );
 }
 

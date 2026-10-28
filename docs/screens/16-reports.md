@@ -16,7 +16,7 @@ Bikri difference: every report exports to CSV and PDF (Dukaan has no export).
 
 ## Layout
 
-Toolbar: range chips Today / Yesterday / 7 days / 30 days / This month / Last month / Custom (date range picker, max 366 days); branch (v2) and device filters; `Export ▾` (CSV of the current tab, PDF of the summary).
+Toolbar: range chips Today / Yesterday / 7 days / 30 days / This month / Last month / Custom (date range picker, max 366 days); the range is remembered on this device; branch (v2) and device filters; `Export ▾` (CSV of the current tab, PDF of the summary).
 
 Tabs:
 1. **Summary**: cards Sold, Bills, Average bill, Gross profit, Expenses, Net profit, Margin; daily bar chart (sold, profit line); payment mix donut (cash/card/bank-wallet/udhaar); udhaar given vs received; a "Tax collected" card when tax is enabled ([07 §9](../07-money-rules.md#9-reports-formulas)).

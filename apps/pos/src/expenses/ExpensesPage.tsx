@@ -19,6 +19,7 @@ import {
   reverseExpense,
 } from '../data/expenses.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
+import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -27,7 +28,16 @@ import { CashMoveDialog } from './CashMoveDialog.tsx';
 import { ExpenseDialog } from './ExpenseDialog.tsx';
 import { categoryName, dateText, timeText } from './format.ts';
 
-type Preset = 'today' | '7d' | '30d' | 'month';
+type Preset = 'today' | '7d' | '30d' | 'month' | 'last_month' | 'custom';
+
+const PRESETS: Preset[] = [
+  'today',
+  '7d',
+  '30d',
+  'month',
+  'last_month',
+  'custom',
+];
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -41,7 +51,14 @@ export function ExpensesPage() {
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
   const readOnly = useReadOnly();
-  const [preset, setPreset] = useState<Preset>('month');
+  const [stored] = useState(() =>
+    readDateFilter('expenses', PRESETS, 'month', businessDate(Date.now())),
+  );
+  const [preset, setPreset] = useState<Preset>(stored.preset);
+  const [custom, setCustom] = useState({
+    from: stored.from,
+    to: stored.to,
+  });
   const [newOpen, setNewOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
   const [reversing, setReversing] = useState<ExpenseRow | null>(null);
@@ -56,12 +73,28 @@ export function ExpensesPage() {
     })();
   }, []);
 
+  const customValid = custom.from <= custom.to;
   const range = (() => {
     if (preset === 'today') return { from: today, to: today };
     if (preset === '7d') return { from: addDays(today, -6), to: today };
     if (preset === '30d') return { from: addDays(today, -29), to: today };
+    if (preset === 'last_month') {
+      const [year = 1970, month = 1] = today.split('-').map(Number);
+      const first = new Date(Date.UTC(year, month - 2, 1));
+      const last = new Date(Date.UTC(year, month - 1, 0));
+      return {
+        from: first.toISOString().slice(0, 10),
+        to: last.toISOString().slice(0, 10),
+      };
+    }
+    if (preset === 'custom')
+      return customValid ? custom : { from: today, to: today };
     return { from: `${today.slice(0, 7)}-01`, to: today };
   })();
+
+  useEffect(() => {
+    rememberDateFilter('expenses', preset, custom.from, custom.to);
+  }, [preset, custom.from, custom.to]);
 
   const data = useLiveQuery(
     () => expenseList(getDb(), range),
@@ -106,7 +139,6 @@ export function ExpensesPage() {
     }
   };
 
-  const presets: Preset[] = ['today', '7d', '30d', 'month'];
   const max = Math.max(1, ...(data?.byCategory.map((c) => c.net) ?? [1]));
 
   return (
@@ -156,7 +188,7 @@ export function ExpensesPage() {
       />
 
       <div className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
-        {presets.map((p) => (
+        {PRESETS.map((p) => (
           <button
             key={p}
             type="button"
@@ -167,6 +199,45 @@ export function ExpensesPage() {
             {t(`office.expenses.range_${p}`)}
           </button>
         ))}
+        {preset === 'custom' ? (
+          <span className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col text-small">
+              {t('office.expenses.from')}
+              <input
+                type="date"
+                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
+                value={custom.from}
+                max={custom.to}
+                onChange={(event) =>
+                  setCustom((current) => ({
+                    ...current,
+                    from: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className="flex flex-col text-small">
+              {t('office.expenses.to')}
+              <input
+                type="date"
+                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
+                value={custom.to}
+                min={custom.from}
+                onChange={(event) =>
+                  setCustom((current) => ({
+                    ...current,
+                    to: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </span>
+        ) : null}
+        {preset === 'custom' && !customValid ? (
+          <p role="alert" className="w-full text-small text-danger">
+            {t('office.expenses.range_invalid')}
+          </p>
+        ) : null}
         <p className="ms-auto self-center text-small">
           {t('office.expenses.total')}:{' '}
           <span className="text-title font-semibold">
