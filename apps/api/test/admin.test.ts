@@ -575,6 +575,29 @@ describe('operator export and restore (I17, I18)', () => {
     await setStatus(a.tenantId, 'active');
   });
 
+  it('usage reports open conflicts per shop without extra requests', async () => {
+    const shop = await seedShop('Conflict usage');
+    const at = Date.now();
+    for (const suffix of ['C1', 'C2']) {
+      await env.DB.prepare(
+        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) VALUES (?1, ?2, ?3, 'sales', 'row', 'over_refund', '{}', 'needs_owner', ?4)",
+      )
+        .bind(
+          shop.tenantId,
+          `01JC0000000000000000000${suffix}`,
+          `01JC0000000000000000000${suffix === 'C1' ? 'D1' : 'D2'}`,
+          at,
+        )
+        .run();
+    }
+    const usage = await json<{
+      open_conflicts: { tenant_id: string; count: number }[];
+    }>(await api('/admin/usage'));
+    expect(
+      usage.open_conflicts.find((row) => row.tenant_id === shop.tenantId),
+    ).toEqual({ tenant_id: shop.tenantId, count: 2 });
+  });
+
   it('backups list and download', async () => {
     await env.BACKUPS.put('d1/2026-10-26.sql.gz', 'gz');
     const list = await json<{ objects: { key: string }[] }>(

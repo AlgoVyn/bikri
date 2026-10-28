@@ -85,11 +85,14 @@ export async function usageHistory(env: Env, tenantId: string, days = 7) {
 /** Account-wide figures for the console Overview (screens/19). */
 export async function accountOverview(env: Env, now: number) {
   const day = utcDay(now);
-  const [size, statuses] = await env.DB.batch([
+  const [size, statuses, conflicts] = await env.DB.batch([
     env.DB.prepare(
       'SELECT COALESCE(SUM(rows_written), 0) AS w, COALESCE(SUM(rows_read), 0) AS r FROM tenant_usage WHERE day = ?1',
     ).bind(day),
     env.DB.prepare('SELECT status, COUNT(*) AS n FROM tenants GROUP BY status'),
+    env.DB.prepare(
+      "SELECT tenant_id, COUNT(*) AS n FROM sync_conflicts WHERE resolution = 'needs_owner' GROUP BY tenant_id",
+    ),
   ]);
   const totals = (size?.results?.[0] ?? { w: 0, r: 0 }) as {
     w: number;
@@ -105,6 +108,12 @@ export async function accountOverview(env: Env, now: number) {
     db_size_bytes: size?.meta.size_after ?? null,
     today: { rows_written: totals.w, rows_read: totals.r },
     tenants_by_status: by,
+    open_conflicts: (
+      (conflicts?.results ?? []) as { tenant_id: string; n: number }[]
+    ).map((row) => ({
+      tenant_id: String(row.tenant_id),
+      count: Number(row.n),
+    })),
   };
 }
 

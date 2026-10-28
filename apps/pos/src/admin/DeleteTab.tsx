@@ -7,9 +7,9 @@ import {
   deleteTenant,
   getTenant,
 } from './api.ts';
-import { adminHref, formatWhen } from './format.ts';
+import { adminHref, formatWhen, statusLabelKey } from './format.ts';
 import type { Tenant } from './types.ts';
-import { dangerBtn, quietBtn, ReasonDialog } from './ui.tsx';
+import { dangerBtn, Panel, quietBtn, ReasonDialog } from './ui.tsx';
 
 export function DeleteTab({
   tenant,
@@ -59,30 +59,63 @@ export function DeleteTab({
   }, [deleting, tenant.id]);
 
   return (
-    <div className="flex max-w-xl flex-col gap-3">
-      <p>{t('admin.delete_warning')}</p>
-      <p>
-        {t('admin.delete_last_export', {
-          when:
-            tenant.last_owner_export_at === null
-              ? t('admin.never')
-              : formatWhen(tenant.last_owner_export_at, lang),
-        })}
-      </p>
-      <p>{t('admin.delete_offer')}</p>
-      <button type="button" className={quietBtn} onClick={onExport}>
-        {t('admin.tab_export')}
-      </button>
-      {deleting ? <p role="status">{t('admin.delete_progress')}</p> : null}
-      {tenant.status !== 'deleted' && !deleting ? (
-        <button
-          type="button"
-          className={dangerBtn}
-          onClick={() => setOpen(true)}
-        >
-          {t('admin.delete_go')}
-        </button>
-      ) : null}
+    <>
+      <Panel
+        title={t('admin.delete_zone')}
+        description={t('admin.delete_zone_hint')}
+        className="max-w-2xl border-danger/30"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="rounded-control border border-danger-subtle bg-danger-subtle px-3 py-2 text-small text-danger-subtle-ink">
+            {t('admin.delete_warning')}
+          </p>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-small text-text-muted">
+                {t('admin.last_export')}
+              </dt>
+              <dd className="font-medium tabular-nums">
+                {tenant.last_owner_export_at === null
+                  ? t('admin.never')
+                  : formatWhen(tenant.last_owner_export_at, lang)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-small text-text-muted">
+                {t('admin.col_status')}
+              </dt>
+              <dd className="font-medium">
+                {t(statusLabelKey(tenant.status))}
+              </dd>
+            </div>
+          </dl>
+          <p className="text-small text-text-muted">
+            {t('admin.delete_offer')}
+          </p>
+          {deleting ? (
+            <p
+              className="rounded-control bg-warning-subtle px-3 py-2 text-small text-warning-subtle-ink"
+              role="status"
+            >
+              {t('admin.delete_progress')}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+            <button type="button" className={quietBtn} onClick={onExport}>
+              {t('admin.tab_export')}
+            </button>
+            {tenant.status !== 'deleted' && !deleting ? (
+              <button
+                type="button"
+                className={dangerBtn}
+                onClick={() => setOpen(true)}
+              >
+                {t('admin.delete_go')}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </Panel>
       <ReasonDialog
         open={open}
         title={t('admin.delete')}
@@ -107,6 +140,6 @@ export function DeleteTab({
           }
         }}
       />
-    </div>
+    </>
   );
 }

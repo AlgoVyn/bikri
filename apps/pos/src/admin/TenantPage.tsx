@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { StoreIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { adminErrorMessage, getTenant, setMaintenance } from './api.ts';
 import { DeleteTab } from './DeleteTab.tsx';
 import { DevicesTab } from './DevicesTab.tsx';
 import { ExportTab } from './ExportTab.tsx';
-import { adminHref, statusLabelKey, tenantBandColor } from './format.ts';
+import { adminHref, formatWhen, tenantBandColor } from './format.ts';
 import { PinTab } from './PinTab.tsx';
 import { RestoreTab } from './RestoreTab.tsx';
 import {
@@ -14,7 +15,7 @@ import {
   readRestoreState,
 } from './restore.ts';
 import { SummaryTab } from './SummaryTab.tsx';
-import { AdminConfirm, primaryBtn, quietBtn } from './ui.tsx';
+import { AdminConfirm, primaryBtn, quietBtn, StatusBadge } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 type Tab = 'summary' | 'devices' | 'pin' | 'export' | 'restore' | 'delete';
@@ -29,7 +30,7 @@ const TABS: readonly { id: Tab; key: string }[] = [
 ];
 
 export function TenantPage({ id }: { id: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const query = useAdminQuery(`tenant:${id}`, () => getTenant(id));
   const [tab, setTab] = useState<Tab>('summary');
@@ -68,28 +69,67 @@ export function TenantPage({ id }: { id: string }) {
 
   const tenant = detail.tenant;
   const maintenance = tenant.status === 'maintenance';
+  const band = tenantBandColor(tenant.id);
+  const lang = i18n.language;
 
   return (
-    <div className="flex flex-col gap-4">
-      <p>
-        <a
-          href={adminHref('/admin/tenants')}
-          className="text-primary underline"
-        >
-          {t('admin.back_to_shops')}
-        </a>
-      </p>
-      <header
-        className="rounded-card px-4 py-3 text-white"
-        style={{ background: tenantBandColor(tenant.id) }}
+    <div className="flex flex-col gap-5">
+      <a
+        href={adminHref('/admin/tenants')}
+        className="inline-flex min-h-9 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"
       >
-        <h1 className="text-title font-semibold">{tenant.display_name}</h1>
-        <p className="font-mono">{tenant.slug}</p>
-        <p className="text-small">{t(statusLabelKey(tenant.status))}</p>
+        <span
+          aria-hidden="true"
+          className="text-title leading-none rtl:rotate-180"
+        >
+          ‹
+        </span>
+        {t('admin.back_to_shops')}
+      </a>
+      <header className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+        <div aria-hidden="true" className="h-1" style={{ background: band }} />
+        <div className="flex flex-wrap items-start gap-4 p-4 lg:p-5">
+          <span
+            aria-hidden="true"
+            className="flex size-12 shrink-0 items-center justify-center rounded-control text-white"
+            style={{ background: band }}
+          >
+            <StoreIcon />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-h1 font-semibold">{tenant.display_name}</h1>
+              <StatusBadge status={tenant.status} />
+            </div>
+            <p className="mt-0.5 font-mono text-small text-text-muted">
+              {tenant.slug}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
+              <span>
+                {t('admin.owner_email')}:{' '}
+                {tenant.owner_email ?? t('admin.never')}
+              </span>
+              <span>
+                {t('admin.devices_count', {
+                  count: detail.devices,
+                })}
+              </span>
+              <span>
+                {t('admin.created')}: {formatWhen(tenant.created_at, lang)}
+              </span>
+              <span>
+                {t('admin.setup_at')}:{' '}
+                {detail.setup_completed_at === null
+                  ? t('admin.setup_pending')
+                  : formatWhen(detail.setup_completed_at, lang)}
+              </span>
+            </div>
+          </div>
+        </div>
       </header>
       {maintenance ? (
         <div
-          className="flex flex-col gap-2 rounded-card bg-warning-subtle p-4 text-warning-subtle-ink"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning-subtle bg-warning-subtle p-4 text-warning-subtle-ink"
           role="status"
         >
           <p>
@@ -109,7 +149,7 @@ export function TenantPage({ id }: { id: string }) {
       <div
         role="tablist"
         aria-label={tenant.display_name}
-        className="flex flex-wrap gap-1"
+        className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-1 shadow-card"
       >
         {TABS.map((item) => (
           <button
@@ -117,7 +157,7 @@ export function TenantPage({ id }: { id: string }) {
             type="button"
             role="tab"
             aria-selected={tab === item.id}
-            className="inline-flex min-h-11 items-center rounded-control px-3 aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink"
+            className="inline-flex min-h-11 items-center rounded-control px-3 text-small font-medium text-text-muted hover:bg-surface-2 hover:text-text aria-selected:bg-primary aria-selected:text-primary-ink"
             onClick={() => setTab(item.id)}
           >
             {t(item.key)}
