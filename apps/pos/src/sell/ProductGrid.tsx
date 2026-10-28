@@ -5,7 +5,7 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { ProductThumb } from '../products/ProductThumb.tsx';
 import type { SellRow } from './useSell.ts';
 
-const TILE_MIN = 132;
+const TILE_MIN = 148;
 const TILE_H = 176;
 const GAP = 8;
 const OVERSCAN_ROWS = 3;
@@ -139,7 +139,7 @@ function Tile({
       data-index={index}
       data-testid="sell-tile"
       aria-current={active || undefined}
-      className={`flex size-full flex-col items-start gap-1 overflow-hidden rounded-card border bg-surface p-2 text-start ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+      className={`flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card hover:border-border-strong ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
       onClick={() => onAdd(row)}
     >
       <ProductThumb
@@ -152,7 +152,9 @@ function Tile({
         {name}
       </span>
       <span className="mt-auto flex w-full items-center justify-between gap-1 text-small">
-        <MoneyText paisa={Number(p.price ?? 0)} />
+        <span className="font-semibold">
+          <MoneyText paisa={Number(p.price ?? 0)} />
+        </span>
         {pill ? (
           <span
             dir="ltr"

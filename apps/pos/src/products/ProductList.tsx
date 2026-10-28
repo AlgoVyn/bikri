@@ -142,64 +142,68 @@ export function ProductList() {
         ) : null}
       </div>
 
-      <search className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
-          <span className="mb-1 text-small">{t('products.search')}</span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-          <span className="mb-1 text-small">
-            {t('products.category_filter')}
-          </span>
-          <select
-            className={selectClass}
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="">{t('products.all_categories')}</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {String(c.name_en)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
-          <span className="mb-1 text-small">{t('products.stock_filter')}</span>
-          <select
-            className={selectClass}
-            value={stock}
-            onChange={(e) => setStock(e.target.value as StockFilter)}
-          >
-            <option value="all">{t('products.stock_all')}</option>
-            <option value="low">{t('products.stock_low')}</option>
-            <option value="out">{t('products.stock_out')}</option>
-            <option value="untracked">{t('products.stock_untracked')}</option>
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
-          <span className="mb-1 text-small">{t('products.sort')}</span>
-          <select
-            className={selectClass}
-            value={sort}
-            onChange={(e) => setSort(e.target.value as ProductSort)}
-          >
-            <option value="name">{t('products.sort_name')}</option>
-            <option value="price">{t('products.sort_price')}</option>
-            <option value="stock">{t('products.sort_stock')}</option>
-            <option value="best">{t('products.sort_best')}</option>
-          </select>
-        </label>
-      </search>
+      {total === 0 ? null : (
+        <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
+          <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
+            <span className="mb-1 text-small">{t('products.search')}</span>
+            <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+              <SearchIcon />
+              <input
+                type="search"
+                autoComplete="off"
+                className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </span>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('products.category_filter')}
+            </span>
+            <select
+              className={selectClass}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">{t('products.all_categories')}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {String(c.name_en)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('products.stock_filter')}
+            </span>
+            <select
+              className={selectClass}
+              value={stock}
+              onChange={(e) => setStock(e.target.value as StockFilter)}
+            >
+              <option value="all">{t('products.stock_all')}</option>
+              <option value="low">{t('products.stock_low')}</option>
+              <option value="out">{t('products.stock_out')}</option>
+              <option value="untracked">{t('products.stock_untracked')}</option>
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
+            <span className="mb-1 text-small">{t('products.sort')}</span>
+            <select
+              className={selectClass}
+              value={sort}
+              onChange={(e) => setSort(e.target.value as ProductSort)}
+            >
+              <option value="name">{t('products.sort_name')}</option>
+              <option value="price">{t('products.sort_price')}</option>
+              <option value="stock">{t('products.sort_stock')}</option>
+              <option value="best">{t('products.sort_best')}</option>
+            </select>
+          </label>
+        </search>
+      )}
 
       {total === 0 ? (
         <EmptyState
@@ -219,14 +223,16 @@ export function ProductList() {
           <p className="text-small text-text-muted" aria-live="polite">
             {t('products.count', { count: rows.length })}
           </p>
-          <ListHeader showCost={showCost} />
-          <VirtualRows
-            rows={rows}
-            showCost={showCost}
-            selecting={selecting}
-            selected={selected}
-            onToggle={toggle}
-          />
+          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+            <ListHeader showCost={showCost} />
+            <VirtualRows
+              rows={rows}
+              showCost={showCost}
+              selecting={selecting}
+              selected={selected}
+              onToggle={toggle}
+            />
+          </div>
         </>
       ) : null}
       <Suspense fallback={null}>

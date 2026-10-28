@@ -181,7 +181,7 @@ export function SalesList({ bill }: { bill?: string }) {
           {t('office.sales.cashier_limited')}
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
           {PRESETS.map((p) => (
             <button
               key={p.id}
@@ -224,8 +224,8 @@ export function SalesList({ bill }: { bill?: string }) {
         </div>
       )}
 
-      <search className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
+      <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
+        <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
           <span className="mb-1 text-small">{t('office.sales.search')}</span>
           <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
             <SearchIcon />
@@ -366,7 +366,7 @@ export function SalesList({ bill }: { bill?: string }) {
               })}
             </p>
           </div>
-          <ul className="flex flex-col">
+          <ul className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card">
             {day.rows.map((row) => (
               <SaleRow
                 key={row.sale.id}

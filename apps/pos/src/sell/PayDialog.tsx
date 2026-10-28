@@ -17,6 +17,12 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import {
+  BankIcon,
+  CardIcon,
+  CashIcon,
+  UdhaarIcon,
+} from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -54,6 +60,13 @@ const METHOD_KEY: Record<PayMethod, string> = {
   bank_wallet: 'payment.bank_wallet',
   card: 'payment.card',
   udhaar: 'payment.udhaar',
+};
+
+const METHOD_ICON: Record<PayMethod, () => React.JSX.Element> = {
+  cash: CashIcon,
+  bank_wallet: BankIcon,
+  card: CardIcon,
+  udhaar: UdhaarIcon,
 };
 
 export type Done = {
@@ -297,18 +310,27 @@ function PayStep({
         aria-label={t('pay.method')}
         className="grid grid-cols-2 gap-1 sm:grid-cols-4"
       >
-        {PAY_METHODS.map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="tab"
-            aria-selected={row?.method === m}
-            className={`min-h-11 rounded-control border px-2 ${row?.method === m ? 'border-primary bg-primary text-primary-ink' : 'border-border bg-surface'}`}
-            onClick={() => chooseMethod(m)}
-          >
-            {t(METHOD_KEY[m])}
-          </button>
-        ))}
+        {PAY_METHODS.map((m) => {
+          const Icon = METHOD_ICON[m];
+          const active = row?.method === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-control border p-2 text-small ${
+                active
+                  ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
+                  : 'border-border bg-surface text-text-muted hover:bg-surface-2'
+              }`}
+              onClick={() => chooseMethod(m)}
+            >
+              <Icon />
+              {t(METHOD_KEY[m])}
+            </button>
+          );
+        })}
       </div>
 
       {row ? (
@@ -484,9 +506,10 @@ function MethodPanel({
     // The cashier types the received amount straight away (prefilled, all selected).
     received.current?.querySelector('input')?.select();
   }, []);
-  const amountInput = (label: string) => (
+  const amountInput = (label: string, large = false) => (
     <MoneyInput
       label={label}
+      large={large}
       value={row.amount}
       onChange={(v) => onChange({ amount: v ?? 0 })}
     />
@@ -494,7 +517,7 @@ function MethodPanel({
   if (row.method === 'cash') {
     return (
       <div className="flex flex-col gap-2">
-        <div ref={received}>{amountInput(t('pay.received'))}</div>
+        <div ref={received}>{amountInput(t('pay.received'), true)}</div>
         <div className="flex flex-wrap gap-2">
           {[due, ...cashChips(due)].map((v, i) => (
             <button

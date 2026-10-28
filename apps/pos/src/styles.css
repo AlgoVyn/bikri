@@ -23,3 +23,10 @@
 [dir="rtl"] .ltr-name {
   text-align: end;
 }
+
+/* Cards use one soft elevation level; dashed empty states stay flat. */
+@layer components {
+  main :is(section, div, ul).rounded-card.border:not(.border-dashed) {
+    box-shadow: var(--shadow-card);
+  }
+}

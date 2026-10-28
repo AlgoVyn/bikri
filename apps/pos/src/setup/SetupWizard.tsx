@@ -324,7 +324,7 @@ export function SetupWizard() {
         ref={cardRef}
         noValidate
         onSubmit={onSubmit}
-        className={`w-full ${step === 3 ? 'max-w-[960px]' : 'max-w-[560px]'} rounded-card border border-border bg-surface p-5`}
+        className={`w-full ${step === 3 ? 'max-w-[960px]' : 'max-w-[560px]'} rounded-card border border-border bg-surface p-5 shadow-card`}
       >
         <header className="mb-4 flex items-center gap-3">
           <span className="text-h2 font-semibold">{t('common.app_name')}</span>

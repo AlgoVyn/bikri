@@ -55,6 +55,7 @@ export function MoneyInput({
   value,
   onChange,
   allowNegative = false,
+  large = false,
   name,
 }: {
   id?: string;
@@ -62,6 +63,8 @@ export function MoneyInput({
   value: number | null;
   onChange: (paisa: number | null) => void;
   allowNegative?: boolean;
+  /** Taller, larger field for the amount that matters (e.g. cash received). */
+  large?: boolean;
   name?: string;
 }) {
   const { t } = useTranslation();
@@ -82,7 +85,7 @@ export function MoneyInput({
       </label>
       <div
         dir="ltr"
-        className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3"
+        className={`flex items-center gap-2 rounded-control border border-border-strong bg-surface px-3 ${large ? 'h-14' : 'h-11'}`}
       >
         <bdi className="font-mono text-text-muted">Rs</bdi>
         <input
@@ -90,7 +93,7 @@ export function MoneyInput({
           name={name}
           inputMode="decimal"
           autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent font-mono text-body text-text outline-none"
+          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none ${large ? 'text-title' : 'text-body'}`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
