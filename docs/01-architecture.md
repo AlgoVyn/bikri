@@ -276,12 +276,15 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 ```
 Strict-Transport-Security: max-age=31536000
 Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'
+Cache-Control: public, max-age=0, must-revalidate, no-transform
 X-Content-Type-Options: nosniff
 Referrer-Policy: same-origin
 Permissions-Policy: camera=(self), usb=(self), serial=(self), bluetooth=()
 ```
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
+
+`no-transform` is required too: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131).
 
 These headers apply only to responses under `/bikri/`. HSTS deliberately omits `includeSubDomains`, because it would be sent for the whole `algovyn.com` domain and force HTTPS on every Algovyn subdomain; add it only if the owner confirms all subdomains are HTTPS.
 

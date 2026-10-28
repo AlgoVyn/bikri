@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_PATH } from './paths.ts';
 import {
+  ASSET_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
   securityHeaderEntries,
@@ -41,7 +42,11 @@ describe('security headers', () => {
   it('writes an asset _headers file with the same pairs the middleware sets', () => {
     const file = renderAssetHeaders();
     expect(file.startsWith(`${BASE_PATH}/*\n`)).toBe(true);
-    expect(parseAssetHeaders(file)).toEqual(SECURITY_HEADERS);
+    expect(parseAssetHeaders(file)).toEqual({
+      'Cache-Control': ASSET_CACHE_CONTROL,
+      ...SECURITY_HEADERS,
+    });
+    expect(ASSET_CACHE_CONTROL).toContain('no-transform');
     expect(Object.fromEntries(securityHeaderEntries())).toEqual(
       SECURITY_HEADERS,
     );
