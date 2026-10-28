@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
+import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -150,8 +151,26 @@ export function LockScreen() {
       className="flex min-h-dvh flex-col bg-bg p-4"
       data-testid="lock-screen"
     >
-      <header className="flex items-center justify-between">
-        <p className="font-semibold">{shopName ?? t('common.app_name')}</p>
+      <header className="flex items-center justify-between gap-3">
+        <div
+          className="flex min-w-0 items-center gap-2"
+          data-testid="brand-lock"
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+          >
+            <SalesIcon />
+          </span>
+          <div className="min-w-0">
+            <p className="text-small font-semibold uppercase tracking-[0.14em] text-text-muted">
+              {t('common.app_name')}
+            </p>
+            <p className="truncate font-medium">
+              {shopName ?? t('common.app_name')}
+            </p>
+          </div>
+        </div>
         <LanguageSelect />
       </header>
       <section className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5">

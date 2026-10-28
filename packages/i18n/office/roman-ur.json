@@ -39,7 +39,14 @@
       "today": "Aaj",
       "walk_in": "Aam customer",
       "yesterday": "Kal",
-      "subtitle": "Har bill, naya pehle"
+      "subtitle": "Har bill, naya pehle",
+      "col_time": "Waqt",
+      "col_invoice": "Bill",
+      "col_customer": "Gahak",
+      "col_items": "Items",
+      "col_total": "Total",
+      "col_method": "Tareeqa",
+      "col_status": "Halat"
     },
     "bill": {
       "audit": "Audit",
@@ -464,7 +471,12 @@
       "supplier_hint": "Supplier ko payment? Suppliers → Pay supplier istemal karein.",
       "title": "Kharchay",
       "total": "Total",
-      "subtitle": "Daraz se kharch"
+      "subtitle": "Daraz se kharch",
+      "range_last_month": "Pichla maheena",
+      "range_custom": "Hasb-e-zaroorat",
+      "from": "Se",
+      "to": "Tak",
+      "range_invalid": "Se tareekh tak tareekh se pehle honi chahiye."
     },
     "dayclose": {
       "bank": "Bank/wallet total",

@@ -20,7 +20,7 @@ Bikri difference: **no "Edit bill"**. Instead `Void` and `Void & reissue` (REQ-B
 
 Page header: Sales icon, title and a one-line subtitle, with Export at the end. The date presets and the search/filter toolbar each sit in a card; each day's bills are in a card.
 
-Toolbar: date range (Today, Yesterday, 7 days, 30 days, This month, Custom), search (invoice no, customer name/phone, product name), filters: method (Cash / Card / Bank-wallet / Udhaar / Split), status (Paid / Part refunded / Refunded / Void), cashier, device. `Export CSV` (REQ-B02).
+Toolbar: date range (Today, Yesterday, 7 days, 30 days, This month, Custom); the selected range is remembered on this device. The list has a column header (Time, Invoice, Customer, Items, Total, Method, Status) and fixed column tracks so values line up across rows., search (invoice no, customer name/phone, product name), filters: method (Cash / Card / Bank-wallet / Udhaar / Split), status (Paid / Part refunded / Refunded / Void), cashier, device. `Export CSV` (REQ-B02).
 
 Summary strip above the list (for the filter): bills, sold (net of refunds), refunds, avg bill.
 

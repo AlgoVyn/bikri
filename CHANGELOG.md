@@ -15,6 +15,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - English, Urdu (RTL) and Roman Urdu; printer-agnostic ESC/POS over WebUSB/Web Serial with browser-print fallback.
 - Refined visual refresh: brand-navy desktop rail, a real 24/30 heading scale, dashboard-style Home, elevated Sell/Products tables and forms, icon payment method cards and card-based filters across the back office. Sell category chips show their names, Home recent bills are shop-wide and newest-first, and the rail shows only the Bikri brand.
 - Reference-driven structure: icon page headers, primary + overflow actions, Home hero and register column, cart tab totals and quantity badges, descriptive payment cards, and Settings rows with icons/chevrons (D-134).
+- Date ranges in Sales, Expenses and Reports are remembered per device; Expenses adds Last month and Custom; Sales rows have aligned columns; Settings is two-column on desktop; Printer/Sync have Back buttons; the lock screen and top bar show the Bikri brand and printer status text (D-135).
 
 ### Sync, tenants and operations
 - Multi-tenant D1 with every row and query scoped by `tenant_id`; per-shop IndexedDB copy and outbox.
