@@ -126,6 +126,17 @@ test.describe('Settings (T-050)', () => {
     ).toBeVisible();
   });
 
+  test('Printer and Sync have a Back button to Settings', async ({ page }) => {
+    await openReadyShop(page, '/bikri/settings/printer');
+    await page.getByRole('link', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings$/u);
+
+    await page.goto('/bikri/settings/sync');
+    await expect(page.getByTestId('sync-page')).toBeVisible();
+    await page.getByRole('link', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings$/u);
+  });
+
   test('AC 7: the #printer link opens the Printer section directly', async ({
     page,
   }) => {

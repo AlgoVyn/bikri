@@ -1,6 +1,6 @@
 import { businessDate, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
@@ -13,6 +13,7 @@ import { getDb } from '../data/db.ts';
 import { type ReportBundle, reportBundle } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
+import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -47,6 +48,16 @@ const PRESETS: { id: Preset; key: string }[] = [
   { id: 'custom', key: 'office.reports.range_custom' },
 ];
 
+const REPORT_PRESET_IDS: Preset[] = [
+  'today',
+  'yesterday',
+  '7d',
+  '30d',
+  'month',
+  'last_month',
+  'custom',
+];
+
 const TABS: { id: ReportTab; key: string }[] = [
   { id: 'summary', key: 'office.reports.tab_summary' },
   { id: 'products', key: 'office.reports.tab_products' },
@@ -68,13 +79,25 @@ export function ReportsPage() {
   const limited = role === 'cashier' && !support;
   const cost = can('cost.view');
   const exportable = can('export.data');
-  const [preset, setPreset] = useState<Preset>('today');
-  const [custom, setCustom] = useState(() => {
-    const today = businessDate(Date.now());
-    return { from: today, to: today };
+  const [stored] = useState(() =>
+    readDateFilter(
+      'reports',
+      limited ? (['today'] as Preset[]) : REPORT_PRESET_IDS,
+      'today',
+      businessDate(Date.now()),
+    ),
+  );
+  const [preset, setPreset] = useState<Preset>(stored.preset);
+  const [custom, setCustom] = useState({
+    from: stored.from,
+    to: stored.to,
   });
   const [deviceId, setDeviceId] = useState('');
   const [tab, setTab] = useState<ReportTab>('summary');
+
+  useEffect(() => {
+    if (!limited) rememberDateFilter('reports', preset, custom.from, custom.to);
+  }, [preset, custom.from, custom.to, limited]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();

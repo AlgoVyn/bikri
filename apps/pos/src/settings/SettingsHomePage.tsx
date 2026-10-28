@@ -73,155 +73,159 @@ function SettingsHomeContent() {
     }
   };
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
       <PageHeader
         icon={<SettingsIcon />}
         tone="bg-surface-2 text-text-muted"
         title={t('nav.settings')}
         subtitle={t('office.settings.subtitle')}
       />
-      <nav className="flex flex-col gap-4">
-        {can('settings.shop') ? (
+      <nav className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="flex flex-col gap-4">
+          {can('settings.shop') ? (
+            <section>
+              <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
+                {t('office.settings.nav_group_shop')}
+              </h2>
+              <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+                <SettingsRow
+                  to="/settings/shop"
+                  icon={<StoreIcon />}
+                  title={t('office.settings.nav_shop')}
+                  hint={t('office.settings.nav_shop_hint')}
+                />
+                {can('settings.staff') ? (
+                  <SettingsRow
+                    to="/settings/cashiers"
+                    icon={<UsersIcon />}
+                    title={t('office.settings.nav_cashiers')}
+                    hint={t('office.settings.nav_cashiers_hint')}
+                  />
+                ) : null}
+                <SettingsRow
+                  to="/settings/activity"
+                  icon={<ClockIcon />}
+                  title={t('office.settings.nav_activity')}
+                  hint={t('office.settings.nav_activity_hint')}
+                />
+              </ul>
+            </section>
+          ) : null}
           <section>
             <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-              {t('office.settings.nav_group_shop')}
+              {t('office.settings.nav_group_device')}
             </h2>
             <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
               <SettingsRow
-                to="/settings/shop"
-                icon={<StoreIcon />}
-                title={t('office.settings.nav_shop')}
-                hint={t('office.settings.nav_shop_hint')}
+                to="/settings/printer"
+                icon={<PrinterIcon />}
+                title={t('printer.title')}
+                hint={t('office.settings.nav_printer_hint')}
               />
-              {can('settings.staff') ? (
+              {can('catalog.edit') ? (
                 <SettingsRow
-                  to="/settings/cashiers"
-                  icon={<UsersIcon />}
-                  title={t('office.settings.nav_cashiers')}
-                  hint={t('office.settings.nav_cashiers_hint')}
+                  to="/settings/labels"
+                  icon={<TagIcon />}
+                  title={t('office.settings.nav_labels')}
+                  hint={t('office.settings.nav_labels_hint')}
                 />
               ) : null}
               <SettingsRow
-                to="/settings/activity"
-                icon={<ClockIcon />}
-                title={t('office.settings.nav_activity')}
-                hint={t('office.settings.nav_activity_hint')}
+                to="/settings/display"
+                icon={<SettingsIcon />}
+                title={t('office.settings.nav_display')}
+                hint={t('office.settings.nav_display_hint')}
+              />
+              <SettingsRow
+                to="/settings/display"
+                icon={<GlobeIcon />}
+                title={t('office.settings.nav_language')}
+                hint={t('office.settings.nav_language_hint')}
               />
             </ul>
           </section>
-        ) : null}
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_device')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-            <SettingsRow
-              to="/settings/printer"
-              icon={<PrinterIcon />}
-              title={t('printer.title')}
-              hint={t('office.settings.nav_printer_hint')}
-            />
-            {can('catalog.edit') ? (
+        </div>
+        <div className="flex flex-col gap-4">
+          <section>
+            <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
+              {t('office.settings.nav_group_data')}
+            </h2>
+            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
               <SettingsRow
-                to="/settings/labels"
-                icon={<TagIcon />}
-                title={t('office.settings.nav_labels')}
-                hint={t('office.settings.nav_labels_hint')}
-              />
-            ) : null}
-            <SettingsRow
-              to="/settings/display"
-              icon={<SettingsIcon />}
-              title={t('office.settings.nav_display')}
-              hint={t('office.settings.nav_display_hint')}
-            />
-            <SettingsRow
-              to="/settings/display"
-              icon={<GlobeIcon />}
-              title={t('office.settings.nav_language')}
-              hint={t('office.settings.nav_language_hint')}
-            />
-          </ul>
-        </section>
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_data')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-            <SettingsRow
-              to="/settings/sync"
-              icon={<CloudIcon />}
-              title={t('syncpage.title')}
-              hint={t('office.settings.nav_sync_hint')}
-            />
-            {owner && info?.device?.is_admin && info.enrolled ? (
-              <SettingsRow
-                to="/settings/devices"
-                icon={<DeviceIcon />}
-                title={t('devices.title')}
-                hint={t('office.settings.nav_devices_hint')}
-              />
-            ) : null}
-            {can('export.data') && role === 'owner' ? (
-              <SettingsRow
-                to="/settings/backup"
+                to="/settings/sync"
                 icon={<CloudIcon />}
-                title={t('office.backup.title')}
-                hint={t('office.backup.nav_hint')}
+                title={t('syncpage.title')}
+                hint={t('office.settings.nav_sync_hint')}
               />
-            ) : null}
-            <SettingsRow
-              to="/settings/about"
-              icon={<InfoIcon />}
-              title={t('office.settings.nav_about')}
-              hint={t('office.settings.nav_about_hint')}
-            />
-          </ul>
-        </section>
-      </nav>
-      {info?.device ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
-              <DeviceIcon />
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-medium">
-                {t('office.settings.nav_this_device')}
-              </h2>
-              <p
-                className="text-small text-text-muted"
-                data-testid="this-device"
-              >
-                {info.tenant?.display_name ?? ''} · {info.device.name} ·{' '}
-                {info.device.code} ·{' '}
-                {info.device.is_admin
-                  ? t('office.settings.nav_admin_device')
-                  : t('office.settings.nav_till_device')}
-              </p>
-            </div>
-          </div>
-          {owner && info.enrolled ? (
-            <>
-              <p className="text-small">
-                {t('office.settings.nav_leave_hint')}
-              </p>
-              <button
-                type="button"
-                className={`${buttonDanger} self-start`}
-                onClick={() => void leave()}
-              >
-                {t('office.settings.nav_leave')}
-              </button>
-              {leaveError ? (
-                <p role="alert" className="text-danger text-small">
-                  {leaveError}
-                </p>
+              {owner && info?.device?.is_admin && info.enrolled ? (
+                <SettingsRow
+                  to="/settings/devices"
+                  icon={<DeviceIcon />}
+                  title={t('devices.title')}
+                  hint={t('office.settings.nav_devices_hint')}
+                />
               ) : null}
-            </>
+              {can('export.data') && role === 'owner' ? (
+                <SettingsRow
+                  to="/settings/backup"
+                  icon={<CloudIcon />}
+                  title={t('office.backup.title')}
+                  hint={t('office.backup.nav_hint')}
+                />
+              ) : null}
+              <SettingsRow
+                to="/settings/about"
+                icon={<InfoIcon />}
+                title={t('office.settings.nav_about')}
+                hint={t('office.settings.nav_about_hint')}
+              />
+            </ul>
+          </section>
+          {info?.device ? (
+            <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
+                  <DeviceIcon />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="font-medium">
+                    {t('office.settings.nav_this_device')}
+                  </h2>
+                  <p
+                    className="text-small text-text-muted"
+                    data-testid="this-device"
+                  >
+                    {info.tenant?.display_name ?? ''} · {info.device.name} ·{' '}
+                    {info.device.code} ·{' '}
+                    {info.device.is_admin
+                      ? t('office.settings.nav_admin_device')
+                      : t('office.settings.nav_till_device')}
+                  </p>
+                </div>
+              </div>
+              {owner && info.enrolled ? (
+                <>
+                  <p className="text-small">
+                    {t('office.settings.nav_leave_hint')}
+                  </p>
+                  <button
+                    type="button"
+                    className={`${buttonDanger} self-start`}
+                    onClick={() => void leave()}
+                  >
+                    {t('office.settings.nav_leave')}
+                  </button>
+                  {leaveError ? (
+                    <p role="alert" className="text-danger text-small">
+                      {leaveError}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </section>
           ) : null}
-        </section>
-      ) : null}
+        </div>
+      </nav>
     </div>
   );
 }

@@ -49,6 +49,9 @@ test.describe('Home and shell (T-013)', () => {
       'aria-label',
       'Printer not set up',
     );
+    await expect(page.getByTestId('printer-dot')).toContainText(
+      'Printer not set up',
+    );
 
     const nav = page.getByRole('navigation', { name: 'Main' });
     if (isPhone(page)) {

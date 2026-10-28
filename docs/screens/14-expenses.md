@@ -12,7 +12,7 @@
 
 ## Layout
 
-Top: date range, totals by category (horizontal bars), `+ Expense` (N), `Cash in / out`, `Export CSV`. List: time, category icon + name, payee, note, amount, method, staff. Grouped by business date.
+Top: date range Today / 7 days / 30 days / This month / Last month / Custom (from–to date fields), totals by category (horizontal bars), `+ Expense` (N), `Cash in / out`, `Export CSV`. The range is remembered on this device across navigation and reloads. List: time, category icon + name, payee, note, amount, method, staff. Grouped by business date.
 
 ## Expense form
 
