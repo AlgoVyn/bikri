@@ -11,6 +11,8 @@ const LOG_CHUNK = 5_000;
 const LOG_MAX_PER_RUN = 50_000;
 const DELETE_CHUNK = 2_000;
 const DELETE_MAX_PER_RUN = 20_000;
+/** At 10 reference shops ~13,500 applied_ops age out per day; the old 5,000 could never keep 90 days. */
+const APPLIED_OPS_MAX_PER_RUN = 20_000;
 
 /** Tables of a tenant, children first, for deletion (13 §7.4). */
 export const DELETE_ORDER = [
@@ -127,7 +129,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     const res = await calls.run(() =>
       DB.batch([
         DB.prepare(
-          'DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT 5000)',
+          `DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT ${APPLIED_OPS_MAX_PER_RUN})`,
         ).bind(now - 90 * DAY),
         DB.prepare('DELETE FROM enrolment_codes WHERE expires_at < ?1').bind(
           now - DAY,

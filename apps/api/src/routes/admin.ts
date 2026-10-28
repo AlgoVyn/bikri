@@ -103,7 +103,7 @@ admin.post('/tenants', async (c) => {
       slug: Slug,
       display_name: z.string().trim().min(1).max(60),
       owner_email: Email.nullish(),
-      daily_write_budget: BUDGET.default(7000),
+      daily_write_budget: BUDGET.default(18_000),
       note: z.string().max(500).default(''),
     })
     .parse(await c.req.json());
@@ -647,6 +647,7 @@ admin.post('/tenants/:id/import', async (c) => {
     .object({
       tbl: z.enum(IMPORT_TABLES as unknown as [string, ...string[]]),
       rows: z.array(z.record(z.string(), Scalar)).min(1).max(500),
+      reason: z.string().trim().max(200).optional(),
     })
     .parse(await c.req.json());
   const tbl = body.tbl as (typeof IMPORT_TABLES)[number];
@@ -679,21 +680,42 @@ admin.post('/tenants/:id/import', async (c) => {
       String((e as Error).message).slice(0, 200),
     );
   }
+  await db.batch(
+    auditStatements(db, {
+      action: 'operator_import',
+      entity: 'shop',
+      entityId: 'shop',
+      after: {
+        tbl,
+        rows: body.rows.length,
+        ...(body.reason ? { reason: body.reason } : {}),
+        by: by(c.var.operator),
+      },
+      now,
+    }),
+  );
   return c.json({ imported: body.rows.length });
 });
 
 admin.post('/tenants/:id/restore-epoch', async (c) => {
   const { tenant, db } = c.var;
   assertMaintenance(tenant);
-  const { restore_point_at } = z
-    .object({ restore_point_at: z.number().int().min(0) })
+  const { restore_point_at, reason } = z
+    .object({
+      restore_point_at: z.number().int().min(0),
+      reason: z.string().trim().max(200).optional(),
+    })
     .parse(await c.req.json());
   const now = Date.now();
   await db.batch([
     restoreEpochStatement(c.env, tenant.id, restore_point_at, now),
     ...auditStatements(db, {
       action: 'tenant_restore',
-      after: { restore_point_at, by: by(c.var.operator) },
+      after: {
+        restore_point_at,
+        ...(reason ? { reason } : {}),
+        by: by(c.var.operator),
+      },
       now,
     }),
   ]);
