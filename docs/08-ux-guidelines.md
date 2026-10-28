@@ -37,7 +37,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-brand-navy` | `#182E55` | `#182E55` | Logo, receipt preview header | logo |
 | `--color-rail` | `#182E55` | `#0B1729` | Desktop rail background | logo navy / derived |
 | `--color-rail-ink` | `#F1F5F9` | `#F1F5F9` | Active rail label and icon | slate-100 (site) |
-| `--color-rail-muted` | `#B8C6DB` | `#9FB0C9` | Inactive rail labels, shop name | derived |
+| `--color-rail-muted` | `#B8C6DB` | `#9FB0C9` | Inactive rail labels, brand wordmark | derived |
 | `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |

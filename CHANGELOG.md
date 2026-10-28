@@ -13,7 +13,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Reports (summary, products, stock, udhaar, staff, day closes, expenses) with CSV/PDF/PNG exports.
 - Owner full export, owner server export with email sign-in, barcode labels (50×25, 38×25, 40×30 mm and A4), settings, staff/PINs, permissions and Activity.
 - English, Urdu (RTL) and Roman Urdu; printer-agnostic ESC/POS over WebUSB/Web Serial with browser-print fallback.
-- Refined visual refresh: brand-navy desktop rail, a real 24/30 heading scale, dashboard-style Home, elevated Sell/Products tables and forms, icon payment method cards and card-based filters across the back office.
+- Refined visual refresh: brand-navy desktop rail, a real 24/30 heading scale, dashboard-style Home, elevated Sell/Products tables and forms, icon payment method cards and card-based filters across the back office. Sell category chips show their names, Home recent bills are shop-wide and newest-first, and the rail shows only the Bikri brand.
 
 ### Sync, tenants and operations
 - Multi-tenant D1 with every row and query scoped by `tenant_id`; per-shop IndexedDB copy and outbox.
