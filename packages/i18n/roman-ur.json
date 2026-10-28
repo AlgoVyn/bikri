@@ -236,7 +236,9 @@
     "attn_sync_stale": "Is till ko {{days}} din se updates nahin milin",
     "attn_sync_stale_severe": "Poora download dobara karne se bachne ke liye {{days}} din ke andar internet se jorein",
     "attn_sync_pending_old": "Yeh till {{time}} se sync nahin hua. Internet se jorein taake aap ka data mehfooz ho.",
-    "attn_clock_wrong": "Is PC ki ghari ghalat hai — tareekh/waqt durust karein"
+    "attn_clock_wrong": "Is PC ki ghari ghalat hai — tareekh/waqt durust karein",
+    "view_all": "Sab dekhein",
+    "today_summary": "Aaj ek nazar mein"
   },
   "import": {
     "action_error": "Chhor di",

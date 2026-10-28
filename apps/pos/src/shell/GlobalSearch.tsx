@@ -75,7 +75,7 @@ export function GlobalSearch() {
         <SearchIcon />
       </button>
       <div
-        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} items-center gap-2 rounded-control border border-border-strong bg-surface px-3 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 h-11 lg:flex lg:w-80`}
+        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} h-11 items-center gap-2 rounded-control border border-border bg-surface-2 px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 lg:flex lg:w-96`}
       >
         <SearchIcon />
         <input
@@ -123,6 +123,9 @@ export function GlobalSearch() {
             }
           }}
         />
+        <kbd className="hidden rounded border border-border bg-surface px-1.5 font-mono text-small text-text-muted lg:inline">
+          /
+        </kbd>
       </div>
       {open && query.trim() !== '' ? (
         <div

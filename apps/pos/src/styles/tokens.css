@@ -24,6 +24,10 @@
   --text-body--line-height: calc(22 / 15);
   --text-small: calc(13 / 15 * 1rem);
   --text-small--line-height: calc(18 / 13);
+  --text-h1: calc(24 / 15 * 1rem);
+  --text-h1--line-height: calc(30 / 24);
+  --text-h2: calc(18 / 15 * 1rem);
+  --text-h2--line-height: calc(26 / 18);
   --text-title: calc(20 / 15 * 1rem);
   --text-title--line-height: calc(28 / 20);
   --text-total: calc(28 / 15 * 1rem);
@@ -34,8 +38,9 @@
   --radius-card: 14px;
   --radius-modal: 18px;
   --radius-pill: 999px;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.06);
-  --shadow-modal: 0 12px 32px rgb(0 0 0 / 0.18);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-topbar: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-modal: 0 12px 32px rgb(15 23 42 / 0.18);
   --color-bg: #f8fafc;
   --color-surface: #ffffff;
   --color-surface-2: #f1f5f9;
@@ -49,6 +54,10 @@
   --color-primary-subtle: #e0f2fe;
   --color-primary-subtle-ink: #00497a;
   --color-brand-navy: #182e55;
+  --color-rail: #182e55;
+  --color-rail-ink: #f1f5f9;
+  --color-rail-muted: #b8c6db;
+  --color-rail-active: #4bc2bf;
   --color-accent: #4bc2bf;
   --color-accent-ink: #182e55;
   --color-danger: #dc2626;
@@ -91,6 +100,10 @@
   --color-primary-subtle: #e0f2fe;
   --color-primary-subtle-ink: #00497a;
   --color-brand-navy: #182e55;
+  --color-rail: #182e55;
+  --color-rail-ink: #f1f5f9;
+  --color-rail-muted: #b8c6db;
+  --color-rail-active: #4bc2bf;
   --color-accent: #4bc2bf;
   --color-accent-ink: #182e55;
   --color-danger: #dc2626;
@@ -111,6 +124,10 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
+  --color-rail: #0b1729;
+  --color-rail-ink: #f1f5f9;
+  --color-rail-muted: #9fb0c9;
+  --color-rail-active: #4bc2bf;
   --color-bg: #0f172a;
   --color-surface: #1e293b;
   --color-surface-2: #273449;
@@ -145,6 +162,10 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    --color-rail: #0b1729;
+    --color-rail-ink: #f1f5f9;
+    --color-rail-muted: #9fb0c9;
+    --color-rail-active: #4bc2bf;
     --color-bg: #0f172a;
     --color-surface: #1e293b;
     --color-surface-2: #273449;

@@ -302,6 +302,48 @@ const textPairs: readonly TokenPair[] = [
     ratio: 5.84,
     needed: 4.5,
   },
+  {
+    name: 'light rail ink on rail',
+    fg: '#F1F5F9',
+    bg: '#182E55',
+    ratio: 12.28,
+    needed: 4.5,
+  },
+  {
+    name: 'light rail-muted on rail',
+    fg: '#B8C6DB',
+    bg: '#182E55',
+    ratio: 7.78,
+    needed: 4.5,
+  },
+  {
+    name: 'light rail-active on rail',
+    fg: '#4BC2BF',
+    bg: '#182E55',
+    ratio: 6.26,
+    needed: 4.5,
+  },
+  {
+    name: 'dark rail ink on rail',
+    fg: '#F1F5F9',
+    bg: '#0B1729',
+    ratio: 16.4,
+    needed: 4.5,
+  },
+  {
+    name: 'dark rail-muted on rail',
+    fg: '#9FB0C9',
+    bg: '#0B1729',
+    ratio: 8.15,
+    needed: 4.5,
+  },
+  {
+    name: 'dark rail-active on rail',
+    fg: '#4BC2BF',
+    bg: '#0B1729',
+    ratio: 8.36,
+    needed: 4.5,
+  },
 ];
 
 const tilePairs: readonly TokenPair[] = [
