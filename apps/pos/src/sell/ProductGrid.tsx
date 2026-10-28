@@ -148,7 +148,9 @@ function Tile({
         color={row.category?.color}
         size="lg"
       />
-      <span className="line-clamp-2 w-full text-small font-medium">{name}</span>
+      <span className="ltr-name line-clamp-2 w-full text-small font-medium">
+        {name}
+      </span>
       <span className="mt-auto flex w-full items-center justify-between gap-1 text-small">
         <MoneyText paisa={Number(p.price ?? 0)} />
         {pill ? (

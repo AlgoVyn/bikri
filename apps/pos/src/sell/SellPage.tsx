@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { SearchIcon } from '../components/icons.tsx';
+import { ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import { isRapidBarcode } from '../components/SearchBox.tsx';
@@ -568,6 +568,9 @@ export function SellPage() {
         >
           {noProducts ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <span className="flex size-14 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+                <ProductsIcon />
+              </span>
               <p className="text-title">{t('sell.no_products')}</p>
               <div className="flex gap-2">
                 {can('catalog.edit') ? (

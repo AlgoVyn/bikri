@@ -13,7 +13,7 @@ Opened by `Take payment` on Sell. Two steps like Dukaan ("Step 1 of 2: payment",
 
 ## Layout
 
-Modal 640 px wide (full screen < 768 px). Header: "Take payment" + `Total to pay Rs 43,000` (large) + close (Esc).
+Modal 640 px wide (full screen < 768 px). Header: "Take payment" + `Total to pay Rs 43,000` (large) + close button (×, also Esc).
 
 1. **Method tabs** (keys `1`–`4`): `Cash`, `Bank / wallet`, `Card`, `Udhaar`. Selecting a tab sets "pay the remaining amount with this method".
 2. **Method panel**

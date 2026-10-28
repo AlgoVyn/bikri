@@ -75,7 +75,7 @@ export function GlobalSearch() {
         <SearchIcon />
       </button>
       <div
-        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} items-center gap-2 rounded-control border border-border-strong bg-surface px-3 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 h-11 lg:flex lg:w-72`}
+        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} items-center gap-2 rounded-control border border-border-strong bg-surface px-3 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 h-11 lg:flex lg:w-80`}
       >
         <SearchIcon />
         <input

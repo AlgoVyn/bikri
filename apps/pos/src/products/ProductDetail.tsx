@@ -112,7 +112,7 @@ export function ProductDetailPage({
           size="lg"
         />
         <div className="min-w-0 flex-1">
-          <h1 className="text-h1 font-semibold break-words">
+          <h1 className="ltr-name text-h1 font-semibold break-words">
             {String(p.name_en)}
           </h1>
           {p.name_ur ? (

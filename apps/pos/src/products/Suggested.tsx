@@ -1,7 +1,7 @@
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary } from '../components/classes.ts';
+import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -25,7 +25,14 @@ export function SuggestedPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <h1 className="text-h1 font-semibold">{t('suggested.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="me-auto text-h1 font-semibold">
+          {t('suggested.title')}
+        </h1>
+        <Link to="/products" className={buttonQuiet}>
+          {t('import.back_to_products')}
+        </Link>
+      </div>
       <p className="text-text-muted">{t('suggested.hint')}</p>
       <ul className="flex flex-col gap-2">
         {SUGGESTED_PRODUCTS.map((name) => {

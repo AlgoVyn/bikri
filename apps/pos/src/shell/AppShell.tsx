@@ -26,6 +26,13 @@ import {
 const navLink =
   'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted aria-[current=page]:text-primary lg:flex-none lg:py-1.5';
 
+/** Shell pages that are not rail items still need a title on a phone. */
+const EXTRA_TITLES: Record<string, string> = {
+  '/day-close': 'home.day_close',
+  '/stock/count': 'count.title',
+  '/labels': 'products.print_label',
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -41,6 +48,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const allowed = (item: NavItem) => item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
   const current = navItemFor(pathname);
+  const extraTitle = EXTRA_TITLES[pathname.replace(/\/+$/u, '')];
+  const screenTitle = current
+    ? t(current.label)
+    : extraTitle
+      ? t(extraTitle)
+      : null;
   const blocked = current !== undefined && !allowed(current);
 
   useEffect(() => {
@@ -134,12 +147,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 lg:start-rail">
         <span
           className="min-w-0 flex-1 truncate font-medium lg:hidden"
-          data-testid="shop-name-bar"
+          data-testid="screen-title-bar"
         >
-          {shopName ?? t('common.app_name')}
+          {screenTitle ?? shopName ?? t('common.app_name')}
         </span>
         <span className="min-w-0 flex-1 truncate font-medium max-lg:hidden">
-          {current ? t(current.label) : ''}
+          {screenTitle ?? ''}
         </span>
         <div className="flex shrink-0 items-center gap-1 lg:gap-2">
           <GlobalSearch />
@@ -185,7 +198,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'}`}
           >
             <item.Icon />
-            <span className="max-w-full truncate">{t(item.label)}</span>
+            <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
+              {t(item.label)}
+            </span>
           </Link>
         ))}
         <button
@@ -195,7 +210,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => openPriceCheck(true)}
         >
           <SearchIcon />
-          <span className="max-w-full truncate">{t('pricecheck.title')}</span>
+          <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
+            {t('pricecheck.title')}
+          </span>
         </button>
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">
@@ -214,6 +231,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 id="more-menu"
                 className="absolute end-1 bottom-full mb-2 w-48 rounded-card border border-border bg-surface py-1 shadow-lg"
               >
+                <li className="border-b border-border px-3 py-2">
+                  <p className="truncate font-medium">
+                    {shopName ?? t('common.app_name')}
+                  </p>
+                </li>
                 {more.map((item) => (
                   <li key={item.to}>
                     <Link

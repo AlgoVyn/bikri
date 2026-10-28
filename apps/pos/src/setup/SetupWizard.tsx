@@ -331,9 +331,6 @@ export function SetupWizard() {
           {step > 0 ? (
             <span className="text-small text-text-muted" aria-live="polite">
               {t('setup.step_of', { n: step })}
-              <span aria-hidden="true" className="ms-2">
-                {[1, 2, 3, 4].map((n) => (n <= step ? '●' : '○')).join(' ')}
-              </span>
             </span>
           ) : null}
           <label className="ms-auto">
@@ -353,6 +350,17 @@ export function SetupWizard() {
             </select>
           </label>
         </header>
+
+        {step > 0 ? (
+          <div className="mb-4 flex gap-1" aria-hidden="true">
+            {[1, 2, 3, 4].map((n) => (
+              <span
+                key={n}
+                className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-primary' : 'bg-surface-2'}`}
+              />
+            ))}
+          </div>
+        ) : null}
 
         {step === 0 ? (
           <section className="flex flex-col gap-4">

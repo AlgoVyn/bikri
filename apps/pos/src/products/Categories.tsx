@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,9 +28,16 @@ export function CategoriesPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <h1 className="text-h1 font-semibold">{t('categories.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="me-auto text-h1 font-semibold">
+          {t('categories.title')}
+        </h1>
+        <Link to="/products" className={buttonQuiet}>
+          {t('import.back_to_products')}
+        </Link>
+      </div>
       <form
-        className="flex gap-2"
+        className="flex gap-2 rounded-card border border-border bg-surface p-3"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim()) return;
@@ -57,7 +65,9 @@ export function CategoriesPage() {
         </button>
       </form>
       {categories && categories.length === 0 ? (
-        <p className="text-text-muted">{t('categories.empty')}</p>
+        <p className="rounded-card border border-dashed border-border-strong px-4 py-8 text-center text-text-muted">
+          {t('categories.empty')}
+        </p>
       ) : null}
       <ul className="flex flex-col gap-2">
         {categories?.map((c, i) => {

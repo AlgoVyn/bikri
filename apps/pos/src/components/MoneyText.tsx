@@ -8,7 +8,7 @@ export function MoneyText({
   grouping?: NumberGrouping;
 }) {
   return (
-    <bdi dir="ltr" className="font-mono tabular-nums">
+    <bdi dir="ltr" className="whitespace-nowrap font-mono tabular-nums">
       {formatMoney(paisa, grouping)}
     </bdi>
   );

@@ -72,7 +72,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await expect(dialog.getByTestId('refund-saved')).toHaveText(
       'Refund saved.',
     );
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.getByTestId('bill-status')).toHaveText('Refunded');
     await expect(page.getByText('Reason: Faulty')).toBeVisible();
     // AC 7: a fully refunded bill has no Refund button.
@@ -226,7 +226,7 @@ test.describe('Urdu refunds (screens/11 AC 4–6)', () => {
     await expect(dialog.getByTestId('refund-saved')).toHaveText(
       'واپسی محفوظ ہو گئی۔',
     );
-    await dialog.getByRole('button', { name: 'بند کریں' }).click();
+    await dialog.getByRole('button', { name: 'بند کریں', exact: true }).click();
     await expect(page.getByTestId('bill-status')).toHaveText('واپس شدہ');
     const refunds = await idbAll<Row>(page, 'refunds');
     expect(refunds).toEqual(

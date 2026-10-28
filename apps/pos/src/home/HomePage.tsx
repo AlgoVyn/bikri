@@ -3,6 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ClockIcon, SearchIcon, SellIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -86,18 +87,21 @@ export function HomePage() {
       to: '/sell',
       label: 'home.new_sale',
       keys: 'N',
+      Icon: SellIcon,
       perm: 'sale.create' as const,
     },
     {
       to: '/day-close',
       label: 'home.day_close',
       keys: 'D',
+      Icon: ClockIcon,
       perm: 'dayclose.create' as const,
     },
     ...NAV.slice(2).map((item) => ({
       to: item.to,
       label: item.label,
       keys: item.keys,
+      Icon: item.Icon,
       perm: item.perm,
     })),
   ].filter((tile) => tile.perm === null || can(tile.perm));
@@ -176,7 +180,7 @@ export function HomePage() {
 
       {data && data.products > 0 ? (
         <section aria-label={t('home.sold_today')}>
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <TodayCard label={t('home.sold_today')} testId="today-sold">
               <MoneyText paisa={data.today.sold} />
               <span className="block text-small text-text-muted">
@@ -224,9 +228,12 @@ export function HomePage() {
               <Link
                 to={tile.to}
                 title={`${t(tile.label)} (${tile.keys})`}
-                className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface p-2 text-center"
+                className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface p-2 text-center transition-colors hover:border-border-strong hover:bg-surface-2"
               >
-                <span className="font-medium">{t(tile.label)}</span>
+                <span className="flex size-9 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
+                  <tile.Icon />
+                </span>
+                <span className="text-small font-medium">{t(tile.label)}</span>
               </Link>
             </li>
           ))}
@@ -235,9 +242,14 @@ export function HomePage() {
               type="button"
               title={`${t('home.price_check')} (Ctrl+Shift+P)`}
               onClick={() => openPriceCheck(true)}
-              className="flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface p-2 text-center"
+              className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface p-2 text-center transition-colors hover:border-border-strong hover:bg-surface-2"
             >
-              <span className="font-medium">{t('home.price_check')}</span>
+              <span className="flex size-9 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
+                <SearchIcon />
+              </span>
+              <span className="text-small font-medium">
+                {t('home.price_check')}
+              </span>
             </button>
           </li>
         </ul>

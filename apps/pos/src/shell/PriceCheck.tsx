@@ -156,7 +156,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
                 className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-border px-3 text-start"
                 onClick={() => void pick(p)}
               >
-                <span>{String(p.name_en)}</span>
+                <span className="ltr-name">{String(p.name_en)}</span>
                 <MoneyText paisa={Number(p.price ?? 0)} />
               </button>
             </li>

@@ -353,7 +353,7 @@
     "reference": "Hawala (ikhtiyari)",
     "remove": "Hatayein",
     "running": "Ada {{paid}} · Baqi {{remaining}}",
-    "save_failed": "Farokht save nahin hui: {{error}}",
+    "save_failed": "Farokht save nahin hui. Dobara koshish karein.",
     "saved": "Farokht save · {{invoice}}",
     "split": "+ Payment taqseem karein",
     "split_list": "Adaigiyan",
@@ -847,7 +847,8 @@
     "search_label": "Talash",
     "search_placeholder": "Talash",
     "show_dialog": "Tasdeeq kholen",
-    "show_override": "Manzoori kholen"
+    "show_override": "Manzoori kholen",
+    "close_dialog": "Dialog band karein"
   },
   "unit": {
     "box": "dabba",

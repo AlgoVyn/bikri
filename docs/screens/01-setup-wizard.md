@@ -22,7 +22,7 @@ Bikri differences: no vendor account, no trial, no activation (REQ-B05); a logo 
 
 ## Layout
 
-Centered card, max width 560 px, on the app background. Top: Bikri wordmark, step indicator "Step n of 4" with 4 dots, language switcher (English / اردو / Roman Urdu) at top-end on every step. Bottom: `Back` (secondary, hidden on step 1) and `Next` / `Finish` (primary). `Skip` (text button) only on step 4.
+Centered card, max width 560 px, on the app background. Top: Bikri wordmark, step indicator "Step n of 4" with a 4-segment progress bar, language switcher (English / اردو / Roman Urdu) at top-end on every step. Bottom: `Back` (secondary, hidden on step 1) and `Next` / `Finish` (primary). `Skip` (text button) only on step 4.
 
 Step 0 (welcome): heading "Welcome to Bikri", three large language buttons, `Start`.
 
