@@ -54,6 +54,7 @@ export type UsageOverview = {
   db_size_bytes: number | null;
   today: { rows_written: number; rows_read: number };
   tenants_by_status: Record<string, number>;
+  open_conflicts: { tenant_id: string; count: number }[];
   last_backup: { key: string; size: number; uploaded: number } | null;
   over_80: string[];
 };
