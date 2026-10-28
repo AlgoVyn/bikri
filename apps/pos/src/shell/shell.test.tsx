@@ -109,14 +109,11 @@ describe('app shell', () => {
     await setLanguage('en');
   });
 
-  it('shows all nine rail items to the owner, with the shop name', async () => {
+  it('shows all nine rail items to the owner, with the Bikri brand', async () => {
     await renderAt(`${BASE_PATH}/`);
     const rail = await screen.findByRole('navigation', { name: 'Main' });
-    expect(
-      await screen.findByText('Algovyn Mobiles', {
-        selector: '[data-testid="shop-name-rail"]',
-      }),
-    ).toBeTruthy();
+    expect(screen.getByTestId('brand-rail').textContent).toContain('Bikri');
+    expect(screen.queryByText('Algovyn Mobiles')).toBeNull();
     for (const name of [
       'Home',
       'Sell',

@@ -64,7 +64,8 @@ test.describe('Home and shell (T-013)', () => {
       await expect(page).toHaveURL(/\/bikri\/reports$/);
       await nav.getByRole('link', { name: /Home/ }).click();
     } else {
-      await expect(page.getByTestId('shop-name-rail')).toHaveText(
+      await expect(page.getByTestId('brand-rail')).toContainText('Bikri');
+      await expect(page.getByTestId('brand-rail')).not.toContainText(
         'Algovyn Mobiles',
       );
       for (const name of [

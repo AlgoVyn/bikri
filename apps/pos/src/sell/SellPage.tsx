@@ -860,7 +860,7 @@ function CategoryChips({
           className={chip(selected === c.id)}
           onClick={() => onPick(c.id)}
         >
-          {String(c.name)}
+          {String(c.name_en)}
         </button>
       ))}
     </div>

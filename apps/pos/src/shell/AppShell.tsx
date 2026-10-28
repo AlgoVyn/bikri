@@ -183,7 +183,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label={t('nav.rail')}
         className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail"
       >
-        <div className="hidden h-topbar shrink-0 flex-col items-center justify-center gap-0.5 lg:flex">
+        <div
+          className="hidden h-topbar shrink-0 flex-col items-center justify-center gap-0.5 lg:flex"
+          data-testid="brand-rail"
+        >
           <span
             aria-hidden="true"
             className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
@@ -194,12 +197,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t('common.app_name')}
           </span>
         </div>
-        <span
-          className="hidden break-words px-1 pb-2 text-center text-[11px] font-medium leading-tight text-rail-muted lg:block"
-          data-testid="shop-name-rail"
-        >
-          {shopName ?? t('common.app_name')}
-        </span>
         {visible.map((item) => {
           const active = current?.to === item.to;
           return (

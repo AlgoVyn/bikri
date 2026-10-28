@@ -104,14 +104,26 @@ export async function attentionItems(
 
 export type RecentBill = { sale: SyncedRow; methods: string[] };
 
-/** Last 5 bills of this device, newest first, with their payment methods. */
+/** Last 5 bills of the shop, newest first, with their payment methods. */
 export async function recentBills(
   db: BikriDb,
-  deviceId: string,
   limit = 5,
 ): Promise<RecentBill[]> {
-  const sales = (await db.sales.orderBy('created_at').reverse().toArray())
-    .filter((s) => s.device_id === deviceId)
+  // Shop-wide, newest first. Fetch a small window from the created_at index,
+  // then sort by the invoice sequence too: two tills (or two quick bills) can
+  // share a timestamp, and the higher sequence is the later bill.
+  const window = await db.sales
+    .orderBy('created_at')
+    .reverse()
+    .limit(50)
+    .toArray();
+  const sales = window
+    .sort(
+      (a, b) =>
+        Number(b.created_at) - Number(a.created_at) ||
+        Number(b.invoice_seq) - Number(a.invoice_seq) ||
+        String(b.id).localeCompare(String(a.id)),
+    )
     .slice(0, limit);
   const out: RecentBill[] = [];
   for (const sale of sales) {

@@ -184,15 +184,29 @@ describe('Home attention and recent bills (screens/04)', () => {
     expect(cashier).not.toContain('conflicts');
   });
 
-  it("lists this device's last bills, newest first, with their methods", async () => {
+  it('lists the shop last bills, newest first, with deterministic ties', async () => {
     const db = await readyDb();
     await seedSampleDay(db, '2026-10-27', NOW);
-    const bills = await recentBills(db, 'dev-1');
+    const seeded = await db.sales.toArray();
+    for (const sale of seeded)
+      await db.sales.update(sale.id, { created_at: NOW });
+    const bills = await recentBills(db);
     expect(bills.map((b) => [b.sale.invoice_no, b.methods])).toEqual([
       ['A-A-2', ['cash', 'udhaar']],
       ['A-A-1', ['cash']],
     ]);
-    expect(await recentBills(db, 'other')).toEqual([]);
+
+    // A newer bill on another till is shown on Home too.
+    const template = seeded[0];
+    await db.sales.add({
+      ...template,
+      id: 'sale-dev-2',
+      invoice_no: 'B-B-1',
+      invoice_seq: 1,
+      device_id: 'dev-2',
+      created_at: NOW + 2,
+    } as never);
+    expect((await recentBills(db))[0]?.sale.invoice_no).toBe('B-B-1');
   });
 });
 
@@ -210,7 +224,7 @@ describe('two shops on one till (I-till)', () => {
       udhaarGiven: 0,
       udhaarReceived: 0,
     });
-    expect(await recentBills(b, 'dev-1')).toEqual([]);
+    expect(await recentBills(b)).toEqual([]);
     expect(await expectedCash(b, 'dev-1', NOW + 10)).toBe(0);
   });
 });
