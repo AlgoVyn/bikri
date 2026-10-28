@@ -121,6 +121,34 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     expect(snap.snapshot_seq).toBe(aMax);
   });
 
+  it('prunes more than 5,000 applied_ops so 90-day retention can be met', async () => {
+    const shop = await seedShop('Prune many');
+    const old = Date.now() - 100 * DAY;
+    for (let batch = 0; batch < 6; batch += 1) {
+      await env.DB.prepare(
+        `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1000)
+         INSERT INTO applied_ops (tenant_id, op_id, device_id, applied_at, result, error_code)
+         SELECT ?1, 'old-' || ?2 || '-' || x, ?3, ?4, 'applied', NULL FROM c`,
+      )
+        .bind(shop.tenantId, batch, shop.till.id, old)
+        .run();
+    }
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(6_000);
+    const report = await pruneAll(env, Date.now());
+    expect(report.applied_ops).toBeGreaterThanOrEqual(6_000);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(0);
+  });
+
   it('I16: deleting D removes only D rows and t/<D>/ objects; then D is a tombstone', async () => {
     const a = await seedShop('Del A');
     const d = await seedShop('Del D');

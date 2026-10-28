@@ -311,23 +311,33 @@ export function measure({ bills = 20_000, days = 120 } = {}) {
       NOW - 90 * DAY,
     );
     db.exec('VACUUM');
-    const final = bytes(db);
-    const delta = final - baseline;
+    const retainedFinal = bytes(db);
+    // Separate the unbounded ledger tables from the retention-limited sync tables.
+    db.exec('DELETE FROM change_log; DELETE FROM applied_ops; VACUUM');
+    const unboundedFinal = bytes(db);
+    const baselinePerShop = baseline / tenants.length;
+    const unboundedPerShop = (unboundedFinal - baseline) / tenants.length;
+    const retainedPerShop = (retainedFinal - unboundedFinal) / tenants.length;
+    const billsPerDay = bills / days;
+    const bytesPerBill = unboundedPerShop / bills;
+    // Reference shop = 150 bills/day. The retained sync tables are already at
+    // steady state and scale with daily volume, not with a full year.
+    const bytesPerShopYear =
+      bytesPerBill * 150 * 365 +
+      retainedPerShop * (150 / billsPerDay) +
+      baselinePerShop;
     return {
       billsPerShop: bills,
       days,
+      billsPerDay,
       tenants: tenants.length,
       baselineBytes: baseline,
-      finalBytes: final,
-      bytesPerBill: Math.round(delta / (bills * tenants.length)),
-      bytesPerShopYear: Math.round(
-        (delta / tenants.length) * (365 / days) + baseline / tenants.length,
-      ),
-      bytesPerShopDay: Math.round(
-        ((delta / tenants.length) * (365 / days) + baseline / tenants.length) /
-          365,
-      ),
-      rowsPerBill: 27,
+      retainedFinalBytes: retainedFinal,
+      unboundedFinalBytes: unboundedFinal,
+      bytesPerBill: Math.round(bytesPerBill),
+      bytesPerShopYear: Math.round(bytesPerShopYear),
+      bytesPerShopDay: Math.round(bytesPerShopYear / 365),
+      logicalRowsPerBill: 27,
     };
   } finally {
     db.close();

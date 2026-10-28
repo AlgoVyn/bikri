@@ -9,7 +9,8 @@ describe('T-062 D1 size measurement', () => {
     expect(result.billsPerShop).toBe(20);
     expect(result.bytesPerBill).toBeGreaterThan(0);
     expect(result.bytesPerShopYear).toBeGreaterThan(result.bytesPerBill);
-    expect(result.rowsPerBill).toBe(27);
+    expect(result.logicalRowsPerBill).toBe(27);
+    expect(result.billsPerDay).toBeCloseTo(4);
   }, 30_000);
 
   it('generates the documented large fixture shape without the file', () => {
