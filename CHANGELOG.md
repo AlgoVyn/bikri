@@ -21,7 +21,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Read-only shops with offline-safe retention of pre-status sales; operator support access is view-only, visible and time-limited.
 - Nightly whole-database backup (`backup.yml`) with per-tenant manifest, private R2 copy, `age`-encrypted 90-day artifact and 30-daily/12-monthly retention.
 - `tools/backup/tenant-extract.mjs` extracts one shop from a nightly backup loaded into `bikri-restore`.
-- Free-tier measurement: 28 rows and ~4.5 KB per bill, ~276 MB per shop-year; start a new shard around 450 MB per database. See [D-127](docs/decisions.md).
+- Free-tier measurement: ~117 rows and ~1.9 KB permanent growth per bill, ~153 MB per shop-year including steady-state sync tables; start a new shard around 450 MB per database. See [D-127](docs/decisions.md).
 - Accessibility sweep: axe on every selling/back-office/settings route in English and the Urdu core journey, no serious/critical violations.
 
 ### Security and data

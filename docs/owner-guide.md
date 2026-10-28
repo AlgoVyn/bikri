@@ -8,12 +8,12 @@ Bikri is your shop's till, stock, khata (udhaar) and reports in one app. It runs
 2. Enter the till's name and connect. A shop code works once; ask Algovyn for a new one if it expired.
 3. The setup wizard asks for:
    - shop name, address and phone (they print on receipts);
-   - receipt header/footer, tax label and tax rate (0 if you do not charge tax);
+   - receipt header/footer, tax rate (0 if you do not charge tax) and rounding;
    - your name and a **4–6 digit owner PIN** (do not use `1234`, `1111` or your year of birth);
-   - optional logo, printer and first products.
+   - optional logo and first products.
 4. Finish. The app installs from the browser menu (**Install app**) for a full-screen till.
 
-You can skip products and printer setup and add them later in Settings.
+The tax label and printer are configured later in Settings → Shop and Settings → Printer. You can skip products and add them later.
 
 ## 2. Signing in and staff
 
@@ -65,7 +65,7 @@ The three cart tabs keep separate sales; **Hold** parks a bill and **Resume** br
 
 - **Reports**: today/7 days/30 days/month/custom range, device filter, summary, products, stock, udhaar, staff, day closes and expenses. Profit and cost appear only for owners/managers (or staff with cost permission).
 - Every list has a CSV export. Reports also have a summary PDF and a shareable PNG.
-- **Settings → Backup** (owner only) downloads a full copy of the shop as a zip (JSON + CSV). **Download from server** needs an admin device and the owner email sign-in; it includes every till, even a lost one.
+- **Settings → Backup** (owner only) downloads a full copy of the shop as a zip (JSON + CSV). **Download from server** needs an admin device and the owner email sign-in. It contains data already synced from every till, including a lost one; unsynced changes on a lost till cannot be recovered.
 
 ## 9. Printer and labels
 
@@ -82,14 +82,14 @@ The three cart tabs keep separate sales; **Hold** parks a bill and **Resume** br
 
 ## 11. Email sign-in and admin devices
 
-Some actions need the owner email as well as the PIN: server export, device management and owner settings. Enter the 6-digit code sent to your email. The session lasts 12 hours and ends when you lock or switch user. Mark at least one device as **admin** in Settings → Devices.
+Some actions need the owner email as well as the PIN: server export, device management and owner settings. Ask Algovyn to add your address, then click the verification link Cloudflare emails you once. After that, enter the 6-digit code sent to your email. The session lasts 12 hours and ends when you lock or switch user. Mark at least one device as **admin** in Settings → Devices.
 
 ## 12. Read-only, support access and your data
 
 - If the shop is made **read-only** (for example an unpaid bill), you can still sign in, see reports and history and export your data, but cannot make sales or changes. A banner stays on every screen. Sales made before the till learned the status are kept.
-- **Algovyn support** access is explicit, time-limited (1–24 hours) and shown in a banner on every till; the support device is view-only. You can end it with **End now**.
-- Every export, import, restore, status change and support session appears in **Settings → Activity** with the reason.
-- Algovyn runs the database and holds the backup key, so it can technically read your shop's data; it does so only to run the service, restore it, or when you ask for help. Nightly backups are encrypted; copies expire after 30 days (daily), 12 months (monthly) and 90 days (off-site).
+- **Algovyn support** access is explicit, time-limited (1–24 hours) and shown in a banner on every till; the support device is view-only. An owner on an admin device can end it with **End now**.
+- Exports, imports and restores appear in **Settings → Activity**; status changes and support sessions also show the reason.
+- Algovyn runs the database and holds the backup key, so it can technically read your shop's data; it does so only to run the service, restore it, or when you ask for help. Your email is used only for sign-in codes; Bikri has no analytics, ads or tracking. Receipts show your shop name and a small "Powered by AlgoVyn" line. Nightly backups stay in a private R2 bucket (encrypted at rest by Cloudflare); the off-site copy is encrypted with Algovyn's key. Copies expire after 30 days (daily), 12 months (monthly) and 90 days (off-site).
 - **Full copy:** Settings → Backup → Export. Do this before leaving Bikri or before a deletion request.
 - **Delete a shop:** ask Algovyn; an export is offered first. Its live rows and files are removed, the tenant row stays as a tombstone, and encrypted backup copies expire on the schedule above.
 

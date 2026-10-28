@@ -309,20 +309,25 @@ export function importRows(
   id: string,
   tbl: string,
   rows: readonly Record<string, string | number | null>[],
+  reason?: string,
 ): Promise<{ imported: number }> {
   return apiJson(idPath(id, '/import'), {
     method: 'POST',
-    body: { tbl, rows },
+    body: { tbl, rows, ...(reason ? { reason } : {}) },
   });
 }
 
 export function restoreEpoch(
   id: string,
   restorePointAt: number,
+  reason?: string,
 ): Promise<{ tenant: Tenant }> {
   return apiJson(idPath(id, '/restore-epoch'), {
     method: 'POST',
-    body: { restore_point_at: restorePointAt },
+    body: {
+      restore_point_at: restorePointAt,
+      ...(reason ? { reason } : {}),
+    },
   });
 }
 

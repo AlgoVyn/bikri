@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SNAPSHOT_TABLES } from '../../apps/api/src/sync/tables.ts';
 import { EXPORT_TABLES } from './tables.mjs';
-import { stripRow, tableCsv } from './tenant-extract.mjs';
+import { backupExportedAt, stripRow, tableCsv } from './tenant-extract.mjs';
 import { zipStore } from './zip.mjs';
 
 describe('tenant extraction', () => {
@@ -25,6 +25,14 @@ describe('tenant extraction', () => {
       expect(EXPORT_TABLES).not.toContain(operational);
   });
 
+  it('uses the nightly backup time as the restore point', () => {
+    expect(backupExportedAt('2026-10-27')).toBe(
+      Date.parse('2026-10-27T02:30:00+05:00'),
+    );
+    expect(() => backupExportedAt('2026-02-31')).toThrow('not a real date');
+    expect(() => backupExportedAt('27-10-2026')).toThrow('YYYY-MM-DD');
+  });
+
   it('writes human-readable CSV with rupees, percent and event time', () => {
     const csv = tableCsv([
       {
@@ -36,12 +44,18 @@ describe('tenant extraction', () => {
         discount_type: 'pct',
         discount_value: 1250,
         cost_snapshot: 500,
+        default_credit_limit: 4000000,
+        round_total_to: 100,
+        setup_completed_at: Date.parse('2026-10-27T06:00:00Z'),
       },
     ]).replace(/^\uFEFF/u, '');
     expect(csv).toContain("'=1+1");
     expect(csv).toContain(',-123.45,');
     expect(csv).toContain(',12.50,');
-    expect(csv).toContain(',5.00\r\n');
+    expect(csv).toContain(',5.00,');
+    expect(csv).toContain(',40000.00,');
+    expect(csv).toContain(',1.00,');
+    expect(csv).toContain('2026-10-27T11:00:00+05:00');
     expect(csv).toMatch(/2026-10-27T11:00:00\+05:00/u);
   });
 

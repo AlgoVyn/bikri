@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { backupKeyDate, retentionPlan } from './retention.mjs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { backupKeyDate, main, retentionPlan } from './retention.mjs';
 
 function keysFor(start, days) {
   const keys = [];
@@ -12,12 +12,22 @@ function keysFor(start, days) {
   return keys;
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete process.env.CLOUDFLARE_ACCOUNT_ID;
+  delete process.env.CLOUDFLARE_API_TOKEN;
+});
+
 describe('backup retention', () => {
-  it('reads only dated backup keys', () => {
+  it('reads only dated backup keys in the configured prefix', () => {
     expect(backupKeyDate('d1/2026-10-28.sql.gz')).toBe('2026-10-28');
     expect(backupKeyDate('d1/2026-10-28.manifest.json')).toBe('2026-10-28');
     expect(backupKeyDate('d1/notes.txt')).toBeNull();
-    expect(backupKeyDate('d1/2026-13-40.sql.gz')).toBeNull();
+    expect(backupKeyDate('d1/2026-02-31.sql.gz')).toBeNull();
+    expect(backupKeyDate('archive/2026-10-28.sql.gz', 'archive/')).toBe(
+      '2026-10-28',
+    );
+    expect(backupKeyDate('d1/2026-10-28.sql.gz', 'archive/')).toBeNull();
   });
 
   it('keeps 30 daily dates plus the 1st of up to 12 months', () => {
@@ -33,9 +43,38 @@ describe('backup retention', () => {
 
   it('leaves unknown keys and future exports alone', () => {
     const plan = retentionPlan(
-      ['d1/2026-01-01.sql.gz', 'd1/manual.txt', 'd1/2027-01-01.sql.gz'],
+      ['d1/2025-01-02.sql.gz', 'd1/manual.txt', 'd1/2027-01-01.sql.gz'],
       '2026-10-28',
     );
     expect(plan.remove).toEqual([]);
+  });
+
+  it('deletes R2 keys with literal slashes through the API', async () => {
+    process.env.CLOUDFLARE_ACCOUNT_ID = 'acct';
+    process.env.CLOUDFLARE_API_TOKEN = 'token';
+    const calls = [];
+    vi.stubGlobal('fetch', async (url, init) => {
+      calls.push({ url: String(url), method: init?.method ?? 'GET' });
+      if (init?.method === 'DELETE')
+        return new Response(JSON.stringify({ success: true, result: {} }), {
+          status: 200,
+        });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          result: [
+            { key: 'd1/2025-01-02.sql.gz' },
+            ...keysFor(1, 30).map((key) => ({ key })),
+          ],
+          result_info: { is_truncated: false },
+        }),
+        { status: 200 },
+      );
+    });
+    const plan = await main(['--today', '2026-10-28']);
+    expect(plan.remove).toEqual(['d1/2025-01-02.sql.gz']);
+    const del = calls.find((call) => call.method === 'DELETE');
+    expect(del?.url).toContain('/objects/d1/2025-01-02.sql.gz');
+    expect(del?.url).not.toContain('%2F');
   });
 });

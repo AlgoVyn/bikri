@@ -240,7 +240,12 @@ export function RestoreTab({
                     rows.push(coerced);
                   }
                   if (rows.length > 0)
-                    await importRows(tenantId, action.tbl, rows);
+                    await importRows(
+                      tenantId,
+                      action.tbl,
+                      rows,
+                      t('admin.restore_reason'),
+                    );
                   const count = Math.max(1, action.to - action.from);
                   setNote(
                     t('admin.restore_importing', {
@@ -256,7 +261,7 @@ export function RestoreTab({
                   );
                 } else if (action.type === 'epoch') {
                   const at = cursor.exportedAt ?? loaded.exported_at;
-                  await restoreEpoch(tenantId, at);
+                  await restoreEpoch(tenantId, at, t('admin.restore_reason'));
                   cursor = reduceRestore(cursor, { type: 'epoch' }, tables);
                 } else if (action.type === 'maintenance_off') {
                   await setMaintenance(

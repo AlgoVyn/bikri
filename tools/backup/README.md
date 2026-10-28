@@ -21,7 +21,7 @@ node tools/backup/export.mjs --local --out-dir /tmp/bikri-backup --date 2026-10-
 Restore one tenant from a nightly dump loaded into `bikri-restore`:
 
 ```sh
-node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <tenant_id> --out export.zip
+node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <tenant_id> --backup-date YYYY-MM-DD --out export.zip
 ```
 
 Restore procedure: [docs/09 §3.2](../../docs/09-backups-and-ops.md#32-restore-a-nightly-backup-to-a-new-database) (whole DB) and [§3.4](../../docs/09-backups-and-ops.md#34-restore-one-tenant) (one shop).
