@@ -145,7 +145,6 @@ export function HomePage() {
               {t('home.new_sale')}
             </Link>
           ) : null}
-
         </div>
       </header>
 
