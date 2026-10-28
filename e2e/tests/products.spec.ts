@@ -100,7 +100,10 @@ test.describe('Products (T-014)', () => {
     ).toBeVisible();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      (async () => {
+        await page.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('button', { name: 'Export CSV' }).click();
+      })(),
     ]);
     const csv = await (await download.createReadStream()).toArray();
     const text = Buffer.concat(csv).toString('utf8');
@@ -154,7 +157,10 @@ test.describe('Products (T-014)', () => {
     );
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      (async () => {
+        await page.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('button', { name: 'Export CSV' }).click();
+      })(),
     ]);
     const text = Buffer.concat(
       await (await download.createReadStream()).toArray(),

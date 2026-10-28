@@ -43,6 +43,7 @@ test.describe('Import spreadsheet (T-023)', () => {
   }) => {
     test.setTimeout(60_000);
     await openReadyShop(page, '/bikri/products');
+    await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('link', { name: 'Import', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Import spreadsheet' }),
@@ -220,6 +221,7 @@ test.describe('Update prices (T-023)', () => {
         { name: 'Cover', price: 50000 },
       ]),
     )) as string[];
+    await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('link', { name: 'Update prices' }).click();
     await page.getByLabel('Percent (e.g. 10 or -5)').fill('10');
     await page.getByLabel('Rounding').selectOption({ label: 'To Rs 10' });

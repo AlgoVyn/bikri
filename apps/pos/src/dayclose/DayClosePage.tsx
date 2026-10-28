@@ -5,8 +5,10 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ClockIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import {
@@ -261,16 +263,15 @@ export function DayClosePage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
-      <div>
-        <h1 className="text-h1 font-semibold">{t('office.dayclose.title')}</h1>
-        <p className="text-small text-text-muted">
-          {data.deviceName} · {t('office.dayclose.period')}{' '}
-          {data.firstClose
+      <PageHeader
+        icon={<ClockIcon />}
+        title={t('office.dayclose.title')}
+        subtitle={`${data.deviceName} · ${t('office.dayclose.period')} ${
+          data.firstClose
             ? t('office.dayclose.since_start')
-            : period(data.periodStart)}{' '}
-          → {period(data.periodEnd)}
-        </p>
-      </div>
+            : period(data.periodStart)
+        } → ${period(data.periodEnd)}`}
+      />
 
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
         <div className="flex flex-wrap items-center gap-2">

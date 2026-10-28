@@ -7,6 +7,7 @@ import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
@@ -156,25 +157,30 @@ export function SalesList({ bill }: { bill?: string }) {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">{t('nav.sales')}</h1>
-        {can('export.data') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!data || data.rows.length === 0}
-            onClick={() =>
-              data &&
-              downloadText(
-                'bikri-sales.csv',
-                salesCsv(data.rows, data.timeZone),
-              )
-            }
-          >
-            {t('office.sales.export_csv')}
-          </button>
-        ) : null}
-      </div>
+      <PageHeader
+        icon={<SalesIcon />}
+        tone="bg-info-subtle text-info-subtle-ink"
+        title={t('nav.sales')}
+        subtitle={t('office.sales.subtitle')}
+        actions={
+          can('export.data') ? (
+            <button
+              type="button"
+              className={buttonQuiet}
+              disabled={!data || data.rows.length === 0}
+              onClick={() =>
+                data &&
+                downloadText(
+                  'bikri-sales.csv',
+                  salesCsv(data.rows, data.timeZone),
+                )
+              }
+            >
+              {t('office.sales.export_csv')}
+            </button>
+          ) : undefined
+        }
+      />
 
       {limited ? (
         <p className="rounded-control bg-surface-2 px-3 py-2 text-small text-text-muted">

@@ -6,6 +6,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierList, suppliersCsv } from '../data/suppliers.ts';
@@ -39,37 +40,42 @@ export function SupplierList() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.suppliers.title')}
-        </h1>
-        {can('export.data') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!data || data.rows.length === 0}
-            onClick={() =>
-              data &&
-              downloadText(
-                'bikri-suppliers.csv',
-                suppliersCsv(data.rows, data.tz),
-              )
-            }
-          >
-            {t('office.suppliers.export_csv')}
-          </button>
-        ) : null}
-        {can('purchase.create') ? (
-          <button
-            type="button"
-            className={`${buttonPrimary} gap-2`}
-            disabled={readOnly}
-            onClick={() => setNewOpen(true)}
-          >
-            {t('office.suppliers.new_supplier')}
-          </button>
-        ) : null}
-      </div>
+      <PageHeader
+        icon={<SuppliersIcon />}
+        tone="bg-success-subtle text-success-subtle-ink"
+        title={t('office.suppliers.title')}
+        subtitle={t('office.suppliers.subtitle')}
+        actions={
+          <>
+            {can('export.data') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!data || data.rows.length === 0}
+                onClick={() =>
+                  data &&
+                  downloadText(
+                    'bikri-suppliers.csv',
+                    suppliersCsv(data.rows, data.tz),
+                  )
+                }
+              >
+                {t('office.suppliers.export_csv')}
+              </button>
+            ) : null}
+            {can('purchase.create') ? (
+              <button
+                type="button"
+                className={`${buttonPrimary} gap-2`}
+                disabled={readOnly}
+                onClick={() => setNewOpen(true)}
+              >
+                {t('office.suppliers.new_supplier')}
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
       {data ? (
         <p className="rounded-card border border-border bg-surface p-3 text-small">

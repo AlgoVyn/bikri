@@ -15,9 +15,9 @@ Opened by `Take payment` on Sell. Two steps like Dukaan ("Step 1 of 2: payment",
 
 Modal 640 px wide (full screen < 768 px). Header: "Take payment" + `Total to pay Rs 43,000` (large) + close button (×, also Esc).
 
-1. **Method tabs** (keys `1`–`4`): `Cash`, `Bank / wallet`, `Card`, `Udhaar` as large cards with icons. The selected card uses the primary-subtle background and primary border. Selecting a tab sets "pay the remaining amount with this method".
+1. **Method tabs** (keys `1`–`4`): `Cash`, `Bank / wallet`, `Card`, `Udhaar` as large cards with an icon, a short hint ("Notes & coins", "Bank or wallet transfer", "Swipe or insert card", "Add to customer khata") and a check on the selected card. The selected card uses the primary-subtle background and primary border. Selecting a tab sets "pay the remaining amount with this method".
 2. **Method panel**
-   - Cash: `Received` `MoneyInput` (prefilled with remaining due, all selected), chips `Exact`, and up to 3 round-ups (07 §4). Shows **`Change to give Rs 600`** in large text (or "Rs 400 still due" in amber).
+   - Cash: `Received` `MoneyInput` (prefilled with remaining due, all selected), chips `Exact`, and up to 3 round-ups (07 §4). Shows `Change to give` and `Still due` as two summary cards (the unused one shows a dash).
    - Bank / wallet: provider chips JazzCash / Easypaisa / NayaPay / Bank transfer / Other; `Reference` (optional, 0–40, e.g. transaction ID); amount.
    - Card: `Last 4 digits` (optional), `Reference` (optional); amount.
    - Udhaar: customer picker (required; `+ New customer` inline: name, phone) → shows "Already owes Rs 5,000 · After this bill Rs 48,000 · Limit Rs 50,000" with amber warning when over (07 §4.1). Amount.

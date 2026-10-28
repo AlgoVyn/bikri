@@ -69,6 +69,13 @@ const METHOD_ICON: Record<PayMethod, () => React.JSX.Element> = {
   udhaar: UdhaarIcon,
 };
 
+const METHOD_HINT: Record<PayMethod, string> = {
+  cash: 'pay.method_cash_hint',
+  bank_wallet: 'pay.method_bank_hint',
+  card: 'pay.method_card_hint',
+  udhaar: 'pay.method_udhaar_hint',
+};
+
 export type Done = {
   sale: SyncedRow;
   customerName: string;
@@ -308,7 +315,7 @@ function PayStep({
       <div
         role="tablist"
         aria-label={t('pay.method')}
-        className="grid grid-cols-2 gap-1 sm:grid-cols-4"
+        className="grid grid-cols-2 gap-2"
       >
         {PAY_METHODS.map((m) => {
           const Icon = METHOD_ICON[m];
@@ -319,15 +326,40 @@ function PayStep({
               type="button"
               role="tab"
               aria-selected={active}
-              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-control border p-2 text-small ${
+              className={`flex min-h-20 items-center gap-2 rounded-control border p-3 text-start ${
                 active
-                  ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
+                  ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
                   : 'border-border bg-surface text-text-muted hover:bg-surface-2'
               }`}
               onClick={() => chooseMethod(m)}
             >
-              <Icon />
-              {t(METHOD_KEY[m])}
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-control ${
+                  active
+                    ? 'bg-surface text-primary'
+                    : 'bg-surface-2 text-text-muted'
+                }`}
+              >
+                <Icon />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-small font-medium">
+                  {t(METHOD_KEY[m])}
+                </span>
+                <span
+                  className={`block text-small ${active ? 'text-primary-subtle-ink' : 'text-text-muted'}`}
+                >
+                  {t(METHOD_HINT[m])}
+                </span>
+              </span>
+              {active ? (
+                <span
+                  aria-hidden="true"
+                  className="text-title text-primary-subtle-ink"
+                >
+                  ✓
+                </span>
+              ) : null}
             </button>
           );
         })}
@@ -530,18 +562,36 @@ function MethodPanel({
             </button>
           ))}
         </div>
-        {change > 0 ? (
-          <p
-            className="text-figure font-semibold text-success"
-            data-testid="pay-change"
-          >
-            {t('pay.change', { amount: formatMoney(change) })}
-          </p>
-        ) : remaining > 0 ? (
-          <p className="text-title text-warning" data-testid="pay-due">
-            {t('pay.still_due', { amount: formatMoney(remaining) })}
-          </p>
-        ) : null}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-control border border-border bg-surface-2 p-2">
+            <p className="text-small text-text-muted">
+              {t('pay.change_label')}
+            </p>
+            {change > 0 ? (
+              <p
+                className="text-title font-semibold text-success"
+                data-testid="pay-change"
+              >
+                <MoneyText paisa={change} />
+              </p>
+            ) : (
+              <p className="text-title font-semibold">—</p>
+            )}
+          </div>
+          <div className="rounded-control border border-border bg-surface-2 p-2">
+            <p className="text-small text-text-muted">{t('pay.due_label')}</p>
+            {remaining > 0 ? (
+              <p
+                className="text-title font-semibold text-warning"
+                data-testid="pay-due"
+              >
+                <MoneyText paisa={remaining} />
+              </p>
+            ) : (
+              <p className="text-title font-semibold">—</p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
