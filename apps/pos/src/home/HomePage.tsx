@@ -1,9 +1,19 @@
 import { businessDate, formatMoney } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { ClockIcon, SearchIcon, SellIcon } from '../components/icons.tsx';
+import {
+  ClockIcon,
+  ExpensesIcon,
+  ProductsIcon,
+  ReportsIcon,
+  SalesIcon,
+  SearchIcon,
+  SellIcon,
+  UdhaarIcon,
+} from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -107,20 +117,40 @@ export function HomePage() {
   ].filter((tile) => tile.perm === null || can(tile.perm));
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4">
-      <header>
-        <h1 className="text-h1 font-semibold">
-          {t('home.greeting', { name: String(staff?.name ?? '') })}
-        </h1>
-        <p className="text-text-muted">
-          {dateText}
-          {data?.branchName ? ` · ${data.branchName}` : ''}
-        </p>
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 lg:p-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-h1 font-semibold">
+            {t('home.greeting', { name: String(staff?.name ?? '') })}
+          </h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-text-muted">
+            <span>{dateText}</span>
+            {data?.branchName ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{data.branchName}</span>
+              </>
+            ) : null}
+            {online ? null : (
+              <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-warning-subtle-ink">
+                {t('home.as_of_device')}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 max-sm:hidden">
+          {can('sale.create') ? (
+            <Link to="/sell" className={`${buttonPrimary} gap-2`}>
+              <SellIcon />
+              {t('home.new_sale')}
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {justSetUp ? (
         <section
-          className="rounded-card border border-border bg-surface p-4"
+          className="rounded-card border border-border bg-surface p-4 shadow-card"
           aria-labelledby="ready-heading"
         >
           <h2 id="ready-heading" className="text-h2 font-semibold">
@@ -153,14 +183,21 @@ export function HomePage() {
 
       {data && data.products === 0 ? (
         <section
-          className="rounded-card border border-border bg-surface p-4"
+          className="rounded-card border border-border bg-surface p-4 shadow-card"
           aria-labelledby="first-heading"
         >
-          <h2 id="first-heading" className="text-h2 font-semibold">
-            {t('home.first_products')}
-          </h2>
-          <p className="mt-1 text-text-muted">{t('home.no_products')}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
+              <ProductsIcon />
+            </span>
+            <div className="min-w-0">
+              <h2 id="first-heading" className="text-h2 font-semibold">
+                {t('home.first_products')}
+              </h2>
+              <p className="mt-1 text-text-muted">{t('home.no_products')}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
             {can('catalog.edit') ? (
               <>
                 <Link to="/products/new" className={buttonPrimary}>
@@ -179,42 +216,55 @@ export function HomePage() {
       ) : null}
 
       {data && data.products > 0 ? (
-        <section aria-label={t('home.sold_today')}>
+        <section aria-label={t('home.today_summary')}>
           <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <TodayCard label={t('home.sold_today')} testId="today-sold">
-              <MoneyText paisa={data.today.sold} />
-              <span className="block text-small text-text-muted">
-                {t('home.bills_count', { count: data.today.bills })}
-              </span>
-            </TodayCard>
+            <TodayCard
+              label={t('home.sold_today')}
+              testId="today-sold"
+              icon={<SalesIcon />}
+              tone="bg-primary-subtle text-primary-subtle-ink"
+              value={<MoneyText paisa={data.today.sold} />}
+              sub={t('home.bills_count', { count: data.today.bills })}
+            />
             {can('cost.view') ? (
-              <TodayCard label={t('home.profit_today')} testId="today-profit">
-                <MoneyText paisa={data.today.grossProfit} />
-              </TodayCard>
+              <TodayCard
+                label={t('home.profit_today')}
+                testId="today-profit"
+                icon={<ReportsIcon />}
+                tone="bg-success-subtle text-success-subtle-ink"
+                value={<MoneyText paisa={data.today.grossProfit} />}
+              />
             ) : null}
             {can('dayclose.view_expected') ? (
-              <TodayCard label={t('home.cash_drawer')} testId="today-cash">
-                <MoneyText paisa={data.cash} />
-              </TodayCard>
+              <TodayCard
+                label={t('home.cash_drawer')}
+                testId="today-cash"
+                icon={<ExpensesIcon />}
+                tone="bg-info-subtle text-info-subtle-ink"
+                value={<MoneyText paisa={data.cash} />}
+              />
             ) : null}
-            <TodayCard label={t('home.udhaar_today')} testId="today-udhaar">
-              <span className="block text-body">
-                {t('home.udhaar_given', {
-                  amount: formatMoney(data.today.udhaarGiven),
-                })}
-              </span>
-              <span className="block text-body">
-                {t('home.udhaar_received', {
-                  amount: formatMoney(data.today.udhaarReceived),
-                })}
-              </span>
-            </TodayCard>
+            <TodayCard
+              label={t('home.udhaar_today')}
+              testId="today-udhaar"
+              icon={<UdhaarIcon />}
+              tone="bg-warning-subtle text-warning-subtle-ink"
+              value={
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-body font-medium">
+                    {t('home.udhaar_given', {
+                      amount: formatMoney(data.today.udhaarGiven),
+                    })}
+                  </span>
+                  <span className="text-body font-medium">
+                    {t('home.udhaar_received', {
+                      amount: formatMoney(data.today.udhaarReceived),
+                    })}
+                  </span>
+                </span>
+              }
+            />
           </ul>
-          {online ? null : (
-            <p className="mt-2 text-small text-text-muted">
-              {t('home.as_of_device')}
-            </p>
-          )}
         </section>
       ) : null}
 
@@ -222,18 +272,18 @@ export function HomePage() {
         <h2 id="quick-heading" className="mb-2 text-h2 font-semibold">
           {t('home.quick_actions')}
         </h2>
-        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {tiles.map((tile) => (
             <li key={tile.to + tile.label}>
               <Link
                 to={tile.to}
                 title={`${t(tile.label)} (${tile.keys})`}
-                className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface p-2 text-center transition-colors hover:border-border-strong hover:bg-surface-2"
+                className="group flex min-h-14 items-center gap-3 rounded-card border border-border bg-surface p-3 text-small font-medium shadow-card hover:border-border-strong hover:bg-surface-2"
               >
-                <span className="flex size-9 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted group-hover:bg-primary-subtle group-hover:text-primary-subtle-ink">
                   <tile.Icon />
                 </span>
-                <span className="text-small font-medium">{t(tile.label)}</span>
+                <span className="min-w-0 truncate">{t(tile.label)}</span>
               </Link>
             </li>
           ))}
@@ -242,14 +292,12 @@ export function HomePage() {
               type="button"
               title={`${t('home.price_check')} (Ctrl+Shift+P)`}
               onClick={() => openPriceCheck(true)}
-              className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface p-2 text-center transition-colors hover:border-border-strong hover:bg-surface-2"
+              className="group flex min-h-14 w-full items-center gap-3 rounded-card border border-border bg-surface p-3 text-start text-small font-medium shadow-card hover:border-border-strong hover:bg-surface-2"
             >
-              <span className="flex size-9 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted group-hover:bg-primary-subtle group-hover:text-primary-subtle-ink">
                 <SearchIcon />
               </span>
-              <span className="text-small font-medium">
-                {t('home.price_check')}
-              </span>
+              <span className="min-w-0 truncate">{t('home.price_check')}</span>
             </button>
           </li>
         </ul>
@@ -260,15 +308,27 @@ export function HomePage() {
           <h2 id="attention-heading" className="mb-2 text-h2 font-semibold">
             {t('home.attention')}
           </h2>
-          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+          <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
             {data.attention.map((item) => (
               <li key={item.kind}>
                 <Link
                   to={ATTENTION_LINK[item.kind] ?? '/'}
-                  className={`flex min-h-11 items-center px-3 py-2 ${attentionTone(item)}`}
+                  className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium hover:bg-surface-2 ${attentionTone(item)}`}
                   data-testid={`attn-${item.kind}`}
                 >
-                  {attentionText(t, i18n.language, item)}
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-full bg-current"
+                  />
+                  <span className="min-w-0 flex-1">
+                    {attentionText(t, i18n.language, item)}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="text-base text-text-muted rtl:rotate-180"
+                  >
+                    ›
+                  </span>
                 </Link>
               </li>
             ))}
@@ -276,39 +336,55 @@ export function HomePage() {
         </section>
       ) : null}
 
-      <section aria-labelledby="recent-heading">
-        <h2 id="recent-heading" className="mb-2 text-h2 font-semibold">
-          {t('home.recent_bills')}
-        </h2>
-        {data && data.recent.length === 0 ? (
-          <p className="text-text-muted">{t('home.no_bills')}</p>
+      <section
+        aria-labelledby="recent-heading"
+        className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+      >
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <h2 id="recent-heading" className="me-auto text-h2 font-semibold">
+            {t('home.recent_bills')}
+          </h2>
+          <Link
+            to="/sales"
+            className="text-small font-medium text-primary hover:underline"
+          >
+            {t('home.view_all')}
+          </Link>
+        </div>
+        {data?.recent.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+            <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+              <SalesIcon />
+            </span>
+            <p className="text-small text-text-muted">{t('home.no_bills')}</p>
+          </div>
         ) : null}
         {data && data.recent.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+          <ul className="divide-y divide-border">
             {data.recent.map(({ sale, methods }) => (
               <li key={sale.id}>
                 <Link
                   to="/sales/$id"
                   params={{ id: sale.id }}
-                  className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
+                  className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-surface-2"
                 >
-                  <bdi dir="ltr" className="font-mono">
+                  <bdi dir="ltr" className="font-mono text-small font-medium">
                     {String(sale.invoice_no)}
                   </bdi>
                   <bdi dir="ltr" className="text-small text-text-muted">
                     {timeFmt.format(Number(sale.created_at))}
                   </bdi>
-                  <span className="flex gap-1">
+                  <span className="flex flex-wrap gap-1">
                     {methods.map((m) => (
                       <span
                         key={m}
-                        className="rounded-full bg-surface-2 px-2 text-small"
+                        className="rounded-full bg-surface-2 px-2 py-0.5 text-small text-text-muted"
                       >
                         {t(`payment.${m}`)}
                       </span>
                     ))}
                   </span>
-                  <span className="ms-auto">
+                  <span className="ms-auto text-body font-semibold">
                     <MoneyText paisa={Number(sale.total)} />
                   </span>
                 </Link>
@@ -365,19 +441,33 @@ function attentionText(
 function TodayCard({
   label,
   testId,
-  children,
+  icon,
+  tone,
+  value,
+  sub,
 }: {
   label: string;
   testId: string;
-  children: React.ReactNode;
+  icon: ReactNode;
+  tone: string;
+  value: ReactNode;
+  sub?: string;
 }) {
   return (
     <li
-      className="rounded-card border border-border bg-surface p-4"
+      className="rounded-card border border-border bg-surface p-4 shadow-card"
       data-testid={testId}
     >
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="mt-1 text-h2 font-semibold">{children}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-small text-text-muted">{label}</p>
+        <span
+          className={`flex size-8 shrink-0 items-center justify-center rounded-control ${tone}`}
+        >
+          {icon}
+        </span>
+      </div>
+      <div className="mt-2 text-title font-semibold">{value}</div>
+      {sub ? <p className="mt-1 text-small text-text-muted">{sub}</p> : null}
     </li>
   );
 }

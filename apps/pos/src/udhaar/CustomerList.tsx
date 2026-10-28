@@ -124,7 +124,7 @@ export function UdhaarList({
         </div>
       ) : null}
 
-      <search className="flex flex-wrap items-end gap-2">
+      <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
         <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
           <span className="mb-1 text-small">{t('office.udhaar.search')}</span>
           <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">

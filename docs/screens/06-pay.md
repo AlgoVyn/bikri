@@ -15,7 +15,7 @@ Opened by `Take payment` on Sell. Two steps like Dukaan ("Step 1 of 2: payment",
 
 Modal 640 px wide (full screen < 768 px). Header: "Take payment" + `Total to pay Rs 43,000` (large) + close button (×, also Esc).
 
-1. **Method tabs** (keys `1`–`4`): `Cash`, `Bank / wallet`, `Card`, `Udhaar`. Selecting a tab sets "pay the remaining amount with this method".
+1. **Method tabs** (keys `1`–`4`): `Cash`, `Bank / wallet`, `Card`, `Udhaar` as large cards with icons. The selected card uses the primary-subtle background and primary border. Selecting a tab sets "pay the remaining amount with this method".
 2. **Method panel**
    - Cash: `Received` `MoneyInput` (prefilled with remaining due, all selected), chips `Exact`, and up to 3 round-ups (07 §4). Shows **`Change to give Rs 600`** in large text (or "Rs 400 still due" in amber).
    - Bank / wallet: provider chips JazzCash / Easypaisa / NayaPay / Bank transfer / Other; `Reference` (optional, 0–40, e.g. transaction ID); amount.
