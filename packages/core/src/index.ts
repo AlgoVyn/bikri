@@ -105,6 +105,7 @@ export {
 } from './schemas/sync.ts';
 export type { SecurityHeaderName } from './securityHeaders.ts';
 export {
+  ASSET_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
   securityHeaderEntries,
