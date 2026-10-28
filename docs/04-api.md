@@ -153,7 +153,7 @@ The till then upserts `products.image_key` / `shop.logo_key` through the normal 
 
 `POST /api/admin/tenants`
 ```json
-{ "slug": "hall-road-mobiles", "display_name": "Hall Road Mobiles", "owner_email": "owner@example.com", "daily_write_budget": 7000, "note": "" }
+{ "slug": "hall-road-mobiles", "display_name": "Hall Road Mobiles", "owner_email": "owner@example.com", "daily_write_budget": 18000, "note": "" }
 → 201 { "tenant": { "id": "01JBZT...", "slug": "hall-road-mobiles", "status": "active", ... },
         "owner_code": { "code": "K7Q2-M9XD", "expires_at": 1793309200000, "link": "https://algovyn.com/bikri/enrol?code=K7Q2M9XD" } }
 ```

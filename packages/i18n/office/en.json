@@ -721,7 +721,8 @@
       "show_you_saved": "Show \"You saved\" line",
       "tax_label": "Tax label",
       "tax_off_hint": "Set a tax rate to offer prices-include-tax.",
-      "title": "Shop profile & receipt"
+      "title": "Shop profile & receipt",
+      "logo": "Shop logo"
     },
     "staff": {
       "active": "Active",

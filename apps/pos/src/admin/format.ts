@@ -5,7 +5,7 @@ export const FREE_READS_PER_DAY = 5_000_000;
 export const SHOP_SHARE = 0.7;
 export const D1_LIMIT_BYTES = 500 * 1024 * 1024;
 export const BACKUP_STALE_MS = 36 * 60 * 60 * 1000;
-export const DEFAULT_WRITE_BUDGET = 7000;
+export const DEFAULT_WRITE_BUDGET = 18_000;
 export const OPS_CHUNK = 200;
 export const EXPORT_PAGE = 1000;
 

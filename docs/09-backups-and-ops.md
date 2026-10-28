@@ -2,7 +2,7 @@
 
 Goal (REQ-B13, REQ-C13): the platform operator can always get **all** data out, restore the whole deployment or **one shop** without touching the others, and no single provider failure loses more than one day of synced data; each shop owner can export their own shop. Unsynced data lives on the tills until pushed.
 
-There is still **one** nightly backup of the whole database (all tenants), encrypted with the **operator's** `age` key; shop owners never handle that key. Per-tenant export, restore and deletion work logically on top of it (§3.4, §3.5).
+There is still **one** nightly backup of the whole database (all tenants): a private R2 copy, plus an off-Cloudflare copy encrypted with the **operator's** `age` key; shop owners never handle that key. Per-tenant export, restore and deletion work logically on top of it (§3.4, §3.5).
 
 ## 1. Layers of protection
 
@@ -24,7 +24,7 @@ Schedule `cron: "30 21 * * *"` (UTC) = **02:30 Asia/Karachi** daily; also `workf
 Steps:
 1. Checkout, setup Node 24, `pnpm i --filter tools`.
 2. `wrangler d1 export bikri --remote --output=bikri-YYYY-MM-DD.sql` (date in Asia/Karachi).
-3. Sanity check: file > 1 KB and contains `CREATE TABLE sales`; row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }`.
+3. Sanity check: file > 1 KB and contains `CREATE TABLE sales`; row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`).
 4. `gzip -9` → upload to R2 bucket `bikri-backups`: `d1/YYYY-MM-DD.sql.gz` + `d1/YYYY-MM-DD.manifest.json` (`wrangler r2 object put bikri-backups/d1/… --remote`).
 5. Encrypt `age -r $BACKUP_AGE_RECIPIENT` → upload as workflow artifact `backup-YYYY-MM-DD` (retention 90 days).
 6. Retention in R2: keep 30 daily, 12 monthly (1st of month); delete older (script lists and deletes).
@@ -72,7 +72,7 @@ Settings → Backup → `Restore from export` is only enabled when the server re
 
 Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#37-operator-endpoints-cloudflare-access)):
 
-1. **Get the shop's data** as a `bikri-export` zip, from one of: the operator console export (current server state), the shop owner's on-device export, or a nightly backup: `wrangler d1 create bikri-restore` (counts against the 10-database Free limit; delete it afterwards), load the backup into it (§3.2 step 1), then `node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --out export.zip` (pages each table with `wrangler d1 execute --json … WHERE tenant_id = ?`).
+1. **Get the shop's data** as a `bikri-export` zip, from one of: the operator console export (current server state), the shop owner's on-device export, or a nightly backup: `wrangler d1 create bikri-restore` (counts against the 10-database Free limit; delete it afterwards), load the backup into it (§3.2 step 1), then `node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --backup-date YYYY-MM-DD --out export.zip` (pages each table with `wrangler d1 execute --json … WHERE tenant_id = ?`).
 2. Console → tenant → `Restore` → `maintenance on` (only this shop's tills get `503 MAINTENANCE` and keep selling offline).
 3. `purge` until nothing is left (≤ 5,000 rows per call; deletes count as rows written, so a large shop may take several calls and should be restored outside the shop's busy hours).
 4. `import` the zip (≤ 500 rows per call, parents first; rows validated like a push; `change_log` written).
@@ -103,7 +103,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 | Raise a shop's budget | console → tenant → daily write budget (keep Σ ≤ 70,000 on Free) |
 | Sync log retention | automatic: nightly cron deletes `change_log` rows older than 30 days per tenant and `applied_ops` older than 90 days ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); the console shows each tenant's `change_log_floor` and the last prune time |
 | Rollback app | `wrangler rollback` (previous version); migrations are forward-only and additive (never drop/rename columns in v1) |
-| New migration | `drizzle-kit generate` → review SQL (every new tenant table: `tenant_id`, `PRIMARY KEY (tenant_id, id)`, composite FKs, indexes leading with `tenant_id`) → commit `packages/db/migrations/000N_*.sql`; bump `SCHEMA_VERSION` and the Dexie version; must be backward compatible with the previous till version for 14 days ([01 §7.2](01-architecture.md#72-cicd)) |
+| New migration | `drizzle-kit generate` → review SQL (every new tenant table: `tenant_id`, `PRIMARY KEY (tenant_id, id)`, composite FKs, indexes leading with `tenant_id`) → commit `packages/db/migrations/000N_*.sql`; bump `SCHEMA_VERSION` for column/wire changes (not index-only ones) and the Dexie version when local data changes; must be backward compatible with the previous till version for 14 days ([01 §7.2](01-architecture.md#72-cicd)) |
 | Lost/stolen till | Shop owner: Settings → Devices → Revoke (admin device); or operator: console → tenant → Devices → Revoke |
 | Staff leaves | Settings → Cashiers → deactivate (keeps history) |
 | Forgotten owner PIN | another owner of the shop, else the operator ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) |
@@ -121,7 +121,7 @@ Plain-language notes shown to every shop owner: linked from the owner pairing st
 
 1. **Who runs Bikri.** Algovyn (the operator, Adnan) runs this Bikri deployment on Cloudflare for several shops. Your shop's data is kept apart from other shops; no other shop can see it.
 2. **What Algovyn can see.** Because Algovyn runs the database and holds the backup key, Algovyn can technically read your shop's data. Algovyn looks at it only to run the service, to restore it, or when you ask for help.
-3. **What you will always see.** Every time Algovyn exports, imports or restores your shop's data, changes your shop's status (for example to read-only) or uses support access, a row appears in Settings → Activity with the reason. Support access is time-limited (at most 24 hours at a time), shows a banner on all your tills while it lasts, and you can end it at any time.
+3. **What you will always see.** Every time Algovyn exports, imports or restores your shop's data, changes your shop's status (for example to read-only) or uses support access, a row appears in Settings → Activity with the operator and details; status changes and support access show the reason. Support access is time-limited (at most 24 hours at a time), shows a banner on all your tills while it lasts, and you can end it at any time.
 4. **Read-only.** If your shop is made read-only (for example for an unpaid bill), you can still sign in, see all your reports and history and export your data; you can't make new sales or changes until it is active again. Sales your tills made before they learned about it are kept.
 5. **Your copy.** You can download a full export of your shop at any time: from a till (Settings → Backup) or from the server (once a day).
 6. **Backups and deletion.** Algovyn makes an encrypted backup of all shops every night. If your shop is deleted, its data is removed from the live database, but copies stay in the encrypted backups until they expire: up to **30 days** in daily backups, up to **12 months** in monthly backups and up to **90 days** in the off-site copies. After that it is gone. Ask for an export before deletion if you want to keep it.
