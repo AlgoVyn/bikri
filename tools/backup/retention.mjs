@@ -10,21 +10,27 @@
 const API = 'https://api.cloudflare.com/client/v4';
 
 import { fileURLToPath } from 'node:url';
+import { backupDate } from './export.mjs';
 
 /** Keys are `d1/YYYY-MM-DD.sql.gz` and `d1/YYYY-MM-DD.manifest.json`. */
-export function backupKeyDate(key) {
-  const match = /^d1\/(\d{4}-\d{2}-\d{2})\.(?:sql\.gz|manifest\.json)$/u.exec(
-    key,
+export function backupKeyDate(key, prefix = 'd1/') {
+  if (!key.startsWith(prefix)) return null;
+  const match = /^(\d{4}-\d{2}-\d{2})\.(?:sql\.gz|manifest\.json)$/u.exec(
+    key.slice(prefix.length),
   );
   if (!match) return null;
   const date = match[1];
-  return Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ? null : date;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== date
+    ? null
+    : date;
 }
 
 /** Which keys the retention policy deletes for a given object listing. */
-export function retentionPlan(keys, today) {
+export function retentionPlan(keys, today, prefix = 'd1/') {
   const dated = keys
-    .map((key) => ({ key, date: backupKeyDate(key) }))
+    .map((key) => ({ key, date: backupKeyDate(key, prefix) }))
     .filter((row) => row.date !== null);
   const dates = [...new Set(dated.map((row) => row.date))].sort().reverse();
   const daily = new Set(dates.slice(0, 30));
@@ -99,7 +105,10 @@ async function listKeys(bucket, prefix) {
 
 async function deleteKey(bucket, key) {
   await cloudflare(
-    `/r2/buckets/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(key)}`,
+    `/r2/buckets/${encodeURIComponent(bucket)}/objects/${key
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`,
     { method: 'DELETE' },
   );
 }
@@ -108,9 +117,9 @@ export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const bucket = args.bucket ?? 'bikri-backups';
   const prefix = args.prefix ?? 'd1/';
-  const today = args.today ?? new Date().toISOString().slice(0, 10);
+  const today = args.today ?? backupDate();
   const keys = await listKeys(bucket, prefix);
-  const plan = retentionPlan(keys, today);
+  const plan = retentionPlan(keys, today, prefix);
   if (args.dryRun) {
     console.log(JSON.stringify({ today, ...plan, dryRun: true }));
     return plan;

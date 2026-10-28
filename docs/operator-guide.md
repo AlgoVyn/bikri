@@ -54,7 +54,7 @@ pnpm exec wrangler r2 bucket create bikri-backups
 ## 3. Create the first shop
 
 1. Open `https://algovyn.com/bikri/admin` (Cloudflare Access prompts for the operator email code).
-2. **Tenants → New**: display name, slug (`a-z`, digits, `-`, 3–30), owner email, daily write budget (default 7,000 rows).
+2. **Tenants → New**: display name, slug (`a-z`, digits, `-`, 3–30), owner email, daily write budget (default 18,000 rows; a reference shop needs this).
 3. Copy the owner pairing code/link once and send it to the owner. The plain code is never shown again.
 4. The owner opens the link on the first till, enters their name and chooses the owner PIN. The setup wizard creates the shop, branch, tax and receipt settings.
 5. In the console, the shop shows its devices and sync status. Rename or revoke devices from **Devices**.
@@ -74,15 +74,15 @@ Target for a second shop: under 15 minutes from the console's New tenant button.
 | Delete a shop | Tenant → **Delete** | Type the slug. Devices stop at once; the cron removes rows and `t/<tenant>/` files; the tenant row stays as a tombstone. Offer an export first. |
 | Owner email change | Tenant → **Edit** | Also add/verify the address in Cloudflare Email Routing. |
 | Owner PIN reset | Tenant → **Reset owner PIN** | The console hashes the new PIN in the browser; the plain PIN never reaches the Worker. |
-| Budgets | Tenant → daily write budget | Keep the sum of active shops ≤ 70,000 rows on Free. |
+| Budgets | Tenant → daily write budget | Keep the sum of active shops ≤ 70,000 rows on Free: four reference shops at 18,000 each. Ten shops need Workers Paid or lower volume. |
 
-Status changes, exports, imports, restores and support access all write an audit row **inside that shop**, visible to the owner in Settings → Activity.
+Status changes, exports, imports, restores and support access write an audit row **inside that shop**, visible to the owner in Settings → Activity; status changes and support access include the reason.
 
 ## 5. Backups
 
 - `.github/workflows/backup.yml` runs daily at **02:30 Asia/Karachi** (21:30 UTC) and on demand.
 - It exports D1, writes `d1/YYYY-MM-DD.manifest.json` with per-shop counts, uploads both to the private `bikri-backups` bucket, keeps an `age`-encrypted copy as a 90-day GitHub artifact, and prunes R2 to 30 daily + 12 monthly backups.
-- The first run must be after this workflow exists on `main`; use **Actions → backup → Run workflow**.
+- The first run must be after this workflow exists on `main`; use **Actions → backup → Run workflow**. A same-day rerun is refused unless you tick `overwrite`, so a failed upload cannot silently replace a good pair.
 - Check the run summary and the artifact. Then do the restore drill:
   1. `pnpm exec wrangler d1 create bikri-restore`
   2. download the `.sql.gz`, `gunzip`, `wrangler d1 execute bikri-restore --remote --file=...`
@@ -91,14 +91,14 @@ Status changes, exports, imports, restores and support access all write an audit
 - Whole-database Time Travel (§3.1 of doc 09) is only for deployment-wide disasters: set `MAINTENANCE=1`, restore, set a new `restore_epoch`/`restore_point_at` for every tenant, then unset it.
 - Per-shop restore uses the console, not Time Travel. To extract one shop from a nightly backup loaded into `bikri-restore`:
   ```sh
-  node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <tenant_id> --out export.zip
+  node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <tenant_id> --backup-date YYYY-MM-DD --out export.zip
   ```
 
 ## 6. Monitoring and limits
 
 - `GET /bikri/api/health` returns `{ ok, db, schema_version }`.
 - Console Overview shows D1 size vs 500 MB, rows written/read vs 100k/5M per day, per-shop budget use, last backup age, tenant statuses.
-- Free-plan production limits and the reference-shop measurement are in [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop). The measured shop-year is **276 MB**, so start a new shard around 450 MB per DB.
+- Free-plan production limits and the reference-shop measurement are in [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop). The measured shop-year is **153 MB**, so start a new shard around 450 MB per DB.
 - `wrangler tail` shows JSON request logs; never log tokens, PINs, codes, phone numbers or customer names.
 
 ## 7. Secrets and rotation

@@ -527,13 +527,16 @@ describe('operator export and restore (I17, I18)', () => {
       if (rows.length === 0) continue;
       const r = await api(`/admin/tenants/${a.tenantId}/import`, {
         method: 'POST',
-        json: { tbl, rows },
+        json: { tbl, rows, reason: 'restore drill' },
       });
       expect(r.status, `${tbl}: ${await r.clone().text()}`).toBe(200);
     }
     const epoch = await api(`/admin/tenants/${a.tenantId}/restore-epoch`, {
       method: 'POST',
-      json: { restore_point_at: Date.now() - 1000 },
+      json: {
+        restore_point_at: Date.now() - 1000,
+        reason: 'restore drill',
+      },
     });
     expect(epoch.status).toBe(200);
     const off = await json<{ tenant: { status: string } }>(
@@ -550,6 +553,16 @@ describe('operator export and restore (I17, I18)', () => {
       ),
     ).toBe(1);
     expect(await auditCount(a.tenantId, 'tenant_restore')).toBe(1);
+    expect(await auditCount(a.tenantId, 'operator_import')).toBeGreaterThan(0);
+    const restoreAudit = await env.DB.prepare(
+      "SELECT after_json FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_restore' ORDER BY created_at DESC LIMIT 1",
+    )
+      .bind(a.tenantId)
+      .first<{ after_json: string }>();
+    expect(JSON.parse(restoreAudit?.after_json ?? '{}')).toMatchObject({
+      reason: 'restore drill',
+      by: 'operator:operator@example.com',
+    });
     const after = await bCounts();
     expect(after[0]).toBe((before[0] ?? 0) + 1);
     expect(

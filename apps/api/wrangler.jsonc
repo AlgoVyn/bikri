@@ -58,7 +58,7 @@
       "simple": { "limit": 10, "period": 60 }
     }
   ],
-  "triggers": { "crons": ["30 21 * * *"] },
+  "triggers": { "crons": ["0 22 * * *"] },
   "observability": { "enabled": true }
   // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com"),
   // OWNER_CODE_KEY and OWNER_SESSION_KEY (32 random bytes each, e.g. `openssl rand -base64 32`). Typed in src/secrets.d.ts.

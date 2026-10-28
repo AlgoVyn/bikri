@@ -33,6 +33,7 @@ const MONEY_FIELDS = new Set([
   'charges_alloc',
   'counted_cash',
   'credit_limit',
+  'default_credit_limit',
   'difference',
   'discount',
   'discount_value',
@@ -53,6 +54,7 @@ const MONEY_FIELDS = new Set([
   'pay_outs',
   'price',
   'refund_received',
+  'round_total_to',
   'rounding',
   'rounding_alloc',
   'subtotal',
@@ -78,9 +80,29 @@ const TIME_FIELDS = new Set([
   'last_seen_at',
   'period_end',
   'period_start',
+  'read_only_seen_at',
+  'oldest_pending_at',
   'revoked_at',
+  'setup_completed_at',
   'updated_at',
+  'at',
 ]);
+
+/** The backup's restore point: the nightly dump starts at 02:30 Asia/Karachi. */
+export function backupExportedAt(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date))
+    throw new Error('--backup-date must be YYYY-MM-DD');
+  const at = Date.parse(`${date}T02:30:00+05:00`);
+  const actual = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(at));
+  if (!Number.isFinite(at) || actual !== date)
+    throw new Error('--backup-date is not a real date');
+  return at;
+}
 
 export function stripRow(table, row) {
   const copy = { ...row };
@@ -233,7 +255,10 @@ export async function main(argv = process.argv.slice(2)) {
   const db = args.db ?? 'bikri-restore';
   const tenantId = args.tenant;
   const outPath = args.out;
+  const backupDate = args['backup-date'];
   if (!tenantId || !outPath) throw new Error('--tenant and --out are required');
+  if (!backupDate) throw new Error('--backup-date YYYY-MM-DD is required');
+  const exportedAt = backupExportedAt(backupDate);
   const local = args.local === true;
   const [tenant] = query({
     db,
@@ -261,7 +286,7 @@ export async function main(argv = process.argv.slice(2)) {
   const manifest = {
     format: 'bikri-export',
     version: 2,
-    exported_at: now,
+    exported_at: exportedAt,
     app_version: APP_VERSION,
     tenant: {
       id: String(tenant.id),

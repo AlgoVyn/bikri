@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "30 21 * * *"
   workflow_dispatch:
+    inputs:
+      overwrite:
+        description: "Replace today's backup if it already exists"
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -16,10 +21,6 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -29,6 +30,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Require the age public key
+        env:
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
         run: |
           if [ -z "$BACKUP_AGE_RECIPIENT" ]; then
             echo "::error::BACKUP_AGE_RECIPIENT is not set; refusing to upload a plain backup."
@@ -41,8 +44,25 @@ jobs:
       - name: Set the backup date (Asia/Karachi)
         id: date
         run: echo "date=$(TZ=Asia/Karachi date +%F)" >> "$GITHUB_OUTPUT"
+      - name: Refuse to overwrite an existing daily backup
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.overwrite != true }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATE: ${{ steps.date.outputs.date }}
+        run: |
+          existing=$(curl -fsS \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/bikri-backups/objects?prefix=d1/$DATE." \
+            | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("result") or []))')
+          if [ "$existing" != "0" ]; then
+            echo "::error::d1/$DATE already exists; rerun with overwrite=true to replace it."
+            exit 1
+          fi
       - name: Export D1 and write manifest
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATE: ${{ steps.date.outputs.date }}
         run: |
           node tools/backup/export.mjs \
@@ -52,14 +72,25 @@ jobs:
       - name: Upload the SQL dump and manifest to R2
         working-directory: apps/api
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATE: ${{ steps.date.outputs.date }}
         run: |
+          GZ_SHA=$(sha256sum "$RUNNER_TEMP/backup/bikri-$DATE.sql.gz" | cut -d' ' -f1)
+          node -e '
+            const fs = require("fs");
+            const [file, sha] = process.argv.slice(1);
+            const m = JSON.parse(fs.readFileSync(file, "utf8"));
+            m.sha256 = sha;
+            fs.writeFileSync(file, JSON.stringify(m, null, 2) + "\n");
+          ' "$RUNNER_TEMP/backup/bikri-$DATE.manifest.json" "$GZ_SHA"
           pnpm exec wrangler r2 object put "bikri-backups/d1/$DATE.sql.gz" \
             --file="$RUNNER_TEMP/backup/bikri-$DATE.sql.gz" --remote --force
           pnpm exec wrangler r2 object put "bikri-backups/d1/$DATE.manifest.json" \
             --file="$RUNNER_TEMP/backup/bikri-$DATE.manifest.json" --remote --force
       - name: Encrypt the off-Cloudflare copy
         env:
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
           DATE: ${{ steps.date.outputs.date }}
         run: |
           age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" \
@@ -73,6 +104,8 @@ jobs:
           retention-days: 90
       - name: Keep 30 daily + 12 monthly backups in R2
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATE: ${{ steps.date.outputs.date }}
         run: node tools/backup/retention.mjs --today "$DATE"
       - name: Summary
