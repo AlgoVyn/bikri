@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const overlayClass = 'fixed inset-0 z-40 bg-text/40';
 const base =
@@ -32,6 +33,7 @@ export function Modal({
   /** Extra content next to the title (e.g. the total to pay). */
   header?: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -40,10 +42,21 @@ export function Modal({
           className={SIZES[full ? 'full' : wide ? 'wide' : 'normal']}
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 pe-12">
             <Dialog.Title className="text-title">{title}</Dialog.Title>
             {header}
           </div>
+          <Dialog.Close asChild>
+            <button
+              type="button"
+              aria-label={t('ui.close_dialog')}
+              className="absolute end-2 top-2 flex size-11 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-surface-2"
+            >
+              <span aria-hidden="true" className="text-title leading-none">
+                ×
+              </span>
+            </button>
+          </Dialog.Close>
           {description ? (
             <Dialog.Description>{description}</Dialog.Description>
           ) : null}

@@ -353,7 +353,7 @@
     "reference": "حوالہ (اختیاری)",
     "remove": "ہٹائیں",
     "running": "ادا {{paid}} · باقی {{remaining}}",
-    "save_failed": "فروخت محفوظ نہیں ہوئی: {{error}}",
+    "save_failed": "فروخت محفوظ نہیں ہوئی۔ دوبارہ کوشش کریں۔",
     "saved": "فروخت محفوظ · {{invoice}}",
     "split": "+ ادائیگی تقسیم کریں",
     "split_list": "ادائیگیاں",
@@ -847,7 +847,8 @@
     "search_label": "تلاش",
     "search_placeholder": "تلاش",
     "show_dialog": "تصدیق کھولیں",
-    "show_override": "منظوری کھولیں"
+    "show_override": "منظوری کھولیں",
+    "close_dialog": "ڈائیلوگ بند کریں"
   },
   "unit": {
     "box": "ڈبہ",

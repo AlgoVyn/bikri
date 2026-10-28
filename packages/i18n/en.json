@@ -353,7 +353,7 @@
     "reference": "Reference (optional)",
     "remove": "Remove",
     "running": "Paid {{paid}} · Remaining {{remaining}}",
-    "save_failed": "The sale was not saved: {{error}}",
+    "save_failed": "The sale was not saved. Try again.",
     "saved": "Sale saved · {{invoice}}",
     "split": "+ Split payment",
     "split_list": "Payments",
@@ -847,7 +847,8 @@
     "search_label": "Search",
     "search_placeholder": "Search",
     "show_dialog": "Open confirm",
-    "show_override": "Open override"
+    "show_override": "Open override",
+    "close_dialog": "Close dialog"
   },
   "unit": {
     "box": "box",

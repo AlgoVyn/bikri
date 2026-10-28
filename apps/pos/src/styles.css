@@ -12,3 +12,14 @@
     transform: translateX(6px);
   }
 }
+
+/* Latin data names stay LTR in Urdu: truncate and wrap at the end, but align
+   to the RTL start edge so they still sit next to their thumbnail. */
+.ltr-name {
+  direction: ltr;
+  text-align: start;
+}
+
+[dir="rtl"] .ltr-name {
+  text-align: end;
+}

@@ -100,114 +100,118 @@ export function PricesPage() {
           {t('import.back_to_products')}
         </Link>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1" htmlFor={`${id}-cat`}>
-          <span className="text-small font-medium">
-            {t('products.category_filter')}
-          </span>
-          <select
-            id={`${id}-cat`}
-            className={fieldClass}
-            value={categoryId}
-            onChange={(e) => {
-              setCategoryId(e.target.value);
-              reset();
-            }}
+      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1" htmlFor={`${id}-cat`}>
+            <span className="text-small font-medium">
+              {t('products.category_filter')}
+            </span>
+            <select
+              id={`${id}-cat`}
+              className={fieldClass}
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                reset();
+              }}
+            >
+              <option value="">{t('products.all_categories')}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {String(c.name_en)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1" htmlFor={`${id}-brand`}>
+            <span className="text-small font-medium">{t('prices.brand')}</span>
+            <input
+              id={`${id}-brand`}
+              className={fieldClass}
+              value={brand}
+              placeholder={t('prices.any_brand')}
+              onChange={(e) => {
+                setBrand(e.target.value);
+                reset();
+              }}
+            />
+          </label>
+          <label className="flex flex-col gap-1" htmlFor={`${id}-kind`}>
+            <span className="text-small font-medium">{t('prices.change')}</span>
+            <select
+              id={`${id}-kind`}
+              className={fieldClass}
+              value={kind}
+              onChange={(e) => {
+                setKind(e.target.value as Kind);
+                reset();
+              }}
+            >
+              <option value="percent">{t('prices.kind_percent')}</option>
+              <option value="amount">{t('prices.kind_amount')}</option>
+              <option value="set">{t('prices.kind_set')}</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1" htmlFor={`${id}-value`}>
+            <span className="text-small font-medium">
+              {kind === 'percent'
+                ? t('prices.value_percent')
+                : t('prices.value_rs')}
+            </span>
+            <input
+              id={`${id}-value`}
+              className={fieldClass}
+              inputMode="decimal"
+              dir="ltr"
+              value={value}
+              aria-invalid={error ? true : undefined}
+              onChange={(e) => {
+                setValue(e.target.value);
+                reset();
+              }}
+            />
+          </label>
+          <label className="flex flex-col gap-1" htmlFor={`${id}-round`}>
+            <span className="text-small font-medium">
+              {t('prices.rounding')}
+            </span>
+            <select
+              id={`${id}-round`}
+              className={fieldClass}
+              value={String(rounding)}
+              onChange={(e) => {
+                setRounding(Number(e.target.value) as Rounding);
+                reset();
+              }}
+            >
+              {ROUNDINGS.map((r) => (
+                <option key={r} value={String(r)}>
+                  {r === 0
+                    ? t('prices.round_none')
+                    : t('prices.round_rs', { n: r / 100 })}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {error ? (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => void preview()}
           >
-            <option value="">{t('products.all_categories')}</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {String(c.name_en)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1" htmlFor={`${id}-brand`}>
-          <span className="text-small font-medium">{t('prices.brand')}</span>
-          <input
-            id={`${id}-brand`}
-            className={fieldClass}
-            value={brand}
-            placeholder={t('prices.any_brand')}
-            onChange={(e) => {
-              setBrand(e.target.value);
-              reset();
-            }}
-          />
-        </label>
-        <label className="flex flex-col gap-1" htmlFor={`${id}-kind`}>
-          <span className="text-small font-medium">{t('prices.change')}</span>
-          <select
-            id={`${id}-kind`}
-            className={fieldClass}
-            value={kind}
-            onChange={(e) => {
-              setKind(e.target.value as Kind);
-              reset();
-            }}
-          >
-            <option value="percent">{t('prices.kind_percent')}</option>
-            <option value="amount">{t('prices.kind_amount')}</option>
-            <option value="set">{t('prices.kind_set')}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1" htmlFor={`${id}-value`}>
-          <span className="text-small font-medium">
-            {kind === 'percent'
-              ? t('prices.value_percent')
-              : t('prices.value_rs')}
-          </span>
-          <input
-            id={`${id}-value`}
-            className={fieldClass}
-            inputMode="decimal"
-            dir="ltr"
-            value={value}
-            aria-invalid={error ? true : undefined}
-            onChange={(e) => {
-              setValue(e.target.value);
-              reset();
-            }}
-          />
-        </label>
-        <label className="flex flex-col gap-1" htmlFor={`${id}-round`}>
-          <span className="text-small font-medium">{t('prices.rounding')}</span>
-          <select
-            id={`${id}-round`}
-            className={fieldClass}
-            value={String(rounding)}
-            onChange={(e) => {
-              setRounding(Number(e.target.value) as Rounding);
-              reset();
-            }}
-          >
-            {ROUNDINGS.map((r) => (
-              <option key={r} value={String(r)}>
-                {r === 0
-                  ? t('prices.round_none')
-                  : t('prices.round_rs', { n: r / 100 })}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {error ? (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      ) : null}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => void preview()}
-        >
-          {t('prices.preview')}
-        </button>
-      </div>
+            {t('prices.preview')}
+          </button>
+        </div>
+      </section>
 
       {rows ? (
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
           <p role="status" data-testid="prices-summary">
             {t('prices.summary', { count: changed.length, total: rows.length })}
           </p>

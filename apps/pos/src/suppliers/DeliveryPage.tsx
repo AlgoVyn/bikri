@@ -222,7 +222,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         </p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-small">
           {t('office.suppliers.supplier_invoice')}
           <input
@@ -243,7 +243,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             onChange={(e) => setDate(e.target.value)}
           />
         </label>
-      </div>
+      </section>
 
       <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
         <p className="text-small font-medium">{t('office.suppliers.lines')}</p>
@@ -274,7 +274,9 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                     className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-start text-small hover:bg-surface-2"
                     onClick={() => add(p)}
                   >
-                    <span className="font-medium">{String(p.name_en)}</span>
+                    <span className="ltr-name font-medium">
+                      {String(p.name_en)}
+                    </span>
                     <span className="text-text-muted">{String(p.sku)}</span>
                     <span className="ms-auto">
                       <MoneyText
@@ -404,7 +406,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
         <MoneyInput
           label={t('office.suppliers.paid_now')}
           value={paidNow}
@@ -437,7 +439,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-      </div>
+      </section>
 
       <div className="flex flex-wrap justify-end gap-2">
         <Link

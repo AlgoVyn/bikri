@@ -265,7 +265,7 @@ export function SupplierReturnPage({
         </p>
       </div>
 
-      <label className="flex flex-col gap-1 text-small">
+      <label className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3 text-small">
         {t('office.suppliers.return_linked')}
         <select
           className={field}
@@ -377,7 +377,7 @@ export function SupplierReturnPage({
               className={field}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('office.suppliers.search_placeholder')}
+              placeholder={t('office.suppliers.search_product')}
             />
           </label>
           {matches.map((product) => (
@@ -394,7 +394,7 @@ export function SupplierReturnPage({
             <ul className="flex flex-col gap-2">
               {unlinked.map((line) => (
                 <li key={line.key} className="flex flex-wrap items-end gap-2">
-                  <span className="min-w-32 flex-1">{line.name}</span>
+                  <span className="ltr-name min-w-32 flex-1">{line.name}</span>
                   <div className="w-32">
                     <QtyInput
                       label={`${t('office.suppliers.return_qty')} ${line.name}`}
@@ -438,7 +438,7 @@ export function SupplierReturnPage({
         </section>
       )}
 
-      <fieldset className="flex flex-col gap-1">
+      <fieldset className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3">
         <legend className="mb-1 text-small">
           {t('office.suppliers.return_reason')}
         </legend>

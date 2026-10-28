@@ -38,6 +38,17 @@ async function t2(page: Page): Promise<void> {
 const pay = (page: Page) => page.getByRole('dialog', { name: 'Take payment' });
 
 test.describe('Pay (T-017)', () => {
+  test('the close button leaves the pay sheet without saving', async ({
+    page,
+  }) => {
+    await t2(page);
+    await page.keyboard.press('F8');
+    await expect(pay(page)).toBeVisible();
+    await pay(page).getByRole('button', { name: 'Close dialog' }).click();
+    await expect(pay(page)).toHaveCount(0);
+    expect(await idbAll(page, 'sales')).toEqual([]);
+  });
+
   test('AC 1: cash 50,000 on 43,000 gives change 7,000 and saves tendered/change; Esc first writes nothing', async ({
     page,
   }) => {

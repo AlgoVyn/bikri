@@ -113,22 +113,36 @@ export function ImportPage() {
         </Link>
       </div>
       <ol
-        className="flex flex-wrap gap-3 text-small text-text-muted"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1"
         aria-label={t('import.steps')}
       >
-        {(['choose', 'map', 'preview', 'importing'] as const).map((s, i) => (
-          <li
-            key={s}
-            aria-current={
-              stage.step === s || (s === 'importing' && stage.step === 'done')
-                ? 'step'
-                : undefined
-            }
-            className="aria-[current=step]:font-semibold aria-[current=step]:text-text"
-          >
-            {i + 1}. {t(`import.step_${s}`)}
-          </li>
-        ))}
+        {(['choose', 'map', 'preview', 'importing'] as const).map((s, i) => {
+          const active =
+            stage.step === s || (s === 'importing' && stage.step === 'done');
+          return (
+            <li
+              key={s}
+              aria-current={active ? 'step' : undefined}
+              className="flex items-center gap-2"
+            >
+              <span
+                className={`flex size-6 items-center justify-center rounded-full text-small ${active ? 'bg-primary font-semibold text-primary-ink' : 'bg-surface-2 text-text-muted'}`}
+              >
+                {i + 1}
+              </span>
+              <span
+                className={`text-small ${active ? 'font-semibold text-text' : 'text-text-muted'}`}
+              >
+                {t(`import.step_${s}`)}
+              </span>
+              {i < 3 ? (
+                <span aria-hidden="true" className="text-text-muted">
+                  ›
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ol>
 
       {stage.step === 'choose' ? (

@@ -300,7 +300,7 @@ function LineRow({
             p.onExpand(expanded ? null : line.key);
           }}
         >
-          <span className="block font-medium" data-testid="line-name">
+          <span className="ltr-name block font-medium" data-testid="line-name">
             {line.name}
           </span>
           <span className="block text-small text-text-muted">
@@ -315,7 +315,8 @@ function LineRow({
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-44">
           <QtyInput
-            label={t('sell.qty_of', { name: line.name })}
+            label={t('ui.qty_label')}
+            ariaLabel={t('sell.qty_of', { name: line.name })}
             unit={unit}
             value={line.qty_milli}
             onChange={(milli) => {

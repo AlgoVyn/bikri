@@ -298,7 +298,7 @@ export function DayClosePage() {
         </div>
         {mode === 'notes' ? (
           <>
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {[
                 ...NOTES.slice(0, 1),
                 ...(show75 ? [COMMEMORATIVE] : []),
@@ -311,7 +311,7 @@ export function DayClosePage() {
                       type="number"
                       min={0}
                       inputMode="numeric"
-                      className="h-10 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-2 text-end"
+                      className="h-11 w-20 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-end"
                       value={notes[value] ?? ''}
                       onChange={(e) =>
                         setNotes((current) => ({
@@ -320,7 +320,7 @@ export function DayClosePage() {
                         }))
                       }
                     />
-                    <span className="w-20 text-end text-text-muted">
+                    <span className="ms-auto text-end text-text-muted">
                       <MoneyText paisa={value * 100 * (notes[value] ?? 0)} />
                     </span>
                   </label>
@@ -329,7 +329,7 @@ export function DayClosePage() {
             </ul>
             <button
               type="button"
-              className="self-start text-small underline"
+              className="min-h-11 self-start text-small underline"
               onClick={() => setShow75((show) => !show)}
             >
               {show75

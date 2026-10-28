@@ -17,6 +17,7 @@ function clampMilli(value: number): number {
 export function QtyInput({
   id,
   label,
+  ariaLabel,
   unit,
   value,
   onChange,
@@ -24,6 +25,8 @@ export function QtyInput({
 }: {
   id?: string;
   label: string;
+  /** Accessible name when the visible label is short (e.g. a cart line). */
+  ariaLabel?: string;
   unit: QtyUnit;
   value: number | null;
   onChange: (milli: number | null) => void;
@@ -69,6 +72,7 @@ export function QtyInput({
         <input
           id={inputId}
           name={name}
+          aria-label={ariaLabel}
           inputMode={qtyAllowsDecimals(unit) ? 'decimal' : 'numeric'}
           autoComplete="off"
           className="h-11 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-3 text-center font-mono text-body text-text outline-none"

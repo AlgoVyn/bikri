@@ -461,7 +461,9 @@ export function BillDetail({ saleId }: { saleId: string }) {
                   className="border-b border-border last:border-0"
                 >
                   <td className="p-2">
-                    <span className="block">{String(line.name_snapshot)}</span>
+                    <span className="ltr-name block">
+                      {String(line.name_snapshot)}
+                    </span>
                     <span className="block text-text-muted sm:hidden">
                       {t('office.bill.qty_price', {
                         qty: `${qty / 1000} ${t(`unit.${unit}`)}`,

@@ -1,6 +1,6 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
-import { Navigate } from '@tanstack/react-router';
+import { Link, Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -57,55 +57,62 @@ export function StockCountPage() {
   if (!draft) {
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-        <h1 className="text-h1 font-semibold">{t('count.title')}</h1>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 font-medium">{t('count.scope')}</legend>
-          {(['all', 'category', 'low'] as const).map((k) => (
-            <label key={k} className="flex min-h-11 items-center gap-2">
-              <input
-                type="radio"
-                name="scope"
-                checked={scopeKind === k}
-                onChange={() => setScopeKind(k)}
-              />
-              {t(`count.scope_${k}`)}
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="me-auto text-h1 font-semibold">{t('count.title')}</h1>
+          <Link to="/products" className={buttonQuiet}>
+            {t('import.back_to_products')}
+          </Link>
+        </div>
+        <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 font-medium">{t('count.scope')}</legend>
+            {(['all', 'category', 'low'] as const).map((k) => (
+              <label key={k} className="flex min-h-11 items-center gap-2">
+                <input
+                  type="radio"
+                  name="scope"
+                  checked={scopeKind === k}
+                  onChange={() => setScopeKind(k)}
+                />
+                {t(`count.scope_${k}`)}
+              </label>
+            ))}
+          </fieldset>
+          {scopeKind === 'category' ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-small font-medium">
+                {t('count.category')}
+              </span>
+              <select
+                className="h-11 rounded-control border border-border-strong bg-surface px-2"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
+                <option value="">—</option>
+                {categories?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {String(c.name_en)}
+                  </option>
+                ))}
+              </select>
             </label>
-          ))}
-        </fieldset>
-        {scopeKind === 'category' ? (
-          <label className="flex flex-col gap-1">
-            <span className="text-small font-medium">
-              {t('count.category')}
-            </span>
-            <select
-              className="h-11 rounded-control border border-border-strong bg-surface px-2"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">—</option>
-              {categories?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {String(c.name_en)}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <button
-          type="button"
-          className={`${buttonPrimary} self-start`}
-          disabled={scopeKind === 'category' && !categoryId}
-          onClick={() =>
-            void startCount(
-              getDb(),
-              scopeKind === 'category'
-                ? { kind: 'category', categoryId }
-                : { kind: scopeKind },
-            )
-          }
-        >
-          {t('count.start')}
-        </button>
+          ) : null}
+          <button
+            type="button"
+            className={`${buttonPrimary} self-start`}
+            disabled={scopeKind === 'category' && !categoryId}
+            onClick={() =>
+              void startCount(
+                getDb(),
+                scopeKind === 'category'
+                  ? { kind: 'category', categoryId }
+                  : { kind: scopeKind },
+              )
+            }
+          >
+            {t('count.start')}
+          </button>
+        </section>
       </div>
     );
   }

@@ -86,6 +86,7 @@ export function ProductList() {
           <button
             type="button"
             className={buttonQuiet}
+            disabled={!rows || rows.length === 0}
             onClick={() => {
               setSelecting((value) => !value);
               setSelected(new Set());
@@ -241,7 +242,7 @@ export function ProductList() {
 
 const gridCols = (showCost: boolean) =>
   showCost
-    ? 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]'
+    ? 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]'
     : 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]';
 
 function ListHeader({ showCost }: { showCost: boolean }) {
@@ -262,7 +263,9 @@ function ListHeader({ showCost }: { showCost: boolean }) {
       {showCost ? (
         <span className="text-end">{t('products.col_margin')}</span>
       ) : null}
-      <span className="text-end">{t('products.col_sold30')}</span>
+      <span className="truncate text-end" title={t('products.col_sold30')}>
+        {t('products.col_sold30')}
+      </span>
     </div>
   );
 }
@@ -380,7 +383,7 @@ function ProductRow({
             {selected ? '✓' : ''}
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-medium">
+            <span className="ltr-name block truncate font-medium">
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small text-text-muted">
@@ -429,7 +432,7 @@ function ProductRow({
             color={row.category?.color}
           />
           <span className="min-w-0">
-            <span className="block truncate font-medium">
+            <span className="ltr-name block truncate font-medium">
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small text-text-muted">
