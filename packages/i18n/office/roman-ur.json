@@ -843,7 +843,13 @@
       "terms_8": "Receipts. Receipt par dukan ka naam, logo aur chhoti \"Powered by AlgoVyn\" line hoti hai.",
       "title": "About",
       "updated": "Update check ho gaya.",
-      "version": "Version"
+      "version": "Version",
+      "shortcuts": "Keyboard shortcuts",
+      "shortcuts_hint": "Shortcuts buttons par nahin, yahan darj hain. Rail items par mouse laane se bhi key nazar aati hai.",
+      "shortcuts_global": "Har jagah",
+      "shortcuts_rail": "Rail items",
+      "shortcuts_sell": "Farokht aur adaigi",
+      "shortcuts_details": "Tafseel aur form"
     },
     "labels": {
       "ask_manager": "Barcode nahi — manager se banwaein",

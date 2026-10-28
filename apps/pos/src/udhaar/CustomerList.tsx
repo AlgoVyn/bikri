@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -101,7 +100,7 @@ export function UdhaarList({
             disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
-            {t('office.udhaar.new_customer')} <KeyBadge keys="N" />
+            {t('office.udhaar.new_customer')}
           </button>
         ) : null}
       </div>

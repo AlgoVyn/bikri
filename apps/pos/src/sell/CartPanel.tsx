@@ -7,7 +7,6 @@ import {
 import type { Cart, CartLine } from '@bikri/db';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import {
@@ -171,7 +170,7 @@ export function CartPanel(p: CartPanelProps) {
                 disabled={cart.lines.length === 0}
                 onClick={p.onBillDiscount}
               >
-                {t('sell.add_discount')} <KeyBadge keys="F3" />
+                {t('sell.add_discount')}
               </button>
             </dt>
             <dd />
@@ -221,10 +220,10 @@ export function CartPanel(p: CartPanelProps) {
           disabled={cart.lines.length === 0}
           onClick={p.onHold}
         >
-          {t('sell.hold')} <KeyBadge keys="F4" />
+          {t('sell.hold')}
         </button>
         <button type="button" className={buttonQuiet} onClick={p.onHeld}>
-          {t('sell.held_bills', { count: p.heldCount })} <KeyBadge keys="F6" />
+          {t('sell.held_bills', { count: p.heldCount })}
         </button>
         <button
           type="button"
@@ -242,7 +241,6 @@ export function CartPanel(p: CartPanelProps) {
         onClick={p.onPay}
       >
         {t('sell.take_payment')} · <MoneyText paisa={totals.total} />{' '}
-        <KeyBadge keys="F8" />
       </button>
     </div>
   );

@@ -131,14 +131,14 @@ Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference vie
 
 ## 6. Global hotkeys
 
-Shown as KeyBadges (REQ-C09). Disabled while typing in a text field unless noted.
+Shortcuts are listed in Settings → About; navigation items also show their key in the tooltip. They are not printed on action buttons. Disabled while typing in a text field unless noted.
 
 | Key | Action | Scope |
 |---|---|---|
 | `N` | New sale / new item on list screens | global |
 | `F2` / `Ctrl+F` | Focus search | Sell, lists (works in fields) |
 | `/` | Global search | global |
-| `Ctrl+1` / `Ctrl+2` / `Ctrl+3` (also `Alt+Shift+1/2/3`) | Switch cart tab | Sell |
+| `Ctrl+1` / `Ctrl+2` / `Ctrl+3` | Switch cart tab | Sell |
 | `F3` | Bill discount | Sell |
 | `F4` / `Ctrl+H` | Hold bill | Sell |
 | `F6` | Held bills | Sell |
@@ -146,21 +146,20 @@ Shown as KeyBadges (REQ-C09). Disabled while typing in a text field unless noted
 | `Enter` / `F8` | Take payment / confirm | Sell / Pay |
 | `F9` | Open drawer (`drawer.open`) | global |
 | `1`–`4` | Payment method | Pay |
-| `Alt+P` | Price check | global |
-| `Alt+1`…`Alt+9` | Rail items | global |
+| `Ctrl+Shift+P` | Price check | global |
+| `Ctrl+Shift+1`…`Ctrl+Shift+9` | Rail items | global |
 | `P` | Print / print again | bill detail, sale complete |
 | `R` | Refund (bill) / Receive money (statement) / Return to supplier (supplier) | detail screens |
 | `L` | Print barcode label | product detail |
 | `Ctrl+S` | Save form | forms (works in fields) |
 | `Esc` | Close / back / clear | global (works in fields) |
 | `Ctrl+L` | Lock | global (works in fields) |
-| `?` | Hotkey help overlay | global |
 
 Browser-reserved keys (`F5`, `Ctrl+W`, `Ctrl+T`, `Ctrl+P`) are never bound.
 
 ### 6.1 Hotkeys and the browser
 
-Run Bikri as the **installed app** (Chrome/Edge → Install, standalone window) on counter PCs: a browser tab may consume some shortcuts before the page sees them (e.g. `Ctrl+1…8` switch tabs in a normal Chrome tab). Every action keeps an F-key or plain-key alternative (cart tabs also `Alt+Shift+1/2/3`). Each binding above must be checked in both a normal tab and the installed window (T-063); bindings Chrome never delivers to pages (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`) are never used (D-020).
+Run Bikri as the **installed app** (Chrome/Edge → Install, standalone window) on counter PCs: a browser tab may consume some shortcuts before the page sees them (e.g. `Ctrl+1…8` switch tabs in a normal Chrome tab). Selling and detail actions keep an F-key or plain-key alternative. Each binding above must be checked in both a normal tab and the installed window (T-063); bindings Chrome never delivers to pages (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`) are never used (D-020).
 
 ## 7. Performance budgets
 

@@ -6,6 +6,7 @@ import {
 } from '@bikri/i18n';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { languageKeys } from './i18n.ts';
 
 const loaded = new Set<string>();
 
@@ -22,7 +23,8 @@ export function useAreaStrings(area: CatalogArea): boolean {
     setReady(false);
     let alive = true;
     void loadAreaCatalog(area, lang).then((bundle) => {
-      i18n.addResourceBundle(lang, 'translation', bundle, true, false);
+      for (const key of languageKeys(lang))
+        i18n.addResourceBundle(key, 'translation', bundle, true, false);
       loaded.add(id);
       if (alive) setReady(true);
     });

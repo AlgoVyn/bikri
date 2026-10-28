@@ -134,6 +134,23 @@ test.describe('Settings (T-050)', () => {
     await expect(page.getByRole('heading', { name: 'Printer' })).toBeVisible();
   });
 
+  test('About lists the keyboard shortcuts instead of button badges', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/settings/about');
+    await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Keyboard shortcuts' }),
+    ).toBeVisible();
+    await expect(page.getByText('Ctrl+Shift+P', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Ctrl+Shift+1…9', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('Ctrl+Shift+9', { exact: true })).toHaveCount(
+      0,
+    );
+  });
+
   test('device language, theme and text size apply immediately', async ({
     page,
   }) => {

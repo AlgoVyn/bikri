@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { emptyCart } from '../data/cart.ts';
@@ -233,7 +232,7 @@ export function CustomerStatement({ customerId }: { customerId: string }) {
             disabled={readOnly}
             onClick={() => setReceiveOpen(true)}
           >
-            {t('office.udhaar.receive_money')} <KeyBadge keys="R" />
+            {t('office.udhaar.receive_money')}
           </button>
         ) : null}
         <button

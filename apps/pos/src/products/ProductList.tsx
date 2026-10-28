@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ProductsIcon, SearchIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import {
   listCategories,
@@ -107,7 +106,6 @@ export function ProductList() {
         {canEdit ? (
           <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
             {t('products.add')}
-            <KeyBadge keys="N" />
           </Link>
         ) : null}
         <button

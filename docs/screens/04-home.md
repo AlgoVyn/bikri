@@ -14,7 +14,7 @@
 
 ## App shell (all screens after unlock)
 
-- **Rail** (desktop ≥ 1024 px: vertical at start edge, 72 px; tablet/mobile: bottom bar with 5 items + "More"): Home, Sell, Products, Sales, Udhaar, Suppliers, Expenses, Reports, Settings. Items the user can't access are hidden. Each item has a tooltip with its hotkey (Alt+1…Alt+9).
+- **Rail** (desktop ≥ 1024 px: vertical at start edge, 72 px; tablet/mobile: bottom bar with 5 items + "More"): Home, Sell, Products, Sales, Udhaar, Suppliers, Expenses, Reports, Settings. Items the user can't access are hidden. Each item has a tooltip with its hotkey (Ctrl+Shift+1…Ctrl+Shift+9).
 - **Top bar** (56 px): screen title; global search (`/` focuses; searches products, customers, bills by invoice no); **sync badge**; printer status dot; staff avatar menu (name, role, `Lock` Ctrl+L, `Switch user`).
 - **Sync badge** states ([03 §7](../03-sync.md#7-status-shown-to-the-user)): `Synced` (green check), `Syncing…` (spinner), `n waiting` (amber, offline or pending), `Sync problem` (red; click opens Settings → Sync). Tooltip shows last successful sync time.
 - **Offline banner**: thin amber bar "Offline — sales are saved on this device" when `navigator.onLine` is false or 3 consecutive pushes fail.
@@ -26,7 +26,7 @@
 
 1. **Greeting row**: "Assalam-o-Alaikum, {name}" + business date + branch.
 2. **Today cards** (4, responsive grid): Sold today (Rs, bill count), Profit today (only with `cost.view`), Cash in drawer (expected so far for this device, per [07 §8](../07-money-rules.md#8-day-close), only with `dayclose.view_expected`), Udhaar given today / received today.
-3. **Quick actions** (tiles, 3–5 per row): New sale (N), Price check (Alt+P), Products, Sales, Udhaar, Suppliers, Expenses, Day close, Reports, Settings. Tile shows icon, label, KeyBadge.
+3. **Quick actions** (tiles, 3–5 per row): New sale (N), Price check (Ctrl+Shift+P), Products, Sales, Udhaar, Suppliers, Expenses, Day close, Reports, Settings. Tiles show icon and label; shortcuts are in the tooltip and Settings → About.
 4. **Attention list** (max 5 items, each linking to the screen): products at or below `min_stock_milli` ("12 items low on stock"), batches expiring in 30 days (v2), udhaar promises due today, customers over limit, failed print jobs, sync conflicts (owner), day not closed yesterday on this device.
 5. **Recent bills**: last 5 bills of this device (invoice, time, total, method chips), click → bill detail.
 

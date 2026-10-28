@@ -80,9 +80,9 @@ test.describe('Home and shell (T-013)', () => {
           nav.getByRole('link', { name: new RegExp(`^${name}`) }),
         ).toBeVisible();
       }
-      await page.keyboard.press('Alt+Digit8');
+      await page.keyboard.press('Control+Shift+Digit8');
       await expect(page).toHaveURL(/\/bikri\/reports$/);
-      await page.keyboard.press('Alt+Digit1');
+      await page.keyboard.press('Control+Shift+Digit1');
     }
     await expect(
       page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
@@ -118,6 +118,20 @@ test.describe('Home and shell (T-013)', () => {
     await expectNoSeriousAxe(page);
     await expectNoHorizontalScroll(page);
     await page.getByLabel('زبان').selectOption('en');
+  });
+
+  test('Roman Urdu: translated Home without raw keys', async ({ page }) => {
+    await openWithSales(page);
+    await page.getByLabel('Language').selectOption('roman-ur');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'roman-ur');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+    await expect(
+      page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
+    ).toBeVisible();
+    await expect(page.getByText('Aaj ki farokht')).toBeVisible();
+    await expect(page.getByText('home.greeting')).toHaveCount(0);
+    // The label is translated too, so pick the header select by position.
+    await page.locator('header select').selectOption('en');
   });
 
   test('a cashier sees no Suppliers, profit or drawer cash, and is turned away by URL', async ({
@@ -160,15 +174,15 @@ test.describe('Home and shell (T-013)', () => {
     );
     await page.evaluate(() => window.__bikriTest?.navigate('/udhaar'));
     await expect(
-      page.getByRole('button', { name: /New customer/ }),
+      page.getByRole('button', { name: /New customer/ }).first(),
     ).toBeDisabled();
     await page.evaluate(() => window.__bikriTest?.navigate('/expenses'));
     await expect(
-      page.getByRole('button', { name: /New expense/ }),
+      page.getByRole('button', { name: /New expense/ }).first(),
     ).toBeDisabled();
     await page.evaluate(() => window.__bikriTest?.navigate('/day-close'));
     await expect(
-      page.getByRole('button', { name: /Close day/ }),
+      page.getByRole('button', { name: /Close day/ }).first(),
     ).toBeDisabled();
     await page.evaluate(() => window.__bikriTest?.navigate('/'));
     await context.setOffline(true);

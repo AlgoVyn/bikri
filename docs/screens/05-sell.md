@@ -15,7 +15,7 @@ Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14
 ## Layout (≥ 1024 px: two columns; < 1024 px: product area full screen with a sticky cart bar that expands into a sheet)
 
 **Start column (≈ 60%) — find products**
-1. Search box (autofocus; placeholder "Search or scan — name, barcode, SKU"; KeyBadge F2). Results replace the grid as you type.
+1. Search box (autofocus; placeholder "Search or scan — name, barcode, SKU"; shortcut F2 (shown in Settings → About)). Results replace the grid as you type.
 2. Category chips row (All, then categories by sort order, horizontally scrollable).
 3. Product grid: tiles 132×132 px min — photo (or coloured initials if none), name (2 lines max), price, stock pill ("12 left", amber when ≤ `min_stock_milli`, red "Out" when ≤ 0, hidden if `track_stock = 0`). Sorted by: selling frequency over 30 days on this device, then name. Virtualised.
 4. Below the grid on desktop: `Quick sale` (F7) and `Held bills (n)` (F6) buttons.

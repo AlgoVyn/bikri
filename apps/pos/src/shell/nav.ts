@@ -26,7 +26,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/',
     label: 'nav.home',
-    keys: 'Alt+1',
+    keys: 'Ctrl+Shift+1',
     Icon: HomeIcon,
     perm: null,
     bar: true,
@@ -34,7 +34,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/sell',
     label: 'nav.sell',
-    keys: 'Alt+2',
+    keys: 'Ctrl+Shift+2',
     Icon: SellIcon,
     perm: 'sale.create',
     bar: true,
@@ -42,7 +42,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/products',
     label: 'nav.products',
-    keys: 'Alt+3',
+    keys: 'Ctrl+Shift+3',
     Icon: ProductsIcon,
     perm: null,
     bar: true,
@@ -50,7 +50,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/sales',
     label: 'nav.sales',
-    keys: 'Alt+4',
+    keys: 'Ctrl+Shift+4',
     Icon: SalesIcon,
     perm: null,
     bar: true,
@@ -58,7 +58,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/udhaar',
     label: 'nav.udhaar',
-    keys: 'Alt+5',
+    keys: 'Ctrl+Shift+5',
     Icon: UdhaarIcon,
     perm: 'payment.receive',
     bar: true,
@@ -66,7 +66,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/suppliers',
     label: 'nav.suppliers',
-    keys: 'Alt+6',
+    keys: 'Ctrl+Shift+6',
     Icon: SuppliersIcon,
     perm: 'purchase.create',
     bar: false,
@@ -74,7 +74,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/expenses',
     label: 'nav.expenses',
-    keys: 'Alt+7',
+    keys: 'Ctrl+Shift+7',
     Icon: ExpensesIcon,
     perm: 'expense.create',
     bar: false,
@@ -82,7 +82,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/reports',
     label: 'nav.reports',
-    keys: 'Alt+8',
+    keys: 'Ctrl+Shift+8',
     Icon: ReportsIcon,
     perm: 'report.view',
     bar: false,
@@ -90,7 +90,7 @@ export const NAV: readonly NavItem[] = [
   {
     to: '/settings',
     label: 'nav.settings',
-    keys: 'Alt+9',
+    keys: 'Ctrl+Shift+9',
     Icon: SettingsIcon,
     perm: null,
     bar: false,

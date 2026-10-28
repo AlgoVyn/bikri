@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -172,7 +171,7 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
               className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
               aria-disabled={readOnly}
             >
-              {t('office.suppliers.record_delivery')} <KeyBadge keys="D" />
+              {t('office.suppliers.record_delivery')}
             </Link>
             <button
               type="button"
@@ -180,7 +179,7 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
               disabled={readOnly}
               onClick={() => setPayOpen(true)}
             >
-              {t('office.suppliers.pay_supplier')} <KeyBadge keys="P" />
+              {t('office.suppliers.pay_supplier')}
             </button>
             <Link
               to="/suppliers/$supplierId/return/new"

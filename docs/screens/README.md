@@ -66,7 +66,7 @@ The full export zip adds `manifest.json`, `json/<table>.json` (paisa, no `tenant
 | `SearchBox` | Debounce 0 ms for local search (Dexie + in-memory index), barcode scan = rapid keystrokes ending in Enter (< 30 ms between keys) is treated as an exact barcode lookup. |
 | `ConfirmDialog` | Title, body, destructive button in danger colour, Esc cancels, Enter confirms only when focus is on the confirm button. |
 | `OverrideDialog` | Manager PIN prompt ([05 §4.1](../05-auth-and-roles.md#41-manager-override)). |
-| `KeyBadge` | Small key hint on buttons (REQ-C09); hidden on touch-only devices (`pointer: coarse` and no keyboard event seen). |
+| `KeyBadge` | Key hint used in the Settings → About shortcut table (always visible there); elsewhere hidden on touch-only devices (`pointer: coarse` and no keyboard event seen). Not shown on action buttons. |
 | `ExportMenu` | CSV (all lists), PDF (reports, statements), Share (Web Share API), generated locally (REQ-B02). |
 | `EmptyState` | Illustration-free: icon, one sentence, one primary action. |
 | `Toast` | Bottom-end, 4 s, max 3 stacked; errors stay until dismissed. |

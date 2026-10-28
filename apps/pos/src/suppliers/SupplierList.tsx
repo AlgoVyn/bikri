@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -67,7 +66,7 @@ export function SupplierList() {
             disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
-            {t('office.suppliers.new_supplier')} <KeyBadge keys="N" />
+            {t('office.suppliers.new_supplier')}
           </button>
         ) : null}
       </div>

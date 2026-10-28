@@ -6,7 +6,6 @@ import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -145,7 +144,7 @@ export function ExpensesPage() {
             disabled={readOnly}
             onClick={() => setNewOpen(true)}
           >
-            {t('office.expenses.new_expense')} <KeyBadge keys="N" />
+            {t('office.expenses.new_expense')}
           </button>
         ) : null}
       </div>
