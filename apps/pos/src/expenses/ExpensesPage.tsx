@@ -149,7 +149,7 @@ export function ExpensesPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
         {presets.map((p) => (
           <button
             key={p}

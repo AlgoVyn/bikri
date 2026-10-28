@@ -20,7 +20,7 @@ Bikri differences: photos (REQ-B10), weighted-average cost shown next to last co
 
 ## Product list
 
-Layout: toolbar (search, category filter, stock filter `All / Low / Out / Not tracked`, sort `Name / Price / Stock / Best selling`), buttons `+ Add product` (N), `Import`, `Export CSV`, `More ▾` (Update prices, Manage categories, Stock count, Select). Table (desktop) / cards (mobile) columns: photo 40 px, Name (+ brand, SKU small), Category, Price, Stock (with unit; amber ≤ min, red ≤ 0), Avg cost and Margin % (only `cost.view`), 30-day sold. Virtualised; 5,000 products scroll at 60 fps.
+Layout: toolbar in a card (search, category filter, stock filter `All / Low / Out / Not tracked`, sort `Name / Price / Stock / Best selling`), buttons `+ Add product` (N), `Import`, `Export CSV`, `More ▾` (Update prices, Manage categories, Stock count, Select). The table sits in its own card. Table (desktop) / cards (mobile) columns: photo 40 px, Name (+ brand, SKU small), Category, Price, Stock (with unit; amber ≤ min, red ≤ 0), Avg cost and Margin % (only `cost.view`), 30-day sold. Virtualised; 5,000 products scroll at 60 fps.
 
 Select mode: checkboxes; bulk actions `Change category`, `Update prices`, `Print labels` ([screens/20](20-barcode-labels.md)), `Delete` (owner), `Export selected`.
 

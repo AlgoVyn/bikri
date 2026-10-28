@@ -493,7 +493,7 @@ export function SellPage() {
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
           </label>
-          <div className="flex h-12 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+          <div className="flex h-14 items-center gap-2 rounded-control border border-border bg-surface px-4 shadow-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             <SearchIcon />
             <input
               id="sell-search"
@@ -635,18 +635,22 @@ export function SellPage() {
         </div>
         <button
           type="button"
-          className={`${buttonPrimary} min-h-14 justify-between lg:hidden`}
+          className={`${buttonPrimary} min-h-14 justify-between gap-2 lg:hidden`}
           data-testid="cart-bar"
           aria-expanded={sheet}
           onClick={() => setSheet(true)}
         >
-          <span>{t('sell.view_cart', { count: cart.lines.length })}</span>
-          <MoneyText paisa={totals.total} />
+          <span className="min-w-0 truncate">
+            {t('sell.view_cart', { count: cart.lines.length })}
+          </span>
+          <span className="shrink-0">
+            <MoneyText paisa={totals.total} />
+          </span>
         </button>
       </section>
       <aside
         aria-label={t('sell.cart')}
-        className={`flex-col border-border bg-bg p-3 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
+        className={`flex-col border-border bg-surface p-3 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
       >
         {sheet ? (
           <button

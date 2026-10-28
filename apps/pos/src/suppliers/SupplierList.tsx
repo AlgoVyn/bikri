@@ -80,7 +80,7 @@ export function SupplierList() {
         </p>
       ) : null}
 
-      <search>
+      <search className="rounded-card border border-border bg-surface p-3 shadow-card">
         <label className="flex min-w-0 flex-col">
           <span className="mb-1 text-small">
             {t('office.suppliers.search')}

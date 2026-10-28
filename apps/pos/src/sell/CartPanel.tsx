@@ -7,6 +7,7 @@ import {
 import type { Cart, CartLine } from '@bikri/db';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { SellIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import {
@@ -65,7 +66,7 @@ export function CartPanel(p: CartPanelProps) {
               type="button"
               role="tab"
               aria-selected={p.active === id}
-              className={`relative min-h-11 flex-1 rounded-control border px-2 text-small ${p.active === id ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink' : 'border-border bg-surface'}`}
+              className={`relative min-h-11 flex-1 rounded-control border px-2 text-small ${p.active === id ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
               onClick={() => p.onTab(id)}
             >
               {t('sell.cart_tab', { n: i + 1 })}
@@ -82,7 +83,10 @@ export function CartPanel(p: CartPanelProps) {
         })}
       </div>
 
-      <div className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface px-3">
+      <div className="flex min-h-14 items-center gap-2 rounded-control border border-border bg-surface-2/60 px-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
+          <UdhaarIcon />
+        </span>
         <div className="min-w-0 flex-1" data-testid="cart-customer">
           {customer ? (
             <>
@@ -113,8 +117,11 @@ export function CartPanel(p: CartPanelProps) {
         className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
       >
         {cart.lines.length === 0 ? (
-          <li className="py-8 text-center text-text-muted">
-            {t('sell.cart_empty')}
+          <li className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+              <SellIcon />
+            </span>
+            <p className="text-small text-text-muted">{t('sell.cart_empty')}</p>
           </li>
         ) : null}
         {cart.lines.map((line, i) => (
@@ -131,7 +138,7 @@ export function CartPanel(p: CartPanelProps) {
       </ul>
 
       <dl
-        className="flex flex-col gap-1 border-t border-border pt-2"
+        className="flex flex-col gap-1 rounded-card border border-border bg-surface-2/50 p-3"
         data-testid="cart-totals"
       >
         <Row
@@ -288,7 +295,7 @@ function LineRow({
     <li
       data-testid="cart-line"
       aria-current={selected || undefined}
-      className={`rounded-card border bg-surface p-2 ${selected ? 'border-primary' : 'border-border'}`}
+      className={`rounded-card border bg-surface-2/60 p-3 ${selected ? 'border-primary' : 'border-border'}`}
     >
       <div className="flex items-start gap-2">
         <button

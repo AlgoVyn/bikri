@@ -22,7 +22,7 @@ export function EmptyState({
         </div>
       ) : null}
       {heading !== undefined ? <h1 className="sr-only">{heading}</h1> : null}
-      <p className="max-w-sm text-text-muted">{message}</p>
+      <p className="max-w-sm text-body font-medium text-text">{message}</p>
       {actionLabel !== undefined && onAction !== undefined ? (
         <button type="button" className={buttonPrimary} onClick={onAction}>
           {actionLabel}
