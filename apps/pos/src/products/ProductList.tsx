@@ -2,10 +2,11 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { buttonPrimary } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { ProductsIcon, SearchIcon } from '../components/icons.tsx';
+import { MoreIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import {
   listCategories,
   listProducts,
@@ -45,6 +46,8 @@ export function ProductList() {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const rows = useLiveQuery(
     () =>
       listProducts(getDb(), {
@@ -78,69 +81,135 @@ export function ProductList() {
     enabled: canEdit,
   });
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [menuOpen]);
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">{t('products.title')}</h1>
-        {canLabel ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!rows || rows.length === 0}
-            onClick={() => {
-              setSelecting((value) => !value);
-              setSelected(new Set());
-            }}
-          >
-            {selecting ? t('common.cancel') : t('products.select')}
-          </button>
-        ) : null}
-        {selecting && selected.size > 0 ? (
-          <button
-            type="button"
-            className={buttonPrimary}
-            onClick={() => setLabelsOpen(true)}
-          >
-            {t('products.print_labels', { count: selected.size })}
-          </button>
-        ) : null}
-        {canEdit ? (
-          <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
-            {t('products.add')}
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          className={buttonQuiet}
-          disabled={!rows || rows.length === 0}
-          onClick={() =>
-            rows &&
-            downloadText('bikri-products.csv', productsCsv(rows, showCost))
-          }
-        >
-          {t('products.export_csv')}
-        </button>
-        {canEdit ? (
+      <PageHeader
+        icon={<ProductsIcon />}
+        title={t('products.title')}
+        subtitle={t('products.subtitle')}
+        actions={
           <>
-            <Link to="/products/import" className={buttonQuiet}>
-              {t('import.button')}
-            </Link>
-            <Link to="/products/prices" className={buttonQuiet}>
-              {t('prices.button')}
-            </Link>
+            {selecting && selected.size > 0 ? (
+              <button
+                type="button"
+                className={buttonPrimary}
+                onClick={() => setLabelsOpen(true)}
+              >
+                {t('products.print_labels', { count: selected.size })}
+              </button>
+            ) : null}
+            {canEdit ? (
+              <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
+                {t('products.add')}
+              </Link>
+            ) : null}
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                className="flex size-11 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2"
+                aria-label={t('products.more_actions')}
+                aria-expanded={menuOpen}
+                aria-controls="product-actions"
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <MoreIcon />
+              </button>
+              {menuOpen ? (
+                <div
+                  id="product-actions"
+                  className="absolute end-0 top-12 z-30 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
+                >
+                  {canLabel ? (
+                    <button
+                      type="button"
+                      className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2"
+                      onClick={() => {
+                        setSelecting((value) => !value);
+                        setSelected(new Set());
+                        setMenuOpen(false);
+                      }}
+                    >
+                      {selecting ? t('common.cancel') : t('products.select')}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={!rows || rows.length === 0}
+                    className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2 disabled:opacity-50"
+                    onClick={() => {
+                      if (rows)
+                        downloadText(
+                          'bikri-products.csv',
+                          productsCsv(rows, showCost),
+                        );
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {t('products.export_csv')}
+                  </button>
+                  {canEdit ? (
+                    <>
+                      <Link
+                        to="/products/import"
+                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {t('import.button')}
+                      </Link>
+                      <Link
+                        to="/products/prices"
+                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {t('prices.button')}
+                      </Link>
+                      <Link
+                        to="/products/categories"
+                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {t('products.manage_categories')}
+                      </Link>
+                      <Link
+                        to="/products/suggested"
+                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {t('home.suggested')}
+                      </Link>
+                    </>
+                  ) : null}
+                  {can('stock.adjust') ? (
+                    <Link
+                      to="/stock/count"
+                      className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {t('count.title')}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </>
-        ) : null}
-        {canEdit ? (
-          <Link to="/products/categories" className={buttonQuiet}>
-            {t('products.manage_categories')}
-          </Link>
-        ) : null}
-        {can('stock.adjust') ? (
-          <Link to="/stock/count" className={buttonQuiet}>
-            {t('count.title')}
-          </Link>
-        ) : null}
-      </div>
+        }
+      />
 
       {total === 0 ? null : (
         <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">

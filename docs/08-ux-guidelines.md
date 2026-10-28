@@ -10,6 +10,19 @@ Bikri has its **own** visual identity. Dukaan screenshots show behaviour only; d
 4. **Plain words** in the three languages; no accounting jargon ("Owes you", "You owe", "Paid to suppliers").
 5. **Numbers are sacred**: right-aligned, tabular figures, always `Rs` prefix, never truncated.
 
+### 1.1 Reference-derived patterns (desktop app only; not its visual identity)
+
+The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behaviour reference. The following structural patterns are adopted with Bikri's own brand and components; the web screenshots are ignored.
+
+- **Page header**: a pastel icon tile, the page title and a one-line subtitle, with the primary action at the end. Secondary actions go behind a `More` (kebab) menu (Products).
+- **Home**: a large `New sale` hero card with a short hint, a two-column grid of action cards that each carry an icon, title and short description, and a right-hand column with a compact `Today's register` summary and `Recent bills`. On phones the register moves directly below the hero.
+- **Sell**: customer tabs show each cart's total or `Empty`; the active tab is solid; product tiles show the quantity already in the cart and a green/amber/red stock pill; the cart panel and totals are visually separate surfaces.
+- **Pay**: payment methods are descriptive cards (icon + method + hint) with a visible selected check; change and remaining are shown as two summary cards.
+- **Settings**: rows have an icon, title, hint and chevron, grouped under short section labels.
+- **Lists**: a filter card, a summary card and the rows/table in their own card; page-level titles use the icon header.
+
+Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.
+
 ## 2. Design tokens (`apps/pos/src/styles/tokens.css`, Tailwind 4 `@theme`)
 
 ### Colour (light / dark) — Algovyn brand (decision D-025)

@@ -79,8 +79,8 @@ test.describe('Sale complete (T-018)', () => {
   }) => {
     await shop(page);
     const change = await sellGalaxy(page);
-    expect(change).toBe('Change to give Rs 3,000');
-    await expect(page.getByTestId('done-change')).toHaveText(change);
+    expect(change).toBe('Rs 3,000');
+    await expect(page.getByTestId('done-change')).toContainText(change);
     await expect(page.getByTestId('sale-saved')).toHaveText(
       'Sale saved · A-A-1',
     );
@@ -228,7 +228,7 @@ test.describe('Sale complete (T-018)', () => {
     await shop(page);
     await page.getByLabel('Language').selectOption('ur');
     const change = await sellGalaxy(page, '50000');
-    await expect(page.getByTestId('done-change')).toHaveText(change);
+    await expect(page.getByTestId('done-change')).toContainText(change);
     await expect(page.getByTestId('done-change')).toContainText('8,000');
     await expect(
       page.getByRole('button', { name: 'دوبارہ پرنٹ' }),

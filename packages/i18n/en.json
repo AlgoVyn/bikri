@@ -238,7 +238,19 @@
     "attn_sync_pending_old": "This till hasn't synced since {{time}}. Connect to the internet so your data is backed up.",
     "attn_clock_wrong": "This PC's clock is wrong — fix the date/time",
     "view_all": "View all",
-    "today_summary": "Today at a glance"
+    "today_summary": "Today at a glance",
+    "new_sale_hint": "Tap to ring up items or scan a barcode",
+    "todays_register": "Today's register",
+    "last_bill": "Last bill {{time}}",
+    "desc_price_check": "Scan a barcode",
+    "desc_day_close": "Count & close",
+    "desc_products": "Manage stock",
+    "desc_sales": "Bills & refunds",
+    "desc_udhaar": "Customer khata",
+    "desc_suppliers": "Purchases & dues",
+    "desc_expenses": "Money out",
+    "desc_reports": "Profit & trends",
+    "desc_settings": "Printers & app"
   },
   "import": {
     "action_error": "Skipped",
@@ -362,7 +374,13 @@
     "still_due": "{{amount}} still due",
     "udhaar_written": "{{amount}} written in {{name}}'s khata · now owes {{balance}}",
     "whatsapp": "Send on WhatsApp",
-    "write_khata": "Write {{amount}} in khata"
+    "write_khata": "Write {{amount}} in khata",
+    "method_cash_hint": "Notes & coins",
+    "method_bank_hint": "Bank or wallet transfer",
+    "method_card_hint": "Swipe or insert card",
+    "method_udhaar_hint": "Add to customer khata",
+    "change_label": "Change to give",
+    "due_label": "Still due"
   },
   "payment": {
     "bank_wallet": "Bank/wallet",
@@ -556,7 +574,9 @@
     "print_label": "Print label",
     "select": "Select",
     "print_labels_one": "Print {{count}} label",
-    "print_labels_other": "Print {{count}} labels"
+    "print_labels_other": "Print {{count}} labels",
+    "subtitle": "Stock, prices and categories",
+    "more_actions": "More actions"
   },
   "sell": {
     "add_discount": "Add discount",
@@ -651,7 +671,8 @@
     "unknown_barcode": "No product with barcode {{code}}",
     "view_cart": "View cart · {{count}} items",
     "view_cart_one": "View cart · 1 item",
-    "walk_in": "Walk-in customer"
+    "walk_in": "Walk-in customer",
+    "empty_tab": "Empty"
   },
   "setup": {
     "add_one": "Add one product",

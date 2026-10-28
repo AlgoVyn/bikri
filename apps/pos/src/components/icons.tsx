@@ -163,3 +163,77 @@ export function BankIcon() {
     </Svg>
   );
 }
+
+export function StoreIcon() {
+  return (
+    <Svg>
+      <path d="M4 9.5 6 4h12l2 5.5" />
+      <path d="M5 9.5V20h14V9.5" />
+      <path d="M9 20v-5h6v5" />
+    </Svg>
+  );
+}
+
+export function UsersIcon() {
+  return (
+    <Svg>
+      <circle cx="9" cy="8" r="2.5" />
+      <path d="M4 19c.8-2.8 2.4-4.2 5-4.2s4.2 1.4 5 4.2" />
+      <path d="M16 6.2a2.5 2.5 0 0 1 0 4.8M17 15c1.8.5 2.8 1.8 3 3.5" />
+    </Svg>
+  );
+}
+
+export function PrinterIcon() {
+  return (
+    <Svg>
+      <path d="M7 8V4h10v4" />
+      <path d="M6 8h12a2 2 0 0 1 2 2v6h-3v4H7v-4H4v-6a2 2 0 0 1 2-2Z" />
+      <path d="M7 16h10M8 12h1" />
+    </Svg>
+  );
+}
+
+export function TagIcon() {
+  return (
+    <Svg>
+      <path d="M4 4h7l9 9-7 7-9-9V4Z" />
+      <circle cx="8" cy="8" r="1.2" />
+    </Svg>
+  );
+}
+
+export function GlobeIcon() {
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4.5 9.5h15M4.5 14.5h15M12 4c2 2.2 3 4.9 3 8s-1 5.8-3 8c-2-2.2-3-4.9-3-8s1-5.8 3-8Z" />
+    </Svg>
+  );
+}
+
+export function CloudIcon() {
+  return (
+    <Svg>
+      <path d="M7 18h10a3.5 3.5 0 0 0 .5-7 5 5 0 0 0-9.6-1.4A3.8 3.8 0 0 0 7 18Z" />
+    </Svg>
+  );
+}
+
+export function DeviceIcon() {
+  return (
+    <Svg>
+      <rect x="3" y="5" width="18" height="11" rx="2" />
+      <path d="M8 20h8M12 16v4" />
+    </Svg>
+  );
+}
+
+export function InfoIcon() {
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 11v5M12 8h.01" />
+    </Svg>
+  );
+}

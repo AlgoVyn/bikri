@@ -38,7 +38,8 @@
       "to": "To",
       "today": "Today",
       "walk_in": "Walk-in customer",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "subtitle": "Every bill, newest first"
     },
     "bill": {
       "audit": "Audit",
@@ -289,7 +290,8 @@
       "title": "Udhaar",
       "to": "To",
       "total": "Total",
-      "total_owed": "Total owed to you"
+      "total_owed": "Total owed to you",
+      "subtitle": "Customer credit and reminders"
     },
     "suppliers": {
       "add_product": "Add a product",
@@ -404,7 +406,8 @@
       "total_owed": "Total you owe suppliers",
       "unit_cost": "Unit cost",
       "update_price": "Also update sale price",
-      "you_owe": "You owe {{amount}}"
+      "you_owe": "You owe {{amount}}",
+      "subtitle": "Deliveries, payments and returns"
     },
     "expenses": {
       "amount": "Amount",
@@ -460,7 +463,8 @@
       "save": "Save",
       "supplier_hint": "Paying a supplier? Use Suppliers → Pay supplier.",
       "title": "Expenses",
-      "total": "Total"
+      "total": "Total",
+      "subtitle": "Money out of the till"
     },
     "dayclose": {
       "bank": "Bank/wallet total",
@@ -507,7 +511,8 @@
       "total_mode": "Total",
       "udhaar_given": "Udhaar given",
       "udhaar_in": "Udhaar received in cash",
-      "next": "Next"
+      "next": "Next",
+      "subtitle": "Count the drawer and close the day"
     },
     "reports": {
       "age_days": "Age (days)",
@@ -636,7 +641,8 @@
       "udhaar_received": "Udhaar received",
       "uncategorized": "Uncategorized",
       "voided_amount": "Voided",
-      "voids": "Voids"
+      "voids": "Voids",
+      "subtitle": "Sales, profit and stock trends"
     },
     "backup": {
       "building": "Building export…",
@@ -722,7 +728,8 @@
       "tax_label": "Tax label",
       "tax_off_hint": "Set a tax rate to offer prices-include-tax.",
       "title": "Shop profile & receipt",
-      "logo": "Shop logo"
+      "logo": "Shop logo",
+      "subtitle": "Shop, device and data"
     },
     "staff": {
       "active": "Active",
