@@ -216,7 +216,11 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
         ) : null}
       </div>
 
-      <div className="overflow-auto rounded-card border border-border">
+      <section
+        className="overflow-auto rounded-card border border-border"
+        aria-label={t('office.suppliers.statement')}
+        tabIndex={0}
+      >
         <table className="w-full min-w-[32rem] text-small">
           <thead className="bg-surface">
             <tr className="border-b border-border text-text-muted">
@@ -279,7 +283,7 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
             )}
           </tbody>
         </table>
-      </div>
+      </section>
 
       <PaySupplierDialog
         open={payOpen}

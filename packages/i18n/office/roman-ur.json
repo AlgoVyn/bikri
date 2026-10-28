@@ -721,7 +721,8 @@
       "show_you_saved": "\"Aap ne bachaya\" line",
       "tax_label": "Tax ka naam",
       "tax_off_hint": "Price-mein-tax ke liye pehle tax rate daalein.",
-      "title": "Dukan profile aur receipt"
+      "title": "Dukan profile aur receipt",
+      "logo": "Dukaan ka logo"
     },
     "staff": {
       "active": "Active",
