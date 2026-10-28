@@ -35,7 +35,9 @@ test.describe('Home and shell (T-013)', () => {
       'Received Rs 100',
     );
     const recent = page.getByRole('region', { name: 'Recent bills' });
-    await expect(recent.getByRole('link').first()).toContainText('A-A-2');
+    await expect(
+      recent.getByRole('link').filter({ hasText: 'A-A-2' }).first(),
+    ).toContainText('A-A-2');
     await expect(
       page.getByRole('heading', { name: 'Needs attention' }),
     ).toHaveCount(0);

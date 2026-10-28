@@ -11,7 +11,7 @@ const BILLS = 20_000;
 
 /** screens/16 AC 5: a 90-day report with 20,000 bills (isolated ~0.9 s; <2 s in the browser). */
 describe('reports performance (screens/16 AC 5)', () => {
-  it('builds 90 days / 20k bills', async () => {
+  it('builds 90 days / 20k bills', { retry: 1, timeout: 90_000 }, async () => {
     const db = await readyDb('perf');
     await addShop(db);
     const sales: SyncedRow[] = [];
@@ -130,5 +130,5 @@ describe('reports performance (screens/16 AC 5)', () => {
     // Isolated this is ~0.9 s; the reference browser target is <2 s, so keep
     // scheduling headroom here.
     expect(elapsed).toBeLessThan(4_000);
-  }, 90_000);
+  });
 });

@@ -190,7 +190,7 @@ export function EnrolPage({
 
   const card = (body: React.ReactNode) => (
     <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6">
+      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-h2 text-primary">
             {t('common.app_name')}

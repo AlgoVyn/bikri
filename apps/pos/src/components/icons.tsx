@@ -133,3 +133,33 @@ export function MoreIcon() {
     </Svg>
   );
 }
+
+export function CashIcon() {
+  return (
+    <Svg>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6 9.5v5M18 9.5v5" />
+    </Svg>
+  );
+}
+
+export function CardIcon() {
+  return (
+    <Svg>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M7 15h3" />
+    </Svg>
+  );
+}
+
+export function BankIcon() {
+  return (
+    <Svg>
+      <path d="M12 3 3.5 7.5h17L12 3Z" />
+      <path d="M5.5 10.5v6M9.5 10.5v6M14.5 10.5v6M18.5 10.5v6" />
+      <path d="M3.5 20.5h17" />
+    </Svg>
+  );
+}

@@ -199,7 +199,7 @@ export function StaffMenu() {
           if (event.key === 'Escape') setOpen(false);
         }}
       >
-        <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-ink font-semibold">
+        <span className="flex size-9 items-center justify-center rounded-full bg-primary font-semibold text-primary-ink ring-2 ring-primary-subtle">
           {name.slice(0, 1).toUpperCase() || '?'}
         </span>
       </button>
