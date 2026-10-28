@@ -191,8 +191,8 @@ What is not logged: the individual reads made by the support device (logging eac
 
 M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset, so `wrangler d1 migrations apply --remote` never ran. `apps/api/wrangler.jsonc` points at a real D1 database `bikri`, but no deploy has applied the migrations to it (this was not re-checked against Cloudflare when writing this doc; the check below covers it).
 
-- **Edit `0001_init.sql` and `0002_seed.sql` in place** (no `0003`): there is no deployed schema to stay compatible with, and an additive `0003` cannot turn single-column primary keys into composite ones (SQLite needs a table rebuild). `SCHEMA_VERSION` stays `1`. Before the first deploy, check `wrangler d1 migrations list bikri --remote` shows nothing applied; if something was applied, delete and re-create the empty `bikri` database (operator decision) rather than writing a rebuild migration.
-- This docs PR changes the SQL blocks in [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql); `tools/check-docs.mjs` will report the two migration files out of sync until **T-008** (the first phase 2 task) copies them and rewrites `apps/api/test/migrations.test.ts` for two tenants.
+- **T-008 rewrote `0001_init.sql` and `0002_seed.sql` in place** while M0 was still undeployed; an additive migration could not turn single-column primary keys into composite ones (SQLite needs a table rebuild). That rewrite is history. After the first remote deploy every schema change is an additive `000N_*.sql` migration: T-062 added `0003_perf_indexes.sql`. `SCHEMA_VERSION` stays `1` for index-only changes and is bumped when columns change.
+- The SQL blocks in [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) are the source of truth and `tools/check-docs.mjs` checks all three migration files against them.
 - Other M0 single-shop assumptions and what replaces them:
 
 | M0 assumption | Multi-tenant replacement |
@@ -208,8 +208,6 @@ M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset,
 | localStorage `bikri.language`, `bikri.persist` | device-level, not shop data: they stay per browser. `bikri.language` is only the pre-enrolment default; after enrolment the language lives in the tenant's Dexie `kv.language`. A new non-secret key `bikri.active_tenant` points at the tenant's Dexie database `bikri-<tenant_id>` (D-073) |
 | `ReceiptShop` printer parameter | already per call: unchanged |
 | `SHOP_TIMEZONE` Worker var | default only; each tenant's `shop.timezone` is authoritative |
-
-Phase 2 work already done on `phase-2-local-till` (T-010 money, part of T-019 printer) is unaffected and is rebased after this PR.
 
 ## 9. Open questions (owner decision needed)
 
