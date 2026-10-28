@@ -7,6 +7,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import {
@@ -73,37 +74,45 @@ export function UdhaarList({
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.udhaar.title')}
-        </h1>
-        <Link to="/udhaar/chase" className={buttonQuiet}>
-          {t('office.udhaar.chase_list')}
-        </Link>
-        {can('export.data') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!data || data.rows.length === 0}
-            onClick={() =>
-              data &&
-              downloadText('bikri-udhaar.csv', customersCsv(data.rows, data.tz))
-            }
-          >
-            {t('office.udhaar.export_csv')}
-          </button>
-        ) : null}
-        {can('party.edit') ? (
-          <button
-            type="button"
-            className={`${buttonPrimary} gap-2`}
-            disabled={readOnly}
-            onClick={() => setNewOpen(true)}
-          >
-            {t('office.udhaar.new_customer')}
-          </button>
-        ) : null}
-      </div>
+      <PageHeader
+        icon={<UdhaarIcon />}
+        tone="bg-warning-subtle text-warning-subtle-ink"
+        title={t('office.udhaar.title')}
+        subtitle={t('office.udhaar.subtitle')}
+        actions={
+          <>
+            <Link to="/udhaar/chase" className={buttonQuiet}>
+              {t('office.udhaar.chase_list')}
+            </Link>
+            {can('export.data') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!data || data.rows.length === 0}
+                onClick={() =>
+                  data &&
+                  downloadText(
+                    'bikri-udhaar.csv',
+                    customersCsv(data.rows, data.tz),
+                  )
+                }
+              >
+                {t('office.udhaar.export_csv')}
+              </button>
+            ) : null}
+            {can('party.edit') ? (
+              <button
+                type="button"
+                className={`${buttonPrimary} gap-2`}
+                disabled={readOnly}
+                onClick={() => setNewOpen(true)}
+              >
+                {t('office.udhaar.new_customer')}
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
       {data ? (
         <div className="grid gap-2 sm:grid-cols-3">

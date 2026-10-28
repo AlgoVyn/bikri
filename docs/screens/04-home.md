@@ -24,15 +24,16 @@
 
 ## Home layout
 
-1. **Greeting row**: "Assalam-o-Alaikum, {name}" + business date + branch; on ≥ 640 px a primary `New sale` button sits at the end. On phones the same actions are the first quick-action tiles.
-2. **Today cards** (4, 2-up on phones, 4-up from 1280): Sold today (Rs, bill count), Profit today (only with `cost.view`), Cash in drawer (expected so far for this device, per [07 §8](../07-money-rules.md#8-day-close), only with `dayclose.view_expected`), Udhaar given today / received today. Each card has a coloured icon chip, a large value and (where useful) a small secondary line; cards use the soft elevation.
-3. **Quick actions** (compact icon+label tiles, 2/3/5 per row): New sale (N), Price check (Ctrl+Shift+P), Products, Sales, Udhaar, Suppliers, Expenses, Day close, Reports, Settings. Shortcuts are in the tooltip and Settings → About.
-4. **Attention list** (max 5 items, each linking to the screen): products at or below `min_stock_milli` ("12 items low on stock"), batches expiring in 30 days (v2), udhaar promises due today, customers over limit, failed print jobs, sync conflicts (owner), day not closed yesterday on this device. Shown in a card with a leading status dot and a chevron.
-5. **Recent bills**: the shop’s last 5 bills, newest first (invoice, time, total, method chips), in a card with a `View all` link to Sales; click a row for bill detail. Empty state inside the card. Bills from every till in the shop appear; the invoice prefix shows the device.
+1. **Greeting row**: "Assalam-o-Alaikum, {name}" + business date + branch.
+2. **New sale hero** (main column): a large primary-subtle card with a receipt icon, `New sale`, the hint "Tap to ring up items or scan a barcode" and a chevron; opens Sell.
+3. **Quick actions** (main column, 1 column on phones / 2 from 640 px): Price check, Products, Sales, Udhaar, Suppliers, Expenses, Day close, Reports, Settings. Each is a card with an icon, title and a short description ("Scan a barcode", "Manage stock", "Bills & refunds", …); shortcuts are in the tooltip and Settings → About.
+4. **Today's register** (right column on ≥ 1024 px; directly below the hero on phones): Sold today (large), bill count and last bill time; Cash in drawer (only with `dayclose.view_expected`), Profit today (only with `cost.view`) and Udhaar given/received. The register stays a single card rather than four separate tiles.
+5. **Attention list** (main column, max 5): products at or below `min_stock_milli` ("12 items low on stock"), batches expiring in 30 days (v2), udhaar promises due today, customers over limit, failed print jobs, sync conflicts (owner), day not closed yesterday on this device. Card with a leading status dot and a chevron.
+6. **Recent bills** (right column on ≥ 1024 px; below the register/market on phones): the shop’s last 5 bills, newest first (invoice, time, total, method chips), in a card with a `View all` link to Sales; click a row for bill detail. Empty state inside the card. Bills from every till in the shop appear; the invoice prefix shows the device.
 
 ## States
 
-- First run (0 products): replace Today cards with a card "Add your first products" with buttons `Add product`, `Import spreadsheet`, `Add from suggested list` (electronics starter list: charger, cable, earbuds, power bank, screen protector, back cover — names only, user sets prices).
+- First run (0 products): replace the hero/register with a card "Add your first products" with buttons `Add product`, `Import spreadsheet`, `Add from suggested list` (electronics starter list: charger, cable, earbuds, power bank, screen protector, back cover — names only, user sets prices), followed by quick actions and the empty Recent bills card.
 - Cashier without `cost.view`: profit card hidden (not blurred).
 - Offline: figures computed from local data, a small "as of this device" pill next to the date.
 

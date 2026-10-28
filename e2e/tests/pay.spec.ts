@@ -66,13 +66,9 @@ test.describe('Pay (T-017)', () => {
       pay(page).getByRole('button', { name: 'Rs 45,000' }),
     ).toBeVisible();
     await pay(page).getByLabel('Received').fill('50000');
-    await expect(pay(page).getByTestId('pay-change')).toHaveText(
-      'Change to give Rs 7,000',
-    );
+    await expect(pay(page).getByTestId('pay-change')).toHaveText('Rs 7,000');
     await pay(page).getByLabel('Received').fill('42600');
-    await expect(pay(page).getByTestId('pay-due')).toHaveText(
-      'Rs 400 still due',
-    );
+    await expect(pay(page).getByTestId('pay-due')).toHaveText('Rs 400');
     await expect(pay(page).getByTestId('pay-done')).toBeDisabled();
     await pay(page).getByLabel('Received').fill('50000');
     await pay(page).getByTestId('pay-done').click();

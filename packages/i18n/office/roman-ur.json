@@ -38,7 +38,8 @@
       "to": "Tak",
       "today": "Aaj",
       "walk_in": "Aam customer",
-      "yesterday": "Kal"
+      "yesterday": "Kal",
+      "subtitle": "Har bill, naya pehle"
     },
     "bill": {
       "audit": "Audit",
@@ -289,7 +290,8 @@
       "title": "Udhaar",
       "to": "Tak",
       "total": "Total",
-      "total_owed": "Total wasool karna hai"
+      "total_owed": "Total wasool karna hai",
+      "subtitle": "Gahak ka udhaar aur yaad dehaniyan"
     },
     "suppliers": {
       "add_product": "Product shamil karein",
@@ -404,7 +406,8 @@
       "total_owed": "Suppliers ko total dena hai",
       "unit_cost": "Per unit cost",
       "update_price": "Sale price bhi badlein",
-      "you_owe": "{{amount}} dena hai"
+      "you_owe": "{{amount}} dena hai",
+      "subtitle": "Delivery, adaigi aur wapsi"
     },
     "expenses": {
       "amount": "Raqam",
@@ -460,7 +463,8 @@
       "save": "Mehfooz karein",
       "supplier_hint": "Supplier ko payment? Suppliers → Pay supplier istemal karein.",
       "title": "Kharchay",
-      "total": "Total"
+      "total": "Total",
+      "subtitle": "Daraz se kharch"
     },
     "dayclose": {
       "bank": "Bank/wallet total",
@@ -507,7 +511,8 @@
       "total_mode": "Total",
       "udhaar_given": "Diya gaya udhaar",
       "udhaar_in": "Udhaar cash wasool",
-      "next": "Aage"
+      "next": "Aage",
+      "subtitle": "Daraz ginein aur din band karein"
     },
     "reports": {
       "age_days": "Umar (din)",
@@ -636,7 +641,8 @@
       "udhaar_received": "Wasool shuda udhaar",
       "uncategorized": "Baghair qism",
       "voided_amount": "Mansookh shuda",
-      "voids": "Mansookh"
+      "voids": "Mansookh",
+      "subtitle": "Farokht, munafa aur stock"
     },
     "backup": {
       "building": "Export ban raha hai…",
@@ -722,7 +728,8 @@
       "tax_label": "Tax ka naam",
       "tax_off_hint": "Price-mein-tax ke liye pehle tax rate daalein.",
       "title": "Dukan profile aur receipt",
-      "logo": "Dukaan ka logo"
+      "logo": "Dukaan ka logo",
+      "subtitle": "Dukaan, device aur data"
     },
     "staff": {
       "active": "Active",

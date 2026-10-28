@@ -16,11 +16,13 @@ export function ProductGrid({
   highlighted,
   onAdd,
   scrollRef,
+  cartQty,
 }: {
   rows: readonly SellRow[];
   highlighted: number;
   onAdd: (row: SellRow) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  cartQty?: ReadonlyMap<string, number>;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLUListElement>(null);
@@ -95,6 +97,7 @@ export function ProductGrid({
               index={index}
               active={index === highlighted}
               onAdd={onAdd}
+              cartQty={cartQty?.get(row.product.id) ?? 0}
             />
           </li>
         );
@@ -108,11 +111,13 @@ function Tile({
   index,
   active,
   onAdd,
+  cartQty,
 }: {
   row: SellRow;
   index: number;
   active: boolean;
   onAdd: (row: SellRow) => void;
+  cartQty: number;
 }) {
   const { t } = useTranslation();
   const p = row.product;
@@ -131,7 +136,7 @@ function Tile({
             cls:
               row.stockState === 'low'
                 ? 'bg-warning-subtle text-warning-subtle-ink'
-                : 'bg-surface-2 text-text-muted',
+                : 'bg-success-subtle text-success-subtle-ink',
           };
   return (
     <button
@@ -139,9 +144,14 @@ function Tile({
       data-index={index}
       data-testid="sell-tile"
       aria-current={active || undefined}
-      className={`flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card hover:border-border-strong ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card hover:border-border-strong ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
       onClick={() => onAdd(row)}
     >
+      {cartQty > 0 ? (
+        <span className="absolute end-2 top-2 flex size-6 items-center justify-center rounded-full bg-primary text-small font-semibold text-primary-ink">
+          {formatQtyFromMilli(cartQty, unit)}
+        </span>
+      ) : null}
       <ProductThumb
         name={name}
         imageKey={p.image_key}

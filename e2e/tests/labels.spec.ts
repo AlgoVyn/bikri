@@ -13,6 +13,7 @@ test.describe('Barcode labels (T-052)', () => {
       ]),
     );
     await page.goto('/bikri/products');
+    await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('button', { name: 'Select', exact: true }).click();
     await page.getByRole('button', { name: /Cable/ }).first().click();
     await page.getByRole('button', { name: 'Print 1 label' }).click();

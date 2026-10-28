@@ -148,6 +148,7 @@ test.describe('Stock adjust (T-021)', () => {
     page,
   }) => {
     const [cable] = await shop(page);
+    await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('link', { name: 'Stock count' }).click();
     await page.getByRole('button', { name: 'Start count' }).click();
     await expect(page.getByTestId('count-row')).toHaveCount(2);
