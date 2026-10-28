@@ -17,7 +17,6 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -299,7 +298,7 @@ function PayStep({
         aria-label={t('pay.method')}
         className="grid grid-cols-2 gap-1 sm:grid-cols-4"
       >
-        {PAY_METHODS.map((m, i) => (
+        {PAY_METHODS.map((m) => (
           <button
             key={m}
             type="button"
@@ -308,7 +307,7 @@ function PayStep({
             className={`min-h-11 rounded-control border px-2 ${row?.method === m ? 'border-primary bg-primary text-primary-ink' : 'border-border bg-surface'}`}
             onClick={() => chooseMethod(m)}
           >
-            {t(METHOD_KEY[m])} <KeyBadge keys={String(i + 1)} />
+            {t(METHOD_KEY[m])}
           </button>
         ))}
       </div>
@@ -373,7 +372,7 @@ function PayStep({
             onClick={addSplit}
             disabled={rows.length >= 4}
           >
-            {t('pay.split')} <KeyBadge keys="Ctrl+Enter" />
+            {t('pay.split')}
           </button>
           <p data-testid="pay-running">
             {t('pay.running', {

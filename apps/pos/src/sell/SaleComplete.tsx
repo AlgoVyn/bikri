@@ -4,7 +4,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { retryPrintJob } from '../data/printJobs.ts';
@@ -238,7 +237,7 @@ export function SaleComplete({
         className={`${buttonPrimary} min-h-14 w-full text-title`}
         onClick={onNewSale}
       >
-        {t('pay.new_sale')} <KeyBadge keys="Enter" />
+        {t('pay.new_sale')}
       </button>
       <div className="grid w-full grid-cols-2 gap-2">
         <button
@@ -246,7 +245,7 @@ export function SaleComplete({
           className={`${buttonQuiet} gap-2`}
           onClick={() => void printAgain()}
         >
-          {t('done.print_again')} <KeyBadge keys="P" />
+          {t('done.print_again')}
         </button>
         <button
           type="button"

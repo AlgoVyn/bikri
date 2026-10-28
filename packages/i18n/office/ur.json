@@ -843,7 +843,13 @@
       "terms_8": "رسیدیں۔ رسید پر دکان کا نام، لوگو اور چھوٹی «Powered by AlgoVyn» لائن ہوتی ہے۔",
       "title": "متعلق",
       "updated": "اپ ڈیٹ چیک ہو گیا۔",
-      "version": "ورژن"
+      "version": "ورژن",
+      "shortcuts": "کی بورڈ شارٹ کٹس",
+      "shortcuts_hint": "شارٹ کٹس بٹنوں پر نہیں، یہاں درج ہیں۔ ریل آئٹمز پر ماؤس لانے سے بھی کلید نظر آتی ہے۔",
+      "shortcuts_global": "ہر جگہ",
+      "shortcuts_rail": "ریل آئٹمز",
+      "shortcuts_sell": "فروخت اور ادائیگی",
+      "shortcuts_details": "تفصیل اور فارم"
     },
     "labels": {
       "ask_manager": "بارکوڈ نہیں — منیجر سے بنوائیں",

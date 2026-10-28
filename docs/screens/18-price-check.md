@@ -1,6 +1,6 @@
 # 18 — Price check
 
-Modal from Home / rail / hotkey `Alt+P`. Everyone. Customers often ask "how much is this?" without buying.
+Modal from Home / rail / hotkey `Ctrl+Shift+P`. Everyone. Customers often ask "how much is this?" without buying.
 
 ## Reference
 

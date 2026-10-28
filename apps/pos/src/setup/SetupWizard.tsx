@@ -280,7 +280,12 @@ export function SetupWizard() {
   keyRef.current = { next, back };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.altKey && /^Digit[123]$/.test(event.code)) {
+      if (
+        event.ctrlKey &&
+        event.shiftKey &&
+        !event.altKey &&
+        /^Digit[123]$/.test(event.code)
+      ) {
         const lang = LANGS[Number(event.code.slice(-1)) - 1]?.[0];
         if (lang) {
           event.preventDefault();

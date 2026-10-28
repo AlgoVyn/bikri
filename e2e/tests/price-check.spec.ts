@@ -132,19 +132,19 @@ test.describe('Price check (T-022)', () => {
     );
   });
 
-  test('Alt+P from a field; unknown barcode → Not found → Add product with the barcode', async ({
+  test('Ctrl+Shift+P from a field; unknown barcode → Not found → Add product with the barcode', async ({
     page,
   }) => {
     await shop(page, '/bikri/sell');
     await page.locator('main input').first().focus();
-    await page.keyboard.press('Alt+KeyP');
+    await page.keyboard.press('Control+Shift+KeyP');
     await expect(dialog(page)).toBeVisible();
     await field(page).fill('8909999999999');
     await field(page).press('Enter');
     await expect(dialog(page).getByText('Not found')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toHaveCount(0);
-    await page.keyboard.press('Alt+KeyP');
+    await page.keyboard.press('Control+Shift+KeyP');
     await field(page).fill('8909999999999');
     await field(page).press('Enter');
     await dialog(page).getByRole('link', { name: 'Add product' }).click();
@@ -155,7 +155,7 @@ test.describe('Price check (T-022)', () => {
   test('AC 3: a cashier never sees cost', async ({ page }) => {
     await shop(page);
     await page.evaluate(() => window.__bikriTest?.unlockAs('cashier', 'Sana'));
-    await page.keyboard.press('Alt+KeyP');
+    await page.keyboard.press('Control+Shift+KeyP');
     await field(page).fill('8901111111111');
     await field(page).press('Enter');
     await expect(dialog(page).getByTestId('price-card-price')).toHaveText(
@@ -188,7 +188,7 @@ test.describe('Price check (T-022)', () => {
   test('Urdu: name search in Urdu, labels in Urdu', async ({ page }) => {
     await shop(page);
     await page.getByLabel('Language').selectOption('ur');
-    await page.keyboard.press('Alt+KeyP');
+    await page.keyboard.press('Control+Shift+KeyP');
     await expect(dialog(page)).toBeVisible();
     await field(page).fill('کیبل');
     await field(page).press('Enter');

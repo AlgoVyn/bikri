@@ -168,10 +168,6 @@ export function PrinterDot() {
   );
 }
 
-function KeyHint({ keys }: { keys: string }) {
-  return <span className="ms-auto text-small text-text-muted">{keys}</span>;
-}
-
 /** Staff avatar with name, role and Lock (T-035; unlocking another profile switches user). */
 export function StaffMenu() {
   const { t } = useTranslation();
@@ -218,13 +214,14 @@ export function StaffMenu() {
           </p>
           <button
             type="button"
+            title={`${t('shell.lock')} (Ctrl+L)`}
             className="mt-2 flex min-h-11 w-full items-center rounded-control px-2 text-start hover:bg-surface-2"
             onClick={() => {
               setOpen(false);
               lock();
             }}
           >
-            {t('shell.lock')} <KeyHint keys="Ctrl+L" />
+            {t('shell.lock')}
           </button>
         </div>
       ) : null}

@@ -112,7 +112,7 @@ function KitFields({ idPrefix }: { idPrefix: string }) {
         onBarcode={() => {}}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <KeyBadge keys="Alt+1" />
+        <KeyBadge keys="Ctrl+Shift+1" />
         <button
           type="button"
           className={buttonQuiet}

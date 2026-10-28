@@ -3,7 +3,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
 import { MoreIcon, SearchIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -84,16 +83,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     void navigate({ to: '/', replace: true });
   }, [blocked, navigate, t, toast]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-bound every render so the handler sees the current permissions
+  // Re-bound every render so the handler sees the current permissions.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // Alt+P works everywhere, even while typing (screens/18).
+      // Ctrl+Shift+P works everywhere, even while typing (screens/18).
       if (
         !event.defaultPrevented &&
-        event.altKey &&
-        !event.ctrlKey &&
+        event.ctrlKey &&
+        event.shiftKey &&
+        !event.altKey &&
         !event.metaKey &&
-        !event.shiftKey &&
         event.code === 'KeyP'
       ) {
         event.preventDefault();
@@ -102,12 +101,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
       if (
         event.defaultPrevented ||
-        event.ctrlKey ||
         event.metaKey ||
         ignoresHotkey(event.target)
       )
         return;
       if (
+        !event.ctrlKey &&
         !event.altKey &&
         !event.shiftKey &&
         (event.key === 'n' || event.key === 'N')
@@ -117,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         void navigate({ to: '/sell' });
         return;
       }
-      if (!event.altKey || event.shiftKey) return;
+      if (!event.ctrlKey || !event.shiftKey || event.altKey) return;
       const digit = /^Digit([1-9])$/u.exec(event.code)?.[1];
       const item = digit === undefined ? undefined : NAV[Number(digit) - 1];
       if (item === undefined || !allowed(item)) return;
@@ -187,20 +186,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <item.Icon />
             <span className="max-w-full truncate">{t(item.label)}</span>
-            <span className="max-lg:hidden">
-              <KeyBadge keys={item.keys} />
-            </span>
           </Link>
         ))}
         <button
           type="button"
           className={`${navLink} max-lg:hidden`}
-          title={`${t('pricecheck.title')} (Alt+P)`}
+          title={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
           onClick={() => openPriceCheck(true)}
         >
           <SearchIcon />
           <span className="max-w-full truncate">{t('pricecheck.title')}</span>
-          <KeyBadge keys="Alt+P" />
         </button>
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">

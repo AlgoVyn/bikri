@@ -9,7 +9,6 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, type CartId, isEmptyCart, loadCarts } from '../data/cart.ts';
@@ -293,7 +292,7 @@ export function BillDetail({ saleId }: { saleId: string }) {
           className={`${buttonQuiet} gap-2`}
           onClick={() => void print()}
         >
-          {t('office.bill.print')} <KeyBadge keys="P" />
+          {t('office.bill.print')}
         </button>
         <button
           type="button"
@@ -320,7 +319,7 @@ export function BillDetail({ saleId }: { saleId: string }) {
               })
             }
           >
-            {t('office.bill.refund')} <KeyBadge keys="R" />
+            {t('office.bill.refund')}
           </button>
         ) : null}
         {canVoid ? (

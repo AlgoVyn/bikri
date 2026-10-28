@@ -3,7 +3,6 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -224,21 +223,21 @@ export function HomePage() {
             <li key={tile.to + tile.label}>
               <Link
                 to={tile.to}
+                title={`${t(tile.label)} (${tile.keys})`}
                 className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface p-2 text-center"
               >
                 <span className="font-medium">{t(tile.label)}</span>
-                <KeyBadge keys={tile.keys} />
               </Link>
             </li>
           ))}
           <li>
             <button
               type="button"
+              title={`${t('home.price_check')} (Ctrl+Shift+P)`}
               onClick={() => openPriceCheck(true)}
               className="flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-card border border-border bg-surface p-2 text-center"
             >
               <span className="font-medium">{t('home.price_check')}</span>
-              <KeyBadge keys="Alt+P" />
             </button>
           </li>
         </ul>
