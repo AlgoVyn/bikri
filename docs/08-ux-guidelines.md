@@ -34,7 +34,11 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-primary-ink` | `#FFFFFF` | `#00385D` | Text on primary | white / brand 900 (site) |
 | `--color-primary-subtle` | `#E0F2FE` | `#00385D` | Selected rows, active rail item | brand 100 / brand 900 |
 | `--color-primary-subtle-ink` | `#00497A` | `#E0F2FE` | Text on primary-subtle | brand 800 / brand 100 |
-| `--color-brand-navy` | `#182E55` | `#182E55` | Rail background option, logo, receipt preview header | logo |
+| `--color-brand-navy` | `#182E55` | `#182E55` | Logo, receipt preview header | logo |
+| `--color-rail` | `#182E55` | `#0B1729` | Desktop rail background | logo navy / derived |
+| `--color-rail-ink` | `#F1F5F9` | `#F1F5F9` | Active rail label and icon | slate-100 (site) |
+| `--color-rail-muted` | `#B8C6DB` | `#9FB0C9` | Inactive rail labels, shop name | derived |
+| `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
 | `--color-danger` | `#DC2626` | `#F87171` | Below cost, refunds, destructive | red-600 (site) / red-400 derived |
@@ -46,13 +50,13 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
 | `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
 
-`theme-color` meta and manifest `theme_color`: `#006BB3`. Rail: light mode uses `--color-surface` with `--color-primary` active state; owner may pick "Navy rail" (`--color-brand-navy` background, white text 13.45:1, teal active indicator 6.26:1).
+`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in both modes (`--color-rail`), with `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
 
 Category tile colours (8, white initials on each): `#006BB3 #182E55 #0F766E #047857 #B45309 #7C3AED #BE185D #475569` (brand blue, logo navy, teal-700 derived from the logo teal — `#4BC2BF` itself is too light for white text — then emerald, amber, violet, pink, slate).
 
 #### Contrast check (WCAG 2.2 AA: 4.5:1 body text, 3:1 large text / UI components)
 
-Computed with the WCAG relative-luminance formula on 27 Oct 2026. CI repeats this with `tools/contrast-check.ts` over the token pairs below and fails on any regression.
+Computed with the WCAG relative-luminance formula on 27–28 Oct 2026. CI repeats this with `tools/contrast-check.ts` over the token pairs below and fails on any regression.
 
 | Mode | Pair | Ratio | Needed | Result |
 |---|---|---|---|---|
@@ -65,6 +69,9 @@ Computed with the WCAG relative-luminance formula on 27 Oct 2026. CI repeats thi
 | Light | primary-subtle-ink `#00497A` on `#E0F2FE` | 8.19 | 4.5 | pass |
 | Light | accent-ink `#182E55` on accent `#4BC2BF` | 6.26 | 4.5 | pass |
 | Light | white on brand-navy `#182E55` | 13.45 | 4.5 | pass |
+| Light | rail-ink `#F1F5F9` on rail `#182E55` | 12.28 | 4.5 | pass |
+| Light | rail-muted `#B8C6DB` on rail `#182E55` | 7.78 | 4.5 | pass |
+| Light | rail-active `#4BC2BF` on rail `#182E55` | 6.26 | 4.5 | pass |
 | Light | danger `#DC2626` on white / white on danger | 4.83 | 4.5 | pass |
 | Light | danger-subtle ink `#991B1B` on `#FEE2E2` | 6.80 | 4.5 | pass |
 | Light | warning `#B45309` on white | 5.02 | 4.5 | pass |
@@ -87,6 +94,9 @@ Computed with the WCAG relative-luminance formula on 27 Oct 2026. CI repeats thi
 | Dark | info `#7DD3FC` on surface | 8.77 | 4.5 | pass |
 | Dark | border-strong `#64748B` on surface | 3.07 | 3.0 | pass |
 | Dark | primary-ink `#00385D` on primary-hover `#7DD3FC` | 7.31 | 4.5 | pass |
+| Dark | rail-ink `#F1F5F9` on rail `#0B1729` | 16.40 | 4.5 | pass |
+| Dark | rail-muted `#9FB0C9` on rail `#0B1729` | 8.15 | 4.5 | pass |
+| Dark | rail-active `#4BC2BF` on rail `#0B1729` | 8.36 | 4.5 | pass |
 | Dark | primary-subtle-ink `#E0F2FE` on `#00385D` | 10.62 | 4.5 | pass |
 | Dark | banner inks on danger/warning/success/info subtle | 11.16 / 12.03 / 11.81 / 12.80 | 4.5 | pass |
 | Tiles | white on each of the 8 tile colours | 5.02 – 13.45 | 4.5 | pass |
@@ -95,13 +105,17 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 
 ### Spacing, radius, elevation
 
-4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows: one level for cards (`0 1px 2px rgb(0 0 0 / .06)`), one for modals (`0 12px 32px rgb(0 0 0 / .18)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
+4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows: one soft two-layer level for cards (`0 1px 2px rgb(15 23 42 / .04), 0 1px 3px rgb(15 23 42 / .06)`), a top-bar shadow (`0 1px 2px rgb(15 23 42 / .04)`) and one for modals (`0 12px 32px rgb(15 23 42 / .18)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
 
 ### Typography
 
 | Role | Font | Size / line height |
 |---|---|---|
-| UI Latin | **Inter** (variable, self-hosted, subset Latin; also the Algovyn website font) | 15/22 body, 13/18 small, 20/28 title, 28/34 total |
+| UI Latin | **Inter** (variable, self-hosted, subset Latin; also the Algovyn website font) | 15/22 body, 13/18 small |
+| Screen title (`text-h1`) | Inter semibold | 24/30 |
+| Section title (`text-h2`) | Inter semibold | 18/26 |
+| Card / dialog title (`text-title`) | Inter semibold | 20/28 |
+| Total (`text-total`) | Inter semibold | 28/34; figures 32/40 |
 | Urdu | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.9 (Nastaliq needs more) |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 

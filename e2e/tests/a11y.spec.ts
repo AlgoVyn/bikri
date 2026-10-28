@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { expectNoSeriousAxe, idbAll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  expectNoSeriousAxe,
+  idbAll,
+  openReadyShop,
+} from './helpers.ts';
 
 // T-063: axe on every screen (08 §8), English and the Urdu core journey.
 
@@ -43,6 +48,7 @@ async function visit(page: import('@playwright/test').Page, path: string) {
   await expect(page.getByText('This page is not available.')).toHaveCount(0);
   await expect(page.locator('main')).toBeVisible();
   await expect(page.locator('main')).not.toBeEmpty();
+  await expectNoHorizontalScroll(page);
 }
 
 test.describe('accessibility sweep (T-063)', () => {

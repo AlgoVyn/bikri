@@ -236,7 +236,9 @@
     "attn_sync_stale": "This till hasn't received updates for {{days}} days",
     "attn_sync_stale_severe": "Connect to the internet within {{days}} days to avoid a full re-download",
     "attn_sync_pending_old": "This till hasn't synced since {{time}}. Connect to the internet so your data is backed up.",
-    "attn_clock_wrong": "This PC's clock is wrong — fix the date/time"
+    "attn_clock_wrong": "This PC's clock is wrong — fix the date/time",
+    "view_all": "View all",
+    "today_summary": "Today at a glance"
   },
   "import": {
     "action_error": "Skipped",

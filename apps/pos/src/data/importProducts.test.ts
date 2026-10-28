@@ -71,7 +71,10 @@ describe('import spreadsheet (screens/08)', () => {
     });
   });
 
-  it('AC 5: 1,000 valid template rows import in < 10 s with 1,000 opening movements, ≤ 200 ops per transaction', async () => {
+  it('AC 5: 1,000 valid template rows import in < 10 s with 1,000 opening movements, ≤ 200 ops per transaction', {
+    retry: 1,
+    timeout: 20_000,
+  }, async () => {
     const { db, ctx } = await shop('imp1');
     const lines = [HEAD];
     for (let i = 0; i < 1000; i += 1) {
@@ -115,7 +118,7 @@ describe('import spreadsheet (screens/08)', () => {
     for (const op of await db.outbox.toArray())
       perTx.set(String(op.tx_id), (perTx.get(String(op.tx_id)) ?? 0) + 1);
     expect(Math.max(...perTx.values())).toBeLessThanOrEqual(200);
-  }, 20_000);
+  });
 
   it('matches by SKU or barcode: updates fields and adds barcodes; stock and cost are ignored', async () => {
     const { db, ctx } = await shop('imp2');

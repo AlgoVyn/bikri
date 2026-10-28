@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon, SearchIcon } from '../components/icons.tsx';
+import { MoreIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -24,7 +24,7 @@ import {
 } from './TopBarParts.tsx';
 
 const navLink =
-  'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted aria-[current=page]:text-primary lg:flex-none lg:py-1.5';
+  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted lg:flex-none lg:py-1.5';
 
 /** Shell pages that are not rail items still need a title on a phone. */
 const EXTRA_TITLES: Record<string, string> = {
@@ -144,9 +144,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-bg text-text">
-      <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 lg:start-rail">
+      <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
         <span
-          className="min-w-0 flex-1 truncate font-medium lg:hidden"
+          className="min-w-0 flex-1 truncate font-semibold lg:hidden"
           data-testid="screen-title-bar"
         >
           {screenTitle ?? shopName ?? t('common.app_name')}
@@ -181,31 +181,55 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <nav
         aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e"
+        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail"
       >
+        <div className="hidden h-topbar shrink-0 flex-col items-center justify-center gap-0.5 lg:flex">
+          <span
+            aria-hidden="true"
+            className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+          >
+            <SalesIcon />
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rail-muted">
+            {t('common.app_name')}
+          </span>
+        </div>
         <span
-          className="hidden h-topbar shrink-0 items-center justify-center break-words px-1 text-center text-small font-semibold leading-tight lg:flex"
+          className="hidden break-words px-1 pb-2 text-center text-[11px] font-medium leading-tight text-rail-muted lg:block"
           data-testid="shop-name-rail"
         >
           {shopName ?? t('common.app_name')}
         </span>
-        {visible.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            title={`${t(item.label)} (${item.keys})`}
-            activeOptions={{ exact: item.to === '/' }}
-            className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'}`}
-          >
-            <item.Icon />
-            <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
-              {t(item.label)}
-            </span>
-          </Link>
-        ))}
+        {visible.map((item) => {
+          const active = current?.to === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              title={`${t(item.label)} (${item.keys})`}
+              activeOptions={{ exact: item.to === '/' }}
+              className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
+                active
+                  ? 'text-primary lg:bg-white/10 lg:text-white'
+                  : 'lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink'
+              }`}
+            >
+              {active ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
+                />
+              ) : null}
+              <item.Icon />
+              <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
+                {t(item.label)}
+              </span>
+            </Link>
+          );
+        })}
         <button
           type="button"
-          className={`${navLink} max-lg:hidden`}
+          className={`${navLink} max-lg:hidden lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink`}
           title={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
           onClick={() => openPriceCheck(true)}
         >
