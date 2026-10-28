@@ -238,7 +238,19 @@
     "attn_sync_pending_old": "یہ ٹِل {{time}} سے سنک نہیں ہوا۔ انٹرنیٹ سے جوڑیں تاکہ آپ کا ڈیٹا محفوظ ہو۔",
     "attn_clock_wrong": "اس PC کی گھڑی غلط ہے — تاریخ/وقت درست کریں",
     "view_all": "سب دیکھیں",
-    "today_summary": "آج ایک نظر میں"
+    "today_summary": "آج ایک نظر میں",
+    "new_sale_hint": "اشیاء شامل کریں یا بارکوڈ اسکین کریں",
+    "todays_register": "آج کا کھاتہ",
+    "last_bill": "آخری بل {{time}}",
+    "desc_price_check": "بارکوڈ اسکین کریں",
+    "desc_day_close": "گنتی اور بندش",
+    "desc_products": "اسٹاک سنبھالیں",
+    "desc_sales": "بل اور واپسی",
+    "desc_udhaar": "گاہک کا کھاتہ",
+    "desc_suppliers": "خریداری اور واجبات",
+    "desc_expenses": "اخراجات",
+    "desc_reports": "منافع اور رجحان",
+    "desc_settings": "پرنٹر اور ایپ"
   },
   "import": {
     "action_error": "چھوڑ دی",
@@ -362,7 +374,13 @@
     "still_due": "{{amount}} ابھی باقی",
     "udhaar_written": "{{amount}} {{name}} کے کھاتے میں لکھا · اب بقایا {{balance}}",
     "whatsapp": "واٹس ایپ پر بھیجیں",
-    "write_khata": "{{amount}} کھاتے میں لکھیں"
+    "write_khata": "{{amount}} کھاتے میں لکھیں",
+    "method_cash_hint": "نوٹ اور سکے",
+    "method_bank_hint": "بینک یا والٹ ٹرانسفر",
+    "method_card_hint": "کارڈ سوائپ یا داخل کریں",
+    "method_udhaar_hint": "گاہک کے کھاتے میں شامل کریں",
+    "change_label": "واپس کرنے ہیں",
+    "due_label": "ابھی باقی"
   },
   "payment": {
     "bank_wallet": "بینک/والیٹ",
@@ -556,7 +574,9 @@
     "print_label": "لیبل پرنٹ کریں",
     "select": "منتخب کریں",
     "print_labels_one": "{{count}} لیبل پرنٹ کریں",
-    "print_labels_other": "{{count}} لیبل پرنٹ کریں"
+    "print_labels_other": "{{count}} لیبل پرنٹ کریں",
+    "subtitle": "اسٹاک، قیمتیں اور اقسام",
+    "more_actions": "مزید کارروائیاں"
   },
   "sell": {
     "add_discount": "رعایت شامل کریں",
@@ -651,7 +671,8 @@
     "unknown_barcode": "بارکوڈ {{code}} والی کوئی پروڈکٹ نہیں",
     "view_cart": "کارٹ دیکھیں · {{count}} اشیاء",
     "view_cart_one": "کارٹ دیکھیں · 1 چیز",
-    "walk_in": "عام گاہک"
+    "walk_in": "عام گاہک",
+    "empty_tab": "خالی"
   },
   "setup": {
     "add_one": "ایک مصنوع شامل کریں",

@@ -3,12 +3,25 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonDanger } from '../components/classes.ts';
+import {
+  ClockIcon,
+  CloudIcon,
+  DeviceIcon,
+  GlobeIcon,
+  InfoIcon,
+  PrinterIcon,
+  SettingsIcon,
+  StoreIcon,
+  TagIcon,
+  UsersIcon,
+} from '../components/icons.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { deviceInfo, tenantInfo } from '../data/localTenant.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
-const rowLink = 'flex min-h-14 flex-col justify-center p-3';
+const rowLink = 'flex min-h-14 items-center gap-3 p-3';
 
 /** Settings (screens/17): printer, sync, devices (admin device + owner) and this device. */
 export function SettingsHomePage() {
@@ -61,156 +74,133 @@ function SettingsHomeContent() {
   };
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <h1 className="text-h1 font-semibold">{t('nav.settings')}</h1>
+      <PageHeader
+        icon={<SettingsIcon />}
+        tone="bg-surface-2 text-text-muted"
+        title={t('nav.settings')}
+        subtitle={t('office.settings.subtitle')}
+      />
       <nav className="flex flex-col gap-4">
         {can('settings.shop') ? (
           <section>
-            <h2 className="mb-1 px-1 text-small text-text-muted">
+            <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
               {t('office.settings.nav_group_shop')}
             </h2>
             <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-              <li>
-                <Link to="/settings/shop" className={rowLink}>
-                  <span className="font-medium">
-                    {t('office.settings.nav_shop')}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {t('office.settings.nav_shop_hint')}
-                  </span>
-                </Link>
-              </li>
+              <SettingsRow
+                to="/settings/shop"
+                icon={<StoreIcon />}
+                title={t('office.settings.nav_shop')}
+                hint={t('office.settings.nav_shop_hint')}
+              />
               {can('settings.staff') ? (
-                <li>
-                  <Link to="/settings/cashiers" className={rowLink}>
-                    <span className="font-medium">
-                      {t('office.settings.nav_cashiers')}
-                    </span>
-                    <span className="text-small text-text-muted">
-                      {t('office.settings.nav_cashiers_hint')}
-                    </span>
-                  </Link>
-                </li>
+                <SettingsRow
+                  to="/settings/cashiers"
+                  icon={<UsersIcon />}
+                  title={t('office.settings.nav_cashiers')}
+                  hint={t('office.settings.nav_cashiers_hint')}
+                />
               ) : null}
-              <li>
-                <Link to="/settings/activity" className={rowLink}>
-                  <span className="font-medium">
-                    {t('office.settings.nav_activity')}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {t('office.settings.nav_activity_hint')}
-                  </span>
-                </Link>
-              </li>
+              <SettingsRow
+                to="/settings/activity"
+                icon={<ClockIcon />}
+                title={t('office.settings.nav_activity')}
+                hint={t('office.settings.nav_activity_hint')}
+              />
             </ul>
           </section>
         ) : null}
         <section>
-          <h2 className="mb-1 px-1 text-small text-text-muted">
+          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
             {t('office.settings.nav_group_device')}
           </h2>
           <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-            <li>
-              <Link to="/settings/printer" className={rowLink}>
-                <span className="font-medium">{t('printer.title')}</span>
-                <span className="text-small text-text-muted">
-                  {t('office.settings.nav_printer_hint')}
-                </span>
-              </Link>
-            </li>
+            <SettingsRow
+              to="/settings/printer"
+              icon={<PrinterIcon />}
+              title={t('printer.title')}
+              hint={t('office.settings.nav_printer_hint')}
+            />
             {can('catalog.edit') ? (
-              <li>
-                <Link to="/settings/labels" className={rowLink}>
-                  <span className="font-medium">
-                    {t('office.settings.nav_labels')}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {t('office.settings.nav_labels_hint')}
-                  </span>
-                </Link>
-              </li>
+              <SettingsRow
+                to="/settings/labels"
+                icon={<TagIcon />}
+                title={t('office.settings.nav_labels')}
+                hint={t('office.settings.nav_labels_hint')}
+              />
             ) : null}
-            <li>
-              <Link to="/settings/display" className={rowLink}>
-                <span className="font-medium">
-                  {t('office.settings.nav_display')}
-                </span>
-                <span className="text-small text-text-muted">
-                  {t('office.settings.nav_display_hint')}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/settings/display" className={rowLink}>
-                <span className="font-medium">
-                  {t('office.settings.nav_language')}
-                </span>
-                <span className="text-small text-text-muted">
-                  {t('office.settings.nav_language_hint')}
-                </span>
-              </Link>
-            </li>
+            <SettingsRow
+              to="/settings/display"
+              icon={<SettingsIcon />}
+              title={t('office.settings.nav_display')}
+              hint={t('office.settings.nav_display_hint')}
+            />
+            <SettingsRow
+              to="/settings/display"
+              icon={<GlobeIcon />}
+              title={t('office.settings.nav_language')}
+              hint={t('office.settings.nav_language_hint')}
+            />
           </ul>
         </section>
         <section>
-          <h2 className="mb-1 px-1 text-small text-text-muted">
+          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
             {t('office.settings.nav_group_data')}
           </h2>
           <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-            <li>
-              <Link to="/settings/sync" className={rowLink}>
-                <span className="font-medium">{t('syncpage.title')}</span>
-                <span className="text-small text-text-muted">
-                  {t('office.settings.nav_sync_hint')}
-                </span>
-              </Link>
-            </li>
+            <SettingsRow
+              to="/settings/sync"
+              icon={<CloudIcon />}
+              title={t('syncpage.title')}
+              hint={t('office.settings.nav_sync_hint')}
+            />
             {owner && info?.device?.is_admin && info.enrolled ? (
-              <li>
-                <Link to="/settings/devices" className={rowLink}>
-                  <span className="font-medium">{t('devices.title')}</span>
-                  <span className="text-small text-text-muted">
-                    {t('office.settings.nav_devices_hint')}
-                  </span>
-                </Link>
-              </li>
+              <SettingsRow
+                to="/settings/devices"
+                icon={<DeviceIcon />}
+                title={t('devices.title')}
+                hint={t('office.settings.nav_devices_hint')}
+              />
             ) : null}
             {can('export.data') && role === 'owner' ? (
-              <li>
-                <Link to="/settings/backup" className={rowLink}>
-                  <span className="font-medium">
-                    {t('office.backup.title')}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {t('office.backup.nav_hint')}
-                  </span>
-                </Link>
-              </li>
+              <SettingsRow
+                to="/settings/backup"
+                icon={<CloudIcon />}
+                title={t('office.backup.title')}
+                hint={t('office.backup.nav_hint')}
+              />
             ) : null}
-            <li>
-              <Link to="/settings/about" className={rowLink}>
-                <span className="font-medium">
-                  {t('office.settings.nav_about')}
-                </span>
-                <span className="text-small text-text-muted">
-                  {t('office.settings.nav_about_hint')}
-                </span>
-              </Link>
-            </li>
+            <SettingsRow
+              to="/settings/about"
+              icon={<InfoIcon />}
+              title={t('office.settings.nav_about')}
+              hint={t('office.settings.nav_about_hint')}
+            />
           </ul>
         </section>
       </nav>
       {info?.device ? (
         <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-          <h2 className="font-medium">
-            {t('office.settings.nav_this_device')}
-          </h2>
-          <p className="text-small text-text-muted" data-testid="this-device">
-            {info.tenant?.display_name ?? ''} · {info.device.name} ·{' '}
-            {info.device.code} ·{' '}
-            {info.device.is_admin
-              ? t('office.settings.nav_admin_device')
-              : t('office.settings.nav_till_device')}
-          </p>
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
+              <DeviceIcon />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-medium">
+                {t('office.settings.nav_this_device')}
+              </h2>
+              <p
+                className="text-small text-text-muted"
+                data-testid="this-device"
+              >
+                {info.tenant?.display_name ?? ''} · {info.device.name} ·{' '}
+                {info.device.code} ·{' '}
+                {info.device.is_admin
+                  ? t('office.settings.nav_admin_device')
+                  : t('office.settings.nav_till_device')}
+              </p>
+            </div>
+          </div>
           {owner && info.enrolled ? (
             <>
               <p className="text-small">
@@ -233,5 +223,37 @@ function SettingsHomeContent() {
         </section>
       ) : null}
     </div>
+  );
+}
+
+function SettingsRow({
+  to,
+  icon,
+  title,
+  hint,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <li>
+      <Link to={to} className={rowLink}>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">{title}</span>
+          <span className="block text-small text-text-muted">{hint}</span>
+        </span>
+        <span
+          aria-hidden="true"
+          className="text-title text-text-muted rtl:rotate-180"
+        >
+          ›
+        </span>
+      </Link>
+    </li>
   );
 }

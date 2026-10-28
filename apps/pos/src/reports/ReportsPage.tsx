@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { type ReportBundle, reportBundle } from '../data/reportBundle.ts';
@@ -200,33 +201,40 @@ export function ReportsPage() {
       className="mx-auto flex max-w-6xl flex-col gap-3 p-4"
       data-testid="reports-page"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.reports.title')}
-        </h1>
-        <label className="flex items-center gap-1 text-small">
-          <span className="text-text-muted">{t('office.reports.device')}</span>
-          <select
-            className={field}
-            value={deviceId}
-            onChange={(event) => setDeviceId(event.target.value)}
-          >
-            <option value="">{t('office.reports.all_devices')}</option>
-            {data.devices.map((device) => (
-              <option key={device.id} value={device.id}>
-                {String(device.name ?? device.code ?? '')}
-              </option>
-            ))}
-          </select>
-        </label>
-        {exportable ? (
-          <ExportMenu
-            onCsv={exportCurrent}
-            onPdf={() => void exportPdf()}
-            onShare={() => void share()}
-          />
-        ) : null}
-      </div>
+      <PageHeader
+        icon={<ReportsIcon />}
+        tone="bg-info-subtle text-info-subtle-ink"
+        title={t('office.reports.title')}
+        subtitle={t('office.reports.subtitle')}
+        actions={
+          <>
+            <label className="flex items-center gap-1 text-small">
+              <span className="text-text-muted">
+                {t('office.reports.device')}
+              </span>
+              <select
+                className={field}
+                value={deviceId}
+                onChange={(event) => setDeviceId(event.target.value)}
+              >
+                <option value="">{t('office.reports.all_devices')}</option>
+                {data.devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {String(device.name ?? device.code ?? '')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {exportable ? (
+              <ExportMenu
+                onCsv={exportCurrent}
+                onPdf={() => void exportPdf()}
+                onShare={() => void share()}
+              />
+            ) : null}
+          </>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-1">
         {(limited

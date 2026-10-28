@@ -7,6 +7,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -110,44 +111,49 @@ export function ExpensesPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.expenses.title')}
-        </h1>
-        {can('cash.move') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={readOnly}
-            onClick={() => setCashOpen(true)}
-          >
-            {t('office.expenses.cash_in_out')}
-          </button>
-        ) : null}
-        {can('export.data') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!data || data.rows.length === 0}
-            onClick={() =>
-              data &&
-              downloadText('bikri-expenses.csv', expensesCsv(data.rows, tz))
-            }
-          >
-            {t('office.expenses.export_csv')}
-          </button>
-        ) : null}
-        {can('expense.create') ? (
-          <button
-            type="button"
-            className={`${buttonPrimary} gap-2`}
-            disabled={readOnly}
-            onClick={() => setNewOpen(true)}
-          >
-            {t('office.expenses.new_expense')}
-          </button>
-        ) : null}
-      </div>
+      <PageHeader
+        icon={<ExpensesIcon />}
+        tone="bg-warning-subtle text-warning-subtle-ink"
+        title={t('office.expenses.title')}
+        subtitle={t('office.expenses.subtitle')}
+        actions={
+          <>
+            {can('cash.move') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={readOnly}
+                onClick={() => setCashOpen(true)}
+              >
+                {t('office.expenses.cash_in_out')}
+              </button>
+            ) : null}
+            {can('export.data') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!data || data.rows.length === 0}
+                onClick={() =>
+                  data &&
+                  downloadText('bikri-expenses.csv', expensesCsv(data.rows, tz))
+                }
+              >
+                {t('office.expenses.export_csv')}
+              </button>
+            ) : null}
+            {can('expense.create') ? (
+              <button
+                type="button"
+                className={`${buttonPrimary} gap-2`}
+                disabled={readOnly}
+                onClick={() => setNewOpen(true)}
+              >
+                {t('office.expenses.new_expense')}
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
       <div className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
         {presets.map((p) => (

@@ -13,6 +13,7 @@ import { QtyInput } from '../components/QtyInput.tsx';
 import {
   CART_IDS,
   type CartId,
+  cartTotals,
   isEmptyCart,
   type ShopMoney,
 } from '../data/cart.ts';
@@ -60,24 +61,35 @@ export function CartPanel(p: CartPanelProps) {
       <div role="tablist" aria-label={t('sell.carts')} className="flex gap-1">
         {CART_IDS.map((id, i) => {
           const filled = !isEmptyCart(p.carts[id]);
+          const total = cartTotals(p.carts[id], p.money).total;
+          const active = p.active === id;
           return (
             <button
               key={id}
               type="button"
               role="tab"
-              aria-selected={p.active === id}
-              className={`relative min-h-11 flex-1 rounded-control border px-2 text-small ${p.active === id ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
+              aria-selected={active}
+              className={`relative flex min-h-14 flex-1 flex-col items-start justify-center rounded-control border px-3 py-2 text-small ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
               onClick={() => p.onTab(id)}
             >
-              {t('sell.cart_tab', { n: i + 1 })}
-              {filled ? (
-                <span
-                  data-testid="cart-dot"
-                  className="ms-1 inline-block size-2 rounded-full bg-primary"
-                >
-                  <span className="sr-only">{t('sell.cart_has_items')}</span>
-                </span>
-              ) : null}
+              <span className="font-medium">
+                {t('sell.cart_tab', { n: i + 1 })}
+              </span>
+              <span
+                className={`mt-0.5 flex items-center gap-1 ${active ? 'text-primary-ink' : 'text-text-muted'}`}
+              >
+                {filled ? (
+                  <>
+                    <span
+                      data-testid="cart-dot"
+                      className="size-1.5 rounded-full bg-current"
+                    />
+                    <MoneyText paisa={total} />
+                  </>
+                ) : (
+                  t('sell.empty_tab')
+                )}
+              </span>
             </button>
           );
         })}

@@ -106,6 +106,16 @@ export function SellPage() {
 
   const cart: Cart = carts?.[active] ?? emptyCart(active, 0);
   const totals = useMemo(() => cartTotals(cart, money), [cart, money]);
+  const cartQty = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const line of cart.lines)
+      if (line.product_id)
+        map.set(
+          line.product_id,
+          (map.get(line.product_id) ?? 0) + line.qty_milli,
+        );
+    return map;
+  }, [cart.lines]);
   const prefix = parseQtyPrefix(query);
   const term = prefix ? prefix.rest : query;
   const results = useMemo(() => {
@@ -611,6 +621,7 @@ export function SellPage() {
               highlighted={highlight}
               onAdd={addRow}
               scrollRef={scrollRef}
+              cartQty={cartQty}
             />
           )}
         </div>
