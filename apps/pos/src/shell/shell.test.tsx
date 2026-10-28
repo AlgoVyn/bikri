@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
@@ -56,6 +57,14 @@ describe('app shell', () => {
     expect(screen.queryByText('Add your first products')).toBeNull();
   });
 
+  it('loads Roman Urdu instead of raw keys', async () => {
+    await renderAt(`${BASE_PATH}/`);
+    await setLanguage('roman-ur');
+    expect(i18n.t('home.greeting', { name: 'Adnan' })).toContain('Assalam');
+    expect(document.documentElement.lang).toBe('roman-ur');
+    expect(document.documentElement.dir).toBe('ltr');
+  });
+
   it('opens a stub from the rail and keeps unknown paths on the not-found page', async () => {
     const user = userEvent.setup();
     await renderAt(`${BASE_PATH}/`);
@@ -84,7 +93,7 @@ describe('app shell', () => {
     expect(apply).toHaveBeenCalledOnce();
   });
 
-  it('moves with Alt+2 and ignores the shortcut inside a field', async () => {
+  it('moves with Ctrl+Shift+2 and ignores the shortcut inside a field', async () => {
     const user = userEvent.setup();
     await renderAt(`${BASE_PATH}/settings`);
     expect(
@@ -92,10 +101,10 @@ describe('app shell', () => {
     ).toBeTruthy();
     const language = screen.getByLabelText('Language');
     language.focus();
-    await user.keyboard('{Alt>}{Digit2}{/Alt}');
+    await user.keyboard('{Control>}{Shift>}{Digit2}{/Shift}{/Control}');
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
     language.blur();
-    await user.keyboard('{Alt>}2{/Alt}');
+    await user.keyboard('{Control>}{Shift>}2{/Shift}{/Control}');
     expect(await screen.findByRole('heading', { name: 'Sell' })).toBeTruthy();
     await setLanguage('en');
   });

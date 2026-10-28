@@ -17,6 +17,11 @@ export function readStoredLanguage(): LocaleCode {
   return isLocale(stored) ? stored : 'en';
 }
 
+/** i18next canonicalises `roman-ur` to `roman-UR`; keep both keys so lookups work. */
+export function languageKeys(locale: LocaleCode): string[] {
+  return locale === 'roman-ur' ? ['roman-ur', 'roman-UR'] : [locale];
+}
+
 export function applyDocumentLanguage(locale: LocaleCode): void {
   document.documentElement.lang = locale;
   document.documentElement.dir = locale === 'ur' ? 'rtl' : 'ltr';
@@ -25,7 +30,9 @@ export function applyDocumentLanguage(locale: LocaleCode): void {
 /** Adds a language's catalog to i18next the first time it is used (D-100). */
 export async function ensureLanguage(locale: LocaleCode): Promise<void> {
   if (i18n.hasResourceBundle(locale, 'translation')) return;
-  i18n.addResourceBundle(locale, 'translation', await loadCatalog(locale));
+  const catalog = await loadCatalog(locale);
+  for (const key of languageKeys(locale))
+    i18n.addResourceBundle(key, 'translation', catalog);
 }
 
 export async function setLanguage(locale: LocaleCode): Promise<void> {
@@ -38,13 +45,18 @@ export async function setLanguage(locale: LocaleCode): Promise<void> {
 export async function initI18n(locale?: LocaleCode): Promise<void> {
   const language = locale ?? readStoredLanguage();
   if (!i18n.isInitialized) {
+    const catalog = await loadCatalog(language);
     await i18n.use(initReactI18next).init({
-      resources: { [language]: { translation: await loadCatalog(language) } },
+      resources: Object.fromEntries(
+        languageKeys(language).map((key) => [key, { translation: catalog }]),
+      ),
       partialBundledLanguages: true,
       lng: language,
       // Catalogs are complete (i18n:check), so no fallback language is downloaded.
       fallbackLng: false,
-      supportedLngs: [...LOCALES],
+      // `roman-ur` is not a valid ISO language tag, so i18next's supportedLngs
+      // whitelist drops it; the app only calls changeLanguage with LOCALES.
+      supportedLngs: false,
       interpolation: { escapeValue: false },
       react: { useSuspense: false },
     });

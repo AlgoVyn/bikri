@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonDanger, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -156,7 +155,6 @@ export function ProductDetailPage({
               className={`${buttonQuiet} gap-2`}
             >
               {t('products.edit')}
-              <KeyBadge keys="E" />
             </Link>
           ) : null}
           {can('catalog.edit') || can('purchase.create') ? (
@@ -166,7 +164,6 @@ export function ProductDetailPage({
               onClick={() => setLabelsOpen(true)}
             >
               {t('products.print_label')}
-              <KeyBadge keys="L" />
             </button>
           ) : null}
           {canEdit ? (

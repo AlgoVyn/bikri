@@ -843,7 +843,13 @@
       "terms_8": "Receipts. Your receipts show your shop name and logo and a small \"Powered by AlgoVyn\" line.",
       "title": "About",
       "updated": "Update checked.",
-      "version": "Version"
+      "version": "Version",
+      "shortcuts": "Keyboard shortcuts",
+      "shortcuts_hint": "Shortcuts are listed here instead of on buttons. Rail items also show their key when you hover over them.",
+      "shortcuts_global": "Everywhere",
+      "shortcuts_rail": "Rail items",
+      "shortcuts_sell": "Selling and payment",
+      "shortcuts_details": "Details and forms"
     },
     "labels": {
       "ask_manager": "No barcode — ask a manager to generate one",

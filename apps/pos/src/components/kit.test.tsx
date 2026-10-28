@@ -294,11 +294,11 @@ describe('dialogs, export, toast, and key hints', () => {
       removeListener: () => {},
     };
     vi.stubGlobal('matchMedia', () => query);
-    const { rerender } = render(<KeyBadge keys="Alt+1" />);
-    expect(screen.queryByText('Alt+1')).toBeNull();
+    const { rerender } = render(<KeyBadge keys="Ctrl+Shift+1" />);
+    expect(screen.queryByText('Ctrl+Shift+1')).toBeNull();
     fireEvent.keyDown(window, { key: 'a' });
-    rerender(<KeyBadge keys="Alt+1" />);
-    expect(screen.getByText('Alt+1')).toBeTruthy();
+    rerender(<KeyBadge keys="Ctrl+Shift+1" />);
+    expect(screen.getByText('Ctrl+Shift+1')).toBeTruthy();
   });
 
   it('renders an empty state action', async () => {

@@ -9,7 +9,6 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -838,7 +837,6 @@ export function ProductFormPage({
           onClick={() => (dirty ? setConfirmDiscard(true) : leave())}
         >
           {t('common.cancel')}
-          <KeyBadge keys="Esc" />
         </button>
         {isEdit ? null : (
           <button
@@ -848,9 +846,7 @@ export function ProductFormPage({
             onClick={() => void submit(true)}
           >
             {t('form.save_another')}
-            <span className="max-lg:hidden">
-              <KeyBadge keys="Ctrl+Shift+S" />
-            </span>
+            <span className="max-lg:hidden"></span>
           </button>
         )}
         <button
@@ -859,9 +855,7 @@ export function ProductFormPage({
           disabled={saving}
         >
           {t('form.save')}
-          <span className="max-lg:hidden">
-            <KeyBadge keys="Ctrl+S" />
-          </span>
+          <span className="max-lg:hidden"></span>
         </button>
       </div>
 

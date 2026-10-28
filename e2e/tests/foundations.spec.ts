@@ -82,9 +82,9 @@ test.describe('shell and languages (T-006, T-007)', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   });
 
-  test('Alt+3 opens Products from the rail', async ({ page }) => {
+  test('Ctrl+Shift+3 opens Products from the rail', async ({ page }) => {
     await openReadyShop(page, '/bikri/');
-    await page.keyboard.press('Alt+Digit3');
+    await page.keyboard.press('Control+Shift+Digit3');
     await expect(page).toHaveURL(/\/bikri\/products$/);
   });
 });

@@ -12,7 +12,6 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { SearchIcon } from '../components/icons.tsx';
-import { KeyBadge } from '../components/KeyBadge.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import { isRapidBarcode } from '../components/SearchBox.tsx';
@@ -557,7 +556,6 @@ export function SellPage() {
                 ×{nextQty / 1000}
               </span>
             ) : null}
-            <KeyBadge keys="F2" />
           </div>
         </search>
         {!searching ? (
@@ -622,14 +620,14 @@ export function SellPage() {
               setDialog('quick');
             }}
           >
-            {t('sell.quick_sale')} <KeyBadge keys="F7" />
+            {t('sell.quick_sale')}
           </button>
           <button
             type="button"
             className={buttonQuiet}
             onClick={() => setDialog('held')}
           >
-            {t('sell.held_bills', { count: heldCount })} <KeyBadge keys="F6" />
+            {t('sell.held_bills', { count: heldCount })}
           </button>
         </div>
         <button

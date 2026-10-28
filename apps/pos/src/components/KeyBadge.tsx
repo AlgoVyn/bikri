@@ -10,8 +10,17 @@ function readCoarsePointer(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-/** Small shortcut hint. Hidden on a touch-only device until a keyboard is used. */
-export function KeyBadge({ keys }: { keys: string }) {
+/**
+ * Small shortcut hint. Hidden on a touch-only device until a keyboard is used, unless
+ * `always` is set (the About help table lists every key).
+ */
+export function KeyBadge({
+  keys,
+  always = false,
+}: {
+  keys: string;
+  always?: boolean;
+}) {
   const [coarse, setCoarse] = useState(readCoarsePointer);
   const [keyboardSeen, setKeyboardSeen] = useState(false);
 
@@ -43,7 +52,7 @@ export function KeyBadge({ keys }: { keys: string }) {
     };
   }, [coarse, keyboardSeen]);
 
-  if (coarse && !keyboardSeen) {
+  if (!always && coarse && !keyboardSeen) {
     return null;
   }
 

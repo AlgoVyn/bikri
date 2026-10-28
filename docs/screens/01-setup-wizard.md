@@ -75,7 +75,7 @@ Two cards: **Add one product** (inline form = product form from [08](08-products
 
 ## Hotkeys
 
-`Enter` = Next (when no textarea focused), `Esc` = Back, `Alt+1/2/3` = language.
+`Enter` = Next (when no textarea focused), `Esc` = Back, `Ctrl+Shift+1/2/3` = language.
 
 ## Acceptance criteria
 
