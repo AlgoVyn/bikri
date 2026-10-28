@@ -4,6 +4,7 @@ import { ledgerContext, saveNewProduct } from '../data/catalog.ts';
 import { closeDb, getDb } from '../data/db.ts';
 import { ensureLocalTenant } from '../data/localTenant.ts';
 import { finishSetup } from '../data/setup.ts';
+import { createSupplier } from '../data/suppliers.ts';
 import { writeAction } from '../data/write.ts';
 import { useSession } from '../state/session.ts';
 import { seedSampleDay } from './sampleDay.ts';
@@ -114,6 +115,28 @@ export async function seedProducts(list: TestProduct[]): Promise<string[]> {
     ids.push(row.id);
   }
   return ids;
+}
+
+/** Supplier for E2E admin screens; returns its id. */
+export async function seedSupplier(s: {
+  name: string;
+  phone?: string;
+  opening?: number;
+}): Promise<string> {
+  const db = getDb();
+  const owner = (await db.staff.toArray()).find((row) => row.role === 'owner');
+  const ctx = await ledgerContext(db, owner?.id ?? '');
+  const row = await createSupplier(
+    db,
+    {
+      name: s.name,
+      phone: s.phone ?? '',
+      opening: s.opening ?? 0,
+    },
+    ctx,
+    owner?.id ?? null,
+  );
+  return row.id;
 }
 
 /** `n` products in one bulk write for the Sell performance check (screens/05 AC 2). */

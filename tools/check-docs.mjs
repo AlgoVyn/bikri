@@ -2,7 +2,7 @@
 // CI docs check (docs/10-testing.md §7):
 //  1. every relative link and image in AGENTS.md, README.md and docs/**/*.md resolves to a file
 //     (links into docs/reference/dukaan/ are skipped: that folder is local-only and gitignored, D-027);
-//  2. packages/db/migrations/0001_init.sql and 0002_seed.sql still match the SQL blocks in
+//  2. packages/db/migrations/0001_init.sql, 0002_seed.sql and 0003_perf_indexes.sql still match the SQL blocks in
 //     docs/02-data-model.md §2 / §2.1 (the doc is the schema source of truth, D-045).
 // Node 24, no dependencies. Exit code 1 on any problem.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -51,27 +51,32 @@ for (const file of files) {
 }
 
 const doc = readFileSync(join(ROOT, 'docs/02-data-model.md'), 'utf8');
-const blocks = [...doc.matchAll(/```sql\n([\s\S]*?)```/g)].map(
-  (m) => m[1] ?? '',
+const blocks = [...doc.matchAll(/```sql\n([\s\S]*?)```/g)].map((m) => ({
+  at: m.index ?? 0,
+  sql: m[1] ?? '',
+}));
+const migrationDir = join(ROOT, 'packages/db/migrations');
+const migrationFiles = readdirSync(migrationDir).filter((name) =>
+  /^\d{4}_.+\.sql$/u.test(name),
 );
-const migrations = [
-  ['0001_init.sql', blocks[0]],
-  ['0002_seed.sql', blocks[1]],
-];
-for (const [name, block] of migrations) {
-  const sql = readFileSync(join(ROOT, 'packages/db/migrations', name), 'utf8');
-  if (block === undefined || !sql.endsWith(block)) {
+if (migrationFiles.length === 0) problems.push('no migration files found');
+for (const name of migrationFiles) {
+  // The doc has one SQL block per migration heading (`... (migration \`0001...sql\`)`).
+  const block = blocks.find((candidate) => {
+    const heading = doc.slice(Math.max(0, candidate.at - 10_000), candidate.at);
+    return heading.includes(`migration \`${name}\``);
+  });
+  const sql = readFileSync(join(migrationDir, name), 'utf8');
+  if (!block || !sql.endsWith(block.sql))
     problems.push(
       `packages/db/migrations/${name} differs from its SQL block in docs/02-data-model.md`,
     );
-  }
 }
-
 if (problems.length > 0) {
   console.error(problems.join('\n'));
   console.error(`docs check: FAIL (${problems.length})`);
   process.exit(1);
 }
 console.log(
-  `docs check: pass (${files.length} markdown files, ${migrations.length} migrations in sync)`,
+  `docs check: pass (${files.length} markdown files, ${migrationFiles.length} migrations in sync)`,
 );

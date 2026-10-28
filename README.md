@@ -17,7 +17,9 @@ Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale we
 
 ## Status
 
-**M0 Foundations** (T-001–T-007) implemented: monorepo, Worker + static assets at `/bikri/`, D1 migrations, CI/CD workflows, PWA shell, Algovyn design tokens + UI kit, i18n. Next: M1 Local till (T-010 onward, see [roadmap](docs/11-roadmap.md)). The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
+**M0–M3 implemented** (foundations, local till, sync/devices/tenants, back office). **M4 Hardening** is in progress: nightly backups, per-shop export/restore, performance measurement, accessibility sweep and release preparation (see the [roadmap](docs/11-roadmap.md)). The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
+
+Read the **[operator guide](docs/operator-guide.md)** to run the deployment and the **[owner guide](docs/owner-guide.md)** to set up a shop and use the till.
 
 The Dukaan POS reference screenshots in `docs/reference/dukaan/` are **local-only**: the folder is gitignored (third-party UI, and one screenshot set came from a real account), so links to them work only in the local checkout where they were captured, not on GitHub.
 
@@ -36,7 +38,7 @@ pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
 pnpm website:check                           # go-live gate for algovyn.com (01 §5.5)
 ```
 
-CI/CD workflows live in `.github/workflows/` (`ci`, `deploy`, `website-guard`). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-platform-operator) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
+CI/CD workflows live in `.github/workflows/` (`ci`, `deploy`, `website-guard`, `backup`). Nothing deploys until the one-time Cloudflare setup in [01 §7.1](docs/01-architecture.md#71-one-time-setup-platform-operator) is done and the repository variable `DEPLOY_ENABLED=true` is set (D-060).
 
 ## Repository layout
 
@@ -47,7 +49,7 @@ packages/core     Pure TypeScript business and money rules, Zod schemas
 packages/db       Drizzle schema + SQL migrations for D1, Dexie schema
 packages/printer  Receipt layout, ESC/POS encoder, raster renderer, transports
 packages/i18n     en / ur / roman-ur translation files
-tools/backup      Nightly D1 export workflow
+tools/backup      D1 export, retention, tenant-extract and backup tests
 docs/             This specification
 ```
 

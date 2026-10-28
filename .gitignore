@@ -10,3 +10,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .turbo/
+
+# Generated performance fixture (tools/seed/large.ts); never commit it.
+e2e/fixtures/large.json

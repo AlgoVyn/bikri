@@ -260,7 +260,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   // owner email sign-in (05 §3.2): free sends to verified destination addresses, from the algovyn.com routing domain
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["bikri@algovyn.com"] }],
   "ratelimits": [{ "name": "OWNER_SIGNIN_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } }],
-  "triggers": { "crons": ["30 21 * * *"] },   // 02:30 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
+  "triggers": { "crons": ["0 22 * * *"] },    // 03:00 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
   "observability": { "enabled": true }
   // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "adnan@yaqoob.org", the platform operator),
   // OWNER_CODE_KEY and OWNER_SESSION_KEY (32 random bytes each, owner email sign-in, 05 §3.2)
@@ -350,7 +350,7 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 
 - `ci.yml` (PR): `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → build → Playwright against `wrangler dev` with local D1.
 - `deploy.yml` (push to `main`): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy` → smoke test. The deploy job runs only when the repository variable `DEPLOY_ENABLED` is `true` (set after §7.1) and refuses the placeholder `database_id`; the website check runs on every push to `main` regardless (D-060). A preview environment (`bikri-preview`, separate D1 `bikri-preview`, URL `https://bikri-preview.<account>.workers.dev/bikri/`, no routes on `algovyn.com`) deploys on PRs with label `preview`; its origin is added to `ALLOWED_ORIGINS` for that environment only.
-- Migrations live in `packages/db/migrations/000N_<name>.sql` (the `migrations_dir` in `wrangler.jsonc`). They must stay backward compatible with tills running the previous app version for at least **14 days** (add columns nullable or with defaults; never rename/drop in v1), because tills may run the old cached app for a while. Bump `SCHEMA_VERSION` with every migration; raise `MIN_CLIENT_SCHEMA` only for a breaking one ([03 §4.1](03-sync.md#41-push--post-apisyncpush)). Dexie schema versions are bumped in the same PR (`db.version(n).stores(...)` with an `upgrade()` when local data must change).
+- Migrations live in `packages/db/migrations/000N_<name>.sql` (the `migrations_dir` in `wrangler.jsonc`). They must stay backward compatible with tills running the previous app version for at least **14 days** (add columns nullable or with defaults; never rename/drop in v1), because tills may run the old cached app for a while. Bump `SCHEMA_VERSION` when a migration changes columns or the wire shape; index-only migrations (e.g. T-062's `0003_perf_indexes.sql`) do not need a client version bump. Raise `MIN_CLIENT_SCHEMA` only for a breaking change ([03 §4.1](03-sync.md#41-push--post-apisyncpush)). Dexie schema versions are bumped in the same PR (`db.version(n).stores(...)` with an `upgrade()` when local data must change).
 
 ## 8. Cloudflare free-tier budget
 
@@ -361,9 +361,9 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 | Worker requests | 100,000/day per account (reset 00:00 UTC) | ~1,560 pulls (60 s × 2 tills × 13 h) + ~300 pushes + ~200 file/other ≈ 2,100/day | ≈ 33 shops at 70 % of the limit |
 | Worker CPU | 10 ms per request | push of 200 ops ≈ 2–5 ms | watch |
 | Worker subrequests | 50/request (1,000 to internal services) | 1 D1 batch + ≤ 2 R2 calls | fine |
-| D1 rows written | 100,000/day per account | ≈ 6,500/day incl. indexes, `change_log`, usage counter and later prune deletes | **≈ 10 shops** at 70 % (the binding limit) |
+| D1 rows written | 100,000/day per account | ≈ 17,550/day (T-062 measured 117/bill for 150 reference bills incl. indexes and sync) | **≈ 4 shops** at the 70 % share |
 | D1 rows read | 5,000,000/day per account | indexed pulls ≈ 25,000/day | > 100 shops |
-| D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 50 MB/year (measure in T-062) | ≈ 10 shop-years per database, then a shard or Workers Paid |
+| D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 153 MB/year (T-062 measured 1.9 KB/bill) | ≈ 3.3 shop-years per database, then a shard or Workers Paid |
 | D1 queries per Worker invocation | 50 | `db.batch()` counts as 1 | fine |
 | D1 Time Travel | 7 days, whole database | disaster recovery only (rolls back every shop) | per-shop restore is logical ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)) |
 | Cron triggers | 5 per account (shared by all Workers on the account), 10 ms CPU each | 1 for all shops (nightly prune + tenant deletion, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); backups run in GitHub Actions | check other Algovyn Workers use ≤ 4 |

@@ -1,6 +1,9 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  expectNoSeriousAxe,
+  openReadyShop,
+} from './helpers.ts';
 
 // T-013: app shell + Home (screens/04).
 
@@ -9,15 +12,6 @@ async function openWithSales(page: Page): Promise<void> {
   await page.evaluate(() => window.__bikriTest?.seedTodaySales());
   await page.reload();
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
-}
-
-async function expectNoSeriousAxe(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(
-    axe.violations.filter(
-      (v) => v.impact === 'serious' || v.impact === 'critical',
-    ),
-  ).toEqual([]);
 }
 
 const isPhone = (page: Page) => (page.viewportSize()?.width ?? 0) < 1024;

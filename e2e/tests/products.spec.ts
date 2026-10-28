@@ -1,17 +1,11 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  expectNoSeriousAxe,
+  openReadyShop,
+} from './helpers.ts';
 
 // T-014: products list, detail, form, categories (screens/08 ACs 1, 2, 4, 7).
-
-async function expectNoSeriousAxe(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(
-    axe.violations.filter(
-      (v) => v.impact === 'serious' || v.impact === 'critical',
-    ),
-  ).toEqual([]);
-}
 
 async function addCable(page: Page): Promise<void> {
   await page.goto('/bikri/products/new');
