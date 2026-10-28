@@ -17,7 +17,9 @@ Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale we
 
 ## Status
 
-**M0 Foundations** (T-001–T-007) implemented: monorepo, Worker + static assets at `/bikri/`, D1 migrations, CI/CD workflows, PWA shell, Algovyn design tokens + UI kit, i18n. Next: M1 Local till (T-010 onward, see [roadmap](docs/11-roadmap.md)). The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
+**M0–M3 implemented** (foundations, local till, sync/devices/tenants, back office). **M4 Hardening** is in progress: nightly backups, per-shop export/restore, performance measurement, accessibility sweep and release preparation (see the [roadmap](docs/11-roadmap.md)). The full implementation-ready specification lives in [`docs/`](docs/00-overview.md). AI coding agents start at [`AGENTS.md`](AGENTS.md).
+
+Read the **[operator guide](docs/operator-guide.md)** to run the deployment and the **[owner guide](docs/owner-guide.md)** to set up a shop and use the till.
 
 The Dukaan POS reference screenshots in `docs/reference/dukaan/` are **local-only**: the folder is gitignored (third-party UI, and one screenshot set came from a real account), so links to them work only in the local checkout where they were captured, not on GitHub.
 
