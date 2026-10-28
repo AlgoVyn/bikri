@@ -72,7 +72,7 @@ export function HomePage() {
         deviceId,
         isOwner: role === 'owner',
       }),
-      recent: await recentBills(db, deviceId),
+      recent: await recentBills(db),
     };
   }, [today, yesterday, role]);
 

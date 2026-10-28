@@ -42,6 +42,18 @@ const tile = (page: Page, name: string) =>
   page.getByTestId('sell-tile').filter({ hasText: name });
 
 test.describe('Sell (T-016)', () => {
+  test('category chips show their names, never undefined', async ({ page }) => {
+    await openReadyShop(page, '/bikri/products/categories');
+    await page.getByPlaceholder('New category').fill('Cables');
+    await page
+      .locator('form')
+      .getByRole('button', { name: 'Add', exact: true })
+      .click();
+    await page.goto('/bikri/sell');
+    await expect(page.getByRole('button', { name: 'Cables' })).toBeVisible();
+    await expect(page.getByText('undefined', { exact: true })).toHaveCount(0);
+  });
+
   test('AC 1, 8: scanning one barcode 3 times is one line of 3 with 3 beeps; unknown barcode; quick sale', async ({
     page,
   }) => {
