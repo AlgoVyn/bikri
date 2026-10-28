@@ -16,6 +16,14 @@ export const SECURITY_HEADERS = {
 
 export type SecurityHeaderName = keyof typeof SECURITY_HEADERS;
 
+/**
+ * Cloudflare Web Analytics injects a beacon into HTML unless the response says
+ * `no-transform`; Bikri must not load third-party scripts (AGENTS.md, D-131).
+ * HTML still revalidates on every load, and Workbox precaches the assets.
+ */
+export const ASSET_CACHE_CONTROL =
+  'public, max-age=0, must-revalidate, no-transform';
+
 export function securityHeaderEntries(): ReadonlyArray<
   readonly [SecurityHeaderName, string]
 > {
@@ -26,7 +34,7 @@ export function securityHeaderEntries(): ReadonlyArray<
 
 /** Cloudflare Workers `_headers` body. Rules apply to `${BASE_PATH}/*`. */
 export function renderAssetHeaders(): string {
-  const lines = [`${BASE_PATH}/*`];
+  const lines = [`${BASE_PATH}/*`, `  Cache-Control: ${ASSET_CACHE_CONTROL}`];
   for (const [name, value] of securityHeaderEntries()) {
     lines.push(`  ${name}: ${value}`);
   }
