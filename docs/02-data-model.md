@@ -819,6 +819,18 @@ There is deliberately **no "Supplier" expense category**: money paid to supplier
 
 The default branch (`name 'Main'`, `bill_prefix 'INV'`, `is_default 1`) and the expense categories are created with the tenant (above). The `shop` row and the owner `staff` row are created by the setup wizard on the tenant's first enrolled device ([screens/01](screens/01-setup-wizard.md)).
 
+### 2.2 Performance indexes (migration `0003_perf_indexes.sql`)
+
+Additive indexes for T-062 hot lookups. They change no column and keep `SCHEMA_VERSION` at 1.
+
+```sql
+-- T-062: indexes for the refund/reversal lookups and supplier-return lines. Additive only.
+CREATE INDEX payments_refund ON payments (tenant_id, refund_id) WHERE refund_id IS NOT NULL;
+CREATE INDEX payments_supplier_return ON payments (tenant_id, supplier_return_id) WHERE supplier_return_id IS NOT NULL;
+CREATE INDEX expenses_reversal ON expenses (tenant_id, reverses_id) WHERE reverses_id IS NOT NULL;
+CREATE INDEX supplier_return_lines_return ON supplier_return_lines (tenant_id, return_id);
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

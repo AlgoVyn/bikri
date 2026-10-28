@@ -363,7 +363,7 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 | Worker subrequests | 50/request (1,000 to internal services) | 1 D1 batch + ≤ 2 R2 calls | fine |
 | D1 rows written | 100,000/day per account | ≈ 6,500/day incl. indexes, `change_log`, usage counter and later prune deletes | **≈ 10 shops** at 70 % (the binding limit) |
 | D1 rows read | 5,000,000/day per account | indexed pulls ≈ 25,000/day | > 100 shops |
-| D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 50 MB/year (measure in T-062) | ≈ 10 shop-years per database, then a shard or Workers Paid |
+| D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 276 MB/year (T-062 measured 4.5 KB/bill) | ≈ 1.8 shop-years per database, then a shard or Workers Paid |
 | D1 queries per Worker invocation | 50 | `db.batch()` counts as 1 | fine |
 | D1 Time Travel | 7 days, whole database | disaster recovery only (rolls back every shop) | per-shop restore is logical ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)) |
 | Cron triggers | 5 per account (shared by all Workers on the account), 10 ms CPU each | 1 for all shops (nightly prune + tenant deletion, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)); backups run in GitHub Actions | check other Algovyn Workers use ≤ 4 |

@@ -93,12 +93,12 @@ Reference shop (01 §8): 2 tills, 13 h/day open, 150 bills/day, 3 lines/bill.
 | Resource (per account, Free) | Per reference shop / day | Planned Bikri share | Shops that fit |
 |---|---|---|---|
 | Worker requests 100,000/day | ≈ 2,100 (60 s pulls while visible + pushes + files) | 70,000 (30 % kept for the website's other Workers and ops) | ≈ 33 |
-| D1 rows written 100,000/day | ≈ 6,500 (≈ 4,500 for bills incl. indexes and `change_log`, + masters, + 1 `tenant_usage` upsert per push, + the 30-day-later prune deletes) | 70,000 | **≈ 10** |
+| D1 rows written 100,000/day | ≈ 4,400 (T-062 measured 4,200 for 150 bills = 28 rows/bill incl. indexes and `change_log`, + masters and `tenant_usage`) | 70,000 | **≈ 10** |
 | D1 rows read 5,000,000/day | ≈ 25,000 (indexed pulls, push look-ups) + snapshots of new tills | 3,500,000 | > 100 |
-| D1 size 500 MB per DB (Free) | ≈ 50 MB per shop-year (01 §8 estimate; T-062 must measure it with `large.json`) | 1 shard | ≈ 10 shop-years per shard |
+| D1 size 500 MB per DB (Free) | ≈ 276 MB per shop-year (T-062 measured 4.5 KB/bill, 757 KB/shop-day; includes 30-day `change_log` and 90-day `applied_ops`) | plan a new shard at ~450 MB | **≈ 1.8 shop-years per DB** |
 | R2 10 GB-month, 1 M Class A/month | ≈ 25 MB photos per shop; ~1 PUT per photo | shared | > 100 |
 
-So **about 10 reference-size shops fit on the Free plan**, limited by rows written; storage then lasts about a year before a second shard or Workers Paid (USD 5/month: 10 GB per database, 50 M rows written and 25 B rows read per month included) is needed.
+So **about 10 reference-size shops fit on the Free plan by rows written**. Storage is the tighter limit: those 10 shops need about **6 databases after a year** (≈18 shop-years across the 10-database allowance), so add a shard when a DB reaches ~450 MB. Workers Paid (USD 5/month: 10 GB per database, 50 M rows written and 25 B rows read per month included) removes the storage pressure. The measurement is reproducible with `node tools/perf/measure-d1.mjs` ([T-062](11-roadmap.md)).
 
 How the daily row budget is shared:
 - `tenants.daily_write_budget` (default **7,000** rows) is set by the operator; the console warns when Σ budgets of active tenants > 70,000.

@@ -57,6 +57,7 @@ const blocks = [...doc.matchAll(/```sql\n([\s\S]*?)```/g)].map(
 const migrations = [
   ['0001_init.sql', blocks[0]],
   ['0002_seed.sql', blocks[1]],
+  ['0003_perf_indexes.sql', blocks[2]],
 ];
 for (const [name, block] of migrations) {
   const sql = readFileSync(join(ROOT, 'packages/db/migrations', name), 'utf8');
