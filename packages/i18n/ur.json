@@ -948,7 +948,8 @@
     "import_preview": "{{count}} تبدیلیاں، {{from}} سے {{to}} · سیلز {{sales}} · ادائیگیاں {{payments}}",
     "import_go": "امپورٹ کریں",
     "import_running": "امپورٹ ہو رہا ہے… {{total}} میں سے {{done}}",
-    "import_done": "امپورٹ مکمل: {{applied}} قبول، {{rejected}} مسترد۔"
+    "import_done": "امپورٹ مکمل: {{applied}} قبول، {{rejected}} مسترد۔",
+    "import_no_file": "کوئی فائل منتخب نہیں"
   },
   "syncpage": {
     "title": "سنک",

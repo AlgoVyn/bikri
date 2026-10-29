@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LockIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -160,14 +161,15 @@ export function PrinterDot() {
       data-testid="printer-dot"
       aria-label={label}
       title={label}
-      className={`inline-flex h-8 items-center rounded-full px-2.5 text-small font-medium hover:opacity-90 ${
+      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small font-medium hover:opacity-90 ${
         loading
           ? 'bg-surface-2 text-text-muted'
           : printer
-            ? 'bg-success text-white'
-            : 'bg-danger text-danger-ink'
+            ? 'bg-success-solid text-white'
+            : 'bg-danger-solid text-white'
       }`}
     >
+      <span aria-hidden="true" className="size-2 rounded-full bg-white/90" />
       {t('shell.printer_label')}
     </Link>
   );
@@ -220,12 +222,13 @@ export function StaffMenu() {
           <button
             type="button"
             title={`${t('shell.lock')} (Ctrl+L)`}
-            className="mt-2 flex min-h-11 w-full items-center rounded-control px-2 text-start hover:bg-surface-2"
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-control px-2 text-start hover:bg-surface-2"
             onClick={() => {
               setOpen(false);
               lock();
             }}
           >
+            <LockIcon />
             {t('shell.lock')}
           </button>
         </div>

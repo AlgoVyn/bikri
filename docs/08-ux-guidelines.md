@@ -56,10 +56,12 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
 | `--color-danger` | `#DC2626` | `#F87171` | Below cost, refunds, destructive | red-600 (site) / red-400 derived |
+| `--color-danger-solid` | `#B91C1C` | `#B91C1C` | White-on-red status pills | darker red for AA with white text |
 | `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#450A0A` / `#FECACA` | Error banners | derived (Tailwind red) |
 | `--color-warning` | `#B45309` | `#FBBF24` | Low stock, over limit, short | derived (amber-700 / amber-400; site's `#f59e0b` fails text contrast on white) |
 | `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#451A03` / `#FDE68A` | Warning banners | site notice colours / derived |
 | `--color-success` | `#047857` | `#34D399` | Synced, drawer correct | emerald-700 (site) / emerald-400 derived |
+| `--color-success-solid` | `#047857` | `#047857` | White-on-green status pills | darker green for AA with white text |
 | `--color-success-subtle` / ink | `#D1FAE5` / `#065F46` | `#022C22` / `#A7F3D0` | Success banners | emerald-100 (site) / derived |
 | `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
 | `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
