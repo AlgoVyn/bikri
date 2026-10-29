@@ -7,7 +7,7 @@ Nightly whole-database backup for [docs/09 §2](../../docs/09-backups-and-ops.md
 | `export.mjs` | `wrangler d1 export`, sanity check, per-tenant row counts and `bikri-YYYY-MM-DD.manifest.json` |
 | `files.mjs` | Weekly listing/download of every `bikri-files` object + sha256 manifest (docs/09 §2.1) |
 | `cloudflare.mjs` | Shared R2 API helpers (list, download, delete) |
-| `retention.mjs` | R2 retention: 30 daily + the 1st of 12 months |
+| `retention.mjs` | R2 retention: 30 daily + one backup per month (the earliest when the 1st is missing) |
 | `tenant-extract.mjs` | One tenant out of a scratch `bikri-restore` DB → `bikri-export` zip (09 §3.4) |
 | `zip.mjs` | Dependency-free STORE zip writer for the extract |
 | `tables.mjs` | Tenant tables counted in the manifest (checked against `packages/db/src/tables.ts`) |

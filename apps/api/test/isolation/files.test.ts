@@ -110,6 +110,15 @@ describe('files (T-033, I7)', () => {
         )
       ).status,
     ).toBe(415);
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `product_image/01JC0000000000000000000099/${digest}`,
+          IMG,
+        )
+      ).status,
+    ).toBe(404);
     const big = new Uint8Array(2 * 1024 * 1024 + 1);
     expect(
       (

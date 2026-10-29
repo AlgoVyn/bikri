@@ -202,6 +202,9 @@ export function SupplierStatement({
               params={{ supplierId }}
               className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
               aria-disabled={readOnly}
+              onClick={(event) => {
+                if (readOnly) event.preventDefault();
+              }}
             >
               {t('office.suppliers.record_delivery')}
             </Link>
@@ -218,6 +221,9 @@ export function SupplierStatement({
               params={{ supplierId }}
               className={`${buttonQuiet} ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
               aria-disabled={readOnly}
+              onClick={(event) => {
+                if (readOnly) event.preventDefault();
+              }}
             >
               {t('office.suppliers.return_supplier')}
             </Link>

@@ -162,7 +162,7 @@ admin.get('/tenants/:id', async (c) => {
       'SELECT name, setup_completed_at FROM shop WHERE tenant_id = ?1',
     ),
     db.prepare(
-      "SELECT after_json, created_at FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_status_change' ORDER BY created_at DESC LIMIT 50",
+      "SELECT after_json, created_at FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_status_change' AND device_id = 'server' ORDER BY created_at DESC LIMIT 50",
     ),
     db.prepare(
       "SELECT (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND revoked_at IS NULL) AS devices, (SELECT COUNT(*) FROM sync_conflicts WHERE tenant_id = ?1 AND resolution = 'needs_owner') AS conflicts",
@@ -184,10 +184,18 @@ admin.get('/tenants/:id', async (c) => {
     usage: await usageHistory(c.env, tenant.id, 7),
     status_history: (
       (history?.results ?? []) as { after_json: string; created_at: number }[]
-    ).map((r) => ({
-      ...(JSON.parse(r.after_json) as Record<string, unknown>),
-      at: r.created_at,
-    })),
+    ).flatMap((r) => {
+      try {
+        return [
+          {
+            ...(JSON.parse(r.after_json) as Record<string, unknown>),
+            at: r.created_at,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    }),
     support: supportPayload(tenant, now),
   });
 });
@@ -237,15 +245,26 @@ async function changeStatus(
     );
   }
   const now = Date.now();
-  const res = await c.var.db.batch(
-    statusChangeStatements(c.env, tenant, to, reason, by(c.var.operator), now),
+  const statements = statusChangeStatements(
+    c.env,
+    tenant,
+    to,
+    reason,
+    by(c.var.operator),
+    now,
   );
+  const update = statements[0];
+  if (!update) throw new ApiError('BAD_STATUS_CHANGE', 409, 'No status update');
+  const res = await c.var.db.batch([update]);
   if ((res[0]?.meta.changes ?? 0) !== 1)
     throw new ApiError(
       'BAD_STATUS_CHANGE',
       409,
       'The status changed meanwhile',
     );
+  // Audit and device side effects only after the CAS succeeded; never write a status row for a
+  // transition another request won.
+  if (statements.length > 1) await c.var.db.batch(statements.slice(1));
   return fresh(c.env, tenant.id);
 }
 
@@ -584,11 +603,16 @@ async function statusBeforeMaintenance(
   db: TenantDb,
 ): Promise<'active' | 'read_only' | 'suspended'> {
   const row = await db.first<{ after_json: string }>(
-    "SELECT after_json FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_status_change' ORDER BY created_at DESC LIMIT 1",
+    "SELECT after_json FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_status_change' AND device_id = 'server' ORDER BY created_at DESC LIMIT 1",
   );
-  const last = row
-    ? (JSON.parse(row.after_json) as { from?: string; to?: string })
-    : {};
+  let last: { from?: string; to?: string } = {};
+  if (row) {
+    try {
+      last = JSON.parse(row.after_json) as { from?: string; to?: string };
+    } catch {
+      last = {};
+    }
+  }
   const s = last.to === 'maintenance' ? last.from : last.to;
   return s === 'read_only' || s === 'suspended' ? s : 'active';
 }

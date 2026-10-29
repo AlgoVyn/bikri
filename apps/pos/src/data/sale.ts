@@ -137,8 +137,6 @@ export async function completeSale(
   ctx: LedgerContext,
   now = Date.now(),
 ): Promise<SaleResult> {
-  const existing = await db.sales.get(input.saleId);
-  if (existing) return { sale: existing, created: false };
   const { cart, money } = input;
   if (cart.lines.length === 0) throw new SaleInvalidError('empty cart');
   const totals: CartResult = cartTotals(cart, money);
@@ -176,9 +174,24 @@ export async function completeSale(
   for (const p of await db.products.bulkGet(productIds))
     if (p) products.set(p.id, p);
 
+  let created = false;
   const sale = await writeAction(
     db,
     async (w) => {
+      const existing = await w
+        .table<SyncedRow, string>('sales')
+        .get(input.saleId);
+      if (existing) return existing;
+      const kv = w.table<{ key: string; value: unknown }>('kv');
+      const last = (await kv.get('cart_last_sale'))?.value as
+        | { cart_id?: string; at?: number }
+        | undefined;
+      if (
+        last?.cart_id === input.cartId &&
+        Number(last.at ?? 0) >= Number(cart.updated_at)
+      )
+        throw new SaleInvalidError('cart already paid in another tab');
+      created = true;
       // Void & reissue (screens/10): the old bill's reversal is part of this same action.
       const reissuePlan = reissue
         ? await computeVoid(w, reissue.sale_id, {
@@ -187,7 +200,6 @@ export async function completeSale(
             now,
           })
         : null;
-      const kv = w.table<{ key: string; value: unknown }>('kv');
       const seq = Number((await kv.get('invoice_seq'))?.value ?? 0) + 1;
       await kv.put({ key: 'invoice_seq', value: seq });
       const bill =
@@ -351,11 +363,19 @@ export async function completeSale(
             : null,
         });
       }
+      await kv.put({
+        key: 'cart_last_sale',
+        value: {
+          cart_id: input.cartId,
+          at: Math.max(now, Number(cart.updated_at)),
+        },
+      });
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
       return saleRow;
     },
     { now, actor: ctx.staff_id },
   );
+  if (!created) return { sale, created: false };
   // 06 §9: the print job is a separate, best-effort write; the sale is already committed.
   if (input.print)
     await db.print_jobs

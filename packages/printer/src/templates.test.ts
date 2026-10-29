@@ -89,11 +89,16 @@ describe('sale receipt conditional rows (06 §4.1)', () => {
         variant((i) => {
           i.shop.showPaymentDetails = false;
           i.shop.showCashierOnReceipt = false;
+          i.sale.udhaarAmount = 50_000;
+          i.sale.khataBalancePaisa = 250_000;
         }),
       ),
     );
     expect(t).not.toMatch(/^Cash /m);
     expect(t).not.toContain('Cashier');
+    // Udhaar is part of the bill's trust, not a payment-detail row.
+    expect(t).toMatch(/^Udhaar \(on khata\) +Rs 500$/m);
+    expect(t).toMatch(/^Khata balance now +Rs 2,500$/m);
   });
 
   it('prints warranty lines, you saved, NTN/STRN, header, REPRINT and the QR when enabled', () => {

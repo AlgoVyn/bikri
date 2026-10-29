@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,8 @@ import {
   updateCategory,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { tileBg } from './tiles.ts';
 
 const textField =
@@ -23,8 +25,12 @@ const textField =
 export function CategoriesPage() {
   const { t } = useTranslation();
   const toast = useToast();
+  const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [name, setName] = useState('');
+  if (!can('catalog.edit') || readOnly)
+    return <Navigate to="/products" replace />;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">

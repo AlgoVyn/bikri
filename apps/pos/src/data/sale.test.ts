@@ -1,5 +1,6 @@
 import type { Cart } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
+import { discardFailed } from '../sync/push.ts';
 import { addOverride, addProduct, emptyCart, loadCarts } from './cart.ts';
 import { createCustomer } from './customers.ts';
 import {
@@ -225,9 +226,10 @@ describe('sale recipe (02 §5)', () => {
       4300000,
     );
     expect(await db.payments.count()).toBe(0);
+    const nextCart = { ...cart, updated_at: Date.now() + 1 };
     await completeSale(
       db,
-      sale(cart, [
+      sale(nextCart, [
         { method: 'cash', amount: 4000000 },
         { method: 'udhaar', amount: 300000 },
       ]),
@@ -245,6 +247,53 @@ describe('sale recipe (02 §5)', () => {
     await db.customers.update(bilal.id, { hard_limit: 1 });
     expect((await udhaarCheck(db, bilal.id, 1)).hard_blocked).toBe(true);
     expect((await udhaarCheck(db, 'nobody', 1)).limit).toBeNull();
+  });
+
+  it('discards a rejected sale transaction and rebuilds its caches', async () => {
+    const { db, ctx, phone, buds } = await shopWithStock('discard-sale');
+    const cart = t2Cart(phone, buds);
+    await db.carts.put(cart);
+    await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 5000000 }]),
+      ctx,
+      NOW,
+    );
+    const ops = await db.outbox.toArray();
+    const first = ops[0];
+    if (first?.seq === undefined) throw new Error('no outbox op');
+    await db.outbox
+      .where('seq')
+      .anyOf(ops.map((op) => op.seq as number))
+      .modify({ status: 'failed' });
+    await discardFailed(db, [first.seq]);
+    expect(await db.sales.count()).toBe(0);
+    expect(await db.sale_lines.count()).toBe(0);
+    expect(await db.payments.count()).toBe(0);
+    expect((await db.stock_levels.get(phone.id))?.on_hand_milli).toBe(1000);
+    expect((await db.stock_levels.get(buds.id))?.on_hand_milli).toBe(5000);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('refuses a second tab selling the same cart snapshot', async () => {
+    const { db, ctx, phone, buds } = await shopWithStock('cart-claim');
+    const cart = t2Cart(phone, buds);
+    await db.carts.put(cart);
+    await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 5000000 }]),
+      ctx,
+      NOW,
+    );
+    await expect(
+      completeSale(
+        db,
+        sale(cart, [{ method: 'cash', amount: 5000000 }]),
+        ctx,
+        NOW,
+      ),
+    ).rejects.toBeInstanceOf(SaleInvalidError);
+    expect(await db.sales.count()).toBe(1);
   });
 
   it('AC 5: the same sale id twice writes one sale', async () => {

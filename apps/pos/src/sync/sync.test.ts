@@ -1,3 +1,4 @@
+import { newId } from '@bikri/core';
 import type { OutboxEntry } from '@bikri/db';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKv, setKv } from '../data/kv.ts';
@@ -202,6 +203,71 @@ describe('push (03 §3, §4.1)', () => {
     expect((await db.categories.get('c-bad'))?.name_en).toBe('Server');
   });
 
+  it('leaves an unanswered op pending instead of dropping or sending it twice', async () => {
+    const db = await enrolled('unanswered');
+    const first = {
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'products' as const,
+      kind: 'upsert' as const,
+      row_id: 'p-one',
+      row: product('p-one'),
+      base_rev: 0,
+      changed_fields: [],
+      created_at: Date.now(),
+      status: 'pending' as const,
+      attempts: 0,
+    };
+    const second = {
+      ...first,
+      op_id: newId(),
+      tx_id: newId(),
+      row_id: 'p-two',
+      row: product('p-two'),
+    };
+    await db.outbox.bulkAdd([first, second]);
+    let calls = 0;
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? {
+            json: {
+              results:
+                calls++ === 0
+                  ? [{ op_id: first.op_id, result: 'applied' }]
+                  : [],
+              server_time: 1,
+              latest_seq: 0,
+            },
+          }
+        : undefined;
+    await pushAll(db);
+    expect((await db.outbox.toArray()).map((e) => e.row_id)).toEqual(['p-two']);
+    expect((await db.outbox.toArray())[0]?.status).toBe('pending');
+  });
+
+  it('returns an in-flight batch to pending when the transport fails', async () => {
+    const db = await enrolled('sending');
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'products',
+      kind: 'upsert',
+      row_id: 'p-send',
+      row: product('p-send'),
+      base_rev: 0,
+      changed_fields: [],
+      created_at: Date.now(),
+      status: 'pending',
+      attempts: 0,
+    });
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? { status: 500, json: { error: { code: 'INTERNAL', message: 'x' } } }
+        : undefined;
+    await expect(pushAll(db)).rejects.toBeInstanceOf(SyncHttpError);
+    expect((await db.outbox.toArray())[0]?.status).toBe('pending');
+  });
+
   it('pushes in several batches and stops when the server processed nothing', async () => {
     const db = await enrolled('push2');
     for (let i = 0; i < 3; i += 1) {
@@ -387,6 +453,10 @@ describe('pull (03 §4.2)', () => {
         created_at: 900,
       },
     ]);
+    await db.sale_lines.bulkAdd([
+      { id: 'l-old', sale_id: 's-old', created_at: 100 },
+      { id: 'l-new', sale_id: 's-new', created_at: 900 },
+    ]);
     server.restoreEpoch = '99';
     server.restorePointAt = 500;
     server.tables = {
@@ -402,7 +472,7 @@ describe('pull (03 §4.2)', () => {
     };
     await pullAll(db);
     const resent = await db.outbox.toArray();
-    expect(resent.map((e) => e.row_id)).toEqual(['s-new']);
+    expect(resent.map((e) => e.row_id)).toEqual(['s-new', 'l-new']);
     expect(resent[0]?.kind).toBe('insert');
     expect(await db.sales.count()).toBe(1);
     expect(await getKv(db, 'restore_epoch', null)).toBe('99');

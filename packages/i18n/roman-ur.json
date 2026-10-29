@@ -385,7 +385,8 @@
     "method_card_hint": "Card swipe ya insert karein",
     "method_udhaar_hint": "Gahak ke khatay mein shamil karein",
     "change_label": "Wapas karne hain",
-    "due_label": "Abhi baqi"
+    "due_label": "Abhi baqi",
+    "cart_changed": "Yeh bill kisi doosre tab mein ada ho chuka hai. Dobara payment se pehle page reload karein."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",

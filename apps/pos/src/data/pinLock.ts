@@ -53,18 +53,30 @@ export async function tryUnlock(
   });
   if (ok) {
     if (failures[staffId]) {
-      delete failures[staffId];
-      await setKv(db, 'pin_failures', failures);
+      await db.transaction('rw', db.kv, async () => {
+        const current = await getKv<Failures>(db, 'pin_failures', {});
+        delete current[staffId];
+        await setKv(db, 'pin_failures', current);
+      });
     }
     return { kind: 'ok', staff };
   }
-  const count = f.count + 1;
-  const wait = lockoutMs(count);
-  failures[staffId] = { count, until: wait ? now + wait : 0 };
-  await setKv(db, 'pin_failures', failures);
-  return wait
-    ? { kind: 'locked', until: now + wait }
-    : { kind: 'wrong', triesLeft: triesLeft(count) };
+  // Re-read and increment inside one transaction: parallel tabs must not overwrite each other's
+  // failure count and bypass the five-attempt lockout.
+  const next = await db.transaction('rw', db.kv, async () => {
+    const current = await getKv<Failures>(db, 'pin_failures', {});
+    const latest = current[staffId] ?? { count: 0, until: 0 };
+    if (latest.until > now) return latest;
+    const count = latest.count + 1;
+    const wait = lockoutMs(count);
+    const value = { count, until: wait ? now + wait : 0 };
+    current[staffId] = value;
+    await setKv(db, 'pin_failures', current);
+    return value;
+  });
+  return next.until > now
+    ? { kind: 'locked', until: next.until }
+    : { kind: 'wrong', triesLeft: triesLeft(next.count) };
 }
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, manager: 1, cashier: 2 };

@@ -95,7 +95,7 @@ export async function createTenant(
     now,
     ttl_ms: OWNER_CODE_TTL_MS,
   });
-  await env.DB.batch([
+  const statements = [
     env.DB.prepare(
       'INSERT INTO tenants (id, slug, display_name, owner_email, daily_write_budget, note, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)',
     ).bind(
@@ -122,7 +122,18 @@ export async function createTenant(
       changeLogStatement(db, 'expense_categories', t.code, 'upsert', null, now),
     ),
     owner.statement,
-  ]);
+  ];
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    if (
+      String((error as Error).message).includes(
+        'UNIQUE constraint failed: tenants.slug',
+      )
+    )
+      throw new SlugTakenError(input.slug);
+    throw error;
+  }
   const tenant = await env.DB.prepare('SELECT * FROM tenants WHERE id = ?1')
     .bind(id)
     .first<TenantRow>();

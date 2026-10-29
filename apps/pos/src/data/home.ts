@@ -1,4 +1,4 @@
-import type { BikriDb, SyncedRow } from '@bikri/db';
+import type { BikriDb, PartyType, SyncedRow } from '@bikri/db';
 import { heldExpiringCount } from './cart.ts';
 
 export type AttentionItem =
@@ -42,12 +42,16 @@ export async function syncAttention(
 /** Products with track_stock = 1 at or below their low-stock alert (min 0 = off; screens/04 AC 4). */
 export async function lowStockCount(db: BikriDb): Promise<number> {
   let count = 0;
-  const products = await db.products.toArray();
-  for (const p of products) {
-    const min = Number(p.min_stock_milli ?? 0);
-    if (p.deleted_at || p.track_stock !== 1 || min <= 0) continue;
-    const level = (await db.stock_levels.get(p.id))?.on_hand_milli ?? 0;
-    if (level <= min) count += 1;
+  const products = (await db.products.toArray()).filter(
+    (p) =>
+      !p.deleted_at &&
+      p.track_stock === 1 &&
+      Number(p.min_stock_milli ?? 0) > 0,
+  );
+  const levels = await db.stock_levels.bulkGet(products.map((p) => p.id));
+  for (const [index, p] of products.entries()) {
+    const level = levels[index]?.on_hand_milli ?? 0;
+    if (level <= Number(p.min_stock_milli ?? 0)) count += 1;
   }
   return count;
 }
@@ -73,13 +77,20 @@ export async function attentionItems(
       String(p.promised_on) === opts.today,
   ).length;
   if (promises > 0) items.push({ kind: 'promises_due', count: promises });
-  let over = 0;
-  for (const c of await db.customers.toArray()) {
-    if (c.deleted_at || c.credit_limit === null || c.credit_limit === undefined)
-      continue;
-    const bal = (await db.party_balances.get(['customer', c.id]))?.balance ?? 0;
-    if (bal > Number(c.credit_limit)) over += 1;
-  }
+  const customers = (await db.customers.toArray()).filter(
+    (c) =>
+      !c.deleted_at && c.credit_limit !== null && c.credit_limit !== undefined,
+  );
+  const balances = await db.party_balances.bulkGet(
+    customers.map((c) => ['customer', c.id] as [PartyType, string]),
+  );
+  const over = balances.reduce(
+    (count, balance, index) =>
+      (balance?.balance ?? 0) > Number(customers[index]?.credit_limit ?? 0)
+        ? count + 1
+        : count,
+    0,
+  );
   if (over > 0) items.push({ kind: 'over_limit', count: over });
   const failed = await db.print_jobs.where('status').equals('failed').count();
   if (failed > 0) items.push({ kind: 'failed_prints', count: failed });

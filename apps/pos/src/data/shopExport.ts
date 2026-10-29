@@ -20,6 +20,7 @@ const MONEY_FIELDS = new Set([
   'charges_alloc',
   'counted_cash',
   'credit_limit',
+  'default_credit_limit',
   'difference',
   'discount',
   'discount_value',
@@ -55,17 +56,21 @@ const MONEY_FIELDS = new Set([
   'unit_credit',
   'unit_price',
   'refund_received',
+  'round_total_to',
 ]);
 
 const TIME_FIELDS = new Set([
   'created_at',
   'deleted_at',
   'enrolled_at',
+  'oldest_pending_at',
   'expires_at',
   'last_seen_at',
   'period_end',
   'period_start',
+  'read_only_seen_at',
   'revoked_at',
+  'setup_completed_at',
   'updated_at',
 ]);
 

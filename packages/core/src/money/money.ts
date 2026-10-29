@@ -151,7 +151,9 @@ export function cashChips(duePaisa: number): number[] {
   const chips: number[] = [];
   for (const step of CASH_CHIP_STEPS) {
     const count = (BigInt(duePaisa) + BigInt(step) - 1n) / BigInt(step);
-    const chip = Number(count * BigInt(step));
+    const rounded = count * BigInt(step);
+    if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) continue;
+    const chip = Number(rounded);
     if (chip !== duePaisa && !chips.includes(chip)) {
       chips.push(chip);
     }

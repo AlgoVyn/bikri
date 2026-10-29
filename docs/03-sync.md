@@ -249,4 +249,6 @@ A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device
 25. Support devices: a push or file upload from a `kind = 'support'` device → `403 FORBIDDEN`; pull and snapshot work; after `expires_at` the token gets `401 DEVICE_REVOKED`.
 
 
+**In-flight ops and restore recovery.** The client marks a pushed batch `sending`; a till never coalesces a new edit into it, and a transport failure returns it to `pending`. Discarding a rejected transaction also removes its local rows and rebuilds the caches. Restore recovery re-sends the child lines of every recovered sale, refund, purchase and supplier return, not just the headers. A sale invoice keeps its original bill prefix (the device code and suffix are still checked; uniqueness is the guard).
+
 **Read-only cutoff and pull quarantine.** Each pushed op carries its outbox `created_at`; a read-only shop accepts a transaction only when its ops were queued inside the grace window, including deletes and master-data edits. A device enrolled while the shop is read-only starts with `read_only_seen_at = now`. If one pulled row cannot be written, the till retries the page row-by-row, records the failure under `kv.pull_errors` (shown in Settings → Sync) and advances the cursor so the rest of the shop keeps syncing.

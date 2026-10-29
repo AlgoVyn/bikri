@@ -1,6 +1,7 @@
 import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useEffect } from 'react';
 import { getDb } from '../data/db.ts';
 import { useSession } from './session.ts';
 
@@ -37,6 +38,17 @@ export function useCurrentStaff(): CurrentStaff {
       null
     );
   }, [session?.staff_id]);
+  const live = staff && staff.active === 1 && !staff.deleted_at ? staff : null;
+  const loaded = staff !== undefined;
+  useEffect(() => {
+    if (session?.role === 'support' || !session || !loaded) return;
+    // Wait until the live query has caught up with the newly unlocked profile; otherwise the
+    // previous owner row can briefly look like a role change and lock the till immediately.
+    if (live && live.id !== session.staff_id) return;
+    // A revoked/deleted profile, or a role changed on another till, must not keep the old
+    // permissions in memory (the server enforces the same rules, but the UI should not offer them).
+    if (!live || live.role !== session.role) useSession.getState().lock();
+  }, [session, loaded, live]);
   if (session?.role === 'support')
     return {
       staff: null,
@@ -44,12 +56,11 @@ export function useCurrentStaff(): CurrentStaff {
       can: (p) => SUPPORT_ALLOWED.has(p),
       support: true,
     };
-  const role = (session?.role ??
-    (staff?.role as Role | undefined) ??
-    'owner') as Role;
-  const json = String(staff?.permissions_json ?? '{}');
+  const role = (live?.role ??
+    (loaded ? 'cashier' : (session?.role ?? 'owner'))) as Role;
+  const json = String(live?.permissions_json ?? '{}');
   return {
-    staff: staff ?? null,
+    staff: live,
     role,
     can: (p) => canDo(role, json, p),
     support: false,

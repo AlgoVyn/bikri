@@ -40,6 +40,7 @@ import {
   PAY_METHODS,
   type PayMethod,
   type PayRow,
+  SaleInvalidError,
   settle,
   udhaarCheck,
   WALLET_PROVIDERS,
@@ -292,7 +293,10 @@ function PayStep({
       toast.push(
         err instanceof ReadOnlyError
           ? t('tenant.readOnly.blocked')
-          : t('pay.save_failed'),
+          : err instanceof SaleInvalidError &&
+              err.message.includes('cart already paid')
+            ? t('pay.cart_changed')
+            : t('pay.save_failed'),
         'error',
       );
     } finally {

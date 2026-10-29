@@ -385,7 +385,8 @@
     "method_card_hint": "Swipe or insert card",
     "method_udhaar_hint": "Add to customer khata",
     "change_label": "Change to give",
-    "due_label": "Still due"
+    "due_label": "Still due",
+    "cart_changed": "This bill was already paid in another tab. Reload before taking payment again."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",

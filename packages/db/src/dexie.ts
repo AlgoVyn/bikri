@@ -84,7 +84,7 @@ export type MasterRow = SyncedRow & {
   updated_by?: string | null;
 };
 
-export type OutboxStatus = 'pending' | 'failed';
+export type OutboxStatus = 'pending' | 'sending' | 'failed';
 
 /** 02 §3.1 / 03 §3. */
 export type OutboxEntry = {

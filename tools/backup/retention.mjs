@@ -33,8 +33,26 @@ export function retentionPlan(keys, today, prefix = 'd1/') {
     .filter((row) => row.date !== null);
   const dates = [...new Set(dated.map((row) => row.date))].sort().reverse();
   const daily = new Set(dates.slice(0, 30));
+  // Keep one backup per calendar month even when the scheduled 1st run failed: fall back to
+  // the earliest available date in that month (docs/09 §2 step 6).
+  const earliestByMonth = new Map();
+  for (const date of [...dates].reverse()) {
+    const month = date.slice(0, 7);
+    if (!earliestByMonth.has(month)) earliestByMonth.set(month, date);
+  }
+  const todayDate = new Date(`${today}T00:00:00Z`);
+  const startMonth = new Date(
+    Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() - 11, 1),
+  )
+    .toISOString()
+    .slice(0, 7);
   const monthly = new Set(
-    dates.filter((date) => date.endsWith('-01')).slice(0, 12),
+    [...earliestByMonth.keys()]
+      .filter((month) => month >= startMonth && month <= today.slice(0, 7))
+      .sort()
+      .reverse()
+      .slice(0, 12)
+      .map((month) => earliestByMonth.get(month)),
   );
   const keep = new Set([...daily, ...monthly]);
   // Unknown keys are left alone: only our own dated objects are ours to delete.

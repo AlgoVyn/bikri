@@ -440,16 +440,27 @@ shop.patch('/devices/:id', async (c) => {
     next.device_code = await allocateDeviceCode(db, body.branch_id);
   }
   const now = Date.now();
+  const adminGuard =
+    body.is_admin === false && d.is_admin === 1
+      ? " AND (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0"
+      : '';
+  const update = db.prepare(
+    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, is_admin = ?6, updated_at = ?7 WHERE tenant_id = ?1 AND id = ?2${adminGuard}`,
+    d.id,
+    next.name,
+    next.branch_id,
+    next.device_code,
+    next.is_admin,
+    now,
+  );
+  const res = await db.batch([update]);
+  if ((res[0]?.meta.changes ?? 0) !== 1)
+    throw new ApiError(
+      'CONFLICT',
+      409,
+      'This device changed elsewhere; refresh and try again',
+    );
   await db.batch([
-    db.prepare(
-      'UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, is_admin = ?6, updated_at = ?7 WHERE tenant_id = ?1 AND id = ?2',
-      d.id,
-      next.name,
-      next.branch_id,
-      next.device_code,
-      next.is_admin,
-      now,
-    ),
     changeLogStatement(db, 'devices', d.id, 'upsert', null, now),
     ...audit(c, 'device_change', {
       entity: 'devices',
@@ -483,12 +494,19 @@ shop.post('/devices/:id/revoke', async (c) => {
     );
   }
   const now = Date.now();
+  const update = db.prepare(
+    "UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3 AND (is_admin = 0 OR (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?3 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0)",
+    now,
+    d.id,
+  );
+  const res = await db.batch([update]);
+  if ((res[0]?.meta.changes ?? 0) !== 1)
+    throw new ApiError(
+      'LAST_ADMIN_DEVICE',
+      409,
+      'Keep at least one admin device',
+    );
   await db.batch([
-    db.prepare(
-      'UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3',
-      now,
-      d.id,
-    ),
     changeLogStatement(db, 'devices', d.id, 'upsert', null, now),
     ...audit(c, 'device_revoke', {
       entity: 'devices',

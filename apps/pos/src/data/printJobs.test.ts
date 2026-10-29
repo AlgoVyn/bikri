@@ -3,6 +3,7 @@ import {
   cancelPrintJob,
   cancelQueuedPrintJobs,
   recoverInterruptedPrintJobs,
+  unresolvedFailedCount,
 } from './printJobs.ts';
 import { dropTestDbs } from './testDb.ts';
 import { readyDb } from './testShop.ts';
@@ -47,6 +48,11 @@ describe('waiting print jobs', () => {
     expect(await db.print_jobs.count()).toBe(3);
   });
 
+  it('reports no unresolved failures on a quiet queue', async () => {
+    const db = await readyDb('print-jobs-empty');
+    expect(await unresolvedFailedCount(db)).toBe(0);
+  });
+
   it('recovers a job left printing by a closed tab', async () => {
     const db = await setup();
     await db.print_jobs.update('p1', { started_at: 1_000, created_at: 1_000 });
@@ -55,6 +61,35 @@ describe('waiting print jobs', () => {
       status: 'failed',
       error: 'INTERRUPTED',
     });
+  });
+
+  it('counts only failed jobs not superseded by a successful reprint', async () => {
+    const db = await setup();
+    await db.print_jobs.bulkAdd([
+      {
+        id: 'f2',
+        kind: 'sale',
+        sale_id: 'sale-1',
+        status: 'failed',
+        created_at: 10,
+      },
+      {
+        id: 'd2',
+        kind: 'sale',
+        sale_id: 'sale-1',
+        status: 'done',
+        created_at: 20,
+      },
+    ]);
+    // f1 has no sale id and remains unresolved; f2 was resolved by d2.
+    expect(await unresolvedFailedCount(db)).toBe(1);
+  });
+
+  it('leaves a fresh printing job alone', async () => {
+    const db = await setup();
+    await db.print_jobs.update('p1', { started_at: 1_000, created_at: 1_000 });
+    expect(await recoverInterruptedPrintJobs(db, 1_000 + 10)).toBe(0);
+    expect((await db.print_jobs.get('p1'))?.status).toBe('printing');
   });
 
   it('does not delete a job that started printing before the cancel', async () => {

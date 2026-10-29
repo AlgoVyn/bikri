@@ -1,6 +1,7 @@
 /** Outbox push (03 §3, §4.1): seq order, ≤ 200 ops and ≤ 512 KB per batch, cut between transactions. */
-import { APP_VERSION, CLIENT_SCHEMA_VERSION } from '@bikri/core';
+import { APP_VERSION, CLIENT_SCHEMA_VERSION, isLedgerTable } from '@bikri/core';
 import type { BikriDb, OutboxEntry } from '@bikri/db';
+import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { tillRequest } from './client.ts';
@@ -115,6 +116,11 @@ export async function pushAll(
     serverTime: null,
   };
   if (!device) return out;
+  // A tab closed mid-request leaves rows in `sending`; the server is idempotent, so retry them.
+  await db.outbox
+    .where('status')
+    .equals('sending')
+    .modify({ status: 'pending' });
   for (let round = 0; round < maxRounds; round += 1) {
     const pending = await db.outbox
       .where('status')
@@ -122,19 +128,32 @@ export async function pushAll(
       .sortBy('seq');
     if (pending.length === 0) break;
     const batch = nextBatch(pending);
-    const res = await tillRequest<PushResponse>(db, '/sync/push', {
-      method: 'POST',
-      json: {
-        device_id: device.id,
-        schema_version: CLIENT_SCHEMA_VERSION,
-        app_version: APP_VERSION,
-        ops: batch.map(toWire),
-      },
-    });
+    const seqs = batch
+      .map((entry) => entry.seq)
+      .filter((seq): seq is number => seq !== undefined);
+    await db.outbox.where('seq').anyOf(seqs).modify({ status: 'sending' });
+    let res: PushResponse;
+    try {
+      res = await tillRequest<PushResponse>(db, '/sync/push', {
+        method: 'POST',
+        json: {
+          device_id: device.id,
+          schema_version: CLIENT_SCHEMA_VERSION,
+          app_version: APP_VERSION,
+          ops: batch.map(toWire),
+        },
+      });
+    } catch (error) {
+      // A transport error leaves the ops pending for the next tick; a mutation made while this
+      // request was in flight must not coalesce into them.
+      await db.outbox.where('seq').anyOf(seqs).modify({ status: 'pending' });
+      throw error;
+    }
     out.sent += batch.length;
     out.serverTime = res.server_time;
     const bySeq = new Map(batch.map((e) => [e.op_id, e]));
     await db.transaction('rw', [db.outbox, db.pull_shadow, db.kv], async () => {
+      const answered = new Set(res.results.map((r) => r.op_id));
       for (const r of res.results) {
         const entry = bySeq.get(r.op_id);
         if (entry?.seq === undefined) continue;
@@ -150,6 +169,10 @@ export async function pushAll(
           await db.outbox.delete(entry.seq);
           await db.pull_shadow.delete([entry.tbl, entry.row_id]);
         }
+      }
+      for (const entry of batch) {
+        if (entry.seq === undefined || answered.has(entry.op_id)) continue;
+        await db.outbox.update(entry.seq, { status: 'pending' });
       }
       await setKv(db, 'last_push_at', Date.now());
     });
@@ -169,16 +192,36 @@ export async function discardFailed(
   db: BikriDb,
   seqs: number[],
 ): Promise<void> {
+  let ledgerChanged = false;
   await db.transaction('rw', db.tables, async () => {
-    const entries = await db.outbox.where('seq').anyOf(seqs).toArray();
+    const failed = (await db.outbox.where('seq').anyOf(seqs).toArray()).filter(
+      (e) => e.seq !== undefined && e.status === 'failed',
+    );
+    if (failed.length === 0) return;
+    // A rejected document is one transaction. Remove every still-queued row of that transaction
+    // (queued child lines included), not just the row the UI happened to show.
+    const txIds = [...new Set(failed.map((e) => e.tx_id))];
+    const entries = (await db.outbox.toArray()).filter((e) =>
+      txIds.includes(e.tx_id),
+    );
     for (const e of entries) {
-      if (e.seq === undefined || e.status !== 'failed') continue;
-      await db.outbox.delete(e.seq);
-      const shadow = await db.pull_shadow.get([e.tbl, e.row_id]);
-      if (shadow) {
-        await db.table(e.tbl).put(shadow.row);
+      if (e.seq === undefined) continue;
+      if (isLedgerTable(e.tbl)) {
+        await db.table(e.tbl).delete(e.row_id);
         await db.pull_shadow.delete([e.tbl, e.row_id]);
+        ledgerChanged = true;
+      } else {
+        const shadow = await db.pull_shadow.get([e.tbl, e.row_id]);
+        if (shadow) {
+          await db.table(e.tbl).put(shadow.row);
+          await db.pull_shadow.delete([e.tbl, e.row_id]);
+        } else if (e.kind === 'upsert' && (e.base_rev ?? 0) === 0) {
+          // A rejected local create has no server copy to restore.
+          await db.table(e.tbl).delete(e.row_id);
+        }
       }
+      await db.outbox.delete(e.seq);
     }
   });
+  if (ledgerChanged) await rebuildCaches(db);
 }

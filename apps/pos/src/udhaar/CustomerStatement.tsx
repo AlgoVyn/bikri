@@ -73,7 +73,9 @@ export function CustomerStatement({
     const statement = await customerStatement(
       db,
       customerId,
-      from && to ? { from, to } : undefined,
+      from || to
+        ? { from: from || '0000-01-01', to: to || '9999-12-31' }
+        : undefined,
     );
     const balance = (await db.party_balances.get(['customer', customerId]))
       ?.balance;
@@ -99,7 +101,7 @@ export function CustomerStatement({
   }, [customerId, from, to]);
 
   useHotkey(plainKey('r'), () => setReceiveOpen(true), {
-    enabled: can('payment.receive'),
+    enabled: can('payment.receive') && !readOnly,
   });
 
   if (data === null)

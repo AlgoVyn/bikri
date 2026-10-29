@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, Navigate, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -11,17 +11,21 @@ import {
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 
 /** Electronics starter list (screens/04 first run): names only, the owner sets prices. */
 export function SuggestedPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { staff } = useCurrentStaff();
+  const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [picked, setPicked] = useState<Record<string, number | null>>({});
   const chosen = Object.entries(picked).filter(
     ([, price]) => price !== null,
   ) as [string, number][];
+  if (!can('catalog.edit') || readOnly)
+    return <Navigate to="/products" replace />;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
