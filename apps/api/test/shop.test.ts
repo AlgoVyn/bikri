@@ -179,7 +179,7 @@ describe('owner email sign-in (T-028, 05 §3.2)', () => {
     expect((await json<Err>(fail)).error.code).toBe('EMAIL_UNAVAILABLE');
     const none = await seedShop('Sign none', { ownerEmail: null });
     expect((await json<Err>(await startSignin(none))).error.code).toBe(
-      'EMAIL_UNAVAILABLE',
+      'OWNER_EMAIL_MISSING',
     );
   });
 

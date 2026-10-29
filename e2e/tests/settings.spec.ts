@@ -101,9 +101,9 @@ test.describe('Settings (T-050)', () => {
     await expect(
       settings.getByRole('link', { name: /Scanner & display/ }),
     ).toBeVisible();
-    await expect(
-      settings.getByRole('link', { name: /Language/ }),
-    ).toBeVisible();
+    await expect(settings.getByRole('link', { name: /Language/ })).toHaveCount(
+      0,
+    );
     await expect(settings.getByRole('link', { name: /Sync/ })).toBeVisible();
     await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
     await expect(settings.getByRole('link', { name: /Cashiers/ })).toHaveCount(

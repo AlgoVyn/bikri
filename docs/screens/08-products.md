@@ -1,6 +1,6 @@
 # 08 — Products
 
-**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`.
+**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`. On ≥ 1024 px the list and the selected product share one master–detail screen ("Select a product" until one is picked); the embedded list shows name, price and stock, while the detail keeps every column and action. Below 1024 px the detail is a full page with a back arrow.
 
 ## Reference
 

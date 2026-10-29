@@ -239,7 +239,9 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     .click();
   await expect(s.page.getByText('Type-C cable 1 m')).toBeVisible();
   await s.page.getByText('Earbuds Pro').click();
-  const photo = s.page.getByTestId('product-photo');
+  const photo = s.page
+    .getByTestId('products-detail')
+    .getByTestId('product-photo');
   await expect(photo).toBeVisible({ timeout: 15_000 });
   await expect
     .poll(() => photo.evaluate((img) => (img as HTMLImageElement).naturalWidth))

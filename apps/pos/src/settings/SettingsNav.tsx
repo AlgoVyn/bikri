@@ -8,7 +8,6 @@ import {
   ClockIcon,
   CloudIcon,
   DeviceIcon,
-  GlobeIcon,
   InfoIcon,
   PrinterIcon,
   SettingsIcon,
@@ -129,13 +128,6 @@ function SettingsNavContent() {
               icon={<SettingsIcon />}
               title={t('office.settings.nav_display')}
               hint={t('office.settings.nav_display_hint')}
-            />
-            <SettingsRow
-              to="/settings/display"
-              icon={<GlobeIcon />}
-              title={t('office.settings.nav_language')}
-              hint={t('office.settings.nav_language_hint')}
-              active={false}
             />
           </ul>
         </section>

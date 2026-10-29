@@ -3,6 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 import {
   expectNoHorizontalScroll,
   idbAll,
+  idbPut,
   installFakePrinters,
   openReadyShop,
   printedText,
@@ -205,6 +206,22 @@ test.describe('Printer (T-020)', () => {
     await expect(page.getByTestId('print-job').first()).toContainText(
       'Printed',
     );
+  });
+
+  test('waiting print jobs can be cancelled', async ({ page }) => {
+    await start(page);
+    await idbPut(page, 'print_jobs', {
+      id: 'job-wait',
+      kind: 'sale',
+      status: 'queued',
+      created_at: Date.now(),
+    });
+    await page.reload();
+    const job = page.getByTestId('print-job').filter({ hasText: 'Waiting' });
+    await expect(job).toHaveCount(1);
+    await job.getByRole('button', { name: 'Cancel print' }).click();
+    await expect(job).toHaveCount(0);
+    await expect(page.getByText('Print cancelled.')).toBeVisible();
   });
 
   test('F9 opens the drawer and is audited; a cashier is refused', async ({

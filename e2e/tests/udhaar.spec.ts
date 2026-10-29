@@ -104,7 +104,10 @@ test.describe('Udhaar (T-043, T-044)', () => {
 
     // Statement PDF works offline (AC 7).
     await context.setOffline(true);
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page
+      .getByTestId('udhaar-detail')
+      .getByRole('button', { name: 'Export', exact: true })
+      .click();
     const [pdf] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('menuitem', { name: 'PDF' }).click(),
@@ -114,7 +117,10 @@ test.describe('Udhaar (T-043, T-044)', () => {
     await context.setOffline(false);
 
     // Statement CSV has the documented header (AC 7).
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page
+      .getByTestId('udhaar-detail')
+      .getByRole('button', { name: 'Export', exact: true })
+      .click();
     const [statementCsv] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('menuitem', { name: 'CSV' }).click(),

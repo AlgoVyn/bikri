@@ -113,7 +113,9 @@ describe('app shell', () => {
     await renderAt(`${BASE_PATH}/`);
     const rail = await screen.findByRole('navigation', { name: 'Main' });
     expect(screen.getByTestId('brand-rail').textContent).toContain('Bikri');
-    expect(screen.queryByText('Algovyn Mobiles')).toBeNull();
+    expect((await screen.findByTestId('rail-shop-name')).textContent).toBe(
+      'Algovyn Mobiles',
+    );
     for (const name of [
       'Home',
       'Sell',

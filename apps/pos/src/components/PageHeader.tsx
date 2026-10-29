@@ -10,13 +10,16 @@ export function PageHeader({
   subtitle,
   actions,
   tone = 'bg-primary-subtle text-primary-subtle-ink',
+  headingLevel = 'h1',
 }: {
   icon?: ReactNode;
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   tone?: string;
+  headingLevel?: 'h1' | 'h2';
 }) {
+  const Heading = headingLevel;
   return (
     <header className="flex flex-wrap items-start gap-3">
       {icon ? (
@@ -28,7 +31,7 @@ export function PageHeader({
         </span>
       ) : null}
       <div className="min-w-0 flex-1">
-        <h1 className="text-h1 font-semibold">{title}</h1>
+        <Heading className="text-h1 font-semibold">{title}</Heading>
         {subtitle ? (
           <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
         ) : null}

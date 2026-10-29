@@ -46,7 +46,9 @@
       "col_items": "Items",
       "col_total": "Total",
       "col_method": "Tareeqa",
-      "col_status": "Halat"
+      "col_status": "Halat",
+      "select_bill": "Bill muntakhib karein",
+      "select_bill_hint": "Us ki items, payments aur actions yahan nazar aayenge."
     },
     "bill": {
       "audit": "Audit",
@@ -298,7 +300,9 @@
       "to": "Tak",
       "total": "Total",
       "total_owed": "Total wasool karna hai",
-      "subtitle": "Gahak ka udhaar aur yaad dehaniyan"
+      "subtitle": "Gahak ka udhaar aur yaad dehaniyan",
+      "select_customer": "Gahak muntakhib karein",
+      "select_customer_hint": "Un ka khata aur baqaya yahan nazar aayega."
     },
     "suppliers": {
       "add_product": "Product shamil karein",
@@ -414,7 +418,9 @@
       "unit_cost": "Per unit cost",
       "update_price": "Sale price bhi badlein",
       "you_owe": "{{amount}} dena hai",
-      "subtitle": "Delivery, adaigi aur wapsi"
+      "subtitle": "Delivery, adaigi aur wapsi",
+      "select_supplier": "Supplier muntakhib karein",
+      "select_supplier_hint": "Deliveries, payments aur baqaya yahan nazar aayenge."
     },
     "expenses": {
       "amount": "Raqam",

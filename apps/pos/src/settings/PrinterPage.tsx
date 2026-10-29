@@ -7,7 +7,11 @@ import { PrinterIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
-import { retryPrintJob } from '../data/printJobs.ts';
+import {
+  cancelPrintJob,
+  cancelQueuedPrintJobs,
+  retryPrintJob,
+} from '../data/printJobs.ts';
 import type { PrinterKv } from '../data/receipt.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, openDrawer, printTestPage } from '../print/printService.ts';
@@ -74,6 +78,7 @@ export function PrinterPage() {
       invoice: sales[i] ? String(sales[i]?.invoice_no) : null,
     }));
   }, []);
+  const queued = jobs?.filter(({ job }) => job.status === 'queued').length ?? 0;
   const [wizard, setWizard] = useState(false);
   // Cashiers' settings.device covers display and language only (05 §6).
   const editable = can('settings.device') && role !== 'cashier';
@@ -251,9 +256,24 @@ export function PrinterPage() {
       ) : null}
 
       <section className="flex flex-col gap-2" aria-labelledby="recent-prints">
-        <h2 id="recent-prints" className="font-semibold">
-          {t('printer.recent')}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="recent-prints" className="font-semibold">
+            {t('printer.recent')}
+          </h2>
+          {queued > 0 ? (
+            <button
+              type="button"
+              className={buttonQuiet}
+              onClick={() => {
+                void cancelQueuedPrintJobs(getDb()).then((count) =>
+                  toast.push(t('printer.cancelled_many', { count }), 'info'),
+                );
+              }}
+            >
+              {t('printer.cancel_waiting', { count: queued })}
+            </button>
+          ) : null}
+        </div>
         {jobs && jobs.length === 0 ? (
           <p className="text-text-muted">{t('printer.recent_empty')}</p>
         ) : null}
@@ -289,6 +309,19 @@ export function PrinterPage() {
                   onClick={() => void retryPrintJob(getDb(), job.id)}
                 >
                   {t('done.retry')}
+                </button>
+              ) : null}
+              {job.status === 'queued' ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  onClick={() => {
+                    void cancelPrintJob(getDb(), job.id).then(() =>
+                      toast.push(t('printer.cancelled'), 'info'),
+                    );
+                  }}
+                >
+                  {t('printer.cancel')}
                 </button>
               ) : null}
             </li>

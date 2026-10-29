@@ -30,7 +30,13 @@ import { PaySupplierDialog } from './PaySupplierDialog.tsx';
 import { SupplierDialog } from './SupplierDialog.tsx';
 
 /** Supplier detail / ledger (screens/13). */
-export function SupplierStatement({ supplierId }: { supplierId: string }) {
+export function SupplierStatement({
+  supplierId,
+  embedded = false,
+}: {
+  supplierId: string;
+  embedded?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
@@ -137,10 +143,34 @@ export function SupplierStatement({ supplierId }: { supplierId: string }) {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
+      }
+    >
       <div className="flex flex-wrap items-start gap-2">
-        <Link to="/suppliers" className={buttonQuiet}>
-          {t('office.suppliers.back')}
+        <Link
+          to="/suppliers"
+          aria-label={t('office.suppliers.back')}
+          title={t('office.suppliers.back')}
+          className={
+            embedded
+              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
+              : buttonQuiet
+          }
+        >
+          {embedded ? (
+            <span
+              aria-hidden="true"
+              className="text-title leading-none rtl:rotate-180"
+            >
+              ‹
+            </span>
+          ) : (
+            t('office.suppliers.back')
+          )}
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-h1 font-semibold">{name}</h1>

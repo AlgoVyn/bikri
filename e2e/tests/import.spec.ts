@@ -253,7 +253,9 @@ test.describe('Update prices (T-023)', () => {
       (p) => window.__bikriTest?.navigate(p),
       `/products/${id}`,
     );
-    await expect(page.getByText('Rs 1,650').first()).toBeVisible();
+    await expect(
+      page.getByTestId('products-detail').getByText('Rs 1,650'),
+    ).toBeVisible();
   });
 
   test('Urdu: set to a price', async ({ page }) => {
