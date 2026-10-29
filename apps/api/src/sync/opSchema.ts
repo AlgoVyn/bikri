@@ -23,6 +23,8 @@ export const PushOpSchema = z.object({
   changed_fields: z.array(z.string().max(40)).max(80).optional(),
   /** Delete ops carry the staff who deleted (permission check, D-104). */
   updated_by: z.string().max(40).nullable().optional(),
+  /** When the till queued the op; used for the read-only cutoff (13 §7.2). */
+  created_at: z.number().int().optional(),
 });
 export type PushOp = z.infer<typeof PushOpSchema>;
 

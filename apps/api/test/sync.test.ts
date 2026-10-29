@@ -692,7 +692,7 @@ describe('refund payment rows and split (04 §5)', () => {
         "SELECT COUNT(*) AS n FROM sync_conflicts WHERE tenant_id = ?1 AND kind = 'over_refund'",
         shop.tenantId,
       ),
-    ).toBe(1);
+    ).toBe(2);
   });
 
   it('a sale without a customer cannot take an udhaar part', async () => {

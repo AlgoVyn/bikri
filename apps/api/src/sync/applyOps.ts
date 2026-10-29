@@ -359,6 +359,13 @@ function checkRefund(
   const sale = saleOf(look, group, saleId);
   const udhaar = Number(row.udhaar_part ?? 0);
   const amount = Number(row.amount ?? 0);
+  const lines = linkedInGroup(group, 'refund_lines', 'refund_id', id);
+  if (
+    lines.length > 0 &&
+    lines.reduce((sum, line) => sum + Number(line.amount ?? 0), 0) !==
+      Number(row.exact_amount ?? 0)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
   if (sale && udhaar > 0) {
     if (!sale.customer_id) throw new Reject('CONSTRAINT_FAILED');
     const earlier =
@@ -449,6 +456,183 @@ function checkSupplierReturn(
 }
 
 /** Server-side checks beyond the database constraints (04 §5, 05 §5). Throws Reject. */
+function sourceInGroup(
+  group: PushOp[],
+  tbl: string,
+  id: string | null,
+): Record<string, unknown> | undefined {
+  if (id === null) return undefined;
+  return group.find(
+    (o) => o.tbl === tbl && o.kind === 'insert' && o.row?.id === id,
+  )?.row;
+}
+
+const ADJUST_REASONS = new Set([
+  'count',
+  'entry_fix',
+  'damaged',
+  'expired',
+  'lost',
+  'spoiled',
+  'customer_return',
+  'wrong_item',
+  'received_godown',
+  'received_local',
+  'received_other',
+  'transfer_in',
+  'transfer_out',
+]);
+
+/** Ledger rows must be backed by the document/payment that created them (07 §5). */
+function checkLedgerEntry(
+  group: PushOp[],
+  row: Record<string, unknown>,
+  staff: StaffRow | null | undefined,
+  allowed: (permission: Permission) => boolean,
+  look: Lookups,
+): void {
+  const amount = Number(row.amount);
+  const source = String(row.source_type);
+  const sourceId =
+    typeof row.source_id === 'string' && row.source_id.length > 0
+      ? row.source_id
+      : null;
+  if (!Number.isInteger(amount) || amount === 0)
+    throw new Reject('CONSTRAINT_FAILED');
+  if (!staff) throw new Reject('FORBIDDEN');
+  const sourceTable: Record<string, string> = {
+    sale: 'sales',
+    refund: 'refunds',
+    void: 'sale_voids',
+    payment: 'payments',
+    purchase: 'purchases',
+    supplier_return: 'supplier_returns',
+  };
+  if (source === 'adjustment') {
+    if (staff.role === 'cashier') throw new Reject('FORBIDDEN');
+    return;
+  }
+  if (source === 'opening') {
+    const partyTable =
+      row.party_type === 'customer' ? 'customers' : 'suppliers';
+    if (!sourceInGroup(group, partyTable, String(row.party_id)))
+      throw new Reject('CONSTRAINT_FAILED');
+    return;
+  }
+  const table = sourceTable[source];
+  if (!table || sourceId === null) throw new Reject('CONSTRAINT_FAILED');
+  const src = sourceInGroup(group, table, sourceId);
+  if (!src) throw new Reject('CONSTRAINT_FAILED');
+  switch (source) {
+    case 'sale':
+      if (!allowed('sale.create')) throw new Reject('FORBIDDEN');
+      if (
+        row.party_type !== 'customer' ||
+        row.party_id !== src.customer_id ||
+        amount !== Number(src.udhaar_amount)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+    case 'refund':
+      if (
+        !allowed('refund.create') &&
+        !overrideFor(group, 'refunds', sourceId, 'refund.create', look.staff)
+      )
+        throw new Reject('FORBIDDEN');
+      if (
+        row.party_type !== 'customer' ||
+        amount !== -Number(src.udhaar_part ?? 0)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+    case 'void':
+      if (
+        !allowed('sale.void') &&
+        !overrideFor(group, 'sale_voids', sourceId, 'sale.void', look.staff)
+      )
+        throw new Reject('FORBIDDEN');
+      if (row.party_type !== 'customer' || amount >= 0)
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+    case 'payment':
+      if (!allowed('payment.receive') && !allowed('purchase.create'))
+        throw new Reject('FORBIDDEN');
+      if (amount !== -Number(src.amount ?? 0))
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+    case 'purchase':
+      if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
+      if (row.party_type !== 'supplier' || amount !== Number(src.total ?? 0))
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+    case 'supplier_return':
+      if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
+      if (row.party_type !== 'supplier' || amount !== -Number(src.total ?? 0))
+        throw new Reject('CONSTRAINT_FAILED');
+      break;
+  }
+}
+
+/** Stock adjustments/counts need stock.adjust; source movements need their document. */
+function checkStockMovement(
+  group: PushOp[],
+  row: Record<string, unknown>,
+  allowed: (permission: Permission) => boolean,
+  look: Lookups,
+): void {
+  const reason = String(row.reason_code);
+  const qty = Number(row.qty_delta_milli);
+  if (!Number.isInteger(qty) || qty === 0)
+    throw new Reject('CONSTRAINT_FAILED');
+  if (ADJUST_REASONS.has(reason) && !allowed('stock.adjust'))
+    throw new Reject('FORBIDDEN');
+  if (reason === 'opening' && !allowed('catalog.edit'))
+    throw new Reject('FORBIDDEN');
+  if (
+    (reason === 'purchase' || reason === 'supplier_return') &&
+    !allowed('purchase.create')
+  )
+    throw new Reject('FORBIDDEN');
+  if (reason === 'sale' && !allowed('sale.create'))
+    throw new Reject('FORBIDDEN');
+  if (
+    reason === 'refund_return' &&
+    !allowed('refund.create') &&
+    !overrideFor(
+      group,
+      'refunds',
+      typeof row.ref_id === 'string' ? row.ref_id : '',
+      'refund.create',
+      look.staff,
+    )
+  )
+    throw new Reject('FORBIDDEN');
+  if (
+    reason === 'void_return' &&
+    !allowed('sale.void') &&
+    !overrideFor(
+      group,
+      'sale_voids',
+      typeof row.ref_id === 'string' ? row.ref_id : '',
+      'sale.void',
+      look.staff,
+    )
+  )
+    throw new Reject('FORBIDDEN');
+  const sourceTable: Record<string, string> = {
+    sale: 'sales',
+    refund_return: 'refunds',
+    void_return: 'sale_voids',
+    purchase: 'purchases',
+    supplier_return: 'supplier_returns',
+  };
+  const table = sourceTable[reason];
+  if (
+    table !== undefined &&
+    (typeof row.ref_id !== 'string' || !sourceInGroup(group, table, row.ref_id))
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+}
 function checkOp(
   ctx: ApplyContext,
   look: Lookups,
@@ -485,6 +669,22 @@ function checkOp(
     throw new Reject('CONSTRAINT_FAILED');
   if (typeof row.created_at === 'number' && row.created_at > ctx.now + DAY_MS)
     throw new Reject('CONSTRAINT_FAILED');
+  for (const [column, value] of Object.entries(row)) {
+    if (typeof value === 'string' && value.length > 4_000)
+      throw new Reject('CONSTRAINT_FAILED');
+    if (typeof value === 'number' && !Number.isSafeInteger(value))
+      throw new Reject('CONSTRAINT_FAILED');
+    if (value !== null && typeof value === 'object')
+      throw new Reject('CONSTRAINT_FAILED');
+    if (column === 'id' && typeof value !== 'string')
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (
+    typeof op.created_at === 'number' &&
+    (op.created_at > ctx.now + DAY_MS ||
+      op.created_at < ctx.tenant.created_at - DAY_MS)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
 
   if (op.kind === 'insert') {
     const cols = new Set(columnsOf(op.tbl as D1Table));
@@ -504,6 +704,12 @@ function checkOp(
         if (row.invoice_no !== expected) throw new Reject('CONSTRAINT_FAILED');
         break;
       }
+      case 'ledger_entries':
+        checkLedgerEntry(group, row, staff, allowed, look);
+        break;
+      case 'stock_movements':
+        checkStockMovement(group, row, allowed, look);
+        break;
       case 'refunds':
         if (
           !allowed('refund.create') &&
@@ -897,6 +1103,26 @@ function sideEffects(
     );
     out.push(conflictLog(conflictId));
     out.push(...saleStatus(String(row.sale_id)));
+  }
+  if (tbl === 'refunds') {
+    const conflictId = newId(now);
+    out.push(
+      db.prepare(
+        `INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at)
+         SELECT ?1, ?2, '', 'refunds', ?3, 'over_refund',
+           json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli',
+             ?5 - (s.paid_total - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.tenant_id = ?1 AND r.sale_id = ?4 AND r.id <> ?3), 0))),
+           'needs_owner', ?6
+         FROM sales s WHERE s.tenant_id = ?1 AND s.id = ?4
+           AND ?5 > (s.paid_total - COALESCE((SELECT SUM(r2.amount) FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?4 AND r2.id <> ?3), 0))`,
+        conflictId,
+        String(row.id),
+        String(row.sale_id),
+        Number(row.amount ?? 0),
+        now,
+      ),
+    );
+    out.push(conflictLog(conflictId));
   }
   if (tbl === 'sale_voids') out.push(...saleStatus(String(row.sale_id)));
   if (tbl === 'refund_lines') {

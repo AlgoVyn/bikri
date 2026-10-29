@@ -85,6 +85,7 @@ export async function printBlocks(
   printer: PrinterKv | null,
   deps: PrintDeps,
   copies = 1,
+  languageOverride?: 'en' | 'ur',
 ): Promise<void> {
   if (!printer?.transport) throw new PrintError('NO_PRINTER');
   const logo = await readLogo(db);
@@ -112,7 +113,7 @@ export async function printBlocks(
   const one = encodeFor(blocks, printer, {
     logo,
     renderer: deps.renderer,
-    language: await receiptLanguage(db),
+    language: languageOverride ?? (await receiptLanguage(db)),
   });
   const bytes = new Uint8Array(one.length * copies);
   for (let i = 0; i < copies; i += 1) bytes.set(one, i * one.length);
@@ -145,7 +146,11 @@ export async function runJob(
   job: PrintJob,
   deps: PrintDeps,
 ): Promise<PrintJob> {
-  await db.print_jobs.update(job.id, { status: 'printing', error: undefined });
+  await db.print_jobs.update(job.id, {
+    status: 'printing',
+    error: undefined,
+    started_at: Date.now(),
+  });
   try {
     const printer = await readPrinter(db);
     if (!printer?.transport) throw new PrintError('NO_PRINTER');
@@ -221,6 +226,8 @@ export async function printTestPage(
     }),
     printer,
     deps,
+    1,
+    'en',
   );
 }
 

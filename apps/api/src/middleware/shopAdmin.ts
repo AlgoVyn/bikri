@@ -1,6 +1,7 @@
 /** Shop admin on admin devices (05 §3, 01 §5): admin device + owner PIN header + owner session. */
 import type { MiddlewareHandler } from 'hono';
 import { verifyToken } from '../auth/crypto.ts';
+import { ownerSessionKey } from '../auth/ownerKeys.ts';
 import { ApiError } from '../errors.ts';
 import type { AppEnv } from '../types.ts';
 
@@ -36,7 +37,7 @@ export const shopAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!NO_SESSION.some((re) => re.test(path))) {
     const token = c.req.header('x-bikri-owner-session') ?? '';
     const s = token
-      ? await verifyToken<OwnerSession>(String(c.env.OWNER_SESSION_KEY), token)
+      ? await verifyToken<OwnerSession>(ownerSessionKey(c.env), token)
       : null;
     if (
       s?.kind !== 'owner' ||

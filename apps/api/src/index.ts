@@ -5,6 +5,7 @@ import { scheduled } from './cron/prune.ts';
 import { accessAuth } from './middleware/accessAuth.ts';
 import { deviceAuth, tenantGate } from './middleware/deviceAuth.ts';
 import { onError } from './middleware/onError.ts';
+import { requestLog } from './middleware/requestLog.ts';
 import { assertSafeEnv, sameOrigin } from './middleware/sameOrigin.ts';
 import {
   applySecurityHeaders,
@@ -22,7 +23,7 @@ import type { AppEnv } from './types.ts';
 
 const app = new Hono<AppEnv>().basePath(API_BASE);
 
-app.use('*', securityHeaders, sameOrigin);
+app.use('*', requestLog, securityHeaders, sameOrigin);
 app.get('/health', health);
 app.post('/devices/enrol', enrol);
 
