@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ProductDetailPage } from '../../products/ProductDetail.tsx';
+import { ProductWorkspace } from '../../products/ProductWorkspace.tsx';
 
 export const Route = createFileRoute('/products/$id/')({
-  component: Detail,
+  component: ProductRoute,
 });
 
-function Detail() {
+function ProductRoute() {
   const { id } = Route.useParams();
-  return <ProductDetailPage id={id} />;
+  return <ProductWorkspace id={id} />;
 }

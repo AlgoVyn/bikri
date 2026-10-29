@@ -1,6 +1,6 @@
 # 12 — Udhaar (customer credit / khata)
 
-**Routes** `/udhaar` (customers), `/udhaar/:customerId` (statement), `/udhaar/chase` (chase list), modals: new/edit customer, receive payment, promise. Permissions: `payment.receive`, `party.edit`, `party.delete`. Balance rules: [07 §5](../07-money-rules.md#5-customer-and-supplier-balances).
+**Routes** `/udhaar` (customers), `/udhaar/:customerId` (statement), `/udhaar/chase` (chase list), modals: new/edit customer, receive payment, promise. Permissions: `payment.receive`, `party.edit`, `party.delete`. Balance rules: [07 §5](../07-money-rules.md#5-customer-and-supplier-balances). On ≥ 1024 px the customer list and the selected khata share one master–detail screen ("Select a customer" until one is picked); below 1024 px the statement is a full page with a back arrow.
 
 ## Reference
 

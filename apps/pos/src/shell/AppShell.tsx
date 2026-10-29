@@ -184,7 +184,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail"
       >
         <div
-          className="hidden h-topbar shrink-0 flex-col items-center justify-center gap-0.5 lg:flex"
+          className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
           data-testid="brand-rail"
         >
           <span
@@ -196,6 +196,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rail-muted">
             {t('common.app_name')}
           </span>
+          {shopName ? (
+            <span
+              className="line-clamp-2 max-w-full text-center text-[10px] leading-tight text-rail-muted"
+              title={shopName}
+              data-testid="rail-shop-name"
+            >
+              {shopName}
+            </span>
+          ) : null}
         </div>
         {visible.map((item) => {
           const active = current?.to === item.to;

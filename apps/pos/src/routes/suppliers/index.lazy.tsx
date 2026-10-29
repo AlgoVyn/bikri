@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { AreaStrings } from '../../i18n/areas.tsx';
-import { SupplierList } from '../../suppliers/SupplierList.tsx';
+import { SupplierWorkspace } from '../../suppliers/SupplierWorkspace.tsx';
 
 export const Route = createLazyFileRoute('/suppliers/')({
   component: SuppliersRoute,
@@ -9,7 +9,7 @@ export const Route = createLazyFileRoute('/suppliers/')({
 function SuppliersRoute() {
   return (
     <AreaStrings area="office">
-      <SupplierList />
+      <SupplierWorkspace />
     </AreaStrings>
   );
 }

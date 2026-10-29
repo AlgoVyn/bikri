@@ -92,6 +92,14 @@ export function SummaryTab({
 
   return (
     <div className="flex flex-col gap-4">
+      {tenant.owner_email === null ? (
+        <p
+          className="rounded-card border border-warning-subtle bg-warning-subtle px-4 py-3 text-small text-warning-subtle-ink"
+          role="status"
+        >
+          {t('admin.owner_email_missing')}
+        </p>
+      ) : null}
       {detail.support ? (
         <div
           className="flex flex-wrap items-start justify-between gap-3 rounded-card border border-info-subtle bg-info-subtle p-4 text-info-subtle-ink"

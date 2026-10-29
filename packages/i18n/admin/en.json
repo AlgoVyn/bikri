@@ -270,6 +270,7 @@
     "pairing_help": "Open the link on the till, or enter this code on the enrol screen.",
     "d1_limit": "of {{limit}}",
     "usage_total": "{{value}} rows in 7 days",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "owner_email_missing": "No owner email is set. Owner email sign-in and device management will not work until you add one in Edit."
   }
 }

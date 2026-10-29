@@ -510,7 +510,11 @@
     "use_58": "58 mm par jayein",
     "which": "Kaun sa printer khareedun?",
     "which_body": "Koi bhi 80 mm thermal raseed printer jo ESC/POS samjhe, USB, auto cutter aur daraz port ke sath. Khareedne se pehle Chrome wale laptop par Test print kar ke dekhein.",
-    "wizard_title": "Printer set karein"
+    "wizard_title": "Printer set karein",
+    "cancel": "Print cancel karein",
+    "cancelled": "Print cancel ho gaya.",
+    "cancel_waiting": "Waiting cancel karein ({{count}})",
+    "cancelled_many": "{{count}} waiting prints cancel ho gaye."
   },
   "products": {
     "add": "Product shamil karein",
@@ -576,7 +580,10 @@
     "print_labels_one": "{{count}} label print karein",
     "print_labels_other": "{{count}} labels print karein",
     "subtitle": "Stock, qeematein aur aqsaam",
-    "more_actions": "Mazeed karrawaiyan"
+    "more_actions": "Mazeed karrawaiyan",
+    "select_product": "Product muntakhib karein",
+    "select_product_hint": "Price, stock aur history yahan nazar aayenge.",
+    "back": "Products par wapas"
   },
   "sell": {
     "add_discount": "Discount lagayein",
@@ -901,7 +908,9 @@
     "send_again_in": "{{time}} baad dobara bhejein",
     "email_unavailable": "Is dukaan ke liye email sign-in kaam nahin kar raha. Algovyn se raabta karein.",
     "rate_limited": "Bohat zyada codes. {{minutes}} minute baad koshish karein.",
-    "offline": "Is ke liye internet chahiye."
+    "offline": "Is ke liye internet chahiye.",
+    "email_missing": "Is dukan ke liye malik ka email darj nahin. Operator console mein shamil karein, phir dobara koshish karein.",
+    "not_enrolled": "Yeh device dukan se munsalik nahin. Devices sambhalne se pehle dobara jorein."
   },
   "devices": {
     "title": "Devices",

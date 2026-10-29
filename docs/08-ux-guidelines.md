@@ -19,6 +19,7 @@ The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behavio
 - **Sell**: customer tabs show each cart's total or `Empty`; the active tab is solid; product tiles show the quantity already in the cart and a green/amber/red stock pill; the cart panel and totals are visually separate surfaces.
 - **Pay**: payment methods are descriptive cards (icon + method + hint) with a visible selected check; change and remaining are shown as two summary cards.
 - **Settings**: a master–detail split on ≥ 1024 px — the grouped index (icon, title, hint and chevron) stays in the start column and the selected section fills the end column; below 1024 px the section is a full page with a back arrow.
+- **Lists and detail**: Sales, Products, Udhaar and Suppliers use the same master–detail split — the list stays on the start side and the selected bill/product/customer/supplier fills the end side with a placeholder when nothing is selected; on phones the detail is a full page with a back arrow.
 - **Lists**: a filter card, a summary card and the rows/table in their own card; page-level titles use the icon header.
 
 Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.
@@ -48,9 +49,9 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-primary-subtle` | `#E0F2FE` | `#00385D` | Selected rows, active rail item | brand 100 / brand 900 |
 | `--color-primary-subtle-ink` | `#00497A` | `#E0F2FE` | Text on primary-subtle | brand 800 / brand 100 |
 | `--color-brand-navy` | `#182E55` | `#182E55` | Logo, receipt preview header | logo |
-| `--color-rail` | `#182E55` | `#0B1729` | Desktop rail background | logo navy / derived |
+| `--color-rail` | `#182E55` | `#1D3357` | Desktop rail background | logo navy / lighter navy so the rail stays distinct from the dark page |
 | `--color-rail-ink` | `#F1F5F9` | `#F1F5F9` | Active rail label and icon | slate-100 (site) |
-| `--color-rail-muted` | `#B8C6DB` | `#9FB0C9` | Inactive rail labels, brand wordmark | derived |
+| `--color-rail-muted` | `#B8C6DB` | `#A9B8CE` | Inactive rail labels, brand wordmark and shop name | derived |
 | `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
@@ -63,7 +64,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
 | `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
 
-`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in both modes (`--color-rail`), with `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
+`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the brand mark, BIKRI wordmark and the shop name under it, with `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
 
 Category tile colours (8, white initials on each): `#006BB3 #182E55 #0F766E #047857 #B45309 #7C3AED #BE185D #475569` (brand blue, logo navy, teal-700 derived from the logo teal — `#4BC2BF` itself is too light for white text — then emerald, amber, violet, pink, slate).
 
@@ -200,7 +201,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 255 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 257 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 

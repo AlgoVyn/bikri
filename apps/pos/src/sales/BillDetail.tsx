@@ -39,7 +39,13 @@ import {
 } from './format.ts';
 
 /** Bill detail (screens/10). `/sales/:id`, with the refund modal at `/sales/:id/refund`. */
-export function BillDetail({ saleId }: { saleId: string }) {
+export function BillDetail({
+  saleId,
+  embedded = false,
+}: {
+  saleId: string;
+  embedded?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -270,10 +276,34 @@ export function BillDetail({ saleId }: { saleId: string }) {
     setPendingApproval({ mode, approvedBy });
   };
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-4xl flex-col gap-3 p-4'
+      }
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <Link to="/sales" className={buttonQuiet}>
-          {t('office.bill.back')}
+        <Link
+          to="/sales"
+          aria-label={t('office.bill.back')}
+          title={t('office.bill.back')}
+          className={
+            embedded
+              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
+              : buttonQuiet
+          }
+        >
+          {embedded ? (
+            <span
+              aria-hidden="true"
+              className="text-title leading-none rtl:rotate-180"
+            >
+              ‹
+            </span>
+          ) : (
+            t('office.bill.back')
+          )}
         </Link>
         <h1 className="me-auto font-mono text-h1 font-semibold">
           {String(sale.invoice_no)}

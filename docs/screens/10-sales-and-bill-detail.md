@@ -1,6 +1,6 @@
 # 10 — Sales history and bill detail
 
-**Routes** `/sales`, `/sales/:id`. Cashiers with `report.view` limited to today see only today's bills of their branch.
+**Routes** `/sales`, `/sales/:id`. Cashiers with `report.view` limited to today see only today's bills of their branch. On ≥ 1024 px the list and the selected bill share one master–detail screen ("Select a bill" until one is picked); below 1024 px the bill is a full page with a back arrow.
 
 ## Reference
 
