@@ -89,19 +89,24 @@ export function ImportPage() {
   const doImport = async (preview: ImportPreview) => {
     const total = preview.summary.new + preview.summary.updates;
     setStage({ step: 'importing', done: 0, total, preview });
-    const ctx = await ledgerContext(getDb(), staff?.id ?? '');
-    const result = await runImport(getDb(), preview, ctx, {
-      onProgress: (done, all) =>
-        setStage({ step: 'importing', done, total: all, preview }),
-    });
-    setStage({ step: 'done', result, preview });
-    toast.push(
-      t('import.done_toast', {
-        created: result.created,
-        updated: result.updated,
-      }),
-      'info',
-    );
+    try {
+      const ctx = await ledgerContext(getDb(), staff?.id ?? '');
+      const result = await runImport(getDb(), preview, ctx, {
+        onProgress: (done, all) =>
+          setStage({ step: 'importing', done, total: all, preview }),
+      });
+      setStage({ step: 'done', result, preview });
+      toast.push(
+        t('import.done_toast', {
+          created: result.created,
+          updated: result.updated,
+        }),
+        'info',
+      );
+    } catch {
+      setStage({ step: 'choose' });
+      toast.push(t('import.import_failed'), 'error');
+    }
   };
 
   return (

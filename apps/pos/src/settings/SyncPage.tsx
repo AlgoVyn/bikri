@@ -49,16 +49,29 @@ export function SyncPage() {
     persisted: boolean;
   } | null>(null);
   const data = useLiveQuery(async () => {
-    const [pending, failed, conflicts, device, lastSync, status, token] =
-      await Promise.all([
-        db.outbox.where('status').equals('pending').count(),
-        db.outbox.where('status').equals('failed').toArray(),
-        db.sync_conflicts.toArray(),
-        deviceInfo(db),
-        getKv<number | null>(db, 'last_sync_at', null),
-        getKv<{ status: string } | null>(db, 'tenant_status', null),
-        getKv<string | null>(db, 'device_token', null),
-      ]);
+    const [
+      pending,
+      failed,
+      conflicts,
+      device,
+      lastSync,
+      status,
+      token,
+      pullErrors,
+    ] = await Promise.all([
+      db.outbox.where('status').equals('pending').count(),
+      db.outbox.where('status').equals('failed').toArray(),
+      db.sync_conflicts.toArray(),
+      deviceInfo(db),
+      getKv<number | null>(db, 'last_sync_at', null),
+      getKv<{ status: string } | null>(db, 'tenant_status', null),
+      getKv<string | null>(db, 'device_token', null),
+      getKv<{ tbl: string; id: string; message: string; at: number }[]>(
+        db,
+        'pull_errors',
+        [],
+      ),
+    ]);
     return {
       pending,
       failed,
@@ -69,6 +82,7 @@ export function SyncPage() {
       lastSync,
       readOnly: status?.status === 'read_only',
       enrolled: Boolean(token),
+      pullErrors,
     };
   }, [db]);
 
@@ -132,6 +146,23 @@ export function SyncPage() {
       <div className="flex flex-col gap-4" data-testid="sync-page">
         {!data.enrolled ? (
           <p className="text-text-muted">{t('syncpage.not_enrolled')}</p>
+        ) : null}
+        {data.pullErrors.length > 0 ? (
+          <div
+            role="status"
+            className="rounded-control bg-warning-subtle p-3 text-small text-warning-subtle-ink"
+          >
+            <p>
+              {t('syncpage.pull_errors', { count: data.pullErrors.length })}
+            </p>
+            <ul className="mt-1 list-inside list-disc">
+              {data.pullErrors.slice(-3).map((row) => (
+                <li key={`${row.at}-${row.tbl}-${row.id}`}>
+                  {row.tbl} · {row.id} · {row.message}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-card border border-border bg-surface p-4">
           <dt className="text-text-muted">{t('syncpage.last_sync')}</dt>

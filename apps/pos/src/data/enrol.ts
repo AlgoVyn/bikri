@@ -70,6 +70,7 @@ export async function enrolDevice(
   code: string,
   deviceName: string,
 ): Promise<{ db: BikriDb; res: EnrolResponse }> {
+  const previousTenant = activeTenantId();
   const res = await request<EnrolResponse>('/devices/enrol', {
     method: 'POST',
     json: {
@@ -84,6 +85,12 @@ export async function enrolDevice(
   });
   closeDb();
   // A fresh device starts from a fresh database (a revoked device's old data was exported first).
+  // Drop the shop this browser was on before as well: a handover must not leave its sales,
+  // customers, PIN hashes or cached photos readable in IndexedDB.
+  if (previousTenant && previousTenant !== res.tenant.id) {
+    await deleteTenantDb(previousTenant);
+    await clearTenantFiles(previousTenant);
+  }
   await deleteTenantDb(res.tenant.id);
   await clearTenantFiles(res.tenant.id);
   const db = openTenantDb(res.tenant.id);

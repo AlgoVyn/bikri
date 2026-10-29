@@ -121,6 +121,21 @@ describe('enrolDevice', () => {
     db.close();
   });
 
+  it('removes the previous shop database when enrolling into another shop', async () => {
+    const old = openTenantDb('t-old');
+    await setKv(old, 'secret', 'old-shop');
+    old.close();
+    setActiveTenantId('t-old');
+    server.override = (req) =>
+      req.path === '/devices/enrol'
+        ? { status: 201, json: enrolResponse('t-enrol') }
+        : undefined;
+    const { db } = await enrolDevice('ABCDEFGH', 'x');
+    const names = (await indexedDB.databases()).map((d) => d.name);
+    expect(names).not.toContain('bikri-t-old');
+    db.close();
+  });
+
   it('surfaces API errors with their code', async () => {
     server.override = () => ({
       status: 400,

@@ -63,7 +63,7 @@ describe('day close slip (screens/15 AC 7)', () => {
     expect(text).toContain('Drawer is correct');
     expect(text).toContain('Closed by');
     expect(text).toContain('Cash counted');
-    expect(text).toContain('Rs 5,000 × 2');
+    expect(text).toContain('Rs 5,000 x 2');
     expect(text).not.toContain('Powered by AlgoVyn');
     for (const line of text.split('\n'))
       expect(line.length).toBeLessThanOrEqual(48);

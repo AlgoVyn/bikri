@@ -38,7 +38,7 @@ export function readOnlyEligible(
   const limit = seenAt + READ_ONLY_GRACE_MS;
   const ok = new Map<string, boolean>();
   for (const op of ops) {
-    const created = op.row?.created_at;
+    const created = op.created_at ?? op.row?.updated_at ?? op.row?.created_at;
     const fine = typeof created === 'number' && created <= limit;
     ok.set(op.tx_id, (ok.get(op.tx_id) ?? true) && fine);
   }

@@ -146,6 +146,7 @@ describe('push (03 §3, §4.1)', () => {
       row_id: 'r1',
       base_rev: 0,
       updated_by: 'st-1',
+      created_at: 1,
     });
     expect(toWire(entry(1, 'a', { kind: 'insert', tbl: 'sales' })).kind).toBe(
       'insert',

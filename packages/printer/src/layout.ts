@@ -105,9 +105,16 @@ export function wrapText(text: string, width: number): string[] {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
   }
-  if (text.length === 0) {
+  const clean = Array.from(text, (ch) => {
+    const code = ch.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? ' ' : ch;
+  })
+    .join('')
+    .trimEnd();
+  if (clean.length === 0) {
     return [];
   }
+  text = clean;
   const lines: string[] = [];
   let rest = text;
   while (rest.length > width) {
@@ -251,6 +258,17 @@ export function formatItemLines(
     return lines;
   }
   const widths = columnWidths(charsPerLine);
+  if (item.qty.length > widths.qty || item.amount.length > widths.amount) {
+    const lines = wrapText(item.name, charsPerLine);
+    lines.push(
+      ...formatPair(
+        item.breakdown ?? ` ${item.qty}`,
+        item.amount,
+        charsPerLine,
+      ),
+    );
+    return lines;
+  }
   const wrapped =
     item.name.length === 0 ? [''] : wrapText(item.name, widths.name);
   const names = limitWrappedLines(wrapped, 2, widths.name);
@@ -319,11 +337,12 @@ function pushText(
       continue;
     }
     // Nastaliq width is not the code-unit count. Hand the whole line to the renderer.
-    if (hasNonAscii(paragraph)) {
-      out.push({ kind: 'text', text: paragraph, align, bold, size });
-      continue;
-    }
-    for (const line of wrapText(paragraph, width)) {
+    // Urdu/Nastaliq glyphs are wider than a monospace cell; use a safer wrap width and let
+    // the raster renderer draw each line instead of handing it one clipped paragraph.
+    const wrapWidth = hasNonAscii(paragraph)
+      ? Math.max(1, Math.floor(width * 0.6))
+      : width;
+    for (const line of wrapText(paragraph, wrapWidth)) {
       out.push({ kind: 'text', text: line, align, bold, size });
     }
   }

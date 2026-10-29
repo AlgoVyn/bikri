@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cancelPrintJob, cancelQueuedPrintJobs } from './printJobs.ts';
+import {
+  cancelPrintJob,
+  cancelQueuedPrintJobs,
+  recoverInterruptedPrintJobs,
+} from './printJobs.ts';
 import { dropTestDbs } from './testDb.ts';
 import { readyDb } from './testShop.ts';
 
@@ -41,6 +45,16 @@ describe('waiting print jobs', () => {
       0,
     );
     expect(await db.print_jobs.count()).toBe(3);
+  });
+
+  it('recovers a job left printing by a closed tab', async () => {
+    const db = await setup();
+    await db.print_jobs.update('p1', { started_at: 1_000, created_at: 1_000 });
+    expect(await recoverInterruptedPrintJobs(db, 1_000 + 120_001)).toBe(1);
+    expect(await db.print_jobs.get('p1')).toMatchObject({
+      status: 'failed',
+      error: 'INTERRUPTED',
+    });
   });
 
   it('does not delete a job that started printing before the cancel', async () => {

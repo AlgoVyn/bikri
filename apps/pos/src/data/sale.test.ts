@@ -51,6 +51,19 @@ describe('settle (07 §4)', () => {
     });
   });
 
+  it('refuses cash change when non-cash already covers the bill', () => {
+    const mixed = settle(4300000, [
+      { method: 'card', amount: 4300000 },
+      { method: 'cash', amount: 500000 },
+    ]);
+    expect(mixed).toMatchObject({
+      cashTendered: 500000,
+      change: 0,
+      remaining: 0,
+      valid: false,
+    });
+  });
+
   it('merges two rows of one method and joins their references', () => {
     expect(
       mergeRows([

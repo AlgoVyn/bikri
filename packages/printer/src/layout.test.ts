@@ -25,6 +25,7 @@ describe('wrapText', () => {
     ]);
     expect(wrapText('ABCDEFGHIJKL', 5)).toEqual(['ABCDE', 'FGHIJ', 'KL']);
     expect(wrapText('', 5)).toEqual([]);
+    expect(wrapText('Cable\t1m\r', 12)).toEqual(['Cable 1m']);
     expect(() => wrapText('x', 0)).toThrow();
   });
 });
@@ -63,6 +64,21 @@ describe('item columns (06 §4.1)', () => {
     );
     expect(first?.[32]).toBe('2');
     expect(first?.slice(-6)).toBe('Rs 900');
+  });
+
+  it('stacks instead of truncating a quantity or amount that does not fit', () => {
+    const lines = formatItemLines(
+      {
+        name: 'Rice bag',
+        qty: '12.345',
+        amount: 'Rs 12,34,56,789.00',
+      },
+      48,
+      'columns',
+    );
+    expect(lines.join('\n')).toContain('12.345');
+    expect(lines.join('\n')).toContain('Rs 12,34,56,789.00');
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(48);
   });
 
   it('wraps a long name to at most 2 lines and adds the indented detail', () => {
@@ -140,6 +156,24 @@ describe('every supported width', () => {
     }
     expect(text).toContain(paperRuler(w));
     expect(paperRuler(w)).toHaveLength(w);
+  });
+
+  it('wraps non-ASCII text into renderable lines instead of one clipped paragraph', () => {
+    const laid = layOut(
+      [
+        {
+          t: 'text',
+          text: 'یہ ایک بہت لمبا اردو نام ہے جو کئی سطروں میں تقسیم ہونا چاہیے',
+          align: 'center',
+        },
+      ],
+      { charsPerLine: 32, itemLayout: 'stacked' },
+    );
+    const lines = laid
+      .map((c) => (c.kind === 'text' ? c.text : ''))
+      .filter(Boolean);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(20);
   });
 
   it('halves the width for double-size text', () => {

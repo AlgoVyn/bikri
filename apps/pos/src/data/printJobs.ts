@@ -23,3 +23,29 @@ export async function cancelQueuedPrintJobs(db: BikriDb): Promise<number> {
     return jobs.length;
   });
 }
+
+/** Moves jobs left in 'printing' by a closed/crashed tab to failed so they can be retried. */
+export async function recoverInterruptedPrintJobs(
+  db: BikriDb,
+  now = Date.now(),
+  staleMs = 2 * 60_000,
+): Promise<number> {
+  return db.transaction('rw', db.print_jobs, async () => {
+    const jobs = await db.print_jobs
+      .where('status')
+      .equals('printing')
+      .toArray();
+    const stale = jobs.filter(
+      (job) => now - (job.started_at ?? job.created_at) > staleMs,
+    );
+    await Promise.all(
+      stale.map((job) =>
+        db.print_jobs.update(job.id, {
+          status: 'failed',
+          error: 'INTERRUPTED',
+        }),
+      ),
+    );
+    return stale.length;
+  });
+}

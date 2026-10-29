@@ -91,6 +91,14 @@ describe('transports (06 §10)', () => {
     }
   });
 
+  it('keeps the setup test page in text mode for an Urdu shop', async () => {
+    const { db } = await soldShop('psTestUr');
+    await db.shop.update('shop', { receipt_language: 'ur' });
+    const usb = fakeUsb();
+    await printTestPage(db, usbPrinter(), { usb, serial: null, renderer });
+    expect(latin(joined(usb.device.sent))).toContain(paperRuler(48));
+  });
+
   it('chunks USB writes at 4096 bytes', async () => {
     const big = new Uint8Array(10_000).fill(7);
     expect(chunks(big).map((c) => c.length)).toEqual([4096, 4096, 1808]);

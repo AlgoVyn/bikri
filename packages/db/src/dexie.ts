@@ -168,6 +168,8 @@ export type PrintJob = {
   supplier_return_id?: string;
   kind: 'sale' | 'refund' | 'test' | 'day_close' | 'statement' | 'supplier';
   status: 'queued' | 'printing' | 'done' | 'failed';
+  /** Set when a print starts; used to recover a tab that closed mid-print. */
+  started_at?: number;
   error?: string;
   /** Prints "REPRINT" under the title (screens/07 AC 3). */
   reprint?: boolean;

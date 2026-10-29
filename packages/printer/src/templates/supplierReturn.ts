@@ -60,7 +60,7 @@ export function buildSupplierReturn(
   pushPair(blocks, labels.date, input.businessDate);
   blocks.push({ t: 'rule', char: '-' });
   for (const line of input.lines) {
-    pushPair(blocks, `${line.qty} × ${line.name}`, money(line.lineTotal));
+    pushPair(blocks, `${line.qty} x ${line.name}`, money(line.lineTotal));
     pushPair(blocks, `  @ ${money(line.unitCredit)}`, '');
   }
   blocks.push({ t: 'rule', char: '-' });

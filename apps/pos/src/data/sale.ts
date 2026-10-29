@@ -86,18 +86,19 @@ export function settle(total: number, rows: readonly PayRow[]): Settlement {
   const nonCash = card + bank + udhaar;
   const cashTendered = sum('cash');
   const cashDue = Math.max(0, total - nonCash);
-  const cash = Math.min(cashTendered, cashDue);
+  const cash = cashDue > 0 ? Math.min(cashTendered, cashDue) : 0;
   const overpaid = nonCash > total;
   const remaining = overpaid ? 0 : cashDue - cash;
+  const cashCoversNothing = cashDue === 0 && cashTendered > 0;
   return {
     applied: { cash, card, bank_wallet: bank },
     udhaar,
     cashTendered,
-    change: cashTendered - cash,
+    change: cashDue > 0 ? cashTendered - cash : 0,
     remaining,
     overpaid,
     paidTotal: cash + card + bank,
-    valid: !overpaid && remaining === 0 && total > 0,
+    valid: !overpaid && !cashCoversNothing && remaining === 0 && total > 0,
   };
 }
 

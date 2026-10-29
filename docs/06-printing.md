@@ -297,7 +297,7 @@ REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 2. Print service picks jobs FIFO; status `printing`; timeout 8 s per job.
 3. Success → `done`. Failure → `failed` with error code (`NO_PRINTER`, `PERMISSION`, `DISCONNECTED`, `TIMEOUT`, `PAPER_OUT` if status known).
 4. UI on failure: a non-blocking toast "Receipt didn't print — <reason>" with **Retry** and **Print later**; the success sheet stays usable for the next sale.
-5. Settings → Printer → Recent prints lists the last 50 jobs with Retry for failed jobs and Cancel for jobs still **Waiting**. Cancelling deletes only that local queued job; a job that has started printing cannot be cancelled. The section also offers Cancel waiting (N) for all queued jobs.
+5. Settings → Printer → Recent prints lists the last 50 jobs with Retry for failed jobs and Cancel for jobs still **Waiting**. A job left in `printing` by a closed tab is marked `INTERRUPTED` on the next start and can be retried.. Cancelling deletes only that local queued job; a job that has started printing cannot be cancelled. The section also offers Cancel waiting (N) for all queued jobs.
 6. Reprint from Sales → bill detail at any time; reprints print `REPRINT` under the title.
 
 ## 10. Tests

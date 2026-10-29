@@ -5,7 +5,7 @@ import { rebuildCaches } from '../data/caches.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { SyncHttpError, tillRequest } from './client.ts';
-import { mergeRows, mergeScope } from './merge.ts';
+import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 import { isLedgerTable, PULLED_TABLES } from './tables.ts';
 
@@ -67,19 +67,62 @@ export async function pullAll(
       await setKv(db, 'restore_epoch', res.restore_epoch);
       continue;
     }
-    const tbls = new Set(res.changes.map((c) => c.tbl));
-    await db.transaction('rw', mergeScope(tbls), async (tx) => {
-      await mergeRows(
-        tx,
-        res.changes.map((c) => ({ tbl: c.tbl, row: c.row })),
-        { caches: true },
-      );
-      await tx.table('kv').put({ key: 'pull_cursor', value: res.next_since });
-      await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
-    });
+    await applyPage(
+      db,
+      res.changes.map((c) => ({ tbl: c.tbl, row: c.row })),
+      res.next_since,
+    );
     if (!res.has_more) break;
   }
   return serverTime;
+}
+
+/**
+ * Applies one pull page. If one malformed row aborts the page, retry row-by-row, quarantine the
+ * bad rows under kv.pull_errors and advance the cursor so sync can continue.
+ */
+async function applyPage(
+  db: BikriDb,
+  rows: ServerRow[],
+  nextSince: number,
+): Promise<void> {
+  const tbls = new Set(rows.map((row) => row.tbl));
+  try {
+    await db.transaction('rw', mergeScope(tbls), async (tx) => {
+      await mergeRows(tx, rows, { caches: true });
+      await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
+      await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
+    });
+    return;
+  } catch {
+    // Fall through to per-row recovery.
+  }
+  const errors: { tbl: string; id: string; message: string; at: number }[] = [];
+  for (const row of rows) {
+    try {
+      await db.transaction('rw', mergeScope([row.tbl]), async (tx) => {
+        await mergeRows(tx, [row], { caches: true });
+      });
+    } catch (error) {
+      errors.push({
+        tbl: row.tbl,
+        id: String(row.row.id ?? ''),
+        message: error instanceof Error ? error.message : String(error),
+        at: Date.now(),
+      });
+    }
+  }
+  await db.transaction('rw', ['kv'], async (tx) => {
+    const stored = (await tx.table('kv').get('pull_errors')) as
+      | { value?: typeof errors }
+      | undefined;
+    await tx.table('kv').put({
+      key: 'pull_errors',
+      value: [...(stored?.value ?? []), ...errors].slice(-50),
+    });
+    await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
+    await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
+  });
 }
 
 /**

@@ -63,7 +63,7 @@ Printer-agnostic ([06 §0](../06-printing.md#0-printer-agnostic-design-decision-
 - A4: for invoices/statements on an office printer.
 - Common: paper width (58 / 80 mm; advanced 44/76/112), characters per line (default 32 / 48), raster width in dots (default 384 / 576), auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with all character widths, Urdu raster line and logo), `Open drawer`.
 - Status: connected / not connected / last error. "A failed print never loses the bill" note (REQ-B15).
-- Recent prints: each **Waiting** job has `Cancel print`, and when any are waiting the heading offers `Cancel waiting (N)`; jobs already printing are not cancelled.
+- Recent prints: each **Waiting** job has `Cancel print`, and when any are waiting the heading offers `Cancel waiting (N)`; jobs already printing are not cancelled. A job left in `printing` by a closed tab becomes `INTERRUPTED` on the next start and can be retried.
 
 ## Labels (`settings.device`, this device only)
 

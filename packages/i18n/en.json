@@ -75,7 +75,8 @@
     "scope_low": "Low stock only",
     "start": "Start count",
     "title": "Stock count",
-    "zero_uncounted": "Set uncounted to 0"
+    "zero_uncounted": "Set uncounted to 0",
+    "save_failed": "The count could not be saved. Try fewer products at once."
   },
   "done": {
     "download_pdf": "Download PDF",
@@ -321,7 +322,8 @@
     "summary": "{{created}} new, {{updated}} updates (matched by SKU or barcode), {{errors}} errors",
     "template": "Download template",
     "title": "Import spreadsheet",
-    "to_preview": "Check rows"
+    "to_preview": "Check rows",
+    "import_failed": "The import could not finish. Check the file and try a smaller one."
   },
   "nav": {
     "expenses": "Expenses",
@@ -437,7 +439,8 @@
     "err_TIMEOUT": "printer did not answer",
     "err_UNSUPPORTED": "this browser can't print this way",
     "failed_toast": "Receipt didn't print — {{reason}}",
-    "later": "Print later"
+    "later": "Print later",
+    "err_INTERRUPTED": "printing was interrupted"
   },
   "printer": {
     "ask_owner": "Ask the owner or a manager to change the printer.",
@@ -974,7 +977,8 @@
     "conflict_field_merge": "Two tills changed the same item",
     "conflict_over_refund": "Refunded more than the bill",
     "conflict_refund_after_void": "Refund after the bill was voided",
-    "conflict_over_return": "Returned more than received"
+    "conflict_over_return": "Returned more than received",
+    "pull_errors": "{{count}} rows could not be applied; sync continued."
   },
   "lock": {
     "who": "Who's selling?",

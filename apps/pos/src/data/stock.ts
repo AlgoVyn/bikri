@@ -276,8 +276,10 @@ export type CountResult = {
 
 /**
  * Finish count: one `count` movement per product whose counted quantity differs from the
- * on-hand **now**; uncounted products are skipped unless `zeroUncounted`. One `stock_count`
- * audit row with the totals. Clears the draft.
+ * on-hand **now**; uncounted products are skipped unless `zeroUncounted`. Work is split into
+ * chunks so a count of hundreds of products stays below the 200-op action limit. The draft is
+ * cleared only after every chunk succeeds; retrying a partially applied count is safe because
+ * the remaining deltas are zero.
  */
 export async function finishCount(
   db: BikriDb,
@@ -286,49 +288,60 @@ export async function finishCount(
   ctx: LedgerContext,
   now = Date.now(),
 ): Promise<CountResult> {
-  const result = await writeAction(
-    db,
-    async (w) => {
-      let movements = 0;
-      let counted = 0;
-      let valueDiff = 0;
-      for (const id of Object.keys(draft.expected)) {
-        const has = Object.hasOwn(draft.counted, id);
-        if (!has && !options.zeroUncounted) continue;
-        const qty = has ? (draft.counted[id] ?? 0) : 0;
-        if (has) counted += 1;
-        const product = await w.table<MasterRow, string>('products').get(id);
-        if (!product || product.deleted_at || product.track_stock !== 1)
-          continue;
-        const delta = qty - (await onHand(w, id));
-        if (delta === 0) continue;
-        await insertMovement(w, product, delta, 'count', ctx, {
-          unitCost: null,
-          note: '',
+  const ids = Object.keys(draft.expected);
+  const result: CountResult = { movements: 0, counted: 0, valueDiff: 0 };
+  const chunkSize = 90;
+  for (let offset = 0; offset < ids.length; offset += chunkSize) {
+    const slice = ids.slice(offset, offset + chunkSize);
+    const part = await writeAction(
+      db,
+      async (w) => {
+        let movements = 0;
+        let counted = 0;
+        let valueDiff = 0;
+        for (const id of slice) {
+          const has = Object.hasOwn(draft.counted, id);
+          if (!has && !options.zeroUncounted) continue;
+          const qty = has ? (draft.counted[id] ?? 0) : 0;
+          if (has) counted += 1;
+          const product = await w.table<MasterRow, string>('products').get(id);
+          if (!product || product.deleted_at || product.track_stock !== 1)
+            continue;
+          const delta = qty - (await onHand(w, id));
+          if (delta === 0) continue;
+          await insertMovement(w, product, delta, 'count', ctx, {
+            unitCost: null,
+            note: '',
+          });
+          movements += 1;
+          valueDiff += Math.round(
+            (delta * Number(product.avg_cost ?? 0)) / 1000,
+          );
+        }
+        await w.insert('audit_log', {
+          id: newId(w.now),
+          action: 'stock_count',
+          entity: 'stock',
+          entity_id: ctx.device_id,
+          before_json: null,
+          after_json: JSON.stringify({
+            scope: draft.scope,
+            items_counted: counted,
+            movements,
+            value_diff: valueDiff,
+          }),
+          device_id: ctx.device_id,
+          staff_id: ctx.staff_id,
+          created_at: now,
         });
-        movements += 1;
-        valueDiff += Math.round((delta * Number(product.avg_cost ?? 0)) / 1000);
-      }
-      await w.insert('audit_log', {
-        id: newId(w.now),
-        action: 'stock_count',
-        entity: 'stock',
-        entity_id: ctx.device_id,
-        before_json: null,
-        after_json: JSON.stringify({
-          scope: draft.scope,
-          items_counted: counted,
-          movements,
-          value_diff: valueDiff,
-        }),
-        device_id: ctx.device_id,
-        staff_id: ctx.staff_id,
-        created_at: w.now,
-      });
-      await w.table('kv').delete(DRAFT_KEY);
-      return { movements, counted, valueDiff };
-    },
-    { now, actor: ctx.staff_id },
-  );
+        return { movements, counted, valueDiff };
+      },
+      { now },
+    );
+    result.movements += part.movements;
+    result.counted += part.counted;
+    result.valueDiff += part.valueDiff;
+  }
+  await discardCount(db);
   return result;
 }

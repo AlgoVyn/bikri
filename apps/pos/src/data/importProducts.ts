@@ -31,7 +31,7 @@ export type Mapping = Partial<Record<ImportField, number>>;
 
 export const MAX_IMPORT_ROWS = 5000;
 /** Rows per Dexie transaction (≤ 200 sync ops: product + barcodes + opening movement). */
-export const IMPORT_CHUNK = 50;
+export const IMPORT_CHUNK = 25;
 export const MAX_NAME = 120;
 export const TEMPLATE_FILE = 'bikri-products-template.csv';
 
