@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openReadyShop } from './helpers.ts';
 
 // T-031 (screens/19): the operator console against `wrangler dev`, where Access is not enforced
 // for the local operator (13 §7.1). Desktop only.
@@ -48,6 +49,16 @@ test('operator console: overview, new shop with a one-time code, read-only and r
     .click();
   await expect(page.getByText(/Active since/)).toBeVisible();
   await expect(page.getByText(/Payment overdue \(e2e\)/)).toBeVisible();
+});
+
+test('operator console follows the selected device theme', async ({ page }) => {
+  await openReadyShop(page, '/bikri/settings/display');
+  await page.getByLabel('Theme').selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Display settings saved.')).toBeVisible();
+  await page.goto('/bikri/admin');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
 test('operator console follows the language switcher and RTL direction', async ({

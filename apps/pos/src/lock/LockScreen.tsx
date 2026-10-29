@@ -14,6 +14,7 @@ import {
   SUPPORT_PROFILE_ID,
   tryUnlock,
 } from '../data/pinLock.ts';
+import { applyDevicePrefs, loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
 import { useSession } from '../state/session.ts';
 
@@ -33,6 +34,17 @@ function mmss(ms: number): string {
 
 export function LockScreen() {
   const { t, i18n } = useTranslation();
+
+  // The lock screen sits outside AppShell, so apply the device's chosen theme here too.
+  useEffect(() => {
+    let alive = true;
+    void loadDevicePrefs(getDb()).then((prefs) => {
+      if (alive) applyDevicePrefs(prefs, i18n.language);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [i18n.language]);
   const db = getDb();
   const unlock = useSession((s) => s.unlock);
   const shopName = useShopName();
