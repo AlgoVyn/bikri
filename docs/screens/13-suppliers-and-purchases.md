@@ -4,7 +4,7 @@
 
 ## Reference
 
-On ≥ 1024 px the supplier list and the selected ledger share one master–detail screen ("Select a supplier" until one is picked); below 1024 px the ledger is a full page with a back arrow.
+On ≥ 1280 px the supplier list and the selected ledger share one master–detail screen ("Select a supplier" until one is picked); below 1280 px the ledger is a full page with a back arrow.
 
 
 | Dukaan | What to learn |

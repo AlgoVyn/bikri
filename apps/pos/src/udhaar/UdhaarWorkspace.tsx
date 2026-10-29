@@ -24,6 +24,7 @@ export function UdhaarWorkspace({
           initialFilter={initialFilter}
           embedded
           detailOpen={customerId !== undefined}
+          selectedId={customerId}
         />
       }
       detail={

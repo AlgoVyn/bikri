@@ -24,7 +24,7 @@ export function DailyChart({
 }) {
   const width = 720;
   const height = 220;
-  const pad = 28;
+  const pad = 56;
   const values = points.flatMap((point) =>
     showProfit ? [point.sold, point.grossProfit] : [point.sold],
   );
@@ -91,14 +91,26 @@ export function DailyChart({
           aria-label={t('office.reports.daily_chart')}
           className="h-52 w-full"
         >
-          <line
-            x1={pad}
-            x2={width - pad}
-            y1={zero}
-            y2={zero}
-            stroke="var(--color-border)"
-            strokeWidth={1}
-          />
+          {[max, min === 0 ? 0 : (max + min) / 2, min].map((value) => (
+            <g key={value}>
+              <line
+                x1={pad}
+                x2={width - pad}
+                y1={y(value)}
+                y2={y(value)}
+                stroke="var(--color-border)"
+                strokeWidth={value === 0 ? 1 : 0.5}
+              />
+              <text
+                x={4}
+                y={y(value) + 3}
+                fontSize={9}
+                fill="var(--color-text-muted)"
+              >
+                {formatMoney(value)}
+              </text>
+            </g>
+          ))}
           {points.map((point, index) => {
             const top = point.sold >= 0 ? y(point.sold) : zero;
             const bottom = point.sold >= 0 ? zero : y(point.sold);
@@ -156,6 +168,7 @@ export function PaymentDonut({ mix, t }: { mix: PaymentMix; t: TFunction }) {
     0,
   );
   const methods = ['cash', 'card', 'bank_wallet', 'udhaar'] as const;
+  const shown = methods.filter((method) => mix[method] !== 0);
   let offset = 0;
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -198,7 +211,8 @@ export function PaymentDonut({ mix, t }: { mix: PaymentMix; t: TFunction }) {
           : null}
       </svg>
       <ul className="flex min-w-0 flex-col gap-1 text-small">
-        {methods.map((method) => (
+        {shown.length === 0 ? <li>—</li> : null}
+        {shown.map((method) => (
           <li key={method} className="flex items-center gap-2">
             <span
               aria-hidden="true"

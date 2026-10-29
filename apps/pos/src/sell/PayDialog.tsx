@@ -126,12 +126,17 @@ export function PayDialog({
       title={done ? t('pay.done_title') : t('sell.take_payment')}
       header={
         done ? null : (
-          <p
-            className="text-total font-semibold whitespace-nowrap max-sm:text-title"
-            data-testid="pay-total"
-          >
-            {t('sell.total_to_pay')} <MoneyText paisa={totals.total} />
-          </p>
+          <div className="text-end">
+            <p className="text-small text-text-muted">
+              {t('sell.total_to_pay')}
+            </p>
+            <p
+              className="text-total font-semibold whitespace-nowrap max-sm:text-title"
+              data-testid="pay-total"
+            >
+              <MoneyText paisa={totals.total} />
+            </p>
+          </div>
         )
       }
     >

@@ -174,7 +174,7 @@ export function DayClosePage() {
 
   if (closed) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
+      <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
         <h1 className="text-h1 font-semibold">{t('office.dayclose.title')}</h1>
         <div className="rounded-card border border-border bg-surface p-4">
           <p className="text-title font-semibold" data-testid="day-closed">
@@ -262,7 +262,7 @@ export function DayClosePage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
+    <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
       <PageHeader
         icon={<ClockIcon />}
         title={t('office.dayclose.title')}
@@ -299,15 +299,31 @@ export function DayClosePage() {
         </div>
         {mode === 'notes' ? (
           <>
-            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="hidden gap-x-6 text-small text-text-muted sm:grid sm:grid-cols-2">
+              {[0, 1].map((column) => (
+                <div
+                  key={column}
+                  className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2"
+                >
+                  <span>{t('office.dayclose.column_note')}</span>
+                  <span className="text-center">
+                    {t('office.dayclose.column_count')}
+                  </span>
+                  <span className="text-end">
+                    {t('office.dayclose.column_amount')}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-6">
               {[
                 ...NOTES.slice(0, 1),
                 ...(show75 ? [COMMEMORATIVE] : []),
                 ...NOTES.slice(1),
               ].map((value) => (
                 <li key={value}>
-                  <label className="flex items-center gap-2 text-small">
-                    <span className="w-14 text-end">{value}</span>
+                  <label className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] items-center gap-2 text-small">
+                    <span className="text-end">{value}</span>
                     <input
                       type="number"
                       min={0}
@@ -321,7 +337,7 @@ export function DayClosePage() {
                         }))
                       }
                     />
-                    <span className="ms-auto text-end text-text-muted">
+                    <span className="text-end text-text-muted">
                       <MoneyText paisa={value * 100 * (notes[value] ?? 0)} />
                     </span>
                   </label>

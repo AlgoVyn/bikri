@@ -4,6 +4,9 @@ export const buttonPrimary =
 export const buttonDanger =
   'inline-flex min-h-11 items-center justify-center rounded-control bg-danger px-4 font-medium text-danger-ink hover:opacity-90 active:opacity-90 disabled:pointer-events-none disabled:opacity-50';
 
+export const buttonDangerQuiet =
+  'inline-flex min-h-11 items-center justify-center rounded-control border border-danger bg-surface px-4 font-medium text-danger hover:bg-danger-subtle disabled:pointer-events-none disabled:opacity-50';
+
 export const buttonQuiet =
   'inline-flex min-h-11 items-center justify-center rounded-control border border-border-strong bg-surface px-4 text-text hover:bg-surface-2 active:bg-surface-2 disabled:pointer-events-none disabled:opacity-50';
 

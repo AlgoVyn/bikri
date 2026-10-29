@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { retryPrintJob } from '../data/printJobs.ts';
@@ -230,6 +231,28 @@ export function SaleComplete({
           })}
         </p>
       ) : null}
+      <dl className="w-full rounded-card border border-border bg-surface-2/50 p-3 text-start text-small">
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-text-muted">
+            {t('sell.items', { count: Number(sale.line_count ?? 0) })}
+          </dt>
+          <dd>
+            <MoneyText paisa={Number(sale.total ?? 0)} />
+          </dd>
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <dt className="text-text-muted">{t('done.paid')}</dt>
+          <dd>
+            <MoneyText paisa={Number(sale.paid_total ?? 0)} />
+          </dd>
+        </div>
+        {done.customerName ? (
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <dt className="text-text-muted">{t('done.customer')}</dt>
+            <dd className="truncate">{done.customerName}</dd>
+          </div>
+        ) : null}
+      </dl>
       <PrintStatus job={job} hasPrinter={settings?.printer ?? false} />
       <button
         ref={newSale}

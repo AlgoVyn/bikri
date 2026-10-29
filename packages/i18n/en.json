@@ -56,7 +56,8 @@
     "not_found": "This page is not available.",
     "required": "required",
     "yes": "Yes",
-    "back": "Back"
+    "back": "Back",
+    "filters": "Filters"
   },
   "count": {
     "category": "Category",
@@ -90,7 +91,9 @@
     "retry": "Retry",
     "share": "Share",
     "share_failed": "Could not make the receipt picture. Try again.",
-    "share_whatsapp": "Send on WhatsApp"
+    "share_whatsapp": "Send on WhatsApp",
+    "paid": "Paid",
+    "customer": "Customer"
   },
   "enrol": {
     "needed": "This till is not part of a shop yet. Enrol it with a pairing code.",
@@ -241,7 +244,7 @@
     "view_all": "View all",
     "today_summary": "Today at a glance",
     "new_sale_hint": "Tap to ring up items or scan a barcode",
-    "todays_register": "Today's register",
+    "todays_register": "Today",
     "last_bill": "Last bill {{time}}",
     "desc_price_check": "Scan a barcode",
     "desc_day_close": "Count & close",
@@ -556,7 +559,7 @@
     "last_cost": "Last cost",
     "manage_categories": "Manage categories",
     "margin": "Margin",
-    "min_stock": "Low stock alert at",
+    "min_stock": "Low stock alert",
     "more": "More",
     "no_match": "No products match.",
     "not_found": "This product is not available.",
@@ -586,7 +589,9 @@
     "more_actions": "More actions",
     "select_product": "Select a product",
     "select_product_hint": "Price, stock and history appear here.",
-    "back": "Back to products"
+    "back": "Back to products",
+    "min_stock_off": "Off",
+    "last14_empty": "No stock movement in the last 14 days."
   },
   "sell": {
     "add_discount": "Add discount",
@@ -602,7 +607,7 @@
     "cart_full": "A bill can have 60 lines — take payment and start a second bill",
     "cart_has_items": "has items",
     "cart_lines": "Items in the bill",
-    "cart_tab": "Customer {{n}}",
+    "cart_tab": "Bill {{n}}",
     "carts": "Open bills",
     "categories": "Categories",
     "change_customer": "Change",
@@ -682,7 +687,8 @@
     "view_cart": "View cart · {{count}} items",
     "view_cart_one": "View cart · 1 item",
     "walk_in": "Walk-in customer",
-    "empty_tab": "Empty"
+    "empty_tab": "New bill",
+    "add_first_item": "Add a product to take payment"
   },
   "setup": {
     "add_one": "Add one product",
@@ -761,7 +767,8 @@
     "tax": "Sales tax %",
     "tax_hint": "Applied after discounts. 0 hides the tax line.",
     "welcome": "Welcome to Bikri",
-    "welcome_hint": "Choose your language. You can change it later."
+    "welcome_hint": "Choose your language. You can change it later.",
+    "offline_hint": "Works offline. Your data stays on this device."
   },
   "shell": {
     "lang_en": "English",
@@ -806,7 +813,9 @@
     "lock": "Lock",
     "sync_paused": "Sync paused",
     "sync_detail_paused": "This shop's account is paused. Contact Algovyn. {{count}} changes are kept on this device.",
-    "printer_label": "Printer"
+    "printer_label": "Printer",
+    "printer_failed": "Print failed",
+    "printer_no": "No printer"
   },
   "stock": {
     "reason": {

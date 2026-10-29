@@ -32,10 +32,12 @@ export function UdhaarList({
   initialFilter = 'all',
   embedded = false,
   detailOpen = false,
+  selectedId,
 }: {
   initialFilter?: CustomerFilter;
   embedded?: boolean;
   detailOpen?: boolean;
+  selectedId?: string;
 }) {
   const { t } = useTranslation();
   const { can } = useCurrentStaff();
@@ -126,7 +128,7 @@ export function UdhaarList({
       />
 
       {data ? (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2">
           <Card
             testid="udhaar-total"
             label={t('office.udhaar.total_owed')}
@@ -223,7 +225,10 @@ export function UdhaarList({
                 <Link
                   to="/udhaar/$customerId"
                   params={{ customerId: row.customer.id }}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2"
+                  aria-current={
+                    row.customer.id === selectedId ? 'page' : undefined
+                  }
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.customer.id === selectedId ? 'bg-primary-subtle' : ''}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
                     <span className="block truncate font-medium">
@@ -302,7 +307,7 @@ function Card({
 }) {
   return (
     <div
-      className="rounded-card border border-border bg-surface p-3"
+      className="rounded-card border border-border bg-surface p-2 sm:p-3"
       data-testid={testid}
     >
       <p className="text-small text-text-muted">{label}</p>

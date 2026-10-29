@@ -2,7 +2,7 @@
 
 **Route** `/settings` with subpages `/settings/<section>`. Left list of sections (top tabs on mobile); sections the user can't access are hidden. Device-level settings live in Dexie `kv` (not synced); shop-level settings are `shop` / `branches` / `staff` rows (synced).
 
-The index has a settings icon, title and one-line subtitle. Each row has an icon, title, hint and chevron, grouped under Shop / This device / Data and help. On ≥ 1024 px Settings uses the reference app's master–detail split: the index stays in the start column and the selected section fills the end column; with nothing selected the end column shows "Choose a setting". Below 1024 px a section is a full page. Every section page has a Back arrow to Settings, and the current row stays highlighted in the index.
+The index has a settings icon, title and one-line subtitle. Each row has an icon, title, hint and chevron, grouped under Shop / This device / Data and help. On ≥ 1280 px Settings uses the reference app's master–detail split: the index stays in the start column and the selected section fills the end column; with nothing selected the end column shows "Choose a setting". Below 1280 px a section is a full page. Every section page has a Back arrow to Settings, and the current row stays highlighted in the index.
 
 ## Reference
 

@@ -150,39 +150,41 @@ export function SupplierStatement({
           : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
       }
     >
-      <div className="flex flex-wrap items-start gap-2">
-        <Link
-          to="/suppliers"
-          aria-label={t('office.suppliers.back')}
-          title={t('office.suppliers.back')}
-          className={
-            embedded
-              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-              : buttonQuiet
-          }
-        >
-          {embedded ? (
-            <span
-              aria-hidden="true"
-              className="text-title leading-none rtl:rotate-180"
-            >
-              ‹
-            </span>
-          ) : (
-            t('office.suppliers.back')
-          )}
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-h1 font-semibold">{name}</h1>
-          {supplier.phone ? (
-            <a
-              href={`tel:${String(supplier.phone)}`}
-              dir="ltr"
-              className="text-small underline"
-            >
-              {String(supplier.phone)}
-            </a>
-          ) : null}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-start gap-2">
+          <Link
+            to="/suppliers"
+            aria-label={t('office.suppliers.back')}
+            title={t('office.suppliers.back')}
+            className={
+              embedded
+                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
+                : buttonQuiet
+            }
+          >
+            {embedded ? (
+              <span
+                aria-hidden="true"
+                className="text-title leading-none rtl:rotate-180"
+              >
+                ‹
+              </span>
+            ) : (
+              t('office.suppliers.back')
+            )}
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-h1 font-semibold">{name}</h1>
+            {supplier.phone ? (
+              <a
+                href={`tel:${String(supplier.phone)}`}
+                dir="ltr"
+                className="text-small underline"
+              >
+                {String(supplier.phone)}
+              </a>
+            ) : null}
+          </div>
         </div>
         <p
           className={`text-figure font-semibold ${supplierBalanceTone(balance)}`}
@@ -245,8 +247,66 @@ export function SupplierStatement({
         ) : null}
       </div>
 
+      <ul className="flex flex-col gap-2 sm:hidden">
+        {rows.length === 0 ? (
+          <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+            {t('office.suppliers.no_entries')}
+          </li>
+        ) : (
+          statement.rows.map((row, index) => (
+            <li
+              key={row.entry.id}
+              className="rounded-card border border-border bg-surface p-3 text-small"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-text-muted">
+                  {dateText(String(row.entry.business_date), i18n.language, tz)}
+                </span>
+                <span className="font-medium">
+                  <MoneyText paisa={row.balance} />
+                </span>
+              </div>
+              <p className="mt-1">
+                {rows[index]?.description}
+                {row.kind === 'purchase' &&
+                row.entry.source_id &&
+                can('purchase.create') &&
+                !readOnly ? (
+                  <Link
+                    to="/suppliers/$supplierId/return/new"
+                    params={{ supplierId }}
+                    search={{ purchase: String(row.entry.source_id) }}
+                    className="ms-2 text-small underline"
+                  >
+                    {t('office.suppliers.return_items')}
+                  </Link>
+                ) : null}
+              </p>
+              <dl className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <dt className="text-text-muted">
+                    {t('office.suppliers.got')}
+                  </dt>
+                  <dd className="text-end">
+                    {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">
+                    {t('office.suppliers.paid')}
+                  </dt>
+                  <dd className="text-end">
+                    {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          ))
+        )}
+      </ul>
+
       <section
-        className="overflow-auto rounded-card border border-border"
+        className="hidden overflow-auto rounded-card border border-border sm:block"
         aria-label={t('office.suppliers.statement')}
         tabIndex={0}
       >

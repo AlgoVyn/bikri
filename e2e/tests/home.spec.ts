@@ -47,14 +47,12 @@ test.describe('Home and shell (T-013)', () => {
     );
     await expect(page.getByTestId('printer-dot')).toHaveAttribute(
       'aria-label',
-      'Printer not set up',
+      'No printer. Printer not set up',
     );
-    await expect(page.getByTestId('printer-dot')).toHaveText('Printer');
+    await expect(page.getByTestId('printer-dot')).toHaveText('No printer');
+    await expect(page.getByTestId('printer-dot')).toHaveClass(/bg-surface-2/);
     await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /bg-danger-subtle/,
-    );
-    await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /text-danger-subtle-ink/,
+      /text-text-muted/,
     );
 
     const nav = page.getByRole('navigation', { name: 'Main' });

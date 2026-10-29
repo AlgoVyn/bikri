@@ -142,7 +142,7 @@ export function ExpensesPage() {
   const max = Math.max(1, ...(data?.byCategory.map((c) => c.net) ?? [1]));
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
+    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
       <PageHeader
         icon={<ExpensesIcon />}
         tone="bg-warning-subtle text-warning-subtle-ink"
