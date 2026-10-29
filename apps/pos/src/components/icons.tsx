@@ -237,3 +237,23 @@ export function InfoIcon() {
     </Svg>
   );
 }
+
+export function LockIcon() {
+  return (
+    <Svg>
+      <rect x="5" y="10" width="14" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      <path d="M12 14v2" />
+    </Svg>
+  );
+}
+
+export function UploadIcon() {
+  return (
+    <Svg>
+      <path d="M12 16V4" />
+      <path d="m8 8 4-4 4 4" />
+      <path d="M4 15v4h16v-4" />
+    </Svg>
+  );
+}

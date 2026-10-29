@@ -136,6 +136,27 @@ test.describe('Settings (T-050)', () => {
     ).toBeVisible();
   });
 
+  test('Devices has a visible import picker and a compact receipt preview', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/settings/devices');
+    const dialog = page.getByRole('dialog', { name: "Confirm it's you" });
+    await dialog
+      .waitFor({ state: 'visible', timeout: 2_000 })
+      .catch(() => undefined);
+    if (await dialog.isVisible()) {
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toHaveCount(0);
+    }
+    await expect(page.getByText('Choose file', { exact: true })).toBeVisible();
+    await expect(page.getByText('No file chosen')).toBeVisible();
+
+    await page.goto('/bikri/settings/shop');
+    await expect(page.getByTestId('receipt-preview-card')).toBeVisible();
+    const box = await page.getByTestId('receipt-preview-card').boundingBox();
+    expect(box?.width ?? 0).toBeLessThan(400);
+  });
+
   test('desktop Settings keeps the index beside the selected section', async ({
     page,
   }, testInfo) => {
