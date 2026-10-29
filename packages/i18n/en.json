@@ -510,7 +510,11 @@
     "use_58": "Switch to 58 mm",
     "which": "Which printer should I buy?",
     "which_body": "Any 80 mm thermal receipt printer that speaks ESC/POS, with USB, an auto-cutter and a drawer port. Bring a laptop with Chrome to the shop and run Test print before paying.",
-    "wizard_title": "Set up printer"
+    "wizard_title": "Set up printer",
+    "cancel": "Cancel print",
+    "cancelled": "Print cancelled.",
+    "cancel_waiting": "Cancel waiting ({{count}})",
+    "cancelled_many": "{{count}} waiting prints cancelled."
   },
   "products": {
     "add": "Add product",
@@ -576,7 +580,10 @@
     "print_labels_one": "Print {{count}} label",
     "print_labels_other": "Print {{count}} labels",
     "subtitle": "Stock, prices and categories",
-    "more_actions": "More actions"
+    "more_actions": "More actions",
+    "select_product": "Select a product",
+    "select_product_hint": "Price, stock and history appear here.",
+    "back": "Back to products"
   },
   "sell": {
     "add_discount": "Add discount",
@@ -901,7 +908,9 @@
     "send_again_in": "Send again in {{time}}",
     "email_unavailable": "Email sign-in isn't working for this shop. Contact Algovyn.",
     "rate_limited": "Too many codes. Try again in {{minutes}} min.",
-    "offline": "You need internet for this."
+    "offline": "You need internet for this.",
+    "email_missing": "No owner email is set for this shop. Set it in the operator console, then try again.",
+    "not_enrolled": "This device isn't connected to the shop. Enrol it again before managing devices."
   },
   "devices": {
     "title": "Devices",

@@ -4,3 +4,22 @@ import type { BikriDb } from '@bikri/db';
 export async function retryPrintJob(db: BikriDb, id: string): Promise<void> {
   await db.print_jobs.update(id, { status: 'queued', error: undefined });
 }
+
+/** Drops one waiting job. Jobs already printing cannot be cancelled. */
+export async function cancelPrintJob(db: BikriDb, id: string): Promise<void> {
+  await db.transaction('rw', db.print_jobs, async () => {
+    const job = await db.print_jobs.get(id);
+    if (job?.status !== 'queued') return;
+    await db.print_jobs.delete(id);
+  });
+}
+
+/** Drops every waiting job; returns how many were removed. */
+export async function cancelQueuedPrintJobs(db: BikriDb): Promise<number> {
+  return db.transaction('rw', db.print_jobs, async () => {
+    const jobs = await db.print_jobs.where('status').equals('queued').toArray();
+    if (jobs.length === 0) return 0;
+    await db.print_jobs.bulkDelete(jobs.map((job) => job.id));
+    return jobs.length;
+  });
+}

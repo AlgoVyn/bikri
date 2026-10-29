@@ -124,9 +124,9 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-rail: #0b1729;
+  --color-rail: #1d3357;
   --color-rail-ink: #f1f5f9;
-  --color-rail-muted: #9fb0c9;
+  --color-rail-muted: #a9b8ce;
   --color-rail-active: #4bc2bf;
   --color-bg: #0f172a;
   --color-surface: #1e293b;
@@ -162,9 +162,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-rail: #0b1729;
+    --color-rail: #1d3357;
     --color-rail-ink: #f1f5f9;
-    --color-rail-muted: #9fb0c9;
+    --color-rail-muted: #a9b8ce;
     --color-rail-active: #4bc2bf;
     --color-bg: #0f172a;
     --color-surface: #1e293b;

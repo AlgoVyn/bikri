@@ -37,7 +37,13 @@ import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 import { statementPdf, statementPng } from './statementFile.ts';
 
 /** Customer khata statement (screens/12). */
-export function CustomerStatement({ customerId }: { customerId: string }) {
+export function CustomerStatement({
+  customerId,
+  embedded = false,
+}: {
+  customerId: string;
+  embedded?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -203,10 +209,34 @@ export function CustomerStatement({ customerId }: { customerId: string }) {
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
+      }
+    >
       <div className="flex flex-wrap items-start gap-2">
-        <Link to="/udhaar" className={buttonQuiet}>
-          {t('office.udhaar.back_customers')}
+        <Link
+          to="/udhaar"
+          aria-label={t('office.udhaar.back_customers')}
+          title={t('office.udhaar.back_customers')}
+          className={
+            embedded
+              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
+              : buttonQuiet
+          }
+        >
+          {embedded ? (
+            <span
+              aria-hidden="true"
+              className="text-title leading-none rtl:rotate-180"
+            >
+              ‹
+            </span>
+          ) : (
+            t('office.udhaar.back_customers')
+          )}
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-h1 font-semibold">{name}</h1>

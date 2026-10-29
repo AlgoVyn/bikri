@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ProductList } from '../../products/ProductList.tsx';
+import { ProductWorkspace } from '../../products/ProductWorkspace.tsx';
 
 export const Route = createFileRoute('/products/')({
-  component: ProductList,
+  component: ProductsRoute,
 });
+
+function ProductsRoute() {
+  return <ProductWorkspace />;
+}

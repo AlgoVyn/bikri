@@ -30,8 +30,12 @@ const selectClass =
 /** Customers list (screens/12). */
 export function UdhaarList({
   initialFilter = 'all',
+  embedded = false,
+  detailOpen = false,
 }: {
   initialFilter?: CustomerFilter;
+  embedded?: boolean;
+  detailOpen?: boolean;
 }) {
   const { t } = useTranslation();
   const { can } = useCurrentStaff();
@@ -73,12 +77,19 @@ export function UdhaarList({
   const sorts: CustomerSort[] = ['balance', 'oldest', 'name', 'activity'];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+      }
+    >
       <PageHeader
         icon={<UdhaarIcon />}
         tone="bg-warning-subtle text-warning-subtle-ink"
         title={t('office.udhaar.title')}
         subtitle={t('office.udhaar.subtitle')}
+        headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
           <>
             <Link to="/udhaar/chase" className={buttonQuiet}>

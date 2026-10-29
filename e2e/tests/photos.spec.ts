@@ -35,7 +35,9 @@ test.describe('Product photos (T-015)', () => {
       page.getByRole('heading', { name: 'Earbuds Pro' }),
     ).toBeVisible();
 
-    const photo = page.getByTestId('product-photo');
+    const photo = page
+      .getByTestId('products-detail')
+      .getByTestId('product-photo');
     await expect(photo).toBeVisible();
     const size = await photo.evaluate((img) => [
       (img as HTMLImageElement).naturalWidth,
@@ -83,7 +85,9 @@ test.describe('Product photos (T-015)', () => {
     await expect(
       page.getByRole('heading', { name: 'Earbuds Pro' }),
     ).toBeVisible();
-    await expect(page.getByTestId('product-photo')).toBeVisible();
+    await expect(
+      page.getByTestId('products-detail').getByTestId('product-photo'),
+    ).toBeVisible();
     await page.evaluate(() => window.__bikriTest?.navigate('/products'));
     await expect(
       page
@@ -112,7 +116,9 @@ test.describe('Product photos (T-015)', () => {
       .getByRole('button', { name: /^محفوظ کریں/ })
       .last()
       .click();
-    await expect(page.getByTestId('product-photo')).toBeVisible();
+    await expect(
+      page.getByTestId('products-detail').getByTestId('product-photo'),
+    ).toBeVisible();
     await page.getByRole('link', { name: /تبدیل کریں/ }).click();
     await expect(page.getByTestId('form-photo')).toBeVisible();
     await page.getByRole('button', { name: 'تصویر ہٹائیں' }).click();
@@ -122,7 +128,9 @@ test.describe('Product photos (T-015)', () => {
       .last()
       .click();
     await expect(page.getByRole('heading', { name: 'Cover' })).toBeVisible();
-    await expect(page.getByTestId('product-photo')).toHaveCount(0);
+    await expect(
+      page.getByTestId('products-detail').getByTestId('product-photo'),
+    ).toHaveCount(0);
     await page.getByLabel('زبان').selectOption('en');
   });
 });

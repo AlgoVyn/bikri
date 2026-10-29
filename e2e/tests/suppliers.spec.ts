@@ -155,7 +155,10 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       levelsAfter.find((l) => l.product_id === productId)?.on_hand_milli,
     ).toBe(23000);
 
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page
+      .getByTestId('suppliers-detail')
+      .getByRole('button', { name: 'Export', exact: true })
+      .click();
     const [statementPdf] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('menuitem', { name: 'PDF' }).click(),
@@ -164,7 +167,10 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     expect(statementPdfBytes.subarray(0, 8).toString('latin1')).toBe(
       '%PDF-1.4',
     );
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page
+      .getByTestId('suppliers-detail')
+      .getByRole('button', { name: 'Export', exact: true })
+      .click();
     const [statementCsv] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('menuitem', { name: 'CSV' }).click(),

@@ -46,7 +46,9 @@
       "col_items": "Items",
       "col_total": "Total",
       "col_method": "Method",
-      "col_status": "Status"
+      "col_status": "Status",
+      "select_bill": "Select a bill",
+      "select_bill_hint": "Its items, payments and actions appear here."
     },
     "bill": {
       "audit": "Audit",
@@ -298,7 +300,9 @@
       "to": "To",
       "total": "Total",
       "total_owed": "Total owed to you",
-      "subtitle": "Customer credit and reminders"
+      "subtitle": "Customer credit and reminders",
+      "select_customer": "Select a customer",
+      "select_customer_hint": "Their khata and balance appear here."
     },
     "suppliers": {
       "add_product": "Add a product",
@@ -414,7 +418,9 @@
       "unit_cost": "Unit cost",
       "update_price": "Also update sale price",
       "you_owe": "You owe {{amount}}",
-      "subtitle": "Deliveries, payments and returns"
+      "subtitle": "Deliveries, payments and returns",
+      "select_supplier": "Select a supplier",
+      "select_supplier_hint": "Deliveries, payments and balance appear here."
     },
     "expenses": {
       "amount": "Amount",

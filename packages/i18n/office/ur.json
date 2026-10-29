@@ -46,7 +46,9 @@
       "col_items": "اشیاء",
       "col_total": "کل",
       "col_method": "طریقہ",
-      "col_status": "حالت"
+      "col_status": "حالت",
+      "select_bill": "بل منتخب کریں",
+      "select_bill_hint": "اس کی اشیاء، ادائیگیاں اور اقدامات یہاں نظر آئیں گے۔"
     },
     "bill": {
       "audit": "آڈٹ",
@@ -298,7 +300,9 @@
       "to": "تک",
       "total": "کل",
       "total_owed": "کل وصول کرنا ہے",
-      "subtitle": "گاہک کا ادھار اور یاد دہانیاں"
+      "subtitle": "گاہک کا ادھار اور یاد دہانیاں",
+      "select_customer": "گاہک منتخب کریں",
+      "select_customer_hint": "ان کا کھاتہ اور بقایا یہاں نظر آئے گا۔"
     },
     "suppliers": {
       "add_product": "پروڈکٹ شامل کریں",
@@ -414,7 +418,9 @@
       "unit_cost": "فی اکائی لاگت",
       "update_price": "سیل کی قیمت بھی بدلیں",
       "you_owe": "{{amount}} دینا ہے",
-      "subtitle": "ڈیلیوری، ادائیگی اور واپسی"
+      "subtitle": "ڈیلیوری، ادائیگی اور واپسی",
+      "select_supplier": "سپلائر منتخب کریں",
+      "select_supplier_hint": "ڈیلیوریاں، ادائیگیاں اور بقایا یہاں نظر آئیں گے۔"
     },
     "expenses": {
       "amount": "رقم",

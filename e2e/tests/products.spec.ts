@@ -185,6 +185,12 @@ test.describe('Products (T-014)', () => {
   }) => {
     await openReadyShop(page, '/bikri/products/categories');
     await expect(page.getByText('No categories yet')).toBeVisible();
+    // Lazy route chunks come from the service-worker precache when offline.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.reload();
+    await expect(page.getByText('No categories yet')).toBeVisible();
     await context.setOffline(true);
     for (const name of ['Chargers', 'Cables']) {
       await page.getByLabel('New category').fill(name);

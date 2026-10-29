@@ -41,10 +41,12 @@ const timeFmt = new Intl.DateTimeFormat('en-GB', {
 export function ProductDetailPage({
   id,
   adjust = false,
+  embedded = false,
 }: {
   id: string;
   /** `/products/:id/adjust` opens the stock adjust dialog (screens/09). */
   adjust?: boolean;
+  embedded?: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -103,7 +105,24 @@ export function ProductDetailPage({
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-4'
+          : 'mx-auto flex max-w-5xl flex-col gap-4 p-4'
+      }
+    >
+      {embedded ? (
+        <Link
+          to="/products"
+          className={`${buttonQuiet} gap-2 self-start lg:hidden`}
+        >
+          <span aria-hidden="true" className="rtl:rotate-180">
+            ‹
+          </span>
+          {t('products.back')}
+        </Link>
+      ) : null}
       <header className="flex flex-wrap items-start gap-4">
         <ProductThumb
           name={String(p.name_en)}
@@ -198,7 +217,7 @@ export function ProductDetailPage({
 
       <section
         aria-label={t('products.price')}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${embedded ? '' : 'lg:grid-cols-5'}`}
       >
         <Figure label={t('products.price')} testId="detail-price">
           <MoneyText paisa={price} />
@@ -382,13 +401,15 @@ export function ProductDetailPage({
           }
         }}
       />
-      <Suspense fallback={null}>
-        <LabelsDialog
-          open={labelsOpen}
-          onOpenChange={setLabelsOpen}
-          initial={[{ productId: p.id, copies: 1 }]}
-        />
-      </Suspense>
+      {labelsOpen ? (
+        <Suspense fallback={null}>
+          <LabelsDialog
+            open={labelsOpen}
+            onOpenChange={setLabelsOpen}
+            initial={[{ productId: p.id, copies: 1 }]}
+          />
+        </Suspense>
+      ) : null}
       {adjust && p.track_stock === 1 && can('stock.adjust') ? (
         <AdjustDialog
           product={p}

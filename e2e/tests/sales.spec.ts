@@ -160,7 +160,9 @@ test.describe('Void and reissue (T-042)', () => {
     await page.getByRole('link', { name: /A-A-1/ }).click();
     await expect(page.getByTestId('bill-status')).toHaveText('Void');
     await expect(page.getByText('Replaced by A-A-2')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'A-A-2' })).toBeVisible();
+    await expect(
+      page.getByTestId('sales-detail').getByRole('link', { name: 'A-A-2' }),
+    ).toBeVisible();
     const voids = await idbAll<Row>(page, 'sale_voids');
     expect(voids).toMatchObject([
       { sale_id: expect.any(String), replacement_sale_id: expect.any(String) },
