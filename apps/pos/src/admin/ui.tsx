@@ -13,7 +13,7 @@ import {
   buttonQuiet,
 } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
-import { countdownParts, formatWhen } from './format.ts';
+import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 
 const dialogClass =
   'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border-0 bg-surface p-4 text-text shadow-modal backdrop:bg-text/40';
@@ -82,6 +82,100 @@ export function Modal({
 export const primaryBtn = `${buttonPrimary} disabled:opacity-50`;
 export const quietBtn = `${buttonQuiet} disabled:opacity-50`;
 export const dangerBtn = `${buttonDanger} disabled:opacity-50`;
+
+export const inputClass =
+  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text focus:border-primary';
+
+const STATUS_TONE: Record<string, string> = {
+  active: 'bg-success-subtle text-success-subtle-ink',
+  read_only: 'bg-warning-subtle text-warning-subtle-ink',
+  suspended: 'bg-danger-subtle text-danger-subtle-ink',
+  maintenance: 'bg-warning-subtle text-warning-subtle-ink',
+  deleting: 'bg-danger-subtle text-danger-subtle-ink',
+  deleted: 'bg-surface-2 text-text-muted',
+};
+
+/** Status pill shared by shop tables, tenant headers and device rows. */
+export function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium ${STATUS_TONE[status] ?? 'bg-surface-2 text-text-muted'}`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+      {t(statusLabelKey(status))}
+    </span>
+  );
+}
+
+/** Card with an optional heading row, used on every operator page. */
+export function Panel({
+  title,
+  description,
+  actions,
+  children,
+  className = '',
+  bodyClassName = 'p-4',
+}: {
+  title?: string;
+  description?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  const id = useId();
+  return (
+    <section
+      className={`rounded-card border border-border bg-surface shadow-card ${className}`}
+      aria-labelledby={title !== undefined ? id : undefined}
+    >
+      {title !== undefined ? (
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="min-w-0">
+            <h2 id={id} className="text-h2 font-semibold">
+              {title}
+            </h2>
+            {description !== undefined ? (
+              <p className="mt-0.5 text-small text-text-muted">{description}</p>
+            ) : null}
+          </div>
+          {actions !== undefined ? (
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          ) : null}
+        </div>
+      ) : null}
+      <div className={bodyClassName}>{children}</div>
+    </section>
+  );
+}
+
+/** Headline number on the overview. */
+export function StatCard({
+  label,
+  value,
+  hint,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className="rounded-card border border-border bg-surface p-4 shadow-card">
+      <p className="text-small font-medium text-text-muted">{label}</p>
+      <p
+        className={`mt-1 font-semibold tabular-nums ${compact ? 'text-title' : 'text-figure'}`}
+      >
+        {value}
+      </p>
+      {hint !== undefined ? (
+        <p className="mt-0.5 text-small text-text-muted">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
 
 export function Field({
   id,
@@ -181,50 +275,82 @@ export function PairingPanel({
   // do not pull in a QR dependency for the operator console.
   return (
     <section
-      className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4"
+      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
       aria-labelledby="pairing-title"
     >
-      <h2 id="pairing-title" className="font-semibold">
-        {heading ?? t('admin.pairing_once')}
-      </h2>
-      <p
-        className="font-mono text-title tracking-widest"
-        data-testid="pairing-code"
-      >
-        <span className="sr-only">{t('admin.pairing_code')} </span>
-        {code}
-      </p>
-      <p>
-        <span className="text-text-muted">{t('admin.pairing_link')} </span>
-        <a className="break-all text-primary underline" href={link}>
-          {link}
-        </a>
-      </p>
-      <p aria-live="polite">
-        {left.done
-          ? t('admin.countdown_done')
-          : t('admin.countdown', { hours: left.hours, minutes: left.minutes })}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={quietBtn}
-          onClick={() => {
-            void navigator.clipboard.writeText(link).then(
-              () => {
-                toast.push(t('admin.copied'), 'info');
-              },
-              () => {
-                toast.push(t('admin.copy_failed'), 'error');
-              },
-            );
-          }}
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <h2 id="pairing-title" className="text-h2 font-semibold">
+          {heading ?? t('admin.pairing_once')}
+        </h2>
+        <p
+          aria-live="polite"
+          className={`rounded-full px-2.5 py-1 text-small font-medium ${
+            left.done
+              ? 'bg-danger-subtle text-danger-subtle-ink'
+              : 'bg-warning-subtle text-warning-subtle-ink'
+          }`}
         >
-          {t('admin.copy_link')}
-        </button>
-        <a className={quietBtn} href={waHref} target="_blank" rel="noreferrer">
-          {t('admin.wa')}
-        </a>
+          {left.done
+            ? t('admin.countdown_done')
+            : t('admin.countdown', {
+                hours: left.hours,
+                minutes: left.minutes,
+              })}
+        </p>
+      </div>
+      <div className="flex flex-col gap-4 p-4">
+        <div className="rounded-control border border-dashed border-border-strong bg-surface-2 px-4 py-5 text-center">
+          <p className="text-small font-medium text-text-muted">
+            {t('admin.pairing_code')}
+          </p>
+          <p
+            className="mt-1 font-mono text-total font-semibold tracking-[0.18em]"
+            data-testid="pairing-code"
+          >
+            {code}
+          </p>
+          <p className="mt-1 text-small text-text-muted">
+            {t('admin.pairing_help')}
+          </p>
+        </div>
+        <div>
+          <p className="text-small text-text-muted">
+            {t('admin.pairing_link')}
+          </p>
+          <a
+            className="break-all font-medium text-primary underline"
+            href={link}
+          >
+            {link}
+          </a>
+        </div>
+        <p className="text-small text-text-muted tabular-nums">{when}</p>
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          <button
+            type="button"
+            className={quietBtn}
+            onClick={() => {
+              void navigator.clipboard.writeText(link).then(
+                () => {
+                  toast.push(t('admin.copied'), 'info');
+                },
+                () => {
+                  toast.push(t('admin.copy_failed'), 'error');
+                },
+              );
+            }}
+          >
+            {t('admin.copy_link')}
+          </button>
+          <a
+            className={quietBtn}
+            href={waHref}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t('admin.wa')}
+          </a>
+        </div>
       </div>
     </section>
   );

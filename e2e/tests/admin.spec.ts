@@ -12,11 +12,14 @@ test('operator console: overview, new shop with a one-time code, read-only and r
   test.setTimeout(90_000);
   await page.goto('/bikri/admin');
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByText('Platform operator')).toBeVisible();
   // The console never opens a shop database or the PIN lock.
   await expect(page.getByTestId('lock-screen')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Shops' }).click();
-  await page.getByRole('link', { name: 'New shop' }).click();
+  await expect(page.getByRole('heading', { name: 'Shops' })).toBeVisible();
+  await page.getByRole('link', { name: 'New shop' }).first().click();
+  await expect(page.getByText('What happens next')).toBeVisible();
   const slug = `ui-${Date.now().toString(36)}`;
   await page.getByLabel('Display name').fill(`Console ${slug}`);
   await page.getByLabel('Slug').fill(slug);
@@ -30,6 +33,7 @@ test('operator console: overview, new shop with a one-time code, read-only and r
 
   // The shop's page: make it read-only with a reason, then reactivate.
   await page.goto('/bikri/admin/tenants');
+  await page.getByLabel('Search shops').fill(slug);
   await page.getByRole('link', { name: `Console ${slug}` }).click();
   await page.getByRole('button', { name: 'Make read-only' }).click();
   const dialog = page.getByRole('dialog');
@@ -44,4 +48,14 @@ test('operator console: overview, new shop with a one-time code, read-only and r
     .click();
   await expect(page.getByText(/Active since/)).toBeVisible();
   await expect(page.getByText(/Payment overdue \(e2e\)/)).toBeVisible();
+});
+
+test('operator console follows the language switcher and RTL direction', async ({
+  page,
+}) => {
+  await page.goto('/bikri/admin');
+  await page.getByLabel('Language').selectOption('ur');
+  await expect(page.getByRole('heading', { name: 'جائزہ' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('link', { name: 'دکانیں' })).toBeVisible();
 });
