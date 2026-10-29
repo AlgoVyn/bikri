@@ -91,26 +91,28 @@ export function DailyChart({
           aria-label={t('office.reports.daily_chart')}
           className="h-52 w-full"
         >
-          {[max, min === 0 ? 0 : (max + min) / 2, min].map((value) => (
-            <g key={value}>
-              <line
-                x1={pad}
-                x2={width - pad}
-                y1={y(value)}
-                y2={y(value)}
-                stroke="var(--color-border)"
-                strokeWidth={value === 0 ? 1 : 0.5}
-              />
-              <text
-                x={4}
-                y={y(value) + 3}
-                fontSize={9}
-                fill="var(--color-text-muted)"
-              >
-                {formatMoney(value)}
-              </text>
-            </g>
-          ))}
+          {[...new Set([max, min === 0 ? 0 : (max + min) / 2, min])].map(
+            (value) => (
+              <g key={value}>
+                <line
+                  x1={pad}
+                  x2={width - pad}
+                  y1={y(value)}
+                  y2={y(value)}
+                  stroke="var(--color-border)"
+                  strokeWidth={value === 0 ? 1 : 0.5}
+                />
+                <text
+                  x={4}
+                  y={y(value) + 3}
+                  fontSize={9}
+                  fill="var(--color-text-muted)"
+                >
+                  {formatMoney(value)}
+                </text>
+              </g>
+            ),
+          )}
           {points.map((point, index) => {
             const top = point.sold >= 0 ? y(point.sold) : zero;
             const bottom = point.sold >= 0 ? zero : y(point.sold);

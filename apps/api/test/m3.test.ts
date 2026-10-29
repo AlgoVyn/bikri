@@ -96,6 +96,7 @@ function refund(
   shop: Awaited<ReturnType<typeof seedShop>>,
   saleId: string,
   udhaar: number,
+  saleLineId: string,
   reason = 'Faulty',
 ) {
   const id = newId(now);
@@ -114,6 +115,15 @@ function refund(
       device_id: shop.till.id,
       staff_id: IDS.owner,
       business_date: '2026-10-27',
+      created_at: now,
+    },
+    line: {
+      id: newId(now),
+      refund_id: id,
+      sale_line_id: saleLineId,
+      qty_milli: 1000,
+      amount: udhaar,
+      restock: 1,
       created_at: now,
     },
     ledger: {
@@ -244,22 +254,34 @@ describe('M3 server rules', () => {
         .first(),
     ).toEqual({ paid_total: 70000, udhaar_amount: 80000 });
 
-    const first = refund(shop, saleId, 50000);
-    const second = refund(shop, saleId, 50000);
+    const first = refund(shop, saleId, 50000, String(sale[1]?.row?.id));
+    const second = refund(shop, saleId, 50000, String(sale[1]?.row?.id));
     const many = await pushOk(shop.till, [
       op('refunds', 'insert', first.row, { tx_id: first.row.id }),
+      op('refund_lines', 'insert', first.line, { tx_id: first.row.id }),
       op('ledger_entries', 'insert', first.ledger, {
         tx_id: first.row.id,
       }),
       op('refunds', 'insert', second.row, { tx_id: second.row.id }),
+      op('refund_lines', 'insert', second.line, { tx_id: second.row.id }),
       op('ledger_entries', 'insert', second.ledger, {
         tx_id: second.row.id,
       }),
     ]);
     expect(many.results[0]?.error_code ?? null).toBeNull();
-    expect(many.results[2]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(
+      many.results
+        .slice(3)
+        .every((row) => row.error_code === 'CONSTRAINT_FAILED'),
+    ).toBe(true);
 
-    const forged = refund(shop, saleId, 50000, 'Forged');
+    const forged = refund(
+      shop,
+      saleId,
+      50000,
+      String(sale[1]?.row?.id),
+      'Forged',
+    );
     const forgedSale = {
       ...sale[0]!.row,
       id: saleId,
@@ -291,13 +313,14 @@ describe('M3 server rules', () => {
       udhaar_amount: 50000,
     };
     const saleId = String(sale[0]!.row?.id);
-    const row = refund(shop, saleId, 20000);
+    const row = refund(shop, saleId, 20000, String(sale[1]?.row?.id));
     const res = await pushOk(shop.till, [
       ...sale,
       op('refunds', 'insert', row.row, { tx_id: row.row.id }),
+      op('refund_lines', 'insert', row.line, { tx_id: row.row.id }),
       op('ledger_entries', 'insert', row.ledger, { tx_id: row.row.id }),
     ]);
-    expect(codes(res)).toEqual([null, null, null, null]);
+    expect(codes(res)).toEqual([null, null, null, null, null]);
   });
 
   it('treats a second void of the same sale as an idempotent no-op', async () => {

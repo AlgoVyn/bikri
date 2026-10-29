@@ -1,5 +1,5 @@
 import { QTY_UNITS, type QtyUnit } from '@bikri/core';
-import { useNavigate } from '@tanstack/react-router';
+import { Navigate, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,7 @@ import {
 import { getDb } from '../data/db.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
 
@@ -119,6 +120,7 @@ export function ProductFormPage({
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const formId = useId();
   const nameRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Draft | null>(
@@ -357,6 +359,8 @@ export function ProductFormPage({
         {text}
       </p>
     ) : null;
+
+  if (readOnly) return <Navigate to="/products" replace />;
 
   return (
     <form

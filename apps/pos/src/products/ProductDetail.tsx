@@ -23,6 +23,7 @@ import { getDb } from '../data/db.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
 import { marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
@@ -59,7 +60,8 @@ export function ProductDetailPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const detail = useLiveQuery(() => productDetail(getDb(), id), [id]);
-  const canEdit = can('catalog.edit');
+  const readOnly = useReadOnly();
+  const canEdit = can('catalog.edit') && !readOnly;
 
   useHotkey(plainKey('l'), () => setLabelsOpen(true), {
     enabled: can('catalog.edit') || can('purchase.create'),
@@ -198,7 +200,7 @@ export function ProductDetailPage({
               {t('products.duplicate')}
             </Link>
           ) : null}
-          {p.track_stock === 1 && can('stock.adjust') ? (
+          {p.track_stock === 1 && can('stock.adjust') && !readOnly ? (
             <Link
               to="/products/$id/adjust"
               params={{ id }}
@@ -207,7 +209,7 @@ export function ProductDetailPage({
               {t('adjust.button')}
             </Link>
           ) : null}
-          {can('catalog.delete') ? (
+          {can('catalog.delete') && !readOnly ? (
             <button
               type="button"
               className={buttonDangerQuiet}

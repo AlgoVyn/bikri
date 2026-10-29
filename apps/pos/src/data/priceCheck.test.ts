@@ -57,6 +57,11 @@ describe('price check (screens/18)', () => {
       expect(r.card.barcodes).toEqual(['5550001', '8901111111111']);
   });
 
+  it('an empty query is a no-op', async () => {
+    const { db } = await shop('pc-empty');
+    expect(await priceCheck(db, '   ')).toEqual({ kind: 'none' });
+  });
+
   it('SKU or a single name match finds one; untracked stock is null; several names list', async () => {
     const { db, cable } = await shop('pc2');
     const sku = String(cable.sku);

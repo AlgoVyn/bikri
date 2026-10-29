@@ -49,3 +49,22 @@ export async function recoverInterruptedPrintJobs(
     return stale.length;
   });
 }
+
+/** Failed jobs that a later successful job for the same sale has not superseded. */
+export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
+  const all = await db.print_jobs.toArray();
+  const lastDone = new Map<string, number>();
+  for (const job of all) {
+    if (job.status !== 'done' || !job.sale_id) continue;
+    lastDone.set(
+      String(job.sale_id),
+      Math.max(lastDone.get(String(job.sale_id)) ?? 0, Number(job.created_at)),
+    );
+  }
+  return all.filter(
+    (job) =>
+      job.status === 'failed' &&
+      (!job.sale_id ||
+        Number(job.created_at) > (lastDone.get(String(job.sale_id)) ?? 0)),
+  ).length;
+}

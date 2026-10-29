@@ -21,12 +21,14 @@ import {
 } from '../data/stock.ts';
 import { beep } from '../sell/beep.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 
 /** Stock count (screens/09): scope → counted list → Finish count. */
 export function StockCountPage() {
   const { t } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const draft = useLiveQuery(() => loadCountDraft(getDb()), []);
   const products = useLiveQuery(async () => {
     const d = await loadCountDraft(getDb());
@@ -43,7 +45,7 @@ export function StockCountPage() {
   const [scan, setScan] = useState('');
   const scanId = useId();
 
-  if (!can('stock.adjust')) return <Navigate to="/" replace />;
+  if (!can('stock.adjust') || readOnly) return <Navigate to="/" replace />;
   if (draft === undefined) return null;
 
   const setCounted = async (

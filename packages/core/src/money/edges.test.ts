@@ -100,6 +100,11 @@ describe('cashChips', () => {
   it('rejects a non-integer due amount', () => {
     expect(() => cashChips(1.5)).toThrow(RangeError);
   });
+
+  it('never returns a chip outside the safe-integer range', () => {
+    for (const chip of cashChips(Number.MAX_SAFE_INTEGER))
+      expect(Number.isSafeInteger(chip)).toBe(true);
+  });
 });
 
 describe('sumSafe and subSafe', () => {

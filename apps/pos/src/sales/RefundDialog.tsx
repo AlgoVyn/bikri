@@ -25,6 +25,7 @@ import { billDetail } from '../data/salesHistory.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
@@ -49,6 +50,7 @@ export function RefundDialog({
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [mode, setMode] = useState<'whole' | 'items'>('whole');
   const [qty, setQty] = useState<Record<string, number>>({});
   const [restock, setRestock] = useState<Record<string, boolean>>({});
@@ -130,7 +132,8 @@ export function RefundDialog({
     reason.length > 0 &&
     reason.length <= 120 &&
     !pending &&
-    done === null;
+    done === null &&
+    !readOnly;
 
   const methods = useMemo(() => {
     const used = new Set<'cash' | 'card' | 'bank_wallet'>(['cash']);

@@ -436,12 +436,26 @@ describe('void rules (05 §5, D-044)', () => {
       business_date: '2026-10-27',
       created_at: Date.now(),
     });
-    const alone = await pushOk(shop.till, [op('refunds', 'insert', refund())]);
+    const lineFor = (row: Record<string, unknown>) => ({
+      id: newId(),
+      refund_id: row.id,
+      sale_line_id: sale[1]?.row?.id,
+      qty_milli: 1000,
+      amount: row.exact_amount,
+      restock: 1,
+      created_at: Date.now(),
+    });
+    const aloneRow = refund();
+    const alone = await pushOk(shop.till, [
+      op('refunds', 'insert', aloneRow),
+      op('refund_lines', 'insert', lineFor(aloneRow)),
+    ]);
     expect(alone.results[0]?.error_code).toBe('FORBIDDEN');
     const row = refund();
     const tx = newId();
     const approved = await pushOk(shop.till, [
       op('refunds', 'insert', row, { tx_id: tx }),
+      op('refund_lines', 'insert', lineFor(row), { tx_id: tx }),
       op('payments', 'insert', refundPayment(shop, row), { tx_id: tx }),
       op(
         'audit_log',
@@ -464,6 +478,7 @@ describe('void rules (05 §5, D-044)', () => {
       ),
     ]);
     expect(approved.results.map((r) => r.error_code ?? null)).toEqual([
+      null,
       null,
       null,
       null,
@@ -560,11 +575,31 @@ describe('refund payment rows and split (04 §5)', () => {
       created_at: Date.now(),
       ...over,
     });
+    const lineFor = (row: Record<string, unknown>) => ({
+      id: newId(),
+      refund_id: row.id,
+      sale_line_id: lineOp?.row?.id,
+      qty_milli: 1000,
+      amount: row.exact_amount,
+      restock: 1,
+      created_at: Date.now(),
+    });
     const send = async (rows: [string, Record<string, unknown>][]) => {
       const t = newId();
+      const expanded = rows.flatMap(([tbl, row]) =>
+        tbl === 'refunds'
+          ? [
+              ['refunds', row] as [string, Record<string, unknown>],
+              ['refund_lines', lineFor(row)] as [
+                string,
+                Record<string, unknown>,
+              ],
+            ]
+          : [[tbl, row] as [string, Record<string, unknown>]],
+      );
       const res = await pushOk(
         shop.till,
-        rows.map(([tbl, row]) => op(tbl, 'insert', row, { tx_id: t })),
+        expanded.map(([tbl, row]) => op(tbl, 'insert', row, { tx_id: t })),
       );
       return res.results[0]?.error_code ?? null;
     };

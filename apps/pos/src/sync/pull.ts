@@ -221,19 +221,42 @@ export async function restoreRecovery(
   await db.transaction('rw', db.tables, async () => {
     if (device) {
       const txId = newId(now);
+      const recovered = new Map<string, Set<string>>();
+      const lineParents: Record<string, { table: string; field: string }> = {
+        sale_lines: { table: 'sales', field: 'sale_id' },
+        refund_lines: { table: 'refunds', field: 'refund_id' },
+        purchase_lines: { table: 'purchases', field: 'purchase_id' },
+        supplier_return_lines: {
+          table: 'supplier_returns',
+          field: 'return_id',
+        },
+      };
       for (const tbl of PULLED_TABLES) {
         if (!isLedgerTable(tbl)) continue;
         const rows = (await db.table(tbl).toArray()) as SyncedRow[];
+        const parent = lineParents[tbl];
         for (const row of rows) {
-          const mine =
-            row.device_id === undefined ? false : row.device_id === device.id;
-          if (!mine || Number(row.created_at ?? 0) < restorePointAt) continue;
+          const mine = parent
+            ? recovered.get(parent.table)?.has(String(row[parent.field])) ===
+              true
+            : row.device_id !== undefined && row.device_id === device.id;
+          if (
+            !mine ||
+            (!parent && Number(row.created_at ?? 0) < restorePointAt)
+          )
+            continue;
+          const id = String(row.id);
+          if (!parent) {
+            const set = recovered.get(tbl) ?? new Set<string>();
+            set.add(id);
+            recovered.set(tbl, set);
+          }
           await db.outbox.add({
             op_id: newId(now),
             tx_id: txId,
             tbl: tbl as LedgerTable,
             kind: 'insert',
-            row_id: row.id,
+            row_id: id,
             row: opRow(tbl as LedgerTable, row),
             created_at: now,
             status: 'pending',

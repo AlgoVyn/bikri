@@ -114,17 +114,20 @@ function pushPayments(
   labels: ReceiptLabels,
   layout: 'columns' | 'stacked',
   grouping: ReceiptShop['numberGrouping'],
+  showPaymentDetails: boolean,
 ): void {
   const money = (paisa: number): string => formatReceiptMoney(paisa, grouping);
   let cashMeta = false;
-  for (const payment of payments) {
-    pushPair(blocks, methodLabel(payment, labels), money(payment.amount));
-    if (payment.method === 'cash' && !cashMeta) {
-      cashMeta = true;
-      const tender =
-        layout === 'stacked' ? labels.tenderedShort : labels.amountTendered;
-      pushPair(blocks, tender, money(sale.cashTendered));
-      pushPair(blocks, labels.change, money(sale.changeGiven));
+  if (showPaymentDetails) {
+    for (const payment of payments) {
+      pushPair(blocks, methodLabel(payment, labels), money(payment.amount));
+      if (payment.method === 'cash' && !cashMeta) {
+        cashMeta = true;
+        const tender =
+          layout === 'stacked' ? labels.tenderedShort : labels.amountTendered;
+        pushPair(blocks, tender, money(sale.cashTendered));
+        pushPair(blocks, labels.change, money(sale.changeGiven));
+      }
     }
   }
   if (sale.udhaarAmount > 0) {
@@ -224,16 +227,17 @@ export function buildSaleReceipt(
       money(sale.tax),
     );
   }
-  if (shop.showPaymentDetails) {
-    pushPayments(
-      blocks,
-      sale,
-      input.payments,
-      labels,
-      paper.itemLayout,
-      shop.numberGrouping,
-    );
-  }
+  // Payment-method rows may be hidden; a udhaar/khata row is part of the bill's trust and must
+  // still print when there is a khata part (06 §5).
+  pushPayments(
+    blocks,
+    sale,
+    input.payments,
+    labels,
+    paper.itemLayout,
+    shop.numberGrouping,
+    shop.showPaymentDetails,
+  );
   const saved = sale.itemDiscountTotal + sale.billDiscount;
   if (shop.showYouSaved && saved > 0) {
     pushPair(blocks, labels.youSaved, money(saved));

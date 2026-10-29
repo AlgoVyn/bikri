@@ -19,7 +19,7 @@ export function usePrintService(): void {
   const ref = useRef({ t, toast });
   ref.current = { t, toast };
   useEffect(() => {
-    void recoverInterruptedPrintJobs(getDb());
+    void recoverInterruptedPrintJobs(getDb(), Date.now(), 0);
   }, []);
   const trigger = useLiveQuery(async () => {
     const db = getDb();

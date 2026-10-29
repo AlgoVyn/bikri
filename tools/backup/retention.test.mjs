@@ -41,6 +41,19 @@ describe('backup retention', () => {
     expect(plan.remove).toHaveLength(116);
   });
 
+  it('keeps the earliest backup of a month when the 1st is missing', () => {
+    const keys = [];
+    for (let day = 2; day <= 30; day += 1) {
+      const date = `2026-09-${String(day).padStart(2, '0')}`;
+      keys.push(`d1/${date}.sql.gz`, `d1/${date}.manifest.json`);
+    }
+    keys.push('d1/2026-10-28.sql.gz', 'd1/2026-10-28.manifest.json');
+    const plan = retentionPlan(keys, '2026-10-28');
+    expect(plan.keep).toContain('2026-09-02');
+    expect(plan.remove).not.toContain('d1/2026-09-02.sql.gz');
+    expect(plan.remove).not.toContain('d1/2026-09-02.manifest.json');
+  });
+
   it('leaves unknown keys and future exports alone', () => {
     const plan = retentionPlan(
       ['d1/2025-01-02.sql.gz', 'd1/manual.txt', 'd1/2027-01-01.sql.gz'],

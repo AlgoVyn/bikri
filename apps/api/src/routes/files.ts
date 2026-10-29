@@ -5,6 +5,8 @@ import type { AppEnv } from '../types.ts';
 import { assertCanWrite } from './sync.ts';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+/** Per-shop cap; the shared 10 GB bucket must not be fillable by one tenant. */
+const MAX_TENANT_FILE_BYTES = 1_000_000_000;
 const TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 const SHA = /^[0-9a-f]{64}$/u;
@@ -65,9 +67,33 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
       400,
       'sha256 does not match the body',
     );
+  if (kind === 'product_image') {
+    const product = await c.var.db.first<{ id: string }>(
+      'SELECT id FROM products WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+      id,
+    );
+    if (!product) throw notFound();
+  }
   const key = tenantKey(tenant.id, relative);
   if (await c.env.FILES.head(key))
     return c.json({ key: relative, size: body.byteLength }, 200);
+  let used = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await c.env.FILES.list({
+      prefix: `t/${tenant.id}/`,
+      ...(cursor ? { cursor } : {}),
+      limit: 1000,
+    });
+    for (const object of page.objects) used += object.size;
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  if (used + body.byteLength > MAX_TENANT_FILE_BYTES)
+    throw new ApiError(
+      'TENANT_QUOTA',
+      429,
+      'This shop has reached its file storage limit',
+    );
   await c.env.FILES.put(key, body, { httpMetadata: { contentType: type } });
   return c.json({ key: relative, size: body.byteLength }, 201);
 }

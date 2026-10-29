@@ -15,7 +15,7 @@ There is still **one** nightly backup of the whole database (all tenants): a pri
 | 5. Off-Cloudflare copy | same file encrypted with `age` | 24 h | GitHub Actions artifact (90 days) + optional owner Google Drive |
 | 6. Shop owner manual export | JSON + CSV zip of **their shop** from Settings → Backup, built from the device's data, or from the server copy (`Download from server`, owner email sign-in, once per 24 h, [13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)) | on demand | owner's PC/phone |
 | 6b. Operator per-shop export | the same zip, built from the server copy in the console (§3.4) | on demand | operator's PC |
-| 7. R2 files (logo, photos) | weekly full listing + copy of every object into the encrypted archive | 7 days | GitHub Actions artifact (90 days), `age`-encrypted |
+| 7. R2 files (logo, photos) | weekly full listing + copy of every object into the encrypted archive; 1 GB per shop | 7 days | GitHub Actions artifact (90 days), `age`-encrypted |
 
 ## 2. Nightly backup workflow (`.github/workflows/backup.yml`)
 
@@ -27,7 +27,7 @@ Steps:
 3. Sanity check: file > 1 KB and contains `CREATE TABLE sales`; row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`).
 4. `gzip -9` → upload to R2 bucket `bikri-backups`: `d1/YYYY-MM-DD.sql.gz` + `d1/YYYY-MM-DD.manifest.json` (`wrangler r2 object put bikri-backups/d1/… --remote`).
 5. Encrypt `age -r $BACKUP_AGE_RECIPIENT` → upload as workflow artifact `backup-YYYY-MM-DD` (retention 90 days).
-6. Retention in R2: keep 30 daily, 12 monthly (1st of month); delete older (script lists and deletes).
+6. Retention in R2: keep 30 daily and one backup per month for the last 12 months (the 1st when present, otherwise the earliest available date); delete older (script lists and deletes).
 7. On failure: GitHub sends the default failure email to the repo owner; the operator console Overview shows "Last backup: 2 days ago" in red when the newest manifest is > 36 h old.
 
 Free-tier impact: one export per night is a few hundred thousand rows read (≪ 5 M/day) and ~3 Class A R2 ops.

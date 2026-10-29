@@ -220,3 +220,6 @@ Answered on 27 Oct 2026 and recorded as D-080–D-085: read-only shops (§7.2), 
 5. **Email beyond verified addresses:** on the Free plan each shop owner's email must be a verified destination address in Cloudflare (the owner clicks Cloudflare's verification email once; at most 200 addresses per account). Moving to Workers Paid and onboarding `algovyn.com` as a sending domain (new SPF/DKIM DNS records) removes that step. When shops grow, switch, or keep verified addresses?
 6. **Owner self-recovery:** should an owner who lost every admin device be able to make a till an admin device with their email code, instead of asking the operator for a new owner pairing code (current design)?
 7. **Writes by support access:** support devices are view-only (§7.5). Should the operator ever be allowed to make changes in a shop's data from a support device (for example with the owner's explicit approval per session)?
+
+
+**File storage per shop.** The till file API rejects an upload that would take a shop over 1 GB or that targets a product not in that shop; the shared R2 bucket cannot be filled by one tenant.

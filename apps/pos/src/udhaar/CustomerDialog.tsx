@@ -90,8 +90,24 @@ export function CustomerDialog({
         address,
         note,
         // 05 §6: cashiers may create a customer but never set or change a credit limit.
-        credit_limit: role === 'cashier' ? null : limit,
-        hard_limit: role === 'owner' ? hard : false,
+        ...(role === 'cashier'
+          ? editing
+            ? {
+                credit_limit:
+                  editing.credit_limit == null
+                    ? null
+                    : Number(editing.credit_limit),
+                hard_limit: Number(editing.hard_limit ?? 0) === 1,
+              }
+            : {}
+          : {
+              credit_limit: limit ?? null,
+              // Only an owner may change the hard limit; a manager's edit preserves it.
+              hard_limit:
+                role === 'owner'
+                  ? hard
+                  : Number(editing?.hard_limit ?? 0) === 1,
+            }),
       };
       if (editing) await updateCustomer(db, editing.id, fields, ctx);
       else

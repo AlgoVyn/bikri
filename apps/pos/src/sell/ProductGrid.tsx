@@ -31,6 +31,7 @@ export function ProductGrid({
   const ref = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ cols: 4, start: 0, end: 8 });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the virtual window when the result set changes
   useEffect(() => {
     const scroller = scrollRef.current;
     const list = ref.current;
@@ -60,18 +61,35 @@ export function ProductGrid({
       scroller.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [scrollRef, tileH]);
+  }, [scrollRef, tileH, rows.length]);
 
   const totalRows = Math.ceil(rows.length / view.cols);
   const first = view.start * view.cols;
   const last = Math.min(rows.length, view.end * view.cols);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the highlight can move outside the rendered window
   useEffect(() => {
     if (highlighted < 0) return;
-    ref.current
-      ?.querySelector(`[data-index="${highlighted}"]`)
-      ?.scrollIntoView({ block: 'nearest' });
-  }, [highlighted]);
+    const rendered = ref.current?.querySelector(
+      `[data-index="${highlighted}"]`,
+    );
+    if (rendered) {
+      rendered.scrollIntoView?.({ block: 'nearest' });
+      return;
+    }
+    // The highlighted tile can be outside the virtual window (keyboard navigation or a filter
+    // change); scroll its row into view and let the scroll observer render it.
+    const scroller = scrollRef.current;
+    const list = ref.current;
+    if (!scroller || !list) return;
+    const row = Math.floor(highlighted / view.cols);
+    const offset = list.offsetTop - scroller.offsetTop;
+    const top = offset + row * (tileH + GAP);
+    scroller.scrollTo({
+      top: Math.max(0, top - (scroller.clientHeight - tileH) / 2),
+      behavior: 'auto',
+    });
+  }, [highlighted, scrollRef, view.cols, tileH, rows.length]);
 
   return (
     <ul
