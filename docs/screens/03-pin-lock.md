@@ -10,7 +10,7 @@
 
 ## Layout
 
-Full screen, app background. Top-start: the Bikri logo mark and wordmark with the shop name underneath. Top-end: sync badge, printer status and language switcher. Center: "Who's selling?" then a row of profile chips (initials avatar, name, role tag), active staff only, ordered owner → managers → cashiers then name. After choosing a profile: 4–6 PIN dots and a 3×4 keypad (1–9, `Clear`, 0, `⌫`). Bottom: clock and date (Asia/Karachi), "Carts and held bills are kept while locked."
+Full screen, app background, following the device theme selected in Settings → Scanner & display (light, dark or system). Top-start: the Bikri logo mark and wordmark with the shop name underneath. Top-end: sync badge, printer status and language switcher. Center: "Who's selling?" then a row of profile chips (initials avatar, name, role tag), active staff only, ordered owner → managers → cashiers then name. After choosing a profile: 4–6 PIN dots and a 3×4 keypad (1–9, `Clear`, 0, `⌫`). Bottom: clock and date (Asia/Karachi), "Carts and held bills are kept while locked."
 
 If only one active staff exists, the chip is pre-selected.
 
