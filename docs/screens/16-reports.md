@@ -27,7 +27,7 @@ Tabs:
 6. **Day closes**: list of closes with expected, counted, difference; totals of shorts/overs.
 7. **Expenses**: by category.
 
-Charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.
+Table headers follow their column alignment: the first name/date column is start-aligned and numeric/metric columns are end-aligned with their values. Charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.
 
 ## CSV columns
 
