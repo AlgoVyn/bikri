@@ -12,7 +12,13 @@ export function SupplierWorkspace({ supplierId }: { supplierId?: string }) {
   const { t } = useTranslation();
   return (
     <MasterDetail
-      master={<SupplierList embedded detailOpen={supplierId !== undefined} />}
+      master={
+        <SupplierList
+          embedded
+          detailOpen={supplierId !== undefined}
+          selectedId={supplierId}
+        />
+      }
       detail={
         supplierId ? (
           <SupplierStatement supplierId={supplierId} embedded />

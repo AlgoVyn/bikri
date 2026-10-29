@@ -731,6 +731,7 @@ export function SellPage() {
             onHold={() => setDialog('hold')}
             onClear={askClear}
             onPay={() => void takePayment()}
+            onAddItem={focusSearch}
             onHeld={() => setDialog('held')}
             heldCount={heldCount}
           />

@@ -116,7 +116,7 @@ export function SyncBadge() {
     });
   } else if (counts.pending > 0) {
     state = 'pending';
-    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    tone = 'bg-surface-2 text-text-muted';
     label = t('shell.sync_waiting', { count: counts.pending });
     detail = t('shell.sync_detail_pending', {
       count: counts.pending,
@@ -133,7 +133,7 @@ export function SyncBadge() {
       // axe label-content-name-mismatch: the accessible name starts with the visible text.
       aria-label={detail === label ? label : `${label}. ${detail}`}
       title={detail}
-      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
+      className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${tone}`}
     >
       <span aria-hidden="true" className="size-2 rounded-full bg-current" />
       <span className="max-lg:hidden">{label}</span>
@@ -149,33 +149,49 @@ export function SyncBadge() {
 /** Printer status pill: green when set up, red when this device has no printer (T-020). */
 export function PrinterDot() {
   const { t } = useTranslation();
-  const printer = useLiveQuery(
-    async () => (await getDb().kv.get('printer'))?.value ?? null,
-    [],
-  );
-  const label = printer ? t('shell.printer_ready') : t('shell.printer_none');
-  const loading = printer === undefined;
+  const data = useLiveQuery(async () => {
+    const db = getDb();
+    return {
+      printer: (await db.kv.get('printer'))?.value ?? null,
+      failed: await db.print_jobs.where('status').equals('failed').count(),
+    };
+  }, []);
+  const printer = data?.printer ?? null;
+  const failed = data?.failed ?? 0;
+  const loading = data === undefined;
+  const detail = failed
+    ? t('shell.printer_failed')
+    : printer
+      ? t('shell.printer_ready')
+      : t('shell.printer_none');
+  const visible = failed ? detail : printer ? detail : t('shell.printer_no');
   return (
     <Link
       to="/settings/printer"
       data-testid="printer-dot"
-      aria-label={label}
-      title={label}
-      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${
+      aria-label={visible === detail ? detail : `${visible}. ${detail}`}
+      title={detail}
+      className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${
         loading
           ? 'bg-surface-2 text-text-muted'
-          : printer
-            ? 'bg-success-subtle text-success-subtle-ink'
-            : 'bg-danger-subtle text-danger-subtle-ink'
+          : failed
+            ? 'bg-danger-subtle text-danger-subtle-ink'
+            : printer
+              ? 'bg-success-subtle text-success-subtle-ink'
+              : 'bg-surface-2 text-text-muted'
       }`}
     >
       <span
         aria-hidden="true"
         className={`size-2 rounded-full ${
-          loading ? 'bg-border-strong' : printer ? 'bg-success' : 'bg-danger'
+          loading || (!printer && !failed)
+            ? 'bg-border-strong'
+            : failed
+              ? 'bg-danger'
+              : 'bg-success'
         }`}
       />
-      {t('shell.printer_label')}
+      <span>{visible}</span>
     </Link>
   );
 }
@@ -233,6 +249,22 @@ export function StaffMenu() {
                 {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
               </p>
             </div>
+          </div>
+          <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2 lg:hidden">
+            <Link
+              to="/settings/sync"
+              className="flex min-h-11 items-center rounded-control px-2 hover:bg-surface-2"
+              onClick={() => setOpen(false)}
+            >
+              {t('syncpage.title')}
+            </Link>
+            <Link
+              to="/settings/printer"
+              className="flex min-h-11 items-center rounded-control px-2 hover:bg-surface-2"
+              onClick={() => setOpen(false)}
+            >
+              {t('shell.printer_label')}
+            </Link>
           </div>
           <button
             type="button"

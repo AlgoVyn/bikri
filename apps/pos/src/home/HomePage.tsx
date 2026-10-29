@@ -299,6 +299,7 @@ export function HomePage() {
                   data={data}
                   showCash={can('dayclose.view_expected')}
                   showProfit={can('cost.view')}
+                  canClose={can('dayclose.create')}
                   timeFmt={timeFmt}
                 />
               ) : null}
@@ -313,10 +314,8 @@ export function HomePage() {
   );
 }
 
-function sectionLabel(lang: string): string {
-  return lang === 'ur'
-    ? 'text-small font-semibold text-text-muted'
-    : 'text-small font-semibold uppercase tracking-wide text-text-muted';
+function sectionLabel(_lang: string): string {
+  return 'text-small font-semibold text-text-muted';
 }
 
 function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
@@ -327,7 +326,7 @@ function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
       <h2 id="quick-heading" className={`mb-2 ${sectionLabel(i18n.language)}`}>
         {t('home.quick_actions')}
       </h2>
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map((tile) => (
           <li key={tile.to + tile.label}>
             <Link
@@ -390,11 +389,13 @@ function RegisterCard({
   data,
   showCash,
   showProfit,
+  canClose,
   timeFmt,
 }: {
   data: HomeData;
   showCash: boolean;
   showProfit: boolean;
+  canClose: boolean;
   timeFmt: Intl.DateTimeFormat;
 }) {
   const { t, i18n } = useTranslation();
@@ -464,6 +465,11 @@ function RegisterCard({
           </dd>
         </div>
       </dl>
+      {canClose ? (
+        <Link to="/day-close" className={`${buttonQuiet} mt-3 w-full`}>
+          {t('home.day_close')}
+        </Link>
+      ) : null}
     </section>
   );
 }

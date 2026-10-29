@@ -58,7 +58,7 @@
       "carts_full": "Free a cart tab (hold or clear it) to start the reissue.",
       "cashier": "Cashier",
       "col_discount": "Discount",
-      "col_kept": "Kept",
+      "col_kept": "On bill",
       "col_name": "Item",
       "col_price": "Price",
       "col_qty": "Qty",
@@ -179,7 +179,8 @@
       "split_title": "Paid and khata split",
       "start_new_sale": "Start new sale for this customer",
       "title": "Refund {{invoice}}",
-      "title_plain": "Refund"
+      "title_plain": "Refund",
+      "choose_reason": "Choose a reason and quantity to continue."
     },
     "udhaar": {
       "add_promise": "Add promise",
@@ -253,7 +254,7 @@
       "overpay_body": "They will be in credit by {{amount}}. Save anyway?",
       "overpay_confirm": "Save payment",
       "overpay_title": "Customer will be in credit",
-      "owes": "Owes {{amount}}",
+      "owes": "Owes you {{amount}}",
       "payment_backdate_owner": "Only the owner can back-date a payment (up to 7 days).",
       "payment_date": "Date",
       "payment_error_amount": "Enter an amount above zero.",
@@ -531,7 +532,10 @@
       "udhaar_given": "Udhaar given",
       "udhaar_in": "Udhaar received in cash",
       "next": "Next",
-      "subtitle": "Count the drawer and close the day"
+      "subtitle": "Count the drawer and close the day",
+      "column_note": "Note",
+      "column_count": "Count",
+      "column_amount": "Amount"
     },
     "reports": {
       "age_days": "Age (days)",
@@ -623,7 +627,7 @@
       "reason": "Reason",
       "refunded_amount": "Refunded",
       "refunds": "Refunds",
-      "refunds_note": "{{count}} refunds · Rs {{amount}}",
+      "refunds_note": "Refunds: {{count}} · {{amount}}",
       "returns_count": "Returns",
       "returns_credit": "Credit",
       "returns_difference": "Return difference",
@@ -661,7 +665,8 @@
       "uncategorized": "Uncategorized",
       "voided_amount": "Voided",
       "voids": "Voids",
-      "subtitle": "Sales, profit and stock trends"
+      "subtitle": "Sales, profit and stock trends",
+      "not_enough_days": "Not enough days for a trend yet."
     },
     "backup": {
       "building": "Building export…",
@@ -671,7 +676,7 @@
       "finished": "Downloaded {{filename}}",
       "hint": "Download a zip of every table: JSON is the restore source, CSV is for Excel.",
       "nav_hint": "Download a full copy of this shop",
-      "nightly": "Your data is backed up every night by Algovyn.",
+      "nightly": "When this till is connected, Algovyn backs up your data every night.",
       "no_permission": "Only the owner can download a full shop copy.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} rows)",
       "restore": "Restore from export",

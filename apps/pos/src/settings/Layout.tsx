@@ -6,7 +6,7 @@ import { AreaStrings } from '../i18n/areas.tsx';
 import { SettingsNav } from './SettingsNav.tsx';
 
 /**
- * Settings on ≥1024 px uses the reference app's master–detail split: the index stays on the
+ * Settings on ≥1280 px uses the reference app's master–detail split: the index stays on the
  * start side and the selected section fills the end side. Below that, a section is a full page.
  */
 export function SettingsSplit({
@@ -18,12 +18,12 @@ export function SettingsSplit({
 }) {
   return (
     <AreaStrings area="office">
-      <div className="mx-auto w-full max-w-[1440px] p-4 lg:p-6">
-        <div className="grid gap-6 lg:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] lg:items-start">
-          <div className={index ? 'min-w-0' : 'min-w-0 max-lg:hidden'}>
+      <div className="mx-auto w-full max-w-[1440px] p-4 xl:p-6">
+        <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
+          <div className={index ? 'min-w-0' : 'min-w-0 max-xl:hidden'}>
             <SettingsNav />
           </div>
-          <div className={index ? 'hidden min-w-0 lg:block' : 'min-w-0'}>
+          <div className={index ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
             {index ? <SettingsPlaceholder /> : children}
           </div>
         </div>
@@ -35,7 +35,7 @@ export function SettingsSplit({
 function SettingsPlaceholder() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-[32rem] flex-col items-center justify-center gap-3 rounded-card border border-dashed border-border-strong bg-surface-2/40 p-8 text-center">
+    <div className="flex min-h-[32rem] flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface p-8 text-center shadow-card">
       <span
         aria-hidden="true"
         className="flex size-14 items-center justify-center rounded-full bg-surface text-text-muted"

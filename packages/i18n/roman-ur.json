@@ -56,7 +56,8 @@
     "not_found": "Yeh safha dastiyab nahi.",
     "required": "zaroori",
     "yes": "Haan",
-    "back": "Wapas"
+    "back": "Wapas",
+    "filters": "Filters"
   },
   "count": {
     "category": "Category",
@@ -90,7 +91,9 @@
     "retry": "Dobara koshish",
     "share": "Share karein",
     "share_failed": "Raseed ki tasveer nahin ban saki. Dobara koshish karein.",
-    "share_whatsapp": "WhatsApp par bhejein"
+    "share_whatsapp": "WhatsApp par bhejein",
+    "paid": "Ada",
+    "customer": "Gahak"
   },
   "enrol": {
     "needed": "Ye till abhi kisi dukaan se munsalik nahin. Pairing code se jorein.",
@@ -241,7 +244,7 @@
     "view_all": "Sab dekhein",
     "today_summary": "Aaj ek nazar mein",
     "new_sale_hint": "Items shamil karein ya barcode scan karein",
-    "todays_register": "Aaj ka khata",
+    "todays_register": "Aaj",
     "last_bill": "Aakhri bill {{time}}",
     "desc_price_check": "Barcode scan karein",
     "desc_day_close": "Ginti aur bandish",
@@ -556,7 +559,7 @@
     "last_cost": "Aakhri laagat",
     "manage_categories": "Categories",
     "margin": "Margin",
-    "min_stock": "Kam stock alert",
+    "min_stock": "Kam stock warning",
     "more": "Mazeed",
     "no_match": "Koi product nahin mili.",
     "not_found": "Yeh product mojood nahin.",
@@ -586,7 +589,9 @@
     "more_actions": "Mazeed karrawaiyan",
     "select_product": "Product muntakhib karein",
     "select_product_hint": "Price, stock aur history yahan nazar aayenge.",
-    "back": "Products par wapas"
+    "back": "Products par wapas",
+    "min_stock_off": "Off",
+    "last14_empty": "Pichhle 14 din mein stock mein koi harkat nahin."
   },
   "sell": {
     "add_discount": "Discount lagayein",
@@ -602,7 +607,7 @@
     "cart_full": "Aik bill mein 60 lines ho sakti hain — payment lein aur doosra bill shuru karein",
     "cart_has_items": "is mein items hain",
     "cart_lines": "Bill ki cheezein",
-    "cart_tab": "Gahak {{n}}",
+    "cart_tab": "Bill {{n}}",
     "carts": "Khule bill",
     "categories": "Categories",
     "change_customer": "Badlein",
@@ -682,7 +687,8 @@
     "view_cart": "Cart dekhein · {{count}} cheezein",
     "view_cart_one": "Cart dekhein · 1 cheez",
     "walk_in": "Aam gahak",
-    "empty_tab": "Khali"
+    "empty_tab": "Nayi bill",
+    "add_first_item": "Payment ke liye product shamil karein"
   },
   "setup": {
     "add_one": "Aik product shamil karein",
@@ -761,7 +767,8 @@
     "tax": "Sales tax %",
     "tax_hint": "Riayat ke baad lagta hai. 0 par tax ki line nahin chhapti.",
     "welcome": "Bikri mein khush aamdeed",
-    "welcome_hint": "Apni zabaan chunein. Baad mein badal sakte hain."
+    "welcome_hint": "Apni zabaan chunein. Baad mein badal sakte hain.",
+    "offline_hint": "Offline chalta hai. Aap ka data isi device par rehta hai."
   },
   "shell": {
     "lang_en": "English",
@@ -806,7 +813,9 @@
     "lock": "Lock karein",
     "sync_paused": "Sync ruka hua hai",
     "sync_detail_paused": "Is dukaan ka account rok diya gaya hai. Algovyn se raabta karein. {{count}} tabdeeliyan isi device par mehfooz hain.",
-    "printer_label": "Printer"
+    "printer_label": "Printer",
+    "printer_failed": "Print fail",
+    "printer_no": "Printer nahin"
   },
   "stock": {
     "reason": {

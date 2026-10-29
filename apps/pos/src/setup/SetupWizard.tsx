@@ -366,6 +366,9 @@ export function SetupWizard() {
           <section className="flex flex-col gap-4">
             <h1 className="text-h1 font-semibold">{t('setup.welcome')}</h1>
             <p className="text-text-muted">{t('setup.welcome_hint')}</p>
+            <p className="text-small text-text-muted">
+              {t('setup.offline_hint')}
+            </p>
             <div className="grid gap-2 sm:grid-cols-3">
               {LANGS.map(([code, key]) => (
                 <button

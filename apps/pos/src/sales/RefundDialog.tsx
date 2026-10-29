@@ -488,6 +488,12 @@ export function RefundDialog({
         </p>
       ) : null}
 
+      {plan && reason.length === 0 ? (
+        <p className="text-small text-text-muted">
+          {t('office.refund.choose_reason')}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className={buttonQuiet} onClick={onClose}>
           {t('common.cancel')}

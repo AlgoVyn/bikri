@@ -196,13 +196,11 @@ test.describe('Sell (T-016)', () => {
       [2, 'Cover'],
       [3, 'Glass'],
     ] as const) {
-      await page
-        .getByRole('tab', { name: new RegExp(`Customer ${n}`) })
-        .click();
+      await page.getByRole('tab', { name: new RegExp(`Bill ${n}`) }).click();
       await expect(page.getByTestId('line-name')).toHaveText([name]);
     }
 
-    // Customer 3: add a customer and a line discount, then hold.
+    // Bill 3: add a customer and a line discount, then hold.
     await page.getByRole('button', { name: 'Change' }).click();
     const cust = page.getByRole('dialog', { name: 'Customer' });
     await cust.getByRole('button', { name: '+ New customer' }).click();

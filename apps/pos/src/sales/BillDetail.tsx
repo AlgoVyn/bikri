@@ -5,6 +5,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
   fieldClass,
@@ -174,8 +175,11 @@ export function BillDetail({
   const voidReason =
     detail.voidRow?.reason !== undefined ? String(detail.voidRow.reason) : '';
   const fullDate = new Intl.DateTimeFormat(localeOf(i18n.language), {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
     timeZone,
   }).format(Number(sale.created_at));
 
@@ -356,7 +360,7 @@ export function BillDetail({
           <>
             <button
               type="button"
-              className={buttonDanger}
+              className={buttonDangerQuiet}
               onClick={() => askVoid('void')}
             >
               {t('office.bill.void')}

@@ -26,7 +26,7 @@ export function timeText(at: number, lang: string, timeZone: string): string {
 }
 
 export function balanceTone(balance: number): string {
-  if (balance > 0) return 'text-danger';
+  if (balance > 0) return 'text-text';
   if (balance < 0) return 'text-success-subtle-ink';
   return 'text-text-muted';
 }

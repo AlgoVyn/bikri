@@ -74,10 +74,12 @@ export function SalesList({
   bill,
   embedded = false,
   detailOpen = false,
+  selectedId,
 }: {
   bill?: string;
   embedded?: boolean;
   detailOpen?: boolean;
+  selectedId?: string;
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -99,9 +101,13 @@ export function SalesList({
   const [status, setStatus] = useState<SaleStatus | ''>('');
   const [staffId, setStaffId] = useState('');
   const [deviceId, setDeviceId] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
   const toast = useToast();
+  const activeFilters = [method, status, staffId, deviceId].filter(
+    Boolean,
+  ).length;
 
   useEffect(() => {
     if (bill) void navigate({ to: '/sales/$id', params: { id: bill } });
@@ -281,82 +287,97 @@ export function SalesList({
             />
           </span>
         </label>
-        <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-          <span className="mb-1 text-small">
-            {t('office.sales.filter_method')}
-          </span>
-          <select
-            className={selectClass}
-            value={method}
-            onChange={(e) => setMethod(e.target.value as MethodFilter | '')}
-          >
-            <option value="">{t('office.sales.all_methods')}</option>
-            {METHOD_FILTERS.map((m) => (
-              <option key={m} value={m}>
-                {m === 'split'
-                  ? t('office.sales.method_split')
-                  : methodLabel(t, m)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-          <span className="mb-1 text-small">
-            {t('office.sales.filter_status')}
-          </span>
-          <select
-            className={selectClass}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as SaleStatus | '')}
-          >
-            <option value="">{t('office.sales.all_statuses')}</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(t, s)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-          <span className="mb-1 text-small">
-            {t('office.sales.filter_cashier')}
-          </span>
-          <select
-            className={selectClass}
-            value={staffId}
-            onChange={(e) => setStaffId(e.target.value)}
-          >
-            <option value="">{t('office.sales.all_cashiers')}</option>
-            {options.staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-          <span className="mb-1 text-small">
-            {t('office.sales.filter_device')}
-          </span>
-          <select
-            className={selectClass}
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-          >
-            <option value="">{t('office.sales.all_devices')}</option>
-            {options.devices.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button
+          type="button"
+          className={`${buttonQuiet} gap-2 lg:hidden`}
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          {t('common.filters')}
+          {activeFilters > 0 ? (
+            <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+              {activeFilters}
+            </span>
+          ) : null}
+        </button>
+        <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
+          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('office.sales.filter_method')}
+            </span>
+            <select
+              className={selectClass}
+              value={method}
+              onChange={(e) => setMethod(e.target.value as MethodFilter | '')}
+            >
+              <option value="">{t('office.sales.all_methods')}</option>
+              {METHOD_FILTERS.map((m) => (
+                <option key={m} value={m}>
+                  {m === 'split'
+                    ? t('office.sales.method_split')
+                    : methodLabel(t, m)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('office.sales.filter_status')}
+            </span>
+            <select
+              className={selectClass}
+              value={status}
+              onChange={(e) => setStatus(e.target.value as SaleStatus | '')}
+            >
+              <option value="">{t('office.sales.all_statuses')}</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {statusLabel(t, s)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('office.sales.filter_cashier')}
+            </span>
+            <select
+              className={selectClass}
+              value={staffId}
+              onChange={(e) => setStaffId(e.target.value)}
+            >
+              <option value="">{t('office.sales.all_cashiers')}</option>
+              {options.staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+            <span className="mb-1 text-small">
+              {t('office.sales.filter_device')}
+            </span>
+            <select
+              className={selectClass}
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
+            >
+              <option value="">{t('office.sales.all_devices')}</option>
+              {options.devices.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </search>
 
       {data && data.rows.length > 0 ? (
         <div
           data-testid="sales-summary"
-          className="grid grid-cols-2 gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-4"
+          className={`grid gap-2 rounded-card border border-border bg-surface p-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
         >
           <Metric
             label={t('office.sales.summary_bills')}
@@ -425,6 +446,7 @@ export function SalesList({
               <SaleRow
                 key={row.sale.id}
                 row={row}
+                current={row.sale.id === selectedId}
                 timeZone={data?.timeZone ?? 'Asia/Karachi'}
                 onReprint={async () => {
                   await queueSalePrint(getDb(), String(row.sale.id), {
@@ -462,10 +484,12 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
 
 function SaleRow({
   row,
+  current,
   timeZone,
   onReprint,
 }: {
   row: SaleListRow;
+  current: boolean;
   timeZone: string;
   onReprint: () => Promise<void>;
 }) {
@@ -477,7 +501,8 @@ function SaleRow({
       <Link
         to="/sales/$id"
         params={{ id: sale.id }}
-        className={`${SALE_GRID} px-2 py-2 pe-12 hover:bg-surface-2`}
+        aria-current={current ? 'page' : undefined}
+        className={`${SALE_GRID} px-2 py-2 pe-12 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''}`}
       >
         <span className="font-mono text-small text-text-muted">
           {timeText(Number(sale.created_at), i18n.language, timeZone)}

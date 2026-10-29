@@ -5,9 +5,10 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { ProductThumb } from '../products/ProductThumb.tsx';
 import type { SellRow } from './useSell.ts';
 
-const TILE_MIN = 148;
-const TILE_H = 176;
+const TILE_MIN = 128;
 const GAP = 8;
+const TILE_H = 172;
+const TILE_H_UR = 196;
 const OVERSCAN_ROWS = 3;
 
 /** Virtualised product tiles inside the Sell scroll area (screens/05). */
@@ -25,6 +26,8 @@ export function ProductGrid({
   cartQty?: ReadonlyMap<string, number>;
 }) {
   const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const tileH = i18n.language === 'ur' ? TILE_H_UR : TILE_H;
   const ref = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ cols: 4, start: 0, end: 8 });
 
@@ -37,7 +40,7 @@ export function ProductGrid({
       const cols = Math.max(1, Math.floor((width + GAP) / (TILE_MIN + GAP)));
       const offset = list.offsetTop - scroller.offsetTop;
       const top = scroller.scrollTop - offset;
-      const rowH = TILE_H + GAP;
+      const rowH = tileH + GAP;
       const start = Math.max(0, Math.floor(top / rowH) - OVERSCAN_ROWS);
       const end =
         Math.ceil((top + scroller.clientHeight) / rowH) + OVERSCAN_ROWS;
@@ -57,7 +60,7 @@ export function ProductGrid({
       scroller.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [scrollRef]);
+  }, [scrollRef, tileH]);
 
   const totalRows = Math.ceil(rows.length / view.cols);
   const first = view.start * view.cols;
@@ -75,7 +78,7 @@ export function ProductGrid({
       ref={ref}
       aria-label={t('sell.products')}
       className="relative"
-      style={{ height: Math.max(0, totalRows * (TILE_H + GAP) - GAP) }}
+      style={{ height: Math.max(0, totalRows * (tileH + GAP) - GAP) }}
     >
       {rows.slice(first, last).map((row, i) => {
         const index = first + i;
@@ -86,10 +89,10 @@ export function ProductGrid({
             key={row.product.id}
             className="absolute"
             style={{
-              top: r * (TILE_H + GAP),
+              top: r * (tileH + GAP),
               insetInlineStart: `calc(${c} * (100% + ${GAP}px) / ${view.cols})`,
               width: `calc((100% - ${(view.cols - 1) * GAP}px) / ${view.cols})`,
-              height: TILE_H,
+              height: tileH,
             }}
           >
             <Tile
@@ -119,9 +122,13 @@ function Tile({
   onAdd: (row: SellRow) => void;
   cartQty: number;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const p = row.product;
-  const name = String(p.name_en ?? '');
+  const name =
+    i18n.language === 'ur' && p.name_ur
+      ? String(p.name_ur)
+      : String(p.name_en ?? '');
+  const latin = !/[\u0600-\u06ff]/u.test(name);
   const unit = String(p.unit ?? 'pc') as QtyUnit;
   const pill =
     row.stockState === 'untracked'
@@ -156,19 +163,20 @@ function Tile({
         name={name}
         imageKey={p.image_key}
         color={row.category?.color}
-        size="lg"
+        size="md"
       />
-      <span className="ltr-name line-clamp-2 w-full text-small font-medium">
+      <span
+        className={`${latin ? 'ltr-name' : ''} line-clamp-2 w-full shrink-0 text-small font-medium`}
+      >
         {name}
       </span>
-      <span className="mt-auto flex w-full items-center justify-between gap-1 text-small">
+      <span className="mt-auto flex w-full shrink-0 items-center justify-between gap-1 text-small">
         <span className="font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />
         </span>
         {pill ? (
           <span
-            dir="ltr"
-            className={`rounded-full px-2 text-small ${pill.cls}`}
+            className={`whitespace-nowrap rounded-full px-2 text-small ${pill.cls}`}
           >
             {pill.text}
           </span>

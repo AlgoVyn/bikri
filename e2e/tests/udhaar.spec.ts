@@ -76,12 +76,12 @@ test.describe('Udhaar (T-043, T-044)', () => {
 
     await page.getByRole('link', { name: /Ali/ }).click();
     await expect(page.getByTestId('statement-balance')).toContainText(
-      'Owes Rs 3,000',
+      'Owes you Rs 3,000',
     );
     await addPromise(page, '2000');
     await receive(page, '2110');
     await expect(page.getByTestId('statement-balance')).toContainText(
-      'Owes Rs 890',
+      'Owes you Rs 890',
     );
 
     const promises = await idbAll<{ status: string }>(page, 'promises');
@@ -161,7 +161,7 @@ test.describe('Udhaar (T-043, T-044)', () => {
     await d.getByRole('button', { name: 'Save' }).click();
     await expect(d).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Sana/ })).toContainText(
-      'Owes Rs 500',
+      'Owes you Rs 500',
     );
     const customers = await idbAll<{
       name: string;
@@ -190,9 +190,10 @@ test.describe('Udhaar (T-043, T-044)', () => {
     await page.getByLabel('Language').selectOption('ur');
     await openAli(page, ali as string);
     await expect(page.getByTestId('statement-balance')).toContainText('بقایا');
-    await expect(
-      page.getByRole('columnheader', { name: 'تفصیل' }),
-    ).toBeVisible();
+    if ((page.viewportSize()?.width ?? 0) >= 640)
+      await expect(
+        page.getByRole('columnheader', { name: 'تفصیل' }),
+      ).toBeVisible();
     await captureOpen(page);
     await page.getByRole('button', { name: 'یاد دہانی بھیجیں' }).click();
     const url = await opened(page);

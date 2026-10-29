@@ -41,6 +41,7 @@ export type CartPanelProps = {
   onHold: () => void;
   onClear: () => void;
   onPay: () => void;
+  onAddItem: () => void;
   onHeld: () => void;
   heldCount: number;
 };
@@ -253,14 +254,23 @@ export function CartPanel(p: CartPanelProps) {
           {t('sell.clear')}
         </button>
       </div>
-      <button
-        type="button"
-        className={`${buttonPrimary} min-h-14 w-full gap-2 text-title`}
-        disabled={cart.lines.length === 0}
-        onClick={p.onPay}
-      >
-        {t('sell.take_payment')} · <MoneyText paisa={totals.total} />{' '}
-      </button>
+      {cart.lines.length === 0 ? (
+        <button
+          type="button"
+          className={`${buttonQuiet} min-h-14 w-full text-small`}
+          onClick={p.onAddItem}
+        >
+          {t('sell.add_first_item')}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`${buttonPrimary} min-h-14 w-full gap-2 text-title`}
+          onClick={p.onPay}
+        >
+          {t('sell.take_payment')} · <MoneyText paisa={totals.total} />{' '}
+        </button>
+      )}
     </div>
   );
 }

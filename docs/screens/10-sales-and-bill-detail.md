@@ -1,6 +1,6 @@
 # 10 — Sales history and bill detail
 
-**Routes** `/sales`, `/sales/:id`. Cashiers with `report.view` limited to today see only today's bills of their branch. On ≥ 1024 px the list and the selected bill share one master–detail screen ("Select a bill" until one is picked); below 1024 px the bill is a full page with a back arrow.
+**Routes** `/sales`, `/sales/:id`. Cashiers with `report.view` limited to today see only today's bills of their branch. On ≥ 1280 px the list and the selected bill share one master–detail screen ("Select a bill" until one is picked); below 1280 px the bill is a full page with a back arrow.
 
 ## Reference
 
@@ -11,7 +11,7 @@
 | ![Dukaan app-sales-list](../reference/dukaan/app-sales-list.png) | Desktop list |
 | ![Dukaan web-bill-detail](../reference/dukaan/web-bill-detail.png) | Bill detail |
 | ![Dukaan app-bill-detail](../reference/dukaan/app-bill-detail.png) | Bill detail with Refund, Print, Edit bill |
-| ![Dukaan app-bill-part-refunded](../reference/dukaan/app-bill-part-refunded.png) | "Part refunded" with refunded/kept per line |
+| ![Dukaan app-bill-part-refunded](../reference/dukaan/app-bill-part-refunded.png) | "Part refunded" with refunded/on-bill per line |
 | ![Dukaan app-bill-refunded](../reference/dukaan/app-bill-refunded.png) | Fully refunded |
 
 Bikri difference: **no "Edit bill"**. Instead `Void` and `Void & reissue` (REQ-B12); the original stays visible with a VOID stamp and a link to the replacement.
@@ -30,7 +30,7 @@ Rows: time, invoice no (mono font), customer, items count, total, method chips, 
 
 Header: invoice no, status pill, date/time, cashier, device, branch, customer (link to statement). Buttons: `Print` (P), `Share` (WhatsApp/PDF), `Refund` (R, `refund.create`, hidden when status refunded/void) → [11](11-refund.md), `Void` (`sale.void`; managers same business date only), `Void & reissue`, `Audit` (owner: shows audit rows for this bill).
 
-Body: lines table (name, qty, unit price, line discount, line total, refunded qty, kept qty), totals block identical to the receipt, payments list (method, amount, reference, tendered/change), refunds list (each with the money paid back and method, and the part taken off the khata) (each with time, staff, reason, method, amount, rounding, `Print refund receipt`), void info.
+Body: lines table (name, qty, unit price, line discount, line total, refunded qty, on-bill qty), totals block identical to the receipt, payments list (method, amount, reference, tendered/change), refunds list (each with the money paid back and method, and the part taken off the khata) (each with time, staff, reason, method, amount, rounding, `Print refund receipt`), void info.
 
 ### Void
 
@@ -42,7 +42,7 @@ Opens the Sell screen in a new cart tab prefilled with the original lines, custo
 
 ## Acceptance criteria
 
-1. A bill refunded for 1 of 2 lines shows "Part refunded" and per-line refunded/kept qty.
+1. A bill refunded for 1 of 2 lines shows "Part refunded" and per-line refunded/on-bill qty.
 2. Voiding a cash bill adds a cash `payments` out row (purpose void) that appears in day close "Refunds & cancelled bills".
 3. Reissue creates a new invoice number; the original shows VOID + link; reports count only the new one.
 4. Export CSV of 7 days has one row per bill with columns `invoice_no,date,time,customer,items,subtotal,discounts,tax,total,cash,card,bank_wallet,udhaar,refunded,status,cashier,device`.

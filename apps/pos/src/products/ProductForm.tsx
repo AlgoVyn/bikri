@@ -360,7 +360,7 @@ export function ProductFormPage({
 
   return (
     <form
-      className="mx-auto flex max-w-2xl flex-col gap-4 p-4 pb-28"
+      className="mx-auto flex max-w-4xl flex-col gap-4 p-4 pb-28"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();

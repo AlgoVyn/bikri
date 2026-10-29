@@ -79,3 +79,19 @@ test('phone sales: one pane at a time', async ({ page }, testInfo) => {
   await expect(page.getByTestId('sales-master')).toBeHidden();
   await expect(page.getByRole('link', { name: 'Back to sales' })).toBeVisible();
 });
+
+test('1024: the list and detail become one pane each', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'one 1024 pass is enough');
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await openReadyShop(page, '/bikri/sales');
+  await page.evaluate(async () => {
+    await window.__bikriTest?.seedTodaySales();
+  });
+  await expect(page.getByText('Select a bill')).toBeHidden();
+  await page.getByRole('link', { name: /A-A-1/ }).click();
+  await expect(page.getByTestId('sales-detail')).toBeVisible();
+  await expect(page.getByTestId('sales-master')).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Back to sales' })).toBeVisible();
+});

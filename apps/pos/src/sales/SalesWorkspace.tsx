@@ -12,7 +12,13 @@ export function SalesWorkspace({ saleId }: { saleId?: string }) {
   const { t } = useTranslation();
   return (
     <MasterDetail
-      master={<SalesList embedded detailOpen={saleId !== undefined} />}
+      master={
+        <SalesList
+          embedded
+          detailOpen={saleId !== undefined}
+          selectedId={saleId}
+        />
+      }
       detail={saleId ? <BillDetail saleId={saleId} embedded /> : undefined}
       showDetail={saleId !== undefined}
       masterTestId="sales-master"

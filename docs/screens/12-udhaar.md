@@ -1,6 +1,6 @@
 # 12 — Udhaar (customer credit / khata)
 
-**Routes** `/udhaar` (customers), `/udhaar/:customerId` (statement), `/udhaar/chase` (chase list), modals: new/edit customer, receive payment, promise. Permissions: `payment.receive`, `party.edit`, `party.delete`. Balance rules: [07 §5](../07-money-rules.md#5-customer-and-supplier-balances). On ≥ 1024 px the customer list and the selected khata share one master–detail screen ("Select a customer" until one is picked); below 1024 px the statement is a full page with a back arrow.
+**Routes** `/udhaar` (customers), `/udhaar/:customerId` (statement), `/udhaar/chase` (chase list), modals: new/edit customer, receive payment, promise. Permissions: `payment.receive`, `party.edit`, `party.delete`. Balance rules: [07 §5](../07-money-rules.md#5-customer-and-supplier-balances). On ≥ 1280 px the customer list and the selected khata share one master–detail screen ("Select a customer" until one is picked); below 1280 px the statement is a full page with a back arrow.
 
 ## Reference
 
@@ -19,7 +19,7 @@
 
 Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`), `+ New customer` (N), `Chase list`, `Export CSV`.
 
-Rows: name, phone, balance (red "Owes Rs 5,890", green "In credit Rs 200", grey "Settled"), oldest unpaid age ("45 days"), limit bar (if limit), next promise date. Click → statement.
+Rows: name, phone, balance (neutral "Owes you Rs 5,890", green "In credit Rs 200", grey "Settled"), oldest unpaid age ("45 days"), limit bar (if limit), next promise date. Click → statement.
 
 ## New / edit customer
 
