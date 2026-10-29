@@ -948,7 +948,8 @@
     "import_preview": "{{count}} changes from {{from}} to {{to}} · sales {{sales}} · payments {{payments}}",
     "import_go": "Import",
     "import_running": "Importing… {{done}} of {{total}}",
-    "import_done": "Imported: {{applied}} accepted, {{rejected}} rejected."
+    "import_done": "Imported: {{applied}} accepted, {{rejected}} rejected.",
+    "import_no_file": "No file chosen"
   },
   "syncpage": {
     "title": "Sync",

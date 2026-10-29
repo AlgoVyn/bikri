@@ -11,7 +11,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { DeviceIcon } from '../components/icons.tsx';
+import { DeviceIcon, UploadIcon } from '../components/icons.tsx';
 import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
 import { formatCode } from '../data/enrol.ts';
@@ -157,6 +157,7 @@ export function DevicesPage() {
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(
     null,
   );
+  const [fileName, setFileName] = useState<string | null>(null);
   const [importState, setImportState] = useState<
     | null
     | {
@@ -522,29 +523,43 @@ export function DevicesPage() {
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <h2 className="text-h2 font-semibold">{t('devices.import_title')}</h2>
         <p className="text-small text-text-muted">{t('devices.import_help')}</p>
-        <input
-          type="file"
-          accept="application/json,.json"
-          aria-label={t('devices.import_choose')}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            void f.text().then((text) => {
-              const p = previewUnsynced(text, db.tenantId);
-              if ('error' in p) {
-                setImportState(null);
-                setError(
-                  p.error === 'other_shop'
-                    ? t('devices.import_other_shop')
-                    : t('devices.import_invalid'),
-                );
-              } else {
-                setError(null);
-                setImportState({ kind: 'preview', p });
-              }
-            });
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            id="unsynced-file"
+            type="file"
+            accept="application/json,.json"
+            className="peer sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setFileName(f.name);
+              void f.text().then((text) => {
+                const p = previewUnsynced(text, db.tenantId);
+                if ('error' in p) {
+                  setImportState(null);
+                  setError(
+                    p.error === 'other_shop'
+                      ? t('devices.import_other_shop')
+                      : t('devices.import_invalid'),
+                  );
+                } else {
+                  setError(null);
+                  setImportState({ kind: 'preview', p });
+                }
+              });
+            }}
+          />
+          <label
+            htmlFor="unsynced-file"
+            className={`${buttonQuiet} cursor-pointer gap-2 peer-focus-visible:ring-2 peer-focus-visible:ring-primary`}
+          >
+            <UploadIcon />
+            {t('devices.import_choose')}
+          </label>
+          <span className="text-small text-text-muted" aria-live="polite">
+            {fileName ?? t('devices.import_no_file')}
+          </span>
+        </div>
         {importState?.kind === 'preview' ? (
           <div className="flex flex-col gap-2" data-testid="import-preview">
             <p>
