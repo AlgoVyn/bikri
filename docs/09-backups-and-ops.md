@@ -15,7 +15,7 @@ There is still **one** nightly backup of the whole database (all tenants): a pri
 | 5. Off-Cloudflare copy | same file encrypted with `age` | 24 h | GitHub Actions artifact (90 days) + optional owner Google Drive |
 | 6. Shop owner manual export | JSON + CSV zip of **their shop** from Settings → Backup, built from the device's data, or from the server copy (`Download from server`, owner email sign-in, once per 24 h, [13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)) | on demand | owner's PC/phone |
 | 6b. Operator per-shop export | the same zip, built from the server copy in the console (§3.4) | on demand | operator's PC |
-| 7. R2 files (logo, photos) | weekly `rclone`-style listing + copy of new objects into the encrypted archive | 7 days | as layer 5 |
+| 7. R2 files (logo, photos) | weekly full listing + copy of every object into the encrypted archive | 7 days | GitHub Actions artifact (90 days), `age`-encrypted |
 
 ## 2. Nightly backup workflow (`.github/workflows/backup.yml`)
 
@@ -37,6 +37,29 @@ A running `wrangler d1 export` **blocks all other queries on the database** (Clo
 The repo is public, so GitHub Actions artifacts can be downloaded by other GitHub users: that is why the off-Cloudflare copy is always `age`-encrypted before upload; never upload the plain `.sql.gz` as an artifact.
 
 The `age` private key is generated once by the **platform operator** (`age-keygen`), kept offline (printed + password manager); only the public recipient is a GitHub secret (`BACKUP_AGE_RECIPIENT`). It is one key for the whole deployment: shop owners never create or hold one, and adding a shop changes nothing here. The operator can therefore decrypt every shop's data; shop owners are told so in the terms and privacy notes (§6.1).
+
+### 2.1 Weekly file backup (`.github/workflows/files-backup.yml`)
+
+The nightly export covers D1 rows only; shop logos and product photos live in the separate
+`bikri-files` bucket (keys `t/<tenant_id>/…`) and are not inside the SQL dump. A separate weekly
+workflow copies them:
+
+1. `tools/backup/files.mjs` lists every object under `t/` through the Cloudflare R2 API
+   (`GET /accounts/{id}/r2/buckets/bikri-files/objects?prefix=t/`), follows the cursor and
+   downloads each object (`GET …/objects/{key}`) with bounded concurrency and retries.
+2. It writes `files/` mirroring the keys and `files-YYYY-MM-DD.manifest.json`
+   (`{ format: "bikri-files", version: 1, date, objects, bytes, tenants: { <id>: { objects, bytes } }, files: [{ key, bytes, sha256, etag }] }`).
+   It fails rather than uploading a partial archive, and its logs contain counts only — never
+   keys or tenant ids.
+3. The workflow tars the tree, encrypts it with `age` and uploads `files-YYYY-MM-DD.tar.gz.age`
+   as an artifact (90 days). The plain archive never leaves the runner. The same
+   `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `BACKUP_AGE_RECIPIENT` secrets are used;
+   the token needs R2 read on `bikri-files`.
+
+It runs at **22:45 UTC Sunday** (03:45 Asia/Karachi Monday), after the nightly D1 export. Each
+archive is a full copy (not a delta) so it restores on its own; the bucket holds images only
+(≤ 2 MB each), so the archive is small. If it grows into gigabytes, revisit the cadence or add
+incremental archives before extending retention.
 
 ## 3. Restore procedures
 
@@ -81,7 +104,20 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 
 ### 3.5 Delete one tenant
 
-[13 §7.4](13-multi-tenancy.md#74-delete-a-tenant): offer a final export, then `delete` (type the slug); devices are revoked immediately, rows and R2 files are removed by the nightly cron ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)), the `tenants` row stays as a tombstone. Copies remain in encrypted backups until they age out (30 days daily, 12 months monthly, 90 days GitHub artifacts); the owner accepted this retention (D-083), and deleting a shop does not shorten it.
+[13 §7.4](13-multi-tenancy.md#74-delete-a-tenant): offer a final export, then `delete` (type the slug); devices are revoked immediately, rows and R2 files are removed by the nightly cron ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)), the `tenants` row stays as a tombstone. Copies remain in encrypted backups until they age out (30 days daily, 12 months monthly, 90 days GitHub artifacts, 90 days weekly file archives); the owner accepted this retention (D-083), and deleting a shop does not shorten it.
+
+### 3.6 Restore files from the weekly archive
+
+1. Download the `files-YYYY-MM-DD` artifact and decrypt it:
+   `age --decrypt --identity <operator key> -o files-YYYY-MM-DD.tar.gz files-YYYY-MM-DD.tar.gz.age`.
+2. Extract it: `tar -xzf files-YYYY-MM-DD.tar.gz` (the tree starts at `files/t/…`).
+3. Compare every extracted file with `files-YYYY-MM-DD.manifest.json` (`bytes` and `sha256`)
+   before uploading.
+4. Upload the objects back to `bikri-files`, keeping the `t/<tenant_id>/…` keys, e.g.
+   `wrangler r2 object put "bikri-files/t/<tenant_id>/shop/logo-<sha>.png" --file=… --remote`
+   (or `rclone copy files/ r2:bikri-files --s3-no-check-bucket`).
+5. Restore the matching D1 rows separately (§3.2 or §3.4); the rows only reference keys, so
+   files can be restored before or after the rows.
 
 ## 4. Monitoring and limits
 
