@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { CloudIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
@@ -18,6 +19,7 @@ import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { OwnerSigninRequired } from '../sync/shopApi.ts';
+import { SettingsPageLayout } from './Layout.tsx';
 import { shopErrorMessage, useShopAdmin } from './OwnerSignin.tsx';
 
 /** Settings → Backup and export (screens/17); the server copy arrives with T-053. */
@@ -54,9 +56,11 @@ function BackupContent() {
 
   if (!can('export.data') || role !== 'owner')
     return (
-      <p className="p-6 text-center text-text-muted">
-        {t('office.backup.no_permission')}
-      </p>
+      <SettingsPageLayout title={t('office.backup.title')} icon={<CloudIcon />}>
+        <p className="p-6 text-center text-text-muted">
+          {t('office.backup.no_permission')}
+        </p>
+      </SettingsPageLayout>
     );
 
   const download = async () => {
@@ -113,8 +117,7 @@ function BackupContent() {
   };
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-3 p-4">
-      <h1 className="text-h1 font-semibold">{t('office.backup.title')}</h1>
+    <SettingsPageLayout title={t('office.backup.title')} icon={<CloudIcon />}>
       <section className="rounded-card border border-border bg-surface p-4">
         <p>{t('office.backup.nightly')}</p>
         <p className="mt-1 text-small text-text-muted">
@@ -200,6 +203,6 @@ function BackupContent() {
           {t('office.backup.restore')}
         </button>
       </section>
-    </div>
+    </SettingsPageLayout>
   );
 }
