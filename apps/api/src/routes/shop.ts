@@ -101,9 +101,9 @@ shop.post('/owner-signin/start', async (c) => {
   const now = Date.now();
   if (!tenant.owner_email)
     throw new ApiError(
-      'EMAIL_UNAVAILABLE',
+      'OWNER_EMAIL_MISSING',
       503,
-      "Email sign-in isn't working for this shop",
+      'No owner email is set for this shop',
     );
   const [recent, shopRow] = await db.batch([
     db.prepare(

@@ -35,7 +35,13 @@ const selectClass =
   'h-11 rounded-control border border-border-strong bg-surface px-2 text-text';
 
 /** Products list (screens/08): search, filters, sort, CSV, virtualised rows. */
-export function ProductList() {
+export function ProductList({
+  embedded = false,
+  detailOpen = false,
+}: {
+  embedded?: boolean;
+  detailOpen?: boolean;
+} = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
@@ -98,11 +104,18 @@ export function ProductList() {
   }, [menuOpen]);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+      }
+    >
       <PageHeader
         icon={<ProductsIcon />}
         title={t('products.title')}
         subtitle={t('products.subtitle')}
+        headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
           <>
             {selecting && selected.size > 0 ? (
@@ -293,54 +306,74 @@ export function ProductList() {
             {t('products.count', { count: rows.length })}
           </p>
           <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-            <ListHeader showCost={showCost} />
+            <ListHeader showCost={showCost} embedded={embedded} />
             <VirtualRows
               rows={rows}
               showCost={showCost}
               selecting={selecting}
               selected={selected}
+              embedded={embedded}
               onToggle={toggle}
             />
           </div>
         </>
       ) : null}
-      <Suspense fallback={null}>
-        <LabelsDialog
-          open={labelsOpen}
-          onOpenChange={setLabelsOpen}
-          initial={[...selected].map((productId) => ({ productId, copies: 1 }))}
-        />
-      </Suspense>
+      {labelsOpen ? (
+        <Suspense fallback={null}>
+          <LabelsDialog
+            open={labelsOpen}
+            onOpenChange={setLabelsOpen}
+            initial={[...selected].map((productId) => ({
+              productId,
+              copies: 1,
+            }))}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
 
-const gridCols = (showCost: boolean) =>
-  showCost
+const gridCols = (showCost: boolean, embedded: boolean) => {
+  if (embedded) return 'grid-cols-[2.5rem_minmax(0,1fr)_auto]';
+  return showCost
     ? 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]'
     : 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]';
+};
 
-function ListHeader({ showCost }: { showCost: boolean }) {
+function ListHeader({
+  showCost,
+  embedded,
+}: {
+  showCost: boolean;
+  embedded: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <div
       aria-hidden="true"
-      className={`hidden gap-3 border-b border-border px-3 pb-1 text-small text-text-muted lg:grid ${gridCols(showCost)}`}
+      className={`hidden gap-3 border-b border-border px-3 pb-1 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
     >
       <span />
       <span>{t('products.col_name')}</span>
-      <span>{t('products.col_category')}</span>
-      <span className="text-end">{t('products.col_price')}</span>
-      <span className="text-end">{t('products.col_stock')}</span>
-      {showCost ? (
-        <span className="text-end">{t('products.col_avg_cost')}</span>
-      ) : null}
-      {showCost ? (
-        <span className="text-end">{t('products.col_margin')}</span>
-      ) : null}
-      <span className="truncate text-end" title={t('products.col_sold30')}>
-        {t('products.col_sold30')}
-      </span>
+      {embedded ? (
+        <span className="text-end">{t('products.col_price')}</span>
+      ) : (
+        <>
+          <span>{t('products.col_category')}</span>
+          <span className="text-end">{t('products.col_price')}</span>
+          <span className="text-end">{t('products.col_stock')}</span>
+          {showCost ? (
+            <span className="text-end">{t('products.col_avg_cost')}</span>
+          ) : null}
+          {showCost ? (
+            <span className="text-end">{t('products.col_margin')}</span>
+          ) : null}
+          <span className="truncate text-end" title={t('products.col_sold30')}>
+            {t('products.col_sold30')}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -351,12 +384,14 @@ function VirtualRows({
   showCost,
   selecting,
   selected,
+  embedded,
   onToggle,
 }: {
   rows: ProductListRow[];
   showCost: boolean;
   selecting: boolean;
   selected: ReadonlySet<string>;
+  embedded: boolean;
   onToggle: (id: string) => void;
 }) {
   const { t } = useTranslation();
@@ -403,6 +438,7 @@ function VirtualRows({
           setSize={rows.length}
           selecting={selecting}
           selected={selected.has(row.product.id)}
+          embedded={embedded}
           onToggle={() => onToggle(row.product.id)}
         />
       ))}
@@ -417,6 +453,7 @@ function ProductRow({
   setSize,
   selecting,
   selected,
+  embedded,
   onToggle,
 }: {
   row: ProductListRow;
@@ -425,6 +462,7 @@ function ProductRow({
   setSize: number;
   selecting: boolean;
   selected: boolean;
+  embedded: boolean;
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
@@ -449,7 +487,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start hover:bg-surface-2 ${gridCols(showCost)}`}
+          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
@@ -465,41 +503,49 @@ function ProductRow({
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
-          <span className="hidden truncate text-text-muted lg:block">
-            {String(row.category?.name_en ?? '')}
-          </span>
+          {embedded ? null : (
+            <span className="hidden truncate text-text-muted lg:block">
+              {String(row.category?.name_en ?? '')}
+            </span>
+          )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
-            <span className={`block text-small lg:hidden ${stockTone}`}>
+            <span
+              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+            >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           </span>
-          <span className={`hidden text-end lg:block ${stockTone}`}>
-            {row.stockState === 'untracked'
-              ? t('products.not_tracked')
-              : qtyWithUnit(t, row.onHand, unit)}
-          </span>
-          {showCost ? (
-            <span className="hidden text-end lg:block">
-              <MoneyText paisa={Number(p.avg_cost ?? 0)} />
-            </span>
-          ) : null}
-          {showCost ? (
-            <span className="hidden text-end lg:block">
-              <bdi dir="ltr">{margin ?? '—'}</bdi>
-            </span>
-          ) : null}
-          <span className="hidden text-end lg:block">
-            {qtyWithUnit(t, row.sold30, unit)}
-          </span>
+          {embedded ? null : (
+            <>
+              <span className={`hidden text-end lg:block ${stockTone}`}>
+                {row.stockState === 'untracked'
+                  ? t('products.not_tracked')
+                  : qtyWithUnit(t, row.onHand, unit)}
+              </span>
+              {showCost ? (
+                <span className="hidden text-end lg:block">
+                  <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+                </span>
+              ) : null}
+              {showCost ? (
+                <span className="hidden text-end lg:block">
+                  <bdi dir="ltr">{margin ?? '—'}</bdi>
+                </span>
+              ) : null}
+              <span className="hidden text-end lg:block">
+                {qtyWithUnit(t, row.sold30, unit)}
+              </span>
+            </>
+          )}
         </button>
       ) : (
         <Link
           to="/products/$id"
           params={{ id: p.id }}
-          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost)}`}
+          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}
@@ -514,35 +560,43 @@ function ProductRow({
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
-          <span className="hidden truncate text-text-muted lg:block">
-            {String(row.category?.name_en ?? '')}
-          </span>
+          {embedded ? null : (
+            <span className="hidden truncate text-text-muted lg:block">
+              {String(row.category?.name_en ?? '')}
+            </span>
+          )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
-            <span className={`block text-small lg:hidden ${stockTone}`}>
+            <span
+              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+            >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           </span>
-          <span className={`hidden text-end lg:block ${stockTone}`}>
-            {row.stockState === 'untracked'
-              ? t('products.not_tracked')
-              : qtyWithUnit(t, row.onHand, unit)}
-          </span>
-          {showCost ? (
-            <span className="hidden text-end lg:block">
-              <MoneyText paisa={Number(p.avg_cost ?? 0)} />
-            </span>
-          ) : null}
-          {showCost ? (
-            <span className="hidden text-end lg:block">
-              <bdi dir="ltr">{margin ?? '—'}</bdi>
-            </span>
-          ) : null}
-          <span className="hidden text-end lg:block">
-            {qtyWithUnit(t, row.sold30, unit)}
-          </span>
+          {embedded ? null : (
+            <>
+              <span className={`hidden text-end lg:block ${stockTone}`}>
+                {row.stockState === 'untracked'
+                  ? t('products.not_tracked')
+                  : qtyWithUnit(t, row.onHand, unit)}
+              </span>
+              {showCost ? (
+                <span className="hidden text-end lg:block">
+                  <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+                </span>
+              ) : null}
+              {showCost ? (
+                <span className="hidden text-end lg:block">
+                  <bdi dir="ltr">{margin ?? '—'}</bdi>
+                </span>
+              ) : null}
+              <span className="hidden text-end lg:block">
+                {qtyWithUnit(t, row.sold30, unit)}
+              </span>
+            </>
+          )}
         </Link>
       )}
     </li>

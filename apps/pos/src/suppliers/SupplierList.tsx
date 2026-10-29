@@ -22,7 +22,13 @@ import {
 import { SupplierDialog } from './SupplierDialog.tsx';
 
 /** Suppliers list (screens/13). */
-export function SupplierList() {
+export function SupplierList({
+  embedded = false,
+  detailOpen = false,
+}: {
+  embedded?: boolean;
+  detailOpen?: boolean;
+} = {}) {
   const { t, i18n } = useTranslation();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -39,12 +45,19 @@ export function SupplierList() {
   });
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+      }
+    >
       <PageHeader
         icon={<SuppliersIcon />}
         tone="bg-success-subtle text-success-subtle-ink"
         title={t('office.suppliers.title')}
         subtitle={t('office.suppliers.subtitle')}
+        headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
           <>
             {can('export.data') ? (

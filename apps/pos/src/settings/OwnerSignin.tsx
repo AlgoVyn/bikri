@@ -29,6 +29,8 @@ export function shopErrorMessage(
   if (e instanceof OfflineError) return t('owner.offline');
   if (e instanceof SyncHttpError) {
     if (e.code === 'EMAIL_UNAVAILABLE') return t('owner.email_unavailable');
+    if (e.code === 'OWNER_EMAIL_MISSING') return t('owner.email_missing');
+    if (e.code === 'UNAUTHENTICATED') return t('owner.not_enrolled');
     if (e.code === 'RATE_LIMITED')
       return t('owner.rate_limited', {
         minutes: Math.max(1, Math.ceil((e.retryAfter ?? 60) / 60)),

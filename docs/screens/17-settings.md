@@ -63,6 +63,7 @@ Printer-agnostic ([06 §0](../06-printing.md#0-printer-agnostic-design-decision-
 - A4: for invoices/statements on an office printer.
 - Common: paper width (58 / 80 mm; advanced 44/76/112), characters per line (default 32 / 48), raster width in dots (default 384 / 576), auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with all character widths, Urdu raster line and logo), `Open drawer`.
 - Status: connected / not connected / last error. "A failed print never loses the bill" note (REQ-B15).
+- Recent prints: each **Waiting** job has `Cancel print`, and when any are waiting the heading offers `Cancel waiting (N)`; jobs already printing are not cancelled.
 
 ## Labels (`settings.device`, this device only)
 
@@ -72,9 +73,9 @@ Label size (50×25 mm roll, 38×25 mm roll, 40×30 mm roll, A4 sheet 3×8), show
 
 Scanner: test field showing keystroke timing; "suffix Enter" check; camera scanning on/off for phones. Display: theme (Light / Dark / System), text size (100/115/130%), cart order (newest on top/bottom), auto-close sale complete, sounds on/off, auto-lock minutes.
 
-## Language
+## Language (inside Scanner & display)
 
-System / English / اردو / Roman Urdu; immediate switch; affects UI and (if receipt language = same) receipts.
+System / English / اردو / Roman Urdu; immediate switch; affects UI and (if receipt language = same) receipts. The index has one **Scanner & display** row; Language is the first control on that page, so there is no duplicate Language row.
 
 ## Devices (admin devices, owner only)
 
@@ -113,7 +114,7 @@ Version, build hash, licence (link to LICENSE), source link (GitHub), check for 
 ## Acceptance criteria
 
 1. Changing tax to 17% updates the receipt preview and the next sale's totals; earlier sales are unchanged.
-2. A cashier sees only Printer and Scanner (read-only: status, Test print, retry), display, Language, Sync and About ([05 §6](../05-auth-and-roles.md#6-permission-matrix) `settings.device`).
+2. A cashier sees only Printer and Scanner & display (which also holds Language), Sync and About ([05 §6](../05-auth-and-roles.md#6-permission-matrix) `settings.device`).
 3. Removing the last active owner is impossible ("At least one owner is needed").
 4. Test print at 80 mm prints 48 characters per line exactly (32 at 58 mm), the logo and an Urdu line, over USB and over Serial; with no WebUSB/Web Serial (Firefox) only System printing is offered.
 5. The `Set up printer` wizard completes with paper width + transport + test print answers and saves `kv.printer`; a failed USB claim offers Serial/System instead of an error dead end.

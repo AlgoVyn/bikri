@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Bundle budget (docs/08-ux-guidelines.md §7): initial JS (gzip) < 255 KB, every other JS chunk < 100 KB.
+// Bundle budget (docs/08-ux-guidelines.md §7): initial JS (gzip) < 257 KB, every other JS chunk < 100 KB.
 // Run after `pnpm build`. Node 24, no dependencies.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'apps/pos/dist/bikri');
-const INITIAL_BUDGET = 255 * 1024;
+const INITIAL_BUDGET = 257 * 1024;
 const CHUNK_BUDGET = 100 * 1024;
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');

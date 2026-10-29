@@ -70,7 +70,15 @@ const METHOD_FILTERS: MethodFilter[] = [
 const STATUSES: SaleStatus[] = ['paid', 'part_refunded', 'refunded', 'void'];
 
 /** Sales history (screens/10). */
-export function SalesList({ bill }: { bill?: string }) {
+export function SalesList({
+  bill,
+  embedded = false,
+  detailOpen = false,
+}: {
+  bill?: string;
+  embedded?: boolean;
+  detailOpen?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { role, staff, can, support } = useCurrentStaff();
@@ -177,12 +185,19 @@ export function SalesList({ bill }: { bill?: string }) {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
+    <div
+      className={
+        embedded
+          ? 'flex min-w-0 flex-col gap-3'
+          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+      }
+    >
       <PageHeader
         icon={<SalesIcon />}
         tone="bg-info-subtle text-info-subtle-ink"
         title={t('nav.sales')}
         subtitle={t('office.sales.subtitle')}
+        headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
           can('export.data') ? (
             <button
