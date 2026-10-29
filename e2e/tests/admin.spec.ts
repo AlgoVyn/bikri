@@ -18,7 +18,7 @@ test('operator console: overview, new shop with a one-time code, read-only and r
 
   await page.getByRole('link', { name: 'Shops' }).click();
   await expect(page.getByRole('heading', { name: 'Shops' })).toBeVisible();
-  await page.getByRole('link', { name: 'New shop' }).click();
+  await page.getByRole('link', { name: 'New shop' }).first().click();
   await expect(page.getByText('What happens next')).toBeVisible();
   const slug = `ui-${Date.now().toString(36)}`;
   await page.getByLabel('Display name').fill(`Console ${slug}`);
