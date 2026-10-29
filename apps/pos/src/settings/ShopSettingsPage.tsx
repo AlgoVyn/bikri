@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { StoreIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -177,7 +178,7 @@ function ShopForm() {
   if (!data) return <p className="sr-only">{t('common.loading')}</p>;
 
   return (
-    <SettingsPageLayout title={t('office.settings.title')}>
+    <SettingsPageLayout title={t('office.settings.title')} icon={<StoreIcon />}>
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
         <h2 className="text-title font-semibold">{t('setup.shop_title')}</h2>
         <label className="flex flex-col gap-1 text-small">

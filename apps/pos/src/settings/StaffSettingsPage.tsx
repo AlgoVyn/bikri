@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
+import { UsersIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -49,7 +50,7 @@ function StaffList() {
   const [adding, setAdding] = useState(false);
   const rows = useLiveQuery(() => staffList(getDb()), []) ?? [];
   return (
-    <SettingsPageLayout title={t('office.staff.title')}>
+    <SettingsPageLayout title={t('office.staff.title')} icon={<UsersIcon />}>
       <div className="flex justify-end">
         <button
           type="button"

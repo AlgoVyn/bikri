@@ -1,9 +1,9 @@
 import type { PrintJob } from '@bikri/db';
-import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { PrinterIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
@@ -12,6 +12,7 @@ import type { PrinterKv } from '../data/receipt.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, openDrawer, printTestPage } from '../print/printService.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { SettingsPageLayout } from './Layout.tsx';
 import { PrinterWizard } from './PrinterWizard.tsx';
 
 const selectClass =
@@ -104,13 +105,7 @@ export function PrinterPage() {
         : t('printer.transport_system');
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to="/settings" className={buttonQuiet}>
-          {t('common.back')}
-        </Link>
-        <h1 className="text-h1 font-semibold">{t('printer.title')}</h1>
-      </div>
+    <SettingsPageLayout title={t('printer.title')} icon={<PrinterIcon />}>
       <section
         className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4"
         aria-labelledby="printer-status"
@@ -300,6 +295,6 @@ export function PrinterPage() {
           ))}
         </ul>
       </section>
-    </div>
+    </SettingsPageLayout>
   );
 }
