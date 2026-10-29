@@ -485,6 +485,16 @@ describe('operator export and restore (I17, I18)', () => {
         })
       ).status,
     ).toBe(200);
+    const oversized = await api(`/admin/tenants/${a.tenantId}/import`, {
+      method: 'POST',
+      json: {
+        tbl: 'products',
+        rows: [
+          { id: '01JB0000000000000000000098', name_en: 'x'.repeat(4_001) },
+        ],
+      },
+    });
+    expect(oversized.status).toBe(400);
     expect((await api('/me', { token: a.till.token })).status).toBe(503);
     // B keeps syncing during A's maintenance.
     await pushOk(b.till, [

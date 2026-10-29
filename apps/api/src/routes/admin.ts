@@ -664,8 +664,22 @@ admin.post('/tenants/:id/import', async (c) => {
           `Unknown column ${tbl}.${k}`,
         );
     }
-    if (typeof row.id !== 'string')
+    if (typeof row.id !== 'string' || row.id.length > 64)
       throw new ApiError('VALIDATION_FAILED', 400, 'Every row needs an id');
+    for (const [k, value] of Object.entries(row)) {
+      if (typeof value === 'string' && value.length > 4_000)
+        throw new ApiError(
+          'VALIDATION_FAILED',
+          400,
+          `Value too long: ${tbl}.${k}`,
+        );
+      if (typeof value === 'number' && !Number.isSafeInteger(value))
+        throw new ApiError(
+          'VALIDATION_FAILED',
+          400,
+          `Number out of range: ${tbl}.${k}`,
+        );
+    }
     stmts.push(
       db.upsert(tbl, row),
       changeLogStatement(db, tbl, row.id, 'upsert', null, now),
