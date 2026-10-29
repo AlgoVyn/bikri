@@ -4,7 +4,10 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
-import { retryPrintJob } from '../data/printJobs.ts';
+import {
+  recoverInterruptedPrintJobs,
+  retryPrintJob,
+} from '../data/printJobs.ts';
 
 /**
  * Runs the print queue while the till is open (06 §9). A failed job raises a toast with
@@ -15,6 +18,9 @@ export function usePrintService(): void {
   const toast = useToast();
   const ref = useRef({ t, toast });
   ref.current = { t, toast };
+  useEffect(() => {
+    void recoverInterruptedPrintJobs(getDb());
+  }, []);
   const trigger = useLiveQuery(async () => {
     const db = getDb();
     const queued = await db.print_jobs.where('status').equals('queued').count();

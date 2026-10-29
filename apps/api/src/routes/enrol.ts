@@ -95,7 +95,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
     is_admin: support ? 0 : code.grants_admin,
     kind: support ? 'support' : 'till',
     expires_at: support ? tenant.support_until : null,
-    read_only_seen_at: null,
+    read_only_seen_at: tenant.status === 'read_only' ? now : null,
     enrolled_at: now,
     enrolled_by: code.created_by,
     revoked_at: null,

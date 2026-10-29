@@ -346,6 +346,26 @@ describe('suppliers and deliveries (T-045)', () => {
         { today: TODAY },
       ),
     ).rejects.toMatchObject({ code: 'product' });
+    const priceLines = Array.from({ length: 60 }, () => ({
+      productId: item.id,
+      qtyMilli: 1000,
+      unitCost: 1000,
+      updatePrice: 999999,
+    }));
+    await expect(
+      saveDelivery(db, { ...base, lines: priceLines }, ctx, { today: TODAY }),
+    ).rejects.toMatchObject({ code: 'too_many' });
+    // Without price changes the same 60 lines stay inside the per-action op budget.
+    const plainLines = priceLines.map(({ updatePrice, ...line }) => line);
+    await expect(
+      saveDelivery(
+        db,
+        { ...base, purchaseId: 'many', lines: plainLines },
+        ctx,
+        { today: TODAY },
+      ),
+    ).resolves.toMatchObject({ line_count: 60 });
+
     await expect(
       paySupplier(
         db,

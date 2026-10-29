@@ -12,6 +12,7 @@ import {
   verifyToken,
 } from '../auth/crypto.ts';
 import { sendSigninEmail } from '../auth/mailer.ts';
+import { ownerCodeKey, ownerSessionKey } from '../auth/ownerKeys.ts';
 import type { TenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import {
@@ -150,10 +151,7 @@ shop.post('/owner-signin/start', async (c) => {
   }
   const id = newId(now);
   const code = newSixDigitCode();
-  const hash = await hmacHex(
-    String(c.env.OWNER_CODE_KEY),
-    `${tenant.id}${id}${code}`,
-  );
+  const hash = await hmacHex(ownerCodeKey(c.env), `${tenant.id}${id}${code}`);
   const expires = now + SIGNIN.ttl;
   await db.batch([
     // A new code ends the previous unused one (expired, not dead: it does not count toward the pause).
@@ -219,7 +217,7 @@ shop.post('/owner-signin/verify', async (c) => {
     throw bad(0);
   }
   const hash = await hmacHex(
-    String(c.env.OWNER_CODE_KEY),
+    ownerCodeKey(c.env),
     `${tenant.id}${body.code_id}${body.code}`,
   );
   if (!safeEqual(hash, row.code_hash)) {
@@ -242,7 +240,7 @@ shop.post('/owner-signin/verify', async (c) => {
     audit(c, 'owner_signin', { entity: 'staff', entityId: ownerId }),
   );
   const exp = now + OWNER_SESSION_MS;
-  const session = await signToken(String(c.env.OWNER_SESSION_KEY), {
+  const session = await signToken(ownerSessionKey(c.env), {
     kind: 'owner',
     tenant_id: tenant.id,
     device_id: device.id,
@@ -563,7 +561,7 @@ shop.get('/export', async (c) => {
       );
     }
     const start = await snapshotPayload(() => undefined, db, tenant, 500);
-    const token = await signToken(String(c.env.OWNER_SESSION_KEY), {
+    const token = await signToken(ownerSessionKey(c.env), {
       kind: 'export',
       tenant_id: tenant.id,
       device_id: device.id,
@@ -575,10 +573,7 @@ shop.get('/export', async (c) => {
     ]);
     return c.json({ export_id: token, ...start });
   }
-  const t = await verifyToken<ExportToken>(
-    String(c.env.OWNER_SESSION_KEY),
-    exportId,
-  );
+  const t = await verifyToken<ExportToken>(ownerSessionKey(c.env), exportId);
   if (
     t?.kind !== 'export' ||
     t.tenant_id !== tenant.id ||

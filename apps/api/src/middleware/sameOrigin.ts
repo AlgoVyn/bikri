@@ -36,10 +36,15 @@ export const sameOrigin: MiddlewareHandler<{ Bindings: Env }> = async (
 
 /** The ACCESS_TEST_EMAIL bypass must never reach production (10 §5). */
 export function assertSafeEnv(env: Env): void {
-  if (
-    String(env.ENV) === 'test' &&
-    allowedOrigins(env).includes('https://algovyn.com')
-  ) {
-    throw new Error('ENV=test must not run with the production origin');
+  const test = String(env.ENV) === 'test';
+  if (test) {
+    const origins = allowedOrigins(env);
+    const safe = origins.every(
+      (origin) =>
+        /^http:\/\/localhost(?::\d+)?$/u.test(origin) ||
+        origin === 'https://bikri.test',
+    );
+    if (!safe || origins.length === 0)
+      throw new Error('ENV=test must only run on a local/test origin');
   }
 }

@@ -28,6 +28,7 @@ function movement(
   reason: 'opening' | 'purchase',
   qty: number,
   unitCost: number,
+  refId: string | null = null,
 ) {
   return {
     id: newId(now),
@@ -35,7 +36,7 @@ function movement(
     qty_delta_milli: qty,
     reason_code: reason,
     ref_type: reason === 'opening' ? 'opening' : 'purchase',
-    ref_id: null,
+    ref_id: refId,
     unit_cost: unitCost,
     note: '',
     branch_id: shop.branchId,
@@ -151,13 +152,17 @@ describe('M3 server rules', () => {
     });
 
     const buy = purchase(shop, id, 1000, 20000);
+    const buyTx = newId(now);
     const received = await pushOk(shop.till, [
-      op('purchases', 'insert', buy.rows[0] as Record<string, unknown>),
-      op('purchase_lines', 'insert', buy.line),
+      op('purchases', 'insert', buy.rows[0] as Record<string, unknown>, {
+        tx_id: buyTx,
+      }),
+      op('purchase_lines', 'insert', buy.line, { tx_id: buyTx }),
       op(
         'stock_movements',
         'insert',
-        movement(shop, id, 'purchase', 1000, 20000),
+        movement(shop, id, 'purchase', 1000, 20000, buy.id),
+        { tx_id: buyTx },
       ),
     ]);
     expect(codes(received)).toEqual([null, null, null]);

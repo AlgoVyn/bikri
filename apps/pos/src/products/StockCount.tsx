@@ -119,9 +119,13 @@ export function StockCountPage() {
 
   const counted = Object.keys(draft.counted).length;
   const finish = async () => {
-    const ctx = await ledgerContext(getDb(), staff?.id ?? '');
-    const r = await finishCount(getDb(), draft, { zeroUncounted: zero }, ctx);
-    toast.push(t('count.finished', { count: r.movements }), 'info');
+    try {
+      const ctx = await ledgerContext(getDb(), staff?.id ?? '');
+      const r = await finishCount(getDb(), draft, { zeroUncounted: zero }, ctx);
+      toast.push(t('count.finished', { count: r.movements }), 'info');
+    } catch {
+      toast.push(t('count.save_failed'), 'error');
+    }
   };
   const onScan = async (code: string) => {
     const product = await findByCode(getDb(), code.trim());

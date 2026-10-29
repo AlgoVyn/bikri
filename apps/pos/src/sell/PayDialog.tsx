@@ -44,6 +44,7 @@ import {
   udhaarCheck,
   WALLET_PROVIDERS,
 } from '../data/sale.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Modal } from './Modal.tsx';
@@ -283,8 +284,12 @@ function PayStep({
       });
     } catch (err) {
       submitted.current = false;
-      console.error('sale save failed', err);
-      toast.push(t('pay.save_failed'), 'error');
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('pay.save_failed'),
+        'error',
+      );
     } finally {
       setPending(false);
     }

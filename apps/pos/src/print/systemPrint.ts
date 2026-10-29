@@ -48,7 +48,22 @@ export async function printHtmlViaSystem(
     if (win === null || typeof win.print !== 'function') {
       return { ok: false, code: 'NO_PRINT' };
     }
-    // Fonts (Noto Nastaliq Urdu, JetBrains Mono) must be ready before the driver rasterises.
+    // @font-face rules do not cross into a srcdoc iframe; copy them before waiting.
+    const fontRules: string[] = [];
+    for (const sheet of Array.from(doc.styleSheets)) {
+      try {
+        for (const rule of Array.from(sheet.cssRules))
+          if (rule instanceof CSSFontFaceRule) fontRules.push(rule.cssText);
+      } catch {
+        // Cross-origin stylesheets cannot be inspected; the OS fallback still applies.
+      }
+    }
+    if (fontRules.length > 0) {
+      const fontStyle = win.document.createElement('style');
+      fontStyle.textContent = fontRules.join('\n');
+      win.document.head.append(fontStyle);
+    }
+    // Noto Nastaliq Urdu / JetBrains Mono must be ready before the driver rasterises.
     await win.document.fonts?.ready;
     // One page as long as the receipt (06 §5.3 / D-087).
     const style = win.document.createElement('style');

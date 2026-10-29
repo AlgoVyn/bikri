@@ -420,7 +420,8 @@
       "you_owe": "You owe {{amount}}",
       "subtitle": "Deliveries, payments and returns",
       "select_supplier": "Select a supplier",
-      "select_supplier_hint": "Deliveries, payments and balance appear here."
+      "select_supplier_hint": "Deliveries, payments and balance appear here.",
+      "delivery_error_too_many": "This delivery would write too many changes at once. Save it as two deliveries."
     },
     "expenses": {
       "amount": "Amount",

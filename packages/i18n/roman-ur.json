@@ -75,7 +75,8 @@
     "scope_low": "Sirf kam stock",
     "start": "Ginti shuru karein",
     "title": "Stock ginti",
-    "zero_uncounted": "Na gine hue ko 0 karein"
+    "zero_uncounted": "Na gine hue ko 0 karein",
+    "save_failed": "Ginti save nahin ho saki. Ek waqt mein kam products try karein."
   },
   "done": {
     "download_pdf": "PDF download karein",
@@ -321,7 +322,8 @@
     "summary": "{{created}} nayi, {{updated}} update (SKU ya barcode se mili), {{errors}} ghaltiyan",
     "template": "Namoona file download karein",
     "title": "Spreadsheet import karein",
-    "to_preview": "Lines jaanchein"
+    "to_preview": "Lines jaanchein",
+    "import_failed": "Import mukammal nahin ho saki. File check karein ya chhoti file try karein."
   },
   "nav": {
     "expenses": "Kharcha",
@@ -437,7 +439,8 @@
     "err_TIMEOUT": "printer ne jawab nahin diya",
     "err_UNSUPPORTED": "yeh browser is tarah print nahin kar sakta",
     "failed_toast": "Raseed print nahin hui — {{reason}}",
-    "later": "Baad mein print"
+    "later": "Baad mein print",
+    "err_INTERRUPTED": "printing darmiyan mein ruk gayi"
   },
   "printer": {
     "ask_owner": "Printer badalne ke liye maalik ya manager se kahein.",
@@ -974,7 +977,8 @@
     "conflict_field_merge": "Do tills ne aik hi cheez badli",
     "conflict_over_refund": "Bill se zyada wapsi",
     "conflict_refund_after_void": "Bill mansookh hone ke baad wapsi",
-    "conflict_over_return": "Wusool se zyada wapas kiya"
+    "conflict_over_return": "Wusool se zyada wapas kiya",
+    "pull_errors": "{{count}} qatarein apply nahin ho sakin; sync jaari raha."
   },
   "lock": {
     "who": "Kaun bech raha hai?",

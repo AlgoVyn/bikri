@@ -1,6 +1,7 @@
 import {
   businessDate,
   computePurchase,
+  MAX_OPS_PER_TX,
   newId,
   nextAvgCost,
   type PurchaseLineResult,
@@ -44,7 +45,8 @@ export class DeliveryError extends Error {
     | 'paid'
     | 'method'
     | 'product'
-    | 'price';
+    | 'price'
+    | 'too_many';
   constructor(code: DeliveryError['code']) {
     super(code);
     this.name = 'DeliveryError';
@@ -116,6 +118,23 @@ export async function saveDelivery(
   );
   if (input.lines.some((line) => !products.has(line.productId)))
     throw new DeliveryError('product');
+  // A delivery is one document and cannot be split across transactions. Refuse up front when the
+  // worst case (line + movement + product update + price audit) would exceed the action limit.
+  const worstOps =
+    1 +
+    input.lines.reduce((count, line) => {
+      const product = products.get(line.productId);
+      const priceChange =
+        line.updatePrice !== null &&
+        line.updatePrice !== undefined &&
+        Number(product?.price ?? 0) !== line.updatePrice;
+      return (
+        count + 2 + (product?.track_stock === 1 ? 1 : 0) + (priceChange ? 1 : 0)
+      );
+    }, 0) +
+    (result.total > 0 ? 1 : 0) +
+    (input.paidNow > 0 ? 2 : 0);
+  if (worstOps > MAX_OPS_PER_TX) throw new DeliveryError('too_many');
   const now = options.now ?? Date.now();
   const date = input.date;
 

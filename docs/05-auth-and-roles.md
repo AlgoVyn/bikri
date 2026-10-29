@@ -128,6 +128,8 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 | insert `sale_lines` with `below_cost = 1` | the sale's staff has `sale.below_cost`, or an override audit row for the sale (same linking rule) |
 | insert `expenses` | `expense.create`; for a cashier: `method = 'cash'` and `amount ≤ 200000` (Rs 2,000) unless overridden |
 | insert `supplier_returns` (and its lines, payment, ledger rows) | staff has `purchase.create` |
+| insert `ledger_entries` | `opening`/`sale`/`refund`/`void`/`payment`/`purchase`/`supplier_return` must carry the source document in the same transaction; `adjustment` is owner/manager only |
+| insert `stock_movements` | adjustment/count reasons need `stock.adjust`; opening needs `catalog.edit`; purchase/return need `purchase.create`; sale/refund/void movements need the source document and its permission |
 | upsert/delete `staff`, `branches`, `shop` | `updated_by` is an owner |
 | delete `products`, `customers`, `suppliers` | `updated_by` has `catalog.delete` / `party.delete` |
 | upsert `products.price` / `last_cost` | `updated_by` has `catalog.edit` (purchases set `last_cost` and need `purchase.create`) |

@@ -110,7 +110,7 @@ export function buildDayClose(
     for (const [value, count] of notes)
       pushPair(
         blocks,
-        `${money(value * 100)} × ${count}`,
+        `${money(value * 100)} x ${count}`,
         money(value * count * 100),
       );
   }

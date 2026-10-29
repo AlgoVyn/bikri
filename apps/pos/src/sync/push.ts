@@ -19,6 +19,7 @@ export type WireOp = {
   base_rev?: number;
   changed_fields?: string[];
   updated_by?: string | null;
+  created_at?: number;
 };
 
 export function toWire(e: OutboxEntry): WireOp {
@@ -31,6 +32,7 @@ export function toWire(e: OutboxEntry): WireOp {
       row_id: e.row_id,
       base_rev: e.base_rev ?? 0,
       updated_by: e.updated_by ?? null,
+      created_at: e.created_at,
     };
   }
   if (e.kind === 'upsert') {
@@ -42,6 +44,7 @@ export function toWire(e: OutboxEntry): WireOp {
       row: e.row ?? {},
       base_rev: e.base_rev ?? 0,
       changed_fields: e.changed_fields ?? [],
+      created_at: e.created_at,
     };
   }
   return {
@@ -50,6 +53,7 @@ export function toWire(e: OutboxEntry): WireOp {
     tbl: e.tbl,
     kind: 'insert',
     row: e.row ?? {},
+    created_at: e.created_at,
   };
 }
 

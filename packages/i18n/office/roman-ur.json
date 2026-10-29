@@ -420,7 +420,8 @@
       "you_owe": "{{amount}} dena hai",
       "subtitle": "Delivery, adaigi aur wapsi",
       "select_supplier": "Supplier muntakhib karein",
-      "select_supplier_hint": "Deliveries, payments aur baqaya yahan nazar aayenge."
+      "select_supplier_hint": "Deliveries, payments aur baqaya yahan nazar aayenge.",
+      "delivery_error_too_many": "Yeh delivery ek waqt mein bohat zyada tabdeeliyan likhegi. Ise do deliveries mein save karein."
     },
     "expenses": {
       "amount": "Raqam",

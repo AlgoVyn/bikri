@@ -42,7 +42,7 @@ const COMMON_CSS = [
   // Double height only (1D 21 01): stretch vertically, keep the column width.
   '.dh { transform: scaleY(2); transform-origin: top left; height: 2.7em }',
   '.logo-wrap { text-align: center } img.logo { max-width: 60%; }',
-  ".urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9; white-space: normal }",
+  ".urdu { font-family: 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', serif; direction: rtl; line-height: 1.9; white-space: normal }",
   '.qr { text-align: center; font-size: 0.8em }',
   // 06 §4.4: the Powered by line; other small (Font B) text is 3/4 of the body.
   '.powered-by { text-align: center; font-size: 8px; margin: 2mm 0 0 }',
@@ -103,8 +103,10 @@ export function renderReceiptHtml(
         if (command.size === 'small') classes.push('sm');
         let attrs = '';
         if (hasNonAscii(command.text)) {
-          classes.push('urdu');
-          attrs = lineNeedsRtl(command.text) ? ' dir="rtl" lang="ur"' : '';
+          if (lineNeedsRtl(command.text)) {
+            classes.push('urdu');
+            attrs = ' dir="rtl" lang="ur"';
+          }
         }
         body.push(
           `<div class="${classes.join(' ')}"${attrs}>${escapeHtml(command.text)}</div>`,

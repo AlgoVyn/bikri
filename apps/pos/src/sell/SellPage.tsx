@@ -42,6 +42,7 @@ import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { beep } from './beep.ts';
 import { CartPanel } from './CartPanel.tsx';
 import { PayDialog } from './PayDialog.tsx';
@@ -80,6 +81,7 @@ export function SellPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const money = useShopMoney();
   const rows = useSellProducts();
   const carts = useCarts();
@@ -260,6 +262,10 @@ export function SellPage() {
   };
 
   const takePayment = async () => {
+    if (readOnly) {
+      toast.push(t('tenant.readOnly.blocked'), 'error');
+      return;
+    }
     await cartsSettled();
     const current = (await getDb().carts.get(active)) ?? cart;
     if (current.lines.length === 0) return;
