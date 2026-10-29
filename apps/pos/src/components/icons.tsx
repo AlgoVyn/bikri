@@ -257,3 +257,12 @@ export function UploadIcon() {
     </Svg>
   );
 }
+
+export function UserIcon() {
+  return (
+    <Svg>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M5.5 20c.8-3.4 3-5.1 6.5-5.1s5.7 1.7 6.5 5.1" />
+    </Svg>
+  );
+}
