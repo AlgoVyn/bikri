@@ -43,7 +43,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/admin/tenants/:id/reset-owner-pin` | Access | Set a new owner PIN when no other owner can |
 | GET | `/admin/backups` | Access | List backup objects in R2 |
 | GET | `/admin/backups/*key` | Access | Download a backup |
-| GET | `/admin/usage` | Access | Account overview: tenants by status, last backup, shops over 80 % of their budget (D-105) |
+| GET | `/admin/usage` | Access | Account overview: tenants by status, gross D1 usage, last backup, shops over 80 % of their budget, and open sync conflicts grouped by tenant (D-105, D-136) |
 | GET | `/admin/slug-available?slug=` | Access | Whether a slug is free (D-105) |
 | GET | `/admin/tenants/:id/devices` | Access | A shop's devices (D-105) |
 | POST | `/admin/tenants/:id/devices/:deviceId/revoke` | Access | Revoke one of a shop's devices (D-105) |

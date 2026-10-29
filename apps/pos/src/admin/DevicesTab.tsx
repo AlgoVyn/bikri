@@ -12,15 +12,14 @@ import { formatCount, formatWhen, OPS_CHUNK } from './format.ts';
 import type { DeviceInfo, IssuedCode, UnsyncedOp } from './types.ts';
 import {
   AdminConfirm,
-  dangerBtn,
   Field,
+  inputClass,
   PairingPanel,
+  Panel,
   primaryBtn,
+  quietBtn,
 } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
-
-const inputClass =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 type Preview = {
   deviceId: string;
@@ -143,203 +142,23 @@ export function DevicesTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <form
-        className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const deviceName = name.trim();
-          if (deviceName.length < 1 || pending) return;
-          setPending(true);
-          void issueCode(tenantId, deviceName, admin)
-            .then((code) => {
-              setIssued(code);
-              setName('');
-              query.reload();
-            })
-            .catch((err: unknown) => {
-              toast.push(
-                adminErrorMessage(err, t('admin.err_generic')),
-                'error',
-              );
-            })
-            .finally(() => {
-              setPending(false);
-            });
-        }}
+      <Panel
+        title={t('admin.issue_code')}
+        description={t('admin.issue_code_hint')}
       >
-        <h2 className="font-semibold">{t('admin.issue_code')}</h2>
-        <Field id="device-name" label={t('admin.device_name')}>
-          <input
-            id="device-name"
-            className={inputClass}
-            value={name}
-            maxLength={40}
-            required
-            autoComplete="off"
-            onChange={(event) => {
-              setName(event.target.value);
-            }}
-          />
-        </Field>
-        <label
-          className="flex min-h-11 items-center gap-2"
-          htmlFor="device-admin"
-        >
-          <input
-            id="device-admin"
-            type="checkbox"
-            checked={admin}
-            onChange={(event) => {
-              setAdmin(event.target.checked);
-            }}
-          />
-          {t('admin.grants_admin')}
-        </label>
-        <button
-          type="submit"
-          className={primaryBtn}
-          disabled={pending || name.trim() === ''}
-        >
-          {t('admin.issue')}
-        </button>
-      </form>
-      {issued !== null ? (
-        <PairingPanel
-          code={issued.code}
-          link={issued.link}
-          expiresAt={issued.expires_at}
-          shopName={shopName}
-        />
-      ) : null}
-      {devices.length === 0 ? (
-        <p className="text-text-muted">{t('admin.devices_empty')}</p>
-      ) : (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full text-left text-small">
-            <thead className="border-b border-border text-text-muted">
-              <tr>
-                <th className="px-3 py-2 font-medium">{t('admin.col_name')}</th>
-                <th className="px-3 py-2 font-medium">{t('admin.col_code')}</th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_branch')}
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_admin')}
-                </th>
-                <th className="px-3 py-2 font-medium">{t('admin.col_kind')}</th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_last_seen')}
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_version')}
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_pending')}
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_ro_seen')}
-                </th>
-                <th className="px-3 py-2 font-medium">
-                  {t('admin.col_status')}
-                </th>
-                <th className="px-3 py-2 font-medium">{t('admin.revoke')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices.map((device) => (
-                <DeviceRow
-                  key={device.id}
-                  device={device}
-                  lang={lang}
-                  onRevoke={() => {
-                    setRevokeId(device.id);
-                  }}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <h2 className="font-semibold">{t('admin.import_ops')}</h2>
-        <Field
-          id="unsynced-file"
-          label={t('admin.import_choose')}
-          hint={t('admin.import_hint')}
-        >
-          <input
-            id="unsynced-file"
-            type="file"
-            accept="application/json,.json"
-            aria-describedby="unsynced-file-hint"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file === undefined) return;
-              void file.text().then((text) => {
-                const parsed = parseUnsynced(text);
-                if (parsed === null) {
-                  setPreview(null);
-                  toast.push(t('admin.import_bad'), 'error');
-                  return;
-                }
-                if (parsed.tenant_id !== tenantId) {
-                  setPreview(null);
-                  toast.push(t('admin.import_tenant_mismatch'), 'error');
-                  return;
-                }
-                const device = devices.find(
-                  (item) => item.id === parsed.device_id,
-                );
-                if (device === undefined || device.revoked_at === null) {
-                  setPreview(null);
-                  toast.push(t('admin.import_not_revoked'), 'error');
-                  return;
-                }
-                setPreview({
-                  deviceId: parsed.device_id,
-                  name: device.name,
-                  ops: parsed.ops,
-                });
-                setProgress(null);
-              });
-            }}
-          />
-        </Field>
-        {preview !== null ? (
-          <p>
-            {t('admin.import_preview', {
-              count: formatCount(preview.ops.length, lang),
-              device: preview.name,
-            })}
-          </p>
-        ) : null}
-        {progress !== null ? <p className="tabular-nums">{progress}</p> : null}
-        <button
-          type="button"
-          className={primaryBtn}
-          disabled={preview === null || pending}
-          onClick={() => {
-            if (preview === null) return;
-            const job = preview;
+        <form
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const deviceName = name.trim();
+            if (deviceName.length < 1 || pending) return;
             setPending(true);
-            void (async () => {
-              let done = 0;
-              for (let i = 0; i < job.ops.length; i += OPS_CHUNK) {
-                const slice = job.ops.slice(i, i + OPS_CHUNK);
-                await importOps(tenantId, job.deviceId, slice);
-                done += slice.length;
-                setProgress(
-                  t('admin.import_progress', {
-                    done: formatCount(done, lang),
-                    total: formatCount(job.ops.length, lang),
-                  }),
-                );
-              }
-              toast.push(t('admin.import_done'), 'info');
-              setPreview(null);
-              query.reload();
-            })()
+            void issueCode(tenantId, deviceName, admin)
+              .then((code) => {
+                setIssued(code);
+                setName('');
+                query.reload();
+              })
               .catch((err: unknown) => {
                 toast.push(
                   adminErrorMessage(err, t('admin.err_generic')),
@@ -351,9 +170,203 @@ export function DevicesTab({
               });
           }}
         >
-          {t('admin.import_run')}
-        </button>
-      </section>
+          <div className="min-w-0 flex-1">
+            <Field id="device-name" label={t('admin.device_name')}>
+              <input
+                id="device-name"
+                className={inputClass}
+                value={name}
+                maxLength={40}
+                required
+                autoComplete="off"
+                onChange={(event) => {
+                  setName(event.target.value);
+                }}
+              />
+            </Field>
+          </div>
+          <label
+            className="flex min-h-11 items-center gap-2 pb-1 sm:pb-0"
+            htmlFor="device-admin"
+          >
+            <input
+              id="device-admin"
+              type="checkbox"
+              checked={admin}
+              onChange={(event) => {
+                setAdmin(event.target.checked);
+              }}
+            />
+            {t('admin.grants_admin')}
+          </label>
+          <button
+            type="submit"
+            className={primaryBtn}
+            disabled={pending || name.trim() === ''}
+          >
+            {t('admin.issue')}
+          </button>
+        </form>
+      </Panel>
+
+      {issued !== null ? (
+        <PairingPanel
+          code={issued.code}
+          link={issued.link}
+          expiresAt={issued.expires_at}
+          shopName={shopName}
+        />
+      ) : null}
+
+      <Panel
+        title={t('admin.tab_devices')}
+        description={t('admin.devices_count', {
+          count: formatCount(devices.length, lang),
+        })}
+        bodyClassName="p-0"
+      >
+        {devices.length === 0 ? (
+          <p className="p-4 text-small text-text-muted">
+            {t('admin.devices_empty')}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-start text-small">
+              <caption className="sr-only">{t('admin.tab_devices')}</caption>
+              <thead className="border-b border-border bg-surface-2 text-text-muted">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.col_name')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.col_kind')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.col_last_seen')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-end font-medium">
+                    {t('admin.col_pending')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.col_ro_seen')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.col_status')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    {t('admin.revoke')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {devices.map((device) => (
+                  <DeviceRow
+                    key={device.id}
+                    device={device}
+                    lang={lang}
+                    onRevoke={() => {
+                      setRevokeId(device.id);
+                    }}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={t('admin.import_ops')} description={t('admin.import_hint')}>
+        <div className="flex max-w-xl flex-col gap-3">
+          <Field id="unsynced-file" label={t('admin.import_choose')}>
+            <input
+              id="unsynced-file"
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file === undefined) return;
+                void file.text().then((text) => {
+                  const parsed = parseUnsynced(text);
+                  if (parsed === null) {
+                    setPreview(null);
+                    toast.push(t('admin.import_bad'), 'error');
+                    return;
+                  }
+                  if (parsed.tenant_id !== tenantId) {
+                    setPreview(null);
+                    toast.push(t('admin.import_tenant_mismatch'), 'error');
+                    return;
+                  }
+                  const device = devices.find(
+                    (item) => item.id === parsed.device_id,
+                  );
+                  if (device === undefined || device.revoked_at === null) {
+                    setPreview(null);
+                    toast.push(t('admin.import_not_revoked'), 'error');
+                    return;
+                  }
+                  setPreview({
+                    deviceId: parsed.device_id,
+                    name: device.name,
+                    ops: parsed.ops,
+                  });
+                  setProgress(null);
+                });
+              }}
+            />
+          </Field>
+          {preview !== null ? (
+            <p className="rounded-control bg-info-subtle px-3 py-2 text-small text-info-subtle-ink">
+              {t('admin.import_preview', {
+                count: formatCount(preview.ops.length, lang),
+                device: preview.name,
+              })}
+            </p>
+          ) : null}
+          {progress !== null ? (
+            <p className="text-small tabular-nums">{progress}</p>
+          ) : null}
+          <button
+            type="button"
+            className={`${primaryBtn} self-start`}
+            disabled={preview === null || pending}
+            onClick={() => {
+              if (preview === null) return;
+              const job = preview;
+              setPending(true);
+              void (async () => {
+                let done = 0;
+                for (let i = 0; i < job.ops.length; i += OPS_CHUNK) {
+                  const slice = job.ops.slice(i, i + OPS_CHUNK);
+                  await importOps(tenantId, job.deviceId, slice);
+                  done += slice.length;
+                  setProgress(
+                    t('admin.import_progress', {
+                      done: formatCount(done, lang),
+                      total: formatCount(job.ops.length, lang),
+                    }),
+                  );
+                }
+                toast.push(t('admin.import_done'), 'info');
+                setPreview(null);
+                query.reload();
+              })()
+                .catch((err: unknown) => {
+                  toast.push(
+                    adminErrorMessage(err, t('admin.err_generic')),
+                    'error',
+                  );
+                })
+                .finally(() => {
+                  setPending(false);
+                });
+            }}
+          >
+            {t('admin.import_run')}
+          </button>
+        </div>
+      </Panel>
       <AdminConfirm
         open={revokeId !== null}
         onOpenChange={(open) => {
@@ -398,40 +411,63 @@ function DeviceRow({
   const { t } = useTranslation();
   const revoked = device.revoked_at !== null;
   return (
-    <tr className="border-b border-border">
-      <td className="px-3 py-2">{device.name}</td>
-      <td className="px-3 py-2 font-mono">{device.device_code}</td>
-      <td className="px-3 py-2 font-mono">{device.branch_id}</td>
-      <td className="px-3 py-2">
-        {device.is_admin ? t('common.yes') : t('common.no')}
+    <tr className="border-b border-border last:border-b-0 hover:bg-surface-2/60">
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{device.name}</span>
+          {device.is_admin ? (
+            <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-[11px] font-medium text-primary-subtle-ink">
+              {t('admin.col_admin')}
+            </span>
+          ) : null}
+        </div>
+        <p className="font-mono text-small text-text-muted">
+          {device.device_code} · {device.branch_id}
+        </p>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-4 py-3">
         {t(
           device.kind === 'support' ? 'admin.kind_support' : 'admin.kind_till',
         )}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-4 py-3 whitespace-nowrap">
         {device.last_seen_at === null
           ? t('admin.never')
           : formatWhen(device.last_seen_at, lang)}
+        {device.app_version !== null ? (
+          <p className="font-mono text-small text-text-muted">
+            v{device.app_version}
+          </p>
+        ) : null}
       </td>
-      <td className="px-3 py-2 font-mono">
-        {device.app_version ?? t('admin.never')}
-      </td>
-      <td className="px-3 py-2 text-end tabular-nums">
+      <td className="px-4 py-3 text-end tabular-nums">
         {formatCount(device.pending_ops, lang)}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-4 py-3 whitespace-nowrap">
         {device.read_only_seen_at === null
-          ? t('admin.never')
+          ? '—'
           : formatWhen(device.read_only_seen_at, lang)}
       </td>
-      <td className="px-3 py-2">
-        {revoked ? t('admin.revoked') : t('admin.active_device')}
+      <td className="px-4 py-3">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium ${
+            revoked
+              ? 'bg-danger-subtle text-danger-subtle-ink'
+              : 'bg-success-subtle text-success-subtle-ink'
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className="size-1.5 rounded-full bg-current"
+          />
+          {revoked ? t('admin.revoked') : t('admin.active_device')}
+        </span>
       </td>
-      <td className="px-3 py-2">
-        {revoked ? null : (
-          <button type="button" className={dangerBtn} onClick={onRevoke}>
+      <td className="px-4 py-3">
+        {revoked ? (
+          <span className="text-text-muted">—</span>
+        ) : (
+          <button type="button" className={quietBtn} onClick={onRevoke}>
             {t('admin.revoke')}
           </button>
         )}
