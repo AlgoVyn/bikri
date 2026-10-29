@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LockIcon } from '../components/icons.tsx';
+import { LockIcon, UserIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -161,15 +161,20 @@ export function PrinterDot() {
       data-testid="printer-dot"
       aria-label={label}
       title={label}
-      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small font-medium hover:opacity-90 ${
+      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${
         loading
           ? 'bg-surface-2 text-text-muted'
           : printer
-            ? 'bg-success-solid text-white'
-            : 'bg-danger-solid text-white'
+            ? 'bg-success-subtle text-success-subtle-ink'
+            : 'bg-danger-subtle text-danger-subtle-ink'
       }`}
     >
-      <span aria-hidden="true" className="size-2 rounded-full bg-white/90" />
+      <span
+        aria-hidden="true"
+        className={`size-2 rounded-full ${
+          loading ? 'bg-border-strong' : printer ? 'bg-success' : 'bg-danger'
+        }`}
+      />
       {t('shell.printer_label')}
     </Link>
   );
@@ -215,10 +220,20 @@ export function StaffMenu() {
           id={menuId}
           className="absolute end-0 top-12 z-40 w-56 rounded-card border border-border bg-surface p-3 shadow-lg"
         >
-          <p className="font-medium">{name}</p>
-          <p className="text-small text-text-muted">
-            {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
-          </p>
+          <div className="flex items-center gap-2">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
+              data-testid="staff-menu-user"
+            >
+              <UserIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium">{name}</p>
+              <p className="text-small text-text-muted">
+                {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             title={`${t('shell.lock')} (Ctrl+L)`}

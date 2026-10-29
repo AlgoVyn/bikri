@@ -51,9 +51,11 @@ test.describe('Home and shell (T-013)', () => {
     );
     await expect(page.getByTestId('printer-dot')).toHaveText('Printer');
     await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /bg-danger-solid/,
+      /bg-danger-subtle/,
     );
-    await expect(page.getByTestId('printer-dot')).toHaveClass(/text-white/);
+    await expect(page.getByTestId('printer-dot')).toHaveClass(
+      /text-danger-subtle-ink/,
+    );
 
     const nav = page.getByRole('navigation', { name: 'Main' });
     if (isPhone(page)) {
@@ -208,6 +210,9 @@ test.describe('Home and shell (T-013)', () => {
     await expect(
       page.getByRole('button', { name: /Lock/ }).locator('svg'),
     ).toHaveCount(1);
+    await expect(
+      page.getByTestId('staff-menu-user').locator('svg'),
+    ).toHaveCount(1);
   });
 
   test('printer pill turns green when a printer is configured', async ({
@@ -218,9 +223,11 @@ test.describe('Home and shell (T-013)', () => {
       await window.__bikriTest?.setKv('printer', { transport: 'system' });
     });
     await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /bg-success-solid/,
+      /bg-success-subtle/,
     );
-    await expect(page.getByTestId('printer-dot')).toHaveClass(/text-white/);
+    await expect(page.getByTestId('printer-dot')).toHaveClass(
+      /text-success-subtle-ink/,
+    );
     await expect(page.getByTestId('printer-dot')).toHaveAttribute(
       'aria-label',
       'Printer ready',

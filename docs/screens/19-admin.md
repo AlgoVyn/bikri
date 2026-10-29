@@ -6,7 +6,7 @@ No Dukaan reference (Dukaan's equivalent is a vendor account page, which is excl
 
 ## Layout
 
-- **Shell:** a brand-navy rail on ≥ 1024 px with the Bikri mark, `Bikri` / `Operator console`, and Overview / Shops / Backups. The top bar carries the language switcher; on smaller screens the rail becomes a horizontal nav under the compact brand header. The content column is capped at 1280 px.
+- **Shell:** follows the device theme selected in the shop app (`bikri.theme` in localStorage); a brand-navy rail on ≥ 1024 px with the Bikri mark, `Bikri` / `Operator console`, and Overview / Shops / Backups. The top bar carries the language switcher; on smaller screens the rail becomes a horizontal nav under the compact brand header. The content column is capped at 1280 px.
 - **Headers:** every page starts with an icon tile, an `h1`, a one-line subtitle and its primary actions, matching the shop pages.
 - **Overview:** four KPI cards (shops, active, devices, setup complete), then *Usage today* (database size and the write/read meters against the free-tier limits), *Shops by status*, and a *Needs attention* panel for the last backup, shops over 80 % of their write budget and open sync conflicts. One `GET /admin/usage` request supplies the conflict counts grouped by tenant.
 - **Shops:** a search box (name or slug), a status filter, a result count and 20-row pagination. Each row shows the name and slug, a status pill, devices, last seen, setup state and the daily write meter. Below 768 px the rows become summary cards; on tablets the table scrolls horizontally.

@@ -9,6 +9,7 @@ import {
 } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useAreaStrings } from '../i18n/areas.tsx';
+import { applyStoredTheme } from '../shell/devicePrefs.ts';
 
 const NAV = [
   { to: '/admin', label: 'admin.nav_overview', Icon: ReportsIcon },
@@ -22,6 +23,9 @@ const navLink =
 export function AdminShell() {
   const { t } = useTranslation();
   const ready = useAreaStrings('admin');
+  useEffect(() => {
+    applyStoredTheme();
+  }, []);
   useEffect(() => {
     if (ready) document.title = t('admin.title');
   }, [t, ready]);

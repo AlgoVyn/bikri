@@ -139,7 +139,10 @@ test.describe('Settings (T-050)', () => {
   test('Devices has a visible import picker and a compact receipt preview', async ({
     page,
   }) => {
-    await openReadyShop(page, '/bikri/settings/devices');
+    await openReadyShop(page, '/bikri/settings');
+    await page.evaluate(() =>
+      window.__bikriTest?.navigate('/settings/devices'),
+    );
     const dialog = page.getByRole('dialog', { name: "Confirm it's you" });
     await dialog
       .waitFor({ state: 'visible', timeout: 2_000 })
