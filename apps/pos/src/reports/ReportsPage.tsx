@@ -440,11 +440,13 @@ function ReportTable({
           <table className="w-full min-w-[36rem] border-collapse text-small">
             <thead>
               <tr className="border-b border-border bg-surface-2 text-start">
-                {headers.map((header) => (
+                {headers.map((header, headerIndex) => (
                   <th
                     key={header}
                     scope="col"
-                    className="px-3 py-2 text-start font-medium"
+                    className={`px-3 py-2 font-medium ${
+                      headerIndex === 0 ? 'text-start' : 'text-end'
+                    }`}
                   >
                     {header}
                   </th>
