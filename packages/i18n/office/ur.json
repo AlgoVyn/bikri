@@ -58,7 +58,7 @@
       "carts_full": "دوبارہ بل بنانے کے لیے کوئی کارٹ ٹیب خالی کریں۔",
       "cashier": "کیشیئر",
       "col_discount": "رعایت",
-      "col_kept": "رکھا",
+      "col_kept": "بل پر",
       "col_name": "آئٹم",
       "col_price": "قیمت",
       "col_qty": "مقدار",
@@ -179,7 +179,8 @@
       "split_title": "ادا شدہ اور کھاتے کی تقسیم",
       "start_new_sale": "اس گاہک کے لیے نئی فروخت شروع کریں",
       "title": "{{invoice}} کی واپسی",
-      "title_plain": "رقم واپس"
+      "title_plain": "رقم واپس",
+      "choose_reason": "جاری رکھنے کے لیے وجہ اور مقدار چنیں۔"
     },
     "udhaar": {
       "add_promise": "وعدہ شامل کریں",
@@ -253,7 +254,7 @@
       "overpay_body": "{{amount}} جمع ہوں گے۔ پھر بھی محفوظ کریں؟",
       "overpay_confirm": "ادائیگی محفوظ کریں",
       "overpay_title": "گاہک کے پاس رقم جمع ہو جائے گی",
-      "owes": "{{amount}} بقایا",
+      "owes": "آپ کو {{amount}} بقایا ہے",
       "payment_backdate_owner": "صرف مالک پرانی تاریخ (7 دن تک) ڈال سکتا ہے۔",
       "payment_date": "تاریخ",
       "payment_error_amount": "صفر سے زیادہ رقم لکھیں۔",
@@ -531,7 +532,10 @@
       "udhaar_given": "دیا گیا ادھار",
       "udhaar_in": "ادھار نقد وصول",
       "next": "آگے",
-      "subtitle": "دراز گنیں اور دن بند کریں"
+      "subtitle": "دراز گنیں اور دن بند کریں",
+      "column_note": "نوٹ",
+      "column_count": "گنتی",
+      "column_amount": "رقم"
     },
     "reports": {
       "age_days": "عمر (دن)",
@@ -623,7 +627,7 @@
       "reason": "وجہ",
       "refunded_amount": "واپس شدہ",
       "refunds": "واپسیاں",
-      "refunds_note": "{{count}} واپسیاں · {{amount}} روپے",
+      "refunds_note": "ریفنڈ: {{count}} · {{amount}}",
       "returns_count": "واپسیاں",
       "returns_credit": "کریڈٹ",
       "returns_difference": "واپسی فرق",
@@ -661,7 +665,8 @@
       "uncategorized": "بغیر قسم",
       "voided_amount": "منسوخ شدہ",
       "voids": "منسوخ",
-      "subtitle": "فروخت، منافع اور اسٹاک"
+      "subtitle": "فروخت، منافع اور اسٹاک",
+      "not_enough_days": "رجحان کے لیے ابھی کافی دن نہیں۔"
     },
     "backup": {
       "building": "ایکسپورٹ بن رہا ہے…",
@@ -671,7 +676,7 @@
       "finished": "{{filename}} ڈاؤن لوڈ ہو گئی",
       "hint": "ہر ٹیبل کی zip ڈاؤن لوڈ کریں: JSON بحالی کے لیے، CSV ایکسل کے لیے۔",
       "nav_hint": "اس دکان کی مکمل کاپی ڈاؤن لوڈ کریں",
-      "nightly": "آپ کا ڈیٹا ہر رات Algovyn کی طرف سے بیک اپ ہوتا ہے۔",
+      "nightly": "جب یہ ٹل جڑا ہو، Algovyn ہر رات آپ کا ڈیٹا بیک اپ کرتا ہے۔",
       "no_permission": "مکمل دکان کی کاپی صرف مالک ڈاؤن لوڈ کر سکتا ہے۔",
       "progress": "{{table}} ({{index}}/{{total}}، {{rows}} سطریں)",
       "restore": "ایکسپورٹ سے بحال کریں",

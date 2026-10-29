@@ -2,7 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary } from '../components/classes.ts';
+import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoreIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -38,9 +38,11 @@ const selectClass =
 export function ProductList({
   embedded = false,
   detailOpen = false,
+  selectedId,
 }: {
   embedded?: boolean;
   detailOpen?: boolean;
+  selectedId?: string;
 } = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -49,10 +51,15 @@ export function ProductList({
   const [categoryId, setCategoryId] = useState('');
   const [stock, setStock] = useState<StockFilter>('all');
   const [sort, setSort] = useState<ProductSort>('name');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const activeFilters =
+    (categoryId ? 1 : 0) +
+    (stock !== 'all' ? 1 : 0) +
+    (sort !== 'name' ? 1 : 0);
   const menuRef = useRef<HTMLDivElement>(null);
   const rows = useLiveQuery(
     () =>
@@ -239,51 +246,68 @@ export function ProductList({
               />
             </span>
           </label>
-          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('products.category_filter')}
-            </span>
-            <select
-              className={selectClass}
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">{t('products.all_categories')}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {String(c.name_en)}
+          <button
+            type="button"
+            className={`${buttonQuiet} gap-2 lg:hidden`}
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            {t('common.filters')}
+            {activeFilters > 0 ? (
+              <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                {activeFilters}
+              </span>
+            ) : null}
+          </button>
+          <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
+            <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+              <span className="mb-1 text-small">
+                {t('products.category_filter')}
+              </span>
+              <select
+                className={selectClass}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
+                <option value="">{t('products.all_categories')}</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {String(c.name_en)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
+              <span className="mb-1 text-small">
+                {t('products.stock_filter')}
+              </span>
+              <select
+                className={selectClass}
+                value={stock}
+                onChange={(e) => setStock(e.target.value as StockFilter)}
+              >
+                <option value="all">{t('products.stock_all')}</option>
+                <option value="low">{t('products.stock_low')}</option>
+                <option value="out">{t('products.stock_out')}</option>
+                <option value="untracked">
+                  {t('products.stock_untracked')}
                 </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('products.stock_filter')}
-            </span>
-            <select
-              className={selectClass}
-              value={stock}
-              onChange={(e) => setStock(e.target.value as StockFilter)}
-            >
-              <option value="all">{t('products.stock_all')}</option>
-              <option value="low">{t('products.stock_low')}</option>
-              <option value="out">{t('products.stock_out')}</option>
-              <option value="untracked">{t('products.stock_untracked')}</option>
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
-            <span className="mb-1 text-small">{t('products.sort')}</span>
-            <select
-              className={selectClass}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as ProductSort)}
-            >
-              <option value="name">{t('products.sort_name')}</option>
-              <option value="price">{t('products.sort_price')}</option>
-              <option value="stock">{t('products.sort_stock')}</option>
-              <option value="best">{t('products.sort_best')}</option>
-            </select>
-          </label>
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
+              <span className="mb-1 text-small">{t('products.sort')}</span>
+              <select
+                className={selectClass}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as ProductSort)}
+              >
+                <option value="name">{t('products.sort_name')}</option>
+                <option value="price">{t('products.sort_price')}</option>
+                <option value="stock">{t('products.sort_stock')}</option>
+                <option value="best">{t('products.sort_best')}</option>
+              </select>
+            </label>
+          </div>
         </search>
       )}
 
@@ -308,6 +332,7 @@ export function ProductList({
           <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
             <ListHeader showCost={showCost} embedded={embedded} />
             <VirtualRows
+              selectedId={selectedId}
               rows={rows}
               showCost={showCost}
               selecting={selecting}
@@ -385,6 +410,7 @@ function VirtualRows({
   selecting,
   selected,
   embedded,
+  selectedId,
   onToggle,
 }: {
   rows: ProductListRow[];
@@ -392,6 +418,7 @@ function VirtualRows({
   selecting: boolean;
   selected: ReadonlySet<string>;
   embedded: boolean;
+  selectedId?: string;
   onToggle: (id: string) => void;
 }) {
   const { t } = useTranslation();
@@ -438,6 +465,7 @@ function VirtualRows({
           setSize={rows.length}
           selecting={selecting}
           selected={selected.has(row.product.id)}
+          current={row.product.id === selectedId}
           embedded={embedded}
           onToggle={() => onToggle(row.product.id)}
         />
@@ -453,6 +481,7 @@ function ProductRow({
   setSize,
   selecting,
   selected,
+  current,
   embedded,
   onToggle,
 }: {
@@ -462,6 +491,7 @@ function ProductRow({
   setSize: number;
   selecting: boolean;
   selected: boolean;
+  current: boolean;
   embedded: boolean;
   onToggle: () => void;
 }) {
@@ -545,7 +575,8 @@ function ProductRow({
         <Link
           to="/products/$id"
           params={{ id: p.id }}
-          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
+          aria-current={current ? 'page' : undefined}
+          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}

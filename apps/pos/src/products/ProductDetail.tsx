@@ -4,7 +4,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonDanger, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonDangerQuiet,
+  buttonPrimary,
+  buttonQuiet,
+} from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -115,7 +119,7 @@ export function ProductDetailPage({
       {embedded ? (
         <Link
           to="/products"
-          className={`${buttonQuiet} gap-2 self-start lg:hidden`}
+          className={`${buttonQuiet} gap-2 self-start xl:hidden`}
         >
           <span aria-hidden="true" className="rtl:rotate-180">
             ‹
@@ -171,7 +175,7 @@ export function ProductDetailPage({
             <Link
               to="/products/$id/edit"
               params={{ id }}
-              className={`${buttonQuiet} gap-2`}
+              className={`${buttonPrimary} gap-2`}
             >
               {t('products.edit')}
             </Link>
@@ -206,7 +210,7 @@ export function ProductDetailPage({
           {can('catalog.delete') ? (
             <button
               type="button"
-              className={buttonDanger}
+              className={buttonDangerQuiet}
               onClick={() => setConfirmDelete(true)}
             >
               {t('products.delete')}
@@ -217,7 +221,7 @@ export function ProductDetailPage({
 
       <section
         aria-label={t('products.price')}
-        className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${embedded ? '' : 'lg:grid-cols-5'}`}
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
       >
         <Figure label={t('products.price')} testId="detail-price">
           <MoneyText paisa={price} />
@@ -241,33 +245,29 @@ export function ProductDetailPage({
             </Figure>
           </>
         ) : null}
-      </section>
-
-      {p.track_stock === 1 ? (
-        <section
-          aria-label={t('products.on_hand')}
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        >
-          <Figure label={t('products.on_hand')} testId="detail-on-hand">
-            {qtyWithUnit(t, detail.onHand, unit)}
-          </Figure>
-          <Figure label={t('products.min_stock')} testId="detail-min">
-            {Number(p.min_stock_milli ?? 0) > 0
-              ? qtyWithUnit(t, Number(p.min_stock_milli), unit)
-              : '—'}
-          </Figure>
-          {showCost ? (
-            <Figure
-              label={t('products.stock_value')}
-              testId="detail-stock-value"
-            >
-              <MoneyText
-                paisa={mulDivRound(Math.max(detail.onHand, 0), avg, 1000)}
-              />
+        {p.track_stock === 1 ? (
+          <>
+            <Figure label={t('products.on_hand')} testId="detail-on-hand">
+              {qtyWithUnit(t, detail.onHand, unit)}
             </Figure>
-          ) : null}
-        </section>
-      ) : null}
+            <Figure label={t('products.min_stock')} testId="detail-min">
+              {Number(p.min_stock_milli ?? 0) > 0
+                ? qtyWithUnit(t, Number(p.min_stock_milli), unit)
+                : t('products.min_stock_off')}
+            </Figure>
+            {showCost ? (
+              <Figure
+                label={t('products.stock_value')}
+                testId="detail-stock-value"
+              >
+                <MoneyText
+                  paisa={mulDivRound(Math.max(detail.onHand, 0), avg, 1000)}
+                />
+              </Figure>
+            ) : null}
+          </>
+        ) : null}
+      </section>
 
       <section
         aria-labelledby="last14-heading"
@@ -282,23 +282,29 @@ export function ProductDetailPage({
             amount: formatMoney(totalRevenue),
           })}
         </p>
-        <div
-          className="mt-3 flex h-24 items-end gap-1"
-          dir="ltr"
-          aria-hidden="true"
-        >
-          {detail.last14.map((d) => (
-            <span
-              key={d.date}
-              title={`${d.date}: ${formatQtyFromMilli(d.qty, unit)}`}
-              className="flex-1 rounded-t bg-primary"
-              style={{
-                height: `${Math.max(2, (d.qty / maxQty) * 100)}%`,
-                opacity: d.qty > 0 ? 1 : 0.25,
-              }}
-            />
-          ))}
-        </div>
+        {totalQty === 0 ? (
+          <p className="mt-3 text-small text-text-muted">
+            {t('products.last14_empty')}
+          </p>
+        ) : (
+          <div
+            className="mt-3 flex h-24 items-end gap-1"
+            dir="ltr"
+            aria-hidden="true"
+          >
+            {detail.last14.map((d) => (
+              <span
+                key={d.date}
+                title={`${d.date}: ${formatQtyFromMilli(d.qty, unit)}`}
+                className="flex-1 rounded-t bg-primary"
+                style={{
+                  height: `${Math.max(2, (d.qty / maxQty) * 100)}%`,
+                  opacity: d.qty > 0 ? 1 : 0.25,
+                }}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="history-heading">

@@ -1,4 +1,4 @@
-import { businessDate, mulDivRound } from '@bikri/core';
+import { businessDate, formatMoney, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -499,28 +499,28 @@ function SummaryTab({
     summary.paymentMix.bank_wallet !== 0;
   return (
     <>
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <li>
+      <ul className="flex flex-wrap gap-3">
+        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
           <Card
             label={t('office.reports.sold')}
             testId="report-sold"
             value={<MoneyText paisa={summary.sold} />}
           />
         </li>
-        <li>
+        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
           <Card
             label={t('office.reports.bills')}
             testId="report-bills"
             value={summary.bills}
           />
         </li>
-        <li>
+        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
           <Card
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
           />
         </li>
-        <li>
+        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
           <Card
             label={t('office.reports.expenses')}
             value={<MoneyText paisa={summary.expenses} />}
@@ -528,20 +528,20 @@ function SummaryTab({
         </li>
         {cost ? (
           <>
-            <li>
+            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
               <Card
                 label={t('office.reports.gross_profit')}
                 testId="report-profit"
                 value={<MoneyText paisa={summary.grossProfit} />}
               />
             </li>
-            <li>
+            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
               <Card
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
               />
             </li>
-            <li>
+            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
               <Card
                 label={t('office.reports.margin')}
                 value={percentText(summary.marginBp)}
@@ -550,7 +550,7 @@ function SummaryTab({
           </>
         ) : null}
         {bundle.taxEnabled || summary.tax !== 0 ? (
-          <li>
+          <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
             <Card
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}
@@ -570,12 +570,20 @@ function SummaryTab({
             <h2 className="mb-2 text-title font-semibold">
               {t('office.reports.daily_chart')}
             </h2>
-            <DailyChart
-              points={summary.daily}
-              showProfit={cost}
-              lang={lang}
-              t={t}
-            />
+            {summary.daily.filter(
+              (point) => point.sold !== 0 || point.grossProfit !== 0,
+            ).length > 1 ? (
+              <DailyChart
+                points={summary.daily}
+                showProfit={cost}
+                lang={lang}
+                t={t}
+              />
+            ) : (
+              <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
+                {t('office.reports.not_enough_days')}
+              </p>
+            )}
           </section>
 
           <div className="grid gap-3 lg:grid-cols-2">
@@ -610,7 +618,7 @@ function SummaryTab({
               <p className="mt-2 text-small text-text-muted">
                 {t('office.reports.refunds_note', {
                   count: summary.refundCount,
-                  amount: (summary.refunded / 100).toFixed(2),
+                  amount: formatMoney(summary.refunded),
                 })}
               </p>
             </section>

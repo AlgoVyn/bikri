@@ -8,7 +8,7 @@
 |---|---|
 | ![Dukaan web-sell-empty](../reference/dukaan/web-sell-empty.png) | Empty cart, search focus, product grid |
 | ![Dukaan web-sell-cart-line-discount](../reference/dukaan/web-sell-cart-line-discount.png) | Line discount Rs/% inline on a cart line |
-| ![Dukaan app-sell-cart-discounts](../reference/dukaan/app-sell-cart-discounts.png) | Line + bill discount, totals block (Subtotal / Item discounts / Discount / Total to pay), Customer 1/2/3 tabs, Held bills, Quick sale |
+| ![Dukaan app-sell-cart-discounts](../reference/dukaan/app-sell-cart-discounts.png) | Line + bill discount, totals block (Subtotal / Item discounts / Discount / Total to pay), Bill 1/2/3 tabs, Held bills, Quick sale |
 
 Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14), no lag on input (REQ-B07), stock warning never blocks (REQ-C07).
 
@@ -17,12 +17,12 @@ Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14
 **Start column (≈ 60%) — find products**
 1. Search box (autofocus; placeholder "Search or scan — name, barcode, SKU"; shortcut F2 (shown in Settings → About)). Results replace the grid as you type.
 2. Category chips row (All, then categories by sort order, horizontally scrollable).
-3. Product grid: elevated tiles 132×176 px min — photo (or coloured initials if none), name (2 lines max), bold price, stock pill ("12 left", green when in stock, amber when ≤ `min_stock_milli`, red "Out" when ≤ 0, hidden if `track_stock = 0`), and a small badge with the quantity already in the active cart. The search is a 56 px field with a focus ring, and category chips sit below it. Sorted by: selling frequency over 30 days on this device, then name. Virtualised.
+3. Product grid: elevated tiles 128×172 px min (196 px tall in Urdu; 64 px photo, or coloured initials if none), name (2 lines max), bold price, stock pill ("12 left", green when in stock, amber when ≤ `min_stock_milli`, red "Out" when ≤ 0, hidden if `track_stock = 0`), and a small badge with the quantity already in the active cart. The search is a 56 px field with a focus ring, and category chips sit below it. Sorted by: selling frequency over 30 days on this device, then name. Virtualised.
 4. Below the grid on desktop: `Quick sale` (F7) and `Held bills (n)` (F6) buttons.
 
 **End column (≈ 40%) — cart**
-1. Cart tabs: `Customer 1`, `Customer 2`, `Customer 3` (Ctrl+1/2/3); each shows its total or `Empty`, the active tab is solid brand blue and a dot marks non-empty carts. Each tab is an independent cart persisted in Dexie `carts` (survives reload and lock).
-2. Customer row: avatar icon, "Walk-in customer" or chosen customer name + balance ("Owes Rs 5,890"), `Change` button (search customers by name/phone, `+ New customer`). Choosing a customer is optional except for udhaar.
+1. Cart tabs: `Bill 1`, `Bill 2`, `Bill 3` (Ctrl+1/2/3); each shows its total or `New bill`, the active tab is solid brand blue and a dot marks non-empty carts. Each tab is an independent cart persisted in Dexie `carts` (survives reload and lock).
+2. Customer row: avatar icon, "Walk-in customer" or chosen customer name + balance ("Owes you Rs 5,890"), `Change` button (search customers by name/phone, `+ New customer`). Choosing a customer is optional except for udhaar.
 3. Cart lines (newest on top, configurable) sit on tinted cards inside the cart panel: name, unit price, `QtyInput`, line total; expand chevron (or click line) reveals: unit price override (needs `catalog.edit` or override if lower than price), discount with `Rs | %` toggle, note (e.g. serial no / IMEI, 0–60 chars), remove. Badges on line: `−Rs 200` discount, `Below cost` (red), `Not enough stock` (amber, informational).
 4. Totals block (exact labels): `Subtotal (n items)` = Σ gross, `Item discounts` (−, hidden if 0), `Discount` with an `Add discount` link (F3) opening Rs/% input (hidden if 0 until added), `Sales tax 17%` (only if tax > 0 and `tax_mode = exclusive`), `Rounding` (only if ≠ 0), **`Total to pay`** (large); with `tax_mode = inclusive` a small muted line under the total: `Includes Sales tax 17%: Rs 1,700`. Figures from [07 §3](../07-money-rules.md#3-bill-totals).
 5. Actions row: `Hold` (Ctrl+H / F4), `Clear` (Esc, confirm if > 0 lines), **`Take payment`** (Enter / F8, primary, full width, shows total).
@@ -50,7 +50,7 @@ Same product added twice merges into one line unless the line has a note or a pr
 | Total discount > staff limit | Take payment opens override (07 §3.1) |
 | Price override below sale price | requires `catalog.edit` or override |
 | Line discount > gross | capped, field shows red border with "Max Rs 500" |
-| Empty cart | Take payment disabled |
+| Empty cart | A neutral `Add a product to take payment` action focuses the search; Take payment appears only when the bill has lines |
 | 60 lines in the cart | adding another line is blocked: "A bill can have 60 lines — take payment and start a second bill" (keeps one bill's sync ops ≤ 200, [03 §3](../03-sync.md#3-outbox)) |
 | Quantity 0 | line removed |
 

@@ -25,9 +25,11 @@ import { SupplierDialog } from './SupplierDialog.tsx';
 export function SupplierList({
   embedded = false,
   detailOpen = false,
+  selectedId,
 }: {
   embedded?: boolean;
   detailOpen?: boolean;
+  selectedId?: string;
 } = {}) {
   const { t, i18n } = useTranslation();
   const { can } = useCurrentStaff();
@@ -146,7 +148,10 @@ export function SupplierList({
               <Link
                 to="/suppliers/$supplierId"
                 params={{ supplierId: row.supplier.id }}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2"
+                aria-current={
+                  row.supplier.id === selectedId ? 'page' : undefined
+                }
+                className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
               >
                 <span className="min-w-0 flex-[2_1_10rem]">
                   <span className="block truncate font-medium">

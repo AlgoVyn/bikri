@@ -216,35 +216,41 @@ export function CustomerStatement({
           : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
       }
     >
-      <div className="flex flex-wrap items-start gap-2">
-        <Link
-          to="/udhaar"
-          aria-label={t('office.udhaar.back_customers')}
-          title={t('office.udhaar.back_customers')}
-          className={
-            embedded
-              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-              : buttonQuiet
-          }
-        >
-          {embedded ? (
-            <span
-              aria-hidden="true"
-              className="text-title leading-none rtl:rotate-180"
-            >
-              ‹
-            </span>
-          ) : (
-            t('office.udhaar.back_customers')
-          )}
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-h1 font-semibold">{name}</h1>
-          {phone ? (
-            <a href={`tel:${phone}`} dir="ltr" className="text-small underline">
-              {phone}
-            </a>
-          ) : null}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-start gap-2">
+          <Link
+            to="/udhaar"
+            aria-label={t('office.udhaar.back_customers')}
+            title={t('office.udhaar.back_customers')}
+            className={
+              embedded
+                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
+                : buttonQuiet
+            }
+          >
+            {embedded ? (
+              <span
+                aria-hidden="true"
+                className="text-title leading-none rtl:rotate-180"
+              >
+                ‹
+              </span>
+            ) : (
+              t('office.udhaar.back_customers')
+            )}
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-h1 font-semibold">{name}</h1>
+            {phone ? (
+              <a
+                href={`tel:${phone}`}
+                dir="ltr"
+                className="text-small underline"
+              >
+                {phone}
+              </a>
+            ) : null}
+          </div>
         </div>
         <p
           className={`text-figure font-semibold ${balanceTone(balance)}`}
@@ -399,9 +405,72 @@ export function CustomerStatement({
         </button>
       </div>
 
+      <ul className="flex flex-col gap-2 sm:hidden">
+        {statement.openingBalance !== 0 ? (
+          <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
+            <span>{t('office.udhaar.entry_opening')}</span>
+            <span className="font-medium">
+              <MoneyText paisa={statement.openingBalance} />
+            </span>
+          </li>
+        ) : null}
+        {rows.length === 0 ? (
+          <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+            {t('office.udhaar.no_entries')}
+          </li>
+        ) : (
+          statement.rows.map((row, index) => (
+            <li
+              key={row.entry.id}
+              className="rounded-card border border-border bg-surface p-3 text-small"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-text-muted">
+                  {dateText(String(row.entry.business_date), i18n.language, tz)}
+                </span>
+                <span className="font-medium">
+                  <MoneyText paisa={row.balance} />
+                </span>
+              </div>
+              <p className="mt-1">
+                {row.saleId ? (
+                  <Link
+                    to="/sales/$id"
+                    params={{ id: row.saleId }}
+                    className="underline"
+                  >
+                    {rows[index]?.description}
+                  </Link>
+                ) : (
+                  rows[index]?.description
+                )}
+              </p>
+              <dl className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <dt className="text-text-muted">
+                    {t('office.udhaar.debit')}
+                  </dt>
+                  <dd className="text-end">
+                    {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">
+                    {t('office.udhaar.credit')}
+                  </dt>
+                  <dd className="text-end">
+                    {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          ))
+        )}
+      </ul>
+
       <div
         ref={tableRef}
-        className="max-h-[60vh] overflow-auto rounded-card border border-border"
+        className="hidden max-h-[60vh] overflow-auto rounded-card border border-border sm:block"
       >
         <table className="w-full min-w-[34rem] text-small">
           <thead className="sticky top-0 bg-surface">

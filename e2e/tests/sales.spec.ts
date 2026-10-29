@@ -44,7 +44,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await expect(page.getByTestId('bill-status')).toHaveText('Part refunded');
     const line = page.getByRole('row').filter({ hasText: 'Charger' });
     await expect(line).toContainText('Refunded: 1');
-    await expect(line).toContainText('Kept: 1');
+    await expect(line).toContainText('On bill: 1');
 
     await page.getByRole('link', { name: 'Back to sales' }).click();
     const [download] = await Promise.all([

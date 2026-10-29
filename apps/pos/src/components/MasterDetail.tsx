@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * Reference-style master–detail workspace (screens 08/10/12/13). On ≥1024 px the list stays on
- * the start side and the selected row's detail fills the end side; on phones only one is shown.
+ * Reference-style master–detail workspace (screens 08/10/12/13). On ≥1280 px the list stays on
+ * the start side and the selected row's detail fills the end side; below that only one is shown.
  */
 export function MasterDetail({
   master,
@@ -20,15 +20,15 @@ export function MasterDetail({
   detailTestId?: string;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 p-4 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-6 lg:p-6">
+    <div className="mx-auto flex w-full max-w-[1720px] flex-col gap-4 p-4 xl:grid xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:items-start xl:gap-6 xl:p-6">
       <div
-        className={showDetail ? 'min-w-0 max-lg:hidden' : 'min-w-0'}
+        className={showDetail ? 'min-w-0 max-xl:hidden' : 'min-w-0'}
         data-testid={masterTestId}
       >
         {master}
       </div>
       <div
-        className={showDetail ? 'min-w-0' : 'hidden min-w-0 lg:block'}
+        className={showDetail ? 'min-w-0' : 'hidden min-w-0 xl:block'}
         data-testid={detailTestId}
       >
         {showDetail ? detail : placeholder}
@@ -47,7 +47,7 @@ export function MasterPlaceholder({
   hint: string;
 }) {
   return (
-    <div className="flex min-h-[26rem] flex-col items-center justify-center gap-3 rounded-card border border-dashed border-border-strong bg-surface-2/40 p-8 text-center">
+    <div className="flex min-h-[26rem] flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface p-8 text-center shadow-card">
       <span
         aria-hidden="true"
         className="flex size-14 items-center justify-center rounded-full bg-surface text-text-muted"

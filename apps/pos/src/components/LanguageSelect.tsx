@@ -9,7 +9,7 @@ export function LanguageSelect() {
     <label className="inline-flex items-center">
       <span className="sr-only">{t('shell.language')}</span>
       <select
-        className="h-11 max-w-24 rounded-control border border-border-strong bg-surface px-1 text-text"
+        className="h-11 max-w-24 rounded-control border border-border-strong bg-surface px-1 text-text max-lg:max-w-20"
         value={language}
         onChange={(event) => {
           const next = event.target.value;

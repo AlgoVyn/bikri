@@ -40,11 +40,15 @@ export function ProductThumb({
   name: string;
   imageKey: unknown;
   color: unknown;
-  size?: 'sm' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
 }) {
   const url = useFileUrl(typeof imageKey === 'string' ? imageKey : null);
   const box =
-    size === 'lg' ? 'size-20 rounded-card text-h1' : 'size-10 rounded-control';
+    size === 'lg'
+      ? 'size-20 rounded-card text-h1'
+      : size === 'md'
+        ? 'size-16 rounded-card text-h2'
+        : 'size-10 rounded-control';
   if (url) {
     return (
       <img

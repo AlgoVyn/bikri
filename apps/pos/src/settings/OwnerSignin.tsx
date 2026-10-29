@@ -68,6 +68,7 @@ export function OwnerSigninDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -100,6 +101,10 @@ export function OwnerSigninDialog({
       setCode('');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (start) codeRef.current?.focus();
+  }, [start]);
 
   const confirm = async () => {
     if (!start) return;
@@ -149,6 +154,7 @@ export function OwnerSigninDialog({
             <label className="flex flex-col gap-1">
               <span>{t('owner.code_label')}</span>
               <input
+                ref={codeRef}
                 className={`${fieldClass} tracking-widest`}
                 inputMode="numeric"
                 autoComplete="one-time-code"

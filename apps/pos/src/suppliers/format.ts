@@ -11,7 +11,7 @@ export function supplierBalanceLabel(t: TFunction, balance: number): string {
 }
 
 export function supplierBalanceTone(balance: number): string {
-  if (balance > 0) return 'text-danger';
+  if (balance > 0) return 'text-text';
   if (balance < 0) return 'text-success-subtle-ink';
   return 'text-text-muted';
 }

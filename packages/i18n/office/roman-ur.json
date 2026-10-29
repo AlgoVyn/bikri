@@ -58,7 +58,7 @@
       "carts_full": "Dobara bill banane ke liye koi cart tab khali karein.",
       "cashier": "Cashier",
       "col_discount": "Riayat",
-      "col_kept": "Rakha",
+      "col_kept": "Bill par",
       "col_name": "Item",
       "col_price": "Qeemat",
       "col_qty": "Miqdaar",
@@ -179,7 +179,8 @@
       "split_title": "Ada shuda aur khatay ki taqseem",
       "start_new_sale": "Is customer ke liye nayi sale shuru karein",
       "title": "{{invoice}} ki wapsi",
-      "title_plain": "Raqam wapas"
+      "title_plain": "Raqam wapas",
+      "choose_reason": "Jaari rakhne ke liye wajah aur miqdar chunein."
     },
     "udhaar": {
       "add_promise": "Wada shamil karein",
@@ -253,7 +254,7 @@
       "overpay_body": "{{amount}} jama honge. Phir bhi mehfooz karein?",
       "overpay_confirm": "Payment mehfooz karein",
       "overpay_title": "Customer ke paas raqam jama ho jayegi",
-      "owes": "{{amount}} baqaya",
+      "owes": "Aap ko {{amount}} dena hai",
       "payment_backdate_owner": "Sirf malik purani tareekh (7 din tak) daal sakta hai.",
       "payment_date": "Tareekh",
       "payment_error_amount": "Sifar se zyada raqam likhein.",
@@ -531,7 +532,10 @@
       "udhaar_given": "Diya gaya udhaar",
       "udhaar_in": "Udhaar cash wasool",
       "next": "Aage",
-      "subtitle": "Daraz ginein aur din band karein"
+      "subtitle": "Daraz ginein aur din band karein",
+      "column_note": "Note",
+      "column_count": "Count",
+      "column_amount": "Raqam"
     },
     "reports": {
       "age_days": "Umar (din)",
@@ -623,7 +627,7 @@
       "reason": "Wajah",
       "refunded_amount": "Wapas shuda",
       "refunds": "Wapsiyan",
-      "refunds_note": "{{count}} wapsiyan · {{amount}} rupees",
+      "refunds_note": "Refunds: {{count}} · {{amount}}",
       "returns_count": "Wapsiyan",
       "returns_credit": "Credit",
       "returns_difference": "Wapsi farq",
@@ -661,7 +665,8 @@
       "uncategorized": "Baghair qism",
       "voided_amount": "Mansookh shuda",
       "voids": "Mansookh",
-      "subtitle": "Farokht, munafa aur stock"
+      "subtitle": "Farokht, munafa aur stock",
+      "not_enough_days": "Trend ke liye abhi kaafi din nahin."
     },
     "backup": {
       "building": "Export ban raha hai…",
@@ -671,7 +676,7 @@
       "finished": "{{filename}} download ho gayi",
       "hint": "Har table ki zip download karein: JSON restore ke liye, CSV Excel ke liye.",
       "nav_hint": "Is dukan ki mukammal copy download karein",
-      "nightly": "Aap ka data har raat Algovyn ki taraf se backup hota hai.",
+      "nightly": "Jab yeh till connected ho, Algovyn har raat aap ka data backup karta hai.",
       "no_permission": "Mukammal dukan ki copy sirf malik download kar sakta hai.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} satrein)",
       "restore": "Export se restore karein",

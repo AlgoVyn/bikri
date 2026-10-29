@@ -18,7 +18,9 @@ export function ProductWorkspace({
   const { t } = useTranslation();
   return (
     <MasterDetail
-      master={<ProductList embedded detailOpen={id !== undefined} />}
+      master={
+        <ProductList embedded detailOpen={id !== undefined} selectedId={id} />
+      }
       detail={
         id ? (
           <ProductDetailPage
