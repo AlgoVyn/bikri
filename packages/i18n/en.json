@@ -795,7 +795,8 @@
     "sync_quota": "Daily sync limit reached",
     "lock": "Lock",
     "sync_paused": "Sync paused",
-    "sync_detail_paused": "This shop's account is paused. Contact Algovyn. {{count}} changes are kept on this device."
+    "sync_detail_paused": "This shop's account is paused. Contact Algovyn. {{count}} changes are kept on this device.",
+    "printer_label": "Printer"
   },
   "stock": {
     "reason": {

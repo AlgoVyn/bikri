@@ -741,7 +741,9 @@
       "tax_off_hint": "Price-mein-tax ke liye pehle tax rate daalein.",
       "title": "Dukan profile aur receipt",
       "logo": "Dukaan ka logo",
-      "subtitle": "Dukaan, device aur data"
+      "subtitle": "Dukaan, device aur data",
+      "choose": "Koi setting muntakhib karein",
+      "choose_hint": "Muntakhib kiya gaya hissa yahan khulega, fehrist hamesha ek click par rahegi."
     },
     "staff": {
       "active": "Active",

@@ -11,6 +11,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { DeviceIcon } from '../components/icons.tsx';
 import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
 import { formatCode } from '../data/enrol.ts';
@@ -18,6 +19,7 @@ import { deviceInfo } from '../data/localTenant.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { OwnerSigninRequired, shopRequest } from '../sync/shopApi.ts';
+import { SettingsPageLayout } from './Layout.tsx';
 import { shopErrorMessage, useShopAdmin } from './OwnerSignin.tsx';
 
 export type ShopDevice = {
@@ -198,17 +200,24 @@ export function DevicesPage() {
   }, [online, staffId, me?.is_admin, role, guard, load]);
 
   if (!me?.is_admin || role !== 'owner')
-    return <p className="p-4 text-text-muted">{t('devices.admin_only')}</p>;
+    return (
+      <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
+        <p className="p-4 text-text-muted">{t('devices.admin_only')}</p>
+      </SettingsPageLayout>
+    );
   if (!online)
-    return <p className="p-4 text-text-muted">{t('devices.online_only')}</p>;
+    return (
+      <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
+        <p className="p-4 text-text-muted">{t('devices.online_only')}</p>
+      </SettingsPageLayout>
+    );
 
   const branchName = (id: string) =>
     branches.find((b) => b.id === id)?.name ?? '—';
   const branchId = form.branch || String(me.branch_id);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
-      <h1 className="text-h1 font-semibold">{t('devices.title')}</h1>
+    <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
       {error ? (
         <p role="alert" className="text-danger">
           {error}
@@ -612,6 +621,6 @@ export function DevicesPage() {
         }}
       />
       {dialog}
-    </div>
+    </SettingsPageLayout>
   );
 }

@@ -1,6 +1,7 @@
 import { APP_VERSION } from '@bikri/core';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
+import { InfoIcon } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -32,7 +33,7 @@ function AboutContent() {
     }
   };
   return (
-    <SettingsPageLayout title={t('office.about.title')}>
+    <SettingsPageLayout title={t('office.about.title')} icon={<InfoIcon />}>
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4 text-small">
         <p>
           <span className="text-text-muted">{t('office.about.version')}: </span>

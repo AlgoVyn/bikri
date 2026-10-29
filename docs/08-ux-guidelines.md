@@ -18,7 +18,7 @@ The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behavio
 - **Home**: a large `New sale` hero card with a short hint, a two-column grid of action cards that each carry an icon, title and short description, and a right-hand column with a compact `Today's register` summary and `Recent bills`. On phones the register moves directly below the hero.
 - **Sell**: customer tabs show each cart's total or `Empty`; the active tab is solid; product tiles show the quantity already in the cart and a green/amber/red stock pill; the cart panel and totals are visually separate surfaces.
 - **Pay**: payment methods are descriptive cards (icon + method + hint) with a visible selected check; change and remaining are shown as two summary cards.
-- **Settings**: rows have an icon, title, hint and chevron, grouped under short section labels.
+- **Settings**: a master–detail split on ≥ 1024 px — the grouped index (icon, title, hint and chevron) stays in the start column and the selected section fills the end column; below 1024 px the section is a full page with a back arrow.
 - **Lists**: a filter card, a summary card and the rows/table in their own card; page-level titles use the icon header.
 
 Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.

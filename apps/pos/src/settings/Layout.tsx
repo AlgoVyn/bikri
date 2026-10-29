@@ -1,26 +1,96 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
+import { SettingsIcon } from '../components/icons.tsx';
+import { AreaStrings } from '../i18n/areas.tsx';
+import { SettingsNav } from './SettingsNav.tsx';
 
-/** Shared Settings subpage frame with a back link and title. */
+/**
+ * Settings on ≥1024 px uses the reference app's master–detail split: the index stays on the
+ * start side and the selected section fills the end side. Below that, a section is a full page.
+ */
+export function SettingsSplit({
+  index = false,
+  children,
+}: {
+  index?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <AreaStrings area="office">
+      <div className="mx-auto w-full max-w-[1440px] p-4 lg:p-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] lg:items-start">
+          <div className={index ? 'min-w-0' : 'min-w-0 max-lg:hidden'}>
+            <SettingsNav />
+          </div>
+          <div className={index ? 'hidden min-w-0 lg:block' : 'min-w-0'}>
+            {index ? <SettingsPlaceholder /> : children}
+          </div>
+        </div>
+      </div>
+    </AreaStrings>
+  );
+}
+
+function SettingsPlaceholder() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-[32rem] flex-col items-center justify-center gap-3 rounded-card border border-dashed border-border-strong bg-surface-2/40 p-8 text-center">
+      <span
+        aria-hidden="true"
+        className="flex size-14 items-center justify-center rounded-full bg-surface text-text-muted"
+      >
+        <SettingsIcon />
+      </span>
+      <p className="text-title font-semibold">{t('office.settings.choose')}</p>
+      <p className="max-w-xs text-small text-text-muted">
+        {t('office.settings.choose_hint')}
+      </p>
+    </div>
+  );
+}
+
+/** Shared Settings subpage frame with the split index, a back link and title. */
 export function SettingsPageLayout({
   title,
+  icon,
   children,
 }: {
   title: string;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to="/settings" className={buttonQuiet}>
-          {t('common.back')}
-        </Link>
-        <h1 className="text-h1 font-semibold">{title}</h1>
+    <SettingsSplit>
+      <div className="flex min-w-0 flex-col gap-4">
+        <header className="flex flex-wrap items-start gap-3">
+          <Link
+            to="/settings"
+            activeOptions={{ exact: true }}
+            aria-label={t('common.back')}
+            title={t('common.back')}
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2 active:bg-surface-2"
+          >
+            <span
+              aria-hidden="true"
+              className="text-title leading-none rtl:rotate-180"
+            >
+              ‹
+            </span>
+          </Link>
+          <span
+            aria-hidden="true"
+            className="flex size-10 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted"
+          >
+            {icon ?? <SettingsIcon />}
+          </span>
+          <h1 className="min-w-0 flex-1 pt-1.5 text-h1 font-semibold">
+            {title}
+          </h1>
+        </header>
+        {children}
       </div>
-      {children}
-    </div>
+    </SettingsSplit>
   );
 }

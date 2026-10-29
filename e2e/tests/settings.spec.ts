@@ -52,7 +52,9 @@ test.describe('Settings (T-050)', () => {
 
     await page.goto('/bikri/settings/about');
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
-    await expect(page.getByText('Terms and privacy')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Terms and privacy' }),
+    ).toBeVisible();
     await expect(
       page.getByText('No analytics, ads or tracking scripts.'),
     ).toBeVisible();
@@ -134,15 +136,47 @@ test.describe('Settings (T-050)', () => {
     ).toBeVisible();
   });
 
-  test('Printer and Sync have a Back button to Settings', async ({ page }) => {
+  test('desktop Settings keeps the index beside the selected section', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
+    await openReadyShop(page, '/bikri/settings');
+    const settings = page.getByRole('main');
+    await expect(settings.getByText('Choose a setting')).toBeVisible();
+    await settings.getByRole('link', { name: /Printer/ }).click();
+    await expect(
+      settings.getByRole('heading', { name: 'Printer' }),
+    ).toBeVisible();
+    await expect(settings.getByText('Choose a setting')).toHaveCount(0);
+    await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
+  });
+
+  test('every Settings section has a Back button to Settings', async ({
+    page,
+  }) => {
     await openReadyShop(page, '/bikri/settings/printer');
-    await page.getByRole('link', { name: 'Back' }).click();
+    await page.getByRole('link', { name: 'Back', exact: true }).click();
     await expect(page).toHaveURL(/\/settings$/u);
 
     await page.goto('/bikri/settings/sync');
     await expect(page.getByTestId('sync-page')).toBeVisible();
-    await page.getByRole('link', { name: 'Back' }).click();
+    await page.getByRole('link', { name: 'Back', exact: true }).click();
     await expect(page).toHaveURL(/\/settings$/u);
+
+    for (const path of ['/settings/devices', '/settings/backup']) {
+      await page.goto(`/bikri${path}`);
+      const dialog = page.getByRole('dialog', { name: "Confirm it's you" });
+      await dialog
+        .waitFor({ state: 'visible', timeout: 2_000 })
+        .catch(() => undefined);
+      if (await dialog.isVisible()) {
+        await dialog.getByRole('button', { name: 'Cancel' }).click();
+        await expect(dialog).toHaveCount(0);
+      }
+      await expect(
+        page.getByRole('link', { name: 'Back', exact: true }),
+      ).toHaveAttribute('href', '/bikri/settings');
+    }
   });
 
   test('AC 7: the #printer link opens the Printer section directly', async ({

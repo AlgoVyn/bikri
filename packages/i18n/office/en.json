@@ -741,7 +741,9 @@
       "tax_off_hint": "Set a tax rate to offer prices-include-tax.",
       "title": "Shop profile & receipt",
       "logo": "Shop logo",
-      "subtitle": "Shop, device and data"
+      "subtitle": "Shop, device and data",
+      "choose": "Choose a setting",
+      "choose_hint": "The section you pick appears here, so the index stays one click away."
     },
     "staff": {
       "active": "Active",
