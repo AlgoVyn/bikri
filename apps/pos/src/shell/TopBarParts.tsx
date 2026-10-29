@@ -145,7 +145,7 @@ export function SyncBadge() {
   );
 }
 
-/** Printer status dot; the real connection state comes with printer setup (T-020). */
+/** Printer status pill: green when set up, red when this device has no printer (T-020). */
 export function PrinterDot() {
   const { t } = useTranslation();
   const printer = useLiveQuery(
@@ -153,23 +153,22 @@ export function PrinterDot() {
     [],
   );
   const label = printer ? t('shell.printer_ready') : t('shell.printer_none');
+  const loading = printer === undefined;
   return (
     <Link
       to="/settings/printer"
       data-testid="printer-dot"
       aria-label={label}
       title={label}
-      className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${
-        printer
-          ? 'bg-success-subtle text-success-subtle-ink'
-          : 'bg-surface-2 text-text-muted'
+      className={`inline-flex h-8 items-center rounded-full px-2.5 text-small font-medium hover:opacity-90 ${
+        loading
+          ? 'bg-surface-2 text-text-muted'
+          : printer
+            ? 'bg-success text-white'
+            : 'bg-danger text-danger-ink'
       }`}
     >
-      <span
-        aria-hidden="true"
-        className={`size-2 rounded-full ${printer ? 'bg-success' : 'bg-border-strong'}`}
-      />
-      <span className="max-lg:hidden">{label}</span>
+      {t('shell.printer_label')}
     </Link>
   );
 }

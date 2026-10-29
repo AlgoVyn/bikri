@@ -795,7 +795,8 @@
     "sync_quota": "Rozana sync ki had poori",
     "lock": "Lock karein",
     "sync_paused": "Sync ruka hua hai",
-    "sync_detail_paused": "Is dukaan ka account rok diya gaya hai. Algovyn se raabta karein. {{count}} tabdeeliyan isi device par mehfooz hain."
+    "sync_detail_paused": "Is dukaan ka account rok diya gaya hai. Algovyn se raabta karein. {{count}} tabdeeliyan isi device par mehfooz hain.",
+    "printer_label": "Printer"
   },
   "stock": {
     "reason": {

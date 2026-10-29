@@ -49,9 +49,8 @@ test.describe('Home and shell (T-013)', () => {
       'aria-label',
       'Printer not set up',
     );
-    await expect(page.getByTestId('printer-dot')).toContainText(
-      'Printer not set up',
-    );
+    await expect(page.getByTestId('printer-dot')).toHaveText('Printer');
+    await expect(page.getByTestId('printer-dot')).toHaveClass(/bg-danger/);
 
     const nav = page.getByRole('navigation', { name: 'Main' });
     if (isPhone(page)) {
@@ -198,6 +197,20 @@ test.describe('Home and shell (T-013)', () => {
     await context.setOffline(false);
     await expect(page.getByTestId('banner-offline')).toHaveCount(0);
     await expectNoHorizontalScroll(page);
+  });
+
+  test('printer pill turns green when a printer is configured', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.setKv('printer', { transport: 'system' });
+    });
+    await expect(page.getByTestId('printer-dot')).toHaveClass(/bg-success/);
+    await expect(page.getByTestId('printer-dot')).toHaveAttribute(
+      'aria-label',
+      'Printer ready',
+    );
   });
 
   for (const size of [

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
+import { ClockIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import {
   AUDIT_ACTIONS,
@@ -69,7 +70,7 @@ function ActivityContent() {
       return String(shop?.timezone ?? 'Asia/Karachi');
     }, []) ?? 'Asia/Karachi';
   return (
-    <SettingsPageLayout title={t('office.activity.title')}>
+    <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
       <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex flex-col gap-1 text-small">
           {t('office.activity.from')}
