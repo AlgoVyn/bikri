@@ -948,7 +948,8 @@
     "import_preview": "{{count}} tabdeeliyan, {{from}} se {{to}} · sales {{sales}} · adaigiyan {{payments}}",
     "import_go": "Import karein",
     "import_running": "Import ho raha hai… {{total}} mein se {{done}}",
-    "import_done": "Import mukammal: {{applied}} qabool, {{rejected}} mustarad."
+    "import_done": "Import mukammal: {{applied}} qabool, {{rejected}} mustarad.",
+    "import_no_file": "Koi file muntakhib nahin"
   },
   "syncpage": {
     "title": "Sync",

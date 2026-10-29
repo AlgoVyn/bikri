@@ -122,7 +122,8 @@ export function ReceiptPreview({
   });
   return (
     <figure
-      className="rounded-card border border-border bg-white p-3 text-black"
+      className="mx-auto w-fit max-w-full rounded-card border border-border bg-white p-3 text-black"
+      data-testid="receipt-preview-card"
       dir="ltr"
     >
       <figcaption className="mb-2 text-small text-text-muted">
