@@ -143,10 +143,16 @@ function StaffDialog({
 
   useEffect(() => {
     if (!open) return;
+    const nextRole = (row?.role as Role | undefined) ?? 'cashier';
     setName(row ? String(row.name) : '');
-    setRole((row?.role as Role | undefined) ?? 'cashier');
+    setRole(nextRole);
     setActive(row ? row.active === 1 : true);
-    setMaxDiscountBp(Number(row?.max_discount_bp ?? 500));
+    setMaxDiscountBp(
+      Number(
+        row?.max_discount_bp ??
+          (nextRole === 'owner' ? 10000 : nextRole === 'manager' ? 2000 : 500),
+      ),
+    );
     try {
       setOverrides(
         JSON.parse(String(row?.permissions_json ?? '{}')) as Record<

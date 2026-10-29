@@ -17,6 +17,13 @@ export function GlobalSearch() {
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [active, setActive] = useState(0);
   const hits = useLiveQuery(() => searchAll(getDb(), query), [query]) ?? [];
+  const optionId = (index: number) => `${listId}-opt-${index}`;
+  useEffect(() => {
+    if (!open || active < 0) return;
+    document
+      .getElementById(`${listId}-opt-${active}`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [active, open, listId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -85,6 +92,11 @@ export function GlobalSearch() {
           aria-label={t('shell.search_label')}
           aria-expanded={open && query.trim() !== ''}
           aria-controls={listId}
+          aria-activedescendant={
+            open && query.trim() !== '' && hits[active]
+              ? optionId(active)
+              : undefined
+          }
           aria-autocomplete="list"
           autoComplete="off"
           placeholder={t('shell.search_label')}
@@ -153,6 +165,7 @@ export function GlobalSearch() {
                   return (
                     <div
                       key={`${hit.kind}-${hit.id}`}
+                      id={optionId(index)}
                       role="option"
                       tabIndex={-1}
                       aria-selected={index === active}

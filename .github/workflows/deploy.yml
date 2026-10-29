@@ -24,7 +24,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   website-check:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Only a CI run caused by a push to this repository's main may deploy. `workflow_run.branches`
+    # matches the triggering run's head branch, so a fork PR can name its branch `main`; the
+    # head_repository and event checks are the actual trust boundary (D-146).
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main' &&
+           github.event.workflow_run.head_repository.full_name == github.repository &&
+           github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -46,7 +54,13 @@ jobs:
 
   deploy:
     needs: website-check
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    if: >-
+      ${{ vars.DEPLOY_ENABLED == 'true' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'main' &&
+            github.event.workflow_run.head_repository.full_name == github.repository &&
+            github.event.workflow_run.conclusion == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production

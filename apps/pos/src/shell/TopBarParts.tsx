@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { LockIcon, UserIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
+import { unresolvedFailedCount } from '../data/printJobs.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useSession } from '../state/session.ts';
 import { useSyncState } from '../sync/state.ts';
@@ -153,7 +154,7 @@ export function PrinterDot() {
     const db = getDb();
     return {
       printer: (await db.kv.get('printer'))?.value ?? null,
-      failed: await db.print_jobs.where('status').equals('failed').count(),
+      failed: await unresolvedFailedCount(db),
     };
   }, []);
   const printer = data?.printer ?? null;

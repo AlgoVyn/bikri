@@ -54,6 +54,31 @@ export type ApplyOutcome = {
 
 const COLUMN = /^[a-z_][a-z0-9_]*$/u;
 const NEVER_FROM_CLIENT = new Set(['tenant_id', 'rev']);
+
+/** Audit actions a till may write; operator/tenant lifecycle rows are server-only. */
+const CLIENT_AUDIT_ACTIONS = new Set([
+  'branch_change',
+  'backup_restore',
+  'cache_rebuilt',
+  'cost_change',
+  'credit_limit_change',
+  'day_close_difference',
+  'discount_over_limit',
+  'drawer_open',
+  'override',
+  'party_delete',
+  'pin_reset',
+  'price_change',
+  'product_delete',
+  'refund',
+  'reissue',
+  'shop_change',
+  'staff_change',
+  'stock_count',
+  'supplier_return',
+  'sync_ops_discarded',
+  'void',
+]);
 const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {
   products: new Set(['avg_cost']),
   sales: new Set(['status']),
@@ -72,6 +97,7 @@ type Current = {
   rev: number;
   deleted_at: number | null;
   setup_completed_at?: number | null;
+  hard_limit?: number | null;
 };
 
 /** Statements of one op and the index of its guarded write (changes must be 1). */
@@ -275,9 +301,44 @@ function staffCreatedInGroup(group: PushOp[], id: string): StaffRow | null {
   return null;
 }
 
+/** The only group-created staff allowed to approve rows: the first owner of an empty setup. */
+function bootstrapOwnerId(look: Lookups, group: PushOp[]): string | null {
+  if (
+    [...look.staff.values()].some(
+      (s) => s.role === 'owner' && s.active === 1 && s.deleted_at === null,
+    ) ||
+    look.current.has(key('shop', 'shop'))
+  )
+    return null;
+  const shopOp = group.find(
+    (o) => o.tbl === 'shop' && o.kind === 'upsert' && o.row?.id === 'shop',
+  );
+  const ownerId = shopOp?.row?.updated_by;
+  if (
+    !shopOp ||
+    typeof ownerId !== 'string' ||
+    Number(shopOp.row?.setup_completed_at ?? 0) === 0
+  )
+    return null;
+  const owner = group.find(
+    (o) =>
+      o.tbl === 'staff' &&
+      o.kind === 'upsert' &&
+      o.row?.id === ownerId &&
+      o.row?.updated_by === ownerId &&
+      o.row?.role === 'owner',
+  );
+  return owner ? ownerId : null;
+}
+
 function staffOf(look: Lookups, group: PushOp[], id: unknown): StaffRow | null {
   if (typeof id !== 'string') return null;
-  const s = look.staff.get(id) ?? staffCreatedInGroup(group, id);
+  const bootstrap = bootstrapOwnerId(look, group);
+  const s =
+    look.staff.get(id) ??
+    (bootstrap !== null && id === bootstrap
+      ? staffCreatedInGroup(group, id)
+      : null);
   return s && s.active === 1 && s.deleted_at === null ? s : null;
 }
 
@@ -361,7 +422,7 @@ function checkRefund(
   const amount = Number(row.amount ?? 0);
   const lines = linkedInGroup(group, 'refund_lines', 'refund_id', id);
   if (
-    lines.length > 0 &&
+    lines.length === 0 ||
     lines.reduce((sum, line) => sum + Number(line.amount ?? 0), 0) !==
       Number(row.exact_amount ?? 0)
   )
@@ -697,11 +758,31 @@ function checkOp(
       Boolean(staff && can(staff.role, staff.permissions_json, p));
     switch (op.tbl) {
       case 'sales': {
-        const branch = look.branches.get(String(row.branch_id));
-        const expected = branch
-          ? `${branch.bill_prefix}-${ctx.device.device_code}-${String(row.invoice_seq)}`
-          : null;
-        if (row.invoice_no !== expected) throw new Reject('CONSTRAINT_FAILED');
+        // The prefix may come from an earlier bill_prefix setting; the device code is stable and
+        // UNIQUE(tenant_id, invoice_no) is the real collision guard (03 §4.1, 07 §2).
+        const invoice = /^[A-Z0-9]{1,6}-([A-Z]{1,2})-(\d+)$/u.exec(
+          String(row.invoice_no),
+        );
+        if (
+          !invoice ||
+          invoice[1] !== ctx.device.device_code ||
+          Number(invoice[2]) !== Number(row.invoice_seq)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        const lines = linkedInGroup(
+          group,
+          'sale_lines',
+          'sale_id',
+          String(row.id),
+        );
+        if (lines.length === 0) throw new Reject('CONSTRAINT_FAILED');
+        if (Number(row.line_count) !== lines.length)
+          throw new Reject('CONSTRAINT_FAILED');
+        if (
+          lines.reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0) !==
+          Number(row.items_qty_milli)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         break;
       }
       case 'ledger_entries':
@@ -848,6 +929,20 @@ function checkOp(
         if (!ok) throw new Reject('FORBIDDEN');
         break;
       }
+      case 'audit_log': {
+        if (!CLIENT_AUDIT_ACTIONS.has(String(row.action)))
+          throw new Reject('FORBIDDEN');
+        for (const field of ['before_json', 'after_json']) {
+          const value = row[field];
+          if (value === null || value === undefined) continue;
+          try {
+            JSON.parse(String(value));
+          } catch {
+            throw new Reject('CONSTRAINT_FAILED');
+          }
+        }
+        break;
+      }
       default:
         break;
     }
@@ -857,35 +952,49 @@ function checkOp(
   // upsert (master)
   const updater = staffOf(look, group, row.updated_by);
   if (op.tbl === 'staff' || op.tbl === 'branches' || op.tbl === 'shop') {
-    // The setup wizard creates the first owner together with the shop (no owner exists yet).
-    const firstOwner =
-      updater?.role === 'owner' &&
-      [...look.staff.values()].every(
-        (s) => s.role !== 'owner' || s.deleted_at !== null,
-      );
-    if (updater?.role !== 'owner' && !firstOwner) throw new Reject('FORBIDDEN');
+    // The setup wizard creates the first owner together with the shop; every later staff/shop/
+    // branch change needs a persisted owner. A group-created owner cannot approve its own row
+    // outside that one bootstrap group (05 §5).
+    const bootstrap = bootstrapOwnerId(look, group);
+    const persisted = updater ? look.staff.get(updater.id) : undefined;
+    if (
+      !updater ||
+      updater.role !== 'owner' ||
+      (!persisted && updater.id !== bootstrap)
+    )
+      throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'shop') {
     const cur = look.current.get(key('shop', 'shop'));
     if ((op.base_rev ?? 0) === 0 && cur?.setup_completed_at)
       throw new Reject('SETUP_ALREADY_DONE');
   }
-  if (op.tbl === 'products') {
-    const fields =
-      op.base_rev === 0 ? Object.keys(row) : (op.changed_fields ?? []);
+  if (
+    op.tbl === 'products' ||
+    op.tbl === 'categories' ||
+    op.tbl === 'product_barcodes'
+  ) {
     if (
-      fields.includes('price') &&
-      !(updater && can(updater.role, updater.permissions_json, 'catalog.edit'))
+      !updater ||
+      !can(updater.role, updater.permissions_json, 'catalog.edit')
     )
       throw new Reject('FORBIDDEN');
     if (
-      fields.includes('last_cost') &&
-      !(
-        updater &&
-        (can(updater.role, updater.permissions_json, 'catalog.edit') ||
-          can(updater.role, updater.permissions_json, 'purchase.create'))
-      )
+      op.tbl === 'products' &&
+      row.deleted_at != null &&
+      !can(updater.role, updater.permissions_json, 'catalog.delete')
     )
+      throw new Reject('FORBIDDEN');
+  }
+  if (op.tbl === 'expense_categories') {
+    if (
+      !updater ||
+      !can(updater.role, updater.permissions_json, 'settings.shop')
+    )
+      throw new Reject('FORBIDDEN');
+  }
+  if (op.tbl === 'promises') {
+    if (!updater || !can(updater.role, updater.permissions_json, 'party.edit'))
       throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'customers' || op.tbl === 'suppliers') {
@@ -895,6 +1004,22 @@ function checkOp(
     // 05 §6: a cashier may create a party, but not edit an existing one or its limits.
     if (updater.role === 'cashier' && look.current.has(key(op.tbl, partyId)))
       throw new Reject('FORBIDDEN');
+    if (
+      row.deleted_at != null &&
+      !can(updater.role, updater.permissions_json, 'party.delete')
+    )
+      throw new Reject('FORBIDDEN');
+    if (op.tbl === 'customers' && row.hard_limit !== undefined) {
+      const cur = look.current.get(key(op.tbl, partyId));
+      // Only an owner may change a hard limit; an unchanged value is fine.
+      if (
+        updater.role !== 'owner' &&
+        cur &&
+        cur.deleted_at === null &&
+        Number(row.hard_limit ?? 0) !== Number(cur.hard_limit ?? 0)
+      )
+        throw new Reject('FORBIDDEN');
+    }
   }
 }
 
@@ -1304,7 +1429,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     const list = [...ids];
     for (let i = 0; i < list.length; i += 90) {
       const chunk = list.slice(i, i + 90);
-      const extra = tbl === 'shop' ? ', setup_completed_at' : '';
+      const extra =
+        tbl === 'shop'
+          ? ', setup_completed_at'
+          : tbl === 'customers'
+            ? ', hard_limit'
+            : '';
       stmts.push(
         db.prepare(
           `SELECT id, rev, deleted_at${extra} FROM ${tbl} WHERE tenant_id = ?1 AND id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
@@ -1445,6 +1575,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           deleted_at: (r.deleted_at as number | null) ?? null,
           setup_completed_at:
             (r.setup_completed_at as number | null | undefined) ?? null,
+          hard_limit: (r.hard_limit as number | null | undefined) ?? null,
         });
       } else if ('sales' in k) {
         look.sales.set(String(r.id), {

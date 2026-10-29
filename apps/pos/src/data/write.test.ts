@@ -1,5 +1,6 @@
 import { MAX_OPS_PER_TX } from '@bikri/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { discardFailed } from '../sync/push.ts';
 import { checkCaches, rebuildCaches } from './caches.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
 import {
@@ -136,6 +137,36 @@ describe('writeAction (03 §3)', () => {
       expect(w.opCount).toBe(MAX_OPS_PER_TX);
     });
     expect(await db.outbox.count()).toBe(MAX_OPS_PER_TX);
+  });
+
+  it('does not coalesce a second edit into an op already in flight', async () => {
+    const db = freshDb();
+    const product = await writeAction(
+      db,
+      (w) =>
+        w.create('products', {
+          name_en: 'Phone X',
+          sku: 'PHO-2',
+          price: 100,
+        }),
+      { now: NOW },
+    );
+    const [first] = await db.outbox.toArray();
+    if (first?.seq === undefined) throw new Error('no outbox op');
+    await db.outbox.update(first.seq, { status: 'sending' });
+    await writeAction(
+      db,
+      (w) => w.update('products', product.id, { price: 200 }),
+      { now: NOW + 1 },
+    );
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops.find((op) => op.seq === first.seq)?.row).toMatchObject({
+      price: 100,
+    });
+    expect(ops.find((op) => op.seq !== first.seq)?.row).toMatchObject({
+      price: 200,
+    });
   });
 
   it('coalesces edits of a pending new row into its create op', async () => {
@@ -328,5 +359,20 @@ describe('caches (02 §3.1, §3.2)', () => {
     expect((await db.party_balances.get(['customer', 'c1']))?.balance).toBe(
       5000,
     );
+  });
+
+  it('discarding a rejected local create removes the row', async () => {
+    const db = freshDb();
+    const product = await writeAction(
+      db,
+      (w) => w.create('products', { name_en: 'New', sku: 'NEW-1', price: 1 }),
+      { now: NOW },
+    );
+    const [op] = await db.outbox.toArray();
+    if (op?.seq === undefined) throw new Error('no outbox op');
+    await db.outbox.update(op.seq, { status: 'failed' });
+    await discardFailed(db, [op.seq]);
+    expect(await db.products.get(product.id)).toBeUndefined();
+    expect(await db.outbox.count()).toBe(0);
   });
 });

@@ -152,6 +152,7 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 | `dayclose.view_expected` | See expected cash before counting (blind count off) | ✔ | ✔ | ✘ |
 | `payment.receive` | Receive udhaar payment | ✔ | ✔ | ✔ |
 | `party.edit` | Create/edit customers and suppliers, credit limits | ✔ | ✔ | create only, no limit edit |
+| hard credit limit | Change a customer's `hard_limit` | ✔ | ✘ | ✘ |
 | `party.delete` | Delete customer/supplier (balance must be 0) | ✔ | ✘ | ✘ |
 | `catalog.edit` | Create/edit products, prices, categories, import, bulk price update, generate barcodes, print barcode labels | ✔ | ✔ | ✘ |
 | `catalog.delete` | Delete products | ✔ | ✘ | ✘ |

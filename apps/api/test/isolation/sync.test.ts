@@ -336,6 +336,7 @@ describe('sync isolation', () => {
         note: mark,
         created_at: now,
       };
+      const saleLine = newId(now);
       const sale = saleOps(shop, shop.till, 1)[0]!.row as Record<
         string,
         unknown
@@ -389,7 +390,7 @@ describe('sync isolation', () => {
           'sale_lines',
           'insert',
           {
-            id: newId(now),
+            id: saleLine,
             sale_id: ids.sale,
             line_no: 1,
             product_id: IDS.product,
@@ -424,12 +425,26 @@ describe('sync isolation', () => {
           tx_id: ids.supplierReturn,
         }),
         op('day_closes', 'insert', dayClose),
+        op(
+          'refund_lines',
+          'insert',
+          {
+            id: newId(now),
+            refund_id: ids.refund,
+            sale_line_id: saleLine,
+            qty_milli: 1000,
+            amount: 1000,
+            restock: 1,
+            created_at: now,
+          },
+          { tx_id: ids.refund },
+        ),
       ];
     };
     const firstA = rows(a, 'A');
     const firstB = rows(b, 'B');
-    await pushOk(a.till, [...firstA.slice(0, 6), firstA[8]!]);
-    await pushOk(b.till, [...firstB.slice(0, 6), firstB[8]!]);
+    await pushOk(a.till, [...firstA.slice(0, 6), firstA[8]!, firstA[9]!]);
+    await pushOk(b.till, [...firstB.slice(0, 6), firstB[8]!, firstB[9]!]);
     await pushOk(a.till, firstA.slice(6, 8));
     await pushOk(b.till, firstB.slice(6, 8));
 
