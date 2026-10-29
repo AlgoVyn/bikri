@@ -150,7 +150,8 @@ bikri/
 │   ├─ ci.yml             lint, typecheck, unit, e2e (on PR)
 │   ├─ deploy.yml         website check + build + wrangler deploy (on main)
 │   ├─ website-guard.yml  nightly + manual: tools/check-website.mjs against the live algovyn.com
-│   └─ backup.yml         nightly D1 export (cron)
+│   ├─ backup.yml         nightly D1 export (cron)
+│   └─ files-backup.yml   weekly R2 file archive (cron)
 ├─ apps/
 │   ├─ pos/               React PWA
 │   │   ├─ index.html  vite.config.ts

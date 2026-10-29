@@ -7,9 +7,8 @@
  *   node tools/backup/retention.mjs [--bucket bikri-backups] [--prefix d1/]
  *     [--today YYYY-MM-DD] [--dry-run]
  */
-const API = 'https://api.cloudflare.com/client/v4';
-
 import { fileURLToPath } from 'node:url';
+import { cloudflareJson, listObjects, objectPath } from './cloudflare.mjs';
 import { backupDate } from './export.mjs';
 
 /** Keys are `d1/YYYY-MM-DD.sql.gz` and `d1/YYYY-MM-DD.manifest.json`. */
@@ -64,53 +63,13 @@ function parseArgs(argv) {
   return out;
 }
 
-async function cloudflare(path, init = {}) {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!account || !token)
-    throw new Error(
-      'CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required',
-    );
-  const res = await fetch(`${API}/accounts/${account}${path}`, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.success) {
-    const message = body?.errors?.[0]?.message ?? res.statusText;
-    throw new Error(`Cloudflare API ${res.status}: ${message}`);
-  }
-  return body;
-}
-
 async function listKeys(bucket, prefix) {
-  const keys = [];
-  let cursor = '';
-  for (let guard = 0; guard < 1000; guard += 1) {
-    const query = new URLSearchParams({ prefix, per_page: '1000' });
-    if (cursor) query.set('cursor', cursor);
-    const page = await cloudflare(
-      `/r2/buckets/${encodeURIComponent(bucket)}/objects?${query.toString()}`,
-    );
-    for (const object of page.result ?? []) keys.push(String(object.key));
-    const cursorNext = page.result_info?.cursor;
-    if (!page.result_info?.is_truncated || !cursorNext) break;
-    cursor = cursorNext;
-  }
-  return keys;
+  const objects = await listObjects(bucket, prefix);
+  return objects.map((object) => String(object.key));
 }
 
 async function deleteKey(bucket, key) {
-  await cloudflare(
-    `/r2/buckets/${encodeURIComponent(bucket)}/objects/${key
-      .split('/')
-      .map(encodeURIComponent)
-      .join('/')}`,
-    { method: 'DELETE' },
-  );
+  await cloudflareJson(objectPath(bucket, key), { method: 'DELETE' });
 }
 
 export async function main(argv = process.argv.slice(2)) {
