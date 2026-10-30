@@ -25,6 +25,7 @@ import {
 } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { rememberListScroll } from '../lib/listScroll.ts';
 import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import {
@@ -502,6 +503,8 @@ function SaleRow({
       <Link
         to="/sales/$id"
         params={{ id: sale.id }}
+        resetScroll={false}
+        onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
         className={`${SALE_GRID} px-2 py-2 pe-12 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''}`}
       >

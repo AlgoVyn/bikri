@@ -18,6 +18,7 @@ import {
 import { getDb } from '../data/db.ts';
 import { categoryName } from '../lib/category.ts';
 import { downloadText } from '../lib/download.ts';
+import { rememberListScroll } from '../lib/listScroll.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { marginText, qtyWithUnit } from './format.ts';
@@ -579,6 +580,8 @@ function ProductRow({
         <Link
           to="/products/$id"
           params={{ id: p.id }}
+          resetScroll={false}
+          onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
           className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
         >

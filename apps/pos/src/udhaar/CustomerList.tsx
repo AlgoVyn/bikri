@@ -18,6 +18,7 @@ import {
   refreshPromises,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
+import { rememberListScroll } from '../lib/listScroll.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -255,6 +256,8 @@ export function UdhaarList({
                 <Link
                   to="/udhaar/$customerId"
                   params={{ customerId: row.customer.id }}
+                  resetScroll={false}
+                  onClick={rememberListScroll}
                   aria-current={
                     row.customer.id === selectedId ? 'page' : undefined
                   }

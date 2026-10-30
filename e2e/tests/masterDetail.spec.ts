@@ -1,7 +1,20 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
 
 // The reference app keeps the list beside the selected row on desktop (screens 08/10/12/13).
+
+async function seedManyProducts(page: Page): Promise<void> {
+  await openReadyShop(page, '/bikri/products');
+  await page.evaluate(
+    (products) => window.__bikriTest?.seedProducts(products),
+    Array.from({ length: 40 }, (_, i) => ({
+      name: `Product ${String(i + 1).padStart(2, '0')}`,
+      price: 100000 + i * 1000,
+      stock: 10,
+    })),
+  );
+  await expect(page.getByTestId('products-master')).toBeVisible();
+}
 test.describe('desktop master–detail', () => {
   test.beforeEach(({ browserName: _b }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop layout');
@@ -35,6 +48,21 @@ test.describe('desktop master–detail', () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test('products: selecting a row deep in the list keeps the scroll position', async ({
+    page,
+  }) => {
+    await seedManyProducts(page);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    await page.locator('main a[href*="/products/"]').last().click();
+    await expect(page.getByTestId('products-detail')).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const detail = await page.getByTestId('products-detail').boundingBox();
+    expect(detail?.y ?? 999).toBeLessThan(200);
+  });
+
   test('udhaar: a customer khata opens beside the list', async ({ page }) => {
     await openReadyShop(page, '/bikri/udhaar');
     await page.evaluate(async () => {
@@ -65,6 +93,19 @@ test.describe('desktop master–detail', () => {
     await expect(page.getByTestId('suppliers-master')).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
+});
+
+test('phone products: selecting a row opens the detail at the top', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await seedManyProducts(page);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.locator('main a[href*="/products/"]').last().click();
+  await expect(page.getByTestId('products-detail')).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
 test('phone sales: one pane at a time', async ({ page }, testInfo) => {

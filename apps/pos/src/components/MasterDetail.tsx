@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useLayoutEffect, useRef } from 'react';
+import { takeListScroll } from '../lib/listScroll.ts';
 
 /**
  * Master–detail workspace (screens 08/10/12/13). Until a row is selected the list uses the
@@ -18,6 +19,37 @@ export function MasterDetail({
   masterTestId?: string;
   detailTestId?: string;
 }) {
+  const masterRef = useRef<HTMLDivElement>(null);
+
+  // List rows keep the page scroll (resetScroll={false}) so desktop selections do not jump.
+  // The list remounts on the detail route and its document height collapses for a frame, so
+  // hold the old height and restore the position before paint. Below xl the detail replaces
+  // the list, so start that pane at its top instead.
+  useLayoutEffect(() => {
+    if (!showDetail) return;
+    if (!window.matchMedia('(min-width: 1280px)').matches) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    const y = takeListScroll();
+    if (y <= 0) return;
+    const root = document.documentElement;
+    const previousMinHeight = root.style.minHeight;
+    root.style.minHeight = `${y + window.innerHeight}px`;
+    window.scrollTo(0, y);
+    let frames = 0;
+    const release = () => {
+      frames += 1;
+      const listHeight = masterRef.current?.scrollHeight ?? 0;
+      if (listHeight >= y || frames > 30) {
+        root.style.minHeight = previousMinHeight;
+        return;
+      }
+      requestAnimationFrame(release);
+    };
+    requestAnimationFrame(release);
+  }, [showDetail]);
+
   return (
     <div
       className={`mx-auto flex w-full max-w-[1720px] flex-col gap-4 p-4 xl:gap-6 xl:p-6 ${
@@ -27,6 +59,7 @@ export function MasterDetail({
       }`}
     >
       <div
+        ref={masterRef}
         className={showDetail ? 'min-w-0 max-xl:hidden' : 'min-w-0'}
         data-testid={masterTestId}
       >

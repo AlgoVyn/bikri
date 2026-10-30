@@ -11,6 +11,7 @@ import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierList, suppliersCsv } from '../data/suppliers.ts';
 import { downloadText } from '../lib/download.ts';
+import { rememberListScroll } from '../lib/listScroll.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -148,6 +149,8 @@ export function SupplierList({
               <Link
                 to="/suppliers/$supplierId"
                 params={{ supplierId: row.supplier.id }}
+                resetScroll={false}
+                onClick={rememberListScroll}
                 aria-current={
                   row.supplier.id === selectedId ? 'page' : undefined
                 }
