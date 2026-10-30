@@ -72,13 +72,9 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
   it('skips voided bills', async () => {
     const db = await readyDb();
     await seedSampleDay(db, '2026-10-27', NOW);
-    const first = await db.sales
-      .where('invoice_seq')
-      .equals(2)
-      .first()
-      .catch(() => undefined);
-    const sales = await db.sales.toArray();
-    const target = first ?? sales.find((s) => s.invoice_seq === 2);
+    const target = (await db.sales.toArray()).find(
+      (sale) => sale.invoice_seq === 2,
+    );
     if (!target) throw new Error('missing');
     await db.sales.update(target.id, { status: 'void' });
     expect(

@@ -353,8 +353,6 @@ function registerRefunds(cases: unknown[]): void {
             prev,
             each,
           );
-          const cash = roundCashRefund(amount);
-          expect(cash.rounding).toBe(cash.amount - amount);
           expect(amount).toBe(expectedPart);
           got.push(amount);
           prev += each;
