@@ -12,6 +12,7 @@ let savedScrollY = 0;
 export function rememberListScroll(): void {
   savedScrollY =
     typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
     window.matchMedia('(min-width: 1280px)').matches
       ? window.scrollY
       : 0;

@@ -27,6 +27,9 @@ export function MasterDetail({
   // the list, so start that pane at its top instead.
   useLayoutEffect(() => {
     if (!showDetail) return;
+    // jsdom (unit tests) has no matchMedia or usable scrollTo; the browser gate is the
+    // two-column breakpoint, not a required feature of every environment.
+    if (typeof window.matchMedia !== 'function') return;
     if (!window.matchMedia('(min-width: 1280px)').matches) {
       window.scrollTo(0, 0);
       return;
