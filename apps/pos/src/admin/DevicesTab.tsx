@@ -416,7 +416,7 @@ function DeviceRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{device.name}</span>
           {device.is_admin ? (
-            <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-[11px] font-medium text-primary-subtle-ink">
+            <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-caption font-medium text-primary-subtle-ink">
               {t('admin.col_admin')}
             </span>
           ) : null}

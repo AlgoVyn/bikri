@@ -136,9 +136,10 @@ export function UdhaarList({
       />
 
       {data ? (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Card
             testid="udhaar-total"
+            className="col-span-2 sm:col-span-1"
             label={t('office.udhaar.total_owed')}
             value={<MoneyText paisa={data.totalOwed} />}
           />
@@ -328,14 +329,16 @@ function Card({
   label,
   value,
   testid,
+  className = '',
 }: {
   label: string;
   value: ReactNode;
   testid?: string;
+  className?: string;
 }) {
   return (
     <div
-      className="rounded-card border border-border bg-surface p-2 sm:p-3"
+      className={`rounded-card border border-border bg-surface p-2 sm:p-3 ${className}`}
       data-testid={testid}
     >
       <p className="text-small text-text-muted">{label}</p>

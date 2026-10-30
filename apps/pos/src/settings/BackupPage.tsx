@@ -12,7 +12,6 @@ import {
 } from '../data/serverExport.ts';
 import {
   buildShopExport,
-  SHOP_EXPORT_TABLES,
   type ShopExportProgress,
 } from '../data/shopExport.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -154,11 +153,9 @@ function BackupContent() {
             {t('office.backup.finished', { filename: done })}
           </p>
         ) : null}
-        <ul className="mt-3 columns-2 text-small text-text-muted">
-          {SHOP_EXPORT_TABLES.map((table) => (
-            <li key={table}>{table}</li>
-          ))}
-        </ul>
+        <p className="mt-3 text-small text-text-muted">
+          {t('office.backup.includes')}
+        </p>
       </section>
 
       <section className="rounded-card border border-border bg-surface p-4">

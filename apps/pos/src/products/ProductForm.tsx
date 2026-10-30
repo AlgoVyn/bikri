@@ -681,7 +681,7 @@ export function ProductFormPage({
             />
             <button
               type="button"
-              className={buttonQuiet}
+              className={`${buttonQuiet} shrink-0 whitespace-nowrap`}
               onClick={async () =>
                 set('sku', await uniqueSku(getDb(), draft.name_en || 'item'))
               }

@@ -62,7 +62,9 @@
   },
   "count": {
     "category": "Category",
+    "counted": "Counted",
     "counted_for": "Counted {{name}}",
+    "difference": "Difference",
     "discard": "Discard count",
     "expected": "Expected",
     "finish": "Finish count",
@@ -407,6 +409,7 @@
     "matches": "Matching products",
     "not_found": "Not found",
     "out_of_stock": "Out of stock",
+    "press_enter": "Press Enter to search",
     "scan_another": "Scan another",
     "search": "Scan or type a name",
     "title": "Price check"

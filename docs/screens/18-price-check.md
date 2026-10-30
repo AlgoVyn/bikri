@@ -10,7 +10,7 @@ Modal from Home / rail / hotkey `Ctrl+Shift+P`. Everyone. Customers often ask "h
 
 ## Layout
 
-Large search/scan field (autofocus). Result card: photo, name (English + Urdu), price (very large), stock ("12 in stock" / "Out of stock" / hidden if not tracked), other barcodes; with `cost.view`: avg cost and margin small. Buttons `Add to cart` (Enter; adds to the active Sell cart), `Scan another` (clears), `Close` (Esc). Unknown barcode: "Not found" + `Add product` (with `catalog.edit`).
+Large search/scan field (autofocus). Typing a name searches automatically after a short pause (a status line says "Press Enter to search" until the result arrives); scanners still commit the exact code on Enter. Result card: photo, name (English + Urdu), price (very large), stock ("12 in stock" / "Out of stock" / hidden if not tracked), other barcodes; with `cost.view`: avg cost and margin small. Buttons `Add to cart` (Enter; adds to the active Sell cart), `Scan another` (clears), `Close` (Esc). Unknown barcode: "Not found" + `Add product` (with `catalog.edit`).
 
 ## Acceptance criteria
 

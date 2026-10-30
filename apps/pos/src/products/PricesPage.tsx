@@ -3,9 +3,10 @@ import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   applyPrices,
@@ -95,10 +96,12 @@ export function PricesPage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <BackLink to="/products" label={t('import.back_to_products')} />
-        <h1 className="me-auto text-h1 font-semibold">{t('prices.title')}</h1>
-      </div>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('import.back_to_products')}
+        icon={<ProductsIcon />}
+        title={t('prices.title')}
+      />
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1" htmlFor={`${id}-cat`}>

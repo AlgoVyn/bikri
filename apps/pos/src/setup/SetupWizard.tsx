@@ -330,7 +330,7 @@ export function SetupWizard() {
         <header className="mb-4 flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+            className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
           >
             <SalesIcon />
           </span>

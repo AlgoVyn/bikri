@@ -22,6 +22,8 @@
 
 [dir="rtl"] .ltr-name {
   text-align: end;
+  /* Latin names do not need the Nastaliq 1.9 line-height; the product list rows are 72 px. */
+  line-height: 1.35;
 }
 
 /* Cards use one soft elevation level; dashed empty states stay flat. */

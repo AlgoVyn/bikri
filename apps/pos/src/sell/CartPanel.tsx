@@ -151,7 +151,7 @@ export function CartPanel(p: CartPanelProps) {
       </ul>
 
       <dl
-        className="flex flex-col gap-1 rounded-card border border-border bg-surface-2/50 p-3"
+        className="flex flex-col gap-0.5 rounded-card border border-border bg-surface-2/50 p-2.5"
         data-testid="cart-totals"
       >
         <Row
@@ -186,7 +186,7 @@ export function CartPanel(p: CartPanelProps) {
             <dt>
               <button
                 type="button"
-                className="inline-flex min-h-11 items-center gap-2 text-primary"
+                className="inline-flex min-h-9 items-center gap-2 text-primary"
                 disabled={cart.lines.length === 0}
                 onClick={p.onBillDiscount}
               >
@@ -233,7 +233,7 @@ export function CartPanel(p: CartPanelProps) {
         ) : null}
       </dl>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
           className={buttonQuiet}
@@ -319,19 +319,22 @@ function LineRow({
     <li
       data-testid="cart-line"
       aria-current={selected || undefined}
-      className={`rounded-card border bg-surface-2/60 p-3 ${selected ? 'border-primary' : 'border-border'}`}
+      className={`rounded-card border bg-surface-2/60 p-2 ${selected ? 'border-primary' : 'border-border'}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
-          className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-start"
+          className="flex min-h-9 min-w-0 flex-1 flex-col justify-center text-start"
           aria-expanded={expanded}
           onClick={() => {
             p.onSelect(line.key);
             p.onExpand(expanded ? null : line.key);
           }}
         >
-          <span className="ltr-name block font-medium" data-testid="line-name">
+          <span
+            className="ltr-name block truncate font-medium"
+            data-testid="line-name"
+          >
             {line.name}
           </span>
           {line.note ? (
@@ -345,7 +348,7 @@ function LineRow({
         </span>
         <button
           type="button"
-          className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
+          className="flex size-9 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
           aria-label={`${t('sell.remove_line')} ${line.name}`}
           title={`${t('sell.remove_line')} ${line.name}`}
           onClick={() => p.onRemoveLine(line.key)}
@@ -356,8 +359,10 @@ function LineRow({
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
+      <div className="mt-1.5 grid grid-cols-3 gap-1.5">
         <QtyInput
+          dense
+          hideLabel
           label={t('ui.qty_label')}
           ariaLabel={t('sell.qty_of', { name: line.name })}
           unit={unit}
@@ -367,17 +372,15 @@ function LineRow({
           }}
         />
         <InlinePrice line={line} onPrice={p.onPriceChange} />
-        <div className="col-span-2 xl:col-span-1">
-          <InlineDiscount
-            line={line}
-            gross={result?.gross ?? 0}
-            onChange={(patch) => p.onChangeLine(line.key, patch)}
-          />
-        </div>
+        <InlineDiscount
+          line={line}
+          gross={result?.gross ?? 0}
+          onChange={(patch) => p.onChangeLine(line.key, patch)}
+        />
       </div>
 
       {hasBadges ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {result && result.discount > 0 ? (
             <span
               className="rounded-full bg-success-subtle px-2 text-small text-success-subtle-ink"
@@ -446,6 +449,7 @@ function InlinePrice({
       }}
     >
       <MoneyInput
+        compact
         label={t('sell.unit_price')}
         value={price}
         onChange={setPrice}
@@ -457,9 +461,11 @@ function InlinePrice({
 /** Compact Rs/% selector that lives inside the discount field. */
 function DiscountTypeToggle({
   type,
+  compact,
   onChange,
 }: {
   type: 'amount' | 'percent';
+  compact?: boolean;
   onChange: (type: 'amount' | 'percent') => void;
 }) {
   const { t } = useTranslation();
@@ -475,7 +481,7 @@ function DiscountTypeToggle({
           key={key}
           type="button"
           aria-pressed={type === key}
-          className={`w-7 text-small font-medium first:rounded-s-control ${
+          className={`${compact ? 'w-6' : 'w-7'} text-small font-medium first:rounded-s-control ${
             type === key
               ? 'bg-primary-subtle text-primary-subtle-ink'
               : 'text-text-muted hover:bg-surface-2'
@@ -510,10 +516,13 @@ function InlineDiscount({
     <div>
       <MoneyInput
         key={type}
+        compact
         label={t('sell.discount')}
         value={line.discount_value || null}
         placeholder="0"
-        leading={<DiscountTypeToggle type={type} onChange={switchType} />}
+        leading={
+          <DiscountTypeToggle compact type={type} onChange={switchType} />
+        }
         onChange={(value) =>
           onChange({ discount_type: type, discount_value: value ?? 0 })
         }

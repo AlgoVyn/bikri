@@ -131,7 +131,8 @@ export function ReceiptPreview({
       data-testid="receipt-preview-card"
       dir="ltr"
     >
-      <figcaption className="mb-2 text-small text-text-muted">
+      {/* The paper stays white in dark mode, so its caption uses the fixed navy token. */}
+      <figcaption className="mb-2 text-small text-brand-navy">
         {t('setup.preview')}
       </figcaption>
       {logoUrl ? (
@@ -143,7 +144,7 @@ export function ReceiptPreview({
       ) : null}
       <pre
         data-testid="receipt-preview"
-        className="overflow-x-auto font-mono text-[10px] leading-tight"
+        className="overflow-x-auto font-mono text-receipt leading-tight"
       >
         {text}
       </pre>

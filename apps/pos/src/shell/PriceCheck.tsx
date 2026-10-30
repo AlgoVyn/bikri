@@ -50,11 +50,41 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
     q: string;
     result: PriceCheckResult;
   } | null>(null);
+  const [searching, setSearching] = useState(false);
   const seq = useRef(0);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Typed names search as you type; scanners still commit on Enter. A stale response is
+  // dropped through the sequence number so fast typing never flashes an old card.
+  useEffect(() => {
+    const q = query.trim();
+    if (q === '') {
+      setShown(null);
+      setSearching(false);
+      return;
+    }
+    if (q.length < 2) {
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      seq.current += 1;
+      const mine = seq.current;
+      void priceCheck(getDb(), q)
+        .then((result) => {
+          if (mine !== seq.current) return;
+          setShown({ q, result });
+        })
+        .finally(() => {
+          if (mine === seq.current) setSearching(false);
+        });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const lookup = async (q: string) => {
     seq.current += 1;
@@ -66,6 +96,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   };
 
   const pick = async (product: MasterRow) => {
+    seq.current += 1;
     const card = await priceCard(getDb(), product);
     setShown({ q: query.trim(), result: { kind: 'found', card } });
     inputRef.current?.focus();
@@ -94,6 +125,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   };
 
   const scanAnother = () => {
+    seq.current += 1;
     setQuery('');
     setShown(null);
     inputRef.current?.focus();
@@ -127,6 +159,12 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
           }}
         />
       </div>
+
+      {query.trim() !== '' && shown?.q !== query.trim() ? (
+        <p className="text-small text-text-muted" role="status">
+          {searching ? t('common.loading') : t('pricecheck.press_enter')}
+        </p>
+      ) : null}
 
       {shown?.result.kind === 'none' ? (
         <div role="status" className="flex flex-col items-start gap-2">
@@ -185,10 +223,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
                 {String(product.name_ur)}
               </p>
             ) : null}
-            <p
-              className="text-[2.75rem] font-bold leading-tight"
-              data-testid="price-card-price"
-            >
+            <p className="text-price font-bold" data-testid="price-card-price">
               <MoneyText paisa={price} />
             </p>
             {card.onHandMilli === null ? null : (

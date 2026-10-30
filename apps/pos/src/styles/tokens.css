@@ -2,10 +2,9 @@
 @import "./fonts.css";
 
 /*
-  Light values live on :root and [data-theme='light'].
-  Dark values live on [data-theme='dark'] and, when the OS asks for dark and
-  the root is not pinned to light, on :root. Tile colours stay the same.
-  Urdu size is set on html only so a 120% rule cannot compound.
+  Light values live once in @theme. Dark values are declared once as --dark-* and aliased by
+  both dark selectors, so the palette has a single source of truth. Tile colours stay the same
+  in both themes. Urdu size is set on html only so a 120% rule cannot compound.
 */
 @theme {
   --spacing: 4px;
@@ -24,6 +23,13 @@
   --text-body--line-height: calc(22 / 15);
   --text-small: calc(13 / 15 * 1rem);
   --text-small--line-height: calc(18 / 13);
+  --text-micro: calc(10 / 15 * 1rem);
+  --text-micro--line-height: 1.2;
+  --text-caption: calc(11 / 15 * 1rem);
+  --text-caption--line-height: 1.35;
+  /* The receipt preview must stay at printed size; it must not follow the Urdu text size. */
+  --text-receipt: 10px;
+  --text-receipt--line-height: 1.25;
   --text-h1: calc(24 / 15 * 1rem);
   --text-h1--line-height: calc(30 / 24);
   --text-h2: calc(18 / 15 * 1rem);
@@ -34,6 +40,9 @@
   --text-total--line-height: calc(34 / 28);
   --text-figure: calc(32 / 15 * 1rem);
   --text-figure--line-height: calc(40 / 32);
+  --text-price: calc(44 / 15 * 1rem);
+  --text-price--line-height: 1.15;
+  --tracking-brand: 0.18em;
   --radius-control: 10px;
   --radius-card: 14px;
   --radius-modal: 18px;
@@ -84,117 +93,103 @@
   --color-t8: #475569;
 }
 
+/* Dark palette values, referenced by both dark selectors below. */
+:root {
+  --dark-rail: #1d3357;
+  --dark-rail-muted: #a9b8ce;
+  --dark-bg: #0f172a;
+  --dark-surface: #1e293b;
+  --dark-surface-2: #273449;
+  --dark-border: #334155;
+  --dark-text: #f1f5f9;
+  --dark-text-muted: #94a3b8;
+  --dark-primary: #4da6ff;
+  --dark-primary-hover: #7dd3fc;
+  --dark-primary-ink: #00385d;
+  --dark-primary-subtle: #00385d;
+  --dark-primary-subtle-ink: #e0f2fe;
+  --dark-accent-ink: #0f172a;
+  --dark-danger: #f87171;
+  --dark-danger-ink: #450a0a;
+  --dark-danger-subtle: #450a0a;
+  --dark-danger-subtle-ink: #fecaca;
+  --dark-warning: #fbbf24;
+  --dark-warning-subtle: #451a03;
+  --dark-warning-subtle-ink: #fde68a;
+  --dark-success: #34d399;
+  --dark-success-subtle: #022c22;
+  --dark-success-subtle-ink: #a7f3d0;
+  --dark-info: #7dd3fc;
+  --dark-info-subtle: #0c2a44;
+  --dark-info-subtle-ink: #e0f2fe;
+}
+
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-2: #f1f5f9;
-  --color-border: #e2e8f0;
-  --color-border-strong: #64748b;
-  --color-text: #0f172a;
-  --color-text-muted: #475569;
-  --color-primary: #006bb3;
-  --color-primary-hover: #005a96;
-  --color-primary-ink: #ffffff;
-  --color-primary-subtle: #e0f2fe;
-  --color-primary-subtle-ink: #00497a;
-  --color-brand-navy: #182e55;
-  --color-rail: #182e55;
-  --color-rail-ink: #f1f5f9;
-  --color-rail-muted: #b8c6db;
-  --color-rail-active: #4bc2bf;
-  --color-accent: #4bc2bf;
-  --color-accent-ink: #182e55;
-  --color-danger: #dc2626;
-  --color-danger-ink: #ffffff;
-  --color-danger-subtle: #fee2e2;
-  --color-danger-subtle-ink: #991b1b;
-  --color-warning: #b45309;
-  --color-warning-subtle: #fef3c7;
-  --color-warning-subtle-ink: #92400e;
-  --color-success: #047857;
-  --color-success-subtle: #d1fae5;
-  --color-success-subtle-ink: #065f46;
-  --color-info: #005a96;
-  --color-info-subtle: #f0f9ff;
-  --color-info-subtle-ink: #00497a;
-  --color-tile-ink: #ffffff;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-rail: #1d3357;
-  --color-rail-ink: #f1f5f9;
-  --color-rail-muted: #a9b8ce;
-  --color-rail-active: #4bc2bf;
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-2: #273449;
-  --color-border: #334155;
-  --color-border-strong: #64748b;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-primary: #4da6ff;
-  --color-primary-hover: #7dd3fc;
-  --color-primary-ink: #00385d;
-  --color-primary-subtle: #00385d;
-  --color-primary-subtle-ink: #e0f2fe;
-  --color-brand-navy: #182e55;
-  --color-accent: #4bc2bf;
-  --color-accent-ink: #0f172a;
-  --color-danger: #f87171;
-  --color-danger-ink: #450a0a;
-  --color-danger-subtle: #450a0a;
-  --color-danger-subtle-ink: #fecaca;
-  --color-warning: #fbbf24;
-  --color-warning-subtle: #451a03;
-  --color-warning-subtle-ink: #fde68a;
-  --color-success: #34d399;
-  --color-success-subtle: #022c22;
-  --color-success-subtle-ink: #a7f3d0;
-  --color-info: #7dd3fc;
-  --color-info-subtle: #0c2a44;
-  --color-info-subtle-ink: #e0f2fe;
-  --color-tile-ink: #ffffff;
+  --color-rail: var(--dark-rail);
+  --color-rail-muted: var(--dark-rail-muted);
+  --color-bg: var(--dark-bg);
+  --color-surface: var(--dark-surface);
+  --color-surface-2: var(--dark-surface-2);
+  --color-border: var(--dark-border);
+  --color-text: var(--dark-text);
+  --color-text-muted: var(--dark-text-muted);
+  --color-primary: var(--dark-primary);
+  --color-primary-hover: var(--dark-primary-hover);
+  --color-primary-ink: var(--dark-primary-ink);
+  --color-primary-subtle: var(--dark-primary-subtle);
+  --color-primary-subtle-ink: var(--dark-primary-subtle-ink);
+  --color-accent-ink: var(--dark-accent-ink);
+  --color-danger: var(--dark-danger);
+  --color-danger-ink: var(--dark-danger-ink);
+  --color-danger-subtle: var(--dark-danger-subtle);
+  --color-danger-subtle-ink: var(--dark-danger-subtle-ink);
+  --color-warning: var(--dark-warning);
+  --color-warning-subtle: var(--dark-warning-subtle);
+  --color-warning-subtle-ink: var(--dark-warning-subtle-ink);
+  --color-success: var(--dark-success);
+  --color-success-subtle: var(--dark-success-subtle);
+  --color-success-subtle-ink: var(--dark-success-subtle-ink);
+  --color-info: var(--dark-info);
+  --color-info-subtle: var(--dark-info-subtle);
+  --color-info-subtle-ink: var(--dark-info-subtle-ink);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-rail: #1d3357;
-    --color-rail-ink: #f1f5f9;
-    --color-rail-muted: #a9b8ce;
-    --color-rail-active: #4bc2bf;
-    --color-bg: #0f172a;
-    --color-surface: #1e293b;
-    --color-surface-2: #273449;
-    --color-border: #334155;
-    --color-border-strong: #64748b;
-    --color-text: #f1f5f9;
-    --color-text-muted: #94a3b8;
-    --color-primary: #4da6ff;
-    --color-primary-hover: #7dd3fc;
-    --color-primary-ink: #00385d;
-    --color-primary-subtle: #00385d;
-    --color-primary-subtle-ink: #e0f2fe;
-    --color-brand-navy: #182e55;
-    --color-accent: #4bc2bf;
-    --color-accent-ink: #0f172a;
-    --color-danger: #f87171;
-    --color-danger-ink: #450a0a;
-    --color-danger-subtle: #450a0a;
-    --color-danger-subtle-ink: #fecaca;
-    --color-warning: #fbbf24;
-    --color-warning-subtle: #451a03;
-    --color-warning-subtle-ink: #fde68a;
-    --color-success: #34d399;
-    --color-success-subtle: #022c22;
-    --color-success-subtle-ink: #a7f3d0;
-    --color-info: #7dd3fc;
-    --color-info-subtle: #0c2a44;
-    --color-info-subtle-ink: #e0f2fe;
-    --color-tile-ink: #ffffff;
+    --color-rail: var(--dark-rail);
+    --color-rail-muted: var(--dark-rail-muted);
+    --color-bg: var(--dark-bg);
+    --color-surface: var(--dark-surface);
+    --color-surface-2: var(--dark-surface-2);
+    --color-border: var(--dark-border);
+    --color-text: var(--dark-text);
+    --color-text-muted: var(--dark-text-muted);
+    --color-primary: var(--dark-primary);
+    --color-primary-hover: var(--dark-primary-hover);
+    --color-primary-ink: var(--dark-primary-ink);
+    --color-primary-subtle: var(--dark-primary-subtle);
+    --color-primary-subtle-ink: var(--dark-primary-subtle-ink);
+    --color-accent-ink: var(--dark-accent-ink);
+    --color-danger: var(--dark-danger);
+    --color-danger-ink: var(--dark-danger-ink);
+    --color-danger-subtle: var(--dark-danger-subtle);
+    --color-danger-subtle-ink: var(--dark-danger-subtle-ink);
+    --color-warning: var(--dark-warning);
+    --color-warning-subtle: var(--dark-warning-subtle);
+    --color-warning-subtle-ink: var(--dark-warning-subtle-ink);
+    --color-success: var(--dark-success);
+    --color-success-subtle: var(--dark-success-subtle);
+    --color-success-subtle-ink: var(--dark-success-subtle-ink);
+    --color-info: var(--dark-info);
+    --color-info-subtle: var(--dark-info-subtle);
+    --color-info-subtle-ink: var(--dark-info-subtle-ink);
   }
 }
 

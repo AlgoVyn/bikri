@@ -677,6 +677,7 @@
       "error": "Export nahi ban saki.",
       "finished": "{{filename}} download ho gayi",
       "hint": "Har table ki zip download karein: JSON restore ke liye, CSV Excel ke liye.",
+      "includes": "Is mein products, barcodes, sales, payments, refunds, udhaar, stock, suppliers, purchases, expenses, cash drawer, day close, staff, devices aur activity shamil hain.",
       "nav_hint": "Is dukan ki mukammal copy download karein",
       "nightly": "Jab yeh till connected ho, Algovyn har raat aap ka data backup karta hai.",
       "no_permission": "Mukammal dukan ki copy sirf malik download kar sakta hai.",

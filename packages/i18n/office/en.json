@@ -677,6 +677,7 @@
       "error": "Could not build the export.",
       "finished": "Downloaded {{filename}}",
       "hint": "Download a zip of every table: JSON is the restore source, CSV is for Excel.",
+      "includes": "Includes products, barcodes, sales, payments, refunds, udhaar, stock, suppliers, purchases, expenses, cash drawer, day closes, staff, devices and activity.",
       "nav_hint": "Download a full copy of this shop",
       "nightly": "When this till is connected, Algovyn backs up your data every night.",
       "no_permission": "Only the owner can download a full shop copy.",

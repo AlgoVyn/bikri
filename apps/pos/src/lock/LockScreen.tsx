@@ -171,7 +171,7 @@ export function LockScreen() {
         >
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+            className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
           >
             <SalesIcon />
           </span>

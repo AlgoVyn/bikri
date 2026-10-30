@@ -1,8 +1,10 @@
-import { Link, Navigate } from '@tanstack/react-router';
+import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   addCategory,
@@ -35,14 +37,12 @@ export function CategoriesPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('categories.title')}
-        </h1>
-        <Link to="/products" className={buttonQuiet}>
-          {t('import.back_to_products')}
-        </Link>
-      </div>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('import.back_to_products')}
+        icon={<ProductsIcon />}
+        title={t('categories.title')}
+      />
       <form
         className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3 sm:flex-row"
         onSubmit={async (e) => {
@@ -84,7 +84,7 @@ export function CategoriesPage() {
         </div>
         <button
           type="submit"
-          className={`${buttonPrimary} sm:self-start`}
+          className={`${buttonPrimary} sm:self-end`}
           disabled={!name.trim()}
         >
           {t('form.add')}

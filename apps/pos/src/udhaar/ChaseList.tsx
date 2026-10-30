@@ -3,9 +3,10 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import {
@@ -77,26 +78,28 @@ export function ChaseList() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <BackLink to="/udhaar" label={t('office.udhaar.back_customers')} />
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.udhaar.chase_title')}
-        </h1>
-        {can('export.data') && data ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() =>
-              downloadText(
-                'bikri-chase.csv',
-                chaseCsv(data, (key) => groupLabel(t, key)),
-              )
-            }
-          >
-            {t('office.udhaar.export_csv')}
-          </button>
-        ) : null}
-      </div>
+      <SubpageHeader
+        backTo="/udhaar"
+        backLabel={t('office.udhaar.back_customers')}
+        icon={<UdhaarIcon />}
+        title={t('office.udhaar.chase_title')}
+        actions={
+          can('export.data') && data ? (
+            <button
+              type="button"
+              className={buttonQuiet}
+              onClick={() =>
+                downloadText(
+                  'bikri-chase.csv',
+                  chaseCsv(data, (key) => groupLabel(t, key)),
+                )
+              }
+            >
+              {t('office.udhaar.export_csv')}
+            </button>
+          ) : null
+        }
+      />
 
       {data ? (
         <p

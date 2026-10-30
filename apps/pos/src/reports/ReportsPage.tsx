@@ -502,28 +502,28 @@ function SummaryTab({
     summary.paymentMix.bank_wallet !== 0;
   return (
     <>
-      <ul className="flex flex-wrap justify-center gap-3">
-        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <li className="min-w-0">
           <Card
             label={t('office.reports.sold')}
             testId="report-sold"
             value={<MoneyText paisa={summary.sold} />}
           />
         </li>
-        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+        <li className="min-w-0">
           <Card
             label={t('office.reports.bills')}
             testId="report-bills"
             value={summary.bills}
           />
         </li>
-        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+        <li className="min-w-0">
           <Card
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
           />
         </li>
-        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+        <li className="min-w-0">
           <Card
             label={t('office.reports.expenses')}
             value={<MoneyText paisa={summary.expenses} />}
@@ -531,20 +531,20 @@ function SummaryTab({
         </li>
         {cost ? (
           <>
-            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+            <li className="min-w-0">
               <Card
                 label={t('office.reports.gross_profit')}
                 testId="report-profit"
                 value={<MoneyText paisa={summary.grossProfit} />}
               />
             </li>
-            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+            <li className="min-w-0">
               <Card
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
               />
             </li>
-            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+            <li className="min-w-0">
               <Card
                 label={t('office.reports.margin')}
                 value={percentText(summary.marginBp)}
@@ -553,7 +553,7 @@ function SummaryTab({
           </>
         ) : null}
         {bundle.taxEnabled || summary.tax !== 0 ? (
-          <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
+          <li className="min-w-0">
             <Card
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}

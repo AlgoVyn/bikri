@@ -168,7 +168,7 @@ export function RestoreTab({
                 >
                   <span
                     aria-hidden="true"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full bg-surface/70 text-[11px] font-semibold"
+                    className="flex size-5 shrink-0 items-center justify-center rounded-full bg-surface/70 text-caption font-semibold"
                   >
                     {done ? '✓' : index + 1}
                   </span>

@@ -195,16 +195,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <span
             aria-hidden="true"
-            className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+            className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
           >
             <SalesIcon />
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rail-muted">
+          <span className="text-micro font-semibold uppercase tracking-[0.18em] text-rail-muted">
             {t('common.app_name')}
           </span>
           {shopName ? (
             <span
-              className="line-clamp-2 max-w-full text-center text-[10px] leading-tight text-rail-muted"
+              className="line-clamp-2 max-w-full text-center text-micro leading-tight text-rail-muted"
               title={shopName}
               data-testid="rail-shop-name"
             >

@@ -527,7 +527,9 @@ function ProductRow({
             {selected ? '✓' : ''}
           </span>
           <span className="min-w-0">
-            <span className="ltr-name block truncate font-medium">
+            <span
+              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
+            >
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small text-text-muted">
@@ -536,7 +538,8 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {categoryName(row.category, i18n.language)}
+              {categoryName(row.category, i18n.language) ||
+                t('form.no_category')}
             </span>
           )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
@@ -585,7 +588,9 @@ function ProductRow({
             color={row.category?.color}
           />
           <span className="min-w-0">
-            <span className="ltr-name block truncate font-medium">
+            <span
+              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
+            >
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small text-text-muted">
@@ -594,7 +599,8 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {categoryName(row.category, i18n.language)}
+              {categoryName(row.category, i18n.language) ||
+                t('form.no_category')}
             </span>
           )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">

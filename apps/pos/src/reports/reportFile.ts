@@ -1,5 +1,6 @@
 import type { ReportBundle } from '../data/reportBundle.ts';
 import { formatShopMoney } from '../lib/money';
+import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
 import { shortDate } from './format.ts';
 
@@ -48,15 +49,15 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas not available');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = CANVAS.paper;
   ctx.fillRect(0, 0, WIDTH, height);
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = CANVAS.ink;
   ctx.font = 'bold 40px Inter, sans-serif';
   ctx.fillText(meta.shopName, MARGIN, 70);
   ctx.font = 'bold 28px Inter, sans-serif';
   ctx.fillText(labels.title, MARGIN, 132);
   ctx.font = '20px Inter, sans-serif';
-  ctx.fillStyle = '#475569';
+  ctx.fillStyle = CANVAS.muted;
   ctx.fillText(
     `${labels.range}: ${shortDate(meta.from, meta.lang)} – ${shortDate(meta.to, meta.lang)}`,
     MARGIN,
@@ -94,18 +95,18 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     const row = Math.floor(index / 4);
     const x = MARGIN + column * (cardWidth + 10);
     const y = 240 + row * 86;
-    ctx.fillStyle = '#f1f5f9';
+    ctx.fillStyle = CANVAS.surface2;
     ctx.fillRect(x, y, cardWidth, 72);
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = CANVAS.muted;
     ctx.font = '16px Inter, sans-serif';
     ctx.fillText(label, x + 14, y + 26);
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = CANVAS.ink;
     ctx.font = 'bold 22px Inter, sans-serif';
     ctx.fillText(value, x + 14, y + 56);
   });
 
   const chartTop = 240 + Math.ceil(cards.length / 4) * 86 + 30;
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = CANVAS.ink;
   ctx.font = 'bold 22px Inter, sans-serif';
   ctx.fillText(
     meta.showProfit
@@ -125,7 +126,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   const chartW = WIDTH - MARGIN * 2;
   const barW = Math.max(1, Math.min(14, chartW / Math.max(1, days) - 1));
   const zero = chartY + ((max - 0) / span) * chartHeight;
-  ctx.strokeStyle = '#cbd5e1';
+  ctx.strokeStyle = CANVAS.rule;
   ctx.beginPath();
   ctx.moveTo(chartX, zero);
   ctx.lineTo(chartX + chartW, zero);
@@ -134,7 +135,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     const x =
       chartX + (days === 1 ? chartW / 2 : (index / (days - 1)) * chartW);
     const y = chartY + ((max - day.sold) / span) * chartHeight;
-    ctx.fillStyle = '#006bb3';
+    ctx.fillStyle = CANVAS.primary;
     if (day.sold >= 0) {
       ctx.fillRect(x - barW / 2, y, barW, Math.max(0, zero - y));
     } else {
@@ -142,7 +143,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     }
   });
   if (meta.showProfit) {
-    ctx.strokeStyle = '#047857';
+    ctx.strokeStyle = CANVAS.success;
     ctx.lineWidth = 2;
     ctx.beginPath();
     summary.daily.forEach((day, index) => {
@@ -156,7 +157,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     ctx.lineWidth = 1;
   }
   if (summary.daily.length > 0) {
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = CANVAS.muted;
     ctx.font = '14px Inter, sans-serif';
     const first = summary.daily[0];
     const last = summary.daily.at(-1);
@@ -177,7 +178,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   }
 
   const mixTop = chartY + chartHeight + 56;
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = CANVAS.ink;
   ctx.font = 'bold 22px Inter, sans-serif';
   ctx.fillText(labels.paymentMix, MARGIN, mixTop);
   ctx.font = '18px Inter, sans-serif';
@@ -190,14 +191,14 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   methods.forEach(([label, value], index) => {
     const x = MARGIN + index * 280;
     const y = mixTop + 34;
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = CANVAS.muted;
     ctx.fillText(label, x, y);
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = CANVAS.ink;
     ctx.font = 'bold 18px Inter, sans-serif';
     ctx.fillText(formatShopMoney(value), x, y + 26);
     ctx.font = '18px Inter, sans-serif';
   });
-  ctx.fillStyle = '#475569';
+  ctx.fillStyle = CANVAS.muted;
   ctx.fillText(
     `${labels.udhaarGiven}: ${formatShopMoney(summary.udhaarGiven)}   ·   ${labels.udhaarReceived}: ${formatShopMoney(summary.udhaarReceived)}`,
     MARGIN,

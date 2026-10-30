@@ -306,6 +306,50 @@ test.describe('Sell (T-016)', () => {
     await page.getByLabel('زبان').selectOption('en');
   });
 
+  test('two cart lines stay fully visible on phone and in Urdu', async ({
+    page,
+  }) => {
+    await openSell(page, [
+      { name: 'Galaxy A15', price: 4200000, stock: 5 },
+      { name: 'Cable', price: 149900, stock: 3 },
+    ]);
+    await tile(page, 'Galaxy A15').click();
+    await tile(page, 'Cable').click();
+    await showCart(page);
+
+    const measure = () =>
+      page.evaluate(() => {
+        const lines = [
+          ...document.querySelectorAll('[data-testid="cart-line"]'),
+        ];
+        const list = lines[0]?.parentElement;
+        const listBox = list?.getBoundingClientRect();
+        const last = lines.at(-1)?.getBoundingClientRect();
+        return {
+          count: lines.length,
+          scrollHeight: list?.scrollHeight ?? 0,
+          clientHeight: list?.clientHeight ?? 0,
+          lastBottom: last?.bottom ?? 0,
+          listBottom: listBox?.bottom ?? 0,
+        };
+      });
+
+    const expectFits = (m: Awaited<ReturnType<typeof measure>>) => {
+      expect(m.count).toBe(2);
+      expect(m.scrollHeight).toBeLessThanOrEqual(m.clientHeight + 1);
+      expect(m.lastBottom).toBeLessThanOrEqual(m.listBottom + 1);
+    };
+
+    expectFits(await measure());
+
+    if (isPhone(page)) await showProducts(page);
+    await page.getByLabel(/Language|زبان/).selectOption('ur');
+    await showCart(page);
+    expectFits(await measure());
+    if (isPhone(page)) await showProducts(page);
+    await page.getByLabel(/Language|زبان/).selectOption('en');
+  });
+
   test('line price and discount are editable without opening the detail panel', async ({
     page,
   }) => {

@@ -143,6 +143,10 @@ export function DevicesPage() {
   const staffId = staff ? String(staff.id) : null;
   const { run, dialog } = useShopAdmin(db, staffId);
   const me = useLiveQuery(() => deviceInfo(db), [db]);
+  const enrolled = useLiveQuery(
+    async () => Boolean((await db.kv.get('device_token'))?.value),
+    [db],
+  );
   const branches =
     useLiveQuery(
       async () => (await db.branches.toArray()).filter((b) => !b.deleted_at),
@@ -199,8 +203,9 @@ export function DevicesPage() {
   }, [db, staffId]);
 
   useEffect(() => {
-    if (online && staffId && me?.is_admin && role === 'owner') void guard(load);
-  }, [online, staffId, me?.is_admin, role, guard, load]);
+    if (online && enrolled && staffId && me?.is_admin && role === 'owner')
+      void guard(load);
+  }, [online, enrolled, staffId, me?.is_admin, role, guard, load]);
 
   if (support) {
     return (
@@ -252,6 +257,9 @@ export function DevicesPage() {
         <p role="alert" className="text-danger">
           {error}
         </p>
+      ) : null}
+      {enrolled === false ? (
+        <p className="text-small text-text-muted">{t('owner.not_enrolled')}</p>
       ) : null}
 
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">

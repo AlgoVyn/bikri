@@ -1,4 +1,5 @@
 import { formatShopMoney } from '../lib/money';
+import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
 
 export type StatementFileRow = {
@@ -44,9 +45,9 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas not available');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = CANVAS.paper;
   ctx.fillRect(0, 0, WIDTH, height);
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = CANVAS.ink;
   ctx.font = 'bold 38px Inter, sans-serif';
   ctx.fillText(meta.shopName, MARGIN, 70);
   ctx.font = 'bold 28px Inter, sans-serif';
@@ -65,9 +66,9 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
     194,
   );
   ctx.font = '18px Inter, sans-serif';
-  ctx.fillStyle = '#475569';
+  ctx.fillStyle = CANVAS.muted;
   ctx.fillText(meta.labels.asOf, MARGIN, 228);
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = CANVAS.ink;
 
   const headerY = 270;
   const cols = {
@@ -85,7 +86,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   ctx.fillText(meta.labels.credit, cols.credit, headerY);
   ctx.fillText(meta.labels.balance, cols.balance, headerY);
   ctx.textAlign = 'left';
-  ctx.strokeStyle = '#cbd5e1';
+  ctx.strokeStyle = CANVAS.rule;
   ctx.beginPath();
   ctx.moveTo(MARGIN, headerY + 10);
   ctx.lineTo(WIDTH - MARGIN, headerY + 10);

@@ -62,7 +62,9 @@
   },
   "count": {
     "category": "Category",
+    "counted": "Ginti",
     "counted_for": "Ginti {{name}}",
+    "difference": "Farq",
     "discard": "Ginti khatam karein",
     "expected": "Mutawaqqa",
     "finish": "Ginti mukammal karein",
@@ -407,6 +409,7 @@
     "matches": "Milti julti products",
     "not_found": "Nahin mila",
     "out_of_stock": "Stock khatam",
+    "press_enter": "Talash ke liye Enter dabayen",
     "scan_another": "Agla scan karein",
     "search": "Scan karein ya naam likhein",
     "title": "Qeemat dekhein"

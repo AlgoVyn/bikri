@@ -46,15 +46,15 @@ export function AdminShell() {
           >
             <span
               aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+              className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
             >
               <SalesIcon />
             </span>
             <span className="min-w-0">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-rail-ink">
+              <span className="block text-caption font-semibold uppercase tracking-[0.18em] text-rail-ink">
                 {t('common.app_name')}
               </span>
-              <span className="block truncate text-[11px] text-rail-muted">
+              <span className="block truncate text-caption text-rail-muted">
                 {t('admin.title')}
               </span>
             </span>
@@ -75,7 +75,7 @@ export function AdminShell() {
               </Link>
             ))}
           </nav>
-          <p className="flex items-center gap-2 border-t border-white/10 px-4 py-3 text-[11px] text-rail-muted">
+          <p className="flex items-center gap-2 border-t border-white/10 px-4 py-3 text-caption text-rail-muted">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-accent"
@@ -89,7 +89,7 @@ export function AdminShell() {
               <Link to="/admin" className="flex items-center gap-2 lg:hidden">
                 <span
                   aria-hidden="true"
-                  className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+                  className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
                 >
                   <SalesIcon />
                 </span>

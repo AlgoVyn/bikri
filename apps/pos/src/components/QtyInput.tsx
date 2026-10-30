@@ -6,7 +6,7 @@ import {
 } from '@bikri/core';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from './classes.ts';
+import { buttonQuiet, buttonQuietDense } from './classes.ts';
 
 const STEP_MILLI = 1000;
 
@@ -22,6 +22,8 @@ export function QtyInput({
   value,
   onChange,
   name,
+  dense = false,
+  hideLabel = false,
 }: {
   id?: string;
   label: string;
@@ -31,6 +33,10 @@ export function QtyInput({
   value: number | null;
   onChange: (milli: number | null) => void;
   name?: string;
+  /** 36 px controls for dense rows (cart lines, stock count, labels). */
+  dense?: boolean;
+  /** Keep the label for assistive tech only; the row already gives the context. */
+  hideLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -55,13 +61,21 @@ export function QtyInput({
 
   return (
     <div>
-      <label htmlFor={inputId} className="mb-1 block text-small text-text">
+      <label
+        htmlFor={inputId}
+        className={hideLabel ? 'sr-only' : 'mb-1 block text-small text-text'}
+      >
         {label}
       </label>
-      <div dir="ltr" className="flex items-center gap-2">
+      <div
+        dir="ltr"
+        className={
+          dense ? 'flex items-center gap-1' : 'flex items-center gap-2'
+        }
+      >
         <button
           type="button"
-          className={buttonQuiet}
+          className={dense ? buttonQuietDense : buttonQuiet}
           aria-label={t('ui.qty_decrease')}
           onClick={() => {
             step(-1);
@@ -75,7 +89,7 @@ export function QtyInput({
           aria-label={ariaLabel}
           inputMode={qtyAllowsDecimals(unit) ? 'decimal' : 'numeric'}
           autoComplete="off"
-          className="h-11 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-3 text-center font-mono text-body text-text outline-none"
+          className={`${dense ? 'h-9 px-1.5 text-small' : 'h-11 px-3 text-body'} min-w-0 flex-1 rounded-control border border-border-strong bg-surface text-center font-mono text-text outline-none`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
@@ -104,7 +118,7 @@ export function QtyInput({
         />
         <button
           type="button"
-          className={buttonQuiet}
+          className={dense ? buttonQuietDense : buttonQuiet}
           aria-label={t('ui.qty_increase')}
           onClick={() => {
             step(1);

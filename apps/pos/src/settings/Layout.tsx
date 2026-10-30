@@ -1,7 +1,7 @@
-import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsIcon } from '../components/icons.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { SettingsNav } from './SettingsNav.tsx';
 
@@ -64,31 +64,12 @@ export function SettingsPageLayout({
   return (
     <SettingsSplit>
       <div className="flex min-w-0 flex-col gap-4">
-        <header className="flex flex-wrap items-start gap-3">
-          <Link
-            to="/settings"
-            activeOptions={{ exact: true }}
-            aria-label={t('common.back')}
-            title={t('common.back')}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2 active:bg-surface-2"
-          >
-            <span
-              aria-hidden="true"
-              className="text-title leading-none rtl:rotate-180"
-            >
-              ‹
-            </span>
-          </Link>
-          <span
-            aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted"
-          >
-            {icon ?? <SettingsIcon />}
-          </span>
-          <h1 className="min-w-0 flex-1 pt-1.5 text-h1 font-semibold">
-            {title}
-          </h1>
-        </header>
+        <SubpageHeader
+          backTo="/settings"
+          backLabel={t('common.back')}
+          icon={icon ?? <SettingsIcon />}
+          title={title}
+        />
         {children}
       </div>
     </SettingsSplit>

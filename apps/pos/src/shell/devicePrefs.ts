@@ -1,5 +1,6 @@
 import type { BikriDb } from '@bikri/db';
 import { getKv, setKv } from '../data/kv.ts';
+import { BROWSER_CHROME } from '../lib/palette.ts';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 export type TextSizePref = '100' | '115' | '130';
@@ -73,7 +74,10 @@ function applyThemeColor(theme: ThemePref): void {
     (theme === 'system' &&
       typeof matchMedia !== 'undefined' &&
       matchMedia('(prefers-color-scheme: dark)').matches);
-  meta.setAttribute('content', dark ? '#0f172a' : '#006BB3');
+  meta.setAttribute(
+    'content',
+    dark ? BROWSER_CHROME.dark : BROWSER_CHROME.light,
+  );
 }
 
 export function applyStoredTheme(): void {

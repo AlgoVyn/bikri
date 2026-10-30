@@ -195,7 +195,24 @@ function ShopForm() {
           <legend className="mb-1 text-small">
             {t('setup.business_type')}
           </legend>
-          <div className="flex flex-wrap gap-2">
+          <select
+            className={`${field} sm:hidden`}
+            aria-label={t('setup.business_type')}
+            value={form.business_type}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                business_type: event.target.value,
+              })
+            }
+          >
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {t(`setup.biz.${type}`)}
+              </option>
+            ))}
+          </select>
+          <div className="hidden flex-wrap gap-2 sm:flex">
             {BUSINESS_TYPES.map((type) => (
               <button
                 key={type}

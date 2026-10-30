@@ -258,9 +258,9 @@ function LabelsDialogContent({
         {rowsWithProducts.map((row) => (
           <li
             key={row.productId}
-            className="flex flex-wrap items-center gap-2 p-2"
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 p-2 sm:grid-cols-[minmax(0,1fr)_10rem_9rem]"
           >
-            <span className="min-w-0 flex-[2_1_12rem]">
+            <span className="col-span-2 min-w-0 sm:col-span-1">
               <span className="block truncate font-medium">
                 {labelName(row.product)}
               </span>
@@ -268,24 +268,28 @@ function LabelsDialogContent({
                 {row.barcode ?? t('office.labels.no_barcode')}
               </span>
             </span>
-            {row.barcode ? (
-              <MoneyText paisa={Number(row.product.price ?? 0)} />
-            ) : can('catalog.edit') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                onClick={() => void generate(row.product)}
-              >
-                {t('office.labels.generate')}
-              </button>
-            ) : (
-              <span className="text-small text-text-muted">
-                {t('office.labels.ask_manager')}
-              </span>
-            )}
-            <div className="w-28">
+            <span className="justify-self-start sm:justify-self-end">
+              {row.barcode ? (
+                <MoneyText paisa={Number(row.product.price ?? 0)} />
+              ) : can('catalog.edit') ? (
+                <button
+                  type="button"
+                  className={`${buttonQuiet} whitespace-nowrap`}
+                  onClick={() => void generate(row.product)}
+                >
+                  {t('office.labels.generate')}
+                </button>
+              ) : (
+                <span className="text-small text-text-muted">
+                  {t('office.labels.ask_manager')}
+                </span>
+              )}
+            </span>
+            <div className="w-32 justify-self-end sm:w-36">
               <QtyInput
-                label={`${t('office.labels.copies')} ${labelName(row.product)}`}
+                dense
+                label={t('office.labels.copies')}
+                ariaLabel={`${t('office.labels.copies')} ${labelName(row.product)}`}
                 unit="pc"
                 value={row.copies * 1000}
                 onChange={(value) =>

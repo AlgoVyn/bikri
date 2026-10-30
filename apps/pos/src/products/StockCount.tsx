@@ -4,9 +4,10 @@ import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { findByCode } from '../data/cart.ts';
 import { ledgerContext, listCategories } from '../data/catalog.ts';
@@ -60,10 +61,12 @@ export function StockCountPage() {
   if (!draft) {
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <BackLink to="/products" label={t('import.back_to_products')} />
-          <h1 className="me-auto text-h1 font-semibold">{t('count.title')}</h1>
-        </div>
+        <SubpageHeader
+          backTo="/products"
+          backLabel={t('import.back_to_products')}
+          icon={<ProductsIcon />}
+          title={t('count.title')}
+        />
         <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 font-medium">{t('count.scope')}</legend>
@@ -140,7 +143,12 @@ export function StockCountPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <h1 className="text-h1 font-semibold">{t('count.title')}</h1>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('import.back_to_products')}
+        icon={<ProductsIcon />}
+        title={t('count.title')}
+      />
       <p className="text-text-muted" data-testid="count-progress">
         {t('count.progress', {
           counted,
@@ -177,37 +185,50 @@ export function StockCountPage() {
             <li
               key={p.id}
               data-testid="count-row"
-              className="grid grid-cols-2 items-end gap-2 p-3 sm:grid-cols-4"
+              className="flex flex-col gap-2 p-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem_minmax(11rem,13rem)_6rem] sm:items-start sm:gap-3"
             >
-              <span className="col-span-2 font-medium sm:col-span-1">
-                {String(p.name_en)}
-              </span>
-              <span className="text-small">
-                {t('count.expected')}{' '}
-                <bdi dir="ltr" data-testid="count-expected">
+              <span className="font-medium">{String(p.name_en)}</span>
+              <span className="flex items-baseline gap-2 text-small sm:block">
+                <span className="text-text-muted sm:mb-1 sm:block">
+                  {t('count.expected')}
+                </span>
+                <bdi
+                  dir="ltr"
+                  className="font-mono sm:flex sm:h-9 sm:items-center"
+                  data-testid="count-expected"
+                >
                   {formatQtyFromMilli(expected, unit)}
                 </bdi>
               </span>
               <QtyInput
-                label={t('count.counted_for', { name: String(p.name_en) })}
+                dense
+                label={t('count.counted')}
+                ariaLabel={t('count.counted_for', { name: String(p.name_en) })}
                 unit={unit}
                 value={value}
                 onChange={(v) => void setCounted(draft, p.id, v)}
               />
-              <span className="text-small" data-testid="count-diff">
-                {diff === null ? (
-                  '—'
-                ) : (
-                  <bdi
-                    dir="ltr"
-                    className={
-                      diff < 0 ? 'text-danger' : diff > 0 ? 'text-success' : ''
-                    }
-                  >
-                    {diff > 0 ? '+' : diff < 0 ? '−' : ''}
-                    {formatQtyFromMilli(Math.abs(diff), unit)}
-                  </bdi>
-                )}
+              <span className="flex items-baseline gap-2 text-small sm:block">
+                <span className="text-text-muted sm:mb-1 sm:block">
+                  {t('count.difference')}
+                </span>
+                <bdi
+                  dir="ltr"
+                  className={`font-mono sm:flex sm:h-9 sm:items-center ${
+                    diff === null
+                      ? ''
+                      : diff < 0
+                        ? 'text-danger'
+                        : diff > 0
+                          ? 'text-success'
+                          : ''
+                  }`}
+                  data-testid="count-diff"
+                >
+                  {diff === null
+                    ? '—'
+                    : `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${formatQtyFromMilli(Math.abs(diff), unit)}`}
+                </bdi>
               </span>
             </li>
           );

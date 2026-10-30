@@ -1,9 +1,10 @@
 import { Link, Navigate } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -114,10 +115,12 @@ export function ImportPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <BackLink to="/products" label={t('import.back_to_products')} />
-        <h1 className="me-auto text-h1 font-semibold">{t('import.title')}</h1>
-      </div>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('import.back_to_products')}
+        icon={<ProductsIcon />}
+        title={t('import.title')}
+      />
       <ol
         className="flex flex-wrap items-center gap-x-2 gap-y-1"
         aria-label={t('import.steps')}

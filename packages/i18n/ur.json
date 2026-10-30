@@ -62,7 +62,9 @@
   },
   "count": {
     "category": "کیٹیگری",
+    "counted": "گنتی",
     "counted_for": "گنتی {{name}}",
+    "difference": "فرق",
     "discard": "گنتی ختم کریں",
     "expected": "متوقع",
     "finish": "گنتی مکمل کریں",
@@ -407,6 +409,7 @@
     "matches": "ملتی جلتی پروڈکٹس",
     "not_found": "نہیں ملا",
     "out_of_stock": "اسٹاک ختم",
+    "press_enter": "تلاش کے لیے Enter دبائیں",
     "scan_another": "اگلا اسکین کریں",
     "search": "اسکین کریں یا نام لکھیں",
     "title": "قیمت دیکھیں"
