@@ -1,5 +1,5 @@
 import { normaliseNumericText, parseMoneyToPaisa } from '@bikri/core';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const TRUE_MINUS = '\u2212';
@@ -57,6 +57,7 @@ export function MoneyInput({
   allowNegative = false,
   large = false,
   name,
+  trailing,
 }: {
   id?: string;
   label: string;
@@ -66,6 +67,8 @@ export function MoneyInput({
   /** Taller, larger field for the amount that matters (e.g. cash received). */
   large?: boolean;
   name?: string;
+  /** Small control beside the label (e.g. the Rs/% switch on a line discount). */
+  trailing?: ReactNode;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -80,9 +83,12 @@ export function MoneyInput({
 
   return (
     <div>
-      <label htmlFor={inputId} className="mb-1 block text-small text-text">
-        {label}
-      </label>
+      <div className="mb-1 flex items-center justify-between gap-1">
+        <label htmlFor={inputId} className="block text-small text-text">
+          {label}
+        </label>
+        {trailing}
+      </div>
       <div
         dir="ltr"
         className={`flex items-center gap-2 rounded-control border border-border-strong bg-surface px-3 ${large ? 'h-14' : 'h-11'}`}

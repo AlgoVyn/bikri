@@ -1,8 +1,14 @@
 import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
 import type { Cart, CartLine } from '@bikri/db';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  fieldClass,
+} from '../components/classes.ts';
 import { SellIcon, UdhaarIcon } from '../components/icons.tsx';
+import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import {
@@ -13,7 +19,7 @@ import {
   type ShopMoney,
 } from '../data/cart.ts';
 import { formatShopMoney } from '../lib/money';
-import { LineEditor } from './LineEditor.tsx';
+import { LineEditor, percentToBp } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
 
 export type CartPanelProps = {
@@ -335,23 +341,43 @@ function LineRow({
             {line.note ? <span className="ms-2">· {line.note}</span> : null}
           </span>
         </button>
-        <span className="pt-2 font-medium" data-testid="line-total">
+        <span className="shrink-0 pt-2 font-medium" data-testid="line-total">
           <MoneyText paisa={result?.net ?? 0} />
         </span>
+        <button
+          type="button"
+          className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
+          aria-label={`${t('sell.remove_line')} ${line.name}`}
+          title={`${t('sell.remove_line')} ${line.name}`}
+          onClick={() => p.onRemoveLine(line.key)}
+        >
+          <span aria-hidden="true" className="text-title leading-none">
+            ×
+          </span>
+        </button>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="w-44">
-          <QtyInput
-            label={t('ui.qty_label')}
-            ariaLabel={t('sell.qty_of', { name: line.name })}
-            unit={unit}
-            value={line.qty_milli}
-            onChange={(milli) => {
-              if (milli !== null)
-                p.onChangeLine(line.key, { qty_milli: milli });
-            }}
+
+      <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
+        <QtyInput
+          label={t('ui.qty_label')}
+          ariaLabel={t('sell.qty_of', { name: line.name })}
+          unit={unit}
+          value={line.qty_milli}
+          onChange={(milli) => {
+            if (milli !== null) p.onChangeLine(line.key, { qty_milli: milli });
+          }}
+        />
+        <InlinePrice line={line} onPrice={p.onPriceChange} />
+        <div className="col-span-2 xl:col-span-1">
+          <InlineDiscount
+            line={line}
+            gross={result?.gross ?? 0}
+            onChange={(patch) => p.onChangeLine(line.key, patch)}
           />
         </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {result && result.discount > 0 ? (
           <span
             className="rounded-full bg-success-subtle px-2 text-small text-success-subtle-ink"
@@ -379,17 +405,130 @@ function LineRow({
           </span>
         ) : null}
       </div>
+
       {expanded ? (
         <LineEditor
           line={line}
-          gross={result?.gross ?? 0}
           revenue={result?.revenue ?? 0}
           showCost={p.showCost}
           onChange={(patch) => p.onChangeLine(line.key, patch)}
-          onPrice={(price) => p.onPriceChange(line, price)}
-          onRemove={() => p.onRemoveLine(line.key)}
         />
       ) : null}
     </li>
+  );
+}
+
+/** Price override directly on the line; commit on blur or Enter. */
+function InlinePrice({
+  line,
+  onPrice,
+}: {
+  line: CartLine;
+  onPrice: (line: CartLine, price: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [price, setPrice] = useState<number | null>(line.unit_price);
+  useEffect(() => {
+    setPrice(line.unit_price);
+  }, [line.unit_price]);
+  const commit = () => {
+    if (price !== null && price !== line.unit_price) onPrice(line, price);
+  };
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: commits the price when focus leaves the field
+    <div
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        commit();
+      }}
+    >
+      <MoneyInput
+        label={t('sell.unit_price')}
+        value={price}
+        onChange={setPrice}
+      />
+    </div>
+  );
+}
+
+/** Line discount directly on the line, with a compact Rs/% switch. */
+function InlineDiscount({
+  line,
+  gross,
+  onChange,
+}: {
+  line: CartLine;
+  gross: number;
+  onChange: (patch: Partial<CartLine>) => void;
+}) {
+  const { t } = useTranslation();
+  const type = line.discount_type ?? 'amount';
+  const pctId = useId();
+  const [pct, setPct] = useState(
+    type === 'percent' && line.discount_value
+      ? String(line.discount_value / 100)
+      : '',
+  );
+  const overMax = type === 'amount' && line.discount_value > gross;
+  const switchType = () => {
+    const next = type === 'amount' ? 'percent' : 'amount';
+    setPct('');
+    onChange({ discount_type: next, discount_value: 0 });
+  };
+  const toggle = (
+    <button
+      type="button"
+      className="min-h-6 shrink-0 rounded px-1 text-small font-medium text-primary underline"
+      aria-label={t('sell.discount_type')}
+      title={t('sell.discount_type')}
+      onClick={switchType}
+    >
+      {type === 'amount' ? '%' : 'Rs'}
+    </button>
+  );
+  if (type === 'amount') {
+    return (
+      <>
+        <MoneyInput
+          label={t('sell.line_discount')}
+          value={line.discount_value || null}
+          trailing={toggle}
+          onChange={(value) =>
+            onChange({ discount_type: 'amount', discount_value: value ?? 0 })
+          }
+        />
+        {overMax ? (
+          <p className="mt-1 text-small text-danger" data-testid="discount-max">
+            {t('sell.discount_max', { amount: formatShopMoney(gross) })}
+          </p>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="mb-1 flex items-center justify-between gap-1">
+        <label htmlFor={pctId} className="text-small text-text">
+          {t('sell.line_discount_pct')}
+        </label>
+        {toggle}
+      </div>
+      <input
+        id={pctId}
+        inputMode="decimal"
+        dir="ltr"
+        className={fieldClass}
+        value={pct}
+        onChange={(event) => {
+          setPct(event.target.value);
+          onChange({
+            discount_type: 'percent',
+            discount_value: percentToBp(event.target.value) ?? 0,
+          });
+        }}
+      />
+    </>
   );
 }
