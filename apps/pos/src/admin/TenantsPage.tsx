@@ -175,22 +175,22 @@ export function TenantsPage() {
               <caption className="sr-only">{t('admin.tenants_title')}</caption>
               <thead className="border-b border-border bg-surface-2 text-text-muted">
                 <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_name')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_status')}
                   </th>
                   <th scope="col" className="px-4 py-3 text-end font-medium">
                     {t('admin.col_devices')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_last_seen')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_setup')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_writes')}
                   </th>
                 </tr>

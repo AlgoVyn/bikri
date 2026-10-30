@@ -147,16 +147,16 @@ export function BackupsPage() {
               <caption className="sr-only">{t('admin.backups_title')}</caption>
               <thead className="border-b border-border bg-surface-2 text-text-muted">
                 <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_date')}
                   </th>
                   <th scope="col" className="px-4 py-3 text-end font-medium">
                     {t('admin.col_size')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_counts')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.download')}
                   </th>
                 </tr>

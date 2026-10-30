@@ -235,25 +235,25 @@ export function DevicesTab({
               <caption className="sr-only">{t('admin.tab_devices')}</caption>
               <thead className="border-b border-border bg-surface-2 text-text-muted">
                 <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_name')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_kind')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_last_seen')}
                   </th>
                   <th scope="col" className="px-4 py-3 text-end font-medium">
                     {t('admin.col_pending')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_ro_seen')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_status')}
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.revoke')}
                   </th>
                 </tr>
