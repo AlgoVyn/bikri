@@ -77,7 +77,9 @@ describe('admin api client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(getUsage()).resolves.toEqual({ email: 'operator@example.com' });
+    await expect(getUsage()).resolves.toEqual({
+      email: 'operator@example.com',
+    });
     const getInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/bikri/api/admin/usage');
     expect(getInit.credentials).toBe('same-origin');
