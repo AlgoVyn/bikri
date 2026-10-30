@@ -132,7 +132,7 @@ describe('catalog edge cases', () => {
     const charger = (await db.products.toArray())[0];
     if (!charger) throw new Error('missing');
     const detail = await productDetail(db, charger.id);
-    expect(detail?.last14.at(-1)).toMatchObject({ qty: 3000, revenue: 150000 });
+    expect(detail?.last14.at(-1)).toMatchObject({ qty: 2000, revenue: 100000 });
     const sale = (await db.sales.toArray())[0];
     if (sale) await db.sales.update(sale.id, { status: 'void' });
     expect(
@@ -209,5 +209,16 @@ describe('top-bar search', () => {
       'A-A-1',
     ]);
     expect((await searchAll(db, 'zzz')).length).toBe(0);
+    expect(
+      await searchAll(db, 'a-a-', { allDates: false, today: '2026-10-28' }),
+    ).toEqual([]);
+    expect(
+      (
+        await searchAll(db, 'a-a-', {
+          allDates: false,
+          today: '2026-10-27',
+        })
+      ).length,
+    ).toBe(2);
   });
 });

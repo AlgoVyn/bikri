@@ -139,7 +139,7 @@ export function DevicesPage() {
   const { t, i18n } = useTranslation();
   const db = getDb();
   const online = useOnline();
-  const { staff, role } = useCurrentStaff();
+  const { staff, role, support } = useCurrentStaff();
   const staffId = staff ? String(staff.id) : null;
   const { run, dialog } = useShopAdmin(db, staffId);
   const me = useLiveQuery(() => deviceInfo(db), [db]);
@@ -148,6 +148,7 @@ export function DevicesPage() {
       async () => (await db.branches.toArray()).filter((b) => !b.deleted_at),
       [db],
     ) ?? [];
+  const localDevices = useLiveQuery(() => db.devices.toArray(), [db]) ?? [];
   const [devices, setDevices] = useState<ShopDevice[] | null>(null);
   const [codes, setCodes] = useState<CodeRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +202,33 @@ export function DevicesPage() {
     if (online && staffId && me?.is_admin && role === 'owner') void guard(load);
   }, [online, staffId, me?.is_admin, role, guard, load]);
 
+  if (support) {
+    return (
+      <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
+        <p className="p-4 text-small text-text-muted">
+          {t('devices.support_view')}
+        </p>
+        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+          {localDevices.map((device) => (
+            <li
+              key={String(device.id)}
+              className="flex flex-wrap items-center justify-between gap-2 p-3"
+            >
+              <span className="font-medium">{String(device.name)}</span>
+              <span className="text-small text-text-muted">
+                {String(device.device_code)}
+                {' · '}
+                {String(
+                  branches.find((b) => b.id === device.branch_id)?.name ?? '—',
+                )}
+                {device.revoked_at ? ` · ${t('devices.revoked')}` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </SettingsPageLayout>
+    );
+  }
   if (!me?.is_admin || role !== 'owner')
     return (
       <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>

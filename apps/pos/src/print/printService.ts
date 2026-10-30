@@ -16,7 +16,11 @@ import {
   logDrawerOpen,
   type PrinterKv,
   receiptPaper,
+  resolveReceiptLanguage,
 } from '../data/receipt.ts';
+import { ReadOnlyError } from '../data/write.ts';
+import { isReadOnly } from '../sync/status.ts';
+import { prepareRasterFonts } from './canvasRaster.ts';
 import { jobReceipt } from './receiptFiles.ts';
 import { printHtmlViaSystem, type SystemPrintResult } from './systemPrint.ts';
 import {
@@ -52,7 +56,11 @@ async function readLogo(db: BikriDb): Promise<RasterSource | null> {
 
 async function receiptLanguage(db: BikriDb): Promise<'ur' | 'en'> {
   const shop = await db.shop.get('shop');
-  return shop?.receipt_language === 'ur' ? 'ur' : 'en';
+  return resolveReceiptLanguage(
+    typeof shop?.receipt_language === 'string'
+      ? shop.receipt_language
+      : undefined,
+  );
 }
 
 /** ESC/POS bytes for blocks on this printer (06 §3). */
@@ -110,6 +118,7 @@ export async function printBlocks(
     }
     return;
   }
+  await prepareRasterFonts();
   const one = encodeFor(blocks, printer, {
     logo,
     renderer: deps.renderer,
@@ -172,6 +181,23 @@ export async function runJob(
   }
 }
 
+/** Atomically claims the oldest queued job. IndexedDB serialises this across tabs. */
+async function claimNextJob(db: BikriDb): Promise<PrintJob | null> {
+  return db.transaction('rw', db.print_jobs, async () => {
+    const next = (
+      await db.print_jobs.where('status').equals('queued').sortBy('created_at')
+    )[0];
+    if (!next) return null;
+    const started_at = Date.now();
+    await db.print_jobs.update(next.id, {
+      status: 'printing',
+      error: undefined,
+      started_at,
+    });
+    return { ...next, status: 'printing', error: undefined, started_at };
+  });
+}
+
 const running = new WeakMap<BikriDb, Promise<void>>();
 
 /**
@@ -187,17 +213,10 @@ export function processQueue(
   if (current) return current;
   const run = (async () => {
     try {
-      const seen = new Set<string>();
       for (;;) {
         if (!(await readPrinter(db))?.transport) return;
-        const next = (
-          await db.print_jobs
-            .where('status')
-            .equals('queued')
-            .sortBy('created_at')
-        ).find((j) => !seen.has(j.id));
+        const next = await claimNextJob(db);
         if (!next) return;
-        seen.add(next.id);
         // Not `onResult?.(await runJob(…))`: optional calls skip evaluating their arguments.
         const result = await runJob(db, next, deps);
         onResult?.(result);
@@ -247,6 +266,11 @@ export async function openDrawer(
   deps: PrintDeps,
   staffId: string | null,
 ): Promise<void> {
+  if (
+    (await isReadOnly(db)) ||
+    (await db.kv.get('device_kind'))?.value === 'support'
+  )
+    throw new ReadOnlyError();
   await kickDrawer(db, await readPrinter(db), deps);
   const device = await deviceInfo(db);
   await logDrawerOpen(db, { device_id: device?.id ?? '', staff_id: staffId });

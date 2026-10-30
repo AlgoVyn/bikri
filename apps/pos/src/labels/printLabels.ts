@@ -1,3 +1,4 @@
+import { BASE_PATH } from '@bikri/core';
 import { LABEL_SIZES } from '@bikri/printer';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 
@@ -18,6 +19,7 @@ export function printLabelHtml(
     frame.remove();
     return;
   }
+  const fontBase = `${window.location.origin}${BASE_PATH}/fonts`;
   const page =
     settings.size === 'a4'
       ? '@page { size: A4; margin: 12.9mm 9mm; }'
@@ -39,12 +41,14 @@ export function printLabelHtml(
       : `width:${size.widthMm}mm;height:${size.heightMm}mm;box-sizing:border-box;padding:1mm;overflow:hidden;break-after:page;`;
   doc.open();
   doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
+    @font-face{font-family:"Noto Nastaliq Urdu";font-style:normal;font-weight:400;font-display:swap;src:url("${fontBase}/noto-nastaliq-urdu-arabic-400-normal.woff2") format("woff2")}
+    @font-face{font-family:"Noto Nastaliq Urdu";font-style:normal;font-weight:700;font-display:swap;src:url("${fontBase}/noto-nastaliq-urdu-arabic-700-normal.woff2") format("woff2")}
     *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     ${page}
     .sheet{${grid}}
     .label{${labelCss}display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3mm;text-align:center}
-    .shop{font-size:7pt;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
-    .name{font-size:8pt;font-weight:700;line-height:1.1;max-height:2.2em;overflow:hidden;width:100%}
+    .shop{font-family:"Noto Nastaliq Urdu",Inter,Arial,sans-serif;font-size:7pt;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+    .name{font-family:"Noto Nastaliq Urdu",Inter,Arial,sans-serif;font-size:8pt;font-weight:700;line-height:1.6;max-height:3.2em;overflow:hidden;width:100%}
     .price{font-size:10pt;font-weight:700;line-height:1.1}
     .bars{width:100%;display:flex;justify-content:center}
     .bars svg{display:block;max-width:100%;height:${size.barHeightMm}mm}

@@ -370,16 +370,24 @@ export async function salesHistory(
 
   const live = rows.filter((r) => r.sale.status !== 'void');
   const soldGross = live.reduce((s, r) => s + n(r.sale.total), 0);
-  const refunds = rows.reduce((s, r) => s + r.refunded, 0);
+  // Match reports: refunds count on the date they happen, not the original sale date.
+  const rangeRefunds = await (src.table('refunds') as Table<SyncedRow>)
+    .where('business_date')
+    .between(filter.from, filter.to, true, true)
+    .toArray();
+  const refunds = rangeRefunds
+    .filter((r) => !filter.branchId || r.branch_id === filter.branchId)
+    .reduce((sum, r) => sum + n(r.amount) + n(r.udhaar_part), 0);
   const bills = live.length;
+  const sold = soldGross - refunds;
   return {
     rows,
     days,
     summary: {
       bills,
-      sold: soldGross - refunds,
+      sold,
       refunds,
-      avgBill: bills > 0 ? Math.round((soldGross - refunds) / bills) : 0,
+      avgBill: bills > 0 ? Math.round(sold / bills) : 0,
     },
   };
 }

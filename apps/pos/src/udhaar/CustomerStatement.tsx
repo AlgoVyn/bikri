@@ -48,8 +48,9 @@ export function CustomerStatement({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { can, role } = useCurrentStaff();
+  const { can, role, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
+  const canEditPromises = can('party.edit');
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [promiseOpen, setPromiseOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -58,12 +59,16 @@ export function CustomerStatement({
   const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!canEditPromises) return;
     void (async () => {
       const db = getDb();
       const tz = await shopTimeZone(db);
-      await refreshPromises(db, { today: businessDate(Date.now(), tz) });
+      await refreshPromises(db, {
+        today: businessDate(Date.now(), tz),
+        actor: staff?.id ?? null,
+      });
     })();
-  }, []);
+  }, [canEditPromises, staff?.id]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();

@@ -192,8 +192,15 @@ describe('udhaar data', () => {
       'st-1',
       { today: '2026-10-25', now: NOW },
     );
-    expect(await refreshPromises(db, { today: TODAY, now: NOW })).toBe(1);
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+    ).toBe(1);
     expect((await db.promises.get(promise.id))?.status).toBe('broken');
+    const op = await db.outbox
+      .where('[tbl+row_id]')
+      .equals(['promises', promise.id])
+      .last();
+    expect(op?.row?.updated_by).toBe('staff-1');
   });
 
   it('AC 5: chase groups sum to the total, promises due at the top', async () => {
@@ -604,7 +611,9 @@ describe('udhaar branch coverage', () => {
         { today: TODAY, now: NOW },
       ),
     ).rejects.toMatchObject({ code: 'customer' });
-    expect(await refreshPromises(db, { today: TODAY, now: NOW })).toBe(0);
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+    ).toBe(0);
     const ali = await customer(db);
     await udhaarSale(db, ctx, ali.id, 100000);
     await createPromise(
@@ -617,7 +626,9 @@ describe('udhaar branch coverage', () => {
       'st-1',
       { today: TODAY, now: NOW },
     );
-    expect(await refreshPromises(db, { today: TODAY, now: NOW })).toBe(0);
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+    ).toBe(0);
   });
 
   it('statement shows refund, void and adjustment entries and a range opening', async () => {

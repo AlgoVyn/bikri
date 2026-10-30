@@ -40,8 +40,9 @@ export function UdhaarList({
   selectedId?: string;
 }) {
   const { t } = useTranslation();
-  const { can } = useCurrentStaff();
+  const { can, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
+  const canEditPromises = can('party.edit');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
   const [sort, setSort] = useState<CustomerSort>('balance');
@@ -49,12 +50,16 @@ export function UdhaarList({
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
+    if (!canEditPromises) return;
     void (async () => {
       const db = getDb();
       const tz = await shopTimeZone(db);
-      await refreshPromises(db, { today: businessDate(Date.now(), tz) });
+      await refreshPromises(db, {
+        today: businessDate(Date.now(), tz),
+        actor: staff?.id ?? null,
+      });
     })();
-  }, []);
+  }, [canEditPromises, staff?.id]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();

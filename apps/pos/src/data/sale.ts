@@ -2,6 +2,7 @@ import {
   businessDate,
   type CartResult,
   creditLimitCheck,
+  isBelowCost,
   newId,
 } from '@bikri/core';
 import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
@@ -249,6 +250,12 @@ export async function completeSale(
         const product = line.product_id
           ? products.get(line.product_id)
           : undefined;
+        const currentProduct = line.product_id
+          ? await w.table<MasterRow, string>('products').get(line.product_id)
+          : undefined;
+        const unitCost = currentProduct
+          ? unitCostOf(currentProduct, money.cost_method)
+          : line.unit_cost;
         const warranty = Number(product?.warranty_days ?? 0);
         const discounted = line.discount_type && line.discount_value > 0;
         await w.insert('sale_lines', {
@@ -272,8 +279,8 @@ export async function completeSale(
           bill_discount_alloc: r.bill_discount_alloc,
           tax_alloc: r.tax_alloc,
           rounding_alloc: r.rounding_alloc,
-          unit_cost_snapshot: line.unit_cost,
-          below_cost: r.below_cost,
+          unit_cost_snapshot: unitCost,
+          below_cost: isBelowCost(r.revenue, line.qty_milli, unitCost) ? 1 : 0,
           serial: line.note ? line.note : null,
           warranty_until: warranty > 0 ? addDays(date, warranty) : null,
           created_at: now,

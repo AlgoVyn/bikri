@@ -271,7 +271,7 @@ describe('products (screens/08)', () => {
     await seedSampleDay(db, businessDate(Date.now()));
     const best = await listProducts(db, { sort: 'best' });
     expect(best[0]?.product.name_en).toBe('Charger');
-    expect(best[0]?.sold30).toBe(3000);
+    expect(best[0]?.sold30).toBe(2000);
   });
 
   it('AC 4: the CSV has cost columns only with cost.view and guards formulas', async () => {
@@ -322,6 +322,15 @@ describe('categories', () => {
     const ctx = await ledgerContext(db, 'st-1');
     const a = await addCategory(db, 'Chargers');
     const b = await addCategory(db, 'Cables');
+    const wired = await addCategory(db, 'Syncable', 't1', {
+      actor: 'st-1',
+    });
+    const wiredOp = await db.outbox
+      .where('[tbl+row_id]')
+      .equals(['categories', wired.id])
+      .first();
+    expect(wiredOp?.row?.updated_by).toBe('st-1');
+    await removeCategory(db, wired.id, { actor: 'st-1' });
     await updateCategory(db, b.id, { name_en: 'Cables & leads', color: 't3' });
     await moveCategory(db, b.id, -1);
     expect(

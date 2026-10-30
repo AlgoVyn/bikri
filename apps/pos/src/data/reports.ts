@@ -19,12 +19,6 @@ export type Summary = {
 
 const n = (v: unknown) => Number(v ?? 0);
 
-function inRange(row: SyncedRow, range: ReportRange): boolean {
-  const date = String(row.business_date);
-  if (date < range.from || date > range.to) return false;
-  return range.deviceId === undefined || row.device_id === range.deviceId;
-}
-
 /** 07 §1: profit uses revenue ex-tax and ex-rounding. */
 export function lineRevenue(line: SyncedRow, taxInclusive: boolean): number {
   return (
@@ -32,6 +26,12 @@ export function lineRevenue(line: SyncedRow, taxInclusive: boolean): number {
     n(line.bill_discount_alloc) -
     (taxInclusive ? n(line.tax_alloc) : 0)
   );
+}
+
+function inRange(row: SyncedRow, range: ReportRange): boolean {
+  const date = String(row.business_date);
+  if (date < range.from || date > range.to) return false;
+  return range.deviceId === undefined || row.device_id === range.deviceId;
 }
 
 /** Sold, bills, gross profit and udhaar figures for a range (07 §9). Refunds count on their own date. */

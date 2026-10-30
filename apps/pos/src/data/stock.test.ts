@@ -294,6 +294,16 @@ describe('stock count (screens/09)', () => {
     await discardCount(db);
   });
 
+  it('skips chunks already applied before a partial count retry', async () => {
+    const { db, ctx, p } = await shop('stk-applied');
+    const draft = await startCount(db, { kind: 'all' }, NOW);
+    draft.counted[p.id] = 9000;
+    draft.applied = [p.id];
+    const r = await finishCount(db, draft, { zeroUncounted: false }, ctx, NOW);
+    expect(r).toEqual({ movements: 0, counted: 0, valueDiff: 0 });
+    expect(await onHand(db, p.id)).toBe(12000);
+  });
+
   it('isolation: adjustments and counts stay in their own shop', async () => {
     const a = await shop('stkA');
     const b = await shop('stkB');

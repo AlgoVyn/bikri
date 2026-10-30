@@ -698,7 +698,17 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
           bill_prefix: 'inv',
           ...master,
         }),
-        /CHECK constraint failed/,
+        /CHECK constraint failed|invalid bill_prefix/,
+      );
+      await expectRejected(
+        insert('branches', {
+          tenant_id: A.id,
+          id: 'br3',
+          name: 'B',
+          bill_prefix: 'A-',
+          ...master,
+        }),
+        /invalid bill_prefix/,
       );
       await expectRejected(
         insert('payments', {

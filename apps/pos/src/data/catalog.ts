@@ -9,6 +9,7 @@ import {
   type LedgerContext,
   type NewProduct,
 } from './products.ts';
+import { lineRevenue } from './reports.ts';
 import { type WriteOptions, type Writer, writeAction } from './write.ts';
 
 const DAY_MS = 86_400_000;
@@ -96,6 +97,32 @@ export async function soldByProduct(
       if (!line.product_id) continue;
       const id = String(line.product_id);
       sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
+    }
+  }
+  // Refunds count on their own business date (07 §9), including refunds of older bills.
+  const refunds = await db.refunds
+    .where('business_date')
+    .between(from, to, true, true)
+    .toArray();
+  if (refunds.length > 0) {
+    const refundLines = await db.refund_lines
+      .where('refund_id')
+      .anyOf(refunds.map((refund) => String(refund.id)))
+      .toArray();
+    const saleLines = new Map(
+      (
+        await db.sale_lines.bulkGet(
+          refundLines.map((line) => String(line.sale_line_id)),
+        )
+      )
+        .filter((line): line is SyncedRow => line !== undefined)
+        .map((line) => [String(line.id), line]),
+    );
+    for (const line of refundLines) {
+      const saleLine = saleLines.get(String(line.sale_line_id));
+      if (!saleLine?.product_id) continue;
+      const id = String(saleLine.product_id);
+      sold.set(id, Math.max(0, (sold.get(id) ?? 0) - Number(line.qty_milli)));
     }
   }
   return sold;
@@ -225,6 +252,8 @@ export async function productDetail(
     .where('business_date')
     .between(first, last, true, true)
     .toArray();
+  const shop = await db.shop.get('shop');
+  const taxInclusive = shop?.tax_mode === 'inclusive';
   const byId = new Map(
     sales.filter((s) => s.status !== 'void').map((s) => [s.id, s]),
   );
@@ -237,7 +266,36 @@ export async function productDetail(
     const day = days.find((d) => d.date === sale.business_date);
     if (!day) continue;
     day.qty += Number(line.qty_milli);
-    day.revenue += Number(line.net) - Number(line.bill_discount_alloc ?? 0);
+    day.revenue += lineRevenue(line, taxInclusive);
+  }
+  const refunds = await db.refunds
+    .where('business_date')
+    .between(first, last, true, true)
+    .toArray();
+  if (refunds.length > 0) {
+    const refundLines = await db.refund_lines
+      .where('refund_id')
+      .anyOf(refunds.map((refund) => String(refund.id)))
+      .toArray();
+    const saleLines = new Map(
+      (
+        await db.sale_lines.bulkGet(
+          refundLines.map((line) => String(line.sale_line_id)),
+        )
+      )
+        .filter((line): line is SyncedRow => line !== undefined)
+        .map((line) => [String(line.id), line]),
+    );
+    for (const line of refundLines) {
+      const saleLine = saleLines.get(String(line.sale_line_id));
+      if (!saleLine || saleLine.product_id !== id) continue;
+      const refund = refunds.find((row) => row.id === line.refund_id);
+      if (!refund) continue;
+      const day = days.find((d) => d.date === String(refund.business_date));
+      if (!day) continue;
+      day.qty = Math.max(0, day.qty - Number(line.qty_milli));
+      day.revenue -= Number(line.amount);
+    }
   }
   return {
     product,

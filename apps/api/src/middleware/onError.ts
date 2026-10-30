@@ -61,6 +61,14 @@ export function onError<E extends { Bindings: Env }>(
     });
   }
 
+  // `c.req.json()` rejects malformed JSON with a native SyntaxError. It is a client
+  // error, not a 500; never log the body.
+  if (err instanceof SyntaxError) {
+    return jsonError(c, 400, {
+      error: { code: 'VALIDATION_FAILED', message: 'Invalid JSON body' },
+    });
+  }
+
   // Account-wide D1 free-tier limit (04 §3, 13 §6): every shop waits for 00:00 UTC.
   if (D1_LIMIT_RE.test(err.message)) {
     const wait = secondsToUtcMidnight(Date.now());

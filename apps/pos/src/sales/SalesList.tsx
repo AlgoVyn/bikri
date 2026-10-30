@@ -84,8 +84,8 @@ export function SalesList({
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { role, staff, can, support } = useCurrentStaff();
-  const limited = role === 'cashier' && !support;
+  const { staff, can } = useCurrentStaff();
+  const limited = !can('report.view');
   const now = Date.now();
   const today = businessDate(now);
   const yesterday = businessDate(now - 86_400_000);

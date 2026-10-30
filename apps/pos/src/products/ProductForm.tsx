@@ -548,7 +548,14 @@ export function ProductFormPage({
                   className={`${buttonQuiet} shrink-0`}
                   disabled={!newCategory.trim()}
                   onClick={async () => {
-                    const created = await addCategory(getDb(), newCategory);
+                    const created = await addCategory(
+                      getDb(),
+                      newCategory,
+                      't1',
+                      {
+                        actor: staff?.id ?? null,
+                      },
+                    );
                     set('category_id', created.id);
                     setNewCategory(null);
                   }}

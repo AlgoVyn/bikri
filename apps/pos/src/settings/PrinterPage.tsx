@@ -16,6 +16,7 @@ import type { PrinterKv } from '../data/receipt.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, openDrawer, printTestPage } from '../print/printService.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsPageLayout } from './Layout.tsx';
 import { PrinterWizard } from './PrinterWizard.tsx';
 
@@ -60,6 +61,7 @@ export function PrinterPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const printer = useLiveQuery(
     async () =>
       ((await getDb().kv.get('printer'))?.value ?? null) as PrinterKv | null,
@@ -81,7 +83,8 @@ export function PrinterPage() {
   const queued = jobs?.filter(({ job }) => job.status === 'queued').length ?? 0;
   const [wizard, setWizard] = useState(false);
   // Cashiers' settings.device covers display and language only (05 §6).
-  const editable = can('settings.device') && role !== 'cashier';
+  const canUse = can('settings.device');
+  const editable = canUse && role !== 'cashier';
   const deps = browserPrintDeps();
 
   const update = (p: Partial<PrinterKv>) =>
@@ -89,6 +92,10 @@ export function PrinterPage() {
 
   const run = async (what: 'test' | 'drawer') => {
     try {
+      if (what === 'drawer' && readOnly) {
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+        return;
+      }
       if (what === 'test') await printTestPage(getDb(), printer ?? {}, deps);
       else await openDrawer(getDb(), deps, staff?.id ?? null);
       toast.push(
@@ -154,7 +161,10 @@ export function PrinterPage() {
                 >
                   {t('printer.test_print')}
                 </button>
-                {can('drawer.open') && printer.transport !== 'system' ? (
+                {editable &&
+                can('drawer.open') &&
+                !readOnly &&
+                printer.transport !== 'system' ? (
                   <button
                     type="button"
                     className={buttonQuiet}
@@ -169,6 +179,15 @@ export function PrinterPage() {
         ) : (
           <p className="text-small text-text-muted">{t('printer.ask_owner')}</p>
         )}
+        {!editable && canUse && printer?.transport ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => void run('test')}
+          >
+            {t('printer.test_print')}
+          </button>
+        ) : null}
         <details className="text-small">
           <summary className="cursor-pointer text-primary">
             {t('printer.which')}

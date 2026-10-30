@@ -9,6 +9,7 @@ import {
   renderReceiptText,
 } from '@bikri/printer';
 import { useTranslation } from 'react-i18next';
+import { resolveReceiptLanguage } from '../data/receipt.ts';
 
 export type PreviewShop = {
   name: string;
@@ -25,11 +26,15 @@ export type PreviewShop = {
 const SAMPLE_PRICE = 4_200_000;
 
 /** Sample 80 mm receipt for the wizard and Settings → Receipt (screens/01 step 3). */
-export function previewBlocks(shop: PreviewShop): Block[] {
-  const labels = receiptLabelsFor(shop.receipt_language);
+export function previewBlocks(shop: PreviewShop, uiLanguage = 'en'): Block[] {
+  const receiptLanguage = resolveReceiptLanguage(
+    shop.receipt_language,
+    uiLanguage,
+  );
+  const labels = receiptLabelsFor(receiptLanguage);
   const taxLabel =
     shop.tax_label?.trim() ||
-    (shop.receipt_language === 'ur' ? 'سیلز ٹیکس' : 'Sales tax');
+    (receiptLanguage === 'ur' ? 'سیلز ٹیکس' : 'Sales tax');
   const tax =
     shop.tax_rate_bp > 0 && !shop.inclusive
       ? Math.round((SAMPLE_PRICE * shop.tax_rate_bp) / 10_000)
@@ -114,9 +119,9 @@ export function ReceiptPreview({
   logoUrl: string | null;
   paperMm?: 58 | 80;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const charsPerLine = paperMm === 58 ? 32 : 48;
-  const text = renderReceiptText(previewBlocks(shop), {
+  const text = renderReceiptText(previewBlocks(shop, i18n.language), {
     charsPerLine,
     itemLayout: itemLayoutFor(charsPerLine, paperMm),
   });

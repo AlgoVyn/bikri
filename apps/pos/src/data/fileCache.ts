@@ -1,3 +1,5 @@
+import { BASE_PATH } from '@bikri/core';
+
 /**
  * Local copies of shop files (01 §PWA): Cache Storage `bikri-files`, cache-first, max 2,000
  * entries (oldest dropped). Keys carry the tenant so two shops on one browser never share a
@@ -8,8 +10,16 @@ export const FILE_CACHE_MAX = 2000;
 
 /** Synthetic request URL for a tenant's relative key (never fetched from the network). */
 export function fileCacheUrl(tenantId: string, key: string): string {
+  const path = key
+    .split('/')
+    .map((segment) => {
+      if (segment === '.' || segment === '..')
+        throw new Error('invalid file key');
+      return encodeURIComponent(segment);
+    })
+    .join('/');
   return new URL(
-    `/bikri/__files/${encodeURIComponent(tenantId)}/${key}`,
+    `${BASE_PATH}/__files/${encodeURIComponent(tenantId)}/${path}`,
     'https://bikri.local',
   ).href;
 }

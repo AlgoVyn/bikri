@@ -20,6 +20,8 @@ const SUPPORT_ALLOWED: ReadonlySet<Permission> = new Set([
   'dayclose.view_expected',
   'export.data',
   'settings.device',
+  'settings.shop',
+  'devices.manage',
 ]);
 
 /**
@@ -28,16 +30,21 @@ const SUPPORT_ALLOWED: ReadonlySet<Permission> = new Set([
  */
 export function useCurrentStaff(): CurrentStaff {
   const session = useSession((s) => s.session);
+  const localTenant =
+    import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev';
   const staff = useLiveQuery(async () => {
     const db = getDb();
     if (session?.role === 'support') return null;
     if (session) return (await db.staff.get(session.staff_id)) ?? null;
+    // The dev/e2e shop has no PIN session; production must never act as owner
+    // without an unlocked staff member.
+    if (!localTenant) return null;
     const all = await db.staff.toArray();
     return (
       all.find((s) => s.role === 'owner' && s.active === 1 && !s.deleted_at) ??
       null
     );
-  }, [session?.staff_id]);
+  }, [session?.staff_id, localTenant]);
   const live = staff && staff.active === 1 && !staff.deleted_at ? staff : null;
   const loaded = staff !== undefined;
   useEffect(() => {

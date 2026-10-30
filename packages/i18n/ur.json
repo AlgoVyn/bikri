@@ -944,6 +944,7 @@
     "load": "تازہ کریں",
     "admin": "ایڈمن",
     "support": "Algovyn سپورٹ {{time}} تک",
+    "support_view": "سپورٹ رسائی: یہ ڈیوائس فہرست صرف پڑھنے کے لیے ہے۔",
     "this_device": "یہ ڈیوائس",
     "revoked": "منسوخ",
     "meta": "{{branch}} · آخری بار {{seen}} · ایپ {{version}} · {{pending}} باقی",

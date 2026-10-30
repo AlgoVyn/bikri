@@ -13,6 +13,7 @@ import {
   receiptLabelsFor,
   type SaleReceiptInput,
 } from '@bikri/printer';
+import { readStoredLanguage } from '../i18n/i18n.ts';
 import { customerBalance } from './customers.ts';
 import { writeAction } from './write.ts';
 
@@ -146,13 +147,26 @@ export async function loadSaleReceipt(
   };
 }
 
+/**
+ * ``app`` follows the device language (Urdu only; Roman Urdu receipts use English labels).
+ * One helper keeps receipts, refunds and the preview in step with labels (D-101).
+ */
+export function resolveReceiptLanguage(
+  value: string | null | undefined,
+  uiLanguage: string = readStoredLanguage(),
+): 'ur' | 'en' {
+  return value === 'ur' || (value === 'app' && uiLanguage === 'ur')
+    ? 'ur'
+    : 'en';
+}
+
 /** Shop fields every receipt prints, plus the receipt language (D-101). */
 export async function receiptShop(
   db: BikriDb,
 ): Promise<{ shop: SaleReceiptInput['shop']; receiptLanguage: string }> {
   const row = (await db.shop.get('shop')) as MasterRow | undefined;
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
-  const receiptLanguage = text(row?.receipt_language);
+  const receiptLanguage = resolveReceiptLanguage(text(row?.receipt_language));
   return {
     receiptLanguage,
     shop: {

@@ -242,13 +242,17 @@ export function splitRefund(input: SplitRefundInput): SplitRefundResult {
   }
   const method = readMethod(input.method);
   if (method !== 'cash') {
+    // Earlier cash rounding can leave paidExact above the amount still owed. Never
+    // hand back more than the customer actually still paid; the cap is recorded as
+    // negative rounding (the same CHECK as the cash branch).
+    const amount = Math.min(paidExact, paidCap);
     return {
       exact: input.exact,
       udhaar_part: udhaarPart,
       paid_exact: paidExact,
       method,
-      amount: paidExact,
-      rounding: 0,
+      amount,
+      rounding: amount - paidExact,
     };
   }
   const cash = roundCashRefund(

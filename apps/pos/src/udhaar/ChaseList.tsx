@@ -31,17 +31,22 @@ import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 /** Chase list (screens/12): promises due, then oldest unpaid age groups. */
 export function ChaseList() {
   const { t, i18n } = useTranslation();
-  const { can } = useCurrentStaff();
+  const { can, staff } = useCurrentStaff();
+  const canEditPromises = can('party.edit');
   const [selected, setSelected] = useState<ChaseRow | null>(null);
   const [dialog, setDialog] = useState<'promise' | 'receive' | null>(null);
 
   useEffect(() => {
+    if (!canEditPromises) return;
     void (async () => {
       const db = getDb();
       const tz = await shopTimeZone(db);
-      await refreshPromises(db, { today: businessDate(Date.now(), tz) });
+      await refreshPromises(db, {
+        today: businessDate(Date.now(), tz),
+        actor: staff?.id ?? null,
+      });
     })();
-  }, []);
+  }, [canEditPromises, staff?.id]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();

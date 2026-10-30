@@ -114,6 +114,8 @@ type Lookups = {
   staff: Map<string, StaffRow>;
   branches: Map<string, { bill_prefix: string }>;
   current: Map<string, Current>;
+  /** Ledger rows already stored (append-only tables have no rev column). */
+  existingLedger: Set<string>;
   onHand: Map<string, { on_hand: number; avg_cost: number }>;
   /** Sales that pushed voids and refunds refer to (D-044 same-day voids, 04 §5 refund split). */
   sales: Map<string, SaleInfo>;
@@ -273,6 +275,7 @@ function overrideFor(
       return Boolean(
         approver &&
           approver.active === 1 &&
+          approver.deleted_at === null &&
           roles.includes(approver.role as Role) &&
           can(approver.role, approver.permissions_json, permission),
       );
@@ -528,6 +531,33 @@ function sourceInGroup(
   )?.row;
 }
 
+/** The void row id for a sale in this action (override audits are keyed by the void). */
+function voidIdForSale(group: PushOp[], saleId: string): string {
+  const row = group.find(
+    (o) =>
+      o.tbl === 'sale_voids' &&
+      o.kind === 'insert' &&
+      o.row?.sale_id === saleId,
+  )?.row;
+  return row && typeof row.id === 'string' ? row.id : saleId;
+}
+
+/** A party row created in this action (opening balances are sent with the new customer/supplier). */
+function partyInGroup(
+  group: PushOp[],
+  tbl: string,
+  id: string | null,
+): Record<string, unknown> | undefined {
+  if (id === null) return undefined;
+  return group.find(
+    (o) =>
+      o.tbl === tbl &&
+      (o.kind === 'insert' || o.kind === 'upsert') &&
+      (o.kind === 'insert' || (o.base_rev ?? 0) === 0) &&
+      o.row?.id === id,
+  )?.row;
+}
+
 const ADJUST_REASONS = new Set([
   'count',
   'entry_fix',
@@ -574,9 +604,12 @@ function checkLedgerEntry(
     return;
   }
   if (source === 'opening') {
+    if (row.party_type !== 'customer' && row.party_type !== 'supplier')
+      throw new Reject('CONSTRAINT_FAILED');
+    if (amount < 0) throw new Reject('CONSTRAINT_FAILED');
     const partyTable =
       row.party_type === 'customer' ? 'customers' : 'suppliers';
-    if (!sourceInGroup(group, partyTable, String(row.party_id)))
+    if (!partyInGroup(group, partyTable, String(row.party_id)))
       throw new Reject('CONSTRAINT_FAILED');
     return;
   }
@@ -615,12 +648,20 @@ function checkLedgerEntry(
       if (row.party_type !== 'customer' || amount >= 0)
         throw new Reject('CONSTRAINT_FAILED');
       break;
-    case 'payment':
+    case 'payment': {
       if (!allowed('payment.receive') && !allowed('purchase.create'))
         throw new Reject('FORBIDDEN');
-      if (amount !== -Number(src.amount ?? 0))
+      if (row.party_type !== src.party_type || row.party_id !== src.party_id)
         throw new Reject('CONSTRAINT_FAILED');
+      // Customer/supplier payments reduce the balance; a supplier refund (cash back)
+      // increases it by the amount received.
+      const expected =
+        src.purpose === 'supplier_refund'
+          ? Number(src.amount ?? 0)
+          : -Number(src.amount ?? 0);
+      if (amount !== expected) throw new Reject('CONSTRAINT_FAILED');
       break;
+    }
     case 'purchase':
       if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
       if (row.party_type !== 'supplier' || amount !== Number(src.total ?? 0))
@@ -714,6 +755,10 @@ function checkOp(
     }
     const need: Partial<Record<string, Permission>> = {
       products: 'catalog.delete',
+      product_barcodes: 'catalog.edit',
+      categories: 'catalog.edit',
+      expense_categories: 'settings.shop',
+      promises: 'party.edit',
       customers: 'party.delete',
       suppliers: 'party.delete',
     };
@@ -921,7 +966,7 @@ function checkOp(
                       overrideFor(
                         group,
                         'sale_voids',
-                        String(row.sale_id),
+                        voidIdForSale(group, String(row.sale_id)),
                         'sale.void',
                         look.staff,
                       )
@@ -963,6 +1008,10 @@ function checkOp(
       (!persisted && updater.id !== bootstrap)
     )
       throw new Reject('FORBIDDEN');
+  }
+  if (op.tbl === 'branches') {
+    if (!/^[A-Z0-9]{1,6}$/u.test(String(row.bill_prefix ?? '')))
+      throw new Reject('CONSTRAINT_FAILED');
   }
   if (op.tbl === 'shop') {
     const cur = look.current.get(key('shop', 'shop'));
@@ -1089,6 +1138,19 @@ function planOp(
           guard: null,
         };
       }
+    }
+    // A replay with a fresh op id (restore recovery or a pruned applied_ops row) must
+    // not re-run side effects such as the weighted-average update.
+    if (
+      look.current.has(key(tbl, id)) ||
+      look.existingLedger.has(key(tbl, id))
+    ) {
+      return {
+        op,
+        stmts: [appliedOp(db, op, deviceId, now, 'applied', null, false)],
+        result: { op_id: op.op_id, result: 'applied' },
+        guard: null,
+      };
     }
     const stmts = [
       db.prepare(
@@ -1301,15 +1363,19 @@ function sideEffects(
         Number.isSafeInteger(row.unit_cost) &&
         Number(row.unit_cost) >= 0
       ) {
-        state.avg_cost = nextAvgCost({
-          on_hand_milli: state.on_hand,
-          avg_cost: state.avg_cost,
-          qty_milli: qty,
-          unit_cost: Number(row.unit_cost),
-        });
+        try {
+          state.avg_cost = nextAvgCost({
+            on_hand_milli: state.on_hand,
+            avg_cost: state.avg_cost,
+            qty_milli: qty,
+            unit_cost: Number(row.unit_cost),
+          });
+        } catch {
+          throw new Reject('CONSTRAINT_FAILED');
+        }
         out.push(
           db.prepare(
-            'UPDATE products SET avg_cost = ?2, last_cost = ?4 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
+            'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
             state.avg_cost,
             row.product_id,
             Number(row.unit_cost),
@@ -1335,6 +1401,7 @@ function sideEffects(
 async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const { db } = ctx;
   const byTable = new Map<string, Set<string>>();
+  const ledgerByTable = new Map<string, Set<string>>();
   const products = new Set<string>();
   const saleIds = new Set<string>();
   const refundIds = new Set<string>();
@@ -1396,6 +1463,11 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         byTable.set(op.tbl, set);
       }
     }
+    if (isLedgerTable(op.tbl) && typeof op.row?.id === 'string') {
+      const set = ledgerByTable.get(op.tbl) ?? new Set<string>();
+      set.add(op.row.id);
+      ledgerByTable.set(op.tbl, set);
+    }
     if (op.tbl === 'stock_movements' && typeof op.row?.product_id === 'string')
       products.add(op.row.product_id);
     if (
@@ -1424,6 +1496,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { voids: true }
     | { expenses: true }
     | { reversals: true }
+    | { ledgerExists: string }
   > = [];
   for (const [tbl, ids] of byTable) {
     const list = [...ids];
@@ -1442,6 +1515,19 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         ),
       );
       kinds.push({ tbl });
+    }
+  }
+  for (const [tbl, ids] of ledgerByTable) {
+    const list = [...ids];
+    for (let i = 0; i < list.length; i += 90) {
+      const chunk = list.slice(i, i + 90);
+      stmts.push(
+        db.prepare(
+          `SELECT id FROM ${tbl} WHERE tenant_id = ?1 AND id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
+          ...chunk,
+        ),
+      );
+      kinds.push({ ledgerExists: tbl });
     }
   }
   const productList = [...products];
@@ -1538,6 +1624,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     staff: new Map(),
     branches: new Map(),
     current: new Map(),
+    existingLedger: new Set(),
     onHand: new Map(),
     expenses: new Map(),
     existingReversals: new Set(),
@@ -1566,6 +1653,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           method: String(r.method),
           reverses_id: typeof r.reverses_id === 'string' ? r.reverses_id : null,
         });
+        continue;
+      }
+      if ('ledgerExists' in k) {
+        look.existingLedger.add(key(k.ledgerExists, String(r.id)));
         continue;
       }
       if ('tbl' in k) {
@@ -1697,17 +1788,22 @@ export async function applyOps(
         continue;
       avg.set(op.row.id, {
         on_hand: 0,
-        avg_cost: Number(op.row.avg_cost ?? 0),
+        // avg_cost is server-managed; never trust a client value.
+        avg_cost: 0,
       });
     }
 
     const groups: Group[] = [];
     for (const ops of pending) {
+      // Plan against a copy so a rejected transaction cannot advance the running
+      // weighted-average state used by later transactions.
+      const groupAvg = new Map(
+        [...avg].map(([id, value]) => [id, { ...value }]),
+      );
       try {
-        groups.push({
-          txId: ops[0]?.tx_id ?? '',
-          planned: ops.map((op) => planOp(ctx, look, ops, op, avg)),
-        });
+        const planned = ops.map((op) => planOp(ctx, look, ops, op, groupAvg));
+        groups.push({ txId: ops[0]?.tx_id ?? '', planned });
+        for (const [id, value] of groupAvg) avg.set(id, value);
       } catch (error) {
         if (!(error instanceof Reject)) throw error;
         for (const op of ops) rejected.push({ op, code: error.code });

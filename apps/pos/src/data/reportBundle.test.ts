@@ -108,6 +108,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
     const { db, ctx, phone, buds } = await shopWithStock('t2');
     await addShop(db, { timezone: TZ, tax_rate_bp: 0 });
     const buds250 = { ...buds, avg_cost: 250000, last_cost: 250000 };
+    await db.products.put(buds250);
     const cart = t2Cart(phone, buds250);
     await db.carts.put(cart);
     await completeSale(

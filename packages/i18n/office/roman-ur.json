@@ -807,6 +807,7 @@
       "pin_not_set": "PIN nahi",
       "pin_required": "Naye cashier ke liye PIN set karein.",
       "pin_set": "PIN set hai",
+      "pin_taken": "Yeh PIN pehle se kisi aur staff ke paas hai.",
       "reset_permissions": "Role default par wapas",
       "role": "Role",
       "role_cashier": "Cashier",

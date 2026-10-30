@@ -519,7 +519,7 @@ shop.post('/devices/:id/revoke', async (c) => {
 
 shop.post('/import-ops', async (c) => {
   const { tenant, db } = c.var;
-  readOnly(tenant);
+  // importOps applies only transactions created before a read-only cutoff (13 §7.2).
   const body = ImportOpsBody.parse(await c.req.json());
   const now = Date.now();
   const out = await importOps(c.env, db, tenant, body.device_id, body.ops, now);

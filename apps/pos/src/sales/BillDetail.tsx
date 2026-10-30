@@ -169,6 +169,12 @@ export function BillDetail({
       </p>
     );
   if (!data) return <PageLoading compact />;
+  if (
+    !can('report.view') &&
+    String(data.detail.sale.business_date) !== data.today
+  ) {
+    return <p className="p-4 text-text-muted">{t('shell.no_access')}</p>;
+  }
 
   const { detail, timeZone } = data;
   const sale = detail.sale;

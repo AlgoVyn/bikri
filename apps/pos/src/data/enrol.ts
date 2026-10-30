@@ -3,7 +3,7 @@ import { APP_VERSION } from '@bikri/core';
 import { type BikriDb, deleteTenantDb, openTenantDb } from '@bikri/db';
 import { request } from '../sync/client.ts';
 import { applyStatus, type StatusPayload } from '../sync/status.ts';
-import { closeDb } from './db.ts';
+import { closeDb, getDb } from './db.ts';
 import { clearTenantFiles } from './fileCache.ts';
 import type { DeviceInfo, TenantInfo } from './localTenant.ts';
 import { activeTenantId, setActiveTenantId } from './tenant.ts';
@@ -71,6 +71,11 @@ export async function enrolDevice(
   deviceName: string,
 ): Promise<{ db: BikriDb; res: EnrolResponse }> {
   const previousTenant = activeTenantId();
+  if (previousTenant) {
+    // getDb() opens the active shop; never delete it while changes are waiting.
+    const count = await unexportedOps(getDb());
+    if (count > 0) throw new UnsyncedOpsError(count);
+  }
   const res = await request<EnrolResponse>('/devices/enrol', {
     method: 'POST',
     json: {
@@ -159,6 +164,20 @@ export async function unsyncedExport(db: BikriDb, now = Date.now()) {
   };
 }
 
+async function outboxFingerprint(db: BikriDb): Promise<string> {
+  const ops = await db.outbox.orderBy('seq').toArray();
+  const text = ops
+    .map(
+      ({ seq, op_id, row }) => `${seq ?? ''}:${op_id}:${JSON.stringify(row)}`,
+    )
+    .join('\n');
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 export async function markUnsyncedExported(
   db: BikriDb,
   now = Date.now(),
@@ -166,7 +185,11 @@ export async function markUnsyncedExported(
   const last = await db.outbox.orderBy('seq').last();
   await db.kv.put({
     key: 'unsynced_exported',
-    value: { at: now, seq: last?.seq ?? 0 },
+    value: {
+      at: now,
+      seq: last?.seq ?? 0,
+      fingerprint: await outboxFingerprint(db),
+    },
   });
 }
 
@@ -175,10 +198,15 @@ export async function unexportedOps(db: BikriDb): Promise<number> {
   const count = await db.outbox.count();
   if (count === 0) return 0;
   const exported = (await db.kv.get('unsynced_exported'))?.value as
-    | { seq: number }
+    | { seq: number; fingerprint?: string }
     | undefined;
+  if (!exported) return count;
   const last = await db.outbox.orderBy('seq').last();
-  return !exported || (last?.seq ?? 0) > exported.seq ? count : 0;
+  if ((last?.seq ?? 0) > exported.seq) return count;
+  // A coalesced edit changes the last row without changing its sequence.
+  if (exported.fingerprint !== undefined)
+    return (await outboxFingerprint(db)) === exported.fingerprint ? 0 : count;
+  return 0;
 }
 
 export async function leaveShop(db: BikriDb): Promise<void> {

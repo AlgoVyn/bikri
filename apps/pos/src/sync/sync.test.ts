@@ -187,7 +187,10 @@ describe('push (03 §3, §4.1)', () => {
     server.log = [];
     await pushAll(db);
     expect(server.log).toHaveLength(0);
+    const oldOpId = left[0]?.op_id;
     await retryFailed(db, [left[0]?.seq ?? 0]);
+    const retried = await db.outbox.where('status').equals('pending').first();
+    expect(retried?.op_id).not.toBe(oldOpId);
     expect(await db.outbox.where('status').equals('pending').count()).toBe(1);
     await db.outbox
       .where('status')
@@ -486,10 +489,251 @@ describe('pull (03 §4.2)', () => {
     });
     await fixInvoiceSeq(db);
     expect(await getKv(db, 'invoice_seq', 0)).toBe(9);
-    await restoreRecovery(db, 0);
+    await restoreRecovery(db, 0, '99');
     expect(
       (await db.outbox.toArray()).filter((e) => e.row_id === 's-9'),
     ).toHaveLength(1);
+  });
+
+  it('groups restore recovery by document and keeps the snapshot state', async () => {
+    const db = await enrolled('restore-groups');
+    const base = {
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+      staff_id: 'st-1',
+      business_date: '2026-10-27',
+      created_at: 1000,
+    };
+    const saleId = 's1';
+    const refundId = 'r1';
+    const voidId = 'v1';
+    const purchaseId = 'p1';
+    const returnId = 'sr1';
+    await db.sales.add({
+      ...base,
+      id: saleId,
+      invoice_no: 'A-A-1',
+      invoice_seq: 1,
+    });
+    await db.sale_lines.add({
+      id: 'sl1',
+      sale_id: saleId,
+      product_id: 'prod-1',
+      created_at: 1000,
+    });
+    await db.payments.bulkAdd([
+      { id: 'pay-sale', sale_id: saleId, purpose: 'sale', created_at: 1000 },
+      {
+        id: 'pay-refund',
+        refund_id: refundId,
+        purpose: 'refund',
+        created_at: 1000,
+      },
+      {
+        id: 'pay-purchase',
+        purchase_id: purchaseId,
+        purpose: 'purchase_paid_now',
+        created_at: 1000,
+      },
+      {
+        id: 'pay-return',
+        supplier_return_id: returnId,
+        purpose: 'supplier_refund',
+        created_at: 1000,
+      },
+      {
+        id: 'pay-void',
+        sale_id: saleId,
+        purpose: 'void',
+        created_at: 1000,
+      },
+    ] as never);
+    await db.refunds.add({
+      id: refundId,
+      sale_id: saleId,
+      created_at: 1000,
+    });
+    await db.refund_lines.add({
+      id: 'rl1',
+      refund_id: refundId,
+      sale_line_id: 'sl1',
+      created_at: 1000,
+    });
+    await db.sale_voids.add({
+      id: voidId,
+      sale_id: saleId,
+      created_at: 1000,
+    });
+    await db.purchases.add({
+      id: purchaseId,
+      created_at: 1000,
+      business_date: '2026-10-27',
+    });
+    await db.purchase_lines.add({
+      id: 'pl1',
+      purchase_id: purchaseId,
+      created_at: 1000,
+    });
+    await db.supplier_returns.add({
+      id: returnId,
+      created_at: 1000,
+      business_date: '2026-10-27',
+    });
+    await db.supplier_return_lines.add({
+      id: 'srl1',
+      return_id: returnId,
+      created_at: 1000,
+    });
+    await db.ledger_entries.bulkAdd([
+      {
+        id: 'l-sale',
+        source_type: 'sale',
+        source_id: saleId,
+        created_at: 1000,
+      },
+      {
+        id: 'l-refund',
+        source_type: 'refund',
+        source_id: refundId,
+        created_at: 1000,
+      },
+      {
+        id: 'l-void',
+        source_type: 'void',
+        source_id: voidId,
+        created_at: 1000,
+      },
+      {
+        id: 'l-pay',
+        source_type: 'payment',
+        source_id: 'pay-sale',
+        created_at: 1000,
+      },
+      {
+        id: 'l-purchase',
+        source_type: 'purchase',
+        source_id: purchaseId,
+        created_at: 1000,
+      },
+      {
+        id: 'l-return',
+        source_type: 'supplier_return',
+        source_id: returnId,
+        created_at: 1000,
+      },
+      {
+        id: 'l-adjust',
+        source_type: 'adjustment',
+        source_id: null,
+        created_at: 1000,
+      },
+    ] as never);
+    await db.stock_movements.bulkAdd([
+      {
+        id: 'm-sale',
+        reason_code: 'sale',
+        ref_id: saleId,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+      {
+        id: 'm-refund',
+        reason_code: 'refund_return',
+        ref_id: refundId,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+      {
+        id: 'm-void',
+        reason_code: 'void_return',
+        ref_id: voidId,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+      {
+        id: 'm-purchase',
+        reason_code: 'purchase',
+        ref_id: purchaseId,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+      {
+        id: 'm-return',
+        reason_code: 'supplier_return',
+        ref_id: returnId,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+      {
+        id: 'm-count',
+        reason_code: 'count',
+        ref_id: null,
+        product_id: 'prod-1',
+        created_at: 1000,
+      },
+    ] as never);
+    await db.expenses.add({
+      id: 'e1',
+      created_at: 1000,
+      business_date: '2026-10-27',
+    });
+    await db.cash_moves.add({ id: 'cm1', created_at: 1000 });
+    await db.day_closes.add({
+      id: 'dc1',
+      device_id: 'dev-1',
+      period_end: 1000,
+      business_date: '2026-10-27',
+      created_at: 1000,
+    });
+    await db.audit_log.bulkAdd([
+      {
+        id: 'a-void',
+        entity: 'sale_voids',
+        entity_id: voidId,
+        created_at: 1000,
+      },
+      {
+        id: 'a-refund',
+        entity: 'refunds',
+        entity_id: refundId,
+        created_at: 1000,
+      },
+      { id: 'a-sale', entity: 'sales', entity_id: saleId, created_at: 1000 },
+      {
+        id: 'a-expense',
+        entity: 'expenses',
+        entity_id: 'e1',
+        created_at: 1000,
+      },
+      { id: 'a-other', entity: 'staff', entity_id: 'st-1', created_at: 1000 },
+    ] as never);
+
+    for (const tbl of [
+      'payments',
+      'refunds',
+      'sale_voids',
+      'purchases',
+      'supplier_returns',
+      'ledger_entries',
+      'stock_movements',
+      'expenses',
+      'cash_moves',
+      'day_closes',
+      'audit_log',
+    ] as const)
+      await db.table(tbl).toCollection().modify({ device_id: 'dev-1' });
+    server.tables = {};
+    await restoreRecovery(db, 500, 'epoch-2');
+    const queued = await db.outbox.toArray();
+    expect(new Set(queued.map((op) => op.tbl)).size).toBeGreaterThan(8);
+    const perTx = new Map<string, number>();
+    for (const op of queued)
+      perTx.set(op.tx_id, (perTx.get(op.tx_id) ?? 0) + 1);
+    expect(Math.max(...perTx.values())).toBeLessThanOrEqual(200);
+    expect(await getKv(db, 'restore_epoch', null)).toBe('epoch-2');
+    expect(await getKv(db, 'snapshot_state', null)).toBeNull();
+    expect(await db.sales.count()).toBe(0);
+    expect(await db.sale_voids.count()).toBe(0);
   });
 
   it('runSnapshot from scratch on a new device', async () => {

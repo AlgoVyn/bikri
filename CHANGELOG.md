@@ -38,6 +38,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.
 - Every tenant query goes through `tenantDb`; R2 keys are always `t/<tenant_id>/…`; cross-tenant isolation suite runs in CI.
 - The pre-paint theme snippet is the external `/bikri/theme-init.js` asset, so the strict `script-src 'self'` CSP no longer blocks it; the app shell has no inline scripts (D-149).
+- Full-codebase review remediation: sync contract fixes (opening balances, supplier refunds, void overrides, category/promise actors), PIN-lock and override hardening, safe pull/restore recovery, idempotent stock averages, read-only drawer/import guards, cross-tab print claims, Urdu receipt/label fonts, sale-time cost snapshots, retry-safe counts, refund-date summaries and net product analytics (D-150).
 
 ### Documentation
 - [Operator guide](docs/operator-guide.md), [owner guide](docs/owner-guide.md), specification in [`docs/`](docs/00-overview.md) and decisions log in [docs/decisions.md](docs/decisions.md).

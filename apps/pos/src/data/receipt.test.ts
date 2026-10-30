@@ -8,6 +8,7 @@ import {
   queueSalePrint,
   receiptPaper,
   receiptShareText,
+  resolveReceiptLanguage,
   waLink,
   waNumber,
 } from './receipt.ts';
@@ -32,6 +33,16 @@ const text = (input: Parameters<typeof buildSaleReceipt>[0]) =>
     charsPerLine: 48,
     itemLayout: 'columns',
   });
+
+describe('receipt language', () => {
+  it('resolves "same as app" and explicit choices', () => {
+    expect(resolveReceiptLanguage('app', 'ur')).toBe('ur');
+    expect(resolveReceiptLanguage('app', 'en')).toBe('en');
+    expect(resolveReceiptLanguage('app', 'roman-ur')).toBe('en');
+    expect(resolveReceiptLanguage('ur', 'en')).toBe('ur');
+    expect(resolveReceiptLanguage('en', 'ur')).toBe('en');
+  });
+});
 
 describe('sale receipt from local rows (screens/07)', () => {
   it('builds the printer input: shop, bill, lines in added order, cash, cashier', async () => {

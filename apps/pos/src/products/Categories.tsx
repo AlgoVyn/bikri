@@ -25,7 +25,7 @@ const textField =
 export function CategoriesPage() {
   const { t } = useTranslation();
   const toast = useToast();
-  const { can } = useCurrentStaff();
+  const { can, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [name, setName] = useState('');
@@ -52,7 +52,7 @@ export function CategoriesPage() {
             getDb(),
             name,
             CATEGORY_COLORS[(categories?.length ?? 0) % CATEGORY_COLORS.length],
-            {},
+            { actor: staff?.id ?? null },
             nameUr,
           );
           setName('');
@@ -117,7 +117,14 @@ export function CategoriesPage() {
                     onBlur={(e) => {
                       const next = e.target.value.trim();
                       if (next && next !== label)
-                        void updateCategory(getDb(), c.id, { name_en: next });
+                        void updateCategory(
+                          getDb(),
+                          c.id,
+                          { name_en: next },
+                          {
+                            actor: staff?.id ?? null,
+                          },
+                        );
                       else e.target.value = label;
                     }}
                   />
@@ -132,7 +139,14 @@ export function CategoriesPage() {
                     onBlur={(e) => {
                       const next = e.target.value.trim();
                       if (next !== String(c.name_ur ?? ''))
-                        void updateCategory(getDb(), c.id, { name_ur: next });
+                        void updateCategory(
+                          getDb(),
+                          c.id,
+                          { name_ur: next },
+                          {
+                            actor: staff?.id ?? null,
+                          },
+                        );
                     }}
                   />
                 </span>
@@ -156,7 +170,14 @@ export function CategoriesPage() {
                         className="peer sr-only"
                         checked={c.color === color}
                         onChange={() =>
-                          void updateCategory(getDb(), c.id, { color })
+                          void updateCategory(
+                            getDb(),
+                            c.id,
+                            { color },
+                            {
+                              actor: staff?.id ?? null,
+                            },
+                          )
                         }
                       />
                       <span className="sr-only">
@@ -175,7 +196,11 @@ export function CategoriesPage() {
                     className={buttonQuiet}
                     disabled={i === 0}
                     aria-label={t('categories.up', { name: label })}
-                    onClick={() => void moveCategory(getDb(), c.id, -1)}
+                    onClick={() =>
+                      void moveCategory(getDb(), c.id, -1, {
+                        actor: staff?.id ?? null,
+                      })
+                    }
                   >
                     ↑
                   </button>
@@ -184,7 +209,11 @@ export function CategoriesPage() {
                     className={buttonQuiet}
                     disabled={i === categories.length - 1}
                     aria-label={t('categories.down', { name: label })}
-                    onClick={() => void moveCategory(getDb(), c.id, 1)}
+                    onClick={() =>
+                      void moveCategory(getDb(), c.id, 1, {
+                        actor: staff?.id ?? null,
+                      })
+                    }
                   >
                     ↓
                   </button>
@@ -194,7 +223,9 @@ export function CategoriesPage() {
                     aria-label={t('categories.delete', { name: label })}
                     onClick={async () => {
                       try {
-                        await removeCategory(getDb(), c.id);
+                        await removeCategory(getDb(), c.id, {
+                          actor: staff?.id ?? null,
+                        });
                       } catch (error) {
                         if (error instanceof CategoryInUseError) {
                           toast.push(

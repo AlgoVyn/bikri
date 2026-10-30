@@ -807,6 +807,7 @@
       "pin_not_set": "No PIN",
       "pin_required": "Set a PIN for the new cashier.",
       "pin_set": "PIN set",
+      "pin_taken": "That PIN is already used by another staff member.",
       "reset_permissions": "Reset to role defaults",
       "role": "Role",
       "role_cashier": "Cashier",

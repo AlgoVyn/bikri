@@ -50,7 +50,7 @@ function Gate() {
   const afterSetup = useSession((s) => s.afterSetup);
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';
-  const devUi = pathname.startsWith('/dev/');
+  const devUi = import.meta.env.DEV && pathname.startsWith('/dev/');
   if (gate === 'loading') return <PageLoading />;
   const onEnrol = pathname === '/enrol' || pathname === '/enrol/';
   if (gate === 'enrol' || revoked || onEnrol)
