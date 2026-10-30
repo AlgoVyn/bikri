@@ -40,7 +40,8 @@
     "products": "{{count}} مصنوعات",
     "products_one": "{{count}} مصنوع",
     "title": "کیٹیگریز",
-    "up": "{{name}} اوپر"
+    "up": "{{name}} اوپر",
+    "name_ur": "اردو نام"
   },
   "common": {
     "app_name": "Bikri",
@@ -592,7 +593,8 @@
     "select_product_hint": "قیمت، اسٹاک اور تاریخ یہاں نظر آئیں گے۔",
     "back": "پروڈکٹس پر واپس",
     "min_stock_off": "بند",
-    "last14_empty": "پچھلے 14 دنوں میں اسٹاک میں کوئی حرکت نہیں۔"
+    "last14_empty": "پچھلے 14 دنوں میں اسٹاک میں کوئی حرکت نہیں۔",
+    "sell": "بیچیں"
   },
   "sell": {
     "add_discount": "رعایت شامل کریں",
@@ -816,7 +818,8 @@
     "sync_detail_paused": "اس دکان کا اکاؤنٹ روک دیا گیا ہے۔ الگوون سے رابطہ کریں۔ {{count}} تبدیلیاں اسی ڈیوائس پر محفوظ ہیں۔",
     "printer_label": "پرنٹر",
     "printer_failed": "پرنٹ ناکام",
-    "printer_no": "پرنٹر نہیں"
+    "printer_no": "پرنٹر نہیں",
+    "skip_content": "مواد پر جائیں"
   },
   "stock": {
     "reason": {

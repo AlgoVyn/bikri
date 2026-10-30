@@ -1,5 +1,5 @@
-import { formatMoney } from '@bikri/core';
 import type { ReportBundle } from '../data/reportBundle.ts';
+import { formatShopMoney } from '../lib/money';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
 import { shortDate } from './format.ts';
 
@@ -73,17 +73,17 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   );
 
   const cards = [
-    [labels.sold, formatMoney(summary.sold)],
+    [labels.sold, formatShopMoney(summary.sold)],
     [labels.bills, String(summary.bills)],
-    [labels.avgBill, formatMoney(summary.avgBill)],
+    [labels.avgBill, formatShopMoney(summary.avgBill)],
     ...(meta.showProfit
       ? [
-          [labels.grossProfit, formatMoney(summary.grossProfit)],
-          [labels.expenses, formatMoney(summary.expenses)],
-          [labels.netProfit, formatMoney(summary.netProfit)],
+          [labels.grossProfit, formatShopMoney(summary.grossProfit)],
+          [labels.expenses, formatShopMoney(summary.expenses)],
+          [labels.netProfit, formatShopMoney(summary.netProfit)],
         ]
-      : [[labels.expenses, formatMoney(summary.expenses)]]),
-    ...(summary.tax !== 0 ? [[labels.tax, formatMoney(summary.tax)]] : []),
+      : [[labels.expenses, formatShopMoney(summary.expenses)]]),
+    ...(summary.tax !== 0 ? [[labels.tax, formatShopMoney(summary.tax)]] : []),
     ...(meta.showProfit
       ? [[labels.margin, `${(summary.marginBp / 100).toFixed(1)}%`]]
       : []),
@@ -194,12 +194,12 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     ctx.fillText(label, x, y);
     ctx.fillStyle = '#0f172a';
     ctx.font = 'bold 18px Inter, sans-serif';
-    ctx.fillText(formatMoney(value), x, y + 26);
+    ctx.fillText(formatShopMoney(value), x, y + 26);
     ctx.font = '18px Inter, sans-serif';
   });
   ctx.fillStyle = '#475569';
   ctx.fillText(
-    `${labels.udhaarGiven}: ${formatMoney(summary.udhaarGiven)}   ·   ${labels.udhaarReceived}: ${formatMoney(summary.udhaarReceived)}`,
+    `${labels.udhaarGiven}: ${formatShopMoney(summary.udhaarGiven)}   ·   ${labels.udhaarReceived}: ${formatShopMoney(summary.udhaarReceived)}`,
     MARGIN,
     mixTop + 92,
   );

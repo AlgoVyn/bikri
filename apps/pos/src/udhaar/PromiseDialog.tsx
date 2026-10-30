@@ -1,4 +1,4 @@
-import { businessDate, formatMoney } from '@bikri/core';
+import { businessDate } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -96,7 +97,7 @@ export function PromiseDialog({
         />
       </div>
       <p className="text-small text-text-muted">
-        {t('office.udhaar.promise_whole', { amount: formatMoney(balance) })}
+        {t('office.udhaar.promise_whole', { amount: formatShopMoney(balance) })}
       </p>
       <label className="flex flex-col gap-1 text-small">
         {t('office.udhaar.note')}

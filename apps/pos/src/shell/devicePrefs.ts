@@ -65,11 +65,23 @@ export function storedTheme(): ThemePref {
 }
 
 /** Applies the device theme to the document without opening a shop database. */
+function applyThemeColor(theme: ThemePref): void {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  const dark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-color-scheme: dark)').matches);
+  meta.setAttribute('content', dark ? '#0f172a' : '#006BB3');
+}
+
 export function applyStoredTheme(): void {
   const root = document.documentElement;
   const theme = storedTheme();
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
+  applyThemeColor(theme);
 }
 
 /** Applies theme and text size to the document (screens/17 display). */
@@ -80,6 +92,7 @@ export function applyDevicePrefs(
   const root = document.documentElement;
   if (prefs.theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = prefs.theme;
+  applyThemeColor(prefs.theme);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, prefs.theme);
   } catch {

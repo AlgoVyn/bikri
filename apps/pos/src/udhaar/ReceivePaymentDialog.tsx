@@ -1,4 +1,4 @@
-import { businessDate, formatMoney, newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -101,7 +102,7 @@ export function ReceivePaymentDialog({
         { role, today },
       );
       toast.push(
-        t('office.udhaar.payment_saved', { amount: formatMoney(amount) }),
+        t('office.udhaar.payment_saved', { amount: formatShopMoney(amount) }),
       );
       onOpenChange(false);
     } catch (err) {
@@ -206,10 +207,10 @@ export function ReceivePaymentDialog({
         <p className="text-small" data-testid="payment-after">
           {after >= 0
             ? t('office.udhaar.balance_after', {
-                amount: formatMoney(after),
+                amount: formatShopMoney(after),
               })
             : t('office.udhaar.credit_after', {
-                amount: formatMoney(-after),
+                amount: formatShopMoney(-after),
               })}
         </p>
         {role !== 'owner' ? (
@@ -250,7 +251,7 @@ export function ReceivePaymentDialog({
         onOpenChange={setOverpay}
         title={t('office.udhaar.overpay_title')}
         body={t('office.udhaar.overpay_body', {
-          amount: formatMoney((amount ?? 0) - Math.max(0, balance)),
+          amount: formatShopMoney((amount ?? 0) - Math.max(0, balance)),
         })}
         confirmLabel={t('office.udhaar.overpay_confirm')}
         onConfirm={() => void save()}

@@ -21,23 +21,27 @@ export function PageHeader({
 }) {
   const Heading = headingLevel;
   return (
-    <header className="flex flex-wrap items-start gap-3">
-      {icon ? (
-        <span
-          aria-hidden="true"
-          className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tone}`}
-        >
-          {icon}
-        </span>
-      ) : null}
-      <div className="min-w-0 flex-1">
-        <Heading className="text-h1 font-semibold">{title}</Heading>
-        {subtitle ? (
-          <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+    <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start">
+      <div className="flex min-w-0 items-start gap-3 md:flex-1">
+        {icon ? (
+          <span
+            aria-hidden="true"
+            className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tone}`}
+          >
+            {icon}
+          </span>
         ) : null}
+        <div className="min-w-0 flex-1">
+          <Heading className="text-h1 font-semibold">{title}</Heading>
+          {subtitle ? (
+            <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+          ) : null}
+        </div>
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
+          {actions}
+        </div>
       ) : null}
     </header>
   );

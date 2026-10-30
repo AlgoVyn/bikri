@@ -1,6 +1,7 @@
-import { formatMoney } from '@bikri/core';
 import type { TFunction } from 'i18next';
+import { useEffect, useRef, useState } from 'react';
 import type { DailyPoint, PaymentMix } from '../data/reportBundle.ts';
+import { formatShopMoney } from '../lib/money';
 import { shortDate } from './format.ts';
 
 const COLORS: Record<keyof PaymentMix, string> = {
@@ -57,6 +58,29 @@ export function DailyChart({
   const line = points
     .map((point, index) => `${x(index)},${y(point.grossProfit)}`)
     .join(' ');
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [renderedWidth, setRenderedWidth] = useState(width);
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const update = () => setRenderedWidth(element.clientWidth || width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  // SVG font sizes are in viewBox units, so compensate for the rendered width: labels stay
+  // around 11–12 CSS px on a phone instead of shrinking to 4 px.
+  const labelFont = Math.min(
+    24,
+    Math.max(8, Math.round((12 * width) / Math.max(1, renderedWidth))),
+  );
+  const summary = points
+    .map(
+      (point) =>
+        `${shortDate(point.date, lang)} ${formatShopMoney(point.sold)}`,
+    )
+    .join('; ');
 
   return (
     <div className="flex flex-col gap-2">
@@ -86,9 +110,10 @@ export function DailyChart({
         </p>
       ) : (
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={t('office.reports.daily_chart')}
+          aria-label={`${t('office.reports.daily_chart')}: ${summary}`}
           className="h-52 w-full"
         >
           {[...new Set([max, min === 0 ? 0 : (max + min) / 2, min])].map(
@@ -105,10 +130,10 @@ export function DailyChart({
                 <text
                   x={4}
                   y={y(value) + 3}
-                  fontSize={9}
+                  fontSize={labelFont}
                   fill="var(--color-text-muted)"
                 >
-                  {formatMoney(value)}
+                  {formatShopMoney(value)}
                 </text>
               </g>
             ),
@@ -128,7 +153,7 @@ export function DailyChart({
                 opacity={point.date === points.at(-1)?.date ? 1 : 0.82}
               >
                 <title>
-                  {`${shortDate(point.date, lang)} · ${formatMoney(point.sold)}`}
+                  {`${shortDate(point.date, lang)} · ${formatShopMoney(point.sold)}`}
                 </title>
               </rect>
             );
@@ -151,7 +176,7 @@ export function DailyChart({
               x={x(points.indexOf(point))}
               y={height - 6}
               textAnchor="middle"
-              fontSize={10}
+              fontSize={labelFont}
               fill="var(--color-text-muted)"
             >
               {shortDate(point.date, lang)}
@@ -223,7 +248,7 @@ export function PaymentDonut({ mix, t }: { mix: PaymentMix; t: TFunction }) {
             />
             <span className="me-auto">{t(`payment.${method}`)}</span>
             <bdi dir="ltr" className="font-mono tabular-nums">
-              {formatMoney(mix[method])}
+              {formatShopMoney(mix[method])}
             </bdi>
           </li>
         ))}

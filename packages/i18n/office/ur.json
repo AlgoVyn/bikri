@@ -25,8 +25,8 @@
       "range_month": "اس مہینے",
       "range_today": "آج",
       "range_yesterday": "کل",
-      "search": "تلاش",
-      "search_placeholder": "بل نمبر، گاہک یا پروڈکٹ",
+      "search": "بل تلاش کریں",
+      "search_placeholder": "بل، گاہک یا پروڈکٹ",
       "status_paid": "ادا شدہ",
       "status_part_refunded": "کچھ رقم واپس",
       "status_refunded": "واپس شدہ",
@@ -422,7 +422,9 @@
       "subtitle": "ڈیلیوری، ادائیگی اور واپسی",
       "select_supplier": "سپلائر منتخب کریں",
       "select_supplier_hint": "ڈیلیوریاں، ادائیگیاں اور بقایا یہاں نظر آئیں گے۔",
-      "delivery_error_too_many": "یہ ڈیلیوری ایک وقت میں بہت زیادہ تبدیلیاں لکھے گی۔ اسے دو ڈیلیوریوں میں محفوظ کریں۔"
+      "delivery_error_too_many": "یہ ڈیلیوری ایک وقت میں بہت زیادہ تبدیلیاں لکھے گی۔ اسے دو ڈیلیوریوں میں محفوظ کریں۔",
+      "lines_count_one": "{{count}} شے",
+      "lines_count_other": "{{count}} اشیاء"
     },
     "expenses": {
       "amount": "رقم",

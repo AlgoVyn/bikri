@@ -1,5 +1,6 @@
+import { formatShopMoney } from '../lib/money';
 /** Settings → Devices on an admin device (screens/17, T-038): codes, devices, import unsynced ops. */
-import { formatMoney } from '@bikri/core';
+
 import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
@@ -567,8 +568,8 @@ export function DevicesPage() {
                 count: importState.p.count,
                 from: timeText(i18n.language, importState.p.from),
                 to: timeText(i18n.language, importState.p.to),
-                sales: formatMoney(importState.p.sales),
-                payments: formatMoney(importState.p.payments),
+                sales: formatShopMoney(importState.p.sales),
+                payments: formatShopMoney(importState.p.payments),
               })}
             </p>
             <button

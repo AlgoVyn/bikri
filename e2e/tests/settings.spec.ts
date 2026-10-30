@@ -241,4 +241,16 @@ test.describe('Settings (T-050)', () => {
     await page.getByRole('main').getByLabel('Language').selectOption('ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   });
+
+  test('the shop card saves its own details', async ({ page }) => {
+    await openReadyShop(page, '/bikri/settings/shop');
+    await page.getByLabel('Shop name').fill('Saved Shop');
+    await page
+      .getByRole('button', { name: 'Save', exact: true })
+      .first()
+      .click();
+    await expect(page.getByText('Settings saved.')).toBeVisible();
+    const [shop] = await idbAll<{ name: string }>(page, 'shop');
+    expect(shop?.name).toBe('Saved Shop');
+  });
 });

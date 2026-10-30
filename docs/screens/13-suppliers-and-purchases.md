@@ -29,7 +29,7 @@ Header: name, balance, buttons `Record delivery` (D), `Pay supplier` (P), `Retur
 |---|---|
 | Supplier invoice no | optional 0–30 |
 | Date | default now; up to 30 days back |
-| Lines | product search/scan (or `+ New product` inline: name, price, unit), qty (`QtyInput` > 0), unit cost (`MoneyInput`, default last cost), line total (computed); "Also update sale price" optional per line |
+| Lines | product search/scan (or `+ New product` inline: name, price, unit), qty (`QtyInput` > 0), unit cost (`MoneyInput`, default last cost), line total (computed); the heading shows the live count (`3 items`); "Also update sale price" optional per line |
 | Other charges | optional `MoneyInput` (freight/packing **on the supplier's invoice**, owed to the supplier) → `purchases.other_charges`, allocated to lines by `line_total` with `allocate()` → `charges_alloc`, `landed_unit_cost` ([02](../02-data-model.md#2-d1-schema-migration-0001_initsql)). Freight paid in cash to a transporter is **not** entered here: record it as an expense "Transport" |
 | Total | Σ line totals + other charges (read-only) |
 | Paid now | `MoneyInput` 0…total, method Cash / Bank-wallet / Card |

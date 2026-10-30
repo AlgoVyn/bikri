@@ -181,6 +181,14 @@ describe('products (screens/08)', () => {
     );
   });
 
+  it('stores and updates the Urdu category name', async () => {
+    const db = await readyDb('cat-ur');
+    const category = await addCategory(db, 'Cables', 't1', {}, 'کیبل');
+    expect(category.name_ur).toBe('کیبل');
+    await updateCategory(db, category.id, { name_ur: 'کیبلز' });
+    expect((await db.categories.get(category.id))?.name_ur).toBe('کیبلز');
+  });
+
   it('AC 7: Duplicate keeps details and clears SKU, barcodes and opening stock; saving makes a new product', async () => {
     const db = await readyDb();
     const ctx = await ledgerContext(db, 'st-1');

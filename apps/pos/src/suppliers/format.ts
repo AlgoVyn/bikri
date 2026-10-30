@@ -1,12 +1,12 @@
-import { formatMoney } from '@bikri/core';
 import type { TFunction } from 'i18next';
 import type { SupplierStatementEntry } from '../data/suppliers.ts';
+import { formatShopMoney } from '../lib/money';
 
 export function supplierBalanceLabel(t: TFunction, balance: number): string {
   if (balance > 0)
-    return t('office.suppliers.you_owe', { amount: formatMoney(balance) });
+    return t('office.suppliers.you_owe', { amount: formatShopMoney(balance) });
   if (balance < 0)
-    return t('office.suppliers.advance', { amount: formatMoney(-balance) });
+    return t('office.suppliers.advance', { amount: formatShopMoney(-balance) });
   return t('office.suppliers.settled');
 }
 

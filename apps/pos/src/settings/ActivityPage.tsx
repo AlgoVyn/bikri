@@ -13,6 +13,7 @@ import {
   auditList,
 } from '../data/settings.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { formatBusinessDate } from '../lib/date.ts';
 import { downloadText } from '../lib/download.ts';
 import { addDays, longDate, timeText } from '../reports/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -81,6 +82,9 @@ function ActivityContent() {
             max={filters.to}
             onChange={(event) => update({ from: event.target.value })}
           />
+          <span className="text-text-muted">
+            {formatBusinessDate(filters.from, i18n.language, timeZone)}
+          </span>
         </label>
         <label className="flex flex-col gap-1 text-small">
           {t('office.activity.to')}
@@ -92,6 +96,9 @@ function ActivityContent() {
             max={today}
             onChange={(event) => update({ to: event.target.value })}
           />
+          <span className="text-text-muted">
+            {formatBusinessDate(filters.to, i18n.language, timeZone)}
+          </span>
         </label>
         <label className="flex flex-col gap-1 text-small">
           {t('office.activity.action')}

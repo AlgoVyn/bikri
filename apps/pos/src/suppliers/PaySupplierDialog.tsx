@@ -1,4 +1,4 @@
-import { formatMoney, newId } from '@bikri/core';
+import { newId } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { paySupplier, SupplierPaymentError } from '../data/purchases.ts';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -60,7 +61,9 @@ export function PaySupplierDialog({
         ctx,
       );
       toast.push(
-        t('office.suppliers.payment_saved', { amount: formatMoney(amount) }),
+        t('office.suppliers.payment_saved', {
+          amount: formatShopMoney(amount),
+        }),
       );
       onOpenChange(false);
     } catch (err) {
@@ -123,7 +126,7 @@ export function PaySupplierDialog({
       </div>
       <p className="text-small text-text-muted">
         {t('office.suppliers.balance_after', {
-          amount: formatMoney(balance - (amount ?? 0)),
+          amount: formatShopMoney(balance - (amount ?? 0)),
         })}
       </p>
       <div className="flex justify-end gap-2">

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { emptyCart } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
@@ -110,7 +111,7 @@ export function CustomerStatement({
         {t('office.udhaar.not_found')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   const { customer, statement, tz, today, balance, shopName } = data;
   const phone = String(customer.phone ?? '');
@@ -255,7 +256,7 @@ export function CustomerStatement({
           </div>
         </div>
         <p
-          className={`text-figure font-semibold ${balanceTone(balance)}`}
+          className={`whitespace-nowrap text-figure font-semibold ${balanceTone(balance)}`}
           data-testid="statement-balance"
         >
           {balanceLabel(t, balance)}
@@ -371,6 +372,11 @@ export function CustomerStatement({
             value={from}
             onChange={(e) => setFrom(e.target.value)}
           />
+          {from ? (
+            <span className="text-text-muted">
+              {dateText(from, i18n.language, tz)}
+            </span>
+          ) : null}
         </label>
         <label className="flex flex-col text-small">
           {t('office.udhaar.to')}
@@ -380,6 +386,11 @@ export function CustomerStatement({
             value={to}
             onChange={(e) => setTo(e.target.value)}
           />
+          {to ? (
+            <span className="text-text-muted">
+              {dateText(to, i18n.language, tz)}
+            </span>
+          ) : null}
         </label>
         {from || to ? (
           <button

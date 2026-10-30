@@ -1,6 +1,7 @@
 import { Link, Navigate } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -49,6 +50,7 @@ export function ImportPage() {
   const { staff, can } = useCurrentStaff();
   const [stage, setStage] = useState<Stage>({ step: 'choose' });
   const [readError, setReadError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const fileId = useId();
   if (!can('catalog.edit')) return <Navigate to="/products" replace />;
 
@@ -60,6 +62,7 @@ export function ImportPage() {
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     setReadError(null);
+    setFileName(file.name);
     try {
       const grid = await readSheetFile(file);
       if (grid.length < 2) {
@@ -112,10 +115,8 @@ export function ImportPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center gap-2">
+        <BackLink to="/products" label={t('import.back_to_products')} />
         <h1 className="me-auto text-h1 font-semibold">{t('import.title')}</h1>
-        <Link to="/products" className={buttonQuiet}>
-          {t('import.back_to_products')}
-        </Link>
       </div>
       <ol
         className="flex flex-wrap items-center gap-x-2 gap-y-1"
@@ -157,16 +158,24 @@ export function ImportPage() {
               max: MAX_IMPORT_ROWS.toLocaleString('en'),
             })}
           </p>
-          <label htmlFor={fileId} className="font-medium">
-            {t('import.choose_file')}
-          </label>
-          <input
-            id={fileId}
-            type="file"
-            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="min-h-11"
-            onChange={(e) => void onFile(e.target.files?.[0])}
-          />
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={fileId}
+              className="flex min-h-11 w-fit cursor-pointer items-center rounded-control border border-dashed border-border-strong bg-surface px-4 font-medium hover:bg-surface-2"
+            >
+              {t('import.choose_file')}
+            </label>
+            <input
+              id={fileId}
+              type="file"
+              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="sr-only"
+              onChange={(e) => void onFile(e.target.files?.[0])}
+            />
+            {fileName ? (
+              <p className="text-small text-text-muted">{fileName}</p>
+            ) : null}
+          </div>
           {readError ? (
             <p role="alert" className="text-danger">
               {readError}

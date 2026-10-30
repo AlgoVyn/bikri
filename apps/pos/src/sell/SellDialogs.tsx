@@ -1,4 +1,4 @@
-import { formatMoney, parsePkPhone } from '@bikri/core';
+import { parsePkPhone } from '@bikri/core';
 import type { HeldBill } from '@bikri/db';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -27,6 +27,7 @@ import {
   findCustomers,
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
+import { formatShopMoney } from '../lib/money';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
 import { Modal } from './Modal.tsx';
 
@@ -479,7 +480,7 @@ export function CustomerDialog({
                   </span>
                   {h.balance > 0 ? (
                     <span className="text-small text-warning">
-                      {t('sell.owes', { amount: formatMoney(h.balance) })}
+                      {t('sell.owes', { amount: formatShopMoney(h.balance) })}
                     </span>
                   ) : null}
                 </button>

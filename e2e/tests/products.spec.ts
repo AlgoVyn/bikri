@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import {
   expectNoHorizontalScroll,
   expectNoSeriousAxe,
+  idbUpdate,
   openReadyShop,
 } from './helpers.ts';
 
@@ -226,5 +227,47 @@ test.describe('Products (T-014)', () => {
     await page.getByRole('button', { name: 'Delete Cables' }).click();
     await expect(page.getByLabel('Name of Cables')).toHaveCount(0);
     await context.setOffline(false);
+  });
+
+  test('1280 keeps the list full width until a product is selected', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
+    await openReadyShop(page, '/bikri/products');
+    await page.evaluate(() =>
+      window.__bikriTest?.seedProducts([
+        { name: 'Full width product', price: 100000, stock: 5 },
+      ]),
+    );
+    await page.reload();
+    await expect(page.getByTestId('products-master')).toBeVisible();
+    const master = await page.getByTestId('products-master').boundingBox();
+    expect(master?.width ?? 0).toBeGreaterThan(900);
+    await expect(page.getByText('Select a product')).toHaveCount(0);
+    await expect(page.getByText('Full width product')).toBeVisible();
+
+    await page.getByRole('link', { name: /Full width product/ }).click();
+    await expect(page.getByTestId('products-detail')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sell' })).toBeVisible();
+    await page.getByRole('button', { name: 'Sell' }).click();
+    await expect(page).toHaveURL(/\/bikri\/sell/);
+    await expect(page.getByTestId('total-to-pay')).toContainText('Rs 1,000');
+  });
+
+  test('the shop Lakh setting changes the UI grouping and the receipt preview', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    const ids = await page.evaluate(
+      () =>
+        window.__bikriTest?.seedProducts([
+          { name: 'Large amount', price: 123456789, stock: 1 },
+        ]) ?? [],
+    );
+    const id = ids[0];
+    if (!id) throw new Error('missing product');
+    await idbUpdate(page, 'shop', 'shop', { number_grouping: 'lakh' });
+    await page.reload();
+    await expect(page.getByText('Rs 12,34,567.89').first()).toBeVisible();
   });
 });

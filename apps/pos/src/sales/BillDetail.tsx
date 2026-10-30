@@ -1,4 +1,4 @@
-import { businessDate, formatMoney, newId, saleLineFinal } from '@bikri/core';
+import { businessDate, newId, saleLineFinal } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useState } from 'react';
@@ -11,6 +11,7 @@ import {
   fieldClass,
 } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, type CartId, isEmptyCart, loadCarts } from '../data/cart.ts';
 import { ledgerContext } from '../data/catalog.ts';
@@ -24,6 +25,8 @@ import {
   shopTimeZone,
 } from '../data/salesHistory.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
+import { formatTimestamp } from '../lib/date';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
@@ -31,7 +34,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
-  localeOf,
   METHOD_KEYS,
   type ReasonKey,
   statusLabel,
@@ -166,7 +168,7 @@ export function BillDetail({
         {t('office.bill.not_found')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   const { detail, timeZone } = data;
   const sale = detail.sale;
@@ -174,14 +176,11 @@ export function BillDetail({
   const inclusive = sale.tax_inclusive === 1;
   const voidReason =
     detail.voidRow?.reason !== undefined ? String(detail.voidRow.reason) : '';
-  const fullDate = new Intl.DateTimeFormat(localeOf(i18n.language), {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  const fullDate = formatTimestamp(
+    Number(sale.created_at),
+    i18n.language,
     timeZone,
-  }).format(Number(sale.created_at));
+  );
 
   const askVoid = (mode: 'void' | 'reissue') => {
     // A manager's previous-day void needs another manager/owner to approve it (05 §5).
@@ -258,14 +257,14 @@ export function BillDetail({
     .reduce((sum, line) => sum + Number(line.line.qty_milli), 0);
   const voidSummary = [
     paidBack > 0
-      ? t('office.void.summary_paid', { amount: formatMoney(paidBack) })
+      ? t('office.void.summary_paid', { amount: formatShopMoney(paidBack) })
       : null,
     returnQty > 0
       ? t('office.void.summary_stock', { qty: returnQty / 1000 })
       : null,
     Number(sale.udhaar_amount) > 0
       ? t('office.void.summary_khata', {
-          amount: formatMoney(Number(sale.udhaar_amount)),
+          amount: formatShopMoney(Number(sale.udhaar_amount)),
           name: detail.customer ? String(detail.customer.name) : '',
         })
       : null,
@@ -320,7 +319,7 @@ export function BillDetail({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <button
           type="button"
           className={`${buttonQuiet} gap-2`}
@@ -501,7 +500,7 @@ export function BillDetail({
                     <span className="block text-text-muted sm:hidden">
                       {t('office.bill.qty_price', {
                         qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
-                        price: formatMoney(Number(line.unit_price)),
+                        price: formatShopMoney(Number(line.unit_price)),
                       })}
                     </span>
                     <span className="block text-small text-text-muted sm:hidden">
@@ -635,11 +634,13 @@ export function BillDetail({
                       {Number(p.cash_tendered ?? 0) > 0 ? (
                         <span className="block text-small text-text-muted">
                           {t('office.bill.tendered', {
-                            amount: formatMoney(Number(p.cash_tendered)),
+                            amount: formatShopMoney(Number(p.cash_tendered)),
                           })}{' '}
                           ·{' '}
                           {t('office.bill.change', {
-                            amount: formatMoney(Number(p.change_given ?? 0)),
+                            amount: formatShopMoney(
+                              Number(p.change_given ?? 0),
+                            ),
                           })}
                         </span>
                       ) : null}
@@ -687,11 +688,11 @@ export function BillDetail({
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <span>
-                    {new Intl.DateTimeFormat(localeOf(i18n.language), {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
+                    {formatTimestamp(
+                      Number(refund.created_at),
+                      i18n.language,
                       timeZone,
-                    }).format(Number(refund.created_at))}
+                    )}
                     {staffName ? ` · ${staffName}` : ''}
                   </span>
                   <span className="font-medium">
@@ -717,7 +718,7 @@ export function BillDetail({
                 {Number(refund.udhaar_part) > 0 ? (
                   <p>
                     {t('office.bill.refund_khata', {
-                      amount: formatMoney(Number(refund.udhaar_part)),
+                      amount: formatShopMoney(Number(refund.udhaar_part)),
                     })}
                   </p>
                 ) : null}
@@ -730,7 +731,7 @@ export function BillDetail({
                     )}
                     {Number(refund.rounding) !== 0
                       ? ` · ${t('office.bill.refund_rounding', {
-                          amount: formatMoney(Number(refund.rounding)),
+                          amount: formatShopMoney(Number(refund.rounding)),
                         })}`
                       : ''}
                   </p>
@@ -961,11 +962,11 @@ function AuditDialog({
                 <div className="flex flex-wrap justify-between gap-2">
                   <span className="font-medium">{String(row.action)}</span>
                   <span className="text-text-muted">
-                    {new Intl.DateTimeFormat(localeOf(i18n.language), {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
+                    {formatTimestamp(
+                      Number(row.created_at),
+                      i18n.language,
                       timeZone,
-                    }).format(Number(row.created_at))}
+                    )}
                   </span>
                 </div>
                 {row.after_json ? (

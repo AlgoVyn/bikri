@@ -28,6 +28,7 @@ import {
   uniqueSku,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { categoryName } from '../lib/category.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -116,7 +117,7 @@ export function ProductFormPage({
   /** Pre-filled from Sell's "No product with barcode …" toast (screens/05). */
   barcode?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -506,7 +507,7 @@ export function ProductFormPage({
                 <option value="">{t('form.no_category')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {String(c.name_en)}
+                    {categoryName(c, i18n.language)}
                   </option>
                 ))}
               </select>
@@ -838,33 +839,35 @@ export function ProductFormPage({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-tabbar z-20 flex flex-wrap justify-end gap-2 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
-        <button
-          type="button"
-          className={`${buttonQuiet} gap-2`}
-          onClick={() => (dirty ? setConfirmDiscard(true) : leave())}
-        >
-          {t('common.cancel')}
-        </button>
-        {isEdit ? null : (
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-end gap-2">
           <button
             type="button"
             className={`${buttonQuiet} gap-2`}
-            disabled={saving}
-            onClick={() => void submit(true)}
+            onClick={() => (dirty ? setConfirmDiscard(true) : leave())}
           >
-            {t('form.save_another')}
+            {t('common.cancel')}
+          </button>
+          {isEdit ? null : (
+            <button
+              type="button"
+              className={`${buttonQuiet} gap-2`}
+              disabled={saving}
+              onClick={() => void submit(true)}
+            >
+              {t('form.save_another')}
+              <span className="max-lg:hidden"></span>
+            </button>
+          )}
+          <button
+            type="submit"
+            className={`${buttonPrimary} gap-2`}
+            disabled={saving}
+          >
+            {t('form.save')}
             <span className="max-lg:hidden"></span>
           </button>
-        )}
-        <button
-          type="submit"
-          className={`${buttonPrimary} gap-2`}
-          disabled={saving}
-        >
-          {t('form.save')}
-          <span className="max-lg:hidden"></span>
-        </button>
+        </div>
       </div>
 
       <ConfirmDialog

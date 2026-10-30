@@ -583,6 +583,7 @@ export async function addCategory(
   name: string,
   color = 't1',
   opts: WriteOptions = {},
+  nameUr = '',
 ): Promise<MasterRow> {
   return writeAction(
     db,
@@ -592,7 +593,7 @@ export async function addCategory(
         rows.reduce((m, c) => Math.max(m, Number(c.sort_order ?? 0)), 0) + 1;
       return w.create('categories', {
         name_en: name.trim(),
-        name_ur: '',
+        name_ur: nameUr.trim(),
         color,
         sort_order: next,
       });
@@ -604,11 +605,12 @@ export async function addCategory(
 export async function updateCategory(
   db: BikriDb,
   id: string,
-  patch: { name_en?: string; color?: string },
+  patch: { name_en?: string; name_ur?: string; color?: string },
   opts: WriteOptions = {},
 ): Promise<void> {
   const clean: OpRow = {};
   if (patch.name_en !== undefined) clean.name_en = patch.name_en.trim();
+  if (patch.name_ur !== undefined) clean.name_ur = patch.name_ur.trim();
   if (patch.color !== undefined) clean.color = patch.color;
   await writeAction(db, (w) => w.update('categories', id, clean), opts);
 }

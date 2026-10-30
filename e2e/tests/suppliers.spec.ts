@@ -45,6 +45,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       .getByRole('button', { name: /Phone X/ })
       .first()
       .click();
+    await expect(page.getByTestId('delivery-line-count')).toHaveText('1 item');
     await page.getByLabel('Qty').first().fill('5');
     await page.getByLabel('Unit cost').first().fill('1200');
     await page.getByLabel('Paid now').fill('5500');

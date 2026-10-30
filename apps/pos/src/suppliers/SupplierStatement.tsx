@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -78,7 +79,7 @@ export function SupplierStatement({
         {t('office.suppliers.not_found')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   const { supplier, statement, balance, tz, shopName } = data;
   const name = String(supplier.name);
@@ -187,20 +188,20 @@ export function SupplierStatement({
           </div>
         </div>
         <p
-          className={`text-figure font-semibold ${supplierBalanceTone(balance)}`}
+          className={`whitespace-nowrap text-figure font-semibold ${supplierBalanceTone(balance)}`}
           data-testid="supplier-balance"
         >
           {supplierBalanceLabel(t, balance)}
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         {can('purchase.create') ? (
           <>
             <Link
               to="/suppliers/$supplierId/delivery/new"
               params={{ supplierId }}
-              className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
+              className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
               aria-disabled={readOnly}
               onClick={(event) => {
                 if (readOnly) event.preventDefault();
@@ -219,7 +220,7 @@ export function SupplierStatement({
             <Link
               to="/suppliers/$supplierId/return/new"
               params={{ supplierId }}
-              className={`${buttonQuiet} ${readOnly ? 'pointer-events-none opacity-50' : ''}`}
+              className={`${buttonQuiet} ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
               aria-disabled={readOnly}
               onClick={(event) => {
                 if (readOnly) event.preventDefault();

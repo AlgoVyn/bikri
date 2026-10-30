@@ -37,7 +37,7 @@ export function useOnline(): boolean {
 }
 
 /** Rail badge (03 §7): synced, pending, offline, error, outdated, downloading, read-only, quota. */
-export function SyncBadge() {
+export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
   const online = useOnline();
   const sync = useSyncState();
@@ -129,16 +129,16 @@ export function SyncBadge() {
   return (
     <Link
       to="/settings/sync"
-      data-testid="sync-badge"
+      data-testid={compact ? 'sync-badge-menu' : 'sync-badge'}
       data-state={state}
       // axe label-content-name-mismatch: the accessible name starts with the visible text.
       aria-label={detail === label ? label : `${label}. ${detail}`}
       title={detail}
-      className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${tone}`}
+      className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
     >
       <span aria-hidden="true" className="size-2 rounded-full bg-current" />
-      <span className="max-lg:hidden">{label}</span>
-      {state === 'pending' ? (
+      <span className={compact ? '' : 'max-lg:hidden'}>{label}</span>
+      {state === 'pending' && !compact ? (
         <bdi className="lg:hidden" aria-hidden="true">
           {counts.pending}
         </bdi>
@@ -148,7 +148,7 @@ export function SyncBadge() {
 }
 
 /** Printer status pill: green when set up, red when this device has no printer (T-020). */
-export function PrinterDot() {
+export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -169,10 +169,10 @@ export function PrinterDot() {
   return (
     <Link
       to="/settings/printer"
-      data-testid="printer-dot"
+      data-testid={compact ? 'printer-dot-menu' : 'printer-dot'}
       aria-label={visible === detail ? detail : `${visible}. ${detail}`}
       title={detail}
-      className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${
+      className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${
         loading
           ? 'bg-surface-2 text-text-muted'
           : failed
@@ -251,21 +251,9 @@ export function StaffMenu() {
               </p>
             </div>
           </div>
-          <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2 lg:hidden">
-            <Link
-              to="/settings/sync"
-              className="flex min-h-11 items-center rounded-control px-2 hover:bg-surface-2"
-              onClick={() => setOpen(false)}
-            >
-              {t('syncpage.title')}
-            </Link>
-            <Link
-              to="/settings/printer"
-              className="flex min-h-11 items-center rounded-control px-2 hover:bg-surface-2"
-              onClick={() => setOpen(false)}
-            >
-              {t('shell.printer_label')}
-            </Link>
+          <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2 lg:hidden">
+            <SyncBadge compact />
+            <PrinterDot compact />
           </div>
           <button
             type="button"

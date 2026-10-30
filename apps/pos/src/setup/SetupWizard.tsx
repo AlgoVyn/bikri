@@ -19,6 +19,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { SalesIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -326,29 +327,38 @@ export function SetupWizard() {
         onSubmit={onSubmit}
         className={`w-full ${step === 3 ? 'max-w-[960px]' : 'max-w-[560px]'} rounded-card border border-border bg-surface p-5 shadow-card`}
       >
-        <header className="mb-4 flex items-center gap-3">
+        <header className="mb-4 flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+          >
+            <SalesIcon />
+          </span>
           <span className="text-h2 font-semibold">{t('common.app_name')}</span>
           {step > 0 ? (
             <span className="text-small text-text-muted" aria-live="polite">
               {t('setup.step_of', { n: step })}
             </span>
           ) : null}
-          <label className="ms-auto">
-            <span className="sr-only">{t('shell.language')}</span>
-            <select
-              className="h-11 rounded-control border border-border-strong bg-surface px-2"
-              value={language}
-              onChange={(e) => {
-                if (isLocale(e.target.value)) void setLanguage(e.target.value);
-              }}
-            >
-              {LANGS.map(([code, key]) => (
-                <option key={code} value={code}>
-                  {t(key)}
-                </option>
-              ))}
-            </select>
-          </label>
+          {step > 0 ? (
+            <label className="ms-auto">
+              <span className="sr-only">{t('shell.language')}</span>
+              <select
+                className="h-11 rounded-control border border-border-strong bg-surface px-2"
+                value={language}
+                onChange={(e) => {
+                  if (isLocale(e.target.value))
+                    void setLanguage(e.target.value);
+                }}
+              >
+                {LANGS.map(([code, key]) => (
+                  <option key={code} value={code}>
+                    {t(key)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </header>
 
         {step > 0 ? (

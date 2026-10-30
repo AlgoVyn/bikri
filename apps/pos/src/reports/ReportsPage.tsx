@@ -1,4 +1,4 @@
-import { businessDate, formatMoney, mulDivRound } from '@bikri/core';
+import { businessDate, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { type ReportBundle, reportBundle } from '../data/reportBundle.ts';
@@ -15,6 +16,7 @@ import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { formatShopMoney } from '../lib/money';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { DailyChart, PaymentDonut } from './charts.tsx';
@@ -136,8 +138,7 @@ export function ReportsPage() {
       </p>
     );
 
-  if (data === undefined)
-    return <p className="sr-only">{t('common.loading')}</p>;
+  if (data === undefined) return <PageLoading compact />;
   if (data === null)
     return (
       <div className="mx-auto max-w-5xl p-4">
@@ -259,57 +260,59 @@ export function ReportsPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-1">
-        {(limited
-          ? PRESETS.filter((item) => item.id === 'today')
-          : PRESETS
-        ).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={preset === item.id}
-            className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-            onClick={() => setPreset(item.id)}
-          >
-            {t(item.key)}
-          </button>
-        ))}
-        {preset === 'custom' && !limited ? (
-          <span className="flex flex-wrap items-center gap-1">
-            <label className="flex items-center gap-1 text-small">
-              {t('office.reports.from')}
-              <input
-                type="date"
-                className={field}
-                value={custom.from}
-                max={data.today}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    from: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="flex items-center gap-1 text-small">
-              {t('office.reports.to')}
-              <input
-                type="date"
-                className={field}
-                value={custom.to}
-                min={custom.from}
-                max={data.today}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    to: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </span>
-        ) : null}
-        <span className="ms-auto text-small text-text-muted">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-1">
+          {(limited
+            ? PRESETS.filter((item) => item.id === 'today')
+            : PRESETS
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={preset === item.id}
+              className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
+              onClick={() => setPreset(item.id)}
+            >
+              {t(item.key)}
+            </button>
+          ))}
+          {preset === 'custom' && !limited ? (
+            <span className="flex flex-wrap items-center gap-1">
+              <label className="flex items-center gap-1 text-small">
+                {t('office.reports.from')}
+                <input
+                  type="date"
+                  className={field}
+                  value={custom.from}
+                  max={data.today}
+                  onChange={(event) =>
+                    setCustom((current) => ({
+                      ...current,
+                      from: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-1 text-small">
+                {t('office.reports.to')}
+                <input
+                  type="date"
+                  className={field}
+                  value={custom.to}
+                  min={custom.from}
+                  max={data.today}
+                  onChange={(event) =>
+                    setCustom((current) => ({
+                      ...current,
+                      to: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </span>
+          ) : null}
+        </div>
+        <span className="text-small text-text-muted">
           {longDate(bundle.range.from, lang)} –{' '}
           {longDate(bundle.range.to, lang)}
         </span>
@@ -499,28 +502,28 @@ function SummaryTab({
     summary.paymentMix.bank_wallet !== 0;
   return (
     <>
-      <ul className="flex flex-wrap gap-3">
-        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+      <ul className="flex flex-wrap justify-center gap-3">
+        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
           <Card
             label={t('office.reports.sold')}
             testId="report-sold"
             value={<MoneyText paisa={summary.sold} />}
           />
         </li>
-        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
           <Card
             label={t('office.reports.bills')}
             testId="report-bills"
             value={summary.bills}
           />
         </li>
-        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
           <Card
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
           />
         </li>
-        <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+        <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
           <Card
             label={t('office.reports.expenses')}
             value={<MoneyText paisa={summary.expenses} />}
@@ -528,20 +531,20 @@ function SummaryTab({
         </li>
         {cost ? (
           <>
-            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
               <Card
                 label={t('office.reports.gross_profit')}
                 testId="report-profit"
                 value={<MoneyText paisa={summary.grossProfit} />}
               />
             </li>
-            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
               <Card
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
               />
             </li>
-            <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+            <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
               <Card
                 label={t('office.reports.margin')}
                 value={percentText(summary.marginBp)}
@@ -550,7 +553,7 @@ function SummaryTab({
           </>
         ) : null}
         {bundle.taxEnabled || summary.tax !== 0 ? (
-          <li className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] lg:basis-[calc(25%-0.75rem)]">
+          <li className="min-w-0 basis-[calc(50%-6px)] last:max-sm:basis-full lg:basis-[calc(25%-9px)]">
             <Card
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}
@@ -618,7 +621,7 @@ function SummaryTab({
               <p className="mt-2 text-small text-text-muted">
                 {t('office.reports.refunds_note', {
                   count: summary.refundCount,
-                  amount: formatMoney(summary.refunded),
+                  amount: formatShopMoney(summary.refunded),
                 })}
               </p>
             </section>

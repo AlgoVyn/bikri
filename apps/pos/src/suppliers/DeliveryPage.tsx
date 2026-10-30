@@ -1,10 +1,4 @@
-import {
-  businessDate,
-  computePurchase,
-  formatMoney,
-  isQtyUnit,
-  newId,
-} from '@bikri/core';
+import { businessDate, computePurchase, isQtyUnit, newId } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -13,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -20,6 +15,8 @@ import { getDb } from '../data/db.ts';
 import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierBalance } from '../data/suppliers.ts';
+import { formatBusinessDate } from '../lib/date';
+import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Line = {
@@ -36,7 +33,7 @@ const field =
 
 /** Record a delivery / purchase (screens/13). */
 export function DeliveryPage({ supplierId }: { supplierId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff } = useCurrentStaff();
@@ -172,8 +169,8 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
       toast.push(
         t('office.suppliers.delivery_saved', {
           count: valid.length,
-          total: formatMoney(total),
-          balance: formatMoney(after),
+          total: formatShopMoney(total),
+          balance: formatShopMoney(after),
         }),
         'info',
         [
@@ -202,7 +199,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         {t('office.suppliers.not_found')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
@@ -210,15 +207,23 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         <Link
           to="/suppliers/$supplierId"
           params={{ supplierId }}
-          className={buttonQuiet}
+          aria-label={t('office.suppliers.back')}
+          title={t('office.suppliers.back')}
+          className={`${buttonQuiet} gap-1 px-2`}
         >
-          {t('office.suppliers.back')}
+          <span
+            aria-hidden="true"
+            className="text-title leading-none rtl:rotate-180"
+          >
+            ‹
+          </span>
+          <span>{t('common.back')}</span>
         </Link>
         <h1 className="me-auto text-h1 font-semibold">
           {t('office.suppliers.delivery_title')}
         </h1>
         <p className="text-small text-text-muted">
-          {String(data.supplier.name)} · {formatMoney(data.balance)}
+          {String(data.supplier.name)} · {formatShopMoney(data.balance)}
         </p>
       </div>
 
@@ -242,11 +247,25 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             value={chosenDate}
             onChange={(e) => setDate(e.target.value)}
           />
+          <span className="text-text-muted">
+            {formatBusinessDate(chosenDate, i18n.language)}
+          </span>
         </label>
       </section>
 
       <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-        <p className="text-small font-medium">{t('office.suppliers.lines')}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-small font-medium">
+            {t('office.suppliers.lines')}
+          </p>
+          <p
+            className="rounded-full bg-surface-2 px-2 text-small font-medium text-text"
+            data-testid="delivery-line-count"
+            aria-live="polite"
+          >
+            {t('office.suppliers.lines_count', { count: lines.length })}
+          </p>
+        </div>
         <search className="flex flex-col gap-1">
           <label className="flex min-w-0 flex-col">
             <span className="mb-1 text-small">

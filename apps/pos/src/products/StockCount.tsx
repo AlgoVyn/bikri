@@ -1,9 +1,10 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
-import { Link, Navigate } from '@tanstack/react-router';
+import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '../components/BackLink.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -60,10 +61,8 @@ export function StockCountPage() {
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center gap-2">
+          <BackLink to="/products" label={t('import.back_to_products')} />
           <h1 className="me-auto text-h1 font-semibold">{t('count.title')}</h1>
-          <Link to="/products" className={buttonQuiet}>
-            {t('import.back_to_products')}
-          </Link>
         </div>
         <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
           <fieldset className="flex flex-col gap-2">

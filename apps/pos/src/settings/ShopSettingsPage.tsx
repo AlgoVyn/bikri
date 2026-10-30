@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -175,7 +176,7 @@ function ShopForm() {
     toast.push(t('office.settings.saved'));
   };
 
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   return (
     <SettingsPageLayout title={t('office.settings.title')} icon={<StoreIcon />}>
@@ -307,6 +308,14 @@ function ShopForm() {
             <img src={logoUrl} alt={t('setup.logo_preview')} className="h-10" />
           ) : null}
         </div>
+        <button
+          type="button"
+          className={`${buttonPrimary} self-start`}
+          disabled={saving || readOnly}
+          onClick={() => void saveShop()}
+        >
+          {t('office.settings.save')}
+        </button>
       </section>
 
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">

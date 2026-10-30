@@ -16,6 +16,7 @@ import {
   type StockFilter,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { categoryName } from '../lib/category.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -44,7 +45,7 @@ export function ProductList({
   detailOpen?: boolean;
   selectedId?: string;
 } = {}) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
   const [query, setQuery] = useState('');
@@ -171,7 +172,7 @@ export function ProductList({
                   <button
                     type="button"
                     disabled={!rows || rows.length === 0}
-                    className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2 disabled:opacity-50"
+                    className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2 disabled:bg-surface-2 disabled:text-text-muted"
                     onClick={() => {
                       if (rows)
                         downloadText(
@@ -272,7 +273,7 @@ export function ProductList({
                 <option value="">{t('products.all_categories')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {String(c.name_en)}
+                    {categoryName(c, i18n.language)}
                   </option>
                 ))}
               </select>
@@ -495,7 +496,7 @@ function ProductRow({
   embedded: boolean;
   onToggle: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const p = row.product;
   const unit = String(p.unit ?? 'pc');
   const stockTone =
@@ -535,7 +536,7 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {String(row.category?.name_en ?? '')}
+              {categoryName(row.category, i18n.language)}
             </span>
           )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
@@ -593,7 +594,7 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {String(row.category?.name_en ?? '')}
+              {categoryName(row.category, i18n.language)}
             </span>
           )}
           <span className="text-end max-lg:row-start-1 max-lg:col-start-3">

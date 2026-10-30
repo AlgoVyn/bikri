@@ -1,4 +1,4 @@
-import { formatMoney, formatQtyFromMilli, mulDivRound } from '@bikri/core';
+import { formatQtyFromMilli, mulDivRound } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useState } from 'react';
@@ -12,6 +12,7 @@ import {
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { addProduct, CartFullError } from '../data/cart.ts';
 import {
   ledgerContext,
   ProductInUseError,
@@ -20,7 +21,13 @@ import {
   stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { categoryName } from '../lib/category.ts';
+import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
+import { formatShopMoney } from '../lib/money';
+import { shortDate } from '../reports/format.ts';
+import { useSellStore } from '../sell/sellStore.ts';
+import { mutateCart, useShopMoney } from '../sell/useSell.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -34,15 +41,6 @@ const LabelsDialog = lazy(() =>
   })),
 );
 
-const timeFmt = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'Asia/Karachi',
-});
-
 export function ProductDetailPage({
   id,
   adjust = false,
@@ -53,7 +51,7 @@ export function ProductDetailPage({
   adjust?: boolean;
   embedded?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -62,6 +60,8 @@ export function ProductDetailPage({
   const detail = useLiveQuery(() => productDetail(getDb(), id), [id]);
   const readOnly = useReadOnly();
   const canEdit = can('catalog.edit') && !readOnly;
+  const activeCart = useSellStore((state) => state.active);
+  const money = useShopMoney();
 
   useHotkey(plainKey('l'), () => setLabelsOpen(true), {
     enabled: can('catalog.edit') || can('purchase.create'),
@@ -93,6 +93,20 @@ export function ProductDetailPage({
   const maxQty = Math.max(1, ...detail.last14.map((d) => d.qty));
   const totalQty = detail.last14.reduce((s, d) => s + d.qty, 0);
   const totalRevenue = detail.last14.reduce((s, d) => s + d.revenue, 0);
+
+  const addToSale = async () => {
+    try {
+      await mutateCart(activeCart, (cart) =>
+        addProduct(cart, p, 1000, money.cost_method),
+      );
+      toast.push(t('pricecheck.added', { name: String(p.name_en) }), 'info');
+      void navigate({ to: '/sell' });
+    } catch (error) {
+      if (error instanceof CartFullError)
+        toast.push(t('sell.cart_full'), 'error');
+      else throw error;
+    }
+  };
 
   const exportHistory = () => {
     downloadText(
@@ -146,7 +160,7 @@ export function ProductDetailPage({
             </p>
           ) : null}
           <p className="text-text-muted">
-            {[p.brand, detail.category?.name_en]
+            {[p.brand, categoryName(detail.category, i18n.language)]
               .filter(Boolean)
               .map(String)
               .join(' · ')}
@@ -172,54 +186,63 @@ export function ProductDetailPage({
             ) : null}
           </dl>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canEdit ? (
-            <Link
-              to="/products/$id/edit"
-              params={{ id }}
-              className={`${buttonPrimary} gap-2`}
-            >
-              {t('products.edit')}
-            </Link>
-          ) : null}
-          {can('catalog.edit') || can('purchase.create') ? (
-            <button
-              type="button"
-              className={`${buttonQuiet} gap-2`}
-              onClick={() => setLabelsOpen(true)}
-            >
-              {t('products.print_label')}
-            </button>
-          ) : null}
-          {canEdit ? (
-            <Link
-              to="/products/new"
-              search={{ duplicate: id }}
-              className={buttonQuiet}
-            >
-              {t('products.duplicate')}
-            </Link>
-          ) : null}
-          {p.track_stock === 1 && can('stock.adjust') && !readOnly ? (
-            <Link
-              to="/products/$id/adjust"
-              params={{ id }}
-              className={buttonQuiet}
-            >
-              {t('adjust.button')}
-            </Link>
-          ) : null}
-          {can('catalog.delete') && !readOnly ? (
-            <button
-              type="button"
-              className={buttonDangerQuiet}
-              onClick={() => setConfirmDelete(true)}
-            >
-              {t('products.delete')}
-            </button>
-          ) : null}
-        </div>
       </header>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {can('sale.create') && !readOnly ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => void addToSale()}
+          >
+            {t('products.sell')}
+          </button>
+        ) : null}
+        {canEdit ? (
+          <Link
+            to="/products/$id/edit"
+            params={{ id }}
+            className={`${buttonPrimary} gap-2`}
+          >
+            {t('products.edit')}
+          </Link>
+        ) : null}
+        {can('catalog.edit') || can('purchase.create') ? (
+          <button
+            type="button"
+            className={`${buttonQuiet} gap-2`}
+            onClick={() => setLabelsOpen(true)}
+          >
+            {t('products.print_label')}
+          </button>
+        ) : null}
+        {canEdit ? (
+          <Link
+            to="/products/new"
+            search={{ duplicate: id }}
+            className={buttonQuiet}
+          >
+            {t('products.duplicate')}
+          </Link>
+        ) : null}
+        {p.track_stock === 1 && can('stock.adjust') && !readOnly ? (
+          <Link
+            to="/products/$id/adjust"
+            params={{ id }}
+            className={buttonQuiet}
+          >
+            {t('adjust.button')}
+          </Link>
+        ) : null}
+        {can('catalog.delete') && !readOnly ? (
+          <button
+            type="button"
+            className={buttonDangerQuiet}
+            onClick={() => setConfirmDelete(true)}
+          >
+            {t('products.delete')}
+          </button>
+        ) : null}
+      </div>
 
       <section
         aria-label={t('products.price')}
@@ -281,7 +304,7 @@ export function ProductDetailPage({
         <p className="text-small text-text-muted">
           {t('products.last14_total', {
             qty: qtyWithUnit(t, totalQty, unit),
-            amount: formatMoney(totalRevenue),
+            amount: formatShopMoney(totalRevenue),
           })}
         </p>
         {totalQty === 0 ? (
@@ -289,22 +312,40 @@ export function ProductDetailPage({
             {t('products.last14_empty')}
           </p>
         ) : (
-          <div
-            className="mt-3 flex h-24 items-end gap-1"
-            dir="ltr"
-            aria-hidden="true"
-          >
-            {detail.last14.map((d) => (
-              <span
-                key={d.date}
-                title={`${d.date}: ${formatQtyFromMilli(d.qty, unit)}`}
-                className="flex-1 rounded-t bg-primary"
-                style={{
-                  height: `${Math.max(2, (d.qty / maxQty) * 100)}%`,
-                  opacity: d.qty > 0 ? 1 : 0.25,
-                }}
-              />
-            ))}
+          <div className="mt-3 flex flex-col gap-1">
+            <div
+              className="flex h-24 items-end gap-1"
+              dir="ltr"
+              role="img"
+              aria-label={detail.last14
+                .map(
+                  (d) =>
+                    `${shortDate(d.date, i18n.language)}: ${formatQtyFromMilli(d.qty, unit)}`,
+                )
+                .join('; ')}
+            >
+              {detail.last14.map((d) => (
+                <span
+                  key={d.date}
+                  title={`${shortDate(d.date, i18n.language)}: ${formatQtyFromMilli(d.qty, unit)}`}
+                  className="flex-1 rounded-t bg-primary"
+                  style={{
+                    height: `${Math.max(2, (d.qty / maxQty) * 100)}%`,
+                    opacity: d.qty > 0 ? 1 : 0.25,
+                  }}
+                />
+              ))}
+            </div>
+            <div
+              className="flex justify-between text-small text-text-muted"
+              dir="ltr"
+            >
+              {[detail.last14[0], detail.last14.at(-1)]
+                .filter((d): d is NonNullable<typeof d> => d !== undefined)
+                .map((d) => (
+                  <span key={d.date}>{shortDate(d.date, i18n.language)}</span>
+                ))}
+            </div>
           </div>
         )}
       </section>
@@ -355,7 +396,10 @@ export function ProductDetailPage({
                     <tr key={h.movement.id} className="border-t border-border">
                       <td className="px-3 py-2">
                         <bdi dir="ltr" className="text-small">
-                          {timeFmt.format(Number(h.movement.created_at))}
+                          {formatTimestamp(
+                            Number(h.movement.created_at),
+                            i18n.language,
+                          )}
                         </bdi>
                       </td>
                       <td className="px-3 py-2">

@@ -1,4 +1,4 @@
-import { type CartResult, cashChips, formatMoney, newId } from '@bikri/core';
+import { type CartResult, cashChips, newId } from '@bikri/core';
 import type { Cart, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -46,6 +46,7 @@ import {
   WALLET_PROVIDERS,
 } from '../data/sale.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { formatShopMoney } from '../lib/money';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Modal } from './Modal.tsx';
@@ -316,13 +317,13 @@ function PayStep({
 
   const label =
     s.udhaar > 0 && s.paidTotal === 0
-      ? t('pay.write_khata', { amount: formatMoney(s.udhaar) })
+      ? t('pay.write_khata', { amount: formatShopMoney(s.udhaar) })
       : s.udhaar > 0
         ? t('pay.done_mixed', {
-            paid: formatMoney(s.paidTotal),
-            udhaar: formatMoney(s.udhaar),
+            paid: formatShopMoney(s.paidTotal),
+            udhaar: formatShopMoney(s.udhaar),
           })
-        : t('pay.done_paid', { amount: formatMoney(total) });
+        : t('pay.done_paid', { amount: formatShopMoney(total) });
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
@@ -441,10 +442,10 @@ function PayStep({
           >
             {t('pay.split')}
           </button>
-          <p data-testid="pay-running">
+          <p data-testid="pay-running" aria-live="polite">
             {t('pay.running', {
-              paid: formatMoney(s.paidTotal + s.udhaar),
-              remaining: formatMoney(s.remaining),
+              paid: formatShopMoney(s.paidTotal + s.udhaar),
+              remaining: formatShopMoney(s.remaining),
             })}
           </p>
         </div>
@@ -585,6 +586,7 @@ function MethodPanel({
               <p
                 className="text-title font-semibold text-success"
                 data-testid="pay-change"
+                aria-live="polite"
               >
                 <MoneyText paisa={change} />
               </p>
@@ -598,6 +600,7 @@ function MethodPanel({
               <p
                 className="text-title font-semibold text-warning"
                 data-testid="pay-due"
+                aria-live="polite"
               >
                 <MoneyText paisa={remaining} />
               </p>
@@ -701,17 +704,17 @@ function MethodPanel({
           className={credit.over_limit ? 'text-warning' : 'text-text-muted'}
         >
           {t('pay.credit_line', {
-            owes: formatMoney(credit.balance),
-            after: formatMoney(credit.balance_after),
+            owes: formatShopMoney(credit.balance),
+            after: formatShopMoney(credit.balance_after),
           })}
           {credit.limit !== null
-            ? ` · ${t('pay.credit_limit', { limit: formatMoney(credit.limit) })}`
+            ? ` · ${t('pay.credit_limit', { limit: formatShopMoney(credit.limit) })}`
             : ''}
           {credit.over_limit ? (
             <span className="block font-medium" role="status">
               {t('pay.over_limit', {
-                over: formatMoney(credit.over_by),
-                limit: formatMoney(credit.limit ?? 0),
+                over: formatShopMoney(credit.over_by),
+                limit: formatShopMoney(credit.limit ?? 0),
               })}
             </span>
           ) : null}

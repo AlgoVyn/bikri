@@ -1,4 +1,4 @@
-import { businessDate, formatMoney } from '@bikri/core';
+import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,7 @@ import {
 } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import {
   dayHeading,
@@ -425,7 +426,7 @@ export function SalesList({
             <p className="text-small text-text-muted">
               {t('office.sales.day_total', {
                 bills: day.bills,
-                amount: formatMoney(day.total),
+                amount: formatShopMoney(day.total),
               })}
             </p>
           </div>

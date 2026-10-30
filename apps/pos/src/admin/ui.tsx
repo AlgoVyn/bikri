@@ -79,9 +79,9 @@ export function Modal({
   );
 }
 
-export const primaryBtn = `${buttonPrimary} disabled:opacity-50`;
-export const quietBtn = `${buttonQuiet} disabled:opacity-50`;
-export const dangerBtn = `${buttonDanger} disabled:opacity-50`;
+export const primaryBtn = buttonPrimary;
+export const quietBtn = buttonQuiet;
+export const dangerBtn = buttonDanger;
 
 export const inputClass =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text focus:border-primary';

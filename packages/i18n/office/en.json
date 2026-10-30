@@ -25,8 +25,8 @@
       "range_month": "This month",
       "range_today": "Today",
       "range_yesterday": "Yesterday",
-      "search": "Search",
-      "search_placeholder": "Invoice no, customer or product",
+      "search": "Search bills",
+      "search_placeholder": "Bill, customer or product",
       "status_paid": "Paid",
       "status_part_refunded": "Part refunded",
       "status_refunded": "Refunded",
@@ -422,7 +422,9 @@
       "subtitle": "Deliveries, payments and returns",
       "select_supplier": "Select a supplier",
       "select_supplier_hint": "Deliveries, payments and balance appear here.",
-      "delivery_error_too_many": "This delivery would write too many changes at once. Save it as two deliveries."
+      "delivery_error_too_many": "This delivery would write too many changes at once. Save it as two deliveries.",
+      "lines_count_one": "{{count}} item",
+      "lines_count_other": "{{count}} items"
     },
     "expenses": {
       "amount": "Amount",

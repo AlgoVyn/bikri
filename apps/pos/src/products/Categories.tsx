@@ -29,6 +29,7 @@ export function CategoriesPage() {
   const readOnly = useReadOnly();
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [name, setName] = useState('');
+  const [nameUr, setNameUr] = useState('');
   if (!can('catalog.edit') || readOnly)
     return <Navigate to="/products" replace />;
 
@@ -43,7 +44,7 @@ export function CategoriesPage() {
         </Link>
       </div>
       <form
-        className="flex gap-2 rounded-card border border-border bg-surface p-3"
+        className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3 sm:flex-row"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim()) return;
@@ -51,22 +52,41 @@ export function CategoriesPage() {
             getDb(),
             name,
             CATEGORY_COLORS[(categories?.length ?? 0) % CATEGORY_COLORS.length],
+            {},
+            nameUr,
           );
           setName('');
+          setNameUr('');
         }}
       >
-        <label className="sr-only" htmlFor="new-category">
-          {t('categories.new')}
-        </label>
-        <input
-          id="new-category"
-          className={textField}
-          placeholder={t('categories.new')}
-          maxLength={40}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button type="submit" className={buttonPrimary} disabled={!name.trim()}>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <label className="sr-only" htmlFor="new-category">
+            {t('categories.new')}
+          </label>
+          <input
+            id="new-category"
+            className={textField}
+            placeholder={t('categories.new')}
+            maxLength={40}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            className={textField}
+            placeholder={t('categories.name_ur')}
+            aria-label={t('categories.name_ur')}
+            lang="ur"
+            dir="rtl"
+            maxLength={40}
+            value={nameUr}
+            onChange={(e) => setNameUr(e.target.value)}
+          />
+        </div>
+        <button
+          type="submit"
+          className={`${buttonPrimary} sm:self-start`}
+          disabled={!name.trim()}
+        >
           {t('form.add')}
         </button>
       </form>
@@ -88,19 +108,35 @@ export function CategoriesPage() {
                   aria-hidden="true"
                   className={`size-6 shrink-0 rounded-full ${tileBg(c.color)}`}
                 />
-                <input
-                  aria-label={t('categories.name', { name: label })}
-                  className={textField}
-                  maxLength={40}
-                  defaultValue={label}
-                  onBlur={(e) => {
-                    const next = e.target.value.trim();
-                    if (next && next !== label)
-                      void updateCategory(getDb(), c.id, { name_en: next });
-                    else e.target.value = label;
-                  }}
-                />
-                <span className="shrink-0 text-small text-text-muted">
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <input
+                    aria-label={t('categories.name', { name: label })}
+                    className={textField}
+                    maxLength={40}
+                    defaultValue={label}
+                    onBlur={(e) => {
+                      const next = e.target.value.trim();
+                      if (next && next !== label)
+                        void updateCategory(getDb(), c.id, { name_en: next });
+                      else e.target.value = label;
+                    }}
+                  />
+                  <input
+                    aria-label={t('categories.name_ur')}
+                    className={textField}
+                    lang="ur"
+                    dir="rtl"
+                    maxLength={40}
+                    placeholder={t('categories.name_ur')}
+                    defaultValue={String(c.name_ur ?? '')}
+                    onBlur={(e) => {
+                      const next = e.target.value.trim();
+                      if (next !== String(c.name_ur ?? ''))
+                        void updateCategory(getDb(), c.id, { name_ur: next });
+                    }}
+                  />
+                </span>
+                <span className="shrink-0 self-start text-small text-text-muted">
                   {t('categories.products', { count: c.productCount })}
                 </span>
               </div>
