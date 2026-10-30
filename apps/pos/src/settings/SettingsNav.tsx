@@ -19,6 +19,7 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { deviceInfo, tenantInfo } from '../data/localTenant.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { rememberListScroll } from '../lib/listScroll.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 const rowLink = 'flex min-h-14 items-center gap-3 p-3';
@@ -234,6 +235,8 @@ function SettingsRow({
     <li>
       <Link
         to={to}
+        resetScroll={false}
+        onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
         className={`${rowLink} ${
           current

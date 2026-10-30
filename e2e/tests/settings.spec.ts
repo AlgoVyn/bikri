@@ -175,6 +175,21 @@ test.describe('Settings (T-050)', () => {
     await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
   });
 
+  test('Settings keeps the nav scroll when a section opens', async ({
+    page,
+  }, testInfo) => {
+    await openReadyShop(page, '/bikri/settings');
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    await page.getByRole('link', { name: /About/ }).click();
+    await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+    const after = await page.evaluate(() => window.scrollY);
+    if (testInfo.project.name === 'phone') expect(after).toBe(0);
+    else expect(after).toBeGreaterThan(0);
+  });
+
   test('every Settings section has a Back button to Settings', async ({
     page,
   }) => {
