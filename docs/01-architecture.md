@@ -287,6 +287,8 @@ Permissions-Policy: camera=(self), usb=(self), serial=(self), bluetooth=()
 
 `no-transform` is required too: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131).
 
+The app shell has **no inline scripts**. The pre-paint theme snippet is the static asset `/bikri/theme-init.js`, loaded with a blocking `<script src>` before the app module so the chosen theme is applied before first paint while `script-src 'self'` stays strict (D-149).
+
 These headers apply only to responses under `/bikri/`. HSTS deliberately omits `includeSubDomains`, because it would be sent for the whole `algovyn.com` domain and force HTTPS on every Algovyn subdomain; add it only if the owner confirms all subdomains are HTTPS.
 
 ### 5.3 Coexisting with the Algovyn website on `algovyn.com`

@@ -12,6 +12,23 @@ function pngSize(bytes: Buffer): { width: number; height: number } {
 }
 
 describe('self-hosted PWA assets', () => {
+  it('loads the pre-paint theme without an inline script', async () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+    const html = await readFile(join(root, 'index.html'), 'utf8');
+    expect(html).toContain('src="%BASE_URL%theme-init.js"');
+    const inline = [
+      ...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi),
+    ].filter((match) => {
+      const attrs = match[1] ?? '';
+      const body = match[2] ?? '';
+      return !/\bsrc\s*=/i.test(attrs) && body.trim() !== '';
+    });
+    expect(inline).toEqual([]);
+    const theme = await readFile(join(publicDir, 'theme-init.js'), 'utf8');
+    expect(theme).toContain("localStorage.getItem('bikri.theme')");
+    expect(theme).toContain('document.documentElement.dataset.theme = theme');
+  });
+
   it('ships OFL licences and woff2 faces', async () => {
     for (const name of [
       'OFL-inter.txt',
