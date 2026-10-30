@@ -322,32 +322,56 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
               return (
                 <li
                   key={line.key}
-                  className="flex flex-wrap items-end gap-2 rounded-control border border-border p-2"
+                  data-testid="delivery-line"
+                  className="rounded-card border border-border bg-surface p-3"
                 >
-                  <div className="min-w-0 flex-[2_1_12rem]">
-                    <p className="truncate text-small font-medium">
-                      {String(line.product.name_en)}
-                    </p>
-                    <p className="text-small text-text-muted">
-                      {t('office.suppliers.line_total')}:{' '}
-                      <MoneyText paisa={lineResult?.line_total ?? 0} />
-                    </p>
-                  </div>
-                  <div className="w-32">
-                    <QtyInput
-                      label={t('office.suppliers.qty')}
-                      unit={unit}
-                      value={line.qtyMilli}
-                      onChange={(milli) =>
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-medium">
+                        {String(line.product.name_en)}
+                      </p>
+                      <p className="text-small text-text-muted">
+                        {unit} · {t('office.suppliers.line_total')}:{' '}
+                        <MoneyText paisa={lineResult?.line_total ?? 0} />
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-danger"
+                      aria-label={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
+                      title={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
+                      onClick={() =>
                         setLines((current) =>
-                          current.map((l, i) =>
-                            i === index ? { ...l, qtyMilli: milli ?? 0 } : l,
-                          ),
+                          current.filter((_, i) => i !== index),
                         )
                       }
-                    />
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="text-title leading-none"
+                      >
+                        ×
+                      </span>
+                    </button>
                   </div>
-                  <div className="w-36">
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div
+                      className="col-span-2 sm:col-span-1"
+                      data-testid="delivery-line-qty"
+                    >
+                      <QtyInput
+                        label={t('office.suppliers.qty')}
+                        unit={unit}
+                        value={line.qtyMilli}
+                        onChange={(milli) =>
+                          setLines((current) =>
+                            current.map((l, i) =>
+                              i === index ? { ...l, qtyMilli: milli ?? 0 } : l,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
                     <MoneyInput
                       label={t('office.suppliers.unit_cost')}
                       value={line.unitCost}
@@ -359,49 +383,44 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                         )
                       }
                     />
-                  </div>
-                  <label className="flex items-center gap-1 text-small">
-                    <input
-                      type="checkbox"
-                      checked={line.updatePrice}
-                      onChange={(e) =>
-                        setLines((current) =>
-                          current.map((l, i) =>
-                            i === index
-                              ? { ...l, updatePrice: e.target.checked }
-                              : l,
-                          ),
-                        )
-                      }
-                    />
-                    {t('office.suppliers.update_price')}
-                  </label>
-                  {line.updatePrice ? (
-                    <div className="w-36">
-                      <MoneyInput
-                        label={t('office.suppliers.price')}
-                        value={line.price}
-                        onChange={(paisa) =>
-                          setLines((current) =>
-                            current.map((l, i) =>
-                              i === index ? { ...l, price: paisa ?? 0 } : l,
-                            ),
-                          )
-                        }
-                      />
+                    <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
+                      <label className="flex min-h-11 items-center gap-2 text-small">
+                        <input
+                          type="checkbox"
+                          className="size-5"
+                          checked={line.updatePrice}
+                          onChange={(e) =>
+                            setLines((current) =>
+                              current.map((l, i) =>
+                                i === index
+                                  ? { ...l, updatePrice: e.target.checked }
+                                  : l,
+                              ),
+                            )
+                          }
+                        />
+                        {t('office.suppliers.update_price')}
+                      </label>
+                      {line.updatePrice ? (
+                        <MoneyInput
+                          label={t('office.suppliers.price')}
+                          value={line.price}
+                          onChange={(paisa) =>
+                            setLines((current) =>
+                              current.map((l, i) =>
+                                i === index ? { ...l, price: paisa ?? 0 } : l,
+                              ),
+                            )
+                          }
+                        />
+                      ) : (
+                        <p className="text-small text-text-muted">
+                          {t('office.suppliers.price')}:{' '}
+                          <MoneyText paisa={Number(line.product.price ?? 0)} />
+                        </p>
+                      )}
                     </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    onClick={() =>
-                      setLines((current) =>
-                        current.filter((_, i) => i !== index),
-                      )
-                    }
-                  >
-                    {t('office.suppliers.remove')}
-                  </button>
+                  </div>
                 </li>
               );
             })}

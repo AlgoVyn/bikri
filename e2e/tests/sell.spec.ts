@@ -122,7 +122,11 @@ test.describe('Sell (T-016)', () => {
       .getByTestId('cart-line')
       .getByRole('button', { name: /^Galaxy A15/ })
       .click();
-    await page.getByLabel('Discount (Rs)').fill('2000');
+    await page
+      .getByTestId('cart-line')
+      .filter({ hasText: 'Galaxy A15' })
+      .getByLabel('Discount (Rs)')
+      .fill('2000');
     await page.keyboard.press('F3');
     const dialog = page.getByRole('dialog', { name: 'Bill discount' });
     await dialog.getByLabel('Discount', { exact: true }).fill('500');
@@ -300,5 +304,24 @@ test.describe('Sell (T-016)', () => {
     ).toBeVisible();
     await expectNoHorizontalScroll(page);
     await page.getByLabel('زبان').selectOption('en');
+  });
+
+  test('line price and discount are editable without opening the detail panel', async ({
+    page,
+  }) => {
+    await openSell(page, [
+      { name: 'Galaxy A15', price: 4200000, cost: 3800000, stock: 5 },
+    ]);
+    await tile(page, 'Galaxy A15').click();
+    await showCart(page);
+    await expect(page.getByLabel('Unit price')).toBeVisible();
+    await expect(page.getByLabel('Discount (Rs)')).toBeVisible();
+    await page.getByLabel('Unit price').fill('43000');
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 43,000');
+    await page.getByLabel('Discount (Rs)').fill('500');
+    await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 42,500');
+    await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 500');
+    await expectNoHorizontalScroll(page);
   });
 });

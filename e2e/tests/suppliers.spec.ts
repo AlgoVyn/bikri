@@ -47,6 +47,14 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       .click();
     await expect(page.getByTestId('delivery-line-count')).toHaveText('1 item');
     await page.getByLabel('Qty').first().fill('5');
+    await expect(
+      page.getByTestId('delivery-line-qty').getByLabel('Qty'),
+    ).toHaveValue('5');
+    const qtyBox = await page
+      .getByTestId('delivery-line-qty')
+      .getByLabel('Qty')
+      .boundingBox();
+    expect(qtyBox?.width ?? 0).toBeGreaterThan(45);
     await page.getByLabel('Unit cost').first().fill('1200');
     await page.getByLabel('Paid now').fill('5500');
     await page.getByRole('button', { name: 'Cash' }).click();
