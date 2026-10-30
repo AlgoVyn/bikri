@@ -58,6 +58,8 @@ export function MoneyInput({
   large = false,
   name,
   trailing,
+  leading,
+  placeholder,
 }: {
   id?: string;
   label: string;
@@ -67,8 +69,11 @@ export function MoneyInput({
   /** Taller, larger field for the amount that matters (e.g. cash received). */
   large?: boolean;
   name?: string;
-  /** Small control beside the label (e.g. the Rs/% switch on a line discount). */
+  /** Small control beside the label (e.g. a hint). */
   trailing?: ReactNode;
+  /** Full-height control at the start of the field (e.g. the Rs/% switch); replaces the Rs prefix. */
+  leading?: ReactNode;
+  placeholder?: string;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -91,15 +96,20 @@ export function MoneyInput({
       </div>
       <div
         dir="ltr"
-        className={`flex items-center gap-2 rounded-control border border-border-strong bg-surface px-3 ${large ? 'h-14' : 'h-11'}`}
+        className={`flex items-stretch rounded-control border border-border-strong bg-surface ${large ? 'h-14' : 'h-11'}`}
       >
-        <bdi className="font-mono text-text-muted">Rs</bdi>
+        {leading ?? (
+          <bdi className="flex shrink-0 items-center ps-3 font-mono text-text-muted">
+            Rs
+          </bdi>
+        )}
         <input
           id={inputId}
           name={name}
           inputMode="decimal"
           autoComplete="off"
-          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none ${large ? 'text-title' : 'text-body'}`}
+          placeholder={placeholder}
+          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted ${large ? 'text-title' : 'text-body'} ${leading ? 'px-3' : 'ps-2 pe-3'}`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}

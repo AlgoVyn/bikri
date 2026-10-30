@@ -1,12 +1,8 @@
 import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
 import type { Cart, CartLine } from '@bikri/db';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
+import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { SellIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -19,7 +15,7 @@ import {
   type ShopMoney,
 } from '../data/cart.ts';
 import { formatShopMoney } from '../lib/money';
-import { LineEditor, percentToBp } from './LineEditor.tsx';
+import { LineEditor } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
 
 export type CartPanelProps = {
@@ -317,16 +313,18 @@ function LineRow({
   const unit = (line.unit ?? 'pc') as QtyUnit;
   const short =
     line.track_stock === 1 && onHand !== undefined && line.qty_milli > onHand;
+  const hasBadges =
+    (result?.discount ?? 0) > 0 || result?.below_cost === 1 || short;
   return (
     <li
       data-testid="cart-line"
       aria-current={selected || undefined}
       className={`rounded-card border bg-surface-2/60 p-3 ${selected ? 'border-primary' : 'border-border'}`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          className="min-h-11 min-w-0 flex-1 text-start"
+          className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-start"
           aria-expanded={expanded}
           onClick={() => {
             p.onSelect(line.key);
@@ -336,12 +334,13 @@ function LineRow({
           <span className="ltr-name block font-medium" data-testid="line-name">
             {line.name}
           </span>
-          <span className="block text-small text-text-muted">
-            <MoneyText paisa={line.unit_price} />
-            {line.note ? <span className="ms-2">· {line.note}</span> : null}
-          </span>
+          {line.note ? (
+            <span className="block text-small text-text-muted">
+              {line.note}
+            </span>
+          ) : null}
         </button>
-        <span className="shrink-0 pt-2 font-medium" data-testid="line-total">
+        <span className="shrink-0 font-medium" data-testid="line-total">
           <MoneyText paisa={result?.net ?? 0} />
         </span>
         <button
@@ -377,34 +376,36 @@ function LineRow({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {result && result.discount > 0 ? (
-          <span
-            className="rounded-full bg-success-subtle px-2 text-small text-success-subtle-ink"
-            data-testid="badge-discount"
-          >
-            <MoneyText paisa={-result.discount} />
-          </span>
-        ) : null}
-        {result?.below_cost === 1 ? (
-          <span
-            className="rounded-full bg-danger-subtle px-2 text-small font-medium text-danger-subtle-ink"
-            data-testid="badge-below-cost"
-          >
-            {t('sell.below_cost')}
-          </span>
-        ) : null}
-        {short ? (
-          <span
-            className="rounded-full bg-warning-subtle px-2 text-small text-warning-subtle-ink"
-            data-testid="badge-stock"
-          >
-            {t('sell.only_in_stock', {
-              qty: Math.max(0, Math.floor((onHand ?? 0) / 1000)),
-            })}
-          </span>
-        ) : null}
-      </div>
+      {hasBadges ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {result && result.discount > 0 ? (
+            <span
+              className="rounded-full bg-success-subtle px-2 text-small text-success-subtle-ink"
+              data-testid="badge-discount"
+            >
+              <MoneyText paisa={-result.discount} />
+            </span>
+          ) : null}
+          {result?.below_cost === 1 ? (
+            <span
+              className="rounded-full bg-danger-subtle px-2 text-small font-medium text-danger-subtle-ink"
+              data-testid="badge-below-cost"
+            >
+              {t('sell.below_cost')}
+            </span>
+          ) : null}
+          {short ? (
+            <span
+              className="rounded-full bg-warning-subtle px-2 text-small text-warning-subtle-ink"
+              data-testid="badge-stock"
+            >
+              {t('sell.only_in_stock', {
+                qty: Math.max(0, Math.floor((onHand ?? 0) / 1000)),
+              })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {expanded ? (
         <LineEditor
@@ -453,7 +454,42 @@ function InlinePrice({
   );
 }
 
-/** Line discount directly on the line, with a compact Rs/% switch. */
+/** Compact Rs/% selector that lives inside the discount field. */
+function DiscountTypeToggle({
+  type,
+  onChange,
+}: {
+  type: 'amount' | 'percent';
+  onChange: (type: 'amount' | 'percent') => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a two-button toggle inside the field, not a form fieldset
+    <div
+      role="group"
+      aria-label={t('sell.discount_type')}
+      className="flex shrink-0 items-stretch border-e border-border-strong"
+    >
+      {(['amount', 'percent'] as const).map((key) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={type === key}
+          className={`w-7 text-small font-medium first:rounded-s-control ${
+            type === key
+              ? 'bg-primary-subtle text-primary-subtle-ink'
+              : 'text-text-muted hover:bg-surface-2'
+          }`}
+          onClick={() => onChange(key)}
+        >
+          {key === 'amount' ? 'Rs' : '%'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Line discount directly on the line, with the Rs/% switch inside the field. */
 function InlineDiscount({
   line,
   gross,
@@ -465,70 +501,28 @@ function InlineDiscount({
 }) {
   const { t } = useTranslation();
   const type = line.discount_type ?? 'amount';
-  const pctId = useId();
-  const [pct, setPct] = useState(
-    type === 'percent' && line.discount_value
-      ? String(line.discount_value / 100)
-      : '',
-  );
   const overMax = type === 'amount' && line.discount_value > gross;
-  const switchType = () => {
-    const next = type === 'amount' ? 'percent' : 'amount';
-    setPct('');
+  const switchType = (next: 'amount' | 'percent') => {
+    if (next === type) return;
     onChange({ discount_type: next, discount_value: 0 });
   };
-  const toggle = (
-    <button
-      type="button"
-      className="min-h-6 shrink-0 rounded px-1 text-small font-medium text-primary underline"
-      aria-label={t('sell.discount_type')}
-      title={t('sell.discount_type')}
-      onClick={switchType}
-    >
-      {type === 'amount' ? '%' : 'Rs'}
-    </button>
-  );
-  if (type === 'amount') {
-    return (
-      <>
-        <MoneyInput
-          label={t('sell.line_discount')}
-          value={line.discount_value || null}
-          trailing={toggle}
-          onChange={(value) =>
-            onChange({ discount_type: 'amount', discount_value: value ?? 0 })
-          }
-        />
-        {overMax ? (
-          <p className="mt-1 text-small text-danger" data-testid="discount-max">
-            {t('sell.discount_max', { amount: formatShopMoney(gross) })}
-          </p>
-        ) : null}
-      </>
-    );
-  }
   return (
-    <>
-      <div className="mb-1 flex items-center justify-between gap-1">
-        <label htmlFor={pctId} className="text-small text-text">
-          {t('sell.line_discount_pct')}
-        </label>
-        {toggle}
-      </div>
-      <input
-        id={pctId}
-        inputMode="decimal"
-        dir="ltr"
-        className={fieldClass}
-        value={pct}
-        onChange={(event) => {
-          setPct(event.target.value);
-          onChange({
-            discount_type: 'percent',
-            discount_value: percentToBp(event.target.value) ?? 0,
-          });
-        }}
+    <div>
+      <MoneyInput
+        key={type}
+        label={t('sell.discount')}
+        value={line.discount_value || null}
+        placeholder="0"
+        leading={<DiscountTypeToggle type={type} onChange={switchType} />}
+        onChange={(value) =>
+          onChange({ discount_type: type, discount_value: value ?? 0 })
+        }
       />
-    </>
+      {overMax ? (
+        <p className="mt-1 text-small text-danger" data-testid="discount-max">
+          {t('sell.discount_max', { amount: formatShopMoney(gross) })}
+        </p>
+      ) : null}
+    </div>
   );
 }
