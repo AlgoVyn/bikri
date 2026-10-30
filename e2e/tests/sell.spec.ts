@@ -125,7 +125,7 @@ test.describe('Sell (T-016)', () => {
     await page
       .getByTestId('cart-line')
       .filter({ hasText: 'Galaxy A15' })
-      .getByLabel('Discount (Rs)')
+      .getByLabel('Discount', { exact: true })
       .fill('2000');
     await page.keyboard.press('F3');
     const dialog = page.getByRole('dialog', { name: 'Bill discount' });
@@ -215,7 +215,7 @@ test.describe('Sell (T-016)', () => {
       .getByTestId('cart-line')
       .getByRole('button', { name: /^Glass/ })
       .click();
-    await page.getByLabel('Discount (Rs)').fill('50');
+    await page.getByLabel('Discount', { exact: true }).fill('50');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 250');
     await page.getByRole('button', { name: /^Hold/ }).click();
     const hold = page.getByRole('dialog', { name: 'Hold this bill' });
@@ -314,14 +314,40 @@ test.describe('Sell (T-016)', () => {
     ]);
     await tile(page, 'Galaxy A15').click();
     await showCart(page);
-    await expect(page.getByLabel('Unit price')).toBeVisible();
-    await expect(page.getByLabel('Discount (Rs)')).toBeVisible();
-    await page.getByLabel('Unit price').fill('43000');
+    const line = page
+      .getByTestId('cart-line')
+      .filter({ hasText: 'Galaxy A15' });
+    await expect(line.getByLabel('Unit price')).toBeVisible();
+    await expect(line.getByLabel('Discount', { exact: true })).toBeVisible();
+    if (!isPhone(page)) {
+      const price = await line
+        .getByLabel('Unit price')
+        .locator('..')
+        .boundingBox();
+      const discount = await line
+        .getByLabel('Discount', { exact: true })
+        .locator('..')
+        .boundingBox();
+      expect(
+        Math.abs((price?.y ?? 0) - (discount?.y ?? 0)),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((price?.width ?? 0) - (discount?.width ?? 0)),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((price?.height ?? 0) - (discount?.height ?? 0)),
+      ).toBeLessThanOrEqual(1);
+    }
+    await line.getByLabel('Unit price').fill('43000');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 43,000');
-    await page.getByLabel('Discount (Rs)').fill('500');
+    await line.getByLabel('Discount', { exact: true }).fill('500');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 42,500');
     await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 500');
+    await line.getByRole('button', { name: '%', exact: true }).click();
+    await line.getByLabel('Discount', { exact: true }).fill('10');
+    await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 38,700');
+    await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 4,300');
     await expectNoHorizontalScroll(page);
   });
 });
