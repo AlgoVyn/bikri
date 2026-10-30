@@ -46,6 +46,7 @@ export function UdhaarList({
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
   const [sort, setSort] = useState<CustomerSort>('balance');
   const [newOpen, setNewOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -69,6 +70,8 @@ export function UdhaarList({
     enabled: can('party.edit') && !readOnly,
   });
 
+  const activeFilterCount =
+    (filter === 'all' ? 0 : 1) + (sort === 'balance' ? 0 : 1);
   const filters: CustomerFilter[] = [
     'all',
     'owes',
@@ -161,34 +164,55 @@ export function UdhaarList({
             />
           </span>
         </label>
-        <label className="flex flex-col">
-          <span className="mb-1 text-small">{t('office.udhaar.filter')}</span>
-          <select
-            className={selectClass}
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as CustomerFilter)}
-          >
-            {filters.map((value) => (
-              <option key={value} value={value}>
-                {t(`office.udhaar.filter_${value}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col">
-          <span className="mb-1 text-small">{t('office.udhaar.sort')}</span>
-          <select
-            className={selectClass}
-            value={sort}
-            onChange={(e) => setSort(e.target.value as CustomerSort)}
-          >
-            {sorts.map((value) => (
-              <option key={value} value={value}>
-                {t(`office.udhaar.sort_${value}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button
+          type="button"
+          className={`${buttonQuiet} gap-2 self-end sm:hidden`}
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          {t('common.filters')}
+          {activeFilterCount > 0 ? (
+            <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </button>
+        <div
+          className={
+            filtersOpen
+              ? 'flex w-full flex-wrap items-end gap-2'
+              : 'hidden sm:flex sm:flex-wrap sm:items-end sm:gap-2'
+          }
+        >
+          <label className="flex flex-col">
+            <span className="mb-1 text-small">{t('office.udhaar.filter')}</span>
+            <select
+              className={selectClass}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as CustomerFilter)}
+            >
+              {filters.map((value) => (
+                <option key={value} value={value}>
+                  {t(`office.udhaar.filter_${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col">
+            <span className="mb-1 text-small">{t('office.udhaar.sort')}</span>
+            <select
+              className={selectClass}
+              value={sort}
+              onChange={(e) => setSort(e.target.value as CustomerSort)}
+            >
+              {sorts.map((value) => (
+                <option key={value} value={value}>
+                  {t(`office.udhaar.sort_${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </search>
 
       {data && data.rows.length === 0 ? (
@@ -231,7 +255,7 @@ export function UdhaarList({
                   className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.customer.id === selectedId ? 'bg-primary-subtle' : ''}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
-                    <span className="block truncate font-medium">
+                    <span className="line-clamp-2 break-words font-medium">
                       {String(row.customer.name)}
                     </span>
                     <span
@@ -243,7 +267,7 @@ export function UdhaarList({
                   </span>
                   <span className="min-w-0 flex-[1_1_8rem] text-small">
                     <span
-                      className={`block font-medium ${balanceTone(row.balance)}`}
+                      className={`block whitespace-nowrap font-medium ${balanceTone(row.balance)}`}
                     >
                       {balanceLabel(t, row.balance)}
                     </span>
@@ -266,13 +290,12 @@ export function UdhaarList({
                             style={{ width: `${percent}%` }}
                           />
                         </span>
-                        <span className="block text-text-muted">
-                          {t('office.udhaar.limit_value', {
-                            used: Math.round(row.balance / 100),
-                            limit: Math.round(
-                              Number(row.customer.credit_limit ?? 0) / 100,
-                            ),
-                          })}
+                        <span className="flex flex-wrap items-center gap-x-1 text-text-muted">
+                          <MoneyText paisa={row.balance} />
+                          <span aria-hidden="true">/</span>
+                          <MoneyText
+                            paisa={Number(row.customer.credit_limit ?? 0)}
+                          />
                         </span>
                       </>
                     ) : null}

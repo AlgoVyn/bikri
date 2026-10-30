@@ -1,4 +1,3 @@
-import { formatMoney } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import {
   barcodeLabelSvg,
@@ -17,6 +16,7 @@ import { addProductBarcode, generateBarcode } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -225,7 +225,7 @@ function LabelsDialogContent({
         labels.push(`<div class="label">
           ${settings.showShop ? `<div class="shop">${escapeHtml(data?.shopName ?? '')}</div>` : ''}
           <div class="name">${escapeHtml(labelName(product))}</div>
-          ${settings.showPrice ? `<div class="price">${formatMoney(Number(product.price))}</div>` : ''}
+          ${settings.showPrice ? `<div class="price">${formatShopMoney(Number(product.price))}</div>` : ''}
           <div class="bars">${svg.svg}</div>
           <div class="value">${escapeHtml(row.barcode)}</div>
         </div>`);
@@ -350,9 +350,10 @@ function LabelsDialogContent({
             <option value="a4">{t('office.labels.size_a4')}</option>
           </select>
         </label>
-        <label className="flex items-center gap-2 self-end text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5"
             checked={settings.showShop}
             onChange={(event) =>
               setSettings({ ...settings, showShop: event.target.checked })
@@ -360,9 +361,10 @@ function LabelsDialogContent({
           />
           {t('office.labels.show_shop')}
         </label>
-        <label className="flex items-center gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5"
             checked={settings.showPrice}
             onChange={(event) =>
               setSettings({ ...settings, showPrice: event.target.checked })

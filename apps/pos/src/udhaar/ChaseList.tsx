@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
+import { BackLink } from '../components/BackLink.tsx';
+import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -72,9 +73,7 @@ export function ChaseList() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Link to="/udhaar" className={buttonQuiet}>
-          {t('office.udhaar.back_customers')}
-        </Link>
+        <BackLink to="/udhaar" label={t('office.udhaar.back_customers')} />
         <h1 className="me-auto text-h1 font-semibold">
           {t('office.udhaar.chase_title')}
         </h1>
@@ -131,7 +130,7 @@ export function ChaseList() {
                 <Link
                   to="/udhaar/$customerId"
                   params={{ customerId: row.customer.customer.id }}
-                  className="min-w-0 flex-[2_1_10rem] hover:underline"
+                  className="min-w-0 flex-[2_1_12rem] hover:underline"
                 >
                   <span className="block truncate font-medium">
                     {String(row.customer.customer.name)}
@@ -144,11 +143,11 @@ export function ChaseList() {
                   </span>
                 </Link>
                 <span
-                  className={`min-w-0 flex-[1_1_6rem] text-end text-small font-medium ${balanceTone(row.customer.balance)}`}
+                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-end text-small font-medium max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
                 >
                   {balanceLabel(t, row.customer.balance)}
                 </span>
-                <span className="flex flex-wrap gap-1">
+                <span className="grid w-full grid-cols-2 gap-1 sm:w-auto sm:grid-cols-4">
                   <button
                     type="button"
                     className={buttonQuiet}
@@ -180,7 +179,7 @@ export function ChaseList() {
                   {can('payment.receive') ? (
                     <button
                       type="button"
-                      className={buttonQuiet}
+                      className={buttonPrimary}
                       onClick={() => {
                         setSelected(row);
                         setDialog('receive');

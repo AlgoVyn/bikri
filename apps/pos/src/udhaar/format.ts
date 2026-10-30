@@ -1,6 +1,6 @@
-import { formatMoney } from '@bikri/core';
 import type { TFunction } from 'i18next';
 import type { StatementEntry } from '../data/udhaar.ts';
+import { formatShopMoney } from '../lib/money';
 
 export function localeOf(lang: string): string {
   return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
@@ -33,10 +33,10 @@ export function balanceTone(balance: number): string {
 
 export function balanceLabel(t: TFunction, balance: number): string {
   if (balance > 0)
-    return t('office.udhaar.owes', { amount: formatMoney(balance) });
+    return t('office.udhaar.owes', { amount: formatShopMoney(balance) });
   if (balance < 0)
     return t('office.udhaar.in_credit', {
-      amount: formatMoney(-balance),
+      amount: formatShopMoney(-balance),
     });
   return t('office.udhaar.settled');
 }

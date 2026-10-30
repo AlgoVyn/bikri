@@ -14,6 +14,7 @@ import {
   SUPPORT_PROFILE_ID,
   tryUnlock,
 } from '../data/pinLock.ts';
+import { Banners } from '../shell/Banners.tsx';
 import { applyDevicePrefs, loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
 import { useSession } from '../state/session.ts';
@@ -185,6 +186,7 @@ export function LockScreen() {
         </div>
         <LanguageSelect />
       </header>
+      <Banners />
       <section className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5">
         <h1 className="text-h1 font-semibold">{t('lock.who')}</h1>
         <div className="flex flex-wrap justify-center gap-2">

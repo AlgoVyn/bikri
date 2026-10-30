@@ -40,7 +40,8 @@
     "products": "{{count}} products",
     "products_one": "{{count}} product",
     "title": "Categories",
-    "up": "Move {{name}} up"
+    "up": "Move {{name}} up",
+    "name_ur": "Urdu name"
   },
   "common": {
     "app_name": "Bikri",
@@ -592,7 +593,8 @@
     "select_product_hint": "Price, stock and history appear here.",
     "back": "Back to products",
     "min_stock_off": "Off",
-    "last14_empty": "No stock movement in the last 14 days."
+    "last14_empty": "No stock movement in the last 14 days.",
+    "sell": "Sell"
   },
   "sell": {
     "add_discount": "Add discount",
@@ -816,7 +818,8 @@
     "sync_detail_paused": "This shop's account is paused. Contact Algovyn. {{count}} changes are kept on this device.",
     "printer_label": "Printer",
     "printer_failed": "Print failed",
-    "printer_no": "No printer"
+    "printer_no": "No printer",
+    "skip_content": "Skip to content"
   },
   "stock": {
     "reason": {

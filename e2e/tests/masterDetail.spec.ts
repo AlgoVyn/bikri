@@ -12,7 +12,7 @@ test.describe('desktop master–detail', () => {
     await page.evaluate(async () => {
       await window.__bikriTest?.seedTodaySales();
     });
-    await expect(page.getByText('Select a bill')).toBeVisible();
+    await expect(page.getByText('Select a bill')).toHaveCount(0);
     await page.getByRole('link', { name: /A-A-1/ }).click();
     await expect(page.getByTestId('sales-detail')).toBeVisible();
     await expect(page.getByTestId('sales-master')).toBeVisible();
@@ -27,7 +27,7 @@ test.describe('desktop master–detail', () => {
         { name: 'Samsung Galaxy A15 128GB', price: 5899900, stock: 12 },
       ]);
     });
-    await expect(page.getByText('Select a product')).toBeVisible();
+    await expect(page.getByText('Select a product')).toHaveCount(0);
     await page.getByRole('link', { name: /Samsung Galaxy A15/ }).click();
     await expect(page.getByTestId('products-detail')).toBeVisible();
     await expect(page.getByTestId('products-master')).toBeVisible();
@@ -44,7 +44,7 @@ test.describe('desktop master–detail', () => {
         balance: 125000,
       });
     });
-    await expect(page.getByText('Select a customer')).toBeVisible();
+    await expect(page.getByText('Select a customer')).toHaveCount(0);
     await page.getByRole('link', { name: /Bilal Ahmed/ }).click();
     await expect(page.getByTestId('udhaar-detail')).toBeVisible();
     await expect(page.getByTestId('udhaar-master')).toBeVisible();
@@ -59,7 +59,7 @@ test.describe('desktop master–detail', () => {
         phone: '03211234567',
       });
     });
-    await expect(page.getByText('Select a supplier')).toBeVisible();
+    await expect(page.getByText('Select a supplier')).toHaveCount(0);
     await page.getByRole('link', { name: /Karachi Traders/ }).click();
     await expect(page.getByTestId('suppliers-detail')).toBeVisible();
     await expect(page.getByTestId('suppliers-master')).toBeVisible();

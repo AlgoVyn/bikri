@@ -1,4 +1,4 @@
-import { formatMoney, mulDivRound, newId } from '@bikri/core';
+import { mulDivRound, newId } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -20,6 +21,7 @@ import {
   supplierReturnData,
 } from '../data/supplierReturns.ts';
 import { supplierBalance } from '../data/suppliers.ts';
+import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Unlinked = {
@@ -219,8 +221,8 @@ export function SupplierReturnPage({
       toast.push(
         t('office.suppliers.return_saved', {
           count: allLines.length,
-          total: formatMoney(total),
-          balance: formatMoney(after),
+          total: formatShopMoney(total),
+          balance: formatShopMoney(after),
         }),
       );
       void navigate({
@@ -245,7 +247,7 @@ export function SupplierReturnPage({
         {t('office.suppliers.not_found')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
@@ -475,7 +477,7 @@ export function SupplierReturnPage({
         <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
           <p className="text-small">
             {t('office.suppliers.return_suggested', {
-              amount: formatMoney(suggested),
+              amount: formatShopMoney(suggested),
             })}
           </p>
           <MoneyInput

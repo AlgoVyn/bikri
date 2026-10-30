@@ -1,4 +1,3 @@
-import { formatMoney } from '@bikri/core';
 import type { PrintJob } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
@@ -14,6 +13,7 @@ import {
   receiptShareText,
   waLink,
 } from '../data/receipt.ts';
+import { formatShopMoney } from '../lib/money';
 import { ignoresHotkey } from '../shell/hotkeys.ts';
 import type { Done } from './PayDialog.tsx';
 
@@ -219,15 +219,15 @@ export function SaleComplete({
       </p>
       {change > 0 ? (
         <p className="text-figure font-semibold" data-testid="done-change">
-          {t('pay.change', { amount: formatMoney(change) })}
+          {t('pay.change', { amount: formatShopMoney(change) })}
         </p>
       ) : null}
       {udhaar > 0 ? (
         <p data-testid="done-udhaar">
           {t('pay.udhaar_written', {
-            amount: formatMoney(udhaar),
+            amount: formatShopMoney(udhaar),
             name: done.customerName,
-            balance: formatMoney(done.balance),
+            balance: formatShopMoney(done.balance),
           })}
         </p>
       ) : null}

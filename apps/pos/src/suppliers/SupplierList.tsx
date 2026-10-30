@@ -163,7 +163,7 @@ export function SupplierList({
                 </span>
                 <span className="min-w-0 flex-[1_1_9rem] text-small">
                   <span
-                    className={`block font-medium ${supplierBalanceTone(row.balance)}`}
+                    className={`block whitespace-nowrap font-medium ${supplierBalanceTone(row.balance)}`}
                   >
                     {supplierBalanceLabel(t, row.balance)}
                   </span>

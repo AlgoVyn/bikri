@@ -1,3 +1,4 @@
+import { formatShopMoney } from '../lib/money';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
 
 export type StatementFileRow = {
@@ -59,7 +60,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   ctx.fillText(meta.labels.balance, MARGIN, 194);
   ctx.font = 'bold 24px Inter, sans-serif';
   ctx.fillText(
-    `Rs ${(meta.balance / 100).toLocaleString('en-PK')}`,
+    formatShopMoney(meta.balance),
     MARGIN + ctx.measureText(meta.labels.balance).width + 12,
     194,
   );
@@ -96,11 +97,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
     if (!values) {
       ctx.fillText(meta.labels.opening, cols.date, y);
       ctx.textAlign = 'right';
-      ctx.fillText(
-        `Rs ${(meta.openingBalance / 100).toLocaleString('en-PK')}`,
-        cols.balance,
-        y,
-      );
+      ctx.fillText(formatShopMoney(meta.openingBalance), cols.balance, y);
       ctx.textAlign = 'left';
       y += ROW;
       return;
@@ -113,22 +110,16 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
     ctx.fillText(text, cols.description, y);
     ctx.textAlign = 'right';
     ctx.fillText(
-      values.debit ? `Rs ${(values.debit / 100).toLocaleString('en-PK')}` : '',
+      values.debit ? formatShopMoney(values.debit) : '',
       cols.debit,
       y,
     );
     ctx.fillText(
-      values.credit
-        ? `Rs ${(values.credit / 100).toLocaleString('en-PK')}`
-        : '',
+      values.credit ? formatShopMoney(values.credit) : '',
       cols.credit,
       y,
     );
-    ctx.fillText(
-      `Rs ${(values.balance / 100).toLocaleString('en-PK')}`,
-      cols.balance,
-      y,
-    );
+    ctx.fillText(formatShopMoney(values.balance), cols.balance, y);
     ctx.textAlign = 'left';
     y += ROW;
   };
@@ -137,11 +128,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   ctx.font = 'bold 20px Inter, sans-serif';
   ctx.fillText(meta.labels.total, cols.description, y + 10);
   ctx.textAlign = 'right';
-  ctx.fillText(
-    `Rs ${(meta.balance / 100).toLocaleString('en-PK')}`,
-    cols.balance,
-    y + 10,
-  );
+  ctx.fillText(formatShopMoney(meta.balance), cols.balance, y + 10);
   return canvas;
 }
 

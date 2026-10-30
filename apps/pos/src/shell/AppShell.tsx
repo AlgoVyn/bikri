@@ -144,6 +144,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-bg text-text">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-ink"
+      >
+        {t('shell.skip_content')}
+      </a>
       <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
         <span
           className="min-w-0 flex-1 truncate font-semibold lg:hidden"
@@ -296,7 +302,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
       </nav>
-      <main className="pt-topbar pb-tabbar lg:ps-rail lg:pb-0">
+      <main
+        id="main-content"
+        className="pt-topbar pb-tabbar lg:ps-rail lg:pb-0"
+      >
         <Banners />
         {blocked ? null : children}
       </main>

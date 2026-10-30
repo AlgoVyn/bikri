@@ -40,6 +40,7 @@ import {
 } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { categoryName } from '../lib/category.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -843,7 +844,7 @@ function CategoryChips({
   selected: string | null;
   onPick: (id: string | null) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const cats =
     useLiveQuery(
       async () =>
@@ -878,7 +879,7 @@ function CategoryChips({
           className={chip(selected === c.id)}
           onClick={() => onPick(c.id)}
         >
-          {String(c.name_en)}
+          {categoryName(c, i18n.language)}
         </button>
       ))}
     </div>

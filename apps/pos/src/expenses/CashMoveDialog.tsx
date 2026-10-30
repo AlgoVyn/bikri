@@ -1,4 +1,4 @@
-import { formatMoney, newId } from '@bikri/core';
+import { newId } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { cashMove, ExpenseError } from '../data/expenses.ts';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -51,7 +52,7 @@ export function CashMoveDialog({
           kind === 'pay_in'
             ? 'office.expenses.cash_in_saved'
             : 'office.expenses.cash_out_saved',
-          { amount: formatMoney(amount) },
+          { amount: formatShopMoney(amount) },
         ),
       );
       onOpenChange(false);

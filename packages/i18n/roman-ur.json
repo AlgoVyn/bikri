@@ -40,7 +40,8 @@
     "products": "{{count}} products",
     "products_one": "{{count}} product",
     "title": "Categories",
-    "up": "{{name}} upar"
+    "up": "{{name}} upar",
+    "name_ur": "Urdu naam"
   },
   "common": {
     "app_name": "Bikri",
@@ -592,7 +593,8 @@
     "select_product_hint": "Price, stock aur history yahan nazar aayenge.",
     "back": "Products par wapas",
     "min_stock_off": "Off",
-    "last14_empty": "Pichhle 14 din mein stock mein koi harkat nahin."
+    "last14_empty": "Pichhle 14 din mein stock mein koi harkat nahin.",
+    "sell": "Bechein"
   },
   "sell": {
     "add_discount": "Discount lagayein",
@@ -816,7 +818,8 @@
     "sync_detail_paused": "Is dukaan ka account rok diya gaya hai. Algovyn se raabta karein. {{count}} tabdeeliyan isi device par mehfooz hain.",
     "printer_label": "Printer",
     "printer_failed": "Print fail",
-    "printer_no": "Printer nahin"
+    "printer_no": "Printer nahin",
+    "skip_content": "Content par jayein"
   },
   "stock": {
     "reason": {

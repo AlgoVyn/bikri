@@ -1,7 +1,8 @@
-import { businessDate, formatMoney, newId, type Role } from '@bikri/core';
+import { businessDate, newId, type Role } from '@bikri/core';
 import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
+import { formatShopMoney } from '../lib/money';
 import { isReadOnly } from '../sync/status.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
@@ -761,7 +762,7 @@ export function reminderMessage(
     date: string;
   },
 ): string {
-  const amount = formatMoney(input.balance, 'intl').replace(/^Rs /u, '');
+  const amount = formatShopMoney(input.balance).replace(/^Rs /u, '');
   if (language === 'ur')
     return `السلام علیکم ${input.name}، ${input.shop} پر آپ کا بقایا ${amount} روپے ہے (${input.date})۔ مہربانی کر کے جلد ادا کر دیں۔ شکریہ!`;
   if (language === 'roman-ur')

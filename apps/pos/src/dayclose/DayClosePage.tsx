@@ -9,6 +9,7 @@ import { ClockIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import {
@@ -27,7 +28,6 @@ import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 
-const NOTES = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1];
 const COMMEMORATIVE = 75;
 
 export function DayClosePage() {
@@ -79,7 +79,7 @@ export function DayClosePage() {
         {t('office.dayclose.no_device')}
       </p>
     );
-  if (!data) return <p className="sr-only">{t('common.loading')}</p>;
+  if (!data) return <PageLoading compact />;
 
   const notesTotal = Object.entries(notes).reduce(
     (sum, [value, count]) => sum + Number(value) * count * 100,
@@ -299,51 +299,58 @@ export function DayClosePage() {
         </div>
         {mode === 'notes' ? (
           <>
-            <div className="hidden gap-x-6 text-small text-text-muted sm:grid sm:grid-cols-2">
-              {[0, 1].map((column) => (
-                <div
-                  key={column}
-                  className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2"
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                [5000, ...(show75 ? [COMMEMORATIVE] : []), 1000, 500, 100, 50],
+                [20, 10, 5, 2, 1],
+              ].map((values) => (
+                <section
+                  key={values.join('-')}
+                  aria-label={`${t('office.dayclose.count_cash')} ${values[0]}–${values.at(-1)}`}
+                  className="rounded-control border border-border p-3"
                 >
-                  <span>{t('office.dayclose.column_note')}</span>
-                  <span className="text-center">
-                    {t('office.dayclose.column_count')}
-                  </span>
-                  <span className="text-end">
-                    {t('office.dayclose.column_amount')}
-                  </span>
-                </div>
+                  <div className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2 text-small text-text-muted">
+                    <span>{t('office.dayclose.column_note')}</span>
+                    <span className="text-center">
+                      {t('office.dayclose.column_count')}
+                    </span>
+                    <span className="text-end">
+                      {t('office.dayclose.column_amount')}
+                    </span>
+                  </div>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {values.map((value) => (
+                      <li key={value}>
+                        <label className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] items-center gap-2 text-small">
+                          <span className="text-end">{value}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            className="h-11 w-20 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-end"
+                            value={notes[value] ?? ''}
+                            onChange={(e) =>
+                              setNotes((current) => ({
+                                ...current,
+                                [value]: Math.max(
+                                  0,
+                                  Number(e.target.value) || 0,
+                                ),
+                              }))
+                            }
+                          />
+                          <span className="text-end text-text-muted">
+                            <MoneyText
+                              paisa={value * 100 * (notes[value] ?? 0)}
+                            />
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
             </div>
-            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-6">
-              {[
-                ...NOTES.slice(0, 1),
-                ...(show75 ? [COMMEMORATIVE] : []),
-                ...NOTES.slice(1),
-              ].map((value) => (
-                <li key={value}>
-                  <label className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] items-center gap-2 text-small">
-                    <span className="text-end">{value}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
-                      className="h-11 w-20 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-end"
-                      value={notes[value] ?? ''}
-                      onChange={(e) =>
-                        setNotes((current) => ({
-                          ...current,
-                          [value]: Math.max(0, Number(e.target.value) || 0),
-                        }))
-                      }
-                    />
-                    <span className="text-end text-text-muted">
-                      <MoneyText paisa={value * 100 * (notes[value] ?? 0)} />
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
             <button
               type="button"
               className="min-h-11 self-start text-small underline"

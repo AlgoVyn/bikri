@@ -1,10 +1,10 @@
-import { formatMoney } from '@bikri/core';
 import type { CartLine } from '@bikri/db';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, fieldClass } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { NOTE_MAX } from '../data/cart.ts';
+import { formatShopMoney } from '../lib/money';
 
 /** Percent text ("5", "12.5") to basis points, or null. */
 export function percentToBp(text: string): number | null {
@@ -113,7 +113,7 @@ export function LineEditor({
                   className="mt-1 text-small text-danger"
                   data-testid="discount-max"
                 >
-                  {t('sell.discount_max', { amount: formatMoney(gross) })}
+                  {t('sell.discount_max', { amount: formatShopMoney(gross) })}
                 </p>
               ) : null}
             </>
@@ -155,7 +155,10 @@ export function LineEditor({
       </div>
       {showCost && line.unit_cost > 0 ? (
         <p className="text-small text-text-muted" data-testid="line-cost">
-          {t('sell.cost_margin', { cost: formatMoney(line.unit_cost), margin })}
+          {t('sell.cost_margin', {
+            cost: formatShopMoney(line.unit_cost),
+            margin,
+          })}
         </p>
       ) : null}
       <button

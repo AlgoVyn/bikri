@@ -8,6 +8,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import {
   CODE_RE,
@@ -192,9 +193,15 @@ export function EnrolPage({
     <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
       <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
         <div className="flex items-center justify-between">
-          <p className="font-semibold text-h2 text-primary">
-            {t('common.app_name')}
-          </p>
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex size-8 items-center justify-center rounded-[10px] bg-accent text-accent-ink"
+            >
+              <SalesIcon />
+            </span>
+            <p className="font-semibold text-h2">{t('common.app_name')}</p>
+          </div>
           <LanguageSelect />
         </div>
         {body}

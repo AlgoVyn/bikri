@@ -25,8 +25,8 @@
       "range_month": "Is mahine",
       "range_today": "Aaj",
       "range_yesterday": "Kal",
-      "search": "Talash",
-      "search_placeholder": "Bill number, customer ya product",
+      "search": "Bill talash karein",
+      "search_placeholder": "Bill, customer ya product",
       "status_paid": "Ada shuda",
       "status_part_refunded": "Kuch raqam wapas",
       "status_refunded": "Wapas shuda",
@@ -422,7 +422,9 @@
       "subtitle": "Delivery, adaigi aur wapsi",
       "select_supplier": "Supplier muntakhib karein",
       "select_supplier_hint": "Deliveries, payments aur baqaya yahan nazar aayenge.",
-      "delivery_error_too_many": "Yeh delivery ek waqt mein bohat zyada tabdeeliyan likhegi. Ise do deliveries mein save karein."
+      "delivery_error_too_many": "Yeh delivery ek waqt mein bohat zyada tabdeeliyan likhegi. Ise do deliveries mein save karein.",
+      "lines_count_one": "{{count}} item",
+      "lines_count_other": "{{count}} items"
     },
     "expenses": {
       "amount": "Raqam",

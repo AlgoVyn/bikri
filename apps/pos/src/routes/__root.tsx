@@ -5,7 +5,8 @@ import {
   useLocation,
 } from '@tanstack/react-router';
 import { lazy, Suspense, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { MoneyGroupingProvider } from '../components/MoneyGrouping.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { ToastProvider } from '../components/Toast.tsx';
 import { useAppGate } from '../data/useAppGate.ts';
 import { useAutoLock } from '../lock/autoLock.ts';
@@ -26,7 +27,6 @@ const EnrolPage = lazy(() =>
 );
 
 function Gate() {
-  const { t } = useTranslation();
   const { gate, db, revoked, enrolled, shopName } = useAppGate();
   const session = useSession((s) => s.session);
   // T-035: an enrolled shop starts locked; the local dev/e2e shop keeps acting as owner (D-090).
@@ -51,12 +51,11 @@ function Gate() {
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';
   const devUi = pathname.startsWith('/dev/');
-  if (gate === 'loading')
-    return <p className="sr-only">{t('common.loading')}</p>;
+  if (gate === 'loading') return <PageLoading />;
   const onEnrol = pathname === '/enrol' || pathname === '/enrol/';
   if (gate === 'enrol' || revoked || onEnrol)
     return (
-      <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+      <Suspense fallback={<PageLoading />}>
         <EnrolPage
           db={enrolled || revoked ? db : null}
           shopName={shopName}
@@ -66,7 +65,7 @@ function Gate() {
     );
   if (gate === 'ready' && enrolled && !session && !devUi)
     return (
-      <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+      <Suspense fallback={<PageLoading />}>
         <LockScreen />
       </Suspense>
     );
@@ -76,9 +75,11 @@ function Gate() {
   if (gate === 'ready' && onSetup) return <Navigate to={afterSetup} replace />;
   if (onSetup) return <Outlet />;
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <MoneyGroupingProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </MoneyGroupingProvider>
   );
 }
 

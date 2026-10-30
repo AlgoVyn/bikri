@@ -1,9 +1,4 @@
-import {
-  type CartResult,
-  formatMoney,
-  type QtyUnit,
-  qtyAllowsDecimals,
-} from '@bikri/core';
+import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
 import type { Cart, CartLine } from '@bikri/db';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -17,6 +12,7 @@ import {
   isEmptyCart,
   type ShopMoney,
 } from '../data/cart.ts';
+import { formatShopMoney } from '../lib/money';
 import { LineEditor } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
 
@@ -108,7 +104,9 @@ export function CartPanel(p: CartPanelProps) {
               </span>
               {customer.balance > 0 ? (
                 <span className="ms-2 text-small text-warning">
-                  {t('sell.owes', { amount: formatMoney(customer.balance) })}
+                  {t('sell.owes', {
+                    amount: formatShopMoney(customer.balance),
+                  })}
                 </span>
               ) : null}
             </>
@@ -215,7 +213,7 @@ export function CartPanel(p: CartPanelProps) {
         ) : null}
         <div className="flex items-baseline justify-between gap-2 text-total font-semibold">
           <dt>{t('sell.total_to_pay')}</dt>
-          <dd data-testid="total-to-pay">
+          <dd data-testid="total-to-pay" aria-live="polite">
             <MoneyText paisa={totals.total} />
           </dd>
         </div>
@@ -227,7 +225,7 @@ export function CartPanel(p: CartPanelProps) {
             {t('sell.includes_tax', {
               label: money.tax_label,
               rate: money.tax_rate_bp / 100,
-              amount: formatMoney(totals.tax),
+              amount: formatShopMoney(totals.tax),
             })}
           </p>
         ) : null}

@@ -121,4 +121,23 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByRole('tab', { name: 'مصنوعات' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'آج' })).toBeVisible();
   });
+
+  test('phone: the header stacks and KPI cards stay two-up', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'phone layout');
+    await seedReports(page);
+    const title = await page
+      .getByRole('heading', { name: 'Reports' })
+      .boundingBox();
+    expect(title?.width ?? 0).toBeGreaterThan(100);
+    const sold = await page.getByTestId('report-sold').boundingBox();
+    expect(sold?.width ?? 0).toBeGreaterThan(150);
+    expect(sold?.width ?? 0).toBeLessThan(220);
+    const actions = await page
+      .getByRole('button', { name: 'Export' })
+      .boundingBox();
+    expect(actions?.y ?? 0).toBeGreaterThan((title?.y ?? 0) + 20);
+    await expectNoHorizontalScroll(page);
+  });
 });

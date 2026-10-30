@@ -1,4 +1,4 @@
-import { formatMoney, isQtyUnit, newId } from '@bikri/core';
+import { isQtyUnit, newId } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,6 +22,7 @@ import {
   refundSale,
 } from '../data/refunds.ts';
 import { billDetail } from '../data/salesHistory.ts';
+import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -400,9 +401,9 @@ export function RefundDialog({
           <p className="font-medium">{t('office.refund.split_title')}</p>
           <p>
             {t('office.refund.split_body', {
-              exact: formatMoney(plan?.exact ?? 0),
-              paid: formatMoney(plan?.amount ?? 0),
-              udhaar: formatMoney(plan?.udhaarPart ?? 0),
+              exact: formatShopMoney(plan?.exact ?? 0),
+              paid: formatShopMoney(plan?.amount ?? 0),
+              udhaar: formatShopMoney(plan?.udhaarPart ?? 0),
               name: detail.customer ? String(detail.customer.name) : '',
             })}
           </p>
@@ -431,7 +432,7 @@ export function RefundDialog({
       ) : plan && plan.udhaarPart > 0 ? (
         <p className="rounded-control bg-warning-subtle p-2 text-warning-subtle-ink">
           {t('office.refund.khata_only', {
-            amount: formatMoney(plan.udhaarPart),
+            amount: formatShopMoney(plan.udhaarPart),
             name: detail?.customer ? String(detail.customer.name) : '',
           })}
         </p>
@@ -515,10 +516,12 @@ export function RefundDialog({
           }}
         >
           {plan && plan.amount > 0
-            ? t('office.refund.button', { amount: formatMoney(plan.amount) })
+            ? t('office.refund.button', {
+                amount: formatShopMoney(plan.amount),
+              })
             : plan && plan.udhaarPart > 0
               ? t('office.refund.button_khata', {
-                  amount: formatMoney(plan.udhaarPart),
+                  amount: formatShopMoney(plan.udhaarPart),
                 })
               : t('office.refund.button_empty')}
         </button>

@@ -1,4 +1,4 @@
-import { businessDate, formatMoney, type Permission } from '@bikri/core';
+import { businessDate, type Permission } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,8 @@ import {
 } from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
+import { formatTimestamp } from '../lib/date';
+import { formatShopMoney } from '../lib/money';
 import { NAV } from '../shell/nav.ts';
 import { usePriceCheck } from '../shell/priceCheckStore.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
@@ -100,20 +102,14 @@ export function HomePage() {
     };
   }, [today, yesterday, role]);
 
-  const dateText = new Intl.DateTimeFormat(
-    i18n.language === 'ur' ? 'ur-PK' : 'en-PK',
-    {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      timeZone: 'Asia/Karachi',
-    },
-  ).format(now);
-  const timeFmt = new Intl.DateTimeFormat('en-PK', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Karachi',
-  });
+  const dateText = formatTimestamp(
+    now,
+    i18n.language,
+    'Asia/Karachi',
+    'weekdayLong',
+  );
+  const timeText = (at: number) =>
+    formatTimestamp(at, i18n.language, 'Asia/Karachi', 'time');
 
   const tiles: QuickTile[] = [
     {
@@ -223,7 +219,7 @@ export function HomePage() {
             </div>
           </section>
           <QuickActions tiles={tiles} />
-          <RecentBillsCard data={data} timeFmt={timeFmt} />
+          <RecentBillsCard data={data} timeText={timeText} />
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
@@ -300,12 +296,12 @@ export function HomePage() {
                   showCash={can('dayclose.view_expected')}
                   showProfit={can('cost.view')}
                   canClose={can('dayclose.create')}
-                  timeFmt={timeFmt}
+                  timeText={timeText}
                 />
               ) : null}
             </div>
             <div className="order-4">
-              <RecentBillsCard data={data} timeFmt={timeFmt} />
+              <RecentBillsCard data={data} timeText={timeText} />
             </div>
           </aside>
         </div>
@@ -390,13 +386,13 @@ function RegisterCard({
   showCash,
   showProfit,
   canClose,
-  timeFmt,
+  timeText,
 }: {
   data: HomeData;
   showCash: boolean;
   showProfit: boolean;
   canClose: boolean;
-  timeFmt: Intl.DateTimeFormat;
+  timeText: (at: number) => string;
 }) {
   const { t, i18n } = useTranslation();
   const last = data.recent[0]?.sale.created_at;
@@ -412,7 +408,7 @@ function RegisterCard({
         {last ? (
           <p className="text-small text-text-muted">
             {t('home.last_bill', {
-              time: timeFmt.format(Number(last)),
+              time: timeText(Number(last)),
             })}
           </p>
         ) : null}
@@ -454,12 +450,12 @@ function RegisterCard({
           <dd className="mt-0.5 flex flex-col gap-0.5 text-body font-medium">
             <span>
               {t('home.udhaar_given', {
-                amount: formatMoney(data.today.udhaarGiven),
+                amount: formatShopMoney(data.today.udhaarGiven),
               })}
             </span>
             <span>
               {t('home.udhaar_received', {
-                amount: formatMoney(data.today.udhaarReceived),
+                amount: formatShopMoney(data.today.udhaarReceived),
               })}
             </span>
           </dd>
@@ -476,10 +472,10 @@ function RegisterCard({
 
 function RecentBillsCard({
   data,
-  timeFmt,
+  timeText,
 }: {
   data: HomeData | undefined;
-  timeFmt: Intl.DateTimeFormat;
+  timeText: (at: number) => string;
 }) {
   const { t } = useTranslation();
   const recent = data?.recent ?? [];
@@ -525,7 +521,7 @@ function RecentBillsCard({
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2 text-small text-text-muted">
-                  <bdi dir="ltr">{timeFmt.format(Number(sale.created_at))}</bdi>
+                  <bdi dir="ltr">{timeText(Number(sale.created_at))}</bdi>
                   {methods.map((m) => (
                     <span
                       key={m}
