@@ -944,6 +944,7 @@
     "load": "Refresh",
     "admin": "Admin",
     "support": "Algovyn support until {{time}}",
+    "support_view": "Support access: this device list is read-only.",
     "this_device": "This device",
     "revoked": "Revoked",
     "meta": "{{branch}} · last seen {{seen}} · app {{version}} · {{pending}} waiting",

@@ -88,6 +88,20 @@ describe('sales history (screens/10)', () => {
     expect(history.days[0]?.total).toBe(8500000);
   });
 
+  it('counts a refund on the date it happens, not the sale date', async () => {
+    const { db } = await twoBills();
+    const refund = await db.refunds.toCollection().first();
+    if (!refund) throw new Error('no refund');
+    await db.refunds.update(refund.id, { business_date: '2026-10-28' });
+    const day = rangeFor('today', NOW, 'Asia/Karachi');
+    const history = await salesHistory(db, day);
+    expect(history.summary).toMatchObject({
+      bills: 2,
+      refunds: 0,
+      sold: 8500000,
+    });
+  });
+
   it('filters by method, status, cashier and device, and searches invoice, customer and product', async () => {
     const { db, firstId, secondId } = await twoBills();
     const day = rangeFor('today', NOW, 'Asia/Karachi');

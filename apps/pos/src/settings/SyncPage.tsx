@@ -109,7 +109,7 @@ export function SyncPage() {
           id: newId(w.now),
           action: 'sync_ops_discarded',
           entity: 'outbox',
-          entity_id: null,
+          entity_id: entries[0]?.op_id ?? data.device?.id ?? 'outbox',
           before_json: JSON.stringify(
             entries.map((e) => ({
               op_id: e.op_id,

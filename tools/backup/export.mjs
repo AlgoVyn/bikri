@@ -46,6 +46,9 @@ export function assertSqlDump(sql) {
     throw new Error('D1 export is smaller than 1 KB');
   if (!/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`[]?sales\b/iu.test(sql))
     throw new Error('D1 export does not contain CREATE TABLE sales');
+  // A schema-only dump is not a backup. Every real shop database has at least one tenant.
+  if (!/INSERT INTO\s+["`[]?tenants\b/iu.test(sql))
+    throw new Error('D1 export does not contain tenant data');
 }
 
 /** D1 limits compound SELECT terms, so counts go in small batches. */

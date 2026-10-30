@@ -25,9 +25,14 @@ describe('nightly D1 export', () => {
       'smaller than 1 KB',
     );
     expect(() =>
-      assertSqlDump(`${'x'.repeat(1100)}\nCREATE TABLE "sales" (id TEXT);`),
+      assertSqlDump(
+        `${'x'.repeat(1100)}\nCREATE TABLE "sales" (id TEXT);\nINSERT INTO tenants VALUES ('t1');`,
+      ),
     ).not.toThrow();
     expect(() => assertSqlDump('x'.repeat(1100))).toThrow('CREATE TABLE sales');
+    expect(() =>
+      assertSqlDump(`${'x'.repeat(1100)}\nCREATE TABLE sales (id TEXT);`),
+    ).toThrow('tenant data');
   });
 
   it('keeps the table list in sync with the generated schema', () => {

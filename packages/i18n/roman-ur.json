@@ -944,6 +944,7 @@
     "load": "Taaza karein",
     "admin": "Admin",
     "support": "Algovyn support {{time}} tak",
+    "support_view": "Support access: yeh device list sirf parhne ke liye hai.",
     "this_device": "Yeh device",
     "revoked": "Mansookh",
     "meta": "{{branch}} · aakhri baar {{seen}} · app {{version}} · {{pending}} baqi",

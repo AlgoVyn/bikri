@@ -1,9 +1,4 @@
-import {
-  can as canDo,
-  type Permission,
-  type Role,
-  verifyPin,
-} from '@bikri/core';
+import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -250,11 +245,9 @@ export function SellPage() {
   const verify = async (pin: string, profileId: string) => {
     const s = allStaff.find((x) => x.id === profileId);
     if (!s || !override) return false;
-    const ok = await verifyPin(pin, {
-      pin_hash: String(s.pin_hash),
-      pin_salt: String(s.pin_salt),
-      pin_iterations: Number(s.pin_iterations),
-    });
+    const { verifyPinWithLockout } = await import('../data/pinLock.ts');
+    const result = await verifyPinWithLockout(getDb(), s.id, pin);
+    const ok = result.kind === 'ok';
     if (ok) {
       const request = override;
       setTimeout(() => request.onApproved(s.id), 0);
@@ -413,6 +406,10 @@ export function SellPage() {
   useHotkey(
     fKey('F9'),
     () => {
+      if (readOnly) {
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+        return;
+      }
       if (!can('drawer.open')) {
         toast.push(t('sell.drawer_denied'), 'error');
         return;

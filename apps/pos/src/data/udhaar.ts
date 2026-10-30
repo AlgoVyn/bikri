@@ -600,8 +600,10 @@ export async function createPromise(
  */
 export async function refreshPromises(
   db: BikriDb,
-  options: { today: string; now?: number },
+  options: { today: string; now?: number; actor: string | null },
 ): Promise<number> {
+  // Status refresh is a server-auditable promise edit; without an actor the push is rejected.
+  if (!options.actor) return 0;
   // Opening the chase list must never write in a read-only shop or on a support device.
   if (await isReadOnly(db)) return 0;
   if ((await db.kv.get('device_kind'))?.value === 'support') return 0;
@@ -640,7 +642,7 @@ export async function refreshPromises(
       for (const update of updates)
         await w.update('promises', update.id, { status: update.status });
     },
-    { now },
+    { now, actor: options.actor },
   );
   return updates.length;
 }

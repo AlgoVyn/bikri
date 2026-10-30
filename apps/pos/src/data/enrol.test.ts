@@ -121,6 +121,19 @@ describe('enrolDevice', () => {
     db.close();
   });
 
+  it('refuses to replace a shop with unsynced changes', async () => {
+    const old = openTenantDb('t-busy');
+    setActiveTenantId('t-busy');
+    await writeAction(old, (w) => w.create('categories', { name_en: 'X' }));
+    old.close();
+    await expect(enrolDevice('ABCDEFGH', 'x')).rejects.toBeInstanceOf(
+      UnsyncedOpsError,
+    );
+    expect(server.log.some((entry) => entry.path === '/devices/enrol')).toBe(
+      false,
+    );
+  });
+
   it('removes the previous shop database when enrolling into another shop', async () => {
     const old = openTenantDb('t-old');
     await setKv(old, 'secret', 'old-shop');
@@ -152,7 +165,9 @@ describe('leave this shop', () => {
   it('is blocked by unsynced ops until they are exported (D-073)', async () => {
     const db = await readyDb('leave');
     setActiveTenantId(db.tenantId);
-    await writeAction(db, (w) => w.create('categories', { name_en: 'X' }));
+    const cat = await writeAction(db, (w) =>
+      w.create('categories', { name_en: 'X' }),
+    );
     expect(await unexportedOps(db)).toBe(1);
     await expect(leaveShop(db)).rejects.toBeInstanceOf(UnsyncedOpsError);
     const file = await unsyncedExport(db, Date.UTC(2026, 0, 2, 3, 4));
@@ -162,9 +177,20 @@ describe('leave this shop', () => {
     expect(file.filename).toMatch(/^bikri-unsynced-.+\.json$/);
     await markUnsyncedExported(db);
     expect(await unexportedOps(db)).toBe(0);
+    // A coalesced edit changes the exported row without changing its sequence.
+    await writeAction(db, (w) =>
+      w.update('categories', String(cat.id), { name_en: 'X2' }),
+    );
+    expect(await unexportedOps(db)).toBe(1);
     // A later write needs a new export.
     await writeAction(db, (w) => w.create('categories', { name_en: 'Y' }));
     expect(await unexportedOps(db)).toBe(2);
+    // A marker written by an older app version has no fingerprint; sequence still works.
+    await setKv(db, 'unsynced_exported', {
+      at: 1,
+      seq: Number((await db.outbox.orderBy('seq').last())?.seq ?? 0),
+    });
+    expect(await unexportedOps(db)).toBe(0);
     await markUnsyncedExported(db);
     await leaveShop(db);
     expect(localStorage.getItem('bikri.active_tenant')).toBeNull();

@@ -1,7 +1,7 @@
 /** Auto-lock after idle minutes and Ctrl+L (05 §4); only for an enrolled shop (D-109). */
 import { useEffect } from 'react';
+import { autoLockMinutes } from '../data/autoLock.ts';
 import { getDb } from '../data/db.ts';
-import { autoLockMinutes } from '../data/pinLock.ts';
 import { useSession } from '../state/session.ts';
 
 export function useAutoLock(enabled: boolean): void {

@@ -272,7 +272,6 @@ export async function checkSite(site, fetchImpl = fetch) {
   const seen = new Set();
   /** @type {Set<string>} */
   const seenJs = new Set();
-  let first = true;
   while (queue.length > 0 && seen.size < MAX_PAGES) {
     const url = /** @type {string} */ (queue.shift());
     const u = new URL(url);
@@ -293,10 +292,9 @@ export async function checkSite(site, fetchImpl = fetch) {
     if (page.status !== 200 || !/html/i.test(page.type ?? '')) continue;
     const result = analyzeHtml(page.text, u.href, host);
     findings.push(...result.findings);
-    if (first) {
-      queue.push(...result.links);
-      first = false;
-    }
+    // Follow every page, not just Home: a third-party script can live on a page
+    // reached only through a sitemap or a second-level link.
+    queue.push(...result.links);
     for (const js of result.sameOriginScripts) {
       if (seenJs.has(js) || isBikriPath(new URL(js).pathname)) continue;
       seenJs.add(js);

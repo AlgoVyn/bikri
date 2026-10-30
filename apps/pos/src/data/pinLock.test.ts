@@ -2,11 +2,13 @@ import { hashPin } from '@bikri/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { setKv } from './kv.ts';
 import {
+  isPinTaken,
   lockedUntil,
   lockoutMs,
   lockProfiles,
   triesLeft,
   tryUnlock,
+  verifyPinWithLockout,
 } from './pinLock.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
 
@@ -97,5 +99,26 @@ describe('PIN lock (05 §4)', () => {
       kind: 'locked',
       until: now + 1_800_000,
     });
+  });
+
+  it('applies the same lockout to overrides and detects duplicate PINs', async () => {
+    const db = await staffDb();
+    const now = 2_000_000;
+    for (let i = 1; i <= 4; i += 1)
+      expect(await verifyPinWithLockout(db, 'o', '0000', now)).toEqual({
+        kind: 'wrong',
+        triesLeft: 5 - i,
+      });
+    expect(await verifyPinWithLockout(db, 'o', '0000', now)).toEqual({
+      kind: 'locked',
+      until: now + 300_000,
+    });
+    expect(await verifyPinWithLockout(db, 'o', '4826', now)).toEqual({
+      kind: 'locked',
+      until: now + 300_000,
+    });
+    expect(await isPinTaken(db, '1357')).toBe(true);
+    expect(await isPinTaken(db, '4826', 'o')).toBe(false);
+    expect(await isPinTaken(db, '9999')).toBe(false);
   });
 });

@@ -34,7 +34,7 @@ export type UnlockResult =
   | { kind: 'wrong'; triesLeft: number }
   | { kind: 'locked'; until: number };
 
-export async function tryUnlock(
+export async function verifyPinWithLockout(
   db: BikriDb,
   staffId: string,
   pin: string,
@@ -79,6 +79,39 @@ export async function tryUnlock(
     : { kind: 'wrong', triesLeft: triesLeft(next.count) };
 }
 
+/** Unlock/profile switch (screens/03); same lockout as an override PIN. */
+export async function tryUnlock(
+  db: BikriDb,
+  staffId: string,
+  pin: string,
+  now = Date.now(),
+): Promise<UnlockResult> {
+  return verifyPinWithLockout(db, staffId, pin, now);
+}
+
+/** 05 §4: a PIN already used by another active staff member is rejected. */
+export async function isPinTaken(
+  db: BikriDb,
+  pin: string,
+  exceptId: string | null = null,
+): Promise<boolean> {
+  for (const staff of await db.staff.toArray()) {
+    if (
+      staff.id === exceptId ||
+      staff.active !== 1 ||
+      staff.deleted_at !== null
+    )
+      continue;
+    const ok = await verifyPin(pin, {
+      pin_hash: String(staff.pin_hash),
+      pin_salt: String(staff.pin_salt),
+      pin_iterations: Number(staff.pin_iterations),
+    });
+    if (ok) return true;
+  }
+  return false;
+}
+
 const ROLE_ORDER: Record<string, number> = { owner: 0, manager: 1, cashier: 2 };
 
 /** Active staff for the profile chips: owner → managers → cashiers, then by name. */
@@ -90,9 +123,4 @@ export async function lockProfiles(db: BikriDb): Promise<MasterRow[]> {
         (ROLE_ORDER[String(a.role)] ?? 9) - (ROLE_ORDER[String(b.role)] ?? 9) ||
         String(a.name).localeCompare(String(b.name)),
     );
-}
-
-/** Auto-lock minutes (2–60; 0 = never, owner only). Default 10. */
-export async function autoLockMinutes(db: BikriDb): Promise<number> {
-  return getKv<number>(db, 'auto_lock_minutes', 10);
 }

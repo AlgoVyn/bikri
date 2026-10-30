@@ -12,6 +12,20 @@ const PX: Record<RenderLineOptions['size'], number> = {
   double: 48,
 };
 
+/** Canvas silently falls back if the font is not loaded; the thermal path must await these. */
+export async function prepareRasterFonts(
+  doc: Document = document,
+): Promise<void> {
+  const fonts = doc.fonts;
+  if (!fonts) return;
+  await Promise.all([
+    fonts.load('400 24px "Noto Nastaliq Urdu"'),
+    fonts.load('700 24px "Noto Nastaliq Urdu"'),
+    fonts.load('400 24px Inter'),
+    fonts.load('700 24px Inter'),
+  ]).catch(() => undefined);
+}
+
 export function createCanvasRasterRenderer(
   doc: Document = document,
 ): RasterRenderer {

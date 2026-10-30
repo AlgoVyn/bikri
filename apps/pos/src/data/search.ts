@@ -13,6 +13,7 @@ const PER_GROUP = 5;
 export async function searchAll(
   db: BikriDb,
   raw: string,
+  scope?: { allDates: boolean; today: string },
 ): Promise<SearchHit[]> {
   const q = raw.trim().toLowerCase();
   if (q === '') return [];
@@ -59,6 +60,8 @@ export async function searchAll(
   }
   const bills: SearchHit[] = [];
   for (const s of await db.sales.orderBy('created_at').reverse().toArray()) {
+    if (scope && !scope.allDates && String(s.business_date) !== scope.today)
+      continue;
     if (String(s.invoice_no).toLowerCase().includes(q)) {
       bills.push({
         kind: 'bill',

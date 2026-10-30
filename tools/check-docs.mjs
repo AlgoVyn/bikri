@@ -67,7 +67,11 @@ for (const name of migrationFiles) {
     return heading.includes(`migration \`${name}\``);
   });
   const sql = readFileSync(join(migrationDir, name), 'utf8');
-  if (!block || !sql.endsWith(block.sql))
+  const prefix = block ? sql.slice(0, sql.length - block.sql.length) : '';
+  const headerOnly = prefix
+    .split('\n')
+    .every((line) => line.trim() === '' || line.trim().startsWith('--'));
+  if (!block || !sql.endsWith(block.sql) || !headerOnly)
     problems.push(
       `packages/db/migrations/${name} differs from its SQL block in docs/02-data-model.md`,
     );

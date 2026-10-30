@@ -223,8 +223,8 @@ function LabelsDialogContent({
       for (let index = 0; index < row.copies; index += 1) {
         const product = row.product;
         labels.push(`<div class="label">
-          ${settings.showShop ? `<div class="shop">${escapeHtml(data?.shopName ?? '')}</div>` : ''}
-          <div class="name">${escapeHtml(labelName(product))}</div>
+          ${settings.showShop ? `<div class="shop" dir="auto">${escapeHtml(data?.shopName ?? '')}</div>` : ''}
+          <div class="name" dir="auto">${escapeHtml(labelName(product))}</div>
           ${settings.showPrice ? `<div class="price">${formatShopMoney(Number(product.price))}</div>` : ''}
           <div class="bars">${svg.svg}</div>
           <div class="value">${escapeHtml(row.barcode)}</div>

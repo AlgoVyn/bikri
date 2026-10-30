@@ -240,7 +240,7 @@ export async function writeVoidRows(
       id: newId(w.now),
       action: 'override',
       entity: 'sale_voids',
-      entity_id: sale.id,
+      entity_id: options.voidId,
       before_json: null,
       after_json: JSON.stringify({
         permission: 'sale.void',
@@ -255,7 +255,7 @@ export async function writeVoidRows(
     id: newId(w.now),
     action: 'void',
     entity: 'sale_voids',
-    entity_id: sale.id,
+    entity_id: options.voidId,
     before_json: null,
     after_json: JSON.stringify({
       sale_id: sale.id,

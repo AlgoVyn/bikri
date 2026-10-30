@@ -1,5 +1,10 @@
 /** Outbox push (03 §3, §4.1): seq order, ≤ 200 ops and ≤ 512 KB per batch, cut between transactions. */
-import { APP_VERSION, CLIENT_SCHEMA_VERSION, isLedgerTable } from '@bikri/core';
+import {
+  APP_VERSION,
+  CLIENT_SCHEMA_VERSION,
+  isLedgerTable,
+  newId,
+} from '@bikri/core';
 import type { BikriDb, OutboxEntry } from '@bikri/db';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
@@ -183,9 +188,30 @@ export async function pushAll(
   return out;
 }
 
-/** Failed ops: Retry puts them back in the queue; Discard (owner) drops them and restores the shadow row. */
+/** Failed ops: Retry re-queues the whole failed action with fresh op ids; Discard (owner) drops it. */
 export async function retryFailed(db: BikriDb, seqs: number[]): Promise<void> {
-  await db.outbox.where('seq').anyOf(seqs).modify({ status: 'pending' });
+  await db.transaction('rw', db.outbox, async () => {
+    const picked = await db.outbox.where('seq').anyOf(seqs).toArray();
+    const txIds = new Set(
+      picked
+        .filter((entry) => entry.status === 'failed')
+        .map((entry) => entry.tx_id),
+    );
+    if (txIds.size === 0) return;
+    const entries = (await db.outbox.toArray()).filter(
+      (entry) => entry.status === 'failed' && txIds.has(entry.tx_id),
+    );
+    for (const entry of entries) {
+      if (entry.seq === undefined) continue;
+      // The server caches rejected op ids in applied_ops; a new id makes Retry meaningful.
+      await db.outbox.update(entry.seq, {
+        op_id: newId(),
+        status: 'pending',
+        attempts: 0,
+        last_error: undefined,
+      });
+    }
+  });
 }
 
 export async function discardFailed(

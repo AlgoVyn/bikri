@@ -34,7 +34,7 @@ export function SettingsNav() {
 
 function SettingsNavContent() {
   const { t } = useTranslation();
-  const { role, can } = useCurrentStaff();
+  const { role, can, support } = useCurrentStaff();
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const info = useLiveQuery(async () => {
     const db = getDb();
@@ -142,7 +142,7 @@ function SettingsNavContent() {
               title={t('syncpage.title')}
               hint={t('office.settings.nav_sync_hint')}
             />
-            {owner && info?.device?.is_admin && info.enrolled ? (
+            {support || (owner && info?.device?.is_admin && info.enrolled) ? (
               <SettingsRow
                 to="/settings/devices"
                 icon={<DeviceIcon />}

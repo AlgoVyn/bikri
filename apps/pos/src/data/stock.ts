@@ -186,6 +186,8 @@ export type CountDraft = {
   expected: Record<string, number>;
   /** product id → counted milli. */
   counted: Record<string, number>;
+  /** Products whose chunk already committed; a retry must not apply them again. */
+  applied?: string[];
 };
 
 export const DRAFT_KEY = 'stock_count_draft';
@@ -222,7 +224,13 @@ export async function startCount(
   const products = await countProducts(db, scope);
   const expected: Record<string, number> = {};
   for (const p of products) expected[p.id] = await onHand(db, p.id);
-  const draft: CountDraft = { scope, started_at: now, expected, counted: {} };
+  const draft: CountDraft = {
+    scope,
+    started_at: now,
+    expected,
+    counted: {},
+    applied: [],
+  };
   await db.kv.put({ key: DRAFT_KEY, value: draft });
   return draft;
 }
@@ -288,7 +296,17 @@ export async function finishCount(
   ctx: LedgerContext,
   now = Date.now(),
 ): Promise<CountResult> {
-  const ids = Object.keys(draft.expected);
+  const stored = await loadCountDraft(db);
+  const source = {
+    ...draft,
+    expected: { ...draft.expected, ...(stored?.expected ?? {}) },
+    counted: { ...draft.counted, ...(stored?.counted ?? {}) },
+    applied: [
+      ...new Set([...(draft.applied ?? []), ...(stored?.applied ?? [])]),
+    ],
+  };
+  const applied = new Set(source.applied);
+  const ids = Object.keys(source.expected).filter((id) => !applied.has(id));
   const result: CountResult = { movements: 0, counted: 0, valueDiff: 0 };
   const chunkSize = 90;
   for (let offset = 0; offset < ids.length; offset += chunkSize) {
@@ -300,9 +318,9 @@ export async function finishCount(
         let counted = 0;
         let valueDiff = 0;
         for (const id of slice) {
-          const has = Object.hasOwn(draft.counted, id);
+          const has = Object.hasOwn(source.counted, id);
           if (!has && !options.zeroUncounted) continue;
-          const qty = has ? (draft.counted[id] ?? 0) : 0;
+          const qty = has ? (source.counted[id] ?? 0) : 0;
           if (has) counted += 1;
           const product = await w.table<MasterRow, string>('products').get(id);
           if (!product || product.deleted_at || product.track_stock !== 1)
@@ -325,7 +343,7 @@ export async function finishCount(
           entity_id: ctx.device_id,
           before_json: null,
           after_json: JSON.stringify({
-            scope: draft.scope,
+            scope: source.scope,
             items_counted: counted,
             movements,
             value_diff: valueDiff,
@@ -341,6 +359,8 @@ export async function finishCount(
     result.movements += part.movements;
     result.counted += part.counted;
     result.valueDiff += part.valueDiff;
+    for (const id of slice) applied.add(id);
+    await saveCountDraft(db, { ...source, applied: [...applied] });
   }
   await discardCount(db);
   return result;

@@ -56,7 +56,7 @@ describe('void recipe (02 §5)', () => {
     expect((await db.sales.get(saleId))?.status).toBe('void');
     const audit = await db.audit_log
       .where('[entity+entity_id]')
-      .equals(['sale_voids', saleId])
+      .equals(['sale_voids', 'void-1'])
       .toArray();
     expect(audit).toMatchObject([{ action: 'void' }]);
   });
@@ -415,7 +415,7 @@ describe('void and reissue branches', () => {
     expect(
       await fx.db.audit_log
         .where('[entity+entity_id]')
-        .equals(['sale_voids', String(fx.saleId)])
+        .equals(['sale_voids', 'cashier-override'])
         .toArray(),
     ).toEqual(
       expect.arrayContaining([
@@ -738,7 +738,7 @@ describe('void and reissue branches', () => {
     expect(
       await fx.db.audit_log
         .where('[entity+entity_id]')
-        .equals(['sale_voids', String(fx.saleId)])
+        .equals(['sale_voids', String(voidRow?.id)])
         .toArray(),
     ).toEqual(
       expect.arrayContaining([expect.objectContaining({ action: 'override' })]),

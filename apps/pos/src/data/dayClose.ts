@@ -196,6 +196,20 @@ export async function closeDay(
     db,
     async (w) => {
       const data = await dayCloseData(w, ctx.device_id, now, input.openingCash);
+      // Two tabs can prepare the same period; the second must return the first close,
+      // not open a second drawer period with the same opening float.
+      const duplicate = (
+        await (w.table('day_closes') as Table<SyncedRow>)
+          .where('[device_id+period_end]')
+          .between(
+            [ctx.device_id, data.periodStart],
+            [ctx.device_id, now],
+            true,
+            true,
+          )
+          .toArray()
+      ).find((row) => n(row.period_start) === data.periodStart);
+      if (duplicate) return duplicate;
       const result = computeDayClose({
         ...data.components,
         counted_cash: input.countedCash,

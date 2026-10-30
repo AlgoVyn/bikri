@@ -1,14 +1,10 @@
-import {
-  can as canDo,
-  type Permission,
-  type Role,
-  verifyPin,
-} from '@bikri/core';
+import { can as canDo, type Permission, type Role } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import { approversFor } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
+import { verifyPinWithLockout } from '../data/pinLock.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 /**
@@ -45,11 +41,8 @@ export function ApprovalDialog({
   const verify = async (pin: string, profileId: string) => {
     const s = everyone.find((x) => x.id === profileId);
     if (!s) return false;
-    const ok = await verifyPin(pin, {
-      pin_hash: String(s.pin_hash),
-      pin_salt: String(s.pin_salt),
-      pin_iterations: Number(s.pin_iterations),
-    });
+    const result = await verifyPinWithLockout(getDb(), s.id, pin);
+    const ok = result.kind === 'ok';
     if (ok) setTimeout(() => onApproved(s.id), 0);
     return ok;
   };

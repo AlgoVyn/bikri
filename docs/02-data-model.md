@@ -831,6 +831,30 @@ CREATE INDEX expenses_reversal ON expenses (tenant_id, reverses_id) WHERE revers
 CREATE INDEX ledger_source ON ledger_entries (tenant_id, source_type, source_id) WHERE source_id IS NOT NULL;
 ```
 
+### 2.3 Bill prefix guard (migration `0004_bill_prefix_guard.sql`)
+
+`branches.bill_prefix` must be 1–6 uppercase letters/digits. The original `GLOB '[A-Z0-9]*'` only checked the first character; these triggers check every character for direct SQL as well as API writes.
+
+```sql
+-- Tighten branches.bill_prefix for rows written directly as well as through the API.
+-- SQLite's GLOB '[A-Z0-9]*' only constrains the first character; this trigger checks every one.
+CREATE TRIGGER branches_bill_prefix_insert
+BEFORE INSERT ON branches
+WHEN NEW.bill_prefix GLOB '*[^A-Z0-9]*'
+  OR length(NEW.bill_prefix) NOT BETWEEN 1 AND 6
+BEGIN
+  SELECT RAISE(ABORT, 'invalid bill_prefix');
+END;
+
+CREATE TRIGGER branches_bill_prefix_update
+BEFORE UPDATE OF bill_prefix ON branches
+WHEN NEW.bill_prefix GLOB '*[^A-Z0-9]*'
+  OR length(NEW.bill_prefix) NOT BETWEEN 1 AND 6
+BEGIN
+  SELECT RAISE(ABORT, 'invalid bill_prefix');
+END;
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

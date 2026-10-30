@@ -385,6 +385,22 @@ describe('refund edges', () => {
     expect(khata.amount).toBe(0);
   });
 
+  it('caps a card refund at the amount still paid after cash rounding', () => {
+    const capped = splitRefund({
+      exact: 6667,
+      paid_total: 20000,
+      udhaar_amount: 0,
+      prior_refunds: [{ amount: 13400, udhaar_part: 0 }],
+      method: 'card',
+    });
+    expect(capped).toMatchObject({
+      paid_exact: 6667,
+      method: 'card',
+      amount: 6600,
+      rounding: -67,
+    });
+  });
+
   it('refunds revenue, cost and tax without a paisa of drift', () => {
     const revenue = 427_215;
     const tax = 15_300;

@@ -15,6 +15,7 @@ import { EmptyState } from '../components/EmptyState.tsx';
 import { UsersIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
+import { isPinTaken } from '../data/pinLock.ts';
 import {
   SettingsError,
   type StaffInput,
@@ -184,6 +185,13 @@ function StaffDialog({
     if (pending) return;
     if (pin !== '' && (pin !== pin2 || isWeakPin(pin))) {
       toast.push(t('office.staff.pin_invalid'), 'error');
+      return;
+    }
+    if (
+      pin !== '' &&
+      (await isPinTaken(getDb(), pin, row ? String(row.id) : null))
+    ) {
+      toast.push(t('office.staff.pin_taken'), 'error');
       return;
     }
     if (!row && pin === '') {

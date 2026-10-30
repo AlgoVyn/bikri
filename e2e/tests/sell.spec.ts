@@ -344,7 +344,9 @@ test.describe('Sell (T-016)', () => {
     await line.getByLabel('Discount', { exact: true }).fill('500');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 42,500');
     await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 500');
-    await line.getByRole('button', { name: '%', exact: true }).click();
+    const percent = line.getByRole('button', { name: '%', exact: true });
+    await percent.click();
+    await expect(percent).toHaveAttribute('aria-pressed', 'true');
     await line.getByLabel('Discount', { exact: true }).fill('10');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 38,700');
     await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 4,300');

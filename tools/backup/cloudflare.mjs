@@ -45,8 +45,10 @@ export async function listObjects(bucket, prefix, auth = r2Auth()) {
       { auth },
     );
     for (const object of page.result ?? []) objects.push(object);
-    const next = page.result_info?.cursor;
-    if (!page.result_info?.is_truncated || !next) return objects;
+    if (!page.result_info?.is_truncated) return objects;
+    const next = page.result_info.cursor;
+    if (!next)
+      throw new Error('R2 object listing was truncated without a cursor');
     cursor = next;
   }
   throw new Error('R2 object listing did not finish');
