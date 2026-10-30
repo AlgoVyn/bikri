@@ -313,9 +313,22 @@ test.describe('Sell (T-016)', () => {
       { name: 'Galaxy A15', price: 4200000, stock: 5 },
       { name: 'Cable', price: 149900, stock: 3 },
     ]);
+    const expectLines = async (count: number) => {
+      if (isPhone(page)) {
+        await expect(page.getByTestId('cart-bar')).toContainText(
+          `${count} item`,
+        );
+      } else {
+        await expect(page.getByTestId('cart-line')).toHaveCount(count);
+      }
+    };
+
     await tile(page, 'Galaxy A15').click();
+    await expectLines(1);
     await tile(page, 'Cable').click();
+    await expectLines(2);
     await showCart(page);
+    await expect(page.getByTestId('cart-line')).toHaveCount(2);
 
     const measure = () =>
       page.evaluate(() => {
@@ -345,6 +358,8 @@ test.describe('Sell (T-016)', () => {
     if (isPhone(page)) await showProducts(page);
     await page.getByLabel(/Language|زبان/).selectOption('ur');
     await showCart(page);
+    await expect(page.getByTestId('cart-line')).toHaveCount(2);
+    await page.waitForTimeout(100);
     expectFits(await measure());
     if (isPhone(page)) await showProducts(page);
     await page.getByLabel(/Language|زبان/).selectOption('en');
