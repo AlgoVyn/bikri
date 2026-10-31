@@ -1,7 +1,7 @@
 import { newId } from '@bikri/core';
+import { Button, Group, Stack, Text, TextInput } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -10,9 +10,6 @@ import { cashMove, ExpenseError } from '../data/expenses.ts';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Pay-in / pay-out dialog (screens/14). */
 export function CashMoveDialog({
@@ -71,57 +68,56 @@ export function CashMoveDialog({
       onOpenChange={onOpenChange}
       title={t('office.expenses.cash_title')}
     >
-      <div className="flex gap-2">
-        <button
-          type="button"
-          aria-pressed={kind === 'pay_in'}
-          className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-          onClick={() => setKind('pay_in')}
-        >
-          {t('office.expenses.pay_in')}
-        </button>
-        <button
-          type="button"
-          aria-pressed={kind === 'pay_out'}
-          className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-          onClick={() => setKind('pay_out')}
-        >
-          {t('office.expenses.pay_out')}
-        </button>
-      </div>
-      <div className="flex flex-col gap-2">
+      <Stack gap="sm">
+        <Group gap="xs">
+          <Button
+            type="button"
+            size="compact-sm"
+            variant={kind === 'pay_in' ? 'light' : 'default'}
+            aria-pressed={kind === 'pay_in'}
+            onClick={() => setKind('pay_in')}
+          >
+            {t('office.expenses.pay_in')}
+          </Button>
+          <Button
+            type="button"
+            size="compact-sm"
+            variant={kind === 'pay_out' ? 'light' : 'default'}
+            aria-pressed={kind === 'pay_out'}
+            onClick={() => setKind('pay_out')}
+          >
+            {t('office.expenses.pay_out')}
+          </Button>
+        </Group>
         <MoneyInput
           label={t('office.expenses.amount')}
           value={amount}
           onChange={setAmount}
         />
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.expenses.reason')}
-          <input
-            className={field}
-            maxLength={120}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </label>
-      </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={!amount || amount <= 0 || reason.trim() === '' || pending}
-          onClick={() => void save()}
-        >
-          {t('office.expenses.save')}
-        </button>
-      </div>
+        <TextInput
+          label={t('office.expenses.reason')}
+          maxLength={120}
+          value={reason}
+          onChange={(event) => setReason(event.currentTarget.value)}
+        />
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={!amount || amount <= 0 || reason.trim() === '' || pending}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.expenses.save')}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

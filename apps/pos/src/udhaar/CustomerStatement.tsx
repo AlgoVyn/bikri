@@ -350,11 +350,7 @@ export function CustomerStatement({
               )}
             </Text>
             {percent !== null ? (
-              <Box
-                role="img"
-                aria-label={t('office.udhaar.limit_bar', { percent })}
-                w={160}
-              >
+              <Box w={160}>
                 <Progress
                   value={percent}
                   size="sm"
@@ -365,6 +361,7 @@ export function CustomerStatement({
                         ? 'warning'
                         : 'brand'
                   }
+                  aria-label={t('office.udhaar.limit_bar', { percent })}
                 />
               </Box>
             ) : null}

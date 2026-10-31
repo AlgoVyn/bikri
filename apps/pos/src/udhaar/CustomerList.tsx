@@ -329,13 +329,7 @@ export function UdhaarList({
                       <Box style={{ flex: '1 1 8rem', minWidth: 0 }}>
                         {percent !== null ? (
                           <>
-                            <Box
-                              role="img"
-                              mb={4}
-                              aria-label={t('office.udhaar.limit_bar', {
-                                percent,
-                              })}
-                            >
+                            <Box mb={4}>
                               <Progress
                                 value={percent}
                                 size="sm"
@@ -346,6 +340,9 @@ export function UdhaarList({
                                       ? 'warning'
                                       : 'brand'
                                 }
+                                aria-label={t('office.udhaar.limit_bar', {
+                                  percent,
+                                })}
                               />
                             </Box>
                             <Text size="sm" c="dimmed">

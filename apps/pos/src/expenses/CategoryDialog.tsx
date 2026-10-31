@@ -1,6 +1,6 @@
+import { Button, Group, SimpleGrid, Stack, TextInput } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { createExpenseCategory } from '../data/expenses.ts';
@@ -23,9 +23,6 @@ export function CategoryDialog({
   const [name, setName] = useState('');
   const [nameUr, setNameUr] = useState('');
   const [pending, setPending] = useState(false);
-  const field =
-    'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
-
   const save = async () => {
     if (name.trim() === '' || pending) return;
     setPending(true);
@@ -54,43 +51,39 @@ export function CategoryDialog({
       onOpenChange={onOpenChange}
       title={t('office.expenses.category_add')}
     >
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.expenses.category_name')}
-          <input
-            className={field}
+      <Stack gap="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <TextInput
+            label={t('office.expenses.category_name')}
             maxLength={40}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(event) => setName(event.currentTarget.value)}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.expenses.category_name_ur')}
-          <input
-            className={field}
+          <TextInput
+            label={t('office.expenses.category_name_ur')}
             maxLength={40}
             value={nameUr}
-            onChange={(e) => setNameUr(e.target.value)}
+            onChange={(event) => setNameUr(event.currentTarget.value)}
           />
-        </label>
-      </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={name.trim() === '' || pending}
-          onClick={() => void save()}
-        >
-          {t('office.expenses.save')}
-        </button>
-      </div>
+        </SimpleGrid>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={name.trim() === '' || pending}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.expenses.save')}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

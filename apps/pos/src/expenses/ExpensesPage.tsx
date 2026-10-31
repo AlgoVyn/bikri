@@ -1,9 +1,19 @@
 import { businessDate, newId } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -142,226 +152,271 @@ export function ExpensesPage() {
   const max = Math.max(1, ...(data?.byCategory.map((c) => c.net) ?? [1]));
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
-      <PageHeader
-        icon={<ExpensesIcon />}
-        tone="bg-warning-subtle text-warning-subtle-ink"
-        title={t('office.expenses.title')}
-        subtitle={t('office.expenses.subtitle')}
-        actions={
-          <>
-            {can('cash.move') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={readOnly}
-                onClick={() => setCashOpen(true)}
-              >
-                {t('office.expenses.cash_in_out')}
-              </button>
-            ) : null}
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText('bikri-expenses.csv', expensesCsv(data.rows, tz))
-                }
-              >
-                {t('office.expenses.export_csv')}
-              </button>
-            ) : null}
-            {can('expense.create') ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.expenses.new_expense')}
-              </button>
-            ) : null}
-          </>
-        }
-      />
-
-      <div className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={preset === p}
-            className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-            onClick={() => setPreset(p)}
-          >
-            {t(`office.expenses.range_${p}`)}
-          </button>
-        ))}
-        {preset === 'custom' ? (
-          <span className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col text-small">
-              {t('office.expenses.from')}
-              <input
-                type="date"
-                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
-                value={custom.from}
-                max={custom.to}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    from: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="flex flex-col text-small">
-              {t('office.expenses.to')}
-              <input
-                type="date"
-                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
-                value={custom.to}
-                min={custom.from}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    to: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </span>
-        ) : null}
-        {preset === 'custom' && !customValid ? (
-          <p role="alert" className="w-full text-small text-danger">
-            {t('office.expenses.range_invalid')}
-          </p>
-        ) : null}
-        <p className="ms-auto self-center text-small">
-          {t('office.expenses.total')}:{' '}
-          <span className="text-title font-semibold">
-            <MoneyText paisa={data?.total ?? 0} />
-          </span>
-        </p>
-      </div>
-
-      {data && data.byCategory.length > 0 ? (
-        <div className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3">
-          {data.byCategory.map((row) => (
-            <div
-              key={row.category?.id ?? 'none'}
-              className="flex items-center gap-2 text-small"
-            >
-              <span className="min-w-32 truncate">
-                {categoryName(row.category, i18n.language)}
-              </span>
-              <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                <span
-                  className="block h-full bg-primary"
-                  style={{ width: `${Math.round((row.net / max) * 100)}%` }}
-                />
-              </span>
-              <MoneyText paisa={row.net} />
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
+    <Box mx="auto" maw={1152} p="md" w="100%">
+      <Stack gap="sm">
+        <PageHeader
           icon={<ExpensesIcon />}
-          message={t('office.expenses.empty')}
-          actionLabel={
-            can('expense.create') ? t('office.expenses.new_expense') : undefined
-          }
-          onAction={
-            can('expense.create') && !readOnly
-              ? () => setNewOpen(true)
-              : undefined
+          tone="bg-warning-subtle text-warning-subtle-ink"
+          title={t('office.expenses.title')}
+          subtitle={t('office.expenses.subtitle')}
+          actions={
+            <>
+              {can('cash.move') ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={readOnly}
+                  onClick={() => setCashOpen(true)}
+                >
+                  {t('office.expenses.cash_in_out')}
+                </Button>
+              ) : null}
+              {can('export.data') ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={!data || data.rows.length === 0}
+                  onClick={() =>
+                    data &&
+                    downloadText(
+                      'bikri-expenses.csv',
+                      expensesCsv(data.rows, tz),
+                    )
+                  }
+                >
+                  {t('office.expenses.export_csv')}
+                </Button>
+              ) : null}
+              {can('expense.create') ? (
+                <Button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.expenses.new_expense')}
+                </Button>
+              ) : null}
+            </>
           }
         />
-      ) : null}
 
-      {data?.days.map((day) => (
-        <section key={day.date} className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
-            <h2 className="text-title font-semibold">
-              {dateText(day.date, i18n.language, tz)}
-            </h2>
-            <p className="text-small text-text-muted">
-              <MoneyText paisa={day.total} />
-            </p>
-          </div>
-          <ul className="flex flex-col rounded-card border border-border bg-surface">
-            {day.rows.map((row) => (
-              <li
-                key={row.expense.id}
-                data-testid="expense-row"
-                className={`flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
+        <Paper withBorder p="sm">
+          <Group gap="xs" align="flex-end">
+            {PRESETS.map((p) => (
+              <Button
+                key={p}
+                type="button"
+                size="compact-sm"
+                variant={preset === p ? 'light' : 'default'}
+                aria-pressed={preset === p}
+                onClick={() => setPreset(p)}
               >
-                <span className="min-w-0 flex-[2_1_10rem]">
-                  <span className="block truncate font-medium">
-                    {categoryName(row.category, i18n.language)}
-                    {row.expense.reverses_id
-                      ? ` · ${t('office.expenses.reversal')}`
-                      : ''}
-                  </span>
-                  <span className="block truncate text-small text-text-muted">
-                    {[row.expense.payee, row.expense.note]
-                      .filter(Boolean)
-                      .map(String)
-                      .join(' · ')}
-                  </span>
-                </span>
-                <span className="text-small text-text-muted">
-                  {timeText(Number(row.expense.created_at), i18n.language, tz)}
-                  {row.staffName ? ` · ${row.staffName}` : ''}
-                </span>
-                <span className="min-w-24 text-end font-medium">
-                  {row.expense.reverses_id ? '−' : ''}
-                  <MoneyText paisa={Number(row.expense.amount)} />
-                </span>
-                <span className="text-small text-text-muted">
-                  {t(
-                    row.expense.method === 'cash'
-                      ? 'payment.cash'
-                      : row.expense.method === 'card'
-                        ? 'payment.card'
-                        : 'payment.bank_wallet',
-                  )}
-                </span>
-                {canReverse(row) ? (
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    onClick={() => setReversing(row)}
-                  >
-                    {t('office.expenses.reverse')}
-                  </button>
-                ) : row.reversed ? (
-                  <span className="text-small text-text-muted">
-                    {t('office.expenses.reversed')}
-                  </span>
-                ) : null}
-              </li>
+                {t(`office.expenses.range_${p}`)}
+              </Button>
             ))}
-          </ul>
-        </section>
-      ))}
+            {preset === 'custom' ? (
+              <>
+                <TextInput
+                  type="date"
+                  label={t('office.expenses.from')}
+                  value={custom.from}
+                  max={custom.to}
+                  onChange={(event) =>
+                    setCustom((current) => ({
+                      ...current,
+                      from: event.currentTarget.value,
+                    }))
+                  }
+                />
+                <TextInput
+                  type="date"
+                  label={t('office.expenses.to')}
+                  value={custom.to}
+                  min={custom.from}
+                  onChange={(event) =>
+                    setCustom((current) => ({
+                      ...current,
+                      to: event.currentTarget.value,
+                    }))
+                  }
+                />
+              </>
+            ) : null}
+            <Group gap={6} align="baseline" ms="auto">
+              <Text size="sm">{t('office.expenses.total')}:</Text>
+              <Text fz={22} fw={600}>
+                <MoneyText paisa={data?.total ?? 0} />
+              </Text>
+            </Group>
+          </Group>
+          {preset === 'custom' && !customValid ? (
+            <Text size="sm" c="danger" role="alert" mt="xs">
+              {t('office.expenses.range_invalid')}
+            </Text>
+          ) : null}
+        </Paper>
 
-      <ExpenseDialog open={newOpen} onOpenChange={setNewOpen} />
-      <CashMoveDialog open={cashOpen} onOpenChange={setCashOpen} />
-      <ConfirmDialog
-        open={reversing !== null}
-        onOpenChange={(open) => {
-          if (!open) setReversing(null);
-        }}
-        title={t('office.expenses.reverse_title')}
-        body={t('office.expenses.reverse_body')}
-        confirmLabel={t('office.expenses.reverse')}
-        onConfirm={() => void reverse()}
-      />
-    </div>
+        {data && data.byCategory.length > 0 ? (
+          <Paper withBorder p="sm">
+            <Stack gap="xs">
+              {data.byCategory.map((row) => (
+                <Group key={row.category?.id ?? 'none'} gap="sm" wrap="nowrap">
+                  <Text size="sm" w={128} truncate>
+                    {categoryName(row.category, i18n.language)}
+                  </Text>
+                  <Box style={{ flex: 1 }}>
+                    <Progress
+                      value={Math.round((row.net / max) * 100)}
+                      size="sm"
+                      color="brand"
+                      aria-label={`${categoryName(row.category, i18n.language)} ${Math.round((row.net / max) * 100)}%`}
+                    />
+                  </Box>
+                  <Text size="sm">
+                    <MoneyText paisa={row.net} />
+                  </Text>
+                </Group>
+              ))}
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            icon={<ExpensesIcon />}
+            message={t('office.expenses.empty')}
+            actionLabel={
+              can('expense.create')
+                ? t('office.expenses.new_expense')
+                : undefined
+            }
+            onAction={
+              can('expense.create') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
+
+        {data?.days.map((day) => (
+          <Box component="section" key={day.date}>
+            <Stack gap={4}>
+              <Group
+                justify="space-between"
+                align="baseline"
+                gap="sm"
+                wrap="wrap"
+                pb={4}
+                style={{
+                  borderBottom: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <Title order={2} fz="md">
+                  {dateText(day.date, i18n.language, tz)}
+                </Title>
+                <Text size="sm" c="dimmed">
+                  <MoneyText paisa={day.total} />
+                </Text>
+              </Group>
+              <Paper withBorder p={0}>
+                <Box
+                  component="ul"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                >
+                  {day.rows.map((row, index) => (
+                    <Box
+                      component="li"
+                      key={row.expense.id}
+                      data-testid="expense-row"
+                      style={{
+                        borderTop:
+                          index > 0
+                            ? '1px solid var(--mantine-color-default-border)'
+                            : undefined,
+                      }}
+                    >
+                      <Group
+                        gap="sm"
+                        p="sm"
+                        wrap="wrap"
+                        opacity={row.expense.reverses_id ? 0.65 : undefined}
+                        style={
+                          row.expense.reverses_id
+                            ? { textDecoration: 'line-through' }
+                            : undefined
+                        }
+                      >
+                        <Box style={{ flex: '2 1 10rem', minWidth: 0 }}>
+                          <Text size="sm" fw={500} truncate>
+                            {categoryName(row.category, i18n.language)}
+                            {row.expense.reverses_id
+                              ? ` · ${t('office.expenses.reversal')}`
+                              : ''}
+                          </Text>
+                          <Text size="sm" c="dimmed" truncate>
+                            {[row.expense.payee, row.expense.note]
+                              .filter(Boolean)
+                              .map(String)
+                              .join(' · ')}
+                          </Text>
+                        </Box>
+                        <Text size="sm" c="dimmed">
+                          {timeText(
+                            Number(row.expense.created_at),
+                            i18n.language,
+                            tz,
+                          )}
+                          {row.staffName ? ` · ${row.staffName}` : ''}
+                        </Text>
+                        <Text size="sm" fw={500} ta="end" w={96}>
+                          {row.expense.reverses_id ? '−' : ''}
+                          <MoneyText paisa={Number(row.expense.amount)} />
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {t(
+                            row.expense.method === 'cash'
+                              ? 'payment.cash'
+                              : row.expense.method === 'card'
+                                ? 'payment.card'
+                                : 'payment.bank_wallet',
+                          )}
+                        </Text>
+                        {canReverse(row) ? (
+                          <Button
+                            type="button"
+                            size="compact-sm"
+                            variant="default"
+                            onClick={() => setReversing(row)}
+                          >
+                            {t('office.expenses.reverse')}
+                          </Button>
+                        ) : row.reversed ? (
+                          <Text size="sm" c="dimmed">
+                            {t('office.expenses.reversed')}
+                          </Text>
+                        ) : null}
+                      </Group>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            </Stack>
+          </Box>
+        ))}
+
+        <ExpenseDialog open={newOpen} onOpenChange={setNewOpen} />
+        <CashMoveDialog open={cashOpen} onOpenChange={setCashOpen} />
+        <ConfirmDialog
+          open={reversing !== null}
+          onOpenChange={(open) => {
+            if (!open) setReversing(null);
+          }}
+          title={t('office.expenses.reverse_title')}
+          body={t('office.expenses.reverse_body')}
+          confirmLabel={t('office.expenses.reverse')}
+          onConfirm={() => void reverse()}
+        />
+      </Stack>
+    </Box>
   );
 }
