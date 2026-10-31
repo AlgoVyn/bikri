@@ -1,9 +1,21 @@
 import { businessDate } from '@bikri/core';
+import {
+  ActionIcon,
+  Anchor,
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Title,
+} from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -24,7 +36,6 @@ import { statementPdf, statementPng } from '../udhaar/statementFile.ts';
 import {
   dateText,
   supplierBalanceLabel,
-  supplierBalanceTone,
   supplierEntryDescription,
 } from './format.ts';
 import { PaySupplierDialog } from './PaySupplierDialog.tsx';
@@ -144,255 +155,267 @@ export function SupplierStatement({
   };
 
   return (
-    <div
-      className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
-      }
+    <Box
+      p={embedded ? undefined : 'md'}
+      mx={embedded ? undefined : 'auto'}
+      maw={embedded ? undefined : 1024}
+      w="100%"
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <Link
-            to="/suppliers"
-            aria-label={t('office.suppliers.back')}
-            title={t('office.suppliers.back')}
-            className={
-              embedded
-                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-                : buttonQuiet
-            }
-          >
-            {embedded ? (
-              <span
-                aria-hidden="true"
-                className="text-title leading-none rtl:rotate-180"
-              >
+      <Stack gap="sm">
+        <Group align="flex-start" gap="sm" wrap="nowrap">
+          {embedded ? (
+            <ActionIcon
+              component={Link}
+              to="/suppliers"
+              variant="default"
+              size={44}
+              aria-label={t('office.suppliers.back')}
+              title={t('office.suppliers.back')}
+            >
+              <span aria-hidden="true" className="rtl:rotate-180">
                 ‹
               </span>
-            ) : (
-              t('office.suppliers.back')
-            )}
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words text-h1 font-semibold">{name}</h1>
+            </ActionIcon>
+          ) : (
+            <Button component={Link} to="/suppliers" variant="default">
+              {t('office.suppliers.back')}
+            </Button>
+          )}
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <Title order={1} fz="h2" style={{ overflowWrap: 'anywhere' }}>
+              {name}
+            </Title>
             {supplier.phone ? (
-              <a
+              <Anchor
                 href={`tel:${String(supplier.phone)}`}
                 dir="ltr"
-                className="text-small underline"
+                size="sm"
               >
                 {String(supplier.phone)}
-              </a>
+              </Anchor>
             ) : null}
-          </div>
-        </div>
-        <p
-          className={`whitespace-nowrap text-figure font-semibold ${supplierBalanceTone(balance)}`}
+          </Box>
+        </Group>
+        <Text
+          fz={32}
+          fw={600}
+          lh={1.15}
+          c={balance > 0 ? undefined : balance < 0 ? 'teal' : 'dimmed'}
           data-testid="supplier-balance"
         >
           {supplierBalanceLabel(t, balance)}
-        </p>
-      </div>
+        </Text>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
-        {can('purchase.create') ? (
-          <>
-            <Link
-              to="/suppliers/$supplierId/delivery/new"
-              params={{ supplierId }}
-              className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
-              aria-disabled={readOnly}
-              onClick={(event) => {
-                if (readOnly) event.preventDefault();
-              }}
-            >
-              {t('office.suppliers.record_delivery')}
-            </Link>
-            <button
+        <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="xs">
+          {can('purchase.create') ? (
+            <>
+              <Link
+                to="/suppliers/$supplierId/delivery/new"
+                params={{ supplierId }}
+                aria-disabled={readOnly}
+                onClick={(event) => {
+                  if (readOnly) event.preventDefault();
+                }}
+                style={{
+                  textDecoration: 'none',
+                  opacity: readOnly ? 0.55 : undefined,
+                }}
+              >
+                <Button component="span" fullWidth>
+                  {t('office.suppliers.record_delivery')}
+                </Button>
+              </Link>
+              <Button
+                type="button"
+                variant="default"
+                disabled={readOnly}
+                onClick={() => setPayOpen(true)}
+              >
+                {t('office.suppliers.pay_supplier')}
+              </Button>
+              <Link
+                to="/suppliers/$supplierId/return/new"
+                params={{ supplierId }}
+                aria-disabled={readOnly}
+                onClick={(event) => {
+                  if (readOnly) event.preventDefault();
+                }}
+                style={{
+                  textDecoration: 'none',
+                  opacity: readOnly ? 0.55 : undefined,
+                }}
+              >
+                <Button component="span" variant="default" fullWidth>
+                  {t('office.suppliers.return_supplier')}
+                </Button>
+              </Link>
+            </>
+          ) : null}
+          {can('purchase.create') ? (
+            <Button
               type="button"
-              className={`${buttonQuiet} gap-2`}
+              variant="default"
               disabled={readOnly}
-              onClick={() => setPayOpen(true)}
+              onClick={() => setEditOpen(true)}
             >
-              {t('office.suppliers.pay_supplier')}
-            </button>
-            <Link
-              to="/suppliers/$supplierId/return/new"
-              params={{ supplierId }}
-              className={`${buttonQuiet} ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
-              aria-disabled={readOnly}
-              onClick={(event) => {
-                if (readOnly) event.preventDefault();
-              }}
-            >
-              {t('office.suppliers.return_supplier')}
-            </Link>
-          </>
-        ) : null}
-        {can('purchase.create') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={readOnly}
-            onClick={() => setEditOpen(true)}
-          >
-            {t('office.suppliers.edit')}
-          </button>
-        ) : null}
-        {can('export.data') && rows.length > 0 ? (
-          <ExportMenu
-            onCsv={() =>
-              downloadText(
-                `supplier-${name.replace(/\s+/gu, '-')}.csv`,
-                supplierStatementCsv(rows),
-              )
-            }
-            onPdf={() => void exportPdf()}
-            onShare={() => void share()}
-          />
-        ) : null}
-      </div>
+              {t('office.suppliers.edit')}
+            </Button>
+          ) : null}
+          {can('export.data') && rows.length > 0 ? (
+            <ExportMenu
+              onCsv={() =>
+                downloadText(
+                  `supplier-${name.replace(/\s+/gu, '-')}.csv`,
+                  supplierStatementCsv(rows),
+                )
+              }
+              onPdf={() => void exportPdf()}
+              onShare={() => void share()}
+            />
+          ) : null}
+        </SimpleGrid>
 
-      <ul className="flex flex-col gap-2 sm:hidden">
-        {rows.length === 0 ? (
-          <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
-            {t('office.suppliers.no_entries')}
-          </li>
-        ) : (
-          statement.rows.map((row, index) => (
-            <li
-              key={row.entry.id}
-              className="rounded-card border border-border bg-surface p-3 text-small"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-text-muted">
-                  {dateText(String(row.entry.business_date), i18n.language, tz)}
-                </span>
-                <span className="font-medium">
-                  <MoneyText paisa={row.balance} />
-                </span>
-              </div>
-              <p className="mt-1">
-                {rows[index]?.description}
-                {row.kind === 'purchase' &&
-                row.entry.source_id &&
-                can('purchase.create') &&
-                !readOnly ? (
-                  <Link
-                    to="/suppliers/$supplierId/return/new"
-                    params={{ supplierId }}
-                    search={{ purchase: String(row.entry.source_id) }}
-                    className="ms-2 text-small underline"
-                  >
-                    {t('office.suppliers.return_items')}
-                  </Link>
-                ) : null}
-              </p>
-              <dl className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.suppliers.got')}
-                  </dt>
-                  <dd className="text-end">
-                    {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.suppliers.paid')}
-                  </dt>
-                  <dd className="text-end">
-                    {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          ))
-        )}
-      </ul>
-
-      <section
-        className="hidden overflow-auto rounded-card border border-border sm:block"
-        aria-label={t('office.suppliers.statement')}
-        tabIndex={0}
-      >
-        <table className="w-full min-w-[32rem] text-small">
-          <thead className="bg-surface">
-            <tr className="border-b border-border text-text-muted">
-              <th className="p-2 text-start">{t('office.suppliers.date')}</th>
-              <th className="p-2 text-start">
-                {t('office.suppliers.description')}
-              </th>
-              <th className="p-2 text-end">{t('office.suppliers.got')}</th>
-              <th className="p-2 text-end">{t('office.suppliers.paid')}</th>
-              <th className="p-2 text-end">{t('office.suppliers.balance')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-4 text-center text-text-muted">
-                  {t('office.suppliers.no_entries')}
-                </td>
-              </tr>
-            ) : (
-              statement.rows.map((row, index) => (
-                <tr
-                  key={row.entry.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="p-2 whitespace-nowrap">
+        <Stack gap="sm" hiddenFrom="sm">
+          {rows.length === 0 ? (
+            <Paper withBorder p="md">
+              <Text size="sm" c="dimmed" ta="center">
+                {t('office.suppliers.no_entries')}
+              </Text>
+            </Paper>
+          ) : (
+            statement.rows.map((row, index) => (
+              <Paper withBorder p="sm" key={row.entry.id}>
+                <Group justify="space-between" gap="sm" align="flex-start">
+                  <Text size="sm" c="dimmed">
                     {dateText(
                       String(row.entry.business_date),
                       i18n.language,
                       tz,
                     )}
-                  </td>
-                  <td className="p-2">
-                    {rows[index]?.description}
-                    {row.kind === 'purchase' &&
-                    row.entry.source_id &&
-                    can('purchase.create') &&
-                    !readOnly ? (
-                      <Link
-                        to="/suppliers/$supplierId/return/new"
-                        params={{ supplierId }}
-                        search={{ purchase: String(row.entry.source_id) }}
-                        className="ms-2 text-small underline"
-                      >
-                        {t('office.suppliers.return_items')}
-                      </Link>
-                    ) : null}
-                  </td>
-                  <td className="p-2 text-end">
-                    {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
-                  </td>
-                  <td className="p-2 text-end">
-                    {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
-                  </td>
-                  <td className="p-2 text-end font-medium">
+                  </Text>
+                  <Text size="sm" fw={500}>
                     <MoneyText paisa={row.balance} />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+                  </Text>
+                </Group>
+                <Text size="sm" mt={4}>
+                  {rows[index]?.description}
+                  {row.kind === 'purchase' &&
+                  row.entry.source_id &&
+                  can('purchase.create') &&
+                  !readOnly ? (
+                    <Link
+                      to="/suppliers/$supplierId/return/new"
+                      params={{ supplierId }}
+                      search={{ purchase: String(row.entry.source_id) }}
+                      className="bikri-link ms-2"
+                    >
+                      {t('office.suppliers.return_items')}
+                    </Link>
+                  ) : null}
+                </Text>
+                <SimpleGrid cols={2} spacing="sm" mt="xs">
+                  <Box>
+                    <Text size="sm" c="dimmed">
+                      {t('office.suppliers.got')}
+                    </Text>
+                    <Text size="sm" ta="end">
+                      {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text size="sm" c="dimmed">
+                      {t('office.suppliers.paid')}
+                    </Text>
+                    <Text size="sm" ta="end">
+                      {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+              </Paper>
+            ))
+          )}
+        </Stack>
 
-      <PaySupplierDialog
-        open={payOpen}
-        onOpenChange={setPayOpen}
-        supplierId={supplierId}
-        supplierName={name}
-        balance={balance}
-      />
-      <SupplierDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        supplier={supplier}
-      />
-    </div>
+        <Paper withBorder visibleFrom="sm">
+          <Box
+            tabIndex={0}
+            role="region"
+            aria-label={t('office.suppliers.statement')}
+            style={{ overflow: 'auto' }}
+          >
+            <Table fz="sm" miw={512}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('office.suppliers.date')}</Table.Th>
+                  <Table.Th>{t('office.suppliers.description')}</Table.Th>
+                  <Table.Th ta="end">{t('office.suppliers.got')}</Table.Th>
+                  <Table.Th ta="end">{t('office.suppliers.paid')}</Table.Th>
+                  <Table.Th ta="end">{t('office.suppliers.balance')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {rows.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5} ta="center" c="dimmed" py="md">
+                      {t('office.suppliers.no_entries')}
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  statement.rows.map((row, index) => (
+                    <Table.Tr key={row.entry.id}>
+                      <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                        {dateText(
+                          String(row.entry.business_date),
+                          i18n.language,
+                          tz,
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {rows[index]?.description}
+                        {row.kind === 'purchase' &&
+                        row.entry.source_id &&
+                        can('purchase.create') &&
+                        !readOnly ? (
+                          <Link
+                            to="/suppliers/$supplierId/return/new"
+                            params={{ supplierId }}
+                            search={{ purchase: String(row.entry.source_id) }}
+                            className="bikri-link ms-2"
+                          >
+                            {t('office.suppliers.return_items')}
+                          </Link>
+                        ) : null}
+                      </Table.Td>
+                      <Table.Td ta="end">
+                        {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
+                      </Table.Td>
+                      <Table.Td ta="end">
+                        {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
+                      </Table.Td>
+                      <Table.Td ta="end" fw={500}>
+                        <MoneyText paisa={row.balance} />
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
+              </Table.Tbody>
+            </Table>
+          </Box>
+        </Paper>
+
+        <PaySupplierDialog
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          supplierId={supplierId}
+          supplierName={name}
+          balance={balance}
+        />
+        <SupplierDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          supplier={supplier}
+        />
+      </Stack>
+    </Box>
   );
 }

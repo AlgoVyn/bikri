@@ -1,9 +1,23 @@
 import { businessDate } from '@bikri/core';
+import {
+  ActionIcon,
+  Anchor,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -28,7 +42,6 @@ import { CustomerDialog } from './CustomerDialog.tsx';
 import {
   ageLabel,
   balanceLabel,
-  balanceTone,
   dateText,
   entryDescription,
   limitPercent,
@@ -217,375 +230,375 @@ export function CustomerStatement({
   );
 
   return (
-    <div
-      className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-5xl flex-col gap-3 p-4'
-      }
+    <Box
+      p={embedded ? undefined : 'md'}
+      mx={embedded ? undefined : 'auto'}
+      maw={embedded ? undefined : 1024}
+      w="100%"
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <Link
-            to="/udhaar"
-            aria-label={t('office.udhaar.back_customers')}
-            title={t('office.udhaar.back_customers')}
-            className={
-              embedded
-                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-                : buttonQuiet
-            }
-          >
-            {embedded ? (
-              <span
-                aria-hidden="true"
-                className="text-title leading-none rtl:rotate-180"
-              >
+      <Stack gap="sm">
+        <Group align="flex-start" gap="sm" wrap="nowrap">
+          {embedded ? (
+            <ActionIcon
+              component={Link}
+              to="/udhaar"
+              variant="default"
+              size={44}
+              aria-label={t('office.udhaar.back_customers')}
+              title={t('office.udhaar.back_customers')}
+            >
+              <span aria-hidden="true" className="rtl:rotate-180">
                 ‹
               </span>
-            ) : (
-              t('office.udhaar.back_customers')
-            )}
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words text-h1 font-semibold">{name}</h1>
+            </ActionIcon>
+          ) : (
+            <Button component={Link} to="/udhaar" variant="default">
+              {t('office.udhaar.back_customers')}
+            </Button>
+          )}
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <Title order={1} fz="h2" style={{ overflowWrap: 'anywhere' }}>
+              {name}
+            </Title>
             {phone ? (
-              <a
-                href={`tel:${phone}`}
-                dir="ltr"
-                className="text-small underline"
-              >
+              <Anchor href={`tel:${phone}`} dir="ltr" size="sm">
                 {phone}
-              </a>
+              </Anchor>
             ) : null}
-          </div>
-        </div>
-        <p
-          className={`whitespace-nowrap text-figure font-semibold ${balanceTone(balance)}`}
+          </Box>
+        </Group>
+        <Text
+          fz={32}
+          fw={600}
+          lh={1.15}
+          c={balance > 0 ? undefined : balance < 0 ? 'teal' : 'dimmed'}
           data-testid="statement-balance"
         >
           {balanceLabel(t, balance)}
-        </p>
-      </div>
+        </Text>
 
-      <div className="flex flex-wrap gap-2">
-        {can('payment.receive') ? (
-          <button
-            type="button"
-            className={`${buttonPrimary} gap-2`}
-            disabled={readOnly}
-            onClick={() => setReceiveOpen(true)}
-          >
-            {t('office.udhaar.receive_money')}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={buttonQuiet}
-          disabled={!reminder}
-          title={reminder ? undefined : t('office.udhaar.reminder_no_phone')}
-          onClick={() => {
-            if (reminder) window.open(reminder, '_blank', 'noopener');
-          }}
-        >
-          {t('office.udhaar.send_reminder')}
-        </button>
-        {can('export.data') ? (
-          <ExportMenu
-            onCsv={exportCsv}
-            onPdf={() => void exportPdf()}
-            onShare={() => void share()}
-          />
-        ) : null}
-        {can('party.edit') ? (
-          <>
-            <button
+        <Group gap="sm">
+          {can('payment.receive') ? (
+            <Button
               type="button"
-              className={buttonQuiet}
               disabled={readOnly}
-              onClick={() => setPromiseOpen(true)}
+              onClick={() => setReceiveOpen(true)}
             >
-              {t('office.udhaar.add_promise')}
-            </button>
-            {role !== 'cashier' ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={readOnly}
-                onClick={() => setEditOpen(true)}
-              >
-                {t('office.udhaar.edit')}
-              </button>
-            ) : null}
-          </>
-        ) : null}
-        {can('sale.create') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void sellTo()}
-          >
-            {t('office.udhaar.sell_to', { name })}
-          </button>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-3 text-small">
-        <span>
-          {t('office.udhaar.limit')}:{' '}
-          {customer.credit_limit === null ||
-          customer.credit_limit === undefined ? (
-            t('office.udhaar.no_limit')
-          ) : (
-            <MoneyText paisa={Number(customer.credit_limit)} />
-          )}
-        </span>
-        {percent !== null ? (
-          <span
-            className="h-2 w-40 overflow-hidden rounded-full bg-surface-2"
-            role="img"
-            aria-label={t('office.udhaar.limit_bar', { percent })}
-          >
-            <span
-              className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-              style={{ width: `${percent}%` }}
-            />
-          </span>
-        ) : null}
-        <span className="text-text-muted">
-          {ageLabel(t, data.oldest ?? null)}
-        </span>
-        {data.promise ? (
-          <span className="text-text-muted">
-            {t('office.udhaar.promise_on', {
-              date: dateText(
-                String(data.promise.promised_on),
-                i18n.language,
-                tz,
-              ),
-            })}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col text-small">
-          {t('office.udhaar.from')}
-          <input
-            type="date"
-            className="h-11 rounded-control border border-border-strong bg-surface px-2"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-          {from ? (
-            <span className="text-text-muted">
-              {dateText(from, i18n.language, tz)}
-            </span>
+              {t('office.udhaar.receive_money')}
+            </Button>
           ) : null}
-        </label>
-        <label className="flex flex-col text-small">
-          {t('office.udhaar.to')}
-          <input
-            type="date"
-            className="h-11 rounded-control border border-border-strong bg-surface px-2"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-          {to ? (
-            <span className="text-text-muted">
-              {dateText(to, i18n.language, tz)}
-            </span>
-          ) : null}
-        </label>
-        {from || to ? (
-          <button
+          <Button
             type="button"
-            className={buttonQuiet}
+            variant="default"
+            disabled={!reminder}
+            title={reminder ? undefined : t('office.udhaar.reminder_no_phone')}
             onClick={() => {
-              setFrom('');
-              setTo('');
+              if (reminder) window.open(reminder, '_blank', 'noopener');
             }}
           >
-            {t('office.udhaar.all_time')}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() =>
-            tableRef.current?.scrollTo({
-              top: tableRef.current.scrollHeight,
-              behavior: 'smooth',
-            })
-          }
-        >
-          {t('office.udhaar.jump_latest')}
-        </button>
-      </div>
-
-      <ul className="flex flex-col gap-2 sm:hidden">
-        {statement.openingBalance !== 0 ? (
-          <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
-            <span>{t('office.udhaar.entry_opening')}</span>
-            <span className="font-medium">
-              <MoneyText paisa={statement.openingBalance} />
-            </span>
-          </li>
-        ) : null}
-        {rows.length === 0 ? (
-          <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
-            {t('office.udhaar.no_entries')}
-          </li>
-        ) : (
-          statement.rows.map((row, index) => (
-            <li
-              key={row.entry.id}
-              className="rounded-card border border-border bg-surface p-3 text-small"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-text-muted">
-                  {dateText(String(row.entry.business_date), i18n.language, tz)}
-                </span>
-                <span className="font-medium">
-                  <MoneyText paisa={row.balance} />
-                </span>
-              </div>
-              <p className="mt-1">
-                {row.saleId ? (
-                  <Link
-                    to="/sales/$id"
-                    params={{ id: row.saleId }}
-                    className="underline"
-                  >
-                    {rows[index]?.description}
-                  </Link>
-                ) : (
-                  rows[index]?.description
-                )}
-              </p>
-              <dl className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.udhaar.debit')}
-                  </dt>
-                  <dd className="text-end">
-                    {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.udhaar.credit')}
-                  </dt>
-                  <dd className="text-end">
-                    {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          ))
-        )}
-      </ul>
-
-      <div
-        ref={tableRef}
-        className="hidden max-h-[60vh] overflow-auto rounded-card border border-border sm:block"
-      >
-        <table className="w-full min-w-[34rem] text-small">
-          <thead className="sticky top-0 bg-surface">
-            <tr className="border-b border-border text-text-muted">
-              <th className="p-2 text-start">{t('office.udhaar.date')}</th>
-              <th className="p-2 text-start">
-                {t('office.udhaar.description')}
-              </th>
-              <th className="p-2 text-end">{t('office.udhaar.debit')}</th>
-              <th className="p-2 text-end">{t('office.udhaar.credit')}</th>
-              <th className="p-2 text-end">{t('office.udhaar.balance')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {statement.openingBalance !== 0 ? (
-              <tr className="border-b border-border">
-                <td className="p-2" />
-                <td className="p-2">{t('office.udhaar.entry_opening')}</td>
-                <td className="p-2" />
-                <td className="p-2" />
-                <td className="p-2 text-end">
-                  <MoneyText paisa={statement.openingBalance} />
-                </td>
-              </tr>
-            ) : null}
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-4 text-center text-text-muted">
-                  {t('office.udhaar.no_entries')}
-                </td>
-              </tr>
-            ) : (
-              statement.rows.map((row, index) => (
-                <tr
-                  key={row.entry.id}
-                  className="border-b border-border last:border-0"
+            {t('office.udhaar.send_reminder')}
+          </Button>
+          {can('export.data') ? (
+            <ExportMenu
+              onCsv={exportCsv}
+              onPdf={() => void exportPdf()}
+              onShare={() => void share()}
+            />
+          ) : null}
+          {can('party.edit') ? (
+            <>
+              <Button
+                type="button"
+                variant="default"
+                disabled={readOnly}
+                onClick={() => setPromiseOpen(true)}
+              >
+                {t('office.udhaar.add_promise')}
+              </Button>
+              {role !== 'cashier' ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={readOnly}
+                  onClick={() => setEditOpen(true)}
                 >
-                  <td className="p-2 whitespace-nowrap">
+                  {t('office.udhaar.edit')}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+          {can('sale.create') ? (
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => void sellTo()}
+            >
+              {t('office.udhaar.sell_to', { name })}
+            </Button>
+          ) : null}
+        </Group>
+
+        <Paper withBorder p="sm">
+          <Group gap="md" align="center">
+            <Text size="sm">
+              {t('office.udhaar.limit')}:{' '}
+              {customer.credit_limit === null ||
+              customer.credit_limit === undefined ? (
+                t('office.udhaar.no_limit')
+              ) : (
+                <MoneyText paisa={Number(customer.credit_limit)} />
+              )}
+            </Text>
+            {percent !== null ? (
+              <Box
+                role="img"
+                aria-label={t('office.udhaar.limit_bar', { percent })}
+                w={160}
+              >
+                <Progress
+                  value={percent}
+                  size="sm"
+                  color={
+                    percent >= 100
+                      ? 'danger'
+                      : percent >= 80
+                        ? 'warning'
+                        : 'brand'
+                  }
+                />
+              </Box>
+            ) : null}
+            <Text size="sm" c="dimmed">
+              {ageLabel(t, data.oldest ?? null)}
+            </Text>
+            {data.promise ? (
+              <Text size="sm" c="dimmed">
+                {t('office.udhaar.promise_on', {
+                  date: dateText(
+                    String(data.promise.promised_on),
+                    i18n.language,
+                    tz,
+                  ),
+                })}
+              </Text>
+            ) : null}
+          </Group>
+        </Paper>
+
+        <Group gap="sm" align="flex-end">
+          <TextInput
+            type="date"
+            label={t('office.udhaar.from')}
+            value={from}
+            onChange={(event) => setFrom(event.currentTarget.value)}
+            description={from ? dateText(from, i18n.language, tz) : undefined}
+          />
+          <TextInput
+            type="date"
+            label={t('office.udhaar.to')}
+            value={to}
+            onChange={(event) => setTo(event.currentTarget.value)}
+            description={to ? dateText(to, i18n.language, tz) : undefined}
+          />
+          {from || to ? (
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => {
+                setFrom('');
+                setTo('');
+              }}
+            >
+              {t('office.udhaar.all_time')}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="default"
+            onClick={() =>
+              tableRef.current?.scrollTo({
+                top: tableRef.current.scrollHeight,
+                behavior: 'smooth',
+              })
+            }
+          >
+            {t('office.udhaar.jump_latest')}
+          </Button>
+        </Group>
+
+        <Stack gap="sm" hiddenFrom="sm">
+          {statement.openingBalance !== 0 ? (
+            <Paper withBorder p="sm">
+              <Group justify="space-between" gap="sm">
+                <Text size="sm">{t('office.udhaar.entry_opening')}</Text>
+                <Text size="sm" fw={500}>
+                  <MoneyText paisa={statement.openingBalance} />
+                </Text>
+              </Group>
+            </Paper>
+          ) : null}
+          {rows.length === 0 ? (
+            <Paper withBorder p="md">
+              <Text size="sm" c="dimmed" ta="center">
+                {t('office.udhaar.no_entries')}
+              </Text>
+            </Paper>
+          ) : (
+            statement.rows.map((row, index) => (
+              <Paper withBorder p="sm" key={row.entry.id}>
+                <Group justify="space-between" gap="sm" align="flex-start">
+                  <Text size="sm" c="dimmed">
                     {dateText(
                       String(row.entry.business_date),
                       i18n.language,
                       tz,
                     )}
-                  </td>
-                  <td className="p-2">
-                    {row.saleId ? (
-                      <Link
-                        to="/sales/$id"
-                        params={{ id: row.saleId }}
-                        className="underline"
-                      >
-                        {rows[index]?.description}
-                      </Link>
-                    ) : (
-                      rows[index]?.description
-                    )}
-                  </td>
-                  <td className="p-2 text-end">
-                    {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
-                  </td>
-                  <td className="p-2 text-end">
-                    {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
-                  </td>
-                  <td className="p-2 text-end font-medium">
+                  </Text>
+                  <Text size="sm" fw={500}>
                     <MoneyText paisa={row.balance} />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </Text>
+                </Group>
+                <Text size="sm" mt={4}>
+                  {row.saleId ? (
+                    <Link
+                      to="/sales/$id"
+                      params={{ id: row.saleId }}
+                      className="bikri-link"
+                    >
+                      {rows[index]?.description}
+                    </Link>
+                  ) : (
+                    rows[index]?.description
+                  )}
+                </Text>
+                <SimpleGrid cols={2} spacing="sm" mt="xs">
+                  <Box>
+                    <Text size="sm" c="dimmed">
+                      {t('office.udhaar.debit')}
+                    </Text>
+                    <Text size="sm" ta="end">
+                      {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text size="sm" c="dimmed">
+                      {t('office.udhaar.credit')}
+                    </Text>
+                    <Text size="sm" ta="end">
+                      {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
+                    </Text>
+                  </Box>
+                </SimpleGrid>
+              </Paper>
+            ))
+          )}
+        </Stack>
 
-      <p className="text-small text-text-muted">
-        {t('office.udhaar.balance')}: <MoneyText paisa={balance} /> ·{' '}
-        {dateText(today, i18n.language, tz)}
-      </p>
+        <Paper withBorder visibleFrom="sm" style={{ overflow: 'hidden' }}>
+          <Box
+            ref={tableRef}
+            tabIndex={0}
+            role="region"
+            aria-label={t('office.udhaar.statement')}
+            style={{ maxHeight: '60vh', overflow: 'auto' }}
+          >
+            <Table fz="sm" miw={544} stickyHeader>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('office.udhaar.date')}</Table.Th>
+                  <Table.Th>{t('office.udhaar.description')}</Table.Th>
+                  <Table.Th ta="end">{t('office.udhaar.debit')}</Table.Th>
+                  <Table.Th ta="end">{t('office.udhaar.credit')}</Table.Th>
+                  <Table.Th ta="end">{t('office.udhaar.balance')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {statement.openingBalance !== 0 ? (
+                  <Table.Tr>
+                    <Table.Td />
+                    <Table.Td>{t('office.udhaar.entry_opening')}</Table.Td>
+                    <Table.Td />
+                    <Table.Td />
+                    <Table.Td ta="end">
+                      <MoneyText paisa={statement.openingBalance} />
+                    </Table.Td>
+                  </Table.Tr>
+                ) : null}
+                {rows.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5} ta="center" c="dimmed" py="md">
+                      {t('office.udhaar.no_entries')}
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  statement.rows.map((row, index) => (
+                    <Table.Tr key={row.entry.id}>
+                      <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                        {dateText(
+                          String(row.entry.business_date),
+                          i18n.language,
+                          tz,
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {row.saleId ? (
+                          <Link
+                            to="/sales/$id"
+                            params={{ id: row.saleId }}
+                            className="bikri-link"
+                          >
+                            {rows[index]?.description}
+                          </Link>
+                        ) : (
+                          rows[index]?.description
+                        )}
+                      </Table.Td>
+                      <Table.Td ta="end">
+                        {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
+                      </Table.Td>
+                      <Table.Td ta="end">
+                        {row.credit > 0 ? (
+                          <MoneyText paisa={row.credit} />
+                        ) : (
+                          '—'
+                        )}
+                      </Table.Td>
+                      <Table.Td ta="end" fw={500}>
+                        <MoneyText paisa={row.balance} />
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
+              </Table.Tbody>
+            </Table>
+          </Box>
+        </Paper>
 
-      <ReceivePaymentDialog
-        open={receiveOpen}
-        onOpenChange={setReceiveOpen}
-        customerId={customerId}
-        customerName={name}
-        balance={balance}
-      />
-      <PromiseDialog
-        open={promiseOpen}
-        onOpenChange={setPromiseOpen}
-        customerId={customerId}
-        customerName={name}
-        balance={balance}
-      />
-      <CustomerDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        customer={customer}
-      />
-    </div>
+        <Text size="sm" c="dimmed">
+          {t('office.udhaar.balance')}: <MoneyText paisa={balance} /> ·{' '}
+          {dateText(today, i18n.language, tz)}
+        </Text>
+
+        <ReceivePaymentDialog
+          open={receiveOpen}
+          onOpenChange={setReceiveOpen}
+          customerId={customerId}
+          customerName={name}
+          balance={balance}
+        />
+        <PromiseDialog
+          open={promiseOpen}
+          onOpenChange={setPromiseOpen}
+          customerId={customerId}
+          customerName={name}
+          balance={balance}
+        />
+        <CustomerDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          customer={customer}
+        />
+      </Stack>
+    </Box>
   );
 }
