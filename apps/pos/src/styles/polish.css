@@ -342,3 +342,41 @@ h4 {
 [data-mantine-color-scheme="dark"] ::selection {
   background: rgb(95 220 215 / 0.28);
 }
+
+/* Next-level hierarchy: quieter badges, taller table rows, calmer secondary actions. */
+.mantine-Table-tr {
+  min-height: 46px;
+}
+
+.mantine-Badge-root[data-variant="light"] {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.mantine-Button-root[data-variant="default"] {
+  background: transparent;
+}
+
+.mantine-Button-root[data-variant="default"]:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.mantine-Tabs-list {
+  border-bottom-color: var(--mantine-color-default-border);
+}
+
+.mantine-Tabs-tab {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.mantine-Paper-root[data-with-border] {
+  background-clip: padding-box;
+}
+
+/* Calmer page rhythm. */
+main h1 {
+  max-width: 28ch;
+}
+
+main section + section {
+  margin-top: 0;
+}

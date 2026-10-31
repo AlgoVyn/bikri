@@ -100,9 +100,9 @@ export const bikriTheme = createTheme({
     fontFamily: sans,
     fontWeight: '600',
     sizes: {
-      h1: { fontSize: '1.6rem', lineHeight: '1.25' },
-      h2: { fontSize: '1.2rem', lineHeight: '1.35' },
-      h3: { fontSize: '1.0667rem', lineHeight: '1.4' },
+      h1: { fontSize: '1.75rem', lineHeight: '1.2' },
+      h2: { fontSize: '1.25rem', lineHeight: '1.3' },
+      h3: { fontSize: '1.05rem', lineHeight: '1.4' },
       h4: { fontSize: '1rem', lineHeight: '1.45' },
       h5: { fontSize: '0.9333rem', lineHeight: '1.5' },
       h6: { fontSize: '0.8667rem', lineHeight: '1.5' },

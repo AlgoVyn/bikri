@@ -309,8 +309,8 @@ function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
         <Title order={3} id="quick-heading" fz="sm" c="dimmed">
           {t('home.quick_actions')}
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
-          {tiles.map((tile) => (
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          {tiles.slice(0, 3).map((tile) => (
             <UnstyledButton
               key={tile.to + tile.label}
               component={Link}
