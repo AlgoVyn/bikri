@@ -1,10 +1,22 @@
 import { businessDate, computePurchase, isQtyUnit, newId } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
+import {
+  ActionIcon,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -27,9 +39,6 @@ type Line = {
   updatePrice: boolean;
   price: number;
 };
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Record a delivery / purchase (screens/13). */
 export function DeliveryPage({ supplierId }: { supplierId: string }) {
@@ -202,305 +211,343 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
   if (!data) return <PageLoading compact />;
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          aria-label={t('office.suppliers.back')}
-          title={t('office.suppliers.back')}
-          className={`${buttonQuiet} gap-1 px-2`}
-        >
-          <span
-            aria-hidden="true"
-            className="text-title leading-none rtl:rotate-180"
+    <Box mx="auto" maw={896} p="md" w="100%">
+      <Stack gap="sm">
+        <Group gap="sm" wrap="wrap">
+          <Link
+            to="/suppliers/$supplierId"
+            params={{ supplierId }}
+            aria-label={t('office.suppliers.back')}
+            title={t('office.suppliers.back')}
+            style={{ textDecoration: 'none' }}
           >
-            ‹
-          </span>
-          <span>{t('common.back')}</span>
-        </Link>
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.suppliers.delivery_title')}
-        </h1>
-        <p className="text-small text-text-muted">
-          {String(data.supplier.name)} · {formatShopMoney(data.balance)}
-        </p>
-      </div>
+            <Button
+              component="span"
+              variant="default"
+              leftSection={<span aria-hidden="true">‹</span>}
+            >
+              {t('common.back')}
+            </Button>
+          </Link>
+          <Title order={1} fz="h2" style={{ marginInlineEnd: 'auto' }}>
+            {t('office.suppliers.delivery_title')}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {String(data.supplier.name)} · {formatShopMoney(data.balance)}
+          </Text>
+        </Group>
 
-      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.supplier_invoice')}
-          <input
-            className={field}
-            maxLength={30}
-            value={invoiceNo}
-            onChange={(e) => setInvoiceNo(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.delivery_date')}
-          <input
-            type="date"
-            className={field}
-            min={minDate}
-            max={today}
-            value={chosenDate}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <span className="text-text-muted">
-            {formatBusinessDate(chosenDate, i18n.language)}
-          </span>
-        </label>
-      </section>
-
-      <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-small font-medium">
-            {t('office.suppliers.lines')}
-          </p>
-          <p
-            className="rounded-full bg-surface-2 px-2 text-small font-medium text-text"
-            data-testid="delivery-line-count"
-            aria-live="polite"
-          >
-            {t('office.suppliers.lines_count', { count: lines.length })}
-          </p>
-        </div>
-        <search className="flex flex-col gap-1">
-          <label className="flex min-w-0 flex-col">
-            <span className="mb-1 text-small">
-              {t('office.suppliers.add_product')}
-            </span>
-            <input
-              className={field}
-              placeholder={t('office.suppliers.search_product')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && matches[0]) {
-                  e.preventDefault();
-                  add(matches[0]);
-                }
-              }}
+        <Paper withBorder p="sm">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <TextInput
+              label={t('office.suppliers.supplier_invoice')}
+              maxLength={30}
+              value={invoiceNo}
+              onChange={(event) => setInvoiceNo(event.currentTarget.value)}
             />
-          </label>
-          {matches.length > 0 ? (
-            <ul className="flex flex-col rounded-control border border-border">
-              {matches.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-start text-small hover:bg-surface-2"
-                    onClick={() => add(p)}
-                  >
-                    <span className="ltr-name font-medium">
-                      {String(p.name_en)}
-                    </span>
-                    <span className="text-text-muted">{String(p.sku)}</span>
-                    <span className="ms-auto">
-                      <MoneyText
-                        paisa={Number(p.last_cost || p.avg_cost || 0)}
-                      />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </search>
+            <TextInput
+              type="date"
+              label={t('office.suppliers.delivery_date')}
+              min={minDate}
+              max={today}
+              value={chosenDate}
+              onChange={(event) => setDate(event.currentTarget.value)}
+              description={formatBusinessDate(chosenDate, i18n.language)}
+            />
+          </SimpleGrid>
+        </Paper>
 
-        {lines.length === 0 ? (
-          <p className="text-small text-text-muted">
-            {t('office.suppliers.no_lines')}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {lines.map((line, index) => {
-              const lineResult = purchase?.lines[valid.indexOf(line)];
-              const rawUnit = String(line.product.unit);
-              const unit = isQtyUnit(rawUnit) ? rawUnit : 'pc';
-              return (
-                <li
-                  key={line.key}
-                  data-testid="delivery-line"
-                  className="rounded-card border border-border bg-surface p-3"
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words font-medium">
-                        {String(line.product.name_en)}
-                      </p>
-                      <p className="text-small text-text-muted">
-                        {unit} · {t('office.suppliers.line_total')}:{' '}
-                        <MoneyText paisa={lineResult?.line_total ?? 0} />
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-danger"
-                      aria-label={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
-                      title={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
-                      onClick={() =>
-                        setLines((current) =>
-                          current.filter((_, i) => i !== index),
-                        )
-                      }
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="text-title leading-none"
-                      >
-                        ×
-                      </span>
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <div
-                      className="col-span-2 sm:col-span-1"
-                      data-testid="delivery-line-qty"
-                    >
-                      <QtyInput
-                        label={t('office.suppliers.qty')}
-                        unit={unit}
-                        value={line.qtyMilli}
-                        onChange={(milli) =>
-                          setLines((current) =>
-                            current.map((l, i) =>
-                              i === index ? { ...l, qtyMilli: milli ?? 0 } : l,
-                            ),
-                          )
+        <Paper withBorder p="sm">
+          <Stack gap="sm">
+            <Group justify="space-between" gap="sm">
+              <Text size="sm" fw={500}>
+                {t('office.suppliers.lines')}
+              </Text>
+              <Text
+                size="sm"
+                px="xs"
+                py={2}
+                bg="var(--mantine-color-default-hover)"
+                style={{ borderRadius: 999 }}
+                data-testid="delivery-line-count"
+                aria-live="polite"
+              >
+                {t('office.suppliers.lines_count', { count: lines.length })}
+              </Text>
+            </Group>
+
+            <Box component="search">
+              <TextInput
+                label={t('office.suppliers.add_product')}
+                placeholder={t('office.suppliers.search_product')}
+                value={query}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && matches[0]) {
+                    event.preventDefault();
+                    add(matches[0]);
+                  }
+                }}
+              />
+              {matches.length > 0 ? (
+                <Paper withBorder mt="xs">
+                  <Box
+                    component="ul"
+                    style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                  >
+                    {matches.map((p, index) => (
+                      <Box
+                        component="li"
+                        key={p.id}
+                        style={
+                          index > 0
+                            ? {
+                                borderTop:
+                                  '1px solid var(--mantine-color-default-border)',
+                              }
+                            : undefined
                         }
-                      />
-                    </div>
-                    <MoneyInput
-                      label={t('office.suppliers.unit_cost')}
-                      value={line.unitCost}
-                      onChange={(paisa) =>
-                        setLines((current) =>
-                          current.map((l, i) =>
-                            i === index ? { ...l, unitCost: paisa ?? 0 } : l,
-                          ),
-                        )
-                      }
-                    />
-                    <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
-                      <label className="flex min-h-11 items-center gap-2 text-small">
-                        <input
-                          type="checkbox"
-                          className="size-5"
-                          checked={line.updatePrice}
-                          onChange={(e) =>
+                      >
+                        <Button
+                          type="button"
+                          variant="transparent"
+                          fullWidth
+                          justify="flex-start"
+                          onClick={() => add(p)}
+                        >
+                          <Group gap="sm" wrap="nowrap" w="100%">
+                            <Text size="sm" fw={500} className="ltr-name">
+                              {String(p.name_en)}
+                            </Text>
+                            <Text size="sm" c="dimmed">
+                              {String(p.sku)}
+                            </Text>
+                            <Text size="sm" ms="auto">
+                              <MoneyText
+                                paisa={Number(p.last_cost || p.avg_cost || 0)}
+                              />
+                            </Text>
+                          </Group>
+                        </Button>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              ) : null}
+            </Box>
+
+            {lines.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                {t('office.suppliers.no_lines')}
+              </Text>
+            ) : (
+              <Stack gap="sm">
+                {lines.map((line, index) => {
+                  const lineResult = purchase?.lines[valid.indexOf(line)];
+                  const rawUnit = String(line.product.unit);
+                  const unit = isQtyUnit(rawUnit) ? rawUnit : 'pc';
+                  return (
+                    <Paper
+                      key={line.key}
+                      withBorder
+                      p="sm"
+                      data-testid="delivery-line"
+                    >
+                      <Group align="flex-start" gap="sm" wrap="nowrap">
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Text fw={500} style={{ overflowWrap: 'anywhere' }}>
+                            {String(line.product.name_en)}
+                          </Text>
+                          <Text size="sm" c="dimmed">
+                            {unit} · {t('office.suppliers.line_total')}:{' '}
+                            <MoneyText paisa={lineResult?.line_total ?? 0} />
+                          </Text>
+                        </Box>
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          size={44}
+                          aria-label={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
+                          title={`${t('office.suppliers.remove')} ${String(line.product.name_en)}`}
+                          onClick={() =>
+                            setLines((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                        >
+                          <span aria-hidden="true">×</span>
+                        </ActionIcon>
+                      </Group>
+                      <SimpleGrid
+                        cols={{ base: 2, sm: 3 }}
+                        spacing="sm"
+                        mt="sm"
+                      >
+                        <Box
+                          data-testid="delivery-line-qty"
+                          style={{ gridColumn: 'span 2' }}
+                        >
+                          <QtyInput
+                            label={t('office.suppliers.qty')}
+                            unit={unit}
+                            value={line.qtyMilli}
+                            onChange={(milli) =>
+                              setLines((current) =>
+                                current.map((l, i) =>
+                                  i === index
+                                    ? { ...l, qtyMilli: milli ?? 0 }
+                                    : l,
+                                ),
+                              )
+                            }
+                          />
+                        </Box>
+                        <MoneyInput
+                          label={t('office.suppliers.unit_cost')}
+                          value={line.unitCost}
+                          onChange={(paisa) =>
                             setLines((current) =>
                               current.map((l, i) =>
                                 i === index
-                                  ? { ...l, updatePrice: e.target.checked }
+                                  ? { ...l, unitCost: paisa ?? 0 }
                                   : l,
                               ),
                             )
                           }
                         />
-                        {t('office.suppliers.update_price')}
-                      </label>
-                      {line.updatePrice ? (
-                        <MoneyInput
-                          label={t('office.suppliers.price')}
-                          value={line.price}
-                          onChange={(paisa) =>
-                            setLines((current) =>
-                              current.map((l, i) =>
-                                i === index ? { ...l, price: paisa ?? 0 } : l,
-                              ),
-                            )
-                          }
-                        />
-                      ) : (
-                        <p className="text-small text-text-muted">
-                          {t('office.suppliers.price')}:{' '}
-                          <MoneyText paisa={Number(line.product.price ?? 0)} />
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                        <Box style={{ gridColumn: 'span 2' }}>
+                          <Checkbox
+                            label={t('office.suppliers.update_price')}
+                            checked={line.updatePrice}
+                            onChange={(event) =>
+                              setLines((current) =>
+                                current.map((l, i) =>
+                                  i === index
+                                    ? {
+                                        ...l,
+                                        updatePrice:
+                                          event.currentTarget.checked,
+                                      }
+                                    : l,
+                                ),
+                              )
+                            }
+                          />
+                          {line.updatePrice ? (
+                            <Box mt="xs">
+                              <MoneyInput
+                                label={t('office.suppliers.price')}
+                                value={line.price}
+                                onChange={(paisa) =>
+                                  setLines((current) =>
+                                    current.map((l, i) =>
+                                      i === index
+                                        ? { ...l, price: paisa ?? 0 }
+                                        : l,
+                                    ),
+                                  )
+                                }
+                              />
+                            </Box>
+                          ) : (
+                            <Text size="sm" c="dimmed" mt={4}>
+                              {t('office.suppliers.price')}:{' '}
+                              <MoneyText
+                                paisa={Number(line.product.price ?? 0)}
+                              />
+                            </Text>
+                          )}
+                        </Box>
+                      </SimpleGrid>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
 
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-40">
+            <Group align="flex-end" gap="sm">
+              <Box w={160}>
+                <MoneyInput
+                  label={t('office.suppliers.other_charges')}
+                  value={otherCharges}
+                  onChange={setOtherCharges}
+                />
+              </Box>
+              <Group gap={6} align="baseline" ms="auto">
+                <Text size="sm">{t('office.suppliers.total')}:</Text>
+                <Text fz={22} fw={600}>
+                  <MoneyText paisa={total} />
+                </Text>
+              </Group>
+            </Group>
+          </Stack>
+        </Paper>
+
+        <Paper withBorder p="sm">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
             <MoneyInput
-              label={t('office.suppliers.other_charges')}
-              value={otherCharges}
-              onChange={setOtherCharges}
+              label={t('office.suppliers.paid_now')}
+              value={paidNow}
+              onChange={setPaidNow}
             />
-          </div>
-          <p className="ms-auto text-small">
-            {t('office.suppliers.total')}:{' '}
-            <span className="text-title font-semibold">
-              <MoneyText paisa={total} />
-            </span>
-          </p>
-        </div>
-      </div>
+            <Box
+              component="fieldset"
+              style={{ border: 0, margin: 0, padding: 0 }}
+            >
+              <Text component="legend" size="sm" mb={4}>
+                {t('office.suppliers.method')}
+              </Text>
+              <Group gap="xs">
+                {(['cash', 'bank_wallet', 'card'] as const).map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="compact-sm"
+                    variant={paidMethod === m ? 'light' : 'default'}
+                    aria-pressed={paidMethod === m}
+                    onClick={() => setPaidMethod(m)}
+                  >
+                    {t(`payment.${m}`)}
+                  </Button>
+                ))}
+              </Group>
+            </Box>
+            <Box style={{ gridColumn: '1 / -1' }}>
+              <TextInput
+                label={t('office.suppliers.note')}
+                maxLength={200}
+                value={note}
+                onChange={(event) => setNote(event.currentTarget.value)}
+              />
+            </Box>
+          </SimpleGrid>
+        </Paper>
 
-      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
-        <MoneyInput
-          label={t('office.suppliers.paid_now')}
-          value={paidNow}
-          onChange={setPaidNow}
-        />
-        <fieldset>
-          <legend className="mb-1 text-small">
-            {t('office.suppliers.method')}
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {(['cash', 'bank_wallet', 'card'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={paidMethod === m}
-                className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-                onClick={() => setPaidMethod(m)}
-              >
-                {t(`payment.${m}`)}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <label className="flex flex-col gap-1 text-small sm:col-span-2">
-          {t('office.suppliers.note')}
-          <input
-            className={field}
-            maxLength={200}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </label>
-      </section>
-
-      <div className="flex flex-wrap justify-end gap-2">
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          className={buttonQuiet}
-        >
-          {t('common.cancel')}
-        </Link>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={valid.length === 0 || pending || paid > total}
-          onClick={() => void save()}
-        >
-          {t('office.suppliers.save_delivery')}
-        </button>
-      </div>
-      {paid > total ? (
-        <p className="text-small text-danger">
-          {t('office.suppliers.delivery_error_paid')}
-        </p>
-      ) : null}
-    </div>
+        <Group justify="flex-end" gap="sm">
+          <Link
+            to="/suppliers/$supplierId"
+            params={{ supplierId }}
+            style={{ textDecoration: 'none' }}
+          >
+            <Button component="span" variant="default">
+              {t('common.cancel')}
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            disabled={valid.length === 0 || pending || paid > total}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.suppliers.save_delivery')}
+          </Button>
+        </Group>
+        {paid > total ? (
+          <Text size="sm" c="danger">
+            {t('office.suppliers.delivery_error_paid')}
+          </Text>
+        ) : null}
+      </Stack>
+    </Box>
   );
 }
