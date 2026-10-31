@@ -1,4 +1,16 @@
-import { Badge, Box, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import {
+  Anchor,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Modal as MantineModal,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import {
   type ReactNode,
   type RefObject,
@@ -19,13 +31,13 @@ import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 const dialogClass =
   'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border-0 bg-surface p-4 text-text shadow-modal backdrop:bg-text/40';
 
-/** Native dialog so the operator pages do not pull Radix into the till bundle. */
+/** Shared operator dialog on the same Mantine modal as the till. */
 export function Modal({
   open,
   title,
   description,
   onClose,
-  initialFocus,
+  initialFocus: _initialFocus,
   children,
 }: {
   open: boolean;
@@ -35,48 +47,24 @@ export function Modal({
   initialFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  useEffect(() => {
-    const el = ref.current;
-    if (!open || el === null) return;
-    if (!el.open) el.showModal();
-    initialFocus?.current?.focus();
-    return () => {
-      if (el.open) el.close();
-    };
-  }, [open, initialFocus]);
-  if (!open) return null;
   return (
-    <dialog
-      ref={ref}
-      className={dialogClass}
-      aria-labelledby={titleId}
-      aria-describedby={description !== undefined ? bodyId : undefined}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter') return;
-        const target = event.target;
-        if (target instanceof HTMLTextAreaElement) return;
-        if (
-          target instanceof HTMLButtonElement &&
-          target.dataset.confirm === 'true'
-        ) {
-          return;
-        }
-        event.preventDefault();
-      }}
+    <MantineModal
+      opened={open}
+      onClose={onClose}
+      title={title}
+      centered
+      size="md"
+      radius="lg"
     >
-      <h2 id={titleId} className="text-title">
-        {title}
-      </h2>
-      {description !== undefined ? <p id={bodyId}>{description}</p> : null}
-      {children}
-    </dialog>
+      <Stack gap="md">
+        {description !== undefined ? (
+          <Text size="sm" c="dimmed">
+            {description}
+          </Text>
+        ) : null}
+        {children}
+      </Stack>
+    </MantineModal>
   );
 }
 
@@ -224,15 +212,17 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id}>{label}</label>
+    <Stack gap={4}>
+      <Text component="label" htmlFor={id} size="sm">
+        {label}
+      </Text>
       {children}
       {hint !== undefined ? (
-        <p id={`${id}-hint`} className="text-small text-text-muted">
+        <Text id={`${id}-hint`} size="sm" c="dimmed">
           {hint}
-        </p>
+        </Text>
       ) : null}
-    </div>
+    </Stack>
   );
 }
 
@@ -251,25 +241,24 @@ export function Meter({
 }) {
   const over = max > 0 && value >= max;
   const warn = !over && warnAt !== undefined && value >= warnAt;
-  let tone = 'var(--color-primary)';
-  if (warn) tone = 'var(--color-warning)';
-  if (over) tone = 'var(--color-danger)';
+  const tone = over ? 'danger' : warn ? 'warning' : 'brand';
   const limit = max > 0 ? max : Math.max(value, 1);
   return (
-    <div>
-      <div className="flex justify-between gap-3 text-small">
-        <span>{label}</span>
-        <span className="tabular-nums">{valueText}</span>
-      </div>
-      <meter
-        className="mt-1 h-2 w-full"
-        min={0}
-        max={limit}
-        value={value}
-        aria-label={label}
-        style={{ accentColor: tone }}
+    <Box>
+      <Group justify="space-between" gap="sm">
+        <Text size="sm">{label}</Text>
+        <Text size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {valueText}
+        </Text>
+      </Group>
+      <Progress
+        mt={4}
+        value={Math.min(100, (value / limit) * 100)}
+        size="sm"
+        color={tone}
+        aria-label={`${label}: ${valueText}`}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -309,21 +298,27 @@ export function PairingPanel({
   // TODO: draw a QR of `link` if a QR generator is added. None is in the repo;
   // do not pull in a QR dependency for the operator console.
   return (
-    <section
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
-      aria-labelledby="pairing-title"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <h2 id="pairing-title" className="text-h2 font-semibold">
+    <Paper component="section" withBorder aria-labelledby="pairing-title">
+      <Group
+        justify="space-between"
+        align="flex-start"
+        gap="sm"
+        px="md"
+        py="sm"
+        wrap="wrap"
+        style={{
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+        }}
+      >
+        <Title order={2} fz="lg" id="pairing-title">
           {heading ?? t('admin.pairing_once')}
-        </h2>
-        <p
+        </Title>
+        <Badge
           aria-live="polite"
-          className={`rounded-full px-2.5 py-1 text-small font-medium ${
-            left.done
-              ? 'bg-danger-subtle text-danger-subtle-ink'
-              : 'bg-warning-subtle text-warning-subtle-ink'
-          }`}
+          variant="light"
+          color={left.done ? 'danger' : 'warning'}
+          tt="none"
+          radius="xl"
         >
           {left.done
             ? t('admin.countdown_done')
@@ -331,39 +326,51 @@ export function PairingPanel({
                 hours: left.hours,
                 minutes: left.minutes,
               })}
-        </p>
-      </div>
-      <div className="flex flex-col gap-4 p-4">
-        <div className="rounded-control border border-dashed border-border-strong bg-surface-2 px-4 py-5 text-center">
-          <p className="text-small font-medium text-text-muted">
+        </Badge>
+      </Group>
+      <Stack gap="md" p="md">
+        <Paper
+          p="md"
+          ta="center"
+          bg="var(--mantine-color-default-hover)"
+          style={{ border: '1px dashed var(--mantine-color-default-border)' }}
+        >
+          <Text size="sm" fw={500} c="dimmed">
             {t('admin.pairing_code')}
-          </p>
-          <p
-            className="mt-1 font-mono text-total font-semibold tracking-[0.18em]"
+          </Text>
+          <Text
+            mt={4}
+            ff="monospace"
+            fz={28}
+            fw={600}
+            style={{ letterSpacing: '0.18em' }}
             data-testid="pairing-code"
           >
             {code}
-          </p>
-          <p className="mt-1 text-small text-text-muted">
+          </Text>
+          <Text mt={4} size="sm" c="dimmed">
             {t('admin.pairing_help')}
-          </p>
-        </div>
-        <div>
-          <p className="text-small text-text-muted">
+          </Text>
+        </Paper>
+        <Box>
+          <Text size="sm" c="dimmed">
             {t('admin.pairing_link')}
-          </p>
-          <a
-            className="break-all font-medium text-primary underline"
-            href={link}
-          >
+          </Text>
+          <Anchor href={link} fw={500} style={{ wordBreak: 'break-all' }}>
             {link}
-          </a>
-        </div>
-        <p className="text-small text-text-muted tabular-nums">{when}</p>
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-          <button
+          </Anchor>
+        </Box>
+        <Text size="sm" c="dimmed">
+          {when}
+        </Text>
+        <Group
+          gap="sm"
+          pt="md"
+          style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+        >
+          <Button
             type="button"
-            className={quietBtn}
+            variant="default"
             onClick={() => {
               void navigator.clipboard.writeText(link).then(
                 () => {
@@ -376,18 +383,19 @@ export function PairingPanel({
             }}
           >
             {t('admin.copy_link')}
-          </button>
-          <a
-            className={quietBtn}
+          </Button>
+          <Button
+            component="a"
             href={waHref}
             target="_blank"
             rel="noreferrer"
+            variant="default"
           >
             {t('admin.wa')}
-          </a>
-        </div>
-      </div>
-    </section>
+          </Button>
+        </Group>
+      </Stack>
+    </Paper>
   );
 }
 

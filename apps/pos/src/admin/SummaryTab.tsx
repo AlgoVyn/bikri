@@ -1,3 +1,13 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -20,14 +30,11 @@ import {
 import type { IssuedCode, TenantDetail } from './types.ts';
 import {
   AdminConfirm,
-  dangerBtn,
   Field,
   HoursDialog,
   Modal,
   PairingPanel,
   Panel,
-  primaryBtn,
-  quietBtn,
   ReasonDialog,
   StatusBadge,
 } from './ui.tsx';
@@ -91,166 +98,175 @@ export function SummaryTab({
   const total = detail.usage.reduce((sum, day) => sum + day.rows_written, 0);
 
   return (
-    <div className="flex flex-col gap-4">
+    <Stack gap="md">
       {tenant.owner_email === null ? (
-        <p
-          className="rounded-card border border-warning-subtle bg-warning-subtle px-4 py-3 text-small text-warning-subtle-ink"
-          role="status"
-        >
-          {t('admin.owner_email_missing')}
-        </p>
+        <Paper p="sm" role="status" bg="var(--mantine-color-warning-subtle)">
+          <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+            {t('admin.owner_email_missing')}
+          </Text>
+        </Paper>
       ) : null}
       {detail.support ? (
-        <div
-          className="flex flex-wrap items-start justify-between gap-3 rounded-card border border-info-subtle bg-info-subtle p-4 text-info-subtle-ink"
-          role="status"
-        >
-          <div>
-            <p className="font-medium">
-              {t('admin.support_active', {
-                when: formatWhen(detail.support.until, lang),
-              })}
-            </p>
-            <p className="mt-0.5 text-small">
-              {t('admin.support_reason', { reason: detail.support.reason })}
-            </p>
-          </div>
-          <button
-            type="button"
-            className={dangerBtn}
-            onClick={() => setEndOpen(true)}
+        <Paper p="md" role="status" bg="var(--color-info-subtle)">
+          <Group
+            justify="space-between"
+            align="flex-start"
+            gap="sm"
+            wrap="wrap"
           >
-            {t('admin.support_end')}
-          </button>
-        </div>
+            <Box>
+              <Text fw={500} c="var(--color-info-subtle-ink)">
+                {t('admin.support_active', {
+                  when: formatWhen(detail.support.until, lang),
+                })}
+              </Text>
+              <Text size="sm" c="var(--color-info-subtle-ink)">
+                {t('admin.support_reason', { reason: detail.support.reason })}
+              </Text>
+            </Box>
+            <Button
+              type="button"
+              color="danger"
+              onClick={() => setEndOpen(true)}
+            >
+              {t('admin.support_end')}
+            </Button>
+          </Group>
+        </Paper>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      <SimpleGrid
+        cols={{ base: 1, xl: 2 }}
+        spacing="md"
+        style={{ alignItems: 'start' }}
+      >
         <Panel
           title={t('admin.tenant_status')}
           description={t('admin.tenant_status_hint')}
         >
-          <div className="flex flex-col gap-3">
+          <Stack gap="sm" align="flex-start">
             <StatusBadge status={status} />
-            <p className="text-small">
+            <Text size="sm">
               {tenant.status_changed_at === null
                 ? t('admin.status_since_never')
                 : t('admin.status_since', {
                     status: t(statusLabelKey(status)),
                     when: formatWhen(tenant.status_changed_at, lang),
                   })}
-            </p>
-            <p className="text-small text-text-muted">
+            </Text>
+            <Text size="sm" c="dimmed">
               {tenant.status_reason === ''
                 ? t('admin.status_reason_none')
                 : t('admin.status_reason', {
                     reason: tenant.status_reason,
                   })}
-            </p>
+            </Text>
             {tenant.status_changed_by !== null ? (
-              <p className="text-small text-text-muted">
+              <Text size="sm" c="dimmed">
                 {t('admin.status_by', { by: tenant.status_changed_by })}
-              </p>
+              </Text>
             ) : null}
-          </div>
+          </Stack>
         </Panel>
 
         <Panel
           title={t('admin.tenant_profile')}
           description={t('admin.tenant_profile_hint')}
         >
-          <dl className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-small text-text-muted">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.shop_name')}
-              </dt>
-              <dd className="font-medium">
+              </Text>
+              <Text fw={500}>
                 {detail.shop_name ?? t('admin.setup_pending')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.owner_email')}
-              </dt>
-              <dd className="break-all font-medium">
+              </Text>
+              <Text fw={500} style={{ wordBreak: 'break-all' }}>
                 {tenant.owner_email ?? t('admin.never')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.created')}
-              </dt>
-              <dd className="tabular-nums">
-                {formatWhen(tenant.created_at, lang)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+              <Text>{formatWhen(tenant.created_at, lang)}</Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.budget')}
-              </dt>
-              <dd className="tabular-nums">
-                {formatCount(tenant.daily_write_budget, lang)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">{t('admin.poll')}</dt>
-              <dd className="tabular-nums">
+              </Text>
+              <Text>{formatCount(tenant.daily_write_budget, lang)}</Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
+                {t('admin.poll')}
+              </Text>
+              <Text>
                 {t('admin.poll_ms', {
                   seconds: Math.round(tenant.poll_after_ms / 1000),
                 })}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.restore_epoch')}
-              </dt>
-              <dd className="font-mono text-small">{tenant.restore_epoch}</dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+              <Text size="sm" ff="monospace">
+                {tenant.restore_epoch}
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.last_restore')}
-              </dt>
-              <dd className="tabular-nums">
+              </Text>
+              <Text>
                 {tenant.restore_point_at > 0
                   ? formatWhen(tenant.restore_point_at, lang)
                   : t('admin.never')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.last_export')}
-              </dt>
-              <dd className="tabular-nums">
+              </Text>
+              <Text>
                 {tenant.last_owner_export_at === null
                   ? t('admin.never')
                   : formatWhen(tenant.last_owner_export_at, lang)}
-              </dd>
-            </div>
+              </Text>
+            </Box>
             {tenant.note !== '' ? (
-              <div className="sm:col-span-2">
-                <dt className="text-small text-text-muted">
+              <Box style={{ gridColumn: '1 / -1' }}>
+                <Text size="sm" c="dimmed">
                   {t('admin.note')}
-                </dt>
-                <dd className="whitespace-pre-wrap">{tenant.note}</dd>
-              </div>
+                </Text>
+                <Text style={{ whiteSpace: 'pre-wrap' }}>{tenant.note}</Text>
+              </Box>
             ) : null}
-          </dl>
+          </SimpleGrid>
         </Panel>
-      </div>
+      </SimpleGrid>
 
       <Panel
         title={t('admin.usage_7d')}
         description={t('admin.tenant_usage_hint')}
         actions={
-          <span className="text-small text-text-muted tabular-nums">
+          <Text size="sm" c="dimmed">
             {t('admin.usage_total', {
               value: formatCount(total, lang),
             })}
-          </span>
+          </Text>
         }
       >
         {detail.usage.length === 0 ? (
-          <p className="text-small text-text-muted">{t('admin.usage_empty')}</p>
+          <Text size="sm" c="dimmed">
+            {t('admin.usage_empty')}
+          </Text>
         ) : (
           <ul className="flex h-36 items-end gap-2 border-b border-border pb-2">
             {detail.usage.map((day) => (
@@ -287,9 +303,9 @@ export function SummaryTab({
 
       <Panel title={t('admin.history')} description={t('admin.history_hint')}>
         {detail.status_history.length === 0 ? (
-          <p className="text-small text-text-muted">
+          <Text size="sm" c="dimmed">
             {t('admin.history_empty')}
-          </p>
+          </Text>
         ) : (
           <ol className="flex flex-col divide-y divide-border">
             {detail.status_history.map((item) => (
@@ -328,54 +344,48 @@ export function SummaryTab({
         title={t('admin.tenant_actions')}
         description={t('admin.tenant_actions_hint')}
       >
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={quietBtn}
-            onClick={() => setEdit(true)}
-          >
+        <Group gap="sm" wrap="wrap">
+          <Button type="button" variant="default" onClick={() => setEdit(true)}>
             {t('admin.edit')}
-          </button>
+          </Button>
           {status === 'active' ? (
-            <button
+            <Button
               type="button"
-              className={quietBtn}
+              variant="default"
               onClick={() => setAction({ kind: 'read-only' })}
             >
               {t('admin.make_readonly')}
-            </button>
+            </Button>
           ) : null}
           {status === 'active' || status === 'read_only' ? (
-            <button
+            <Button
               type="button"
-              className={quietBtn}
+              variant="default"
               onClick={() => setAction({ kind: 'suspend' })}
             >
               {t('admin.suspend')}
-            </button>
+            </Button>
           ) : null}
           {status === 'suspended' || status === 'read_only' ? (
-            <button
+            <Button
               type="button"
-              className={primaryBtn}
               onClick={() => setAction({ kind: 'reactivate' })}
             >
               {t('admin.reactivate')}
-            </button>
+            </Button>
           ) : null}
           {supportable && detail.support === null ? (
-            <button
+            <Button
               type="button"
-              className={quietBtn}
+              variant="default"
               onClick={() => setSupportOpen(true)}
             >
               {t('admin.support_start')}
-            </button>
+            </Button>
           ) : null}
           {status !== 'deleting' ? (
-            <button
+            <Button
               type="button"
-              className={primaryBtn}
               disabled={pending}
               onClick={() => {
                 void run(async () => {
@@ -386,9 +396,9 @@ export function SummaryTab({
               }}
             >
               {t('admin.issue_owner_code')}
-            </button>
+            </Button>
           ) : null}
-        </div>
+        </Group>
       </Panel>
 
       {issued !== null ? (
@@ -457,7 +467,7 @@ export function SummaryTab({
           )
         }
       />
-    </div>
+    </Stack>
   );
 }
 
@@ -567,47 +577,47 @@ function EditDialog({
           onChange={(event) => setNote(event.target.value)}
         />
       </Field>
-      <button
-        type="button"
-        className={primaryBtn}
-        data-confirm="true"
-        disabled={!nameOk || !budgetOk || !pollOk || !emailOk || pending}
-        onClick={() => {
-          const body: {
-            display_name?: string;
-            owner_email?: string | null;
-            daily_write_budget?: number;
-            poll_after_ms?: number;
-            note?: string;
-          } = {};
-          const display = name.trim();
-          if (display !== tenant.display_name) body.display_name = display;
-          if (nextEmail === '' && tenant.owner_email !== null)
-            body.owner_email = null;
-          else if (nextEmail !== '' && nextEmail !== tenant.owner_email) {
-            body.owner_email = nextEmail;
-          }
-          if (budgetN !== tenant.daily_write_budget)
-            body.daily_write_budget = budgetN;
-          if (secondsN * 1000 !== tenant.poll_after_ms)
-            body.poll_after_ms = secondsN * 1000;
-          if (note !== tenant.note) body.note = note;
-          void onSave(body).then((ok) => {
-            if (ok) onOpenChange(false);
-          });
-        }}
-      >
-        {t('admin.save')}
-      </button>
-      <button
-        type="button"
-        className={quietBtn}
-        onClick={() => {
-          onOpenChange(false);
-        }}
-      >
-        {t('common.cancel')}
-      </button>
+      <Group justify="flex-end" gap="sm">
+        <Button
+          type="button"
+          variant="default"
+          onClick={() => {
+            onOpenChange(false);
+          }}
+        >
+          {t('common.cancel')}
+        </Button>
+        <Button
+          type="button"
+          disabled={!nameOk || !budgetOk || !pollOk || !emailOk || pending}
+          onClick={() => {
+            const body: {
+              display_name?: string;
+              owner_email?: string | null;
+              daily_write_budget?: number;
+              poll_after_ms?: number;
+              note?: string;
+            } = {};
+            const display = name.trim();
+            if (display !== tenant.display_name) body.display_name = display;
+            if (nextEmail === '' && tenant.owner_email !== null)
+              body.owner_email = null;
+            else if (nextEmail !== '' && nextEmail !== tenant.owner_email) {
+              body.owner_email = nextEmail;
+            }
+            if (budgetN !== tenant.daily_write_budget)
+              body.daily_write_budget = budgetN;
+            if (secondsN * 1000 !== tenant.poll_after_ms)
+              body.poll_after_ms = secondsN * 1000;
+            if (note !== tenant.note) body.note = note;
+            void onSave(body).then((ok) => {
+              if (ok) onOpenChange(false);
+            });
+          }}
+        >
+          {t('admin.save')}
+        </Button>
+      </Group>
     </Modal>
   );
 }
