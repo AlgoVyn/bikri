@@ -138,3 +138,14 @@
   background: var(--mantine-color-brand-0);
   color: var(--mantine-color-brand-9);
 }
+
+/* Inline router links inside Mantine text surfaces. */
+.bikri-link {
+  color: var(--mantine-color-brand-7);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+[data-mantine-color-scheme="dark"] .bikri-link {
+  color: var(--mantine-color-brand-4);
+}

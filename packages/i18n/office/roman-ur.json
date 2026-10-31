@@ -69,6 +69,7 @@
       "conflict_warning": "Is bill mein sync ka tazad hai.",
       "customer": "Customer",
       "date": "Tareekh",
+      "items": "Bill ki items",
       "device": "Device",
       "money_out": "Diya gaya paisa",
       "no_payments": "Koi payment darj nahi.",

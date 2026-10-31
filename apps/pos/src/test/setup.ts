@@ -29,6 +29,15 @@ if (typeof window.scrollTo !== 'function') {
   window.scrollTo = (() => undefined) as typeof window.scrollTo;
 }
 
+// jsdom has no ResizeObserver; Mantine ScrollArea (table overflow, option lists) expects one.
+if (typeof globalThis.ResizeObserver !== 'function') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 // Dexie live queries can take a moment beside the other package suites.
 configure({ asyncUtilTimeout: 5_000 });
 
