@@ -298,6 +298,17 @@ body {
   }
 }
 
+@keyframes bikri-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .bikri-overlay[data-state="open"] {
   animation: bikri-overlay-in var(--duration-fast) var(--ease-standard);
 }
@@ -308,4 +319,8 @@ body {
 
 .bikri-toast {
   animation: bikri-toast-in var(--duration-overlay) var(--ease-standard);
+}
+
+.bikri-menu {
+  animation: bikri-menu-in var(--duration-fast) var(--ease-standard);
 }

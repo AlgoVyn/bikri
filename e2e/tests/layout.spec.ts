@@ -27,6 +27,14 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
 }
 
 test.describe('design layout invariants', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    if (testInfo.project.name !== 'desktop') {
+      test.skip();
+      return;
+    }
+    await page.waitForLoadState('domcontentloaded');
+  });
+
   test('no horizontal scroll at 390, 768, 1280 and 1920', async ({ page }) => {
     await seedVisualShop(page);
     for (const width of WIDTHS) {

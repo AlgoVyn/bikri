@@ -162,7 +162,7 @@ export function SupplierList({
                   aria-current={
                     row.supplier.id === selectedId ? 'page' : undefined
                   }
-                  className={`flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
+                  className={`flex min-h-11 focus-visible:outline-offset-[-2px] flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
                     <span className="block truncate font-medium">

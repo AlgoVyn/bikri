@@ -14,7 +14,7 @@ export function ListSurface({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+    <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
       {toolbar !== undefined ? (
         <div className="border-b border-border p-3">{toolbar}</div>
       ) : null}
@@ -22,6 +22,6 @@ export function ListSurface({
         <div className="border-b border-border px-3 py-2">{summary}</div>
       ) : null}
       {children}
-    </section>
+    </div>
   );
 }

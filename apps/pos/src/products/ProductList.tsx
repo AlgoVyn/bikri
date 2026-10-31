@@ -122,29 +122,17 @@ export function ProductList({
   });
   if (canEdit) {
     more.push(
-      {
-        label: t('import.button'),
-        onSelect: () => void navigate({ to: '/products/import' }),
-      },
-      {
-        label: t('prices.button'),
-        onSelect: () => void navigate({ to: '/products/prices' }),
-      },
+      { label: t('import.button'), to: '/products/import' },
+      { label: t('prices.button'), to: '/products/prices' },
       {
         label: t('products.manage_categories'),
-        onSelect: () => void navigate({ to: '/products/categories' }),
+        to: '/products/categories',
       },
-      {
-        label: t('home.suggested'),
-        onSelect: () => void navigate({ to: '/products/suggested' }),
-      },
+      { label: t('home.suggested'), to: '/products/suggested' },
     );
   }
   if (can('stock.adjust')) {
-    more.push({
-      label: t('count.title'),
-      onSelect: () => void navigate({ to: '/stock/count' }),
-    });
+    more.push({ label: t('count.title'), to: '/stock/count' });
   }
 
   const primary =
@@ -352,8 +340,14 @@ function ListHeader({
           {showCost ? (
             <span className="text-end">{t('products.col_margin')}</span>
           ) : null}
-          <span className="truncate text-end" title={t('products.col_sold30')}>
-            {t('products.col_sold30_short')}
+          <span
+            className="text-end leading-tight"
+            title={t('products.col_sold30')}
+          >
+            {t('products.col_sold')}
+            <span className="block text-caption text-text-muted">
+              {t('products.col_sold_days')}
+            </span>
           </span>
         </>
       )}
@@ -475,7 +469,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
@@ -539,7 +533,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}
