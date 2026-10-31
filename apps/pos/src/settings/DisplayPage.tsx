@@ -1,7 +1,16 @@
+import {
+  Button,
+  Checkbox,
+  NativeSelect,
+  NumberInput,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary } from '../components/classes.ts';
 import { SettingsIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -16,9 +25,6 @@ import {
 } from '../shell/devicePrefs.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Language, display, auto-lock and scanner test for this device (screens/17). */
 export function DisplayPage() {
@@ -62,110 +68,100 @@ function DisplayContent() {
       title={t('office.display.title')}
       icon={<SettingsIcon />}
     >
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.language')}
-          <select
-            className={field}
+      <Paper withBorder p="lg">
+        <Stack gap="md">
+          <NativeSelect
+            label={t('office.display.language')}
             value={i18n.language}
             onChange={(event) =>
-              void setLanguage(event.target.value as 'en' | 'ur' | 'roman-ur')
+              void setLanguage(
+                event.currentTarget.value as 'en' | 'ur' | 'roman-ur',
+              )
             }
-          >
-            <option value="en">{t('shell.lang_en')}</option>
-            <option value="ur">{t('shell.lang_ur')}</option>
-            <option value="roman-ur">{t('shell.lang_roman_ur')}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.theme')}
-          <select
-            className={field}
+            data={[
+              { value: 'en', label: t('shell.lang_en') },
+              { value: 'ur', label: t('shell.lang_ur') },
+              { value: 'roman-ur', label: t('shell.lang_roman_ur') },
+            ]}
+          />
+          <NativeSelect
+            label={t('office.display.theme')}
             value={form.theme}
             onChange={(event) =>
-              change({ theme: event.target.value as DevicePrefs['theme'] })
+              change({
+                theme: event.currentTarget.value as DevicePrefs['theme'],
+              })
             }
-          >
-            <option value="system">{t('office.display.theme_system')}</option>
-            <option value="light">{t('office.display.theme_light')}</option>
-            <option value="dark">{t('office.display.theme_dark')}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.text_size')}
-          <select
-            className={field}
+            data={[
+              { value: 'system', label: t('office.display.theme_system') },
+              { value: 'light', label: t('office.display.theme_light') },
+              { value: 'dark', label: t('office.display.theme_dark') },
+            ]}
+          />
+          <NativeSelect
+            label={t('office.display.text_size')}
             value={form.textSize}
             onChange={(event) =>
               change({
-                textSize: event.target.value as DevicePrefs['textSize'],
+                textSize: event.currentTarget.value as DevicePrefs['textSize'],
               })
             }
-          >
-            <option value="100">100%</option>
-            <option value="115">115%</option>
-            <option value="130">130%</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.auto_lock')}
-          <input
-            type="number"
+            data={[
+              { value: '100', label: '100%' },
+              { value: '115', label: '115%' },
+              { value: '130', label: '130%' },
+            ]}
+          />
+          <NumberInput
+            label={t('office.display.auto_lock')}
             min={0}
             max={60}
-            className={field}
             value={form.autoLockMinutes}
-            onChange={(event) =>
+            onChange={(value) =>
               change({
-                autoLockMinutes: Math.max(
-                  0,
-                  Math.min(60, Number(event.target.value) || 0),
-                ),
+                autoLockMinutes: Math.max(0, Math.min(60, Number(value) || 0)),
               })
             }
           />
-        </label>
-        <label className="flex items-center gap-2 text-small">
-          <input
-            type="checkbox"
+          <Checkbox
+            label={t('office.display.camera')}
             checked={form.camera}
-            onChange={(event) => change({ camera: event.target.checked })}
+            onChange={(event) =>
+              change({ camera: event.currentTarget.checked })
+            }
           />
-          {t('office.display.camera')}
-        </label>
-        <label className="flex items-center gap-2 text-small">
-          <input
-            type="checkbox"
+          <Checkbox
+            label={t('office.display.suffix_enter')}
             checked={form.suffixEnter}
-            onChange={(event) => change({ suffixEnter: event.target.checked })}
+            onChange={(event) =>
+              change({ suffixEnter: event.currentTarget.checked })
+            }
           />
-          {t('office.display.suffix_enter')}
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.scanner_test')}
-          <input
-            className={`${field} font-mono`}
+          <TextInput
+            label={t('office.display.scanner_test')}
             placeholder={t('office.display.scanner_placeholder')}
+            styles={{
+              input: { fontFamily: 'var(--mantine-font-family-monospace)' },
+            }}
             onKeyDown={() => {
               const now = performance.now();
               if (last.current !== null) setGap(Math.round(now - last.current));
               last.current = now;
             }}
           />
-        </label>
-        <p className="text-small text-text-muted" aria-live="polite">
-          {gap === null
-            ? t('office.display.scanner_hint')
-            : t('office.display.scanner_gap', { ms: gap })}
-        </p>
-        <button
-          type="button"
-          className={`${buttonPrimary} self-start`}
-          onClick={() => void save()}
-        >
-          {t('office.display.save')}
-        </button>
-      </section>
+          <Text size="sm" c="dimmed" aria-live="polite">
+            {gap === null
+              ? t('office.display.scanner_hint')
+              : t('office.display.scanner_gap', { ms: gap })}
+          </Text>
+          <Button
+            onClick={() => void save()}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {t('office.display.save')}
+          </Button>
+        </Stack>
+      </Paper>
     </SettingsPageLayout>
   );
 }

@@ -35,6 +35,19 @@ const dark: MantineColorsTuple = [
   '#020617',
 ];
 
+const accent: MantineColorsTuple = [
+  '#e6fbfa',
+  '#c7f5f3',
+  '#95ece8',
+  '#5fdcd7',
+  '#4bc2bf',
+  '#2fa9a6',
+  '#218a88',
+  '#1c6d6b',
+  '#1a5756',
+  '#0d3f3f',
+];
+
 const success: MantineColorsTuple = [
   '#ecfdf5',
   '#d1fae5',
@@ -80,7 +93,7 @@ const mono = 'JetBrains Mono, ui-monospace, monospace';
 export const bikriTheme = createTheme({
   primaryColor: 'brand',
   primaryShade: { light: 6, dark: 4 },
-  colors: { brand, dark, success, warning, danger },
+  colors: { brand, dark, success, warning, danger, accent },
   fontFamily: sans,
   fontFamilyMonospace: mono,
   headings: {

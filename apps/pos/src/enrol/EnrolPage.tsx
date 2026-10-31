@@ -1,5 +1,16 @@
 /** Enrol this device (screens/02, T-034). Rendered by the gate without the app shell. */
 import type { BikriDb } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -190,23 +201,34 @@ export function EnrolPage({
   };
 
   const card = (body: React.ReactNode) => (
-    <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span
-              aria-hidden="true"
-              className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
-            >
+    <Box
+      component="main"
+      mih="100dvh"
+      bg="var(--mantine-color-body)"
+      p="md"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Paper withBorder shadow="sm" p="lg" w="100%" maw={460}>
+        <Group justify="space-between" align="center" gap="sm">
+          <Group gap="sm" wrap="nowrap">
+            <ThemeIcon size={36} radius="md" color="accent" variant="filled">
               <SalesIcon />
-            </span>
-            <p className="font-semibold text-h2">{t('common.app_name')}</p>
-          </div>
+            </ThemeIcon>
+            <Text size="lg" fw={700}>
+              {t('common.app_name')}
+            </Text>
+          </Group>
           <LanguageSelect />
-        </div>
-        {body}
-      </div>
-    </main>
+        </Group>
+        <Stack gap="md" mt="md">
+          {body}
+        </Stack>
+      </Paper>
+    </Box>
   );
 
   if (stage.kind === 'downloading' || stage.kind === 'failed') {
@@ -327,26 +349,26 @@ export function EnrolPage({
   const codeError = error;
   return card(
     <>
-      <h1 className="font-semibold text-h2">{t('enrol.heading')}</h1>
+      <Title order={2}>{t('enrol.heading')}</Title>
       {stage.kind === 'left' ? (
         <p role="status" className="text-small">
           {t('enrol.not_mine_help', { shop: stage.shop })}
         </p>
       ) : null}
-      <div role="tablist" className="flex gap-2">
+      <Group gap="sm" role="tablist">
         {(['code', 'new'] as const).map((id) => (
-          <button
+          <Button
             key={id}
             type="button"
             role="tab"
             aria-selected={tab === id}
-            className={tab === id ? buttonPrimary : buttonQuiet}
+            variant={tab === id ? 'filled' : 'default'}
             onClick={() => setTab(id)}
           >
             {t(id === 'code' ? 'enrol.tab_code' : 'enrol.tab_new')}
-          </button>
+          </Button>
         ))}
-      </div>
+      </Group>
       {tab === 'new' ? (
         <p className="text-small">{t('enrol.new_shop_help')}</p>
       ) : null}
@@ -358,35 +380,32 @@ export function EnrolPage({
           void connect();
         }}
       >
-        <label className="flex flex-col gap-1">
-          <span>{t('enrol.code_label')}</span>
-          <input
-            className={`${fieldClass} uppercase tracking-widest`}
-            value={formatCode(code)}
-            onChange={(e) => {
-              setCode(normaliseCodeInput(e.target.value));
-              setError(null);
-            }}
-            autoComplete="one-time-code"
-            autoCapitalize="characters"
-            spellCheck={false}
-            inputMode="text"
-            maxLength={9}
-            aria-invalid={codeError ? true : undefined}
-            aria-describedby={codeError ? 'enrol-error' : undefined}
-            placeholder="ABCD-EFGH"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span>{t('enrol.name_label')}</span>
-          <input
-            className={fieldClass}
-            value={name}
-            maxLength={60}
-            placeholder={defaultDeviceName()}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
+        <TextInput
+          label={t('enrol.code_label')}
+          value={formatCode(code)}
+          onChange={(e) => {
+            setCode(normaliseCodeInput(e.currentTarget.value));
+            setError(null);
+          }}
+          autoComplete="one-time-code"
+          autoCapitalize="characters"
+          spellCheck={false}
+          inputMode="text"
+          maxLength={9}
+          aria-invalid={codeError ? true : undefined}
+          aria-describedby={codeError ? 'enrol-error' : undefined}
+          placeholder="ABCD-EFGH"
+          styles={{
+            input: { textTransform: 'uppercase', letterSpacing: '0.12em' },
+          }}
+        />
+        <TextInput
+          label={t('enrol.name_label')}
+          value={name}
+          maxLength={60}
+          placeholder={defaultDeviceName()}
+          onChange={(e) => setName(e.currentTarget.value)}
+        />
         {codeError ? (
           <p id="enrol-error" role="alert" className="text-danger text-small">
             {codeError}
@@ -395,13 +414,14 @@ export function EnrolPage({
         {!online ? (
           <p className="text-small text-text-muted">{t('enrol.err_offline')}</p>
         ) : null}
-        <button
+        <Button
           type="submit"
-          className={buttonPrimary}
+          fullWidth
+          loading={busy}
           disabled={!online || busy}
         >
           {busy ? t('enrol.connecting') : t('enrol.connect')}
-        </button>
+        </Button>
       </form>
       {tab === 'new' ? (
         <details className="text-small">
