@@ -1,4 +1,15 @@
 import { API_BASE } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  ThemeIcon,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CloudIcon } from '../components/icons.tsx';
@@ -12,7 +23,7 @@ import {
   manifestKeyFor,
 } from './format.ts';
 import type { BackupManifest, BackupObject } from './types.ts';
-import { Panel, StatCard } from './ui.tsx';
+import { StatCard } from './ui.tsx';
 
 type Row = BackupObject & { manifest: BackupManifest | null | undefined };
 
@@ -77,35 +88,39 @@ export function BackupsPage() {
   }, [t, toast]);
 
   if (error !== null && rows === null) {
-    return <p className="text-text-muted">{error}</p>;
+    return <Text c="dimmed">{error}</Text>;
   }
-  if (rows === null) return <p className="sr-only">{t('common.loading')}</p>;
+  if (rows === null)
+    return <Text className="sr-only">{t('common.loading')}</Text>;
 
   const latest = rows[0];
   const totalBytes = rows.reduce((sum, row) => sum + row.size, 0);
 
   return (
-    <div className="flex flex-col gap-5">
+    <Stack gap="lg">
       <PageHeader
         icon={<CloudIcon />}
         title={t('admin.backups_title')}
         subtitle={t('admin.backups_subtitle')}
       />
 
-      <div className="flex items-start gap-3 rounded-card border border-info-subtle bg-info-subtle p-4 text-info-subtle-ink">
-        <span
-          aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface/70"
-        >
-          <CloudIcon />
-        </span>
-        <div>
-          <p className="font-medium">{t('admin.backups_info_title')}</p>
-          <p className="mt-0.5 text-small">{t('admin.backups_info_body')}</p>
-        </div>
-      </div>
+      <Paper p="md" bg="var(--color-info-subtle)">
+        <Group align="flex-start" gap="sm" wrap="nowrap">
+          <ThemeIcon size={36} radius="md" variant="light" color="brand">
+            <CloudIcon />
+          </ThemeIcon>
+          <Box>
+            <Text fw={500} c="var(--color-info-subtle-ink)">
+              {t('admin.backups_info_title')}
+            </Text>
+            <Text size="sm" c="var(--color-info-subtle-ink)">
+              {t('admin.backups_info_body')}
+            </Text>
+          </Box>
+        </Group>
+      </Paper>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
         <StatCard
           label={t('admin.backup_latest')}
           value={
@@ -128,103 +143,119 @@ export function BackupsPage() {
           label={t('admin.backup_total')}
           value={formatBytes(totalBytes, lang)}
         />
-      </div>
+      </SimpleGrid>
 
       {rows.length === 0 ? (
-        <Panel bodyClassName="flex flex-col items-center gap-2 px-4 py-14 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
-            <CloudIcon />
-          </span>
-          <p className="font-medium">{t('admin.backups_empty')}</p>
-          <p className="max-w-md text-small text-text-muted">
-            {t('admin.backups_empty_hint')}
-          </p>
-        </Panel>
+        <Paper withBorder p="xl">
+          <Stack align="center" gap="sm">
+            <ThemeIcon size={48} radius="xl" variant="light" color="gray">
+              <CloudIcon />
+            </ThemeIcon>
+            <Text fw={500}>{t('admin.backups_empty')}</Text>
+            <Text size="sm" c="dimmed" maw={420} ta="center">
+              {t('admin.backups_empty_hint')}
+            </Text>
+          </Stack>
+        </Paper>
       ) : (
-        <Panel bodyClassName="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-start text-small">
-              <caption className="sr-only">{t('admin.backups_title')}</caption>
-              <thead className="border-b border-border bg-surface-2 text-text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_date')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-end font-medium">
-                    {t('admin.col_size')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_counts')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.download')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+        <Paper withBorder>
+          <Box
+            tabIndex={0}
+            role="region"
+            aria-label={t('admin.backups_title')}
+            style={{ overflowX: 'auto' }}
+          >
+            <Table fz="sm" miw={760}>
+              <Table.Caption className="sr-only">
+                {t('admin.backups_title')}
+              </Table.Caption>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('admin.col_date')}</Table.Th>
+                  <Table.Th ta="end">{t('admin.col_size')}</Table.Th>
+                  <Table.Th>{t('admin.col_counts')}</Table.Th>
+                  <Table.Th>{t('admin.download')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {rows.map((row) => (
-                  <tr
-                    key={row.key}
-                    className="border-b border-border align-top last:border-b-0 hover:bg-surface-2/60"
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap">
+                  <Table.Tr key={row.key}>
+                    <Table.Td style={{ whiteSpace: 'nowrap' }}>
                       {formatWhen(row.uploaded, lang)}
-                    </td>
-                    <td className="px-4 py-3 text-end tabular-nums">
-                      {formatBytes(row.size, lang)}
-                    </td>
-                    <td className="px-4 py-3">
+                    </Table.Td>
+                    <Table.Td ta="end">{formatBytes(row.size, lang)}</Table.Td>
+                    <Table.Td>
                       <Counts manifest={row.manifest} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        className="inline-flex min-h-9 items-center rounded-control border border-border-strong bg-surface px-3 font-medium text-text hover:bg-surface-2"
+                    </Table.Td>
+                    <Table.Td>
+                      <Button
+                        component="a"
                         href={`${API_BASE}/admin/backups/download?key=${encodeURIComponent(row.key)}`}
+                        variant="default"
+                        size="compact-sm"
                       >
                         {t('admin.download')}
-                      </a>
-                    </td>
-                  </tr>
+                      </Button>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+              </Table.Tbody>
+            </Table>
+          </Box>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }
 
 function Counts({ manifest }: { manifest: BackupManifest | null | undefined }) {
   const { t, i18n } = useTranslation();
   if (manifest === undefined) {
-    return <span className="text-text-muted">{t('common.loading')}</span>;
+    return (
+      <Text size="sm" c="dimmed">
+        {t('common.loading')}
+      </Text>
+    );
   }
   const tenants = manifest?.tenants;
   if (manifest === null || tenants === undefined) {
-    return <span className="text-text-muted">{t('admin.counts_missing')}</span>;
+    return (
+      <Text size="sm" c="dimmed">
+        {t('admin.counts_missing')}
+      </Text>
+    );
   }
   const entries = Object.entries(tenants);
   if (entries.length === 0) {
-    return <span className="text-text-muted">{t('admin.counts_missing')}</span>;
+    return (
+      <Text size="sm" c="dimmed">
+        {t('admin.counts_missing')}
+      </Text>
+    );
   }
   const totals = manifestTotals(manifest);
   return (
-    <details>
-      <summary className="cursor-pointer text-start font-medium text-primary">
+    <Box component="details">
+      <Text
+        component="summary"
+        size="sm"
+        fw={500}
+        c="var(--mantine-color-brand-7)"
+        style={{ cursor: 'pointer' }}
+      >
         {t('admin.counts_summary', {
           rows: formatCount(totals.rows, i18n.language),
           shops: formatCount(totals.shops, i18n.language),
         })}
-      </summary>
-      <ul className="mt-1 max-h-48 overflow-y-auto">
+      </Text>
+      <Box component="ul" mt={4} style={{ maxHeight: 192, overflowY: 'auto' }}>
         {entries.map(([id, tenant]) => (
           <li key={id} className="tabular-nums">
             {tenant.slug ?? id}:{' '}
             {formatCount(tableSum(tenant.tables), i18n.language)}
           </li>
         ))}
-      </ul>
-    </details>
+      </Box>
+    </Box>
   );
 }

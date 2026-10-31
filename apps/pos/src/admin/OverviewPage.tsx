@@ -1,3 +1,15 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CloudIcon, ReportsIcon } from '../components/icons.tsx';
@@ -22,7 +34,7 @@ import {
   SHOP_SHARE,
 } from './format.ts';
 import type { TenantListItem, UsageOverview } from './types.ts';
-import { Meter, Panel, quietBtn, StatCard, StatusBadge } from './ui.tsx';
+import { Meter, Panel, StatCard, StatusBadge } from './ui.tsx';
 
 export function OverviewPage() {
   const { t, i18n } = useTranslation();
@@ -57,10 +69,10 @@ export function OverviewPage() {
   }, [t, toast, tick]);
 
   if (error !== null && usage === null) {
-    return <p className="text-text-muted">{error}</p>;
+    return <Text c="dimmed">{error}</Text>;
   }
   if (usage === null) {
-    return <p className="sr-only">{t('common.loading')}</p>;
+    return <Text className="sr-only">{t('common.loading')}</Text>;
   }
   const lang = i18n.language;
   const writeShare = Math.round(FREE_WRITES_PER_DAY * SHOP_SHARE);
@@ -82,28 +94,28 @@ export function OverviewPage() {
   const quiet = open.length === 0 && usage.over_80.length === 0 && backupOk;
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack gap="lg">
       <PageHeader
         icon={<ReportsIcon />}
         title={t('admin.overview_title')}
         subtitle={t('admin.overview_subtitle')}
         actions={
           <>
-            <span className="inline-flex min-h-9 items-center rounded-full bg-surface-2 px-3 text-small text-text-muted">
+            <Badge variant="light" color="gray" tt="none" radius="xl">
               {t('admin.signed_in', { email: usage.email })}
-            </span>
-            <button
+            </Badge>
+            <Button
               type="button"
-              className={quietBtn}
+              variant="default"
               onClick={() => setTick((value) => value + 1)}
             >
               {t('admin.refresh')}
-            </button>
+            </Button>
           </>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <SimpleGrid cols={{ base: 2, xl: 4 }} spacing="sm">
         <StatCard
           label={t('admin.stat_shops')}
           value={formatCount(tenants.length, lang)}
@@ -124,32 +136,53 @@ export function OverviewPage() {
             total: formatCount(tenants.length, lang),
           })}
         />
-      </div>
+      </SimpleGrid>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] xl:items-start">
-        <div className="flex flex-col gap-4">
+      <SimpleGrid
+        cols={{ base: 1, xl: 2 }}
+        spacing="md"
+        style={{ alignItems: 'start' }}
+      >
+        <Stack gap="md">
           <Panel
             title={t('admin.usage_today')}
             description={t('admin.usage_today_hint')}
           >
-            <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-3">
-              <div>
-                <p className="text-small text-text-muted">
-                  {t('admin.d1_size')}
-                </p>
-                <p className="text-title font-semibold tabular-nums">
-                  {usage.db_size_bytes === null
-                    ? t('admin.never')
-                    : formatBytes(usage.db_size_bytes, lang)}
-                </p>
-              </div>
-              <p className="text-small text-text-muted tabular-nums">
-                {t('admin.d1_limit', {
-                  limit: formatBytes(D1_LIMIT_BYTES, lang),
-                })}
-              </p>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
+            <Stack gap="md">
+              <Group
+                justify="space-between"
+                align="flex-end"
+                gap="sm"
+                wrap="wrap"
+                pb="sm"
+                style={{
+                  borderBottom: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <Box>
+                  <Text size="sm" c="dimmed">
+                    {t('admin.d1_size')}
+                  </Text>
+                  <Text
+                    fz={22}
+                    fw={600}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {usage.db_size_bytes === null
+                      ? t('admin.never')
+                      : formatBytes(usage.db_size_bytes, lang)}
+                  </Text>
+                </Box>
+                <Text
+                  size="sm"
+                  c="dimmed"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {t('admin.d1_limit', {
+                    limit: formatBytes(D1_LIMIT_BYTES, lang),
+                  })}
+                </Text>
+              </Group>
               <Meter
                 label={t('admin.writes_today')}
                 value={usage.today.rows_written}
@@ -160,11 +193,11 @@ export function OverviewPage() {
                   limit: formatCount(FREE_WRITES_PER_DAY, lang),
                 })}
               />
-              <p className="text-small text-text-muted">
+              <Text size="sm" c="dimmed">
                 {t('admin.share_70', {
                   value: formatCount(writeShare, lang),
                 })}
-              </p>
+              </Text>
               <Meter
                 label={t('admin.reads_today')}
                 value={usage.today.rows_read}
@@ -175,182 +208,217 @@ export function OverviewPage() {
                   limit: formatCount(FREE_READS_PER_DAY, lang),
                 })}
               />
-              <p className="text-small text-text-muted">
+              <Text size="sm" c="dimmed">
                 {t('admin.share_70', {
                   value: formatCount(readShare, lang),
                 })}
-              </p>
-            </div>
+              </Text>
+            </Stack>
           </Panel>
 
           <Panel
             title={t('admin.by_status')}
             description={t('admin.by_status_hint')}
           >
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
               {knownStatuses().map((status) => (
-                <li
+                <Paper
                   key={status}
-                  className="flex items-center justify-between gap-3 rounded-control bg-surface-2/60 px-3 py-2"
+                  p="sm"
+                  bg="var(--mantine-color-default-hover)"
                 >
-                  <StatusBadge status={status} />
-                  <span className="font-semibold tabular-nums">
-                    {formatCount(usage.tenants_by_status[status] ?? 0, lang)}
-                  </span>
-                </li>
+                  <Group justify="space-between" gap="sm">
+                    <StatusBadge status={status} />
+                    <Text
+                      fw={600}
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {formatCount(usage.tenants_by_status[status] ?? 0, lang)}
+                    </Text>
+                  </Group>
+                </Paper>
               ))}
-            </ul>
+            </SimpleGrid>
           </Panel>
-        </div>
+        </Stack>
 
         <Panel
           title={t('admin.needs_attention')}
           description={t('admin.needs_attention_hint')}
         >
-          <div className="flex flex-col divide-y divide-border">
-            <section
-              className="flex items-start gap-3 pb-4"
-              aria-labelledby="backup-row"
-            >
-              <span
-                aria-hidden="true"
-                className={`flex size-10 shrink-0 items-center justify-center rounded-control ${
-                  backup === null || stale
-                    ? 'bg-warning-subtle text-warning-subtle-ink'
-                    : 'bg-success-subtle text-success-subtle-ink'
-                }`}
-              >
-                <CloudIcon />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h3 id="backup-row" className="text-small font-medium">
-                  {t('admin.last_backup')}
-                </h3>
-                {backup === null ? (
-                  <p className="text-small text-text-muted">
-                    {t('admin.backup_never')}
-                  </p>
-                ) : (
-                  <p className="text-small text-text-muted tabular-nums">
-                    {formatWhen(backup.uploaded, lang)} ·{' '}
-                    {formatBytes(backup.size, lang)}
-                  </p>
-                )}
-              </div>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-small font-medium ${
-                  backup === null || stale
-                    ? 'bg-warning-subtle text-warning-subtle-ink'
-                    : 'bg-success-subtle text-success-subtle-ink'
-                }`}
-              >
-                {backup === null
-                  ? t('admin.never')
-                  : stale
-                    ? t('admin.backup_old')
-                    : t('admin.backup_ok')}
-              </span>
-            </section>
+          <Stack gap="md">
+            <Box component="section" aria-labelledby="backup-row">
+              <Group align="flex-start" gap="sm" wrap="nowrap">
+                <ThemeIcon
+                  size={40}
+                  radius="md"
+                  variant="light"
+                  color={backup === null || stale ? 'warning' : 'success'}
+                >
+                  <CloudIcon />
+                </ThemeIcon>
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Title order={3} fz="sm" id="backup-row">
+                    {t('admin.last_backup')}
+                  </Title>
+                  {backup === null ? (
+                    <Text size="sm" c="dimmed">
+                      {t('admin.backup_never')}
+                    </Text>
+                  ) : (
+                    <Text size="sm" c="dimmed">
+                      {formatWhen(backup.uploaded, lang)} ·{' '}
+                      {formatBytes(backup.size, lang)}
+                    </Text>
+                  )}
+                </Box>
+                <Badge
+                  variant="light"
+                  color={backup === null || stale ? 'warning' : 'success'}
+                  tt="none"
+                  radius="xl"
+                >
+                  {backup === null
+                    ? t('admin.never')
+                    : stale
+                      ? t('admin.backup_old')
+                      : t('admin.backup_ok')}
+                </Badge>
+              </Group>
+            </Box>
 
-            <section className="py-4" aria-labelledby="over-budget-row">
-              <div className="flex items-center justify-between gap-3">
-                <h3 id="over-budget-row" className="text-small font-medium">
+            <Box
+              component="section"
+              pt="md"
+              aria-labelledby="over-budget-row"
+              style={{
+                borderTop: '1px solid var(--mantine-color-default-border)',
+              }}
+            >
+              <Group justify="space-between" gap="sm">
+                <Title order={3} fz="sm" id="over-budget-row">
                   {t('admin.over_80')}
-                </h3>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-small font-semibold tabular-nums ${
-                    usage.over_80.length === 0
-                      ? 'bg-surface-2 text-text-muted'
-                      : 'bg-warning-subtle text-warning-subtle-ink'
-                  }`}
+                </Title>
+                <Badge
+                  variant="light"
+                  color={usage.over_80.length === 0 ? 'gray' : 'warning'}
+                  tt="none"
+                  radius="xl"
                 >
                   {formatCount(usage.over_80.length, lang)}
-                </span>
-              </div>
-              <p className="mt-0.5 text-small text-text-muted">
+                </Badge>
+              </Group>
+              <Text size="sm" c="dimmed" mt={2}>
                 {t('admin.over_80_hint')}
-              </p>
+              </Text>
               {usage.over_80.length === 0 ? (
-                <p className="mt-2 text-small text-text-muted">
+                <Text size="sm" c="dimmed" mt="sm">
                   {t('admin.over_80_none')}
-                </p>
+                </Text>
               ) : (
-                <ul className="mt-1 flex flex-col">
+                <Stack gap={0} mt="xs">
                   {usage.over_80.map((id) => {
                     const tenant = byId.get(id);
                     return (
-                      <li key={id}>
-                        <a
-                          href={adminHref(`/admin/tenants/${id}`)}
-                          className="flex min-h-9 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
-                        >
-                          <span className="truncate">
-                            {tenant?.display_name ?? id}
-                          </span>
-                          <span aria-hidden="true" className="rtl:rotate-180">
-                            ›
-                          </span>
-                        </a>
-                      </li>
+                      <Button
+                        key={id}
+                        component="a"
+                        href={adminHref(`/admin/tenants/${id}`)}
+                        variant="transparent"
+                        justify="space-between"
+                        size="compact-sm"
+                        px={4}
+                      >
+                        <Text component="span" size="sm" truncate>
+                          {tenant?.display_name ?? id}
+                        </Text>
+                        <Text component="span" aria-hidden="true">
+                          ›
+                        </Text>
+                      </Button>
                     );
                   })}
-                </ul>
+                </Stack>
               )}
-            </section>
+            </Box>
 
-            <section className="pt-4" aria-labelledby="conflicts-row">
-              <div className="flex items-center justify-between gap-3">
-                <h3 id="conflicts-row" className="text-small font-medium">
+            <Box
+              component="section"
+              pt="md"
+              aria-labelledby="conflicts-row"
+              style={{
+                borderTop: '1px solid var(--mantine-color-default-border)',
+              }}
+            >
+              <Group justify="space-between" gap="sm">
+                <Title order={3} fz="sm" id="conflicts-row">
                   {t('admin.conflicts')}
-                </h3>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-small font-semibold tabular-nums ${
-                    conflictTotal === 0
-                      ? 'bg-success-subtle text-success-subtle-ink'
-                      : 'bg-danger-subtle text-danger-subtle-ink'
-                  }`}
+                </Title>
+                <Badge
+                  variant="light"
+                  color={conflictTotal === 0 ? 'success' : 'danger'}
+                  tt="none"
+                  radius="xl"
                 >
                   {formatCount(conflictTotal, lang)}
-                </span>
-              </div>
-              <p className="mt-0.5 text-small text-text-muted">
+                </Badge>
+              </Group>
+              <Text size="sm" c="dimmed" mt={2}>
                 {t('admin.conflicts_hint')}
-              </p>
+              </Text>
               {open.length === 0 ? (
-                <p className="mt-2 text-small text-text-muted">
+                <Text size="sm" c="dimmed" mt="sm">
                   {t('admin.conflicts_none')}
-                </p>
+                </Text>
               ) : (
-                <ul className="mt-1 flex flex-col">
+                <Stack gap={0} mt="xs">
                   {open.map((row) => (
-                    <li key={row.id}>
-                      <a
-                        href={adminHref(`/admin/tenants/${row.id}`)}
-                        className="flex min-h-9 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
-                      >
-                        <span className="truncate">{row.name}</span>
-                        <span className="shrink-0 tabular-nums text-text-muted">
-                          {formatCount(row.count, lang)}
-                        </span>
-                      </a>
-                    </li>
+                    <Button
+                      key={row.id}
+                      component="a"
+                      href={adminHref(`/admin/tenants/${row.id}`)}
+                      variant="transparent"
+                      justify="space-between"
+                      size="compact-sm"
+                      px={4}
+                    >
+                      <Text component="span" size="sm" truncate>
+                        {row.name}
+                      </Text>
+                      <Text component="span" size="sm" c="dimmed">
+                        {formatCount(row.count, lang)}
+                      </Text>
+                    </Button>
                   ))}
-                </ul>
+                </Stack>
               )}
-            </section>
+            </Box>
 
             {quiet ? (
-              <p className="flex items-center gap-2 pt-4 text-small font-medium text-success-subtle-ink">
-                <span
+              <Group
+                gap="sm"
+                pt="md"
+                style={{
+                  borderTop: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <Box
                   aria-hidden="true"
-                  className="size-2 rounded-full bg-success"
+                  w={8}
+                  h={8}
+                  style={{
+                    borderRadius: 999,
+                    background: 'var(--color-success)',
+                  }}
                 />
-                {t('admin.attention_none')}
-              </p>
+                <Text size="sm" fw={500} c="var(--color-success)">
+                  {t('admin.attention_none')}
+                </Text>
+              </Group>
             ) : null}
-          </div>
+          </Stack>
         </Panel>
-      </div>
-    </div>
+      </SimpleGrid>
+    </Stack>
   );
 }

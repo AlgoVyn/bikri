@@ -1,3 +1,16 @@
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  Progress,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  ThemeIcon,
+} from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchIcon, StoreIcon } from '../components/icons.tsx';
@@ -11,7 +24,7 @@ import {
   statusLabelKey,
 } from './format.ts';
 import type { TenantListItem } from './types.ts';
-import { Panel, primaryBtn, quietBtn, StatusBadge } from './ui.tsx';
+import { StatusBadge } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 const PAGE_SIZE = 20;
@@ -25,14 +38,14 @@ export function TenantsPage() {
   const lang = i18n.language;
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
+      <Stack gap="sm" align="flex-start">
+        <Text c="dimmed">{query.error}</Text>
+        <Button type="button" onClick={query.reload}>
           {t('admin.retry')}
-        </button>
-      </p>
+        </Button>
+      </Stack>
     ) : (
-      <p className="sr-only">{t('common.loading')}</p>
+      <Text className="sr-only">{t('common.loading')}</Text>
     );
   }
   const tenants = query.data.tenants;
@@ -56,235 +69,205 @@ export function TenantsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <Stack gap="lg">
       <PageHeader
         icon={<StoreIcon />}
         title={t('admin.tenants_title')}
         subtitle={t('admin.tenants_subtitle')}
         actions={
-          <a href={adminHref('/admin/tenants/new')} className={primaryBtn}>
+          <Button component="a" href={adminHref('/admin/tenants/new')}>
             {t('admin.new_shop')}
-          </a>
+          </Button>
         }
       />
 
-      <div className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-56 flex-1 items-center gap-2 rounded-control border border-border-strong bg-surface px-3 focus-within:border-primary">
-          <SearchIcon />
-          <span className="sr-only">{t('admin.search_shops')}</span>
-          <input
+      <Paper withBorder p="sm">
+        <Group align="flex-end" gap="sm" wrap="wrap">
+          <TextInput
             type="search"
-            className="h-11 min-w-0 flex-1 bg-transparent text-text outline-none"
+            aria-label={t('admin.search_shops')}
             placeholder={t('admin.search_shops_placeholder')}
+            leftSection={<SearchIcon />}
             value={search}
             onChange={(event) => {
-              setSearch(event.target.value);
+              setSearch(event.currentTarget.value);
               setPage(1);
             }}
+            style={{ flex: '1 1 14rem', minWidth: 0 }}
           />
-        </label>
-        <label className="flex items-center gap-2 text-small">
-          <span className="text-text-muted">{t('admin.filter_status')}</span>
-          <select
-            className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
+          <NativeSelect
+            label={t('admin.filter_status')}
             value={status}
             onChange={(event) => {
-              setStatus(event.target.value);
+              setStatus(event.currentTarget.value);
               setPage(1);
             }}
-          >
-            <option value="">{t('admin.all_statuses')}</option>
-            {knownStatuses().map((item) => (
-              <option key={item} value={item}>
-                {t(statusLabelKey(item))}
-              </option>
-            ))}
-          </select>
-        </label>
-        {filtering ? (
-          <button type="button" className={quietBtn} onClick={clear}>
-            {t('admin.clear_filters')}
-          </button>
-        ) : null}
-        <p className="ms-auto self-center text-small text-text-muted tabular-nums">
-          {t('admin.shops_count', {
-            count: formatCount(filtered.length, lang),
-          })}
-        </p>
-      </div>
+            data={[
+              { value: '', label: t('admin.all_statuses') },
+              ...knownStatuses().map((item) => ({
+                value: item,
+                label: t(statusLabelKey(item)),
+              })),
+            ]}
+          />
+          {filtering ? (
+            <Button type="button" variant="default" onClick={clear}>
+              {t('admin.clear_filters')}
+            </Button>
+          ) : null}
+          <Text size="sm" c="dimmed" ms="auto" mb={8}>
+            {t('admin.shops_count', {
+              count: formatCount(filtered.length, lang),
+            })}
+          </Text>
+        </Group>
+      </Paper>
 
       {tenants.length === 0 ? (
-        <Panel bodyClassName="flex flex-col items-center gap-3 px-4 py-14 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
-            <StoreIcon />
-          </span>
-          <p className="font-medium">{t('admin.empty_tenants')}</p>
-          <a href={adminHref('/admin/tenants/new')} className={primaryBtn}>
-            {t('admin.new_shop')}
-          </a>
-        </Panel>
+        <Paper withBorder p="xl">
+          <Stack align="center" gap="sm">
+            <ThemeIcon size={48} radius="xl" variant="light" color="gray">
+              <StoreIcon />
+            </ThemeIcon>
+            <Text fw={500}>{t('admin.empty_tenants')}</Text>
+            <Button component="a" href={adminHref('/admin/tenants/new')}>
+              {t('admin.new_shop')}
+            </Button>
+          </Stack>
+        </Paper>
       ) : filtered.length === 0 ? (
-        <Panel bodyClassName="flex flex-col items-center gap-3 px-4 py-14 text-center">
-          <p className="font-medium">{t('admin.no_match')}</p>
-          <button type="button" className={quietBtn} onClick={clear}>
-            {t('admin.clear_filters')}
-          </button>
-        </Panel>
+        <Paper withBorder p="xl">
+          <Stack align="center" gap="sm">
+            <Text fw={500}>{t('admin.no_match')}</Text>
+            <Button type="button" variant="default" onClick={clear}>
+              {t('admin.clear_filters')}
+            </Button>
+          </Stack>
+        </Paper>
       ) : (
-        <Panel bodyClassName="p-0">
-          <ul className="flex flex-col divide-y divide-border md:hidden">
-            {shown.map((tenant) => (
-              <li key={tenant.id}>
-                <a
-                  href={adminHref(`/admin/tenants/${tenant.id}`)}
-                  className="flex flex-col gap-2 p-4 hover:bg-surface-2/60"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {tenant.display_name}
-                      </p>
-                      <p className="truncate font-mono text-small text-text-muted">
-                        {tenant.slug}
-                      </p>
-                    </div>
-                    <StatusBadge status={tenant.status} />
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
-                    <span>
-                      {tenant.devices} {t('admin.col_devices')}
-                    </span>
-                    <span>
+        <Paper withBorder>
+          <Box
+            tabIndex={0}
+            role="region"
+            aria-label={t('admin.tenants_title')}
+            style={{ overflowX: 'auto' }}
+          >
+            <Table fz="sm" miw={880}>
+              <Table.Caption className="sr-only">
+                {t('admin.tenants_title')}
+              </Table.Caption>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('admin.col_name')}</Table.Th>
+                  <Table.Th>{t('admin.col_status')}</Table.Th>
+                  <Table.Th ta="end">{t('admin.col_devices')}</Table.Th>
+                  <Table.Th>{t('admin.col_last_seen')}</Table.Th>
+                  <Table.Th>{t('admin.col_setup')}</Table.Th>
+                  <Table.Th>{t('admin.col_writes')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {shown.map((tenant) => (
+                  <Table.Tr key={tenant.id}>
+                    <Table.Td>
+                      <Box
+                        component="a"
+                        href={adminHref(`/admin/tenants/${tenant.id}`)}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
+                        <Text fw={500} truncate>
+                          {tenant.display_name}
+                        </Text>
+                        <Text size="sm" ff="monospace" c="dimmed">
+                          {tenant.slug}
+                        </Text>
+                      </Box>
+                    </Table.Td>
+                    <Table.Td>
+                      <StatusBadge status={tenant.status} />
+                    </Table.Td>
+                    <Table.Td ta="end">
+                      {formatCount(tenant.devices, lang)}
+                    </Table.Td>
+                    <Table.Td style={{ whiteSpace: 'nowrap' }}>
                       {tenant.last_seen_at === null
                         ? t('admin.never')
                         : formatWhen(tenant.last_seen_at, lang)}
-                    </span>
-                    <span>
-                      {tenant.setup_completed
-                        ? t('admin.setup_done')
-                        : t('admin.setup_pending')}
-                    </span>
-                  </div>
-                  <WriteMeter tenant={tenant} lang={lang} />
-                </a>
-              </li>
-            ))}
-          </ul>
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[880px] text-start text-small">
-              <caption className="sr-only">{t('admin.tenants_title')}</caption>
-              <thead className="border-b border-border bg-surface-2 text-text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_name')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_status')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-end font-medium">
-                    {t('admin.col_devices')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_last_seen')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_setup')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_writes')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((tenant) => {
-                  return (
-                    <tr
-                      key={tenant.id}
-                      className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
-                    >
-                      <td className="px-4 py-3">
-                        <a
-                          href={adminHref(`/admin/tenants/${tenant.id}`)}
-                          className="group inline-flex min-w-0 flex-col"
-                        >
-                          <span className="truncate font-medium text-text group-hover:text-primary">
-                            {tenant.display_name}
-                          </span>
-                          <span className="font-mono text-small text-text-muted">
-                            {tenant.slug}
-                          </span>
-                        </a>
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={tenant.status} />
-                      </td>
-                      <td className="px-4 py-3 text-end tabular-nums">
-                        {formatCount(tenant.devices, lang)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {tenant.last_seen_at === null
-                          ? t('admin.never')
-                          : formatWhen(tenant.last_seen_at, lang)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1.5 ${
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={6} wrap="nowrap">
+                        <Box
+                          aria-hidden="true"
+                          w={6}
+                          h={6}
+                          style={{
+                            borderRadius: 999,
+                            background: tenant.setup_completed
+                              ? 'var(--mantine-color-success-6)'
+                              : 'var(--mantine-color-gray-5)',
+                          }}
+                        />
+                        <Text
+                          size="sm"
+                          c={
                             tenant.setup_completed
-                              ? 'text-success-subtle-ink'
-                              : 'text-text-muted'
-                          }`}
+                              ? 'var(--color-success)'
+                              : 'dimmed'
+                          }
                         >
-                          <span
-                            aria-hidden="true"
-                            className={`size-1.5 rounded-full ${
-                              tenant.setup_completed
-                                ? 'bg-success'
-                                : 'bg-border-strong'
-                            }`}
-                          />
                           {tenant.setup_completed
                             ? t('admin.setup_done')
                             : t('admin.setup_pending')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <WriteMeter tenant={tenant} lang={lang} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <p className="text-small text-text-muted tabular-nums">
+                        </Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>
+                      <WriteMeter tenant={tenant} lang={lang} />
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Box>
+          <Group
+            justify="space-between"
+            gap="sm"
+            px="md"
+            py="sm"
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
+            <Text size="sm" c="dimmed">
               {t('admin.page_of', {
                 page: formatCount(current, lang),
                 pages: formatCount(pages, lang),
               })}
-            </p>
-            <div className="flex gap-2">
-              <button
+            </Text>
+            <Group gap="xs">
+              <Button
                 type="button"
-                className={quietBtn}
+                variant="default"
+                size="compact-sm"
                 disabled={current <= 1}
                 onClick={() => setPage(current - 1)}
               >
                 {t('admin.prev')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className={quietBtn}
+                variant="default"
+                size="compact-sm"
                 disabled={current >= pages}
                 onClick={() => setPage(current + 1)}
               >
                 {t('admin.next')}
-              </button>
-            </div>
-          </div>
-        </Panel>
+              </Button>
+            </Group>
+          </Group>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -303,24 +286,26 @@ function WriteMeter({
   if (warn) tone = 'var(--color-warning)';
   if (hot) tone = 'var(--color-danger)';
   return (
-    <div>
-      <meter
-        className="h-2 w-full max-w-28"
-        min={0}
-        max={budget > 0 ? budget : 1}
-        value={tenant.today.rows_written}
-        style={{ accentColor: tone }}
+    <Box maw={112}>
+      <Progress
+        value={
+          budget > 0
+            ? Math.min(100, (tenant.today.rows_written / budget) * 100)
+            : 0
+        }
+        size="sm"
+        color={tone}
         aria-label={t('admin.writes_bar', {
           written: formatCount(tenant.today.rows_written, lang),
           budget: formatCount(budget, lang),
         })}
       />
-      <p className="mt-1 text-small text-text-muted tabular-nums">
+      <Text size="sm" c="dimmed" mt={4}>
         {t('admin.writes_bar', {
           written: formatCount(tenant.today.rows_written, lang),
           budget: formatCount(budget, lang),
         })}
-      </p>
-    </div>
+      </Text>
+    </Box>
   );
 }

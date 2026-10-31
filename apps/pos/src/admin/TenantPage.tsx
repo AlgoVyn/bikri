@@ -1,3 +1,15 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Tabs,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StoreIcon } from '../components/icons.tsx';
@@ -15,7 +27,7 @@ import {
   readRestoreState,
 } from './restore.ts';
 import { SummaryTab } from './SummaryTab.tsx';
-import { AdminConfirm, primaryBtn, quietBtn, StatusBadge } from './ui.tsx';
+import { AdminConfirm, StatusBadge } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 type Tab = 'summary' | 'devices' | 'pin' | 'export' | 'restore' | 'delete';
@@ -56,14 +68,14 @@ export function TenantPage({ id }: { id: string }) {
 
   if (detail === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
+      <Stack gap="sm" align="flex-start">
+        <Text c="dimmed">{query.error}</Text>
+        <Button type="button" onClick={query.reload}>
           {t('admin.retry')}
-        </button>
-      </p>
+        </Button>
+      </Stack>
     ) : (
-      <p className="sr-only">{t('common.loading')}</p>
+      <Text className="sr-only">{t('common.loading')}</Text>
     );
   }
 
@@ -73,122 +85,122 @@ export function TenantPage({ id }: { id: string }) {
   const lang = i18n.language;
 
   return (
-    <div className="flex flex-col gap-5">
-      <a
+    <Stack gap="lg">
+      <Button
+        component="a"
         href={adminHref('/admin/tenants')}
-        className="inline-flex min-h-9 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"
+        variant="transparent"
+        px={0}
+        size="compact-sm"
+        leftSection={<span aria-hidden="true">‹</span>}
+        style={{ alignSelf: 'flex-start' }}
       >
-        <span
-          aria-hidden="true"
-          className="text-title leading-none rtl:rotate-180"
-        >
-          ‹
-        </span>
         {t('admin.back_to_shops')}
-      </a>
-      <header className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-        <div aria-hidden="true" className="h-1" style={{ background: band }} />
-        <div className="flex flex-wrap items-start gap-4 p-4 lg:p-5">
-          <span
-            aria-hidden="true"
-            className="flex size-12 shrink-0 items-center justify-center rounded-control text-white"
-            style={{ background: band }}
+      </Button>
+
+      <Paper withBorder style={{ overflow: 'hidden' }}>
+        <Box aria-hidden="true" h={4} style={{ background: band }} />
+        <Group align="flex-start" gap="md" p="lg" wrap="nowrap">
+          <ThemeIcon
+            size={48}
+            radius="md"
+            style={{ background: band, color: '#fff' }}
           >
             <StoreIcon />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-h1 font-semibold">{tenant.display_name}</h1>
+          </ThemeIcon>
+          <Box style={{ minWidth: 0, flex: 1 }}>
+            <Group gap="sm" wrap="wrap" align="center">
+              <Title order={1} fz="h2">
+                {tenant.display_name}
+              </Title>
               <StatusBadge status={tenant.status} />
-            </div>
-            <p className="mt-0.5 font-mono text-small text-text-muted">
+            </Group>
+            <Text size="sm" ff="monospace" c="dimmed" mt={2}>
               {tenant.slug}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
-              <span>
+            </Text>
+            <Group gap="md" mt="xs">
+              <Text size="sm" c="dimmed">
                 {t('admin.owner_email')}:{' '}
                 {tenant.owner_email ?? t('admin.never')}
-              </span>
-              <span>
-                {t('admin.devices_count', {
-                  count: detail.devices,
-                })}
-              </span>
-              <span>
+              </Text>
+              <Text size="sm" c="dimmed">
+                {t('admin.devices_count', { count: detail.devices })}
+              </Text>
+              <Text size="sm" c="dimmed">
                 {t('admin.created')}: {formatWhen(tenant.created_at, lang)}
-              </span>
-              <span>
+              </Text>
+              <Text size="sm" c="dimmed">
                 {t('admin.setup_at')}:{' '}
                 {detail.setup_completed_at === null
                   ? t('admin.setup_pending')
                   : formatWhen(detail.setup_completed_at, lang)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
+              </Text>
+            </Group>
+          </Box>
+        </Group>
+      </Paper>
+
       {maintenance ? (
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning-subtle bg-warning-subtle p-4 text-warning-subtle-ink"
-          role="status"
-        >
-          <p>
-            {stored?.aborted
-              ? t('admin.aborted_banner')
-              : t('admin.maintenance_banner')}
-          </p>
-          <button
-            type="button"
-            className={quietBtn}
-            onClick={() => setOffOpen(true)}
-          >
-            {t('admin.end_maintenance')}
-          </button>
-        </div>
+        <Paper p="md" role="status" bg="var(--mantine-color-warning-subtle)">
+          <Group justify="space-between" gap="sm" wrap="wrap">
+            <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+              {stored?.aborted
+                ? t('admin.aborted_banner')
+                : t('admin.maintenance_banner')}
+            </Text>
+            <Button
+              type="button"
+              variant="default"
+              size="compact-sm"
+              onClick={() => setOffOpen(true)}
+            >
+              {t('admin.end_maintenance')}
+            </Button>
+          </Group>
+        </Paper>
       ) : null}
-      <div
-        role="tablist"
+
+      <Tabs
+        value={tab}
+        onChange={(value) => setTab((value ?? 'summary') as Tab)}
         aria-label={tenant.display_name}
-        className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-1 shadow-card"
       >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            className="inline-flex min-h-11 items-center rounded-control px-3 text-small font-medium text-text-muted hover:bg-surface-2 hover:text-text aria-selected:bg-primary aria-selected:text-primary-ink"
-            onClick={() => setTab(item.id)}
-          >
-            {t(item.key)}
-          </button>
-        ))}
-      </div>
-      {tab === 'summary' ? (
-        <SummaryTab detail={detail} onChanged={query.reload} />
-      ) : null}
-      {tab === 'devices' ? (
-        <DevicesTab tenantId={tenant.id} shopName={tenant.display_name} />
-      ) : null}
-      {tab === 'pin' ? <PinTab tenantId={tenant.id} /> : null}
-      {tab === 'export' ? <ExportTab tenantId={tenant.id} /> : null}
-      {tab === 'restore' ? (
-        <RestoreTab
-          tenantId={tenant.id}
-          onChanged={() => {
-            query.reload();
-            bump();
-          }}
-          onState={bump}
-        />
-      ) : null}
-      {tab === 'delete' ? (
-        <DeleteTab
-          tenant={tenant}
-          onChanged={query.reload}
-          onExport={() => setTab('export')}
-        />
-      ) : null}
+        <Tabs.List>
+          {TABS.map((item) => (
+            <Tabs.Tab key={item.id} value={item.id}>
+              {t(item.key)}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+        <Tabs.Panel value={tab} pt="md">
+          {tab === 'summary' ? (
+            <SummaryTab detail={detail} onChanged={query.reload} />
+          ) : null}
+          {tab === 'devices' ? (
+            <DevicesTab tenantId={tenant.id} shopName={tenant.display_name} />
+          ) : null}
+          {tab === 'pin' ? <PinTab tenantId={tenant.id} /> : null}
+          {tab === 'export' ? <ExportTab tenantId={tenant.id} /> : null}
+          {tab === 'restore' ? (
+            <RestoreTab
+              tenantId={tenant.id}
+              onChanged={() => {
+                query.reload();
+                bump();
+              }}
+              onState={bump}
+            />
+          ) : null}
+          {tab === 'delete' ? (
+            <DeleteTab
+              tenant={tenant}
+              onChanged={query.reload}
+              onExport={() => setTab('export')}
+            />
+          ) : null}
+        </Tabs.Panel>
+      </Tabs>
+
       <AdminConfirm
         open={offOpen}
         onOpenChange={setOffOpen}
@@ -219,7 +231,7 @@ export function TenantPage({ id }: { id: string }) {
             });
         }}
       />
-      {pending ? <p className="sr-only">{t('common.loading')}</p> : null}
-    </div>
+      {pending ? <Text className="sr-only">{t('common.loading')}</Text> : null}
+    </Stack>
   );
 }
