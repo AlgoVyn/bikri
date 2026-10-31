@@ -39,7 +39,7 @@ const LabelsDialog = lazy(() =>
   })),
 );
 
-const ROW_PX = 60;
+const ROW_PX = 56;
 const OVERSCAN = 8;
 
 const selectClass =
@@ -353,7 +353,7 @@ function ListHeader({
             <span className="text-end">{t('products.col_margin')}</span>
           ) : null}
           <span className="truncate text-end" title={t('products.col_sold30')}>
-            {t('products.col_sold30')}
+            {t('products.col_sold30_short')}
           </span>
         </>
       )}
@@ -485,11 +485,11 @@ function ProductRow({
           </span>
           <span className="min-w-0">
             <span
-              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
+              className={`ltr-name font-medium leading-tight ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
             >
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small text-text-muted">
+            <span className="block truncate text-small leading-tight text-text-muted">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
@@ -548,11 +548,11 @@ function ProductRow({
           />
           <span className="min-w-0">
             <span
-              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
+              className={`ltr-name font-medium leading-tight ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
             >
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small text-text-muted">
+            <span className="block truncate text-small leading-tight text-text-muted">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>

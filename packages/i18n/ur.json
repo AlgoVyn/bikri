@@ -543,6 +543,7 @@
     "col_name": "نام",
     "col_price": "قیمت",
     "col_sold30": "فروخت (30 دن)",
+    "col_sold30_short": "30 دن",
     "col_stock": "اسٹاک",
     "count": "{{count}} مصنوعات",
     "count_one": "{{count}} مصنوع",

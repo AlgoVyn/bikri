@@ -543,6 +543,7 @@
     "col_name": "Name",
     "col_price": "Price",
     "col_sold30": "Sold (30 days)",
+    "col_sold30_short": "30d",
     "col_stock": "Stock",
     "count": "{{count}} products",
     "count_one": "{{count}} product",

@@ -27,15 +27,16 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
 }
 
 test.describe('design layout invariants', () => {
-  test('no horizontal scroll or overlap at 390, 768, 1280 and 1920', async ({
-    page,
-  }) => {
+  test('no horizontal scroll at 390, 768, 1280 and 1920', async ({ page }) => {
     await seedVisualShop(page);
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
       for (const route of ROUTES) {
         await page.evaluate((to) => window.__bikriTest?.navigate(to), route);
-        await page.waitForTimeout(route === '/reports' ? 350 : 150);
+        await page.waitForFunction(
+          () => !document.querySelector('[aria-busy="true"]'),
+        );
+        await page.waitForTimeout(route === '/reports' ? 250 : 120);
         await expectNoHorizontalScroll(page);
         if (process.env.VISUAL === '1') {
           await test
@@ -74,8 +75,16 @@ test.describe('design layout invariants', () => {
     const height = await rows
       .first()
       .evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeLessThanOrEqual(64);
+    expect(height).toBeLessThanOrEqual(60);
     expect(height).toBeGreaterThanOrEqual(44);
     expect(await rows.count()).toBeGreaterThanOrEqual(8);
+    const visible = await rows.evaluateAll(
+      (elements) =>
+        elements.filter((el) => {
+          const rect = el.getBoundingClientRect();
+          return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        }).length,
+    );
+    expect(visible).toBeGreaterThanOrEqual(8);
   });
 });

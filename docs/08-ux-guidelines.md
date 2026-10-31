@@ -135,11 +135,11 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 | Urdu | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.9 (Nastaliq needs more) |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 
-All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed.
+All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use 15 px and line-height 1.5 in Urdu so Nastaliq option text fits inside a 44 px field; body text keeps the +20% size and 1.9 leading.
 
 ### Layout containers and page anatomy
 
-Every top-level screen uses one of four containers from `pageClass()` in `apps/pos/src/components/classes.ts`; a screen never invents its own `max-w-*`. The page header and its actions always span the container, never the start column of a split.
+Shop screens use one of the four widths below through `pageClass()`; `MasterDetail` owns the workspace width directly, and setup/enrol/lock use the focused width. A screen never invents its own `max-w-*`. The page header and its actions always span the container, never the start column of a split.
 
 | Width | Class | Used by |
 |---|---|---|
