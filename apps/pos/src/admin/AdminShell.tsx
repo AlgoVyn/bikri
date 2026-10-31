@@ -1,12 +1,4 @@
-import {
-  AppShell,
-  Box,
-  Divider,
-  Group,
-  Stack,
-  Text,
-  ThemeIcon,
-} from '@mantine/core';
+import { AppShell, Box, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -90,35 +82,17 @@ export function AdminShell() {
               <ThemeIcon size={36} radius="md" color="accent" variant="filled">
                 <SalesIcon />
               </ThemeIcon>
-              <Stack gap={0} style={{ minWidth: 0 }}>
-                <Text
-                  fw={800}
-                  size="sm"
-                  tt="uppercase"
-                  style={{ letterSpacing: '0.14em', lineHeight: 1.1 }}
-                >
-                  {t('common.app_name')}
-                </Text>
-                <Text size="10px" c="dimmed" truncate visibleFrom="sm">
-                  {t('admin.operator_label')}
-                </Text>
-              </Stack>
+              <Text
+                fw={800}
+                size="sm"
+                tt="uppercase"
+                style={{ letterSpacing: '0.14em', lineHeight: 1.1 }}
+              >
+                {t('common.app_name')}
+              </Text>
             </Box>
-            <Divider
-              orientation="vertical"
-              visibleFrom="md"
-              color="var(--mantine-color-default-border)"
-            />
-            <Text size="sm" fw={600} visibleFrom="sm" truncate>
-              {t('admin.title')}
-            </Text>
           </Group>
-          <Group gap="sm" wrap="nowrap">
-            <Text size="xs" c="dimmed" visibleFrom="lg">
-              {t('admin.access_note')}
-            </Text>
-            <LanguageSelect />
-          </Group>
+          <LanguageSelect />
         </Group>
       </AppShell.Header>
 
@@ -129,20 +103,25 @@ export function AdminShell() {
               <AdminNav />
             </Box>
           </Box>
-          <Group gap="sm" px="md" py="md" wrap="nowrap">
-            <Box
-              aria-hidden="true"
-              w={6}
-              h={6}
-              style={{
-                borderRadius: 999,
-                background: 'var(--mantine-color-accent-4)',
-              }}
-            />
-            <Text size="xs" c="rgba(184,198,219,0.8)">
-              {t('admin.access_note')}
+          <Stack gap={6} px="md" py="md">
+            <Text size="xs" fw={600} c="rgba(184,198,219,0.92)">
+              {t('admin.operator_label')}
             </Text>
-          </Group>
+            <Group gap="sm" wrap="nowrap">
+              <Box
+                aria-hidden="true"
+                w={6}
+                h={6}
+                style={{
+                  borderRadius: 999,
+                  background: 'var(--mantine-color-accent-4)',
+                }}
+              />
+              <Text size="xs" c="rgba(184,198,219,0.8)">
+                {t('admin.access_note')}
+              </Text>
+            </Group>
+          </Stack>
         </Stack>
       </AppShell.Navbar>
 

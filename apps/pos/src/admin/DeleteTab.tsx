@@ -1,3 +1,12 @@
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -9,7 +18,7 @@ import {
 } from './api.ts';
 import { adminHref, formatWhen, statusLabelKey } from './format.ts';
 import type { Tenant } from './types.ts';
-import { dangerBtn, Panel, quietBtn, ReasonDialog } from './ui.tsx';
+import { Panel, ReasonDialog } from './ui.tsx';
 
 export function DeleteTab({
   tenant,
@@ -63,58 +72,66 @@ export function DeleteTab({
       <Panel
         title={t('admin.delete_zone')}
         description={t('admin.delete_zone_hint')}
-        className="max-w-2xl border-danger/30"
       >
-        <div className="flex flex-col gap-4">
-          <p className="rounded-control border border-danger-subtle bg-danger-subtle px-3 py-2 text-small text-danger-subtle-ink">
-            {t('admin.delete_warning')}
-          </p>
-          <dl className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-small text-text-muted">
+        <Stack gap="md">
+          <Paper p="sm" bg="var(--mantine-color-danger-subtle)">
+            <Text size="sm" c="var(--mantine-color-danger-subtle-ink)">
+              {t('admin.delete_warning')}
+            </Text>
+          </Paper>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.last_export')}
-              </dt>
-              <dd className="font-medium tabular-nums">
+              </Text>
+              <Text fw={500}>
                 {tenant.last_owner_export_at === null
                   ? t('admin.never')
                   : formatWhen(tenant.last_owner_export_at, lang)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-small text-text-muted">
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">
                 {t('admin.col_status')}
-              </dt>
-              <dd className="font-medium">
-                {t(statusLabelKey(tenant.status))}
-              </dd>
-            </div>
-          </dl>
-          <p className="text-small text-text-muted">
+              </Text>
+              <Text fw={500}>{t(statusLabelKey(tenant.status))}</Text>
+            </Box>
+          </SimpleGrid>
+          <Text size="sm" c="dimmed">
             {t('admin.delete_offer')}
-          </p>
+          </Text>
           {deleting ? (
-            <p
-              className="rounded-control bg-warning-subtle px-3 py-2 text-small text-warning-subtle-ink"
+            <Paper
+              p="sm"
               role="status"
+              bg="var(--mantine-color-warning-subtle)"
             >
-              {t('admin.delete_progress')}
-            </p>
+              <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+                {t('admin.delete_progress')}
+              </Text>
+            </Paper>
           ) : null}
-          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-            <button type="button" className={quietBtn} onClick={onExport}>
+          <Group
+            gap="sm"
+            pt="md"
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
+            <Button type="button" variant="default" onClick={onExport}>
               {t('admin.tab_export')}
-            </button>
+            </Button>
             {tenant.status !== 'deleted' && !deleting ? (
-              <button
+              <Button
                 type="button"
-                className={dangerBtn}
+                color="danger"
                 onClick={() => setOpen(true)}
               >
                 {t('admin.delete_go')}
-              </button>
+              </Button>
             ) : null}
-          </div>
-        </div>
+          </Group>
+        </Stack>
       </Panel>
       <ReasonDialog
         open={open}
