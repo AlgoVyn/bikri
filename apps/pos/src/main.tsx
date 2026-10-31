@@ -8,6 +8,7 @@ import { registerAppUpdate } from './pwa/registerSW.ts';
 import { MantineRoot } from './ui/MantineRoot.tsx';
 import './styles/layers.css';
 import './styles/compat.css';
+import './styles/polish.css';
 
 await initI18n();
 if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev') {

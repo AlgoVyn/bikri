@@ -162,8 +162,8 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
           radius="xl"
           styles={{
             root: {
-              height: 32,
-              maxWidth: compact ? 220 : 190,
+              height: 30,
+              maxWidth: compact ? 200 : 170,
               textTransform: 'none',
               fontWeight: 600,
             },
@@ -232,8 +232,8 @@ export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
           radius="xl"
           styles={{
             root: {
-              height: 32,
-              maxWidth: compact ? 220 : 170,
+              height: 30,
+              maxWidth: compact ? 200 : 160,
               textTransform: 'none',
               fontWeight: 600,
             },

@@ -148,7 +148,11 @@ export const bikriTheme = createTheme({
     Button: {
       defaultProps: { size: 'md' },
       styles: {
-        root: { minHeight: 44, fontWeight: 600 },
+        root: {
+          minHeight: 44,
+          fontWeight: 550,
+          letterSpacing: '0.005em',
+        },
       },
     },
     ActionIcon: {
@@ -185,11 +189,19 @@ export const bikriTheme = createTheme({
     Switch: { defaultProps: { size: 'md' } },
     Modal: { defaultProps: { radius: 'lg', centered: true } },
     Drawer: { defaultProps: { radius: 'lg' } },
-    Badge: { defaultProps: { radius: 'xl' } },
+    Badge: {
+      defaultProps: { radius: 'xl', tt: 'none' },
+      styles: { root: { fontWeight: 550 } },
+    },
     Card: { defaultProps: { radius: 'lg', withBorder: true } },
     Paper: { defaultProps: { radius: 'lg' } },
     Table: {
-      defaultProps: { verticalSpacing: 'sm', horizontalSpacing: 'md' },
+      defaultProps: {
+        verticalSpacing: 'sm',
+        horizontalSpacing: 'md',
+        highlightOnHover: true,
+        fz: 'sm',
+      },
     },
   },
   other: {

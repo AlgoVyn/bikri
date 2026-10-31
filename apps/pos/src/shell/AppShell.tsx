@@ -12,7 +12,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { type ReactNode, useEffect } from 'react';
+import { Fragment, type ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MoreIcon,
@@ -244,27 +244,33 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Stack gap={4} p={8} pt="md" style={{ overflowY: 'auto' }}>
                 {visible.map((item) => {
                   const active = current?.to === item.to;
+                  const groupBreak =
+                    item.to === '/suppliers' || item.to === '/settings';
                   return (
-                    <Tooltip
-                      key={item.to}
-                      label={`${t(item.label)} (${item.keys})`}
-                      position="right"
-                      withArrow
-                      openDelay={400}
-                    >
-                      <Link
-                        to={item.to}
-                        aria-label={`${t(item.label)} (${item.keys})`}
-                        aria-current={active ? 'page' : undefined}
-                        className="bikri-rail-item"
-                        data-active={active || undefined}
+                    <Fragment key={item.to}>
+                      {groupBreak ? (
+                        <Divider my={6} color="rgba(255,255,255,0.10)" />
+                      ) : null}
+                      <Tooltip
+                        label={`${t(item.label)} (${item.keys})`}
+                        position="right"
+                        withArrow
+                        openDelay={400}
                       >
-                        <item.Icon />
-                        <Text size="10px" lh={1.15} ta="center" tt="none">
-                          {t(item.label)}
-                        </Text>
-                      </Link>
-                    </Tooltip>
+                        <Link
+                          to={item.to}
+                          aria-label={`${t(item.label)} (${item.keys})`}
+                          aria-current={active ? 'page' : undefined}
+                          className="bikri-rail-item"
+                          data-active={active || undefined}
+                        >
+                          <item.Icon />
+                          <Text size="10px" lh={1.15} ta="center" tt="none">
+                            {t(item.label)}
+                          </Text>
+                        </Link>
+                      </Tooltip>
+                    </Fragment>
                   );
                 })}
                 <Divider my={6} color="rgba(255,255,255,0.10)" />
