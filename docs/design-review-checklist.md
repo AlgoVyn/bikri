@@ -20,3 +20,5 @@ Also run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm i18n:check`, `pnpm co
 ```sh
 VISUAL=1 pnpm --filter @bikri/e2e exec playwright test tests/layout.spec.ts --project=desktop --reporter=html
 ```
+
+The matrix is reviewed by a human; pixel baselines are deliberately not committed because the seeded shop includes the current date and time, which makes image diffs brittle.
