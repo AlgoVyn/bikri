@@ -18,6 +18,7 @@ export function Modal({
   wide = false,
   full = false,
   header,
+  testId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,6 +29,7 @@ export function Modal({
   full?: boolean;
   /** Extra content next to the title (e.g. the total to pay). */
   header?: ReactNode;
+  testId?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -49,7 +51,7 @@ export function Modal({
         </Group>
       }
     >
-      <Stack gap="md">
+      <Stack gap="md" data-testid={testId}>
         {description ? (
           <Text size="sm" c="dimmed">
             {description}

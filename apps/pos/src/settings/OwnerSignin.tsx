@@ -1,13 +1,9 @@
 /** "Confirm it's you" (screens/17, 05 §3.2) and a hook that runs shop-admin calls behind it. */
 import type { BikriDb } from '@bikri/db';
-import * as Dialog from '@radix-ui/react-dialog';
+import { Box, Button, Group, Stack, Text, TextInput } from '@mantine/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
+import { Modal } from '../sell/Modal.tsx';
 import { OfflineError, SyncHttpError } from '../sync/client.ts';
 import {
   normaliseSigninCode,
@@ -17,10 +13,6 @@ import {
   startOwnerSignin,
   verifyOwnerSignin,
 } from '../sync/shopApi.ts';
-
-const overlayClass = 'fixed inset-0 z-40 bg-text/40';
-const contentClass =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal bg-surface p-4 text-text shadow-modal';
 
 export function shopErrorMessage(
   t: (k: string, o?: Record<string, unknown>) => string,
@@ -134,73 +126,73 @@ export function OwnerSigninDialog({
   const resendIn = start ? 60_000 - (now - start.sent_at) : 0;
   const left = start ? start.expires_at - now : 0;
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => (o ? undefined : onCancel())}>
-      <Dialog.Portal>
-        <Dialog.Overlay className={overlayClass} />
-        <Dialog.Content className={contentClass} data-testid="owner-signin">
-          <Dialog.Title className="text-title">{t('owner.title')}</Dialog.Title>
-          <Dialog.Description>
-            {start
-              ? t('owner.sent', { email: start.email_hint })
-              : t('owner.sending')}
-          </Dialog.Description>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void confirm();
-            }}
-          >
-            <label className="flex flex-col gap-1">
-              <span>{t('owner.code_label')}</span>
-              <input
-                ref={codeRef}
-                className={`${fieldClass} tracking-widest`}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                disabled={!start}
-                onChange={(e) => setCode(normaliseSigninCode(e.target.value))}
-              />
-            </label>
-            {start ? (
-              <p className="text-small text-text-muted">
-                {left > 0
-                  ? t('owner.expires_in', { time: mmss(left) })
-                  : t('owner.code_dead')}
-              </p>
-            ) : null}
-            {error ? (
-              <p role="alert" className="text-danger text-small">
-                {error}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={busy || resendIn > 0}
-                onClick={() => void send()}
-              >
-                {resendIn > 0
-                  ? t('owner.send_again_in', { time: mmss(resendIn) })
-                  : t('owner.send_again')}
-              </button>
-              <button type="button" className={buttonQuiet} onClick={onCancel}>
-                {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                className={buttonPrimary}
-                disabled={busy || !start}
-              >
-                {t('common.confirm')}
-              </button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      title={t('owner.title')}
+      description={
+        start
+          ? t('owner.sent', { email: start.email_hint })
+          : t('owner.sending')
+      }
+      testId="owner-signin"
+    >
+      <Box
+        component="form"
+        onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          void confirm();
+        }}
+      >
+        <Stack gap="sm">
+          <TextInput
+            ref={codeRef}
+            label={t('owner.code_label')}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            disabled={!start}
+            data-autofocus
+            onChange={(event) =>
+              setCode(normaliseSigninCode(event.currentTarget.value))
+            }
+            styles={{ input: { letterSpacing: '0.12em' } }}
+          />
+          {start ? (
+            <Text size="sm" c="dimmed">
+              {left > 0
+                ? t('owner.expires_in', { time: mmss(left) })
+                : t('owner.code_dead')}
+            </Text>
+          ) : null}
+          {error ? (
+            <Text role="alert" c="danger" size="sm">
+              {error}
+            </Text>
+          ) : null}
+          <Group justify="flex-end" gap="sm">
+            <Button
+              type="button"
+              variant="default"
+              disabled={busy || resendIn > 0}
+              onClick={() => void send()}
+            >
+              {resendIn > 0
+                ? t('owner.send_again_in', { time: mmss(resendIn) })
+                : t('owner.send_again')}
+            </Button>
+            <Button type="button" variant="default" onClick={onCancel}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={busy || !start} loading={busy}>
+              {t('common.confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Box>
+    </Modal>
   );
 }
 

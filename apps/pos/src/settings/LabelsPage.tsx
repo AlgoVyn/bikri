@@ -1,8 +1,17 @@
 import { barcodeLabelSvg, LABEL_SIZES } from '@bikri/printer';
+import {
+  Button,
+  Checkbox,
+  Group,
+  NativeSelect,
+  NumberInput,
+  Paper,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { TagIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -74,99 +83,81 @@ function LabelsContent() {
       toast.push(t('office.labels.charset'), 'error');
     }
   };
-  const field =
-    'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
   return (
     <SettingsPageLayout title={t('office.labels.title')} icon={<TagIcon />}>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.labels.size')}
-          <select
-            className={field}
+      <Paper withBorder p="lg">
+        <Stack gap="sm">
+          <NativeSelect
+            label={t('office.labels.size')}
             value={form.size}
             onChange={(event) =>
               setForm({
                 ...form,
-                size: event.target.value as LabelSettings['size'],
+                size: event.currentTarget.value as LabelSettings['size'],
               })
             }
-          >
-            <option value="50x25">{t('office.labels.size_50x25')}</option>
-            <option value="38x25">{t('office.labels.size_38x25')}</option>
-            <option value="40x30">{t('office.labels.size_40x30')}</option>
-            <option value="a4">{t('office.labels.size_a4')}</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-small">
-          <input
-            type="checkbox"
+            data={[
+              { value: '50x25', label: t('office.labels.size_50x25') },
+              { value: '38x25', label: t('office.labels.size_38x25') },
+              { value: '40x30', label: t('office.labels.size_40x30') },
+              { value: 'a4', label: t('office.labels.size_a4') },
+            ]}
+          />
+          <Checkbox
+            label={t('office.labels.show_shop')}
             checked={form.showShop}
             onChange={(event) =>
-              setForm({ ...form, showShop: event.target.checked })
+              setForm({ ...form, showShop: event.currentTarget.checked })
             }
           />
-          {t('office.labels.show_shop')}
-        </label>
-        <label className="flex items-center gap-2 text-small">
-          <input
-            type="checkbox"
+          <Checkbox
+            label={t('office.labels.show_price')}
             checked={form.showPrice}
             onChange={(event) =>
-              setForm({ ...form, showPrice: event.target.checked })
+              setForm({ ...form, showPrice: event.currentTarget.checked })
             }
           />
-          {t('office.labels.show_price')}
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.labels.dpi')}
-          <select
-            className={field}
+          <NativeSelect
+            label={t('office.labels.dpi')}
             value={form.dpi}
             onChange={(event) =>
-              setForm({ ...form, dpi: Number(event.target.value) as 203 | 300 })
+              setForm({
+                ...form,
+                dpi: Number(event.currentTarget.value) as 203 | 300,
+              })
             }
-          >
-            <option value={203}>203 dpi</option>
-            <option value={300}>300 dpi</option>
-          </select>
-        </label>
-        {form.size === 'a4' ? (
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.labels.start')}
-            <input
-              type="number"
+            data={[
+              { value: '203', label: '203 dpi' },
+              { value: '300', label: '300 dpi' },
+            ]}
+          />
+          {form.size === 'a4' ? (
+            <NumberInput
+              label={t('office.labels.start')}
               min={0}
               max={23}
-              className={field}
               value={form.start}
-              onChange={(event) =>
+              onChange={(value) =>
                 setForm({
                   ...form,
-                  start: Math.max(
-                    0,
-                    Math.min(23, Number(event.target.value) || 0),
-                  ),
+                  start: Math.max(0, Math.min(23, Number(value) || 0)),
                 })
               }
             />
-          </label>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={buttonPrimary}
-            onClick={() => void save()}
-          >
-            {t('office.labels.save')}
-          </button>
-          <button type="button" className={buttonQuiet} onClick={printTest}>
-            {t('office.labels.print_test')}
-          </button>
-        </div>
-        <p className="text-small text-text-muted">
-          {t('office.labels.print_hint')}
-        </p>
-      </section>
+          ) : null}
+          <Group gap="sm">
+            <Button type="button" onClick={() => void save()}>
+              {t('office.labels.save')}
+            </Button>
+            <Button type="button" variant="default" onClick={printTest}>
+              {t('office.labels.print_test')}
+            </Button>
+          </Group>
+          <Text size="sm" c="dimmed">
+            {t('office.labels.print_hint')}
+          </Text>
+        </Stack>
+      </Paper>
     </SettingsPageLayout>
   );
 }
