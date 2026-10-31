@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
+import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -272,203 +273,213 @@ export function SalesList({
         </div>
       )}
 
-      <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
-          <span className="mb-1 text-small">{t('office.sales.search')}</span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
-              placeholder={t('office.sales.search_placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+      <ListSurface
+        toolbar={
+          <search className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
+              <span className="mb-1 text-small">
+                {t('office.sales.search')}
+              </span>
+              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+                <SearchIcon />
+                <input
+                  type="search"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+                  placeholder={t('office.sales.search_placeholder')}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </span>
+            </label>
+            <button
+              type="button"
+              className={`${buttonQuiet} gap-2 lg:hidden`}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              {t('common.filters')}
+              {activeFilters > 0 ? (
+                <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                  {activeFilters}
+                </span>
+              ) : null}
+            </button>
+            <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
+              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.sales.filter_method')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={method}
+                  onChange={(e) =>
+                    setMethod(e.target.value as MethodFilter | '')
+                  }
+                >
+                  <option value="">{t('office.sales.all_methods')}</option>
+                  {METHOD_FILTERS.map((m) => (
+                    <option key={m} value={m}>
+                      {m === 'split'
+                        ? t('office.sales.method_split')
+                        : methodLabel(t, m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.sales.filter_status')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as SaleStatus | '')}
+                >
+                  <option value="">{t('office.sales.all_statuses')}</option>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel(t, s)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.sales.filter_cashier')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
+                >
+                  <option value="">{t('office.sales.all_cashiers')}</option>
+                  {options.staff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.sales.filter_device')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={deviceId}
+                  onChange={(e) => setDeviceId(e.target.value)}
+                >
+                  <option value="">{t('office.sales.all_devices')}</option>
+                  {options.devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </search>
+        }
+      >
+        {data && data.rows.length > 0 ? (
+          <div
+            data-testid="sales-summary"
+            className={`grid gap-3 border-b border-border px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
+          >
+            <Metric
+              label={t('office.sales.summary_bills')}
+              value={String(data.summary.bills)}
             />
-          </span>
-        </label>
-        <button
-          type="button"
-          className={`${buttonQuiet} gap-2 lg:hidden`}
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {t('common.filters')}
-          {activeFilters > 0 ? (
-            <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-              {activeFilters}
-            </span>
-          ) : null}
-        </button>
-        <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('office.sales.filter_method')}
-            </span>
-            <select
-              className={selectClass}
-              value={method}
-              onChange={(e) => setMethod(e.target.value as MethodFilter | '')}
-            >
-              <option value="">{t('office.sales.all_methods')}</option>
-              {METHOD_FILTERS.map((m) => (
-                <option key={m} value={m}>
-                  {m === 'split'
-                    ? t('office.sales.method_split')
-                    : methodLabel(t, m)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('office.sales.filter_status')}
-            </span>
-            <select
-              className={selectClass}
-              value={status}
-              onChange={(e) => setStatus(e.target.value as SaleStatus | '')}
-            >
-              <option value="">{t('office.sales.all_statuses')}</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {statusLabel(t, s)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('office.sales.filter_cashier')}
-            </span>
-            <select
-              className={selectClass}
-              value={staffId}
-              onChange={(e) => setStaffId(e.target.value)}
-            >
-              <option value="">{t('office.sales.all_cashiers')}</option>
-              {options.staff.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-            <span className="mb-1 text-small">
-              {t('office.sales.filter_device')}
-            </span>
-            <select
-              className={selectClass}
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-            >
-              <option value="">{t('office.sales.all_devices')}</option>
-              {options.devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </search>
-
-      {data && data.rows.length > 0 ? (
-        <div
-          data-testid="sales-summary"
-          className={`grid gap-2 rounded-card border border-border bg-surface p-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
-        >
-          <Metric
-            label={t('office.sales.summary_bills')}
-            value={String(data.summary.bills)}
-          />
-          <Metric
-            label={t('office.sales.summary_sold')}
-            value={<MoneyText paisa={data.summary.sold} />}
-          />
-          <Metric
-            label={t('office.sales.summary_refunds')}
-            value={<MoneyText paisa={data.summary.refunds} />}
-          />
-          <Metric
-            label={t('office.sales.summary_avg')}
-            value={<MoneyText paisa={data.summary.avgBill} />}
-          />
-        </div>
-      ) : null}
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
-          icon={<SalesIcon />}
-          message={
-            query || method || status || staffId || deviceId
-              ? t('office.sales.no_match')
-              : t('office.sales.empty')
-          }
-        />
-      ) : null}
-
-      {visibleDays.map((day) => (
-        <section key={day.date} className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
-            <h2 className="text-title font-semibold">
-              {dayHeading(
-                t,
-                day.date,
-                today,
-                yesterday,
-                i18n.language,
-                data?.timeZone ?? 'Asia/Karachi',
-              )}
-            </h2>
-            <p className="text-small text-text-muted">
-              {t('office.sales.day_total', {
-                bills: day.bills,
-                amount: formatShopMoney(day.total),
-              })}
-            </p>
+            <Metric
+              label={t('office.sales.summary_sold')}
+              value={<MoneyText paisa={data.summary.sold} />}
+            />
+            <Metric
+              label={t('office.sales.summary_refunds')}
+              value={<MoneyText paisa={data.summary.refunds} />}
+            />
+            <Metric
+              label={t('office.sales.summary_avg')}
+              value={<MoneyText paisa={data.summary.avgBill} />}
+            />
           </div>
-          <ul className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card">
-            <li
-              className={`${SALE_GRID} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
-              aria-hidden="true"
-            >
-              <span>{t('office.sales.col_time')}</span>
-              <span>{t('office.sales.col_invoice')}</span>
-              <span>{t('office.sales.col_customer')}</span>
-              <span className="text-end">{t('office.sales.col_items')}</span>
-              <span className="text-end">{t('office.sales.col_total')}</span>
-              <span>{t('office.sales.col_method')}</span>
-              <span className="text-end">{t('office.sales.col_status')}</span>
-            </li>
-            {day.rows.map((row) => (
-              <SaleRow
-                key={row.sale.id}
-                row={row}
-                current={row.sale.id === selectedId}
-                timeZone={data?.timeZone ?? 'Asia/Karachi'}
-                onReprint={async () => {
-                  await queueSalePrint(getDb(), String(row.sale.id), {
-                    reprint: true,
-                  });
-                  toast.push(t('office.bill.print_queued'));
-                }}
-              />
-            ))}
-          </ul>
-        </section>
-      ))}
+        ) : null}
 
-      {data &&
-      data.rows.length > visibleDays.reduce((s, d) => s + d.rows.length, 0) ? (
-        <div
-          ref={sentinel}
-          className="py-4 text-center text-small text-text-muted"
-        >
-          {t('office.sales.loading_more')}
-        </div>
-      ) : null}
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            variant="plain"
+            icon={<SalesIcon />}
+            message={
+              query || method || status || staffId || deviceId
+                ? t('office.sales.no_match')
+                : t('office.sales.empty')
+            }
+          />
+        ) : null}
+
+        {visibleDays.map((day) => (
+          <section key={day.date} className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
+              <h2 className="text-title font-semibold">
+                {dayHeading(
+                  t,
+                  day.date,
+                  today,
+                  yesterday,
+                  i18n.language,
+                  data?.timeZone ?? 'Asia/Karachi',
+                )}
+              </h2>
+              <p className="text-small text-text-muted">
+                {t('office.sales.day_total', {
+                  bills: day.bills,
+                  amount: formatShopMoney(day.total),
+                })}
+              </p>
+            </div>
+            <ul className="flex flex-col">
+              <li
+                className={`${SALE_GRID} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
+                aria-hidden="true"
+              >
+                <span>{t('office.sales.col_time')}</span>
+                <span>{t('office.sales.col_invoice')}</span>
+                <span>{t('office.sales.col_customer')}</span>
+                <span className="text-end">{t('office.sales.col_items')}</span>
+                <span className="text-end">{t('office.sales.col_total')}</span>
+                <span>{t('office.sales.col_method')}</span>
+                <span className="text-end">{t('office.sales.col_status')}</span>
+              </li>
+              {day.rows.map((row) => (
+                <SaleRow
+                  key={row.sale.id}
+                  row={row}
+                  current={row.sale.id === selectedId}
+                  timeZone={data?.timeZone ?? 'Asia/Karachi'}
+                  onReprint={async () => {
+                    await queueSalePrint(getDb(), String(row.sale.id), {
+                      reprint: true,
+                    });
+                    toast.push(t('office.bill.print_queued'));
+                  }}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
+
+        {data &&
+        data.rows.length >
+          visibleDays.reduce((s, d) => s + d.rows.length, 0) ? (
+          <div
+            ref={sentinel}
+            className="py-4 text-center text-small text-text-muted"
+          >
+            {t('office.sales.loading_more')}
+          </div>
+        ) : null}
+      </ListSurface>
     </div>
   );
 }
@@ -504,9 +515,9 @@ function SaleRow({
         resetScroll={false}
         onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
-        className={`${SALE_GRID} px-2 py-2 pe-12 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''}`}
+        className={`${SALE_GRID} min-h-11 px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''}`}
       >
-        <span className="font-mono text-small text-text-muted">
+        <span className="tabular-nums text-small text-text-muted">
           {timeText(Number(sale.created_at), i18n.language, timeZone)}
         </span>
         <span className="min-w-0">

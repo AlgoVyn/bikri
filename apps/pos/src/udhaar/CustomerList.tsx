@@ -10,6 +10,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
+import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
@@ -158,172 +159,185 @@ export function UdhaarList({
         </div>
       ) : null}
 
-      <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
-          <span className="mb-1 text-small">{t('office.udhaar.search')}</span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
-              placeholder={t('office.udhaar.search_placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-        <button
-          type="button"
-          className={`${buttonQuiet} gap-2 self-end sm:hidden`}
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {t('common.filters')}
-          {activeFilterCount > 0 ? (
-            <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-              {activeFilterCount}
-            </span>
-          ) : null}
-        </button>
-        <div
-          className={
-            filtersOpen
-              ? 'flex w-full flex-wrap items-end gap-2'
-              : 'hidden sm:flex sm:flex-wrap sm:items-end sm:gap-2'
-          }
-        >
-          <label className="flex flex-col">
-            <span className="mb-1 text-small">{t('office.udhaar.filter')}</span>
-            <select
-              className={selectClass}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as CustomerFilter)}
+      <ListSurface
+        toolbar={
+          <search className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
+              <span className="mb-1 text-small">
+                {t('office.udhaar.search')}
+              </span>
+              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+                <SearchIcon />
+                <input
+                  type="search"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent text-body outline-none"
+                  placeholder={t('office.udhaar.search_placeholder')}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </span>
+            </label>
+            <button
+              type="button"
+              className={`${buttonQuiet} gap-2 self-end sm:hidden`}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
             >
-              {filters.map((value) => (
-                <option key={value} value={value}>
-                  {t(`office.udhaar.filter_${value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col">
-            <span className="mb-1 text-small">{t('office.udhaar.sort')}</span>
-            <select
-              className={selectClass}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as CustomerSort)}
+              {t('common.filters')}
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+            <div
+              className={
+                filtersOpen
+                  ? 'flex w-full flex-wrap items-end gap-2'
+                  : 'hidden sm:flex sm:flex-wrap sm:items-end sm:gap-2'
+              }
             >
-              {sorts.map((value) => (
-                <option key={value} value={value}>
-                  {t(`office.udhaar.sort_${value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </search>
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
-          icon={<UdhaarIcon />}
-          message={
-            query || filter !== 'all'
-              ? t('office.udhaar.no_match')
-              : t('office.udhaar.no_customers')
-          }
-          actionLabel={
-            can('party.edit') && !readOnly
-              ? t('office.udhaar.new_customer')
-              : undefined
-          }
-          onAction={
-            can('party.edit') && !readOnly ? () => setNewOpen(true) : undefined
-          }
-        />
-      ) : null}
-
-      {data && data.rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {data.rows.map((row) => {
-            const percent = limitPercent(
-              row.balance,
-              row.customer.credit_limit === null ||
-                row.customer.credit_limit === undefined
-                ? null
-                : Number(row.customer.credit_limit),
-            );
-            return (
-              <li key={row.customer.id}>
-                <Link
-                  to="/udhaar/$customerId"
-                  params={{ customerId: row.customer.id }}
-                  resetScroll={false}
-                  onClick={rememberListScroll}
-                  aria-current={
-                    row.customer.id === selectedId ? 'page' : undefined
-                  }
-                  className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.customer.id === selectedId ? 'bg-primary-subtle' : ''}`}
+              <label className="flex flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.udhaar.filter')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value as CustomerFilter)}
                 >
-                  <span className="min-w-0 flex-[2_1_10rem]">
-                    <span className="line-clamp-2 break-words font-medium">
-                      {String(row.customer.name)}
+                  {filters.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`office.udhaar.filter_${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.udhaar.sort')}
+                </span>
+                <select
+                  className={selectClass}
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as CustomerSort)}
+                >
+                  {sorts.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`office.udhaar.sort_${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </search>
+        }
+      >
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            variant="plain"
+            icon={<UdhaarIcon />}
+            message={
+              query || filter !== 'all'
+                ? t('office.udhaar.no_match')
+                : t('office.udhaar.no_customers')
+            }
+            actionLabel={
+              can('party.edit') && !readOnly
+                ? t('office.udhaar.new_customer')
+                : undefined
+            }
+            onAction={
+              can('party.edit') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
+
+        {data && data.rows.length > 0 ? (
+          <ul className="flex flex-col divide-y divide-border">
+            {data.rows.map((row) => {
+              const percent = limitPercent(
+                row.balance,
+                row.customer.credit_limit === null ||
+                  row.customer.credit_limit === undefined
+                  ? null
+                  : Number(row.customer.credit_limit),
+              );
+              return (
+                <li key={row.customer.id}>
+                  <Link
+                    to="/udhaar/$customerId"
+                    params={{ customerId: row.customer.id }}
+                    resetScroll={false}
+                    onClick={rememberListScroll}
+                    aria-current={
+                      row.customer.id === selectedId ? 'page' : undefined
+                    }
+                    className={`flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.customer.id === selectedId ? 'bg-primary-subtle' : ''}`}
+                  >
+                    <span className="min-w-0 flex-[2_1_10rem]">
+                      <span className="line-clamp-2 break-words font-medium">
+                        {String(row.customer.name)}
+                      </span>
+                      <span
+                        dir="ltr"
+                        className="block text-small text-text-muted"
+                      >
+                        {String(row.customer.phone ?? '')}
+                      </span>
                     </span>
-                    <span
-                      dir="ltr"
-                      className="block text-small text-text-muted"
-                    >
-                      {String(row.customer.phone ?? '')}
+                    <span className="min-w-0 flex-[1_1_8rem] text-small">
+                      <span
+                        className={`block whitespace-nowrap font-medium ${balanceTone(row.balance)}`}
+                      >
+                        {balanceLabel(t, row.balance)}
+                      </span>
+                      <span className="block text-text-muted">
+                        {ageLabel(t, row.oldestUnpaidAt)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small">
-                    <span
-                      className={`block whitespace-nowrap font-medium ${balanceTone(row.balance)}`}
-                    >
-                      {balanceLabel(t, row.balance)}
-                    </span>
-                    <span className="block text-text-muted">
-                      {ageLabel(t, row.oldestUnpaidAt)}
-                    </span>
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small">
-                    {percent !== null ? (
-                      <>
-                        <span
-                          className="mb-1 block h-2 overflow-hidden rounded-full bg-surface-2"
-                          role="img"
-                          aria-label={t('office.udhaar.limit_bar', {
-                            percent,
-                          })}
-                        >
+                    <span className="min-w-0 flex-[1_1_8rem] text-small">
+                      {percent !== null ? (
+                        <>
                           <span
-                            className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </span>
-                        <span className="flex flex-wrap items-center gap-x-1 text-text-muted">
-                          <MoneyText paisa={row.balance} />
-                          <span aria-hidden="true">/</span>
-                          <MoneyText
-                            paisa={Number(row.customer.credit_limit ?? 0)}
-                          />
-                        </span>
-                      </>
-                    ) : null}
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small text-text-muted">
-                    {row.promise
-                      ? t('office.udhaar.promise_on', {
-                          date: String(row.promise.promised_on),
-                        })
-                      : ''}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+                            className="mb-1 block h-2 overflow-hidden rounded-full bg-surface-2"
+                            role="img"
+                            aria-label={t('office.udhaar.limit_bar', {
+                              percent,
+                            })}
+                          >
+                            <span
+                              className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </span>
+                          <span className="flex flex-wrap items-center gap-x-1 text-text-muted">
+                            <MoneyText paisa={row.balance} />
+                            <span aria-hidden="true">/</span>
+                            <MoneyText
+                              paisa={Number(row.customer.credit_limit ?? 0)}
+                            />
+                          </span>
+                        </>
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-[1_1_8rem] text-small text-text-muted">
+                      {row.promise
+                        ? t('office.udhaar.promise_on', {
+                            date: String(row.promise.promised_on),
+                          })
+                        : ''}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </ListSurface>
 
       <CustomerDialog open={newOpen} onOpenChange={setNewOpen} />
     </div>

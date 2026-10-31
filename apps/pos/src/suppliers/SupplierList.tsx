@@ -9,6 +9,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
+import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
@@ -95,102 +96,111 @@ export function SupplierList({
         }
       />
 
-      {data ? (
-        <p className="rounded-card border border-border bg-surface p-3 text-small">
-          {t('office.suppliers.total_owed')}:{' '}
-          <span className="text-title font-semibold">
-            <MoneyText paisa={data.totalOwed} />
-          </span>
-        </p>
-      ) : null}
+      <ListSurface
+        toolbar={
+          <search className="flex flex-col">
+            <label className="flex min-w-0 flex-col">
+              <span className="mb-1 text-small">
+                {t('office.suppliers.search')}
+              </span>
+              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+                <SearchIcon />
+                <input
+                  type="search"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent text-body outline-none"
+                  placeholder={t('office.suppliers.search_placeholder')}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </span>
+            </label>
+          </search>
+        }
+        summary={
+          data ? (
+            <p className="text-small">
+              {t('office.suppliers.total_owed')}:{' '}
+              <span className="text-title font-semibold">
+                <MoneyText paisa={data.totalOwed} />
+              </span>
+            </p>
+          ) : undefined
+        }
+      >
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            variant="plain"
+            icon={<SuppliersIcon />}
+            message={
+              query
+                ? t('office.suppliers.no_match')
+                : t('office.suppliers.no_suppliers')
+            }
+            actionLabel={
+              can('purchase.create') && !readOnly
+                ? t('office.suppliers.new_supplier')
+                : undefined
+            }
+            onAction={
+              can('purchase.create') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
 
-      <search className="rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-0 flex-col">
-          <span className="mb-1 text-small">
-            {t('office.suppliers.search')}
-          </span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
-              placeholder={t('office.suppliers.search_placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-      </search>
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
-          icon={<SuppliersIcon />}
-          message={
-            query
-              ? t('office.suppliers.no_match')
-              : t('office.suppliers.no_suppliers')
-          }
-          actionLabel={
-            can('purchase.create') && !readOnly
-              ? t('office.suppliers.new_supplier')
-              : undefined
-          }
-          onAction={
-            can('purchase.create') && !readOnly
-              ? () => setNewOpen(true)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {data && data.rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {data.rows.map((row) => (
-            <li key={row.supplier.id}>
-              <Link
-                to="/suppliers/$supplierId"
-                params={{ supplierId: row.supplier.id }}
-                resetScroll={false}
-                onClick={rememberListScroll}
-                aria-current={
-                  row.supplier.id === selectedId ? 'page' : undefined
-                }
-                className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
-              >
-                <span className="min-w-0 flex-[2_1_10rem]">
-                  <span className="block truncate font-medium">
-                    {String(row.supplier.name)}
+        {data && data.rows.length > 0 ? (
+          <ul className="flex flex-col divide-y divide-border">
+            {data.rows.map((row) => (
+              <li key={row.supplier.id}>
+                <Link
+                  to="/suppliers/$supplierId"
+                  params={{ supplierId: row.supplier.id }}
+                  resetScroll={false}
+                  onClick={rememberListScroll}
+                  aria-current={
+                    row.supplier.id === selectedId ? 'page' : undefined
+                  }
+                  className={`flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
+                >
+                  <span className="min-w-0 flex-[2_1_10rem]">
+                    <span className="block truncate font-medium">
+                      {String(row.supplier.name)}
+                    </span>
+                    <span
+                      dir="ltr"
+                      className="block text-small text-text-muted"
+                    >
+                      {String(row.supplier.phone ?? '')}
+                    </span>
                   </span>
-                  <span dir="ltr" className="block text-small text-text-muted">
-                    {String(row.supplier.phone ?? '')}
+                  <span className="min-w-0 flex-[1_1_9rem] text-small">
+                    <span
+                      className={`block whitespace-nowrap font-medium ${supplierBalanceTone(row.balance)}`}
+                    >
+                      {supplierBalanceLabel(t, row.balance)}
+                    </span>
                   </span>
-                </span>
-                <span className="min-w-0 flex-[1_1_9rem] text-small">
-                  <span
-                    className={`block whitespace-nowrap font-medium ${supplierBalanceTone(row.balance)}`}
-                  >
-                    {supplierBalanceLabel(t, row.balance)}
+                  <span className="min-w-0 flex-[1_1_9rem] text-small text-text-muted">
+                    {row.lastDeliveryAt
+                      ? t('office.suppliers.last_delivery', {
+                          date: dateText(
+                            new Date(row.lastDeliveryAt)
+                              .toISOString()
+                              .slice(0, 10),
+                            i18n.language,
+                            data.tz,
+                          ),
+                        })
+                      : t('office.suppliers.never')}
                   </span>
-                </span>
-                <span className="min-w-0 flex-[1_1_9rem] text-small text-text-muted">
-                  {row.lastDeliveryAt
-                    ? t('office.suppliers.last_delivery', {
-                        date: dateText(
-                          new Date(row.lastDeliveryAt)
-                            .toISOString()
-                            .slice(0, 10),
-                          i18n.language,
-                          data.tz,
-                        ),
-                      })
-                    : t('office.suppliers.never')}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </ListSurface>
 
       <SupplierDialog open={newOpen} onOpenChange={setNewOpen} />
     </div>

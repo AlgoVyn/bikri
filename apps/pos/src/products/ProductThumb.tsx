@@ -48,7 +48,7 @@ export function ProductThumb({
       ? 'size-20 rounded-card text-h1'
       : size === 'md'
         ? 'size-16 rounded-card text-h2'
-        : 'size-10 rounded-control';
+        : 'size-8 rounded-control';
   const clean = name.trim();
   const words = clean.split(/\s+/).filter(Boolean);
   const monogram =

@@ -227,6 +227,17 @@ html:lang(ur) * {
   line-height: 1.9;
 }
 
+/* Single-line controls do not need the full Nastaliq leading; native selects clip it. */
+html:lang(ur) input,
+html:lang(ur) select {
+  line-height: 1.5;
+}
+
+/* Nastaliq glyphs are taller than a 44 px native select; a slightly smaller control font fits. */
+html:lang(ur) select {
+  font-size: 15px;
+}
+
 body {
   margin: 0;
   min-height: 100dvh;

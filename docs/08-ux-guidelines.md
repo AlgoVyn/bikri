@@ -24,6 +24,8 @@ The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behavio
 
 Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.
 
+Every PR that adds or changes a screen answers the ten questions in the [design review checklist](design-review-checklist.md); a **no** blocks the PR unless a decision records why.
+
 ## 2. Design tokens (`apps/pos/src/styles/tokens.css`, Tailwind 4 `@theme`)
 
 ### Colour (light / dark) — Algovyn brand (decision D-025)
@@ -156,6 +158,8 @@ Page anatomy, top to bottom: **header** (title, one-line purpose, actions) → *
 2. Secondary actions are quiet outlined buttons; tertiary actions are text/icon buttons.
 3. Everything else lives in a `More` menu. Destructive actions are **outlined red**, never filled, and always behind a confirm; a confirm dialog may use a filled danger button for its final step.
 4. Empty states, dialogs and error banners each offer exactly one primary action.
+
+Implement the hierarchy with `PageActions` (`apps/pos/src/components/`): `primary` is one filled control, `secondary` holds quiet actions, and `more` holds the rest. For list screens, `ListSurface` renders the toolbar, context strip and rows in one surface.
 
 ### Surfaces and elevation
 

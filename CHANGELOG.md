@@ -6,6 +6,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Design
 - Design-system pass: four named page containers, Home actions grouped into **Run the till** and **Manage** with a navy hero and a Stock count shortcut, flat date/filter strips, solid empty states, a calmer Settings placeholder, shared overlay/toast motion, two-letter product monograms, a wider Urdu Sell tile, and red kept for destructive/overdue only (D-151).
+- List screens now use one surface (toolbar, summary and rows) with a shared `PageActions` menu, 60 px product rows and 44 px list targets; a layout spec checks 390/768/1280/1920 in English and Urdu, and the design checklist is in [docs/design-review-checklist.md](docs/design-review-checklist.md) (D-152).
 - Vite dev serves the language catalogs again; dynamic JSON imports no longer carry Node-only import attributes.
 
 ### Selling and back office

@@ -10,6 +10,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
+import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -250,109 +251,120 @@ export function ExpensesPage() {
         </p>
       </div>
 
-      {data && data.byCategory.length > 0 ? (
-        <div className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3">
-          {data.byCategory.map((row) => (
-            <div
-              key={row.category?.id ?? 'none'}
-              className="flex items-center gap-2 text-small"
-            >
-              <span className="min-w-32 truncate">
-                {categoryName(row.category, i18n.language)}
-              </span>
-              <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                <span
-                  className="block h-full bg-primary"
-                  style={{ width: `${Math.round((row.net / max) * 100)}%` }}
-                />
-              </span>
-              <MoneyText paisa={row.net} />
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
-          icon={<ExpensesIcon />}
-          message={t('office.expenses.empty')}
-          actionLabel={
-            can('expense.create') ? t('office.expenses.new_expense') : undefined
-          }
-          onAction={
-            can('expense.create') && !readOnly
-              ? () => setNewOpen(true)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {data?.days.map((day) => (
-        <section key={day.date} className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
-            <h2 className="text-title font-semibold">
-              {dateText(day.date, i18n.language, tz)}
-            </h2>
-            <p className="text-small text-text-muted">
-              <MoneyText paisa={day.total} />
-            </p>
-          </div>
-          <ul className="flex flex-col rounded-card border border-border bg-surface">
-            {day.rows.map((row) => (
-              <li
-                key={row.expense.id}
-                data-testid="expense-row"
-                className={`flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
-              >
-                <span className="min-w-0 flex-[2_1_10rem]">
-                  <span className="block truncate font-medium">
+      <ListSurface
+        summary={
+          data && data.byCategory.length > 0 ? (
+            <div className="flex flex-col gap-1 py-1">
+              {data.byCategory.map((row) => (
+                <div
+                  key={row.category?.id ?? 'none'}
+                  className="flex items-center gap-2 text-small"
+                >
+                  <span className="min-w-32 truncate">
                     {categoryName(row.category, i18n.language)}
-                    {row.expense.reverses_id
-                      ? ` · ${t('office.expenses.reversal')}`
-                      : ''}
                   </span>
-                  <span className="block truncate text-small text-text-muted">
-                    {[row.expense.payee, row.expense.note]
-                      .filter(Boolean)
-                      .map(String)
-                      .join(' · ')}
+                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                    <span
+                      className="block h-full bg-primary"
+                      style={{ width: `${Math.round((row.net / max) * 100)}%` }}
+                    />
                   </span>
-                </span>
-                <span className="text-small text-text-muted">
-                  {timeText(Number(row.expense.created_at), i18n.language, tz)}
-                  {row.staffName ? ` · ${row.staffName}` : ''}
-                </span>
-                <span className="min-w-24 text-end font-medium">
-                  {row.expense.reverses_id ? '−' : ''}
-                  <MoneyText paisa={Number(row.expense.amount)} />
-                </span>
-                <span className="text-small text-text-muted">
-                  {t(
-                    row.expense.method === 'cash'
-                      ? 'payment.cash'
-                      : row.expense.method === 'card'
-                        ? 'payment.card'
-                        : 'payment.bank_wallet',
-                  )}
-                </span>
-                {canReverse(row) ? (
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    onClick={() => setReversing(row)}
-                  >
-                    {t('office.expenses.reverse')}
-                  </button>
-                ) : row.reversed ? (
+                  <MoneyText paisa={row.net} />
+                </div>
+              ))}
+            </div>
+          ) : undefined
+        }
+      >
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            variant="plain"
+            icon={<ExpensesIcon />}
+            message={t('office.expenses.empty')}
+            actionLabel={
+              can('expense.create')
+                ? t('office.expenses.new_expense')
+                : undefined
+            }
+            onAction={
+              can('expense.create') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
+
+        {data?.days.map((day) => (
+          <section key={day.date} className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
+              <h2 className="text-title font-semibold">
+                {dateText(day.date, i18n.language, tz)}
+              </h2>
+              <p className="text-small text-text-muted">
+                <MoneyText paisa={day.total} />
+              </p>
+            </div>
+            <ul className="flex flex-col">
+              {day.rows.map((row) => (
+                <li
+                  key={row.expense.id}
+                  data-testid="expense-row"
+                  className={`flex min-h-11 flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
+                >
+                  <span className="min-w-0 flex-[2_1_10rem]">
+                    <span className="block truncate font-medium">
+                      {categoryName(row.category, i18n.language)}
+                      {row.expense.reverses_id
+                        ? ` · ${t('office.expenses.reversal')}`
+                        : ''}
+                    </span>
+                    <span className="block truncate text-small text-text-muted">
+                      {[row.expense.payee, row.expense.note]
+                        .filter(Boolean)
+                        .map(String)
+                        .join(' · ')}
+                    </span>
+                  </span>
                   <span className="text-small text-text-muted">
-                    {t('office.expenses.reversed')}
+                    {timeText(
+                      Number(row.expense.created_at),
+                      i18n.language,
+                      tz,
+                    )}
+                    {row.staffName ? ` · ${row.staffName}` : ''}
                   </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+                  <span className="min-w-24 text-end font-medium">
+                    {row.expense.reverses_id ? '−' : ''}
+                    <MoneyText paisa={Number(row.expense.amount)} />
+                  </span>
+                  <span className="text-small text-text-muted">
+                    {t(
+                      row.expense.method === 'cash'
+                        ? 'payment.cash'
+                        : row.expense.method === 'card'
+                          ? 'payment.card'
+                          : 'payment.bank_wallet',
+                    )}
+                  </span>
+                  {canReverse(row) ? (
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() => setReversing(row)}
+                    >
+                      {t('office.expenses.reverse')}
+                    </button>
+                  ) : row.reversed ? (
+                    <span className="text-small text-text-muted">
+                      {t('office.expenses.reversed')}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </ListSurface>
 
       <ExpenseDialog open={newOpen} onOpenChange={setNewOpen} />
       <CashMoveDialog open={cashOpen} onOpenChange={setCashOpen} />

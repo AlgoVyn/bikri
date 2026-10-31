@@ -8,8 +8,13 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { MoreIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
+import { ProductsIcon, SearchIcon } from '../components/icons.tsx';
+import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import {
+  type PageActionItem,
+  PageActions,
+} from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import {
   listCategories,
@@ -34,7 +39,7 @@ const LabelsDialog = lazy(() =>
   })),
 );
 
-const ROW_PX = 72;
+const ROW_PX = 60;
 const OVERSCAN = 8;
 
 const selectClass =
@@ -61,12 +66,10 @@ export function ProductList({
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [labelsOpen, setLabelsOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const activeFilters =
     (categoryId ? 1 : 0) +
     (stock !== 'all' ? 1 : 0) +
     (sort !== 'name' ? 1 : 0);
-  const menuRef = useRef<HTMLDivElement>(null);
   const rows = useLiveQuery(
     () =>
       listProducts(getDb(), {
@@ -100,21 +103,64 @@ export function ProductList({
     enabled: canEdit,
   });
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', onEscape);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', onEscape);
-    };
-  }, [menuOpen]);
+  const more: PageActionItem[] = [];
+  if (canLabel) {
+    more.push({
+      label: selecting ? t('common.cancel') : t('products.select'),
+      onSelect: () => {
+        setSelecting((value) => !value);
+        setSelected(new Set());
+      },
+    });
+  }
+  more.push({
+    label: t('products.export_csv'),
+    disabled: !rows || rows.length === 0,
+    onSelect: () => {
+      if (rows) downloadText('bikri-products.csv', productsCsv(rows, showCost));
+    },
+  });
+  if (canEdit) {
+    more.push(
+      {
+        label: t('import.button'),
+        onSelect: () => void navigate({ to: '/products/import' }),
+      },
+      {
+        label: t('prices.button'),
+        onSelect: () => void navigate({ to: '/products/prices' }),
+      },
+      {
+        label: t('products.manage_categories'),
+        onSelect: () => void navigate({ to: '/products/categories' }),
+      },
+      {
+        label: t('home.suggested'),
+        onSelect: () => void navigate({ to: '/products/suggested' }),
+      },
+    );
+  }
+  if (can('stock.adjust')) {
+    more.push({
+      label: t('count.title'),
+      onSelect: () => void navigate({ to: '/stock/count' }),
+    });
+  }
+
+  const primary =
+    selecting && selected.size > 0 ? (
+      <button
+        type="button"
+        className={buttonPrimary}
+        onClick={() => setLabelsOpen(true)}
+      >
+        {t('products.print_labels', { count: selected.size })}
+      </button>
+    ) : canEdit && !selecting ? (
+      <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
+        {t('products.add')}
+      </Link>
+    ) : undefined;
 
   return (
     <div
@@ -128,192 +174,13 @@ export function ProductList({
         subtitle={t('products.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
-          <>
-            {selecting && selected.size > 0 ? (
-              <button
-                type="button"
-                className={buttonPrimary}
-                onClick={() => setLabelsOpen(true)}
-              >
-                {t('products.print_labels', { count: selected.size })}
-              </button>
-            ) : null}
-            {canEdit ? (
-              <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
-                {t('products.add')}
-              </Link>
-            ) : null}
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                className="flex size-11 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2"
-                aria-label={t('products.more_actions')}
-                aria-expanded={menuOpen}
-                aria-controls="product-actions"
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                <MoreIcon />
-              </button>
-              {menuOpen ? (
-                <div
-                  id="product-actions"
-                  className="absolute end-0 top-12 z-30 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
-                >
-                  {canLabel ? (
-                    <button
-                      type="button"
-                      className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2"
-                      onClick={() => {
-                        setSelecting((value) => !value);
-                        setSelected(new Set());
-                        setMenuOpen(false);
-                      }}
-                    >
-                      {selecting ? t('common.cancel') : t('products.select')}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={!rows || rows.length === 0}
-                    className="flex min-h-11 items-center gap-2 rounded-control px-2 text-start text-small hover:bg-surface-2 disabled:bg-surface-2 disabled:text-text-muted"
-                    onClick={() => {
-                      if (rows)
-                        downloadText(
-                          'bikri-products.csv',
-                          productsCsv(rows, showCost),
-                        );
-                      setMenuOpen(false);
-                    }}
-                  >
-                    {t('products.export_csv')}
-                  </button>
-                  {canEdit ? (
-                    <>
-                      <Link
-                        to="/products/import"
-                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {t('import.button')}
-                      </Link>
-                      <Link
-                        to="/products/prices"
-                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {t('prices.button')}
-                      </Link>
-                      <Link
-                        to="/products/categories"
-                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {t('products.manage_categories')}
-                      </Link>
-                      <Link
-                        to="/products/suggested"
-                        className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {t('home.suggested')}
-                      </Link>
-                    </>
-                  ) : null}
-                  {can('stock.adjust') ? (
-                    <Link
-                      to="/stock/count"
-                      className="flex min-h-11 items-center gap-2 rounded-control px-2 text-small hover:bg-surface-2"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      {t('count.title')}
-                    </Link>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          </>
+          <PageActions
+            primary={primary}
+            more={more}
+            moreLabel={t('products.more_actions')}
+          />
         }
       />
-
-      {total === 0 ? null : (
-        <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
-          <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
-            <span className="mb-1 text-small">{t('products.search')}</span>
-            <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-              <SearchIcon />
-              <input
-                type="search"
-                autoComplete="off"
-                className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </span>
-          </label>
-          <button
-            type="button"
-            className={`${buttonQuiet} gap-2 lg:hidden`}
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((open) => !open)}
-          >
-            {t('common.filters')}
-            {activeFilters > 0 ? (
-              <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-                {activeFilters}
-              </span>
-            ) : null}
-          </button>
-          <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-            <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-              <span className="mb-1 text-small">
-                {t('products.category_filter')}
-              </span>
-              <select
-                className={selectClass}
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-              >
-                <option value="">{t('products.all_categories')}</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {categoryName(c, i18n.language)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
-              <span className="mb-1 text-small">
-                {t('products.stock_filter')}
-              </span>
-              <select
-                className={selectClass}
-                value={stock}
-                onChange={(e) => setStock(e.target.value as StockFilter)}
-              >
-                <option value="all">{t('products.stock_all')}</option>
-                <option value="low">{t('products.stock_low')}</option>
-                <option value="out">{t('products.stock_out')}</option>
-                <option value="untracked">
-                  {t('products.stock_untracked')}
-                </option>
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
-              <span className="mb-1 text-small">{t('products.sort')}</span>
-              <select
-                className={selectClass}
-                value={sort}
-                onChange={(e) => setSort(e.target.value as ProductSort)}
-              >
-                <option value="name">{t('products.sort_name')}</option>
-                <option value="price">{t('products.sort_price')}</option>
-                <option value="stock">{t('products.sort_stock')}</option>
-                <option value="best">{t('products.sort_best')}</option>
-              </select>
-            </label>
-          </div>
-        </search>
-      )}
 
       {total === 0 ? (
         <EmptyState
@@ -324,29 +191,116 @@ export function ProductList({
             canEdit ? () => void navigate({ to: '/products/new' }) : undefined
           }
         />
-      ) : rows && rows.length === 0 ? (
-        <p className="py-8 text-center text-text-muted">
-          {t('products.no_match')}
-        </p>
-      ) : rows ? (
-        <>
-          <p className="text-small text-text-muted" aria-live="polite">
-            {t('products.count', { count: rows.length })}
-          </p>
-          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-            <ListHeader showCost={showCost} embedded={embedded} />
-            <VirtualRows
-              selectedId={selectedId}
-              rows={rows}
-              showCost={showCost}
-              selecting={selecting}
-              selected={selected}
-              embedded={embedded}
-              onToggle={toggle}
-            />
-          </div>
-        </>
-      ) : null}
+      ) : (
+        <ListSurface
+          toolbar={
+            <search className="flex flex-wrap items-end gap-2">
+              <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
+                <span className="mb-1 text-small">{t('products.search')}</span>
+                <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+                  <SearchIcon />
+                  <input
+                    type="search"
+                    autoComplete="off"
+                    className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </span>
+              </label>
+              <button
+                type="button"
+                className={`${buttonQuiet} gap-2 lg:hidden`}
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                {t('common.filters')}
+                {activeFilters > 0 ? (
+                  <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                    {activeFilters}
+                  </span>
+                ) : null}
+              </button>
+              <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
+                <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('products.category_filter')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                  >
+                    <option value="">{t('products.all_categories')}</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {categoryName(c, i18n.language)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('products.stock_filter')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={stock}
+                    onChange={(e) => setStock(e.target.value as StockFilter)}
+                  >
+                    <option value="all">{t('products.stock_all')}</option>
+                    <option value="low">{t('products.stock_low')}</option>
+                    <option value="out">{t('products.stock_out')}</option>
+                    <option value="untracked">
+                      {t('products.stock_untracked')}
+                    </option>
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
+                  <span className="mb-1 text-small">{t('products.sort')}</span>
+                  <select
+                    className={selectClass}
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as ProductSort)}
+                  >
+                    <option value="name">{t('products.sort_name')}</option>
+                    <option value="price">{t('products.sort_price')}</option>
+                    <option value="stock">{t('products.sort_stock')}</option>
+                    <option value="best">{t('products.sort_best')}</option>
+                  </select>
+                </label>
+              </div>
+            </search>
+          }
+          summary={
+            rows ? (
+              <p className="text-small text-text-muted" aria-live="polite">
+                {t('products.count', { count: rows.length })}
+              </p>
+            ) : undefined
+          }
+        >
+          {rows && rows.length === 0 ? (
+            <p className="py-8 text-center text-text-muted">
+              {t('products.no_match')}
+            </p>
+          ) : rows ? (
+            <>
+              <ListHeader showCost={showCost} embedded={embedded} />
+              <VirtualRows
+                selectedId={selectedId}
+                rows={rows}
+                showCost={showCost}
+                selecting={selecting}
+                selected={selected}
+                embedded={embedded}
+                onToggle={toggle}
+              />
+            </>
+          ) : null}
+        </ListSurface>
+      )}
+
       {labelsOpen ? (
         <Suspense fallback={null}>
           <LabelsDialog
@@ -521,7 +475,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
+          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
@@ -585,7 +539,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}

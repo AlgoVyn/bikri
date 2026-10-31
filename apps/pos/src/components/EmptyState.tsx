@@ -7,15 +7,24 @@ export function EmptyState({
   message,
   actionLabel,
   onAction,
+  variant = 'card',
 }: {
   icon?: ReactNode;
   heading?: string;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** `plain` when the empty state already sits inside a list surface. */
+  variant?: 'card' | 'plain';
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-12 text-center shadow-card">
+    <div
+      className={
+        variant === 'card'
+          ? 'flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-12 text-center shadow-card'
+          : 'flex flex-col items-center gap-3 px-6 py-12 text-center'
+      }
+    >
       {icon !== undefined ? (
         <div className="flex size-12 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
           {icon}

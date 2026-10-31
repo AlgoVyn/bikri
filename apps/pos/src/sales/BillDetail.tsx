@@ -515,7 +515,7 @@ export function BillDetail({
                       {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
                     </span>
                   </td>
-                  <td className="p-2 text-end font-mono">
+                  <td className="p-2 text-end tabular-nums">
                     {qty / 1000} {t(`unit.${unit}`)}
                   </td>
                   <td className="hidden p-2 text-end sm:table-cell">
