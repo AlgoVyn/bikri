@@ -390,31 +390,40 @@ export function SalesList({
                 style={{ flex: '1 1 9rem', minWidth: 0 }}
               />
             </Group>
+            {data && data.rows.length > 0 ? (
+              <Box
+                pt="sm"
+                mt="sm"
+                data-testid="sales-summary"
+                style={{
+                  borderTop: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <SimpleGrid
+                  cols={embedded ? 2 : { base: 2, sm: 4 }}
+                  spacing="sm"
+                >
+                  <Metric
+                    label={t('office.sales.summary_bills')}
+                    value={String(data.summary.bills)}
+                  />
+                  <Metric
+                    label={t('office.sales.summary_sold')}
+                    value={<MoneyText paisa={data.summary.sold} />}
+                  />
+                  <Metric
+                    label={t('office.sales.summary_refunds')}
+                    value={<MoneyText paisa={data.summary.refunds} />}
+                  />
+                  <Metric
+                    label={t('office.sales.summary_avg')}
+                    value={<MoneyText paisa={data.summary.avgBill} />}
+                  />
+                </SimpleGrid>
+              </Box>
+            ) : null}
           </Paper>
         </Box>
-
-        {data && data.rows.length > 0 ? (
-          <Box px="xs" py="sm" data-testid="sales-summary">
-            <SimpleGrid cols={embedded ? 2 : { base: 2, sm: 4 }} spacing="sm">
-              <Metric
-                label={t('office.sales.summary_bills')}
-                value={String(data.summary.bills)}
-              />
-              <Metric
-                label={t('office.sales.summary_sold')}
-                value={<MoneyText paisa={data.summary.sold} />}
-              />
-              <Metric
-                label={t('office.sales.summary_refunds')}
-                value={<MoneyText paisa={data.summary.refunds} />}
-              />
-              <Metric
-                label={t('office.sales.summary_avg')}
-                value={<MoneyText paisa={data.summary.avgBill} />}
-              />
-            </SimpleGrid>
-          </Box>
-        ) : null}
 
         {data && data.rows.length === 0 ? (
           <EmptyState

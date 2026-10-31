@@ -415,3 +415,24 @@ main section + section {
   border-radius: 999px;
   background: var(--mantine-color-accent-4);
 }
+
+/* Muted status tints in dark mode. */
+[data-mantine-color-scheme="dark"] .bg-success-subtle {
+  background: rgb(52 211 153 / 0.1);
+  color: #a7f3d0;
+}
+
+[data-mantine-color-scheme="dark"] .bg-warning-subtle {
+  background: rgb(251 191 36 / 0.1);
+  color: #fde68a;
+}
+
+[data-mantine-color-scheme="dark"] .bg-danger-subtle {
+  background: rgb(248 113 113 / 0.1);
+  color: #fecaca;
+}
+
+[data-mantine-color-scheme="dark"] .bg-primary-subtle {
+  background: rgb(77 166 255 / 0.1);
+  color: #e0f2fe;
+}

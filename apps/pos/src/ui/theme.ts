@@ -109,7 +109,7 @@ export const bikriTheme = createTheme({
     },
   },
   fontSizes: {
-    xs: '0.7333rem',
+    xs: '0.75rem',
     sm: '0.8667rem',
     md: '1rem',
     lg: '1.2rem',
