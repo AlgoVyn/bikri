@@ -250,6 +250,12 @@ body {
   outline-offset: 2px;
 }
 
+/* Pressed toggles must not animate through a low-contrast intermediate colour. */
+[aria-pressed="true"],
+[aria-selected="true"] {
+  transition: none;
+}
+
 /* A control inside a focus-within wrapper relies on the wrapper ring (docs/08 §8). */
 .bikri-focus-wrapper:focus-visible {
   outline: none;
