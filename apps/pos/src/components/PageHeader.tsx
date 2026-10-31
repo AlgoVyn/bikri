@@ -28,7 +28,7 @@ export function PageHeader({
         ? 'red'
         : 'brand';
   return (
-    <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
+    <Group justify="space-between" align="flex-end" gap="md" wrap="wrap">
       <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
         {icon ? (
           <ThemeIcon size={44} radius="md" variant="light" color={color}>

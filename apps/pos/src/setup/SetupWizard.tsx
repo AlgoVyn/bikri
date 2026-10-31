@@ -23,7 +23,7 @@ import {
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SalesIcon } from '../components/icons.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
@@ -305,9 +305,7 @@ export function SetupWizard() {
       >
         <form ref={cardRef} noValidate onSubmit={onSubmit}>
           <Group gap="sm" mb="md" wrap="nowrap">
-            <ThemeIcon size={36} radius="md" color="accent" variant="filled">
-              <SalesIcon />
-            </ThemeIcon>
+            <BrandMark size={36} />
             <Text size="lg" fw={700}>
               {t('common.app_name')}
             </Text>

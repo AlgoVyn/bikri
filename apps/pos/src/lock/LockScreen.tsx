@@ -16,7 +16,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SalesIcon } from '../components/icons.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -182,9 +182,7 @@ export function LockScreen() {
     >
       <Group justify="space-between" align="center" gap="sm">
         <Group gap="sm" wrap="nowrap" data-testid="brand-lock">
-          <ThemeIcon size={38} radius="md" color="accent" variant="filled">
-            <SalesIcon />
-          </ThemeIcon>
+          <BrandMark size={38} />
           <Stack gap={0} style={{ minWidth: 0 }}>
             <Text size="xs" fw={700} c="dimmed" tt="uppercase">
               {t('common.app_name')}

@@ -385,3 +385,17 @@ main section + section {
 [data-mantine-color-scheme="dark"] .bikri-home-hero {
   background: linear-gradient(135deg, #142b4d 0%, #091a33 100%) !important;
 }
+
+@media (max-width: 47.99em) {
+  main h1 {
+    font-size: 24px;
+  }
+
+  .mantine-Table-th {
+    font-size: 11px;
+  }
+
+  .mantine-Table-td {
+    font-size: 13px;
+  }
+}

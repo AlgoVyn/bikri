@@ -85,84 +85,86 @@ function SettingsNavContent() {
         subtitle={t('office.settings.subtitle')}
       />
       <nav aria-label={t('nav.settings')}>
-        <Stack gap="lg">
-          {can('settings.shop') ? (
-            <SettingsGroup title={t('office.settings.nav_group_shop')}>
-              <SettingsRow
-                to="/settings/shop"
-                icon={<StoreIcon />}
-                title={t('office.settings.nav_shop')}
-                hint={t('office.settings.nav_shop_hint')}
-              />
-              {can('settings.staff') ? (
+        <Paper withBorder>
+          <Stack gap={0}>
+            {can('settings.shop') ? (
+              <SettingsGroup title={t('office.settings.nav_group_shop')}>
                 <SettingsRow
-                  to="/settings/cashiers"
-                  icon={<UsersIcon />}
-                  title={t('office.settings.nav_cashiers')}
-                  hint={t('office.settings.nav_cashiers_hint')}
+                  to="/settings/shop"
+                  icon={<StoreIcon />}
+                  title={t('office.settings.nav_shop')}
+                  hint={t('office.settings.nav_shop_hint')}
+                />
+                {can('settings.staff') ? (
+                  <SettingsRow
+                    to="/settings/cashiers"
+                    icon={<UsersIcon />}
+                    title={t('office.settings.nav_cashiers')}
+                    hint={t('office.settings.nav_cashiers_hint')}
+                  />
+                ) : null}
+                <SettingsRow
+                  to="/settings/activity"
+                  icon={<ClockIcon />}
+                  title={t('office.settings.nav_activity')}
+                  hint={t('office.settings.nav_activity_hint')}
+                />
+              </SettingsGroup>
+            ) : null}
+            <SettingsGroup title={t('office.settings.nav_group_device')}>
+              <SettingsRow
+                to="/settings/printer"
+                icon={<PrinterIcon />}
+                title={t('printer.title')}
+                hint={t('office.settings.nav_printer_hint')}
+              />
+              {can('catalog.edit') ? (
+                <SettingsRow
+                  to="/settings/labels"
+                  icon={<TagIcon />}
+                  title={t('office.settings.nav_labels')}
+                  hint={t('office.settings.nav_labels_hint')}
                 />
               ) : null}
               <SettingsRow
-                to="/settings/activity"
-                icon={<ClockIcon />}
-                title={t('office.settings.nav_activity')}
-                hint={t('office.settings.nav_activity_hint')}
+                to="/settings/display"
+                icon={<SettingsIcon />}
+                title={t('office.settings.nav_display')}
+                hint={t('office.settings.nav_display_hint')}
               />
             </SettingsGroup>
-          ) : null}
-          <SettingsGroup title={t('office.settings.nav_group_device')}>
-            <SettingsRow
-              to="/settings/printer"
-              icon={<PrinterIcon />}
-              title={t('printer.title')}
-              hint={t('office.settings.nav_printer_hint')}
-            />
-            {can('catalog.edit') ? (
+            <SettingsGroup title={t('office.settings.nav_group_data')}>
               <SettingsRow
-                to="/settings/labels"
-                icon={<TagIcon />}
-                title={t('office.settings.nav_labels')}
-                hint={t('office.settings.nav_labels_hint')}
-              />
-            ) : null}
-            <SettingsRow
-              to="/settings/display"
-              icon={<SettingsIcon />}
-              title={t('office.settings.nav_display')}
-              hint={t('office.settings.nav_display_hint')}
-            />
-          </SettingsGroup>
-          <SettingsGroup title={t('office.settings.nav_group_data')}>
-            <SettingsRow
-              to="/settings/sync"
-              icon={<CloudIcon />}
-              title={t('syncpage.title')}
-              hint={t('office.settings.nav_sync_hint')}
-            />
-            {support || (owner && info?.device?.is_admin && info.enrolled) ? (
-              <SettingsRow
-                to="/settings/devices"
-                icon={<DeviceIcon />}
-                title={t('devices.title')}
-                hint={t('office.settings.nav_devices_hint')}
-              />
-            ) : null}
-            {can('export.data') && role === 'owner' ? (
-              <SettingsRow
-                to="/settings/backup"
+                to="/settings/sync"
                 icon={<CloudIcon />}
-                title={t('office.backup.title')}
-                hint={t('office.backup.nav_hint')}
+                title={t('syncpage.title')}
+                hint={t('office.settings.nav_sync_hint')}
               />
-            ) : null}
-            <SettingsRow
-              to="/settings/about"
-              icon={<InfoIcon />}
-              title={t('office.settings.nav_about')}
-              hint={t('office.settings.nav_about_hint')}
-            />
-          </SettingsGroup>
-        </Stack>
+              {support || (owner && info?.device?.is_admin && info.enrolled) ? (
+                <SettingsRow
+                  to="/settings/devices"
+                  icon={<DeviceIcon />}
+                  title={t('devices.title')}
+                  hint={t('office.settings.nav_devices_hint')}
+                />
+              ) : null}
+              {can('export.data') && role === 'owner' ? (
+                <SettingsRow
+                  to="/settings/backup"
+                  icon={<CloudIcon />}
+                  title={t('office.backup.title')}
+                  hint={t('office.backup.nav_hint')}
+                />
+              ) : null}
+              <SettingsRow
+                to="/settings/about"
+                icon={<InfoIcon />}
+                title={t('office.settings.nav_about')}
+                hint={t('office.settings.nav_about_hint')}
+              />
+            </SettingsGroup>
+          </Stack>
+        </Paper>
       </nav>
       {info?.device ? (
         <Paper p="md" withBorder>
@@ -218,14 +220,12 @@ function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <Stack gap="xs">
-      <Text size="xs" fw={700} c="dimmed" px={4}>
+    <Box>
+      <Text size="xs" fw={700} c="dimmed" px="md" pt="md" pb={6} tt="uppercase">
         {title}
       </Text>
-      <Paper withBorder style={{ overflow: 'hidden' }}>
-        {children}
-      </Paper>
-    </Stack>
+      {children}
+    </Box>
   );
 }
 

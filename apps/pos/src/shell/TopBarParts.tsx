@@ -227,13 +227,13 @@ export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
         <Badge
           variant="light"
           color={color}
-          size={compact ? 'md' : 'lg'}
+          size="sm"
           leftSection={dot}
           radius="xl"
           styles={{
             root: {
-              height: 30,
-              maxWidth: compact ? 200 : 160,
+              height: 28,
+              maxWidth: compact ? 180 : 130,
               textTransform: 'none',
               fontWeight: 600,
             },

@@ -391,19 +391,33 @@ function Card({
   label,
   value,
   testId,
+  flat = false,
 }: {
   label: string;
   value: ReactNode;
   testId?: string;
+  flat?: boolean;
 }) {
-  return (
-    <Paper withBorder p="sm" h="100%" data-testid={testId}>
+  const body = (
+    <>
       <Text size="sm" c="dimmed">
         {label}
       </Text>
       <Text fz={24} fw={600}>
         {value}
       </Text>
+    </>
+  );
+  if (flat) {
+    return (
+      <Box p="sm" data-testid={testId}>
+        {body}
+      </Box>
+    );
+  }
+  return (
+    <Paper withBorder p="sm" h="100%" data-testid={testId}>
+      {body}
     </Paper>
   );
 }
@@ -508,65 +522,79 @@ function SummaryTab({
     summary.paymentMix.bank_wallet !== 0;
   return (
     <>
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <li className="min-w-0">
-          <Card
-            label={t('office.reports.sold')}
-            testId="report-sold"
-            value={<MoneyText paisa={summary.sold} />}
-          />
-        </li>
-        <li className="min-w-0">
-          <Card
-            label={t('office.reports.bills')}
-            testId="report-bills"
-            value={summary.bills}
-          />
-        </li>
-        <li className="min-w-0">
-          <Card
-            label={t('office.reports.avg_bill')}
-            value={<MoneyText paisa={summary.avgBill} />}
-          />
-        </li>
-        <li className="min-w-0">
-          <Card
-            label={t('office.reports.expenses')}
-            value={<MoneyText paisa={summary.expenses} />}
-          />
-        </li>
-        {cost ? (
-          <>
-            <li className="min-w-0">
-              <Card
-                label={t('office.reports.gross_profit')}
-                testId="report-profit"
-                value={<MoneyText paisa={summary.grossProfit} />}
-              />
-            </li>
-            <li className="min-w-0">
-              <Card
-                label={t('office.reports.net_profit')}
-                value={<MoneyText paisa={summary.netProfit} />}
-              />
-            </li>
-            <li className="min-w-0">
-              <Card
-                label={t('office.reports.margin')}
-                value={percentText(summary.marginBp)}
-              />
-            </li>
-          </>
-        ) : null}
-        {bundle.taxEnabled || summary.tax !== 0 ? (
+      <Paper withBorder p="sm">
+        <Box
+          component="ul"
+          className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+          style={{ listStyle: 'none', margin: 0, padding: 0 }}
+        >
           <li className="min-w-0">
             <Card
-              label={t('office.reports.tax_collected')}
-              value={<MoneyText paisa={summary.tax} />}
+              flat
+              label={t('office.reports.sold')}
+              testId="report-sold"
+              value={<MoneyText paisa={summary.sold} />}
             />
           </li>
-        ) : null}
-      </ul>
+          <li className="min-w-0">
+            <Card
+              flat
+              label={t('office.reports.bills')}
+              testId="report-bills"
+              value={summary.bills}
+            />
+          </li>
+          <li className="min-w-0">
+            <Card
+              flat
+              label={t('office.reports.avg_bill')}
+              value={<MoneyText paisa={summary.avgBill} />}
+            />
+          </li>
+          <li className="min-w-0">
+            <Card
+              flat
+              label={t('office.reports.expenses')}
+              value={<MoneyText paisa={summary.expenses} />}
+            />
+          </li>
+          {cost ? (
+            <>
+              <li className="min-w-0">
+                <Card
+                  flat
+                  label={t('office.reports.gross_profit')}
+                  testId="report-profit"
+                  value={<MoneyText paisa={summary.grossProfit} />}
+                />
+              </li>
+              <li className="min-w-0">
+                <Card
+                  flat
+                  label={t('office.reports.net_profit')}
+                  value={<MoneyText paisa={summary.netProfit} />}
+                />
+              </li>
+              <li className="min-w-0">
+                <Card
+                  flat
+                  label={t('office.reports.margin')}
+                  value={percentText(summary.marginBp)}
+                />
+              </li>
+            </>
+          ) : null}
+          {bundle.taxEnabled || summary.tax !== 0 ? (
+            <li className="min-w-0">
+              <Card
+                flat
+                label={t('office.reports.tax_collected')}
+                value={<MoneyText paisa={summary.tax} />}
+              />
+            </li>
+          ) : null}
+        </Box>
+      </Paper>
 
       {!hasActivity ? (
         <EmptyState
@@ -589,11 +617,9 @@ function SummaryTab({
                 t={t}
               />
             ) : (
-              <Paper withBorder p="md">
-                <Text size="sm" c="dimmed" ta="center">
-                  {t('office.reports.not_enough_days')}
-                </Text>
-              </Paper>
+              <Text size="sm" c="dimmed" ta="center" py="md">
+                {t('office.reports.not_enough_days')}
+              </Text>
             )}
           </Paper>
 

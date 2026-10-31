@@ -14,7 +14,7 @@ import {
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SalesIcon } from '../components/icons.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import {
   CODE_RE,
@@ -210,9 +210,7 @@ export function EnrolPage({
       <Paper withBorder shadow="sm" p="lg" w="100%" maw={460}>
         <Group justify="space-between" align="center" gap="sm">
           <Group gap="sm" wrap="nowrap">
-            <ThemeIcon size={36} radius="md" color="accent" variant="filled">
-              <SalesIcon />
-            </ThemeIcon>
+            <BrandMark size={36} />
             <Text size="lg" fw={700}>
               {t('common.app_name')}
             </Text>
