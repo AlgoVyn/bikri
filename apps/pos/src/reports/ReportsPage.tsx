@@ -1,8 +1,21 @@
 import { businessDate, mulDivRound } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
@@ -69,9 +82,6 @@ const TABS: { id: ReportTab; key: string }[] = [
   { id: 'day_closes', key: 'office.reports.tab_day_closes' },
   { id: 'expenses', key: 'office.reports.tab_expenses' },
 ];
-
-const field =
-  'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 
 /** Reports for one range, computed on the device (screens/16). */
 export function ReportsPage() {
@@ -141,12 +151,16 @@ export function ReportsPage() {
   if (data === undefined) return <PageLoading compact />;
   if (data === null)
     return (
-      <div className="mx-auto max-w-5xl p-4">
-        <h1 className="text-h1 font-semibold">{t('office.reports.title')}</h1>
-        <p className="mt-2 rounded-card bg-warning-subtle p-3 text-warning-subtle-ink">
-          {t('office.reports.range_too_long')}
-        </p>
-      </div>
+      <Box mx="auto" maw={1024} p="md">
+        <Title order={1} fz="h2">
+          {t('office.reports.title')}
+        </Title>
+        <Paper p="sm" mt="sm" bg="var(--mantine-color-warning-subtle)">
+          <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+            {t('office.reports.range_too_long')}
+          </Text>
+        </Paper>
+      </Box>
     );
 
   const bundle = data.bundle;
@@ -221,150 +235,133 @@ export function ReportsPage() {
   };
 
   return (
-    <div
-      className="mx-auto flex max-w-6xl flex-col gap-3 p-4"
-      data-testid="reports-page"
-    >
-      <PageHeader
-        icon={<ReportsIcon />}
-        tone="bg-info-subtle text-info-subtle-ink"
-        title={t('office.reports.title')}
-        subtitle={t('office.reports.subtitle')}
-        actions={
-          <>
-            <label className="flex items-center gap-1 text-small">
-              <span className="text-text-muted">
-                {t('office.reports.device')}
-              </span>
-              <select
-                className={field}
+    <Box mx="auto" maw={1152} p="md" w="100%" data-testid="reports-page">
+      <Stack gap="sm">
+        <PageHeader
+          icon={<ReportsIcon />}
+          tone="bg-info-subtle text-info-subtle-ink"
+          title={t('office.reports.title')}
+          subtitle={t('office.reports.subtitle')}
+          actions={
+            <>
+              <NativeSelect
+                aria-label={t('office.reports.device')}
                 value={deviceId}
-                onChange={(event) => setDeviceId(event.target.value)}
-              >
-                <option value="">{t('office.reports.all_devices')}</option>
-                {data.devices.map((device) => (
-                  <option key={device.id} value={device.id}>
-                    {String(device.name ?? device.code ?? '')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {exportable ? (
-              <ExportMenu
-                onCsv={exportCurrent}
-                onPdf={() => void exportPdf()}
-                onShare={() => void share()}
+                onChange={(event) => setDeviceId(event.currentTarget.value)}
+                data={[
+                  { value: '', label: t('office.reports.all_devices') },
+                  ...data.devices.map((device) => ({
+                    value: device.id,
+                    label: String(device.name ?? device.code ?? ''),
+                  })),
+                ]}
               />
+              {exportable ? (
+                <ExportMenu
+                  onCsv={exportCurrent}
+                  onPdf={() => void exportPdf()}
+                  onShare={() => void share()}
+                />
+              ) : null}
+            </>
+          }
+        />
+
+        <Paper withBorder p="sm">
+          <Group justify="space-between" gap="sm" wrap="wrap">
+            <Group gap="xs" align="flex-end">
+              {(limited
+                ? PRESETS.filter((item) => item.id === 'today')
+                : PRESETS
+              ).map((item) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  size="compact-sm"
+                  variant={preset === item.id ? 'light' : 'default'}
+                  aria-pressed={preset === item.id}
+                  onClick={() => setPreset(item.id)}
+                >
+                  {t(item.key)}
+                </Button>
+              ))}
+              {preset === 'custom' && !limited ? (
+                <>
+                  <TextInput
+                    type="date"
+                    label={t('office.reports.from')}
+                    value={custom.from}
+                    max={data.today}
+                    onChange={(event) =>
+                      setCustom((current) => ({
+                        ...current,
+                        from: event.currentTarget.value,
+                      }))
+                    }
+                  />
+                  <TextInput
+                    type="date"
+                    label={t('office.reports.to')}
+                    value={custom.to}
+                    min={custom.from}
+                    max={data.today}
+                    onChange={(event) =>
+                      setCustom((current) => ({
+                        ...current,
+                        to: event.currentTarget.value,
+                      }))
+                    }
+                  />
+                </>
+              ) : null}
+            </Group>
+            <Text size="sm" c="dimmed">
+              {longDate(bundle.range.from, lang)} –{' '}
+              {longDate(bundle.range.to, lang)}
+            </Text>
+          </Group>
+        </Paper>
+
+        <Tabs
+          value={tab}
+          onChange={(value) => setTab((value ?? 'summary') as ReportTab)}
+          aria-label={t('office.reports.title')}
+        >
+          <Tabs.List>
+            {TABS.map((item) => (
+              <Tabs.Tab
+                key={item.id}
+                value={item.id}
+                data-testid={`report-tab-${item.id}`}
+              >
+                {t(item.key)}
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+          <Tabs.Panel value={tab} pt="sm">
+            {tab === 'summary' ? (
+              <SummaryTab bundle={bundle} cost={cost} lang={lang} />
             ) : null}
-          </>
-        }
-      />
-
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-1">
-          {(limited
-            ? PRESETS.filter((item) => item.id === 'today')
-            : PRESETS
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={preset === item.id}
-              className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-              onClick={() => setPreset(item.id)}
-            >
-              {t(item.key)}
-            </button>
-          ))}
-          {preset === 'custom' && !limited ? (
-            <span className="flex flex-wrap items-center gap-1">
-              <label className="flex items-center gap-1 text-small">
-                {t('office.reports.from')}
-                <input
-                  type="date"
-                  className={field}
-                  value={custom.from}
-                  max={data.today}
-                  onChange={(event) =>
-                    setCustom((current) => ({
-                      ...current,
-                      from: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label className="flex items-center gap-1 text-small">
-                {t('office.reports.to')}
-                <input
-                  type="date"
-                  className={field}
-                  value={custom.to}
-                  min={custom.from}
-                  max={data.today}
-                  onChange={(event) =>
-                    setCustom((current) => ({
-                      ...current,
-                      to: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            </span>
-          ) : null}
-        </div>
-        <span className="text-small text-text-muted">
-          {longDate(bundle.range.from, lang)} –{' '}
-          {longDate(bundle.range.to, lang)}
-        </span>
-      </div>
-
-      <div
-        role="tablist"
-        aria-label={t('office.reports.title')}
-        className="flex flex-wrap gap-1"
-      >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            id={`report-tab-${item.id}`}
-            aria-selected={tab === item.id}
-            aria-controls={`report-panel-${item.id}`}
-            data-testid={`report-tab-${item.id}`}
-            className="inline-flex min-h-11 items-center rounded-control px-3 aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink"
-            onClick={() => setTab(item.id)}
-          >
-            {t(item.key)}
-          </button>
-        ))}
-      </div>
-
-      <section
-        role="tabpanel"
-        id={`report-panel-${tab}`}
-        aria-labelledby={`report-tab-${tab}`}
-        className="flex flex-col gap-3"
-      >
-        {tab === 'summary' ? (
-          <SummaryTab bundle={bundle} cost={cost} lang={lang} />
-        ) : null}
-        {tab === 'products' ? (
-          <ProductsTab bundle={bundle} cost={cost} lang={lang} />
-        ) : null}
-        {tab === 'stock' ? (
-          <StockTab bundle={bundle} cost={cost} lang={lang} />
-        ) : null}
-        {tab === 'udhaar' ? <UdhaarTab bundle={bundle} lang={lang} /> : null}
-        {tab === 'staff' ? <StaffTab bundle={bundle} /> : null}
-        {tab === 'day_closes' ? (
-          <DayCloseTab bundle={bundle} lang={lang} />
-        ) : null}
-        {tab === 'expenses' ? (
-          <ExpensesTab bundle={bundle} lang={lang} />
-        ) : null}
-      </section>
-    </div>
+            {tab === 'products' ? (
+              <ProductsTab bundle={bundle} cost={cost} lang={lang} />
+            ) : null}
+            {tab === 'stock' ? (
+              <StockTab bundle={bundle} cost={cost} lang={lang} />
+            ) : null}
+            {tab === 'udhaar' ? (
+              <UdhaarTab bundle={bundle} lang={lang} />
+            ) : null}
+            {tab === 'staff' ? <StaffTab bundle={bundle} /> : null}
+            {tab === 'day_closes' ? (
+              <DayCloseTab bundle={bundle} lang={lang} />
+            ) : null}
+            {tab === 'expenses' ? (
+              <ExpensesTab bundle={bundle} lang={lang} />
+            ) : null}
+          </Tabs.Panel>
+        </Tabs>
+      </Stack>
+    </Box>
   );
 }
 
@@ -400,21 +397,24 @@ function Card({
   testId?: string;
 }) {
   return (
-    <div
-      className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3"
-      data-testid={testId}
-    >
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="text-title font-semibold">{value}</p>
-    </div>
+    <Paper withBorder p="sm" h="100%" data-testid={testId}>
+      <Text size="sm" c="dimmed">
+        {label}
+      </Text>
+      <Text fz={24} fw={600}>
+        {value}
+      </Text>
+    </Paper>
   );
 }
 
 function NoRows({ message }: { message: string }) {
   return (
-    <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
-      {message}
-    </p>
+    <Paper withBorder p="md">
+      <Text size="sm" c="dimmed" ta="center">
+        {message}
+      </Text>
+    </Paper>
   );
 }
 
@@ -434,49 +434,55 @@ function ReportTable({
   rowKeys?: readonly string[];
 }) {
   return (
-    <section className="flex flex-col gap-2" data-testid={testId}>
-      <h2 className="text-title font-semibold">{title}</h2>
-      {rows.length === 0 ? (
-        <NoRows message={empty} />
-      ) : (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full min-w-[36rem] border-collapse text-small">
-            <thead>
-              <tr className="border-b border-border bg-surface-2 text-start">
-                {headers.map((header, headerIndex) => (
-                  <th
-                    key={header}
-                    scope="col"
-                    className={`px-3 py-2 font-medium ${
-                      headerIndex === 0 ? 'text-start' : 'text-end'
-                    }`}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr
-                  key={rowKeys?.[index] ?? String(row[0])}
-                  className="border-b border-border last:border-0"
-                >
-                  {row.map((cell, cellIndex) => (
-                    <td
-                      key={headers[cellIndex]}
-                      className={`px-3 py-2 ${cellIndex === 0 ? '' : 'text-end'}`}
-                    >
-                      {cell}
-                    </td>
+    <Box component="section" data-testid={testId}>
+      <Stack gap="sm">
+        <Title order={2} fz="md">
+          {title}
+        </Title>
+        {rows.length === 0 ? (
+          <NoRows message={empty} />
+        ) : (
+          <Paper withBorder>
+            <Box
+              tabIndex={0}
+              role="region"
+              aria-label={title}
+              style={{ overflowX: 'auto' }}
+            >
+              <Table fz="sm" miw={576}>
+                <Table.Thead>
+                  <Table.Tr>
+                    {headers.map((header, headerIndex) => (
+                      <Table.Th
+                        key={header}
+                        scope="col"
+                        ta={headerIndex === 0 ? 'start' : 'end'}
+                      >
+                        {header}
+                      </Table.Th>
+                    ))}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {rows.map((row, index) => (
+                    <Table.Tr key={rowKeys?.[index] ?? String(row[0])}>
+                      {row.map((cell, cellIndex) => (
+                        <Table.Td
+                          key={headers[cellIndex]}
+                          ta={cellIndex === 0 ? 'start' : 'end'}
+                        >
+                          {cell}
+                        </Table.Td>
+                      ))}
+                    </Table.Tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+                </Table.Tbody>
+              </Table>
+            </Box>
+          </Paper>
+        )}
+      </Stack>
+    </Box>
   );
 }
 
@@ -569,10 +575,10 @@ function SummaryTab({
         />
       ) : (
         <>
-          <section className="rounded-card border border-border bg-surface p-3">
-            <h2 className="mb-2 text-title font-semibold">
+          <Paper withBorder p="sm">
+            <Title order={2} fz="md" mb="xs">
               {t('office.reports.daily_chart')}
-            </h2>
+            </Title>
             {summary.daily.filter(
               (point) => point.sold !== 0 || point.grossProfit !== 0,
             ).length > 1 ? (
@@ -583,49 +589,51 @@ function SummaryTab({
                 t={t}
               />
             ) : (
-              <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
-                {t('office.reports.not_enough_days')}
-              </p>
+              <Paper withBorder p="md">
+                <Text size="sm" c="dimmed" ta="center">
+                  {t('office.reports.not_enough_days')}
+                </Text>
+              </Paper>
             )}
-          </section>
+          </Paper>
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <section className="rounded-card border border-border bg-surface p-3">
-              <h2 className="mb-2 text-title font-semibold">
+          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="sm">
+            <Paper withBorder p="sm">
+              <Title order={2} fz="md" mb="xs">
                 {t('office.reports.payment_mix')}
-              </h2>
+              </Title>
               <PaymentDonut mix={summary.paymentMix} t={t} />
-            </section>
-            <section className="rounded-card border border-border bg-surface p-3">
-              <h2 className="mb-2 text-title font-semibold">
+            </Paper>
+            <Paper withBorder p="sm">
+              <Title order={2} fz="md" mb="xs">
                 {t('office.reports.udhaar')}
-              </h2>
-              <dl className="grid grid-cols-2 gap-3 text-small">
-                <div>
-                  <dt className="text-text-muted">
+              </Title>
+              <SimpleGrid cols={2} spacing="sm">
+                <Box>
+                  <Text size="sm" c="dimmed">
                     {t('office.reports.udhaar_given')}
-                  </dt>
-                  <dd className="text-title font-semibold">
+                  </Text>
+                  <Text fz={22} fw={600}>
                     <MoneyText paisa={summary.udhaarGiven} />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-text-muted">
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="sm" c="dimmed">
                     {t('office.reports.udhaar_received')}
-                  </dt>
-                  <dd className="text-title font-semibold">
+                  </Text>
+                  <Text fz={22} fw={600}>
                     <MoneyText paisa={summary.udhaarReceived} />
-                  </dd>
-                </div>
-              </dl>
-              <p className="mt-2 text-small text-text-muted">
+                  </Text>
+                </Box>
+              </SimpleGrid>
+              <Text size="sm" c="dimmed" mt="xs">
                 {t('office.reports.refunds_note', {
                   count: summary.refundCount,
                   amount: formatShopMoney(summary.refunded),
                 })}
-              </p>
-            </section>
-          </div>
+              </Text>
+            </Paper>
+          </SimpleGrid>
         </>
       )}
     </>
