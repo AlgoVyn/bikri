@@ -32,9 +32,13 @@ export function PageHeader({
           </span>
         ) : null}
         <div className="min-w-0 flex-1">
-          <Heading className="text-h1 font-semibold">{title}</Heading>
+          <Heading className="text-balance text-h1 font-semibold tracking-[-0.01em]">
+            {title}
+          </Heading>
           {subtitle ? (
-            <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+            <p className="mt-1 max-w-2xl text-small text-text-muted">
+              {subtitle}
+            </p>
           ) : null}
         </div>
       </div>

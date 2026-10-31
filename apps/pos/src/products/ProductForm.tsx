@@ -8,6 +8,7 @@ import {
   buttonPrimary,
   buttonQuiet,
   fieldClass,
+  pageClass,
 } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
@@ -365,7 +366,7 @@ export function ProductFormPage({
 
   return (
     <form
-      className="mx-auto flex max-w-4xl flex-col gap-4 p-4 pb-28"
+      className={`${pageClass('focused', 'gap-4')} pb-28`}
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -847,7 +848,7 @@ export function ProductFormPage({
       </div>
 
       <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
-        <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-end gap-2">
+        <div className="mx-auto flex w-full max-w-[896px] flex-wrap justify-end gap-2">
           <button
             type="button"
             className={`${buttonQuiet} gap-2`}

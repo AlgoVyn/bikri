@@ -4,7 +4,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { ClockIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -174,7 +178,7 @@ export function DayClosePage() {
 
   if (closed) {
     return (
-      <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
+      <div className={pageClass('standard')}>
         <h1 className="text-h1 font-semibold">{t('office.dayclose.title')}</h1>
         <div className="rounded-card border border-border bg-surface p-4">
           <p className="text-title font-semibold" data-testid="day-closed">
@@ -262,7 +266,7 @@ export function DayClosePage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
+    <div className={pageClass('standard')}>
       <PageHeader
         icon={<ClockIcon />}
         title={t('office.dayclose.title')}

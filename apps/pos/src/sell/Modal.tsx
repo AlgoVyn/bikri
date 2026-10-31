@@ -2,9 +2,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const overlayClass = 'fixed inset-0 z-40 bg-text/40';
+const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-text/40';
 const base =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal bg-surface p-4 text-text shadow-modal';
 const SIZES = {
   normal: `${base} w-[min(32rem,calc(100%-2rem))]`,
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,

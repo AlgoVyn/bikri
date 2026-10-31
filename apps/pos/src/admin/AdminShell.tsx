@@ -123,7 +123,7 @@ export function AdminShell() {
           </header>
           <main
             id="admin-main"
-            className="mx-auto w-full max-w-[1280px] flex-1 p-4 lg:p-6"
+            className="mx-auto w-full max-w-[1440px] flex-1 p-4 xl:p-6"
           >
             <Outlet />
           </main>

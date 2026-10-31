@@ -521,7 +521,7 @@ export function SellPage() {
               }
               autoComplete="off"
               placeholder={t('sell.search_placeholder')}
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
+              className="bikri-focus-wrapper min-w-0 flex-1 bg-transparent text-body outline-none"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {

@@ -3,7 +3,11 @@ import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -95,7 +99,7 @@ export function PricesPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
+    <div className={pageClass('focused', 'gap-4')}>
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}

@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
+import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -195,9 +195,7 @@ export function SalesList({
   return (
     <div
       className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+        embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('standard')
       }
     >
       <PageHeader
@@ -231,7 +229,7 @@ export function SalesList({
           {t('office.sales.cashier_limited')}
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
+        <div className="flex flex-wrap items-center gap-1">
           {PRESETS.map((p) => (
             <button
               key={p.id}

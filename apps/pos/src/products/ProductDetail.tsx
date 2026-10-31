@@ -8,6 +8,7 @@ import {
   buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
+  pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -129,7 +130,7 @@ export function ProductDetailPage({
       className={
         embedded
           ? 'flex min-w-0 flex-col gap-4'
-          : 'mx-auto flex max-w-5xl flex-col gap-4 p-4'
+          : pageClass('standard', 'gap-4')
       }
     >
       {embedded ? (

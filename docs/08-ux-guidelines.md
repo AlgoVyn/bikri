@@ -135,6 +135,36 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 
 All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed.
 
+### Layout containers and page anatomy
+
+Every top-level screen uses one of four containers from `pageClass()` in `apps/pos/src/components/classes.ts`; a screen never invents its own `max-w-*`. The page header and its actions always span the container, never the start column of a split.
+
+| Width | Class | Used by |
+|---|---|---|
+| Focused | 896 px | setup, enrol, lock, single-column forms |
+| Standard | 1152 px | Home, lists, statements, reports, expenses, day close, forms with line items |
+| Wide | 1440 px | Settings master–detail |
+| Workspace | 1720 px | list + detail workspaces (`MasterDetail`) |
+
+Widths are explicit pixels because the document root is 15 px, so Tailwind's `max-w-6xl` would resolve to 1080 px, not 1152 px.
+
+Page anatomy, top to bottom: **header** (title, one-line purpose, actions) → **context strip** (date presets, filters — flat, not another card) → **content** (one surface per job) → **sticky action bar** on forms. On phones the header keeps title + search + avatar; everything else moves into the staff/More sheet.
+
+### Action hierarchy
+
+1. **One filled primary per screen** — the next thing the user should do.
+2. Secondary actions are quiet outlined buttons; tertiary actions are text/icon buttons.
+3. Everything else lives in a `More` menu. Destructive actions are **outlined red**, never filled, and always behind a confirm; a confirm dialog may use a filled danger button for its final step.
+4. Empty states, dialogs and error banners each offer exactly one primary action.
+
+### Surfaces and elevation
+
+A card is a *grouping of one job*, not decoration. Do not nest a filter card, a summary card and a list card on one screen: use one surface with a toolbar and dividers, or keep the context strip flat on the page background. Cards use `border-border` + `shadow-card`; overlays (modal, sheet, menu) are the only surfaces with `shadow-modal`. Spacing inside a surface is 16 px, between sections 24 px, between label and value 4–8 px.
+
+### Motion
+
+Durations: `140ms` for hover/press and small state changes, `200ms` for overlays. Easing `cubic-bezier(.2, 0, 0, 1)`. Nothing bounces. Radix overlays and toasts use the shared `bikri-*` animations in `tokens.css`; `prefers-reduced-motion` reduces every duration. Every async action shows press state, optimistic row, skeleton or toast within 100 ms.
+
 ## 3. Layout and responsiveness
 
 Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference viewports for tests: 390×844 (phone), 768×1024 (tablet), 1280×800 (shop PC), 1920×1080. Sell is two-column from `lg`. Rail vertical from `lg`, bottom bar below. Modals are full-screen sheets below `md`.
@@ -201,7 +231,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 263 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 266 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 

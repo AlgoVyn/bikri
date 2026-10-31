@@ -24,7 +24,7 @@ import {
 } from './TopBarParts.tsx';
 
 const navLink =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted lg:flex-none lg:py-1.5';
+  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted transition-colors duration-150 lg:flex-none lg:py-1.5';
 
 /** Shell pages that are not rail items still need a title on a phone. */
 const EXTRA_TITLES: Record<string, string> = {

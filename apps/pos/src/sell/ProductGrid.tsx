@@ -6,6 +6,8 @@ import { ProductThumb } from '../products/ProductThumb.tsx';
 import type { SellRow } from './useSell.ts';
 
 const TILE_MIN = 128;
+/** Nastaliq needs more width than Latin; below this the price and stock pill collide. */
+const TILE_MIN_UR = 160;
 const GAP = 8;
 const TILE_H = 172;
 const TILE_H_UR = 196;
@@ -27,7 +29,9 @@ export function ProductGrid({
 }) {
   const { t } = useTranslation();
   const { i18n } = useTranslation();
-  const tileH = i18n.language === 'ur' ? TILE_H_UR : TILE_H;
+  const urdu = i18n.language === 'ur';
+  const tileH = urdu ? TILE_H_UR : TILE_H;
+  const tileMin = urdu ? TILE_MIN_UR : TILE_MIN;
   const ref = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ cols: 4, start: 0, end: 8 });
 
@@ -38,7 +42,7 @@ export function ProductGrid({
     if (!scroller || !list) return;
     const update = () => {
       const width = list.clientWidth;
-      const cols = Math.max(1, Math.floor((width + GAP) / (TILE_MIN + GAP)));
+      const cols = Math.max(1, Math.floor((width + GAP) / (tileMin + GAP)));
       const offset = list.offsetTop - scroller.offsetTop;
       const top = scroller.scrollTop - offset;
       const rowH = tileH + GAP;
@@ -169,7 +173,7 @@ function Tile({
       data-index={index}
       data-testid="sell-tile"
       aria-current={active || undefined}
-      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card hover:border-border-strong ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card transition-[border-color,box-shadow] duration-150 hover:border-border-strong active:scale-[0.995] ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
       onClick={() => onAdd(row)}
     >
       {cartQty > 0 ? (
@@ -189,12 +193,12 @@ function Tile({
         {name}
       </span>
       <span className="mt-auto flex w-full shrink-0 items-center justify-between gap-1 text-small">
-        <span className="font-semibold">
+        <span className="text-body font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />
         </span>
         {pill ? (
           <span
-            className={`whitespace-nowrap rounded-full px-2 text-small ${pill.cls}`}
+            className={`shrink-0 whitespace-nowrap rounded-full px-1.5 text-caption ${pill.cls}`}
           >
             {pill.text}
           </span>

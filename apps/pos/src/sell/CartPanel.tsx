@@ -3,7 +3,7 @@ import type { Cart, CartLine } from '@bikri/db';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { SellIcon, UdhaarIcon } from '../components/icons.tsx';
+import { SalesIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
@@ -68,7 +68,7 @@ export function CartPanel(p: CartPanelProps) {
               type="button"
               role="tab"
               aria-selected={active}
-              className={`relative flex min-h-14 flex-1 flex-col items-start justify-center rounded-control border px-3 py-2 text-small ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
+              className={`relative flex min-h-14 flex-1 flex-col items-start justify-center rounded-control border px-3 py-2 text-small transition-colors duration-150 ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
               onClick={() => p.onTab(id)}
             >
               <span className="font-medium">
@@ -132,7 +132,7 @@ export function CartPanel(p: CartPanelProps) {
         {cart.lines.length === 0 ? (
           <li className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
-              <SellIcon />
+              <SalesIcon />
             </span>
             <p className="text-small text-text-muted">{t('sell.cart_empty')}</p>
           </li>

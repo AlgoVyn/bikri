@@ -1,5 +1,6 @@
 import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { pageClass } from '../components/classes.ts';
 import { SettingsIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -49,7 +50,7 @@ export function SettingsSplit({
 
   return (
     <AreaStrings area="office">
-      <div className="mx-auto w-full max-w-[1440px] p-4 xl:p-6">
+      <div className={pageClass('wide', 'gap-6')}>
         <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
           <div
             ref={navRef}
@@ -69,10 +70,10 @@ export function SettingsSplit({
 function SettingsPlaceholder() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-[32rem] flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface p-8 text-center shadow-card">
+    <div className="flex min-h-[24rem] flex-col items-center justify-center gap-3 text-center">
       <span
         aria-hidden="true"
-        className="flex size-14 items-center justify-center rounded-full bg-surface text-text-muted"
+        className="flex size-14 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
       >
         <SettingsIcon />
       </span>

@@ -2,7 +2,11 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoreIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -115,9 +119,7 @@ export function ProductList({
   return (
     <div
       className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
+        embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('standard')
       }
     >
       <PageHeader

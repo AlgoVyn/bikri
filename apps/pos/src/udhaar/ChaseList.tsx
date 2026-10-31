@@ -3,7 +3,11 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -77,7 +81,7 @@ export function ChaseList() {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-3 p-4">
+    <div className={pageClass('standard')}>
       <SubpageHeader
         backTo="/udhaar"
         backLabel={t('office.udhaar.back_customers')}

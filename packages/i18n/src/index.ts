@@ -11,12 +11,11 @@ export type Catalog = typeof en;
 export async function loadCatalog(locale: LocaleCode): Promise<Catalog> {
   switch (locale) {
     case 'ur':
-      return (await import('../ur.json', { with: { type: 'json' } })).default;
+      return (await import('../ur.json')).default;
     case 'roman-ur':
-      return (await import('../roman-ur.json', { with: { type: 'json' } }))
-        .default as Catalog;
+      return (await import('../roman-ur.json')).default as Catalog;
     default:
-      return (await import('../en.json', { with: { type: 'json' } })).default;
+      return (await import('../en.json')).default;
   }
 }
 
@@ -48,14 +47,12 @@ export async function loadAreaCatalog(
 
 type JsonModule = Promise<{ default: unknown }>;
 const adminFiles: Record<LocaleCode, () => JsonModule> = {
-  en: () => import('../admin/en.json', { with: { type: 'json' } }),
-  ur: () => import('../admin/ur.json', { with: { type: 'json' } }),
-  'roman-ur': () =>
-    import('../admin/roman-ur.json', { with: { type: 'json' } }),
+  en: () => import('../admin/en.json'),
+  ur: () => import('../admin/ur.json'),
+  'roman-ur': () => import('../admin/roman-ur.json'),
 };
 const officeFiles: Record<LocaleCode, () => JsonModule> = {
-  en: () => import('../office/en.json', { with: { type: 'json' } }),
-  ur: () => import('../office/ur.json', { with: { type: 'json' } }),
-  'roman-ur': () =>
-    import('../office/roman-ur.json', { with: { type: 'json' } }),
+  en: () => import('../office/en.json'),
+  ur: () => import('../office/ur.json'),
+  'roman-ur': () => import('../office/roman-ur.json'),
 };

@@ -36,7 +36,7 @@ export function SubpageHeader({
         to={backTo}
         aria-label={backLabel}
         title={backLabel}
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2 active:bg-surface-2"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
       >
         <span
           aria-hidden="true"
@@ -54,9 +54,13 @@ export function SubpageHeader({
         </span>
       ) : null}
       <div className="min-w-0 flex-1 pt-1.5">
-        <h1 className="text-h1 font-semibold">{title}</h1>
+        <h1 className="text-balance text-h1 font-semibold tracking-[-0.01em]">
+          {title}
+        </h1>
         {subtitle ? (
-          <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+          <p className="mt-1 max-w-2xl text-small text-text-muted">
+            {subtitle}
+          </p>
         ) : null}
       </div>
       {actions ? (

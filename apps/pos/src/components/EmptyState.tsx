@@ -15,9 +15,9 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-border-strong px-4 py-14 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-12 text-center shadow-card">
       {icon !== undefined ? (
-        <div className="flex size-14 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+        <div className="flex size-12 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
           {icon}
         </div>
       ) : null}

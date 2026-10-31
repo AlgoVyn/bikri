@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { pageClass } from './classes.ts';
 
 /** A calm branded skeleton used while a route or a local query is loading. */
 export function PageLoading({ compact = false }: { compact?: boolean }) {
@@ -6,9 +7,7 @@ export function PageLoading({ compact = false }: { compact?: boolean }) {
   return (
     <div
       className={
-        compact
-          ? 'flex flex-col gap-3 p-4'
-          : 'mx-auto flex max-w-6xl flex-col gap-4 p-4'
+        compact ? 'flex flex-col gap-3 p-4' : pageClass('standard', 'gap-4')
       }
       aria-busy="true"
       aria-label={t('common.loading')}

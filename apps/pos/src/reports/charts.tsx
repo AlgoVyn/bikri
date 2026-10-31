@@ -8,7 +8,7 @@ const COLORS: Record<keyof PaymentMix, string> = {
   cash: 'var(--color-primary)',
   card: 'var(--color-success)',
   bank_wallet: 'var(--color-warning)',
-  udhaar: 'var(--color-danger)',
+  udhaar: 'var(--color-brand-navy)',
 };
 
 /** Simple responsive bars + profit line, no chart library (screens/16). */
@@ -247,7 +247,7 @@ export function PaymentDonut({ mix, t }: { mix: PaymentMix; t: TFunction }) {
               style={{ background: COLORS[method] }}
             />
             <span className="me-auto">{t(`payment.${method}`)}</span>
-            <bdi dir="ltr" className="font-mono tabular-nums">
+            <bdi dir="ltr" className="tabular-nums">
               {formatShopMoney(mix[method])}
             </bdi>
           </li>

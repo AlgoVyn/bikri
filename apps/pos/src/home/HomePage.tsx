@@ -2,9 +2,14 @@ import { businessDate, type Permission } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import {
   ClockIcon,
+  CountIcon,
   ProductsIcon,
   SalesIcon,
   SearchIcon,
@@ -56,6 +61,9 @@ const QUICK_DESC: Record<string, string> = {
 };
 
 const DAY_MS = 86_400_000;
+
+/** Home groups its actions by the job the cashier is doing (screens/04). */
+const RUN_ROUTES = new Set(['/day-close', '/sales', '/udhaar']);
 
 const ATTENTION_LINK: Record<string, string> = {
   low_stock: '/products',
@@ -120,7 +128,23 @@ export function HomePage() {
       Icon: ClockIcon,
       perm: 'dayclose.create' as const,
     },
-    ...NAV.slice(2).map((item) => ({
+    ...NAV.slice(2, 3).map((item) => ({
+      to: item.to,
+      label: item.label,
+      desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
+      keys: item.keys,
+      Icon: item.Icon,
+      perm: item.perm,
+    })),
+    {
+      to: '/stock/count',
+      label: 'count.title',
+      desc: 'home.desc_count',
+      keys: '',
+      Icon: CountIcon,
+      perm: 'stock.adjust' as const,
+    },
+    ...NAV.slice(3).map((item) => ({
       to: item.to,
       label: item.label,
       desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
@@ -130,8 +154,11 @@ export function HomePage() {
     })),
   ].filter((tile) => tile.perm === null || can(tile.perm));
 
+  const runTiles = tiles.filter((tile) => RUN_ROUTES.has(tile.to));
+  const manageTiles = tiles.filter((tile) => !RUN_ROUTES.has(tile.to));
+
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 lg:p-6">
+    <div className={pageClass('standard', 'gap-6')}>
       <header>
         <h1 className="text-h1 font-semibold">
           {t('home.greeting', { name: String(staff?.name ?? '') })}
@@ -218,7 +245,15 @@ export function HomePage() {
               ) : null}
             </div>
           </section>
-          <QuickActions tiles={tiles} />
+          <div className="flex flex-col gap-6">
+            <QuickActions
+              tiles={runTiles}
+              label="home.run_till"
+              showPriceCheck
+              columns={2}
+            />
+            <QuickActions tiles={manageTiles} label="home.manage" />
+          </div>
           <RecentBillsCard data={data} timeText={timeText} />
         </div>
       ) : (
@@ -226,29 +261,43 @@ export function HomePage() {
           <div className="contents lg:col-start-1 lg:flex lg:flex-col lg:gap-6">
             <Link
               to="/sell"
-              className="group order-1 flex min-h-24 items-center gap-4 rounded-card border border-primary/30 bg-primary-subtle p-4 shadow-card hover:border-primary"
+              className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border border-rail-active/30 bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-rail-active/60"
             >
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-control bg-primary text-primary-ink">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-16 end-16 size-32 rounded-full bg-accent/10"
+              />
+              <span className="relative flex size-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink">
                 <SellIcon />
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-title font-semibold">
+              <span className="relative min-w-0 flex-1">
+                <span className="block text-title font-semibold text-rail-ink">
                   {t('home.new_sale')}
                 </span>
-                <span className="block text-small text-primary-subtle-ink">
+                <span className="block text-small text-rail-muted">
                   {t('home.new_sale_hint')}
                 </span>
               </span>
               <span
                 aria-hidden="true"
-                className="text-title text-primary rtl:rotate-180"
+                className="relative text-title text-rail-active rtl:rotate-180"
               >
                 ›
               </span>
             </Link>
 
-            <div className="order-3">
-              <QuickActions tiles={tiles} />
+            <div className="order-3 flex flex-col gap-6">
+              <QuickActions
+                tiles={runTiles}
+                label="home.run_till"
+                showPriceCheck
+                columns={2}
+              />
+              <QuickActions tiles={manageTiles} label="home.manage" />
             </div>
 
             {data && data.attention.length > 0 ? (
@@ -264,7 +313,7 @@ export function HomePage() {
                     <li key={item.kind}>
                       <Link
                         to={ATTENTION_LINK[item.kind] ?? '/'}
-                        className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium hover:bg-surface-2 ${attentionTone(item)}`}
+                        className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium transition-colors duration-150 hover:bg-surface-2 ${attentionTone(item)}`}
                         data-testid={`attn-${item.kind}`}
                       >
                         <span
@@ -314,27 +363,44 @@ function sectionLabel(_lang: string): string {
   return 'text-small font-semibold text-text-muted';
 }
 
-function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
+function QuickActions({
+  tiles,
+  label,
+  showPriceCheck = false,
+  columns = 3,
+}: {
+  tiles: readonly QuickTile[];
+  label: string;
+  showPriceCheck?: boolean;
+  columns?: 2 | 3;
+}) {
   const { t, i18n } = useTranslation();
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
+  const grid =
+    columns === 2
+      ? 'grid gap-2 sm:grid-cols-2 xl:grid-cols-2'
+      : 'grid gap-2 sm:grid-cols-2 xl:grid-cols-3';
   return (
-    <section aria-labelledby="quick-heading">
-      <h2 id="quick-heading" className={`mb-2 ${sectionLabel(i18n.language)}`}>
-        {t('home.quick_actions')}
+    <section aria-labelledby={`${label}-heading`}>
+      <h2
+        id={`${label}-heading`}
+        className={`mb-2 ${sectionLabel(i18n.language)}`}
+      >
+        {t(label)}
       </h2>
-      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className={grid}>
         {tiles.map((tile) => (
           <li key={tile.to + tile.label}>
             <Link
               to={tile.to}
-              title={`${t(tile.label)} (${tile.keys})`}
-              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card hover:border-border-strong hover:bg-surface-2"
+              title={tile.keys ? `${t(tile.label)} (${tile.keys})` : undefined}
+              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
                 <tile.Icon />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-small font-medium">
+                <span className="block text-body font-medium">
                   {t(tile.label)}
                 </span>
                 <span className="mt-0.5 block text-small text-text-muted">
@@ -350,32 +416,34 @@ function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
             </Link>
           </li>
         ))}
-        <li>
-          <button
-            type="button"
-            title={`${t('home.price_check')} (Ctrl+Shift+P)`}
-            onClick={() => openPriceCheck(true)}
-            className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card hover:border-border-strong hover:bg-surface-2"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-              <SearchIcon />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-small font-medium">
-                {t('home.price_check')}
-              </span>
-              <span className="mt-0.5 block text-small text-text-muted">
-                {t('home.desc_price_check')}
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="text-title text-text-muted rtl:rotate-180"
+        {showPriceCheck ? (
+          <li>
+            <button
+              type="button"
+              title={`${t('home.price_check')} (Ctrl+Shift+P)`}
+              onClick={() => openPriceCheck(true)}
+              className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2"
             >
-              ›
-            </span>
-          </button>
-        </li>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
+                <SearchIcon />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-body font-medium">
+                  {t('home.price_check')}
+                </span>
+                <span className="mt-0.5 block text-small text-text-muted">
+                  {t('home.desc_price_check')}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="text-title text-text-muted rtl:rotate-180"
+              >
+                ›
+              </span>
+            </button>
+          </li>
+        ) : null}
       </ul>
     </section>
   );
@@ -510,7 +578,7 @@ function RecentBillsCard({
               <Link
                 to="/sales/$id"
                 params={{ id: sale.id }}
-                className="flex flex-col gap-1 px-4 py-3 hover:bg-surface-2"
+                className="flex flex-col gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-2"
               >
                 <span className="flex items-center justify-between gap-2">
                   <bdi dir="ltr" className="font-mono text-small font-medium">

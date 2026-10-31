@@ -56,6 +56,17 @@ export function SalesIcon() {
   );
 }
 
+export function CountIcon() {
+  return (
+    <Svg>
+      <rect x="5" y="4.5" width="14" height="16" rx="2" />
+      <path d="M9 4.5V3h6v1.5" />
+      <path d="m8.5 12 2 2 4-4" />
+      <path d="M8.5 18h7" />
+    </Svg>
+  );
+}
+
 export function UdhaarIcon() {
   return (
     <Svg>

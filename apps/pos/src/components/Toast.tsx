@@ -97,15 +97,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed end-4 bottom-4 z-50 flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2">
+      <div className="pointer-events-none fixed end-4 bottom-20 z-50 flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2 lg:bottom-4">
         {items.map((item) => (
           <div
             key={item.id}
             role={item.tone === 'error' ? 'alert' : 'status'}
             className={
               item.tone === 'error'
-                ? 'pointer-events-auto flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
-                : 'pointer-events-auto flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
+                ? 'bikri-toast pointer-events-auto flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
+                : 'bikri-toast pointer-events-auto flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
             }
           >
             <span className="min-w-0 flex-1">{item.message}</span>

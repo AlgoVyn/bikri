@@ -4,6 +4,10 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased] — 1.0.0 release candidate
 
+### Design
+- Design-system pass: four named page containers, Home actions grouped into **Run the till** and **Manage** with a navy hero and a Stock count shortcut, flat date/filter strips, solid empty states, a calmer Settings placeholder, shared overlay/toast motion, two-letter product monograms, a wider Urdu Sell tile, and red kept for destructive/overdue only (D-151).
+- Vite dev serves the language catalogs again; dynamic JSON imports no longer carry Node-only import attributes.
+
 ### Selling and back office
 - Offline-first selling with three carts, held bills, cash/card/bank/wallet/udhaar payments, change, receipt printing and sharing.
 - Refunds (including the part-udhaar split), voids and void-and-reissue, append-only corrections and printable notices.

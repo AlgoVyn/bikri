@@ -9,6 +9,7 @@ import {
   buttonPrimary,
   buttonQuiet,
   fieldClass,
+  pageClass,
 } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -287,9 +288,7 @@ export function BillDetail({
   return (
     <div
       className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-4xl flex-col gap-3 p-4'
+        embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('focused')
       }
     >
       <div className="flex flex-wrap items-center gap-2">

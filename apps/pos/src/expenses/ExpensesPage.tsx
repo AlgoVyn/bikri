@@ -3,7 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -142,7 +146,7 @@ export function ExpensesPage() {
   const max = Math.max(1, ...(data?.byCategory.map((c) => c.net) ?? [1]));
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-4">
+    <div className={pageClass('standard')}>
       <PageHeader
         icon={<ExpensesIcon />}
         tone="bg-warning-subtle text-warning-subtle-ink"
@@ -187,7 +191,7 @@ export function ExpensesPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-3 shadow-card">
+      <div className="flex flex-wrap gap-1">
         {PRESETS.map((p) => (
           <button
             key={p}

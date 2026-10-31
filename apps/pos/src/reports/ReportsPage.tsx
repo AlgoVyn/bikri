@@ -2,7 +2,7 @@ import { businessDate, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
+import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
@@ -141,7 +141,7 @@ export function ReportsPage() {
   if (data === undefined) return <PageLoading compact />;
   if (data === null)
     return (
-      <div className="mx-auto max-w-5xl p-4">
+      <div className={pageClass('focused')}>
         <h1 className="text-h1 font-semibold">{t('office.reports.title')}</h1>
         <p className="mt-2 rounded-card bg-warning-subtle p-3 text-warning-subtle-ink">
           {t('office.reports.range_too_long')}
@@ -221,10 +221,7 @@ export function ReportsPage() {
   };
 
   return (
-    <div
-      className="mx-auto flex max-w-6xl flex-col gap-3 p-4"
-      data-testid="reports-page"
-    >
+    <div className={pageClass('standard')} data-testid="reports-page">
       <PageHeader
         icon={<ReportsIcon />}
         tone="bg-info-subtle text-info-subtle-ink"
@@ -548,6 +545,12 @@ function SummaryTab({
               <Card
                 label={t('office.reports.margin')}
                 value={percentText(summary.marginBp)}
+              />
+            </li>
+            <li className="min-w-0">
+              <Card
+                label={t('office.reports.refunds')}
+                value={<MoneyText paisa={summary.refunded} />}
               />
             </li>
           </>

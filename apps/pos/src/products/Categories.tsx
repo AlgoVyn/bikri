@@ -2,7 +2,11 @@ import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -36,7 +40,7 @@ export function CategoriesPage() {
     return <Navigate to="/products" replace />;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
+    <div className={pageClass('focused', 'gap-4')}>
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}

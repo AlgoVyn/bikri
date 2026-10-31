@@ -30,7 +30,7 @@ export function useFileUrl(key: string | null | undefined): string | null {
   return url;
 }
 
-/** Product photo, or a coloured tile with the first letter (category colour). */
+/** Product photo, or a coloured tile with a two-letter monogram (category colour). */
 export function ProductThumb({
   name,
   imageKey,
@@ -49,6 +49,12 @@ export function ProductThumb({
       : size === 'md'
         ? 'size-16 rounded-card text-h2'
         : 'size-10 rounded-control';
+  const clean = name.trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  const monogram =
+    (words.length > 1
+      ? `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`
+      : clean.slice(0, 2)) || '?';
   if (url) {
     return (
       <img
@@ -64,7 +70,7 @@ export function ProductThumb({
       aria-hidden="true"
       className={`flex shrink-0 items-center justify-center font-semibold text-tile-ink ${box} ${tileBg(color)}`}
     >
-      {name.slice(0, 1).toUpperCase()}
+      {monogram.toUpperCase()}
     </span>
   );
 }

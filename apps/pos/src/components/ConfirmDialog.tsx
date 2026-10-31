@@ -3,9 +3,9 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonDanger, buttonQuiet } from './classes.ts';
 
-const overlayClass = 'fixed inset-0 z-40 bg-text/40';
+const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-text/40';
 const contentClass =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal bg-surface p-4 text-text shadow-modal';
 
 export function ConfirmDialog({
   open,

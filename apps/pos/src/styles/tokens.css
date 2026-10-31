@@ -93,6 +93,13 @@
   --color-t8: #475569;
 }
 
+/* Motion: shared durations and easing (docs/08 §2). */
+:root {
+  --duration-fast: 140ms;
+  --duration-overlay: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
 /* Dark palette values, referenced by both dark selectors below. */
 :root {
   --dark-rail: #1d3357;
@@ -232,6 +239,11 @@ body {
   outline-offset: 2px;
 }
 
+/* A control inside a focus-within wrapper relies on the wrapper ring (docs/08 §8). */
+.bikri-focus-wrapper:focus-visible {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -241,4 +253,48 @@ body {
     /* biome-ignore lint/complexity/noImportantStyles: reduced motion has to win */
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Shared overlay motion (docs/08 §2 — Motion). Radix sets data-state on open/close. */
+@keyframes bikri-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bikri-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bikri-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bikri-overlay[data-state="open"] {
+  animation: bikri-overlay-in var(--duration-fast) var(--ease-standard);
+}
+
+.bikri-dialog[data-state="open"] {
+  animation: bikri-content-in var(--duration-overlay) var(--ease-standard);
+}
+
+.bikri-toast {
+  animation: bikri-toast-in var(--duration-overlay) var(--ease-standard);
 }

@@ -3,7 +3,11 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -250,7 +254,7 @@ export function SupplierReturnPage({
   if (!data) return <PageLoading compact />;
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
+    <div className={pageClass('focused')}>
       <div className="flex flex-wrap items-center gap-2">
         <Link
           to="/suppliers/$supplierId"
