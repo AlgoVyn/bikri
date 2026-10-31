@@ -274,7 +274,7 @@ export function HomePage() {
       </UnstyledButton>
 
       <Grid gap="xl">
-        <Grid.Col span={{ base: 12, lg: 8 }} order={{ base: 1, lg: 1 }}>
+        <Grid.Col span={{ base: 12, lg: 8 }} order={{ base: 2, lg: 1 }}>
           <Stack gap="xl">
             <QuickActions tiles={tiles} />
             <RecentBillsCard data={data} timeText={timeText} />
@@ -283,7 +283,7 @@ export function HomePage() {
             ) : null}
           </Stack>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, lg: 4 }} order={{ base: 2, lg: 2 }}>
+        <Grid.Col span={{ base: 12, lg: 4 }} order={{ base: 1, lg: 2 }}>
           <Stack gap="lg">
             {data ? (
               <RegisterCard
@@ -310,7 +310,7 @@ function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
         <Title order={3} id="quick-heading" fz="sm" c="dimmed">
           {t('home.quick_actions')}
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <SimpleGrid cols={2} spacing="sm">
           {tiles.slice(0, 3).map((tile) => (
             <UnstyledButton
               key={tile.to + tile.label}

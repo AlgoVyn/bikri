@@ -1,4 +1,15 @@
-import { Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { Link } from '@tanstack/react-router';
 import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsIcon } from '../components/icons.tsx';
@@ -50,7 +61,13 @@ export function SettingsSplit({
 
   return (
     <AreaStrings area="office">
-      <div className="mx-auto w-full max-w-[1440px] p-4 xl:p-6">
+      <div
+        className={
+          index
+            ? 'mx-auto min-h-[calc(100dvh+120px)] w-full max-w-[1440px] p-4 xl:p-6'
+            : 'mx-auto w-full max-w-[1440px] p-4 xl:p-6'
+        }
+      >
         <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
           <div
             ref={navRef}
@@ -70,25 +87,20 @@ export function SettingsSplit({
 function SettingsPlaceholder() {
   const { t } = useTranslation();
   return (
-    <Paper
-      withBorder
-      p="xl"
-      style={{
-        minHeight: 512,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Stack align="center" gap="sm" maw={320}>
-        <ThemeIcon size={56} radius="xl" variant="light" color="gray">
+    <Paper withBorder p="lg">
+      <Group gap="sm" wrap="nowrap" align="flex-start">
+        <ThemeIcon size={40} radius="md" variant="light" color="gray">
           <SettingsIcon />
         </ThemeIcon>
-        <Title order={3}>{t('office.settings.choose')}</Title>
-        <Text size="sm" c="dimmed" ta="center">
-          {t('office.settings.choose_hint')}
-        </Text>
-      </Stack>
+        <Stack gap={2}>
+          <Title order={3} fz="lg">
+            {t('office.settings.choose')}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {t('office.settings.choose_hint')}
+          </Text>
+        </Stack>
+      </Group>
     </Paper>
   );
 }

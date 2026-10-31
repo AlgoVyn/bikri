@@ -394,7 +394,7 @@ export function SalesList({
         </Box>
 
         {data && data.rows.length > 0 ? (
-          <Paper withBorder p="sm" data-testid="sales-summary">
+          <Box px="xs" py="sm" data-testid="sales-summary">
             <SimpleGrid cols={embedded ? 2 : { base: 2, sm: 4 }} spacing="sm">
               <Metric
                 label={t('office.sales.summary_bills')}
@@ -413,7 +413,7 @@ export function SalesList({
                 value={<MoneyText paisa={data.summary.avgBill} />}
               />
             </SimpleGrid>
-          </Paper>
+          </Box>
         ) : null}
 
         {data && data.rows.length === 0 ? (

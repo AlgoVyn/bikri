@@ -603,25 +603,25 @@ function SummaryTab({
         />
       ) : (
         <>
-          <Paper withBorder p="sm">
-            <Title order={2} fz="md" mb="xs">
-              {t('office.reports.daily_chart')}
-            </Title>
-            {summary.daily.filter(
-              (point) => point.sold !== 0 || point.grossProfit !== 0,
-            ).length > 1 ? (
+          {summary.daily.filter(
+            (point) => point.sold !== 0 || point.grossProfit !== 0,
+          ).length > 1 ? (
+            <Paper withBorder p="sm">
+              <Title order={2} fz="md" mb="xs">
+                {t('office.reports.daily_chart')}
+              </Title>
               <DailyChart
                 points={summary.daily}
                 showProfit={cost}
                 lang={lang}
                 t={t}
               />
-            ) : (
-              <Text size="sm" c="dimmed" ta="center" py="md">
-                {t('office.reports.not_enough_days')}
-              </Text>
-            )}
-          </Paper>
+            </Paper>
+          ) : (
+            <Text size="sm" c="dimmed" ta="center">
+              {t('office.reports.not_enough_days')}
+            </Text>
+          )}
 
           <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="sm">
             <Paper withBorder p="sm">

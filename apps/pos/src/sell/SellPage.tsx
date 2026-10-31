@@ -1,6 +1,6 @@
 import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
-import { Badge, Button, Group, TextInput } from '@mantine/core';
+import { Badge, Button, Group, Text, TextInput } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -628,13 +628,20 @@ export function SellPage() {
               </button>
             </div>
           ) : (
-            <ProductGrid
-              rows={results}
-              highlighted={highlight}
-              onAdd={addRow}
-              scrollRef={scrollRef}
-              cartQty={cartQty}
-            />
+            <>
+              <ProductGrid
+                rows={results}
+                highlighted={highlight}
+                onAdd={addRow}
+                scrollRef={scrollRef}
+                cartQty={cartQty}
+              />
+              {!searching && results.length > 0 && results.length < 8 ? (
+                <Text size="sm" c="dimmed" ta="center" py="sm">
+                  {t('sell.catalogue_hint')}
+                </Text>
+              ) : null}
+            </>
           )}
         </div>
         <Group gap="sm" visibleFrom="lg">
