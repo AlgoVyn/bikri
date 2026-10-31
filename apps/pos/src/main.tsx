@@ -5,6 +5,10 @@ import { router } from './app.tsx';
 import { initI18n } from './i18n/i18n.ts';
 import { rememberPersistentStorage } from './pwa/persist.ts';
 import { registerAppUpdate } from './pwa/registerSW.ts';
+import { MantineRoot } from './ui/MantineRoot.tsx';
+import './styles/layers.css';
+import '@mantine/core/styles.layer.css';
+import '@mantine/notifications/styles.layer.css';
 import './styles.css';
 
 await initI18n();
@@ -22,6 +26,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <MantineRoot>
+      <RouterProvider router={router} />
+    </MantineRoot>
   </StrictMode>,
 );

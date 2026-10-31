@@ -26,7 +26,8 @@ describe('self-hosted PWA assets', () => {
     expect(inline).toEqual([]);
     const theme = await readFile(join(publicDir, 'theme-init.js'), 'utf8');
     expect(theme).toContain("localStorage.getItem('bikri.theme')");
-    expect(theme).toContain('document.documentElement.dataset.theme = theme');
+    expect(theme).toContain('root.dataset.theme = stored');
+    expect(theme).toContain('root.dataset.mantineColorScheme');
   });
 
   it('ships OFL licences and woff2 faces', async () => {

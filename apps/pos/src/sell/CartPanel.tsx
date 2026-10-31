@@ -1,8 +1,19 @@
 import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
 import type { Cart, CartLine } from '@bikri/db';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  ThemeIcon,
+  UnstyledButton,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { SellIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -56,86 +67,120 @@ export function CartPanel(p: CartPanelProps) {
   const customer = useCustomer(p.cart.customer_id);
   const { totals, cart, money } = p;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div role="tablist" aria-label={t('sell.carts')} className="flex gap-1">
+    <Stack gap="sm" style={{ minHeight: 0, flex: 1 }}>
+      <Group gap={6} role="tablist" aria-label={t('sell.carts')} wrap="nowrap">
         {CART_IDS.map((id, i) => {
           const filled = !isEmptyCart(p.carts[id]);
           const total = cartTotals(p.carts[id], p.money).total;
           const active = p.active === id;
           return (
-            <button
+            <UnstyledButton
               key={id}
-              type="button"
               role="tab"
               aria-selected={active}
-              className={`relative flex min-h-14 flex-1 flex-col items-start justify-center rounded-control border px-3 py-2 text-small ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
               onClick={() => p.onTab(id)}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 56,
+                borderRadius: 10,
+                border: `1px solid ${active ? 'var(--mantine-color-brand-6)' : 'var(--mantine-color-default-border)'}`,
+                background: active
+                  ? 'var(--mantine-color-brand-6)'
+                  : 'var(--mantine-color-default)',
+                color: active ? '#fff' : 'var(--mantine-color-dimmed)',
+                padding: '8px 10px',
+                textAlign: 'start',
+              }}
             >
-              <span className="font-medium">
+              <Text size="xs" fw={600} truncate>
                 {t('sell.cart_tab', { n: i + 1 })}
-              </span>
-              <span
-                className={`mt-0.5 flex items-center gap-1 ${active ? 'text-primary-ink' : 'text-text-muted'}`}
-              >
+              </Text>
+              <Group gap={4} mt={2} wrap="nowrap">
                 {filled ? (
                   <>
-                    <span
+                    <Box
                       data-testid="cart-dot"
-                      className="size-1.5 rounded-full bg-current"
+                      w={6}
+                      h={6}
+                      style={{ borderRadius: 999, background: 'currentColor' }}
                     />
-                    <MoneyText paisa={total} />
+                    <Text size="xs" fw={active ? 600 : 500} truncate>
+                      <MoneyText paisa={total} />
+                    </Text>
                   </>
                 ) : (
-                  t('sell.empty_tab')
+                  <Text size="xs" truncate>
+                    {t('sell.empty_tab')}
+                  </Text>
                 )}
-              </span>
-            </button>
+              </Group>
+            </UnstyledButton>
           );
         })}
-      </div>
+      </Group>
 
-      <div className="flex min-h-14 items-center gap-2 rounded-control border border-border bg-surface-2/60 px-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
-          <UdhaarIcon />
-        </span>
-        <div className="min-w-0 flex-1" data-testid="cart-customer">
-          {customer ? (
-            <>
-              <span className="font-medium">
-                {String(customer.customer.name)}
-              </span>
-              {customer.balance > 0 ? (
-                <span className="ms-2 text-small text-warning">
-                  {t('sell.owes', {
-                    amount: formatShopMoney(customer.balance),
-                  })}
-                </span>
-              ) : null}
-            </>
-          ) : (
-            <span className="text-text-muted">{t('sell.walk_in')}</span>
-          )}
-        </div>
-        <button
-          type="button"
-          className="min-h-11 px-2 text-primary"
-          onClick={p.onCustomer}
-        >
-          {t('sell.change_customer')}
-        </button>
-      </div>
+      <Paper p="sm" withBorder>
+        <Group gap="sm" wrap="nowrap">
+          <ThemeIcon size={32} radius="xl" variant="light">
+            <UdhaarIcon />
+          </ThemeIcon>
+          <Box style={{ minWidth: 0, flex: 1 }} data-testid="cart-customer">
+            {customer ? (
+              <Group gap={6} wrap="wrap">
+                <Text size="sm" fw={600}>
+                  {String(customer.customer.name)}
+                </Text>
+                {customer.balance > 0 ? (
+                  <Text size="xs" c="yellow.7">
+                    {t('sell.owes', {
+                      amount: formatShopMoney(customer.balance),
+                    })}
+                  </Text>
+                ) : null}
+              </Group>
+            ) : (
+              <Text size="sm" c="dimmed">
+                {t('sell.walk_in')}
+              </Text>
+            )}
+          </Box>
+          <Button variant="subtle" size="compact-sm" onClick={p.onCustomer}>
+            {t('sell.change_customer')}
+          </Button>
+        </Group>
+      </Paper>
 
-      <ul
+      <Stack
+        component="ul"
+        gap="sm"
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          minHeight: 0,
+          flex: 1,
+          overflowY: 'auto',
+        }}
         aria-label={t('sell.cart_lines')}
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
       >
         {cart.lines.length === 0 ? (
-          <li className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
-              <SellIcon />
-            </span>
-            <p className="text-small text-text-muted">{t('sell.cart_empty')}</p>
-          </li>
+          <Box component="li" style={{ flex: 1, display: 'flex' }}>
+            <Stack
+              align="center"
+              justify="center"
+              gap="sm"
+              py="xl"
+              style={{ flex: 1 }}
+            >
+              <ThemeIcon size={48} radius="xl" variant="light" color="gray">
+                <SellIcon />
+              </ThemeIcon>
+              <Text size="sm" c="dimmed">
+                {t('sell.cart_empty')}
+              </Text>
+            </Stack>
+          </Box>
         ) : null}
         {cart.lines.map((line, i) => (
           <LineRow
@@ -148,130 +193,141 @@ export function CartPanel(p: CartPanelProps) {
             p={p}
           />
         ))}
-      </ul>
+      </Stack>
 
-      <dl
-        className="flex flex-col gap-0.5 rounded-card border border-border bg-surface-2/50 p-2.5"
-        data-testid="cart-totals"
-      >
-        <Row
-          label={t('sell.subtotal', { count: itemCount(cart.lines) })}
-          paisa={totals.gross_total}
-          testId="total-subtotal"
-        />
-        {totals.item_discount_total > 0 ? (
+      <Paper p="sm" withBorder data-testid="cart-totals">
+        <Box
+          component="dl"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            margin: 0,
+          }}
+        >
           <Row
-            label={t('sell.item_discounts')}
-            paisa={-totals.item_discount_total}
-            testId="total-item-discounts"
+            label={t('sell.subtotal', { count: itemCount(cart.lines) })}
+            paisa={totals.gross_total}
+            testId="total-subtotal"
           />
-        ) : null}
-        {totals.bill_discount > 0 ? (
-          <div className="flex items-center justify-between gap-2">
-            <dt>
-              <button
-                type="button"
-                className="text-primary underline"
-                onClick={p.onBillDiscount}
-              >
-                {t('sell.discount')}
-              </button>
-            </dt>
-            <dd data-testid="total-discount">
-              <MoneyText paisa={-totals.bill_discount} />
-            </dd>
-          </div>
-        ) : (
-          <div>
-            <dt>
-              <button
-                type="button"
-                className="inline-flex min-h-9 items-center gap-2 text-primary"
-                disabled={cart.lines.length === 0}
-                onClick={p.onBillDiscount}
-              >
-                {t('sell.add_discount')}
-              </button>
-            </dt>
-            <dd />
-          </div>
-        )}
-        {totals.tax > 0 && money.tax_mode === 'exclusive' ? (
-          <Row
-            label={t('sell.tax', {
-              label: money.tax_label,
-              rate: money.tax_rate_bp / 100,
-            })}
-            paisa={totals.tax}
-            testId="total-tax"
+          {totals.item_discount_total > 0 ? (
+            <Row
+              label={t('sell.item_discounts')}
+              paisa={-totals.item_discount_total}
+              testId="total-item-discounts"
+            />
+          ) : null}
+          {totals.bill_discount > 0 ? (
+            <Group justify="space-between" gap="sm" component="div">
+              <Box component="dt">
+                <UnstyledButton onClick={p.onBillDiscount}>
+                  <Text size="sm" c="brand" td="underline">
+                    {t('sell.discount')}
+                  </Text>
+                </UnstyledButton>
+              </Box>
+              <Text component="dd" size="sm" data-testid="total-discount">
+                <MoneyText paisa={-totals.bill_discount} />
+              </Text>
+            </Group>
+          ) : (
+            <Box component="div">
+              <Box component="dt">
+                <Button
+                  variant="subtle"
+                  size="compact-xs"
+                  disabled={cart.lines.length === 0}
+                  onClick={p.onBillDiscount}
+                >
+                  {t('sell.add_discount')}
+                </Button>
+              </Box>
+              <dd />
+            </Box>
+          )}
+          {totals.tax > 0 && money.tax_mode === 'exclusive' ? (
+            <Row
+              label={t('sell.tax', {
+                label: money.tax_label,
+                rate: money.tax_rate_bp / 100,
+              })}
+              paisa={totals.tax}
+              testId="total-tax"
+            />
+          ) : null}
+          {totals.rounding !== 0 ? (
+            <Row
+              label={t('sell.rounding')}
+              paisa={totals.rounding}
+              testId="total-rounding"
+            />
+          ) : null}
+          <Box
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+              margin: '4px 0',
+            }}
           />
-        ) : null}
-        {totals.rounding !== 0 ? (
-          <Row
-            label={t('sell.rounding')}
-            paisa={totals.rounding}
-            testId="total-rounding"
-          />
-        ) : null}
-        <div className="flex items-baseline justify-between gap-2 text-total font-semibold">
-          <dt>{t('sell.total_to_pay')}</dt>
-          <dd data-testid="total-to-pay" aria-live="polite">
-            <MoneyText paisa={totals.total} />
-          </dd>
-        </div>
-        {totals.tax > 0 && money.tax_mode === 'inclusive' ? (
-          <p
-            className="text-small text-text-muted"
-            data-testid="total-includes-tax"
-          >
-            {t('sell.includes_tax', {
-              label: money.tax_label,
-              rate: money.tax_rate_bp / 100,
-              amount: formatShopMoney(totals.tax),
-            })}
-          </p>
-        ) : null}
-      </dl>
+          <Group justify="space-between" align="baseline" gap="sm">
+            <Text component="dt" fw={700} fz={24}>
+              {t('sell.total_to_pay')}
+            </Text>
+            <Text
+              component="dd"
+              fw={700}
+              fz={24}
+              data-testid="total-to-pay"
+              aria-live="polite"
+            >
+              <MoneyText paisa={totals.total} />
+            </Text>
+          </Group>
+          {totals.tax > 0 && money.tax_mode === 'inclusive' ? (
+            <Text size="xs" c="dimmed" data-testid="total-includes-tax">
+              {t('sell.includes_tax', {
+                label: money.tax_label,
+                rate: money.tax_rate_bp / 100,
+                amount: formatShopMoney(totals.tax),
+              })}
+            </Text>
+          ) : null}
+        </Box>
+      </Paper>
 
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          className={buttonQuiet}
+      <Group gap={6} wrap="wrap">
+        <Button
+          variant="default"
+          size="compact-sm"
           disabled={cart.lines.length === 0}
           onClick={p.onHold}
         >
           {t('sell.hold')}
-        </button>
-        <button type="button" className={buttonQuiet} onClick={p.onHeld}>
+        </Button>
+        <Button variant="default" size="compact-sm" onClick={p.onHeld}>
           {t('sell.held_bills', { count: p.heldCount })}
-        </button>
-        <button
-          type="button"
-          className={buttonQuiet}
+        </Button>
+        <Button
+          variant="default"
+          size="compact-sm"
           disabled={isEmptyCart(cart)}
           onClick={p.onClear}
         >
           {t('sell.clear')}
-        </button>
-      </div>
+        </Button>
+      </Group>
       {cart.lines.length === 0 ? (
-        <button
-          type="button"
-          className={`${buttonQuiet} min-h-14 w-full text-small`}
-          onClick={p.onAddItem}
-        >
+        <Button variant="default" size="lg" fullWidth onClick={p.onAddItem}>
           {t('sell.add_first_item')}
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
-          className={`${buttonPrimary} min-h-14 w-full gap-2 text-title`}
-          onClick={p.onPay}
-        >
-          {t('sell.take_payment')} · <MoneyText paisa={totals.total} />{' '}
-        </button>
+        <Button size="lg" fullWidth onClick={p.onPay}>
+          <Group justify="space-between" w="100%">
+            <span>{t('sell.take_payment')}</span>
+            <MoneyText paisa={totals.total} />
+          </Group>
+        </Button>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -285,12 +341,14 @@ function Row({
   testId: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <dt>{label}</dt>
-      <dd data-testid={testId}>
+    <Group justify="space-between" gap="sm">
+      <Text component="dt" size="sm">
+        {label}
+      </Text>
+      <Text component="dd" size="sm" data-testid={testId}>
         <MoneyText paisa={paisa} />
-      </dd>
-    </div>
+      </Text>
+    </Group>
   );
 }
 
@@ -316,50 +374,73 @@ function LineRow({
   const hasBadges =
     (result?.discount ?? 0) > 0 || result?.below_cost === 1 || short;
   return (
-    <li
+    <Paper
+      component="li"
       data-testid="cart-line"
       aria-current={selected || undefined}
-      className={`rounded-card border bg-surface-2/60 p-2 ${selected ? 'border-primary' : 'border-border'}`}
+      p="sm"
+      withBorder
+      style={{
+        borderColor: selected
+          ? 'var(--mantine-color-brand-6)'
+          : 'var(--mantine-color-default-border)',
+        boxShadow: selected
+          ? '0 0 0 2px var(--mantine-color-brand-2)'
+          : undefined,
+      }}
     >
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          className="flex min-h-9 min-w-0 flex-1 flex-col justify-center text-start"
+      <Group gap="xs" wrap="nowrap" align="center">
+        <UnstyledButton
+          style={{
+            display: 'flex',
+            minWidth: 0,
+            flex: 1,
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+          }}
           aria-expanded={expanded}
           onClick={() => {
             p.onSelect(line.key);
             p.onExpand(expanded ? null : line.key);
           }}
         >
-          <span
-            className="ltr-name block truncate font-medium"
+          <Text
+            className="ltr-name"
+            size="sm"
+            fw={600}
+            truncate
+            w="100%"
             data-testid="line-name"
           >
             {line.name}
-          </span>
+          </Text>
           {line.note ? (
-            <span className="block text-small text-text-muted">
+            <Text size="xs" c="dimmed" truncate w="100%">
               {line.note}
-            </span>
+            </Text>
           ) : null}
-        </button>
-        <span className="shrink-0 font-medium" data-testid="line-total">
+        </UnstyledButton>
+        <Text
+          size="sm"
+          fw={600}
+          style={{ flexShrink: 0 }}
+          data-testid="line-total"
+        >
           <MoneyText paisa={result?.net ?? 0} />
-        </span>
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
+        </Text>
+        <ActionIcon
+          variant="subtle"
+          color="red"
+          size="sm"
           aria-label={`${t('sell.remove_line')} ${line.name}`}
           title={`${t('sell.remove_line')} ${line.name}`}
           onClick={() => p.onRemoveLine(line.key)}
         >
-          <span aria-hidden="true" className="text-title leading-none">
-            ×
-          </span>
-        </button>
-      </div>
+          <span aria-hidden="true">×</span>
+        </ActionIcon>
+      </Group>
 
-      <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+      <Group grow gap="xs" mt="xs" align="flex-start">
         <QtyInput
           dense
           hideLabel
@@ -377,37 +458,43 @@ function LineRow({
           gross={result?.gross ?? 0}
           onChange={(patch) => p.onChangeLine(line.key, patch)}
         />
-      </div>
+      </Group>
 
       {hasBadges ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <Group gap={6} mt="xs" wrap="wrap">
           {result && result.discount > 0 ? (
-            <span
-              className="rounded-full bg-success-subtle px-2 text-small text-success-subtle-ink"
+            <Badge
+              color="green"
+              variant="light"
+              tt="none"
               data-testid="badge-discount"
             >
               <MoneyText paisa={-result.discount} />
-            </span>
+            </Badge>
           ) : null}
           {result?.below_cost === 1 ? (
-            <span
-              className="rounded-full bg-danger-subtle px-2 text-small font-medium text-danger-subtle-ink"
+            <Badge
+              color="red"
+              variant="light"
+              tt="none"
               data-testid="badge-below-cost"
             >
               {t('sell.below_cost')}
-            </span>
+            </Badge>
           ) : null}
           {short ? (
-            <span
-              className="rounded-full bg-warning-subtle px-2 text-small text-warning-subtle-ink"
+            <Badge
+              color="yellow"
+              variant="light"
+              tt="none"
               data-testid="badge-stock"
             >
               {t('sell.only_in_stock', {
                 qty: Math.max(0, Math.floor((onHand ?? 0) / 1000)),
               })}
-            </span>
+            </Badge>
           ) : null}
-        </div>
+        </Group>
       ) : null}
 
       {expanded ? (
@@ -418,7 +505,7 @@ function LineRow({
           onChange={(patch) => p.onChangeLine(line.key, patch)}
         />
       ) : null}
-    </li>
+    </Paper>
   );
 }
 

@@ -1,3 +1,11 @@
+import {
+  ActionIcon,
+  Group,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
@@ -10,9 +18,8 @@ export type SubpageParent =
   | '/udhaar';
 
 /**
- * The shared subpage header: circular back affordance, decorative icon tile, title and
- * optional end actions. Settings, product utilities and Udhaar all use this frame so the
- * same level of the app never has two different headers.
+ * The shared subpage header: circular back, decorative icon tile, title and end actions.
+ * Settings, product utilities and Udhaar all use this frame.
  */
 export function SubpageHeader({
   backTo,
@@ -23,7 +30,6 @@ export function SubpageHeader({
   actions,
 }: {
   backTo: SubpageParent;
-  /** Accessible name of the back link (the destination, not just "Back"). */
   backLabel: string;
   icon?: ReactNode;
   title: string;
@@ -31,39 +37,40 @@ export function SubpageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-start gap-3">
-      <Link
-        to={backTo}
-        aria-label={backLabel}
-        title={backLabel}
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2 active:bg-surface-2"
-      >
-        <span
-          aria-hidden="true"
-          className="text-title leading-none rtl:rotate-180"
+    <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
+      <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
+        <ActionIcon
+          component={Link}
+          to={backTo}
+          aria-label={backLabel}
+          title={backLabel}
+          variant="default"
+          size="lg"
+          radius="md"
         >
-          ‹
-        </span>
-      </Link>
-      {icon ? (
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted"
-        >
-          {icon}
-        </span>
-      ) : null}
-      <div className="min-w-0 flex-1 pt-1.5">
-        <h1 className="text-h1 font-semibold">{title}</h1>
-        {subtitle ? (
-          <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+          <span aria-hidden="true" className="rtl:rotate-180">
+            ‹
+          </span>
+        </ActionIcon>
+        {icon ? (
+          <ThemeIcon size={40} radius="md" variant="light" color="gray">
+            {icon}
+          </ThemeIcon>
         ) : null}
-      </div>
+        <Stack gap={2} style={{ minWidth: 0 }}>
+          <Title order={1}>{title}</Title>
+          {subtitle ? (
+            <Text size="sm" c="dimmed">
+              {subtitle}
+            </Text>
+          ) : null}
+        </Stack>
+      </Group>
       {actions ? (
-        <div className="flex w-full flex-wrap items-center gap-2 sm:ms-auto sm:w-auto">
+        <Group gap="sm" wrap="wrap" justify="flex-end">
           {actions}
-        </div>
+        </Group>
       ) : null}
-    </header>
+    </Group>
   );
 }

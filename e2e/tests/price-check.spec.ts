@@ -174,7 +174,7 @@ test.describe('Price check (T-022)', () => {
       await page.getByRole('button', { name: 'More' }).click();
       await page
         .locator('#more-menu')
-        .getByRole('button', { name: 'Price check' })
+        .getByRole('menuitem', { name: 'Price check' })
         .click();
     } else {
       await page

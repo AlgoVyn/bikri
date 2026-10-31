@@ -1,9 +1,18 @@
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  ThemeIcon,
+  UnstyledButton,
+} from '@mantine/core';
 import { Link, useLocation } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonDanger } from '../components/classes.ts';
 import {
   ClockIcon,
   CloudIcon,
@@ -22,7 +31,7 @@ import { AreaStrings } from '../i18n/areas.tsx';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
-const rowLink = 'flex min-h-14 items-center gap-3 p-3';
+const _rowLink = 'flex min-h-14 items-center gap-3 p-3';
 
 /** The shared Settings index: groups, this-device card and leave action. */
 export function SettingsNav() {
@@ -68,20 +77,17 @@ function SettingsNavContent() {
     }
   };
   return (
-    <div className="flex flex-col gap-5">
+    <Stack gap="lg">
       <PageHeader
         icon={<SettingsIcon />}
         tone="bg-surface-2 text-text-muted"
         title={t('nav.settings')}
         subtitle={t('office.settings.subtitle')}
       />
-      <nav aria-label={t('nav.settings')} className="flex flex-col gap-4">
-        {can('settings.shop') ? (
-          <section>
-            <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-              {t('office.settings.nav_group_shop')}
-            </h2>
-            <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+      <nav aria-label={t('nav.settings')}>
+        <Stack gap="lg">
+          {can('settings.shop') ? (
+            <SettingsGroup title={t('office.settings.nav_group_shop')}>
               <SettingsRow
                 to="/settings/shop"
                 icon={<StoreIcon />}
@@ -102,14 +108,9 @@ function SettingsNavContent() {
                 title={t('office.settings.nav_activity')}
                 hint={t('office.settings.nav_activity_hint')}
               />
-            </ul>
-          </section>
-        ) : null}
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_device')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+            </SettingsGroup>
+          ) : null}
+          <SettingsGroup title={t('office.settings.nav_group_device')}>
             <SettingsRow
               to="/settings/printer"
               icon={<PrinterIcon />}
@@ -130,13 +131,8 @@ function SettingsNavContent() {
               title={t('office.settings.nav_display')}
               hint={t('office.settings.nav_display_hint')}
             />
-          </ul>
-        </section>
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_data')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+          </SettingsGroup>
+          <SettingsGroup title={t('office.settings.nav_group_data')}>
             <SettingsRow
               to="/settings/sync"
               icon={<CloudIcon />}
@@ -165,53 +161,71 @@ function SettingsNavContent() {
               title={t('office.settings.nav_about')}
               hint={t('office.settings.nav_about_hint')}
             />
-          </ul>
-        </section>
+          </SettingsGroup>
+        </Stack>
       </nav>
       {info?.device ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
+        <Paper p="md" withBorder>
+          <Group align="flex-start" gap="sm" wrap="nowrap">
+            <ThemeIcon size={36} radius="md" variant="light" color="gray">
               <DeviceIcon />
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-medium">
+            </ThemeIcon>
+            <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+              <Text size="sm" fw={600}>
                 {t('office.settings.nav_this_device')}
-              </h2>
-              <p
-                className="text-small text-text-muted"
-                data-testid="this-device"
-              >
+              </Text>
+              <Text size="xs" c="dimmed" data-testid="this-device">
                 {info.tenant?.display_name ?? ''} · {info.device.name} ·{' '}
                 {info.device.code} ·{' '}
                 {info.device.is_admin
                   ? t('office.settings.nav_admin_device')
                   : t('office.settings.nav_till_device')}
-              </p>
-            </div>
-          </div>
+              </Text>
+            </Stack>
+          </Group>
           {owner && info.enrolled ? (
-            <>
-              <p className="text-small">
+            <Stack gap="xs" mt="sm">
+              <Text size="xs" c="dimmed">
                 {t('office.settings.nav_leave_hint')}
-              </p>
-              <button
-                type="button"
-                className={`${buttonDanger} self-start`}
+              </Text>
+              <Button
+                color="red"
+                variant="light"
+                size="compact-sm"
                 onClick={() => void leave()}
+                style={{ alignSelf: 'flex-start' }}
               >
                 {t('office.settings.nav_leave')}
-              </button>
+              </Button>
               {leaveError ? (
-                <p role="alert" className="text-danger text-small">
+                <Text role="alert" size="xs" c="red">
                   {leaveError}
-                </p>
+                </Text>
               ) : null}
-            </>
+            </Stack>
           ) : null}
-        </section>
+        </Paper>
       ) : null}
-    </div>
+    </Stack>
+  );
+}
+
+function SettingsGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Stack gap="xs">
+      <Text size="xs" fw={700} c="dimmed" px={4}>
+        {title}
+      </Text>
+      <Paper withBorder style={{ overflow: 'hidden' }}>
+        {children}
+      </Paper>
+    </Stack>
   );
 }
 
@@ -232,38 +246,41 @@ function SettingsRow({
   const current =
     active ?? pathname.replace(/\/+$/u, '') === to.replace(/\/+$/u, '');
   return (
-    <li>
-      <Link
-        to={to}
-        resetScroll={false}
-        onClick={rememberListScroll}
-        aria-current={current ? 'page' : undefined}
-        className={`${rowLink} ${
-          current
-            ? 'bg-primary-subtle text-primary-subtle-ink'
-            : 'hover:bg-surface-2'
-        }`}
-      >
-        <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-control ${
-            current
-              ? 'bg-surface text-primary-subtle-ink'
-              : 'bg-surface-2 text-text-muted'
-          }`}
+    <UnstyledButton
+      component={Link}
+      to={to}
+      resetScroll={false}
+      onClick={rememberListScroll}
+      aria-current={current ? 'page' : undefined}
+      w="100%"
+      px="md"
+      py="sm"
+      style={{
+        borderTop: '1px solid var(--mantine-color-default-border)',
+        background: current ? 'var(--mantine-color-brand-0)' : undefined,
+      }}
+    >
+      <Group gap="md" wrap="nowrap">
+        <ThemeIcon
+          size={36}
+          radius="md"
+          variant={current ? 'filled' : 'light'}
+          color={current ? 'brand' : 'gray'}
         >
           {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium">{title}</span>
-          <span className="block text-small text-text-muted">{hint}</span>
-        </span>
-        <span
-          aria-hidden="true"
-          className="text-title text-text-muted rtl:rotate-180"
-        >
+        </ThemeIcon>
+        <Box style={{ minWidth: 0, flex: 1 }}>
+          <Text size="sm" fw={600} c={current ? 'brand.9' : undefined}>
+            {title}
+          </Text>
+          <Text size="xs" c="dimmed" lineClamp={2}>
+            {hint}
+          </Text>
+        </Box>
+        <Text aria-hidden="true" c="dimmed" className="rtl:rotate-180">
           ›
-        </span>
-      </Link>
-    </li>
+        </Text>
+      </Group>
+    </UnstyledButton>
   );
 }

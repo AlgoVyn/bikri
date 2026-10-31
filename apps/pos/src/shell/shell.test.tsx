@@ -15,12 +15,17 @@ import { initI18n, setLanguage } from '../i18n/i18n.ts';
 import { resetUpdateStore, setUpdateReady } from '../pwa/updateStore.ts';
 import { routeTree } from '../routeTree.gen.ts';
 import { useSession } from '../state/session.ts';
+import { MantineRoot } from '../ui/MantineRoot.tsx';
 
 async function renderAt(entry: string) {
   const history = createMemoryHistory({ initialEntries: [entry] });
   const router = createRouter({ routeTree, history, basepath: BASE_PATH });
   await router.load();
-  render(<RouterProvider router={router} />);
+  render(
+    <MantineRoot>
+      <RouterProvider router={router} />
+    </MantineRoot>,
+  );
   return router;
 }
 
@@ -127,7 +132,7 @@ describe('app shell', () => {
       'Reports',
       'Settings',
     ]) {
-      expect(rail.querySelector(`a[title^="${name} ("]`)).not.toBeNull();
+      expect(rail.querySelector(`a[aria-label^="${name} ("]`)).not.toBeNull();
     }
   });
 
@@ -139,8 +144,8 @@ describe('app shell', () => {
       await screen.findByRole('heading', { name: 'Assalam-o-Alaikum, Sana' }),
     ).toBeTruthy();
     const rail = screen.getByRole('navigation', { name: 'Main' });
-    expect(rail.querySelector('a[title^="Suppliers ("]')).toBeNull();
-    expect(rail.querySelector('a[title^="Sell ("]')).not.toBeNull();
+    expect(rail.querySelector('a[aria-label^="Suppliers ("]')).toBeNull();
+    expect(rail.querySelector('a[aria-label^="Sell ("]')).not.toBeNull();
   });
 
   it('hides profit and drawer cash from a cashier but shows them to the owner', async () => {

@@ -1,8 +1,24 @@
+import {
+  Box,
+  Divider,
+  Group,
+  AppShell as MantineAppShell,
+  Menu,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
+import {
+  MoreIcon,
+  SalesIcon,
+  SearchIcon,
+  SettingsIcon,
+} from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -23,15 +39,14 @@ import {
   useShopName,
 } from './TopBarParts.tsx';
 
-const navLink =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted lg:flex-none lg:py-1.5';
-
-/** Shell pages that are not rail items still need a title on a phone. */
 const EXTRA_TITLES: Record<string, string> = {
   '/day-close': 'home.day_close',
   '/stock/count': 'count.title',
   '/labels': 'products.print_label',
 };
+
+const _railText = 'rgba(241, 245, 249, 0.72)';
+const railMuted = 'rgba(184, 198, 219, 0.78)';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -42,8 +57,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   usePrintService();
   const { can } = useCurrentStaff();
   const shopName = useShopName();
-  const [moreOpen, setMoreOpen] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
+  const desktop = useMediaQuery('(min-width: 1024px)', false, {
+    getInitialValueInEffect: false,
+  });
 
   const allowed = (item: NavItem) => item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
@@ -55,30 +72,31 @@ export function AppShell({ children }: { children: ReactNode }) {
       ? t(extraTitle)
       : null;
   const blocked = current !== undefined && !allowed(current);
+  const more = visible.filter((item) => !item.bar);
 
   useEffect(() => {
     document.title = t('common.app_title');
   }, [t]);
 
-  // Device-level display preferences (screens/17).
   useEffect(() => {
     let alive = true;
     void import('./devicePrefs.ts').then(async (module) => {
       const prefs = await module.loadDevicePrefs(getDb());
-      if (alive) module.applyDevicePrefs(prefs, i18n.language);
+      if (alive)
+        module.applyDevicePrefs(
+          { ...prefs, theme: module.storedTheme() },
+          i18n.language,
+        );
     });
     return () => {
       alive = false;
     };
   }, [i18n.language]);
 
-  // Warm the lazily loaded sale-completion screen as soon as the shell is up, so the first
-  // offline sale on a freshly loaded till can still show "Sale complete" (D-114).
   useEffect(() => {
     void import('../sell/SaleComplete.tsx').catch(() => undefined);
   }, []);
 
-  // T-027: a write attempted in a read-only shop shows one toast instead of a generic failure.
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {
       if (!(event.reason instanceof ReadOnlyError)) return;
@@ -89,17 +107,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('unhandledrejection', onRejection);
   }, [t, toast]);
 
-  // screens/04 AC 2: a hidden screen opened by URL goes Home with a toast.
   useEffect(() => {
     if (!blocked) return;
     toast.push(t('shell.no_access'), 'error');
     void navigate({ to: '/', replace: true });
   }, [blocked, navigate, t, toast]);
 
-  // Re-bound every render so the handler sees the current permissions.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // Ctrl+Shift+P works everywhere, even while typing (screens/18).
       if (
         !event.defaultPrevented &&
         event.ctrlKey &&
@@ -140,176 +155,265 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const more = visible.filter((item) => !item.bar);
-
   return (
-    <div className="min-h-dvh bg-bg text-text">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-ink"
+    <>
+      <MantineAppShell
+        header={{ height: 60 }}
+        navbar={{ width: 88, breakpoint: 'lg', collapsed: { mobile: true } }}
+        padding={0}
+        styles={{
+          header: {
+            background: 'var(--mantine-color-body)',
+            borderBottom: '1px solid var(--mantine-color-default-border)',
+          },
+          navbar: {
+            background: 'var(--bikri-rail, #182e55)',
+            border: 0,
+            borderInlineEnd: '1px solid rgb(255 255 255 / 0.08)',
+          },
+          main: {
+            background: 'var(--mantine-color-body)',
+          },
+        }}
       >
-        {t('shell.skip_content')}
-      </a>
-      <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
-        <span
-          className="min-w-0 flex-1 truncate font-semibold lg:hidden"
-          data-testid="screen-title-bar"
-        >
-          {screenTitle ?? shopName ?? t('common.app_name')}
-        </span>
-        <span className="min-w-0 flex-1 truncate font-medium max-lg:hidden">
-          {screenTitle ?? ''}
-        </span>
-        <div className="flex shrink-0 items-center gap-1 lg:gap-2">
-          <GlobalSearch />
-          {updateReady ? (
-            <button
-              type="button"
-              className={buttonPrimary}
-              onClick={() => applyUpdate()}
-            >
-              {t('shell.update_ready')}
-            </button>
-          ) : null}
-          <SyncBadge />
-          <PrinterDot />
-          {import.meta.env.DEV ? (
-            <Link
-              to="/dev/ui"
-              className="text-small text-primary max-lg:hidden"
-            >
-              {t('shell.ui_kit')}
-            </Link>
-          ) : null}
-          <LanguageSelect />
-          <StaffMenu />
-        </div>
-      </header>
-      <nav
-        aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail"
-      >
-        <div
-          className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
-          data-testid="brand-rail"
-        >
-          <span
-            aria-hidden="true"
-            className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
+        <MantineAppShell.Header>
+          <Group
+            h="100%"
+            px={{ base: 'sm', sm: 'md' }}
+            justify="space-between"
+            wrap="nowrap"
+            gap="sm"
           >
-            <SalesIcon />
-          </span>
-          <span className="text-micro font-semibold uppercase tracking-[0.18em] text-rail-muted">
-            {t('common.app_name')}
-          </span>
-          {shopName ? (
-            <span
-              className="line-clamp-2 max-w-full text-center text-micro leading-tight text-rail-muted"
-              title={shopName}
-              data-testid="rail-shop-name"
-            >
-              {shopName}
-            </span>
-          ) : null}
-        </div>
-        {visible.map((item) => {
-          const active = current?.to === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              title={`${t(item.label)} (${item.keys})`}
-              activeOptions={{ exact: item.to === '/' }}
-              className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
-                active
-                  ? 'text-primary lg:bg-white/10 lg:text-white'
-                  : 'lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink'
-              }`}
-            >
-              {active ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
-                />
-              ) : null}
-              <item.Icon />
-              <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
-                {t(item.label)}
-              </span>
-            </Link>
-          );
-        })}
-        <button
-          type="button"
-          className={`${navLink} max-lg:hidden lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink`}
-          title={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
-          onClick={() => openPriceCheck(true)}
-        >
-          <SearchIcon />
-          <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
-            {t('pricecheck.title')}
-          </span>
-        </button>
-        {more.length > 0 ? (
-          <div className="relative flex min-w-0 flex-1 lg:hidden">
-            <button
-              type="button"
-              className={navLink}
-              aria-expanded={moreOpen}
-              aria-controls="more-menu"
-              onClick={() => setMoreOpen((open) => !open)}
-            >
-              <MoreIcon />
-              <span className="max-w-full truncate">{t('nav.more')}</span>
-            </button>
-            {moreOpen ? (
-              <ul
-                id="more-menu"
-                className="absolute end-1 bottom-full mb-2 w-48 rounded-card border border-border bg-surface py-1 shadow-lg"
+            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+              <Text
+                data-testid="screen-title-bar"
+                fw={650}
+                size="sm"
+                truncate
+                hiddenFrom="lg"
               >
-                <li className="border-b border-border px-3 py-2">
-                  <p className="truncate font-medium">
-                    {shopName ?? t('common.app_name')}
-                  </p>
-                </li>
-                {more.map((item) => (
-                  <li key={item.to}>
-                    <Link
-                      to={item.to}
-                      onClick={() => setMoreOpen(false)}
-                      className="flex min-h-11 items-center gap-3 px-3 text-text aria-[current=page]:text-primary"
-                    >
-                      <item.Icon />
-                      {t(item.label)}
-                    </Link>
-                  </li>
-                ))}
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      openPriceCheck(true);
+                {screenTitle ?? shopName ?? t('common.app_name')}
+              </Text>
+              <Text fw={550} size="sm" truncate visibleFrom="lg">
+                {screenTitle ?? t('common.app_name')}
+              </Text>
+            </Group>
+            <Group gap={4} wrap="nowrap">
+              <GlobalSearch />
+              {updateReady ? (
+                <UnstyledButton
+                  onClick={() => applyUpdate()}
+                  px="sm"
+                  py={6}
+                  style={{
+                    borderRadius: 10,
+                    background: 'var(--mantine-color-brand-6)',
+                    color: 'var(--mantine-color-white)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t('shell.update_ready')}
+                </UnstyledButton>
+              ) : null}
+              <Box visibleFrom="lg">
+                <SyncBadge />
+              </Box>
+              <Box visibleFrom="lg">
+                <PrinterDot />
+              </Box>
+              <LanguageSelect />
+              <StaffMenu />
+            </Group>
+          </Group>
+        </MantineAppShell.Header>
+
+        {desktop ? (
+          <MantineAppShell.Navbar p={0} aria-label={t('nav.rail')}>
+            <Stack justify="space-between" h="100%" gap={0}>
+              <Stack gap={4} p={8} pt="md" style={{ overflowY: 'auto' }}>
+                <Stack
+                  gap={2}
+                  align="center"
+                  mb="sm"
+                  px={2}
+                  data-testid="brand-rail"
+                >
+                  <Box
+                    aria-hidden="true"
+                    style={{
+                      display: 'flex',
+                      width: 38,
+                      height: 38,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 12,
+                      background: 'var(--mantine-color-accent, #4bc2bf)',
+                      color: '#182e55',
                     }}
-                    className="flex min-h-11 w-full items-center gap-3 px-3 text-text"
+                  >
+                    <SalesIcon />
+                  </Box>
+                  <Text
+                    size="9px"
+                    fw={700}
+                    tt="uppercase"
+                    style={{ letterSpacing: '0.18em', color: railMuted }}
+                  >
+                    {t('common.app_name')}
+                  </Text>
+                </Stack>
+                {visible.map((item) => {
+                  const active = current?.to === item.to;
+                  return (
+                    <Tooltip
+                      key={item.to}
+                      label={`${t(item.label)} (${item.keys})`}
+                      position="right"
+                      withArrow
+                      openDelay={400}
+                    >
+                      <Link
+                        to={item.to}
+                        aria-label={`${t(item.label)} (${item.keys})`}
+                        aria-current={active ? 'page' : undefined}
+                        className="bikri-rail-item"
+                        data-active={active || undefined}
+                      >
+                        <item.Icon />
+                        <Text size="10px" lh={1.15} ta="center" tt="none">
+                          {t(item.label)}
+                        </Text>
+                      </Link>
+                    </Tooltip>
+                  );
+                })}
+                <Divider my={6} color="rgba(255,255,255,0.10)" />
+                <Tooltip
+                  label={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
+                  position="right"
+                  withArrow
+                  openDelay={400}
+                >
+                  <UnstyledButton
+                    className="bikri-rail-item"
+                    onClick={() => openPriceCheck(true)}
                   >
                     <SearchIcon />
-                    {t('pricecheck.title')}
-                  </button>
-                </li>
-              </ul>
-            ) : null}
-          </div>
+                    <Text size="10px" lh={1.15} ta="center">
+                      {t('pricecheck.title')}
+                    </Text>
+                  </UnstyledButton>
+                </Tooltip>
+              </Stack>
+              <Stack gap={2} p={8} pb="md" align="center">
+                {import.meta.env.DEV ? (
+                  <UnstyledButton
+                    component={Link}
+                    to="/dev/ui"
+                    style={{ color: railMuted }}
+                  >
+                    <SettingsIcon />
+                  </UnstyledButton>
+                ) : null}
+                {shopName ? (
+                  <Text
+                    size="9px"
+                    ta="center"
+                    lineClamp={2}
+                    title={shopName}
+                    data-testid="rail-shop-name"
+                    style={{ color: railMuted }}
+                  >
+                    {shopName}
+                  </Text>
+                ) : null}
+              </Stack>
+            </Stack>
+          </MantineAppShell.Navbar>
         ) : null}
-      </nav>
-      <main
-        id="main-content"
-        className="pt-topbar pb-tabbar lg:ps-rail lg:pb-0"
-      >
-        <Banners />
-        {blocked ? null : children}
-      </main>
+
+        <MantineAppShell.Main className="pb-[76px] lg:pb-0">
+          <Banners />
+          {blocked ? null : children}
+        </MantineAppShell.Main>
+      </MantineAppShell>
+
+      {!desktop ? (
+        <Box
+          component="nav"
+          aria-label={t('nav.rail')}
+          className="fixed inset-x-0 bottom-0 z-30"
+          style={{
+            borderTop: '1px solid var(--mantine-color-default-border)',
+            background: 'var(--mantine-color-body)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
+        >
+          <Group gap={0} justify="space-around" align="stretch" wrap="nowrap">
+            {visible
+              .filter((item) => item.bar)
+              .map((item) => {
+                const active = current?.to === item.to;
+                return (
+                  <UnstyledButton
+                    key={item.to}
+                    component={Link}
+                    to={item.to}
+                    className="bikri-tab-item"
+                    data-active={active || undefined}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <item.Icon />
+                    <Text size="10px" lh={1.1}>
+                      {t(item.label)}
+                    </Text>
+                  </UnstyledButton>
+                );
+              })}
+            {more.length > 0 ? (
+              <Menu position="top-end" width={220} shadow="lg" radius="md">
+                <Menu.Target>
+                  <UnstyledButton className="bikri-tab-item">
+                    <MoreIcon />
+                    <Text size="10px" lh={1.1}>
+                      {t('nav.more')}
+                    </Text>
+                  </UnstyledButton>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Box id="more-menu">
+                    <Menu.Label>{shopName ?? t('common.app_name')}</Menu.Label>
+                    {more.map((item) => (
+                      <Menu.Item
+                        key={item.to}
+                        component={Link}
+                        to={item.to}
+                        leftSection={<item.Icon />}
+                      >
+                        {t(item.label)}
+                      </Menu.Item>
+                    ))}
+                    <Menu.Divider />
+                    <Menu.Item
+                      leftSection={<SearchIcon />}
+                      onClick={() => openPriceCheck(true)}
+                    >
+                      {t('pricecheck.title')}
+                    </Menu.Item>
+                    <Menu.Divider />
+                    <Box px="sm" py={4} hiddenFrom="lg">
+                      <SyncBadge compact />
+                      <PrinterDot compact />
+                    </Box>
+                  </Box>
+                </Menu.Dropdown>
+              </Menu>
+            ) : null}
+          </Group>
+        </Box>
+      ) : null}
+
       <PriceCheck />
-    </div>
+    </>
   );
 }

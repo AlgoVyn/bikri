@@ -60,11 +60,11 @@ test.describe('Home and shell (T-013)', () => {
       await expect(nav.getByRole('link', { name: /Suppliers/ })).toBeHidden();
       await nav.getByRole('button', { name: 'More' }).click();
       await expect(
-        page.locator('#more-menu').getByRole('link', { name: 'Suppliers' }),
+        page.locator('#more-menu').getByRole('menuitem', { name: 'Suppliers' }),
       ).toBeVisible();
       await page
         .locator('#more-menu')
-        .getByRole('link', { name: 'Reports' })
+        .getByRole('menuitem', { name: 'Reports' })
         .click();
       await expect(page).toHaveURL(/\/bikri\/reports$/);
       await nav.getByRole('link', { name: /Home/ }).click();
@@ -206,7 +206,7 @@ test.describe('Home and shell (T-013)', () => {
     await openReadyShop(page, '/bikri/');
     await page.getByRole('button', { name: 'Staff menu' }).click();
     await expect(
-      page.getByRole('button', { name: /Lock/ }).locator('svg'),
+      page.getByRole('menuitem', { name: /Lock/ }).locator('svg'),
     ).toHaveCount(1);
     await expect(
       page.getByTestId('staff-menu-user').locator('svg'),

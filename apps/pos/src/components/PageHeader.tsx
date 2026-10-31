@@ -1,8 +1,9 @@
+import { Group, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import type { ReactNode } from 'react';
 
 /**
- * The shared page header (reference: page icon + title + short subtitle, actions at the end).
- * The icon is decorative; the h1 is the accessible title.
+ * The shared page header: icon tile, title, optional subtitle and end actions.
+ * The icon is decorative; the heading is the accessible title.
  */
 export function PageHeader({
   icon,
@@ -19,30 +20,35 @@ export function PageHeader({
   tone?: string;
   headingLevel?: 'h1' | 'h2';
 }) {
-  const Heading = headingLevel;
+  const color = tone.includes('warning')
+    ? 'yellow'
+    : tone.includes('success')
+      ? 'green'
+      : tone.includes('danger')
+        ? 'red'
+        : 'brand';
   return (
-    <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start">
-      <div className="flex min-w-0 items-start gap-3 md:flex-1">
+    <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
+      <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
         {icon ? (
-          <span
-            aria-hidden="true"
-            className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tone}`}
-          >
+          <ThemeIcon size={44} radius="md" variant="light" color={color}>
             {icon}
-          </span>
+          </ThemeIcon>
         ) : null}
-        <div className="min-w-0 flex-1">
-          <Heading className="text-h1 font-semibold">{title}</Heading>
+        <Stack gap={2} style={{ minWidth: 0 }}>
+          <Title order={headingLevel === 'h2' ? 2 : 1}>{title}</Title>
           {subtitle ? (
-            <p className="mt-0.5 text-small text-text-muted">{subtitle}</p>
+            <Text size="sm" c="dimmed">
+              {subtitle}
+            </Text>
           ) : null}
-        </div>
-      </div>
+        </Stack>
+      </Group>
       {actions ? (
-        <div className="flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
+        <Group gap="sm" wrap="wrap" justify="flex-end">
           {actions}
-        </div>
+        </Group>
       ) : null}
-    </header>
+    </Group>
   );
 }

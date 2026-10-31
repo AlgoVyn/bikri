@@ -38,13 +38,15 @@ function DisplayContent() {
   const [form, setForm] = useState<DevicePrefs>(DEFAULT_PREFS);
   const [gap, setGap] = useState<number | null>(null);
   const last = useRef<number | null>(null);
+  const loaded = useRef(false);
   useEffect(() => {
-    if (stored) setForm(stored);
+    // Load the saved prefs once. A live-query refresh after the user changes a control must
+    // not snap the form back to the stored value.
+    if (stored && !loaded.current) {
+      loaded.current = true;
+      setForm(stored);
+    }
   }, [stored]);
-  useEffect(() => {
-    applyDevicePrefs(form, i18n.language);
-  }, [form, i18n.language]);
-
   const change = (patch: Partial<DevicePrefs>) => {
     const next = { ...form, ...patch };
     setForm(next);

@@ -1,5 +1,6 @@
 import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
+import { Badge, Button, Group, TextInput } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -496,7 +497,7 @@ export function SellPage() {
 
   return (
     <div
-      className={`fixed inset-x-0 top-topbar bottom-tabbar flex lg:start-rail lg:bottom-0 ${sheet ? 'z-40' : ''}`}
+      className={`fixed inset-x-0 top-[60px] bottom-[76px] flex lg:bottom-0 lg:start-[88px] ${sheet ? 'z-[150]' : ''}`}
     >
       <section
         aria-label={t('sell.find_products')}
@@ -507,70 +508,77 @@ export function SellPage() {
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
           </label>
-          <div className="flex h-14 items-center gap-2 rounded-control border border-border bg-surface px-4 shadow-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-            <SearchIcon />
-            <input
-              id="sell-search"
-              ref={searchRef}
-              type="search"
-              role="combobox"
-              aria-expanded={searching}
-              aria-controls="sell-results"
-              aria-activedescendant={
-                highlight >= 0 ? `sell-result-${highlight}` : undefined
+          <TextInput
+            id="sell-search"
+            ref={searchRef}
+            type="search"
+            role="combobox"
+            size="lg"
+            radius="md"
+            leftSection={<SearchIcon />}
+            aria-expanded={searching}
+            aria-controls="sell-results"
+            aria-activedescendant={
+              highlight >= 0 ? `sell-result-${highlight}` : undefined
+            }
+            autoComplete="off"
+            placeholder={t('sell.search_placeholder')}
+            value={query}
+            rightSection={
+              nextQty ? (
+                <Badge
+                  color="brand"
+                  variant="light"
+                  radius="xl"
+                  data-testid="next-qty"
+                >
+                  ×{nextQty / 1000}
+                </Badge>
+              ) : undefined
+            }
+            rightSectionWidth={nextQty ? 64 : undefined}
+            styles={{
+              input: { height: 56, fontSize: 'var(--mantine-font-size-md)' },
+            }}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              const now = performance.now();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const rapid = isRapidBarcode(
+                  stamps.current,
+                  now,
+                  e.currentTarget.value,
+                );
+                stamps.current = [];
+                const value = e.currentTarget.value;
+                // A scanner types the next code straight away: empty the box now.
+                if (rapid) setQuery('');
+                void onEnter(value, rapid);
+                return;
               }
-              autoComplete="off"
-              placeholder={t('sell.search_placeholder')}
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                const now = performance.now();
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  const rapid = isRapidBarcode(
-                    stamps.current,
-                    now,
-                    e.currentTarget.value,
-                  );
-                  stamps.current = [];
-                  const value = e.currentTarget.value;
-                  // A scanner types the next code straight away: empty the box now.
-                  if (rapid) setQuery('');
-                  void onEnter(value, rapid);
-                  return;
-                }
-                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                  if (!searching) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setHighlight((h) =>
-                    Math.min(
-                      results.length - 1,
-                      Math.max(0, h + (e.key === 'ArrowDown' ? 1 : -1)),
-                    ),
-                  );
-                  return;
-                }
-                if (e.key === 'Escape' && query) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setQuery('');
-                  return;
-                }
-                if (e.key.length === 1)
-                  stamps.current = [...stamps.current, now].slice(-64);
-              }}
-            />
-            {nextQty ? (
-              <span
-                className="rounded-full bg-primary-subtle px-2 text-small text-primary-subtle-ink"
-                data-testid="next-qty"
-              >
-                ×{nextQty / 1000}
-              </span>
-            ) : null}
-          </div>
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (!searching) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setHighlight((h) =>
+                  Math.min(
+                    results.length - 1,
+                    Math.max(0, h + (e.key === 'ArrowDown' ? 1 : -1)),
+                  ),
+                );
+                return;
+              }
+              if (e.key === 'Escape' && query) {
+                e.preventDefault();
+                e.stopPropagation();
+                setQuery('');
+                return;
+              }
+              if (e.key.length === 1)
+                stamps.current = [...stamps.current, now].slice(-64);
+            }}
+          />
         </search>
         {!searching ? (
           <CategoryChips selected={categoryId} onPick={setCategoryId} />
@@ -629,43 +637,41 @@ export function SellPage() {
             />
           )}
         </div>
-        <div className="flex gap-2 max-lg:hidden">
-          <button
-            type="button"
-            className={buttonQuiet}
+        <Group gap="sm" visibleFrom="lg">
+          <Button
+            variant="default"
             onClick={() => {
               setQuickName('');
               setDialog('quick');
             }}
           >
             {t('sell.quick_sale')}
-          </button>
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => setDialog('held')}
-          >
+          </Button>
+          <Button variant="default" onClick={() => setDialog('held')}>
             {t('sell.held_bills', { count: heldCount })}
-          </button>
-        </div>
-        <button
-          type="button"
-          className={`${buttonPrimary} min-h-14 justify-between gap-2 lg:hidden`}
+          </Button>
+        </Group>
+        <Button
+          size="lg"
+          fullWidth
+          hiddenFrom="lg"
           data-testid="cart-bar"
           aria-expanded={sheet}
           onClick={() => setSheet(true)}
         >
-          <span className="min-w-0 truncate">
-            {t('sell.view_cart', { count: cart.lines.length })}
-          </span>
-          <span className="shrink-0">
-            <MoneyText paisa={totals.total} />
-          </span>
-        </button>
+          <Group justify="space-between" w="100%">
+            <span className="min-w-0 truncate">
+              {t('sell.view_cart', { count: cart.lines.length })}
+            </span>
+            <span className="shrink-0">
+              <MoneyText paisa={totals.total} />
+            </span>
+          </Group>
+        </Button>
       </section>
       <aside
         aria-label={t('sell.cart')}
-        className={`flex-col border-border bg-surface p-3 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
+        className={`flex-col border-border bg-surface p-3 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-[150] flex' : 'hidden'}`}
       >
         {sheet ? (
           <button
@@ -851,34 +857,35 @@ function CategoryChips({
       [],
     ) ?? [];
   if (cats.length === 0) return null;
-  const chip = (on: boolean) =>
-    `min-h-11 shrink-0 rounded-full border px-3 text-small ${on ? 'border-primary bg-primary text-primary-ink' : 'border-border bg-surface'}`;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a row of filter chips
-    <div
-      className="flex gap-2 overflow-x-auto"
+    <Group
+      gap="xs"
+      wrap="nowrap"
       aria-label={t('sell.categories')}
       role="group"
+      style={{ overflowX: 'auto', paddingBottom: 2 }}
     >
-      <button
-        type="button"
+      <Button
+        size="sm"
+        radius="xl"
+        variant={selected === null ? 'filled' : 'default'}
         aria-pressed={selected === null}
-        className={chip(selected === null)}
         onClick={() => onPick(null)}
       >
         {t('sell.all')}
-      </button>
+      </Button>
       {cats.map((c) => (
-        <button
+        <Button
           key={c.id}
-          type="button"
+          size="sm"
+          radius="xl"
+          variant={selected === c.id ? 'filled' : 'default'}
           aria-pressed={selected === c.id}
-          className={chip(selected === c.id)}
           onClick={() => onPick(c.id)}
         >
           {categoryName(c, i18n.language)}
-        </button>
+        </Button>
       ))}
-    </div>
+    </Group>
   );
 }

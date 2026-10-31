@@ -1,6 +1,17 @@
+import {
+  Avatar,
+  Badge,
+  Box,
+  Group,
+  Menu,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LockIcon, UserIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
@@ -36,6 +47,15 @@ export function useOnline(): boolean {
   return online;
 }
 
+const dot = (
+  <Box
+    aria-hidden="true"
+    w={6}
+    h={6}
+    style={{ borderRadius: 999, background: 'currentColor' }}
+  />
+);
+
 /** Rail badge (03 §7): synced, pending, offline, error, outdated, downloading, read-only, quota. */
 export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
@@ -65,7 +85,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
           minutes: Math.max(0, Math.round((Date.now() - at) / 60_000)),
         })
       : t('shell.sync_never');
-  let tone = 'bg-success-subtle text-success-subtle-ink';
+  let color = 'success';
   let label = t('shell.sync_synced');
   let detail = t('shell.sync_detail_synced', {
     ago: ago(counts.lastSync),
@@ -78,38 +98,37 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         ? Math.round((sync.progress.done / sync.progress.total) * 100)
         : 0;
     state = 'downloading';
-    tone = 'bg-info-subtle text-info-subtle-ink';
+    color = 'brand';
     label = t('shell.sync_downloading', { pct });
     detail = label;
   } else if (sync.phase === 'outdated') {
     state = 'outdated';
-    tone = 'bg-info-subtle text-info-subtle-ink';
+    color = 'brand';
     label = t('shell.sync_outdated');
     detail = label;
   } else if (counts.readOnly) {
     state = 'read-only';
-    tone = 'bg-surface-2 text-text-muted';
+    color = 'gray';
     label = t('shell.sync_read_only');
     detail = t('shell.sync_detail_read_only', { count: counts.pending });
   } else if (!online || sync.phase === 'offline') {
     state = 'offline';
-    tone = 'bg-surface-2 text-text-muted';
+    color = 'gray';
     label = t('shell.sync_offline');
     detail = t('shell.sync_detail_offline', { count: counts.pending });
   } else if (sync.phase === 'suspended') {
-    // 13 §7.2: a suspended shop keeps selling offline; ops stay on the device.
     state = 'paused';
-    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    color = 'warning';
     label = t('shell.sync_paused');
     detail = t('shell.sync_detail_paused', { count: counts.pending });
   } else if (sync.phase === 'quota') {
     state = 'quota';
-    tone = 'bg-warning-subtle text-warning-subtle-ink';
+    color = 'warning';
     label = t('shell.sync_quota');
     detail = label;
   } else if (counts.failed > 0 || sync.phase === 'error') {
     state = 'error';
-    tone = 'bg-danger-subtle text-danger-subtle-ink';
+    color = 'danger';
     label = t('shell.sync_problem');
     detail = t('shell.sync_detail_error', {
       message:
@@ -117,7 +136,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
     });
   } else if (counts.pending > 0) {
     state = 'pending';
-    tone = 'bg-surface-2 text-text-muted';
+    color = 'gray';
     label = t('shell.sync_waiting', { count: counts.pending });
     detail = t('shell.sync_detail_pending', {
       count: counts.pending,
@@ -127,23 +146,38 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
     label = t('shell.sync_syncing');
   }
   return (
-    <Link
-      to="/settings/sync"
-      data-testid={compact ? 'sync-badge-menu' : 'sync-badge'}
-      data-state={state}
-      // axe label-content-name-mismatch: the accessible name starts with the visible text.
-      aria-label={detail === label ? label : `${label}. ${detail}`}
-      title={detail}
-      className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
-    >
-      <span aria-hidden="true" className="size-2 rounded-full bg-current" />
-      <span className={compact ? '' : 'max-lg:hidden'}>{label}</span>
-      {state === 'pending' && !compact ? (
-        <bdi className="lg:hidden" aria-hidden="true">
-          {counts.pending}
-        </bdi>
-      ) : null}
-    </Link>
+    <Tooltip label={detail} withArrow openDelay={300}>
+      <UnstyledButton
+        component={Link}
+        to="/settings/sync"
+        data-testid={compact ? 'sync-badge-menu' : 'sync-badge'}
+        data-state={state}
+        aria-label={detail === label ? label : `${label}. ${detail}`}
+      >
+        <Badge
+          variant="light"
+          color={color}
+          size={compact ? 'md' : 'lg'}
+          leftSection={dot}
+          radius="xl"
+          styles={{
+            root: {
+              height: 32,
+              maxWidth: compact ? 220 : 190,
+              textTransform: 'none',
+              fontWeight: 600,
+            },
+            label: {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            },
+          }}
+        >
+          {label}
+        </Badge>
+      </UnstyledButton>
+    </Tooltip>
   );
 }
 
@@ -166,34 +200,54 @@ export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
       ? t('shell.printer_ready')
       : t('shell.printer_none');
   const visible = failed ? detail : printer ? detail : t('shell.printer_no');
+  const color = loading
+    ? 'gray'
+    : failed
+      ? 'danger'
+      : printer
+        ? 'success'
+        : 'gray';
   return (
-    <Link
-      to="/settings/printer"
-      data-testid={compact ? 'printer-dot-menu' : 'printer-dot'}
-      aria-label={visible === detail ? detail : `${visible}. ${detail}`}
-      title={detail}
-      className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${
-        loading
-          ? 'bg-surface-2 text-text-muted'
-          : failed
-            ? 'bg-danger-subtle text-danger-subtle-ink'
-            : printer
-              ? 'bg-success-subtle text-success-subtle-ink'
-              : 'bg-surface-2 text-text-muted'
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`size-2 rounded-full ${
-          loading || (!printer && !failed)
-            ? 'bg-border-strong'
+    <Tooltip label={detail} withArrow openDelay={300}>
+      <UnstyledButton
+        component={Link}
+        to="/settings/printer"
+        data-testid={compact ? 'printer-dot-menu' : 'printer-dot'}
+        aria-label={visible === detail ? detail : `${visible}. ${detail}`}
+        className={
+          loading
+            ? 'bg-surface-2 text-text-muted'
             : failed
-              ? 'bg-danger'
-              : 'bg-success'
-        }`}
-      />
-      <span>{visible}</span>
-    </Link>
+              ? 'bg-danger-subtle text-danger-subtle-ink'
+              : printer
+                ? 'bg-success-subtle text-success-subtle-ink'
+                : 'bg-surface-2 text-text-muted'
+        }
+      >
+        <Badge
+          variant="light"
+          color={color}
+          size={compact ? 'md' : 'lg'}
+          leftSection={dot}
+          radius="xl"
+          styles={{
+            root: {
+              height: 32,
+              maxWidth: compact ? 220 : 170,
+              textTransform: 'none',
+              fontWeight: 600,
+            },
+            label: {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            },
+          }}
+        >
+          {visible}
+        </Badge>
+      </UnstyledButton>
+    </Tooltip>
   );
 }
 
@@ -202,73 +256,58 @@ export function StaffMenu() {
   const { t } = useTranslation();
   const { staff, role, support } = useCurrentStaff();
   const lock = useSession((s) => s.lock);
-  const [open, setOpen] = useState(false);
-  const menuId = useId();
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
   const name = support ? t('lock.support_profile') : String(staff?.name ?? '');
+  const initial = name.slice(0, 1).toUpperCase() || '?';
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={t('shell.staff_menu')}
-        aria-expanded={open}
-        aria-controls={menuId}
-        className="flex size-11 items-center justify-center"
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <span className="flex size-9 items-center justify-center rounded-full bg-primary font-semibold text-primary-ink ring-2 ring-primary-subtle">
-          {name.slice(0, 1).toUpperCase() || '?'}
-        </span>
-      </button>
-      {open ? (
-        <div
-          id={menuId}
-          className="absolute end-0 top-12 z-40 w-56 rounded-card border border-border bg-surface p-3 shadow-lg"
+    <Menu position="bottom-end" width={250} shadow="lg" radius="md">
+      <Menu.Target>
+        <UnstyledButton
+          aria-label={t('shell.staff_menu')}
+          style={{ display: 'flex', alignItems: 'center' }}
         >
-          <div className="flex items-center gap-2">
-            <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
-              data-testid="staff-menu-user"
-            >
+          <Avatar color="brand" radius="xl" size={36} variant="filled">
+            {initial}
+          </Avatar>
+        </UnstyledButton>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Label>
+          <Group gap="sm" wrap="nowrap">
+            <Avatar color="brand" variant="light" radius="xl" size={32}>
               <UserIcon />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium">{name}</p>
-              <p className="text-small text-text-muted">
+            </Avatar>
+            <Stack gap={0} style={{ minWidth: 0 }}>
+              <Group gap={4} wrap="nowrap" data-testid="staff-menu-user">
+                <UserIcon />
+                <Text size="sm" fw={600} truncate>
+                  {name}
+                </Text>
+              </Group>
+              <Text size="xs" c="dimmed" truncate>
                 {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2 lg:hidden">
+              </Text>
+            </Stack>
+          </Group>
+        </Menu.Label>
+        <Box hiddenFrom="lg" px="xs" pb="xs">
+          <Stack gap={6} align="flex-start">
             <SyncBadge compact />
             <PrinterDot compact />
-          </div>
-          <button
-            type="button"
-            title={`${t('shell.lock')} (Ctrl+L)`}
-            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-control px-2 text-start hover:bg-surface-2"
-            onClick={() => {
-              setOpen(false);
-              lock();
-            }}
-          >
-            <LockIcon />
-            {t('shell.lock')}
-          </button>
-        </div>
-      ) : null}
-    </div>
+          </Stack>
+        </Box>
+        <Menu.Divider hiddenFrom="lg" />
+        <Menu.Item
+          leftSection={<LockIcon />}
+          onClick={() => lock()}
+          rightSection={
+            <Text size="xs" c="dimmed">
+              Ctrl+L
+            </Text>
+          }
+        >
+          {t('shell.lock')}
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
   );
 }

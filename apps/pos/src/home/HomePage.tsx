@@ -1,8 +1,22 @@
 import { businessDate, type Permission } from '@bikri/core';
+import {
+  Badge,
+  Box,
+  Button,
+  Divider,
+  Grid,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import {
   ClockIcon,
   ProductsIcon,
@@ -70,7 +84,7 @@ const ATTENTION_LINK: Record<string, string> = {
   held_expiring: '/sell',
 };
 
-/** Home (screens/04). */
+/** Home (screens/04): a calm daily overview with one obvious next action. */
 export function HomePage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -131,253 +145,230 @@ export function HomePage() {
   ].filter((tile) => tile.perm === null || can(tile.perm));
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-4 lg:p-6">
-      <header>
-        <h1 className="text-h1 font-semibold">
-          {t('home.greeting', { name: String(staff?.name ?? '') })}
-        </h1>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-text-muted">
-          <span>{dateText}</span>
-          {data?.branchName ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>{data.branchName}</span>
-            </>
-          ) : null}
-          {online ? null : (
-            <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-warning-subtle-ink">
-              {t('home.as_of_device')}
-            </span>
-          )}
-        </p>
-      </header>
+    <Stack gap="xl" maw={1220} mx="auto" p={{ base: 'md', lg: 'xl' }}>
+      <Group justify="space-between" align="flex-start" gap="md">
+        <Stack gap={4}>
+          <Title order={1}>
+            {t('home.greeting', { name: String(staff?.name ?? '') })}
+          </Title>
+          <Group gap="xs" wrap="wrap">
+            <Text size="sm" c="dimmed">
+              {dateText}
+            </Text>
+            {data?.branchName ? (
+              <>
+                <Text size="sm" c="dimmed" aria-hidden="true">
+                  ·
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {data.branchName}
+                </Text>
+              </>
+            ) : null}
+            {online ? null : (
+              <Badge color="warning" variant="filled" radius="xl">
+                {t('home.as_of_device')}
+              </Badge>
+            )}
+          </Group>
+        </Stack>
+      </Group>
 
       {justSetUp ? (
-        <section
-          className="rounded-card border border-border bg-surface p-4 shadow-card"
-          aria-labelledby="ready-heading"
-        >
-          <h2 id="ready-heading" className="text-h2 font-semibold">
-            {t('setup.ready')}
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={buttonPrimary}
-              onClick={() => {
-                setJustSetUp(false);
-                void navigate({ to: '/sell' });
-              }}
-            >
-              {t('setup.start_selling')}
-            </button>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => {
-                setJustSetUp(false);
-                void navigate({ to: '/settings' });
-              }}
-            >
-              {t('setup.setup_printer')}
-            </button>
-          </div>
-        </section>
+        <Paper p="lg" withBorder>
+          <Stack gap="sm">
+            <Title order={2}>{t('setup.ready')}</Title>
+            <Group gap="sm">
+              <Button
+                onClick={() => {
+                  setJustSetUp(false);
+                  void navigate({ to: '/sell' });
+                }}
+              >
+                {t('setup.start_selling')}
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setJustSetUp(false);
+                  void navigate({ to: '/settings' });
+                }}
+              >
+                {t('setup.setup_printer')}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
       ) : null}
 
       {data && data.products === 0 ? (
-        <div className="flex flex-col gap-6">
-          <section
-            className="rounded-card border border-border bg-surface p-4 shadow-card"
-            aria-labelledby="first-heading"
-          >
-            <div className="flex items-start gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-                <ProductsIcon />
-              </span>
-              <div className="min-w-0">
-                <h2 id="first-heading" className="text-h2 font-semibold">
-                  {t('home.first_products')}
-                </h2>
-                <p className="mt-1 text-text-muted">{t('home.no_products')}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {can('catalog.edit') ? (
-                <>
-                  <Link to="/products/new" className={buttonPrimary}>
-                    {t('home.add_product')}
-                  </Link>
-                  <Link to="/products/import" className={buttonQuiet}>
-                    {t('home.import')}
-                  </Link>
-                  <Link to="/products/suggested" className={buttonQuiet}>
-                    {t('home.suggested')}
-                  </Link>
-                </>
-              ) : null}
-            </div>
-          </section>
-          <QuickActions tiles={tiles} />
-          <RecentBillsCard data={data} timeText={timeText} />
-        </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div className="contents lg:col-start-1 lg:flex lg:flex-col lg:gap-6">
-            <Link
-              to="/sell"
-              className="group order-1 flex min-h-24 items-center gap-4 rounded-card border border-primary/30 bg-primary-subtle p-4 shadow-card hover:border-primary"
-            >
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-control bg-primary text-primary-ink">
-                <SellIcon />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-title font-semibold">
-                  {t('home.new_sale')}
-                </span>
-                <span className="block text-small text-primary-subtle-ink">
-                  {t('home.new_sale_hint')}
-                </span>
-              </span>
-              <span
-                aria-hidden="true"
-                className="text-title text-primary rtl:rotate-180"
+        <Paper p="lg" withBorder>
+          <Group align="flex-start" gap="md" wrap="nowrap">
+            <ThemeIcon size={44} radius="md" variant="light">
+              <ProductsIcon />
+            </ThemeIcon>
+            <Stack gap={4} style={{ minWidth: 0 }}>
+              <Title order={2}>{t('home.first_products')}</Title>
+              <Text c="dimmed">{t('home.no_products')}</Text>
+            </Stack>
+          </Group>
+          {can('catalog.edit') ? (
+            <Group gap="sm" mt="md">
+              <Button component={Link} to="/products/new">
+                {t('home.add_product')}
+              </Button>
+              <Button component={Link} to="/products/import" variant="default">
+                {t('home.import')}
+              </Button>
+              <Button
+                component={Link}
+                to="/products/suggested"
+                variant="subtle"
               >
-                ›
-              </span>
-            </Link>
+                {t('home.suggested')}
+              </Button>
+            </Group>
+          ) : null}
+        </Paper>
+      ) : null}
 
-            <div className="order-3">
-              <QuickActions tiles={tiles} />
-            </div>
+      <UnstyledButton component={Link} to="/sell" w="100%">
+        <Paper
+          p={{ base: 'lg', sm: 'xl' }}
+          radius="lg"
+          style={{
+            background:
+              'linear-gradient(135deg, var(--mantine-color-brand-7) 0%, var(--mantine-color-brand-9) 100%)',
+            color: 'var(--mantine-color-white)',
+          }}
+        >
+          <Group wrap="nowrap" gap="lg">
+            <ThemeIcon
+              size={56}
+              radius="lg"
+              variant="white"
+              color="brand"
+              style={{ color: 'var(--mantine-color-brand-7)' }}
+            >
+              <SellIcon />
+            </ThemeIcon>
+            <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+              <Text fw={650} fz={20}>
+                {t('home.new_sale')}
+              </Text>
+              <Text size="sm" style={{ color: 'rgba(255,255,255,0.78)' }}>
+                {t('home.new_sale_hint')}
+              </Text>
+            </Stack>
+            <Text
+              aria-hidden="true"
+              fz={28}
+              style={{ opacity: 0.75 }}
+              className="rtl:rotate-180"
+            >
+              ›
+            </Text>
+          </Group>
+        </Paper>
+      </UnstyledButton>
 
+      <Grid gap="xl">
+        <Grid.Col span={{ base: 12, lg: 8 }} order={{ base: 2, lg: 1 }}>
+          <Stack gap="xl">
+            <QuickActions tiles={tiles} />
             {data && data.attention.length > 0 ? (
-              <section aria-labelledby="attention-heading" className="order-5">
-                <h2
-                  id="attention-heading"
-                  className="mb-2 text-small font-semibold text-text-muted"
-                >
-                  {t('home.attention')}
-                </h2>
-                <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
-                  {data.attention.map((item) => (
-                    <li key={item.kind}>
-                      <Link
-                        to={ATTENTION_LINK[item.kind] ?? '/'}
-                        className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium hover:bg-surface-2 ${attentionTone(item)}`}
-                        data-testid={`attn-${item.kind}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="size-2 shrink-0 rounded-full bg-current"
-                        />
-                        <span className="min-w-0 flex-1">
-                          {attentionText(t, i18n.language, item)}
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className="text-base text-text-muted rtl:rotate-180"
-                        >
-                          ›
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+              <AttentionList items={data.attention} />
             ) : null}
-          </div>
-
-          <aside className="contents lg:col-start-2 lg:flex lg:flex-col lg:gap-4">
-            <div className="order-2">
-              {data ? (
-                <RegisterCard
-                  data={data}
-                  showCash={can('dayclose.view_expected')}
-                  showProfit={can('cost.view')}
-                  canClose={can('dayclose.create')}
-                  timeText={timeText}
-                />
-              ) : null}
-            </div>
-            <div className="order-4">
-              <RecentBillsCard data={data} timeText={timeText} />
-            </div>
-          </aside>
-        </div>
-      )}
-    </div>
+          </Stack>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, lg: 4 }} order={{ base: 1, lg: 2 }}>
+          <Stack gap="lg">
+            {data ? (
+              <RegisterCard
+                data={data}
+                showCash={can('dayclose.view_expected')}
+                showProfit={can('cost.view')}
+                canClose={can('dayclose.create')}
+                timeText={timeText}
+              />
+            ) : null}
+            <RecentBillsCard data={data} timeText={timeText} />
+          </Stack>
+        </Grid.Col>
+      </Grid>
+    </Stack>
   );
 }
 
-function sectionLabel(_lang: string): string {
-  return 'text-small font-semibold text-text-muted';
-}
-
 function QuickActions({ tiles }: { tiles: readonly QuickTile[] }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
   return (
-    <section aria-labelledby="quick-heading">
-      <h2 id="quick-heading" className={`mb-2 ${sectionLabel(i18n.language)}`}>
-        {t('home.quick_actions')}
-      </h2>
-      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map((tile) => (
-          <li key={tile.to + tile.label}>
-            <Link
+    <Box component="section" aria-labelledby="quick-heading">
+      <Stack gap="sm">
+        <Title order={3} id="quick-heading" fz="sm" c="dimmed">
+          {t('home.quick_actions')}
+        </Title>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+          {tiles.map((tile) => (
+            <UnstyledButton
+              key={tile.to + tile.label}
+              component={Link}
               to={tile.to}
               title={`${t(tile.label)} (${tile.keys})`}
-              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card hover:border-border-strong hover:bg-surface-2"
+              h="100%"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-                <tile.Icon />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-small font-medium">
-                  {t(tile.label)}
-                </span>
-                <span className="mt-0.5 block text-small text-text-muted">
-                  {t(tile.desc)}
-                </span>
-              </span>
-              <span
-                aria-hidden="true"
-                className="text-title text-text-muted rtl:rotate-180"
-              >
-                ›
-              </span>
-            </Link>
-          </li>
-        ))}
-        <li>
-          <button
-            type="button"
+              <Paper p="md" h="100%" withBorder>
+                <Group align="flex-start" wrap="nowrap" gap="sm">
+                  <ThemeIcon size={40} radius="md" variant="light">
+                    <tile.Icon />
+                  </ThemeIcon>
+                  <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                    <Text size="sm" fw={600} lineClamp={1}>
+                      {t(tile.label)}
+                    </Text>
+                    <Text size="xs" c="dimmed" lineClamp={1}>
+                      {t(tile.desc)}
+                    </Text>
+                  </Stack>
+                  <Text
+                    aria-hidden="true"
+                    c="dimmed"
+                    className="rtl:rotate-180"
+                  >
+                    ›
+                  </Text>
+                </Group>
+              </Paper>
+            </UnstyledButton>
+          ))}
+          <UnstyledButton
             title={`${t('home.price_check')} (Ctrl+Shift+P)`}
             onClick={() => openPriceCheck(true)}
-            className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card hover:border-border-strong hover:bg-surface-2"
+            h="100%"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-              <SearchIcon />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-small font-medium">
-                {t('home.price_check')}
-              </span>
-              <span className="mt-0.5 block text-small text-text-muted">
-                {t('home.desc_price_check')}
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="text-title text-text-muted rtl:rotate-180"
-            >
-              ›
-            </span>
-          </button>
-        </li>
-      </ul>
-    </section>
+            <Paper p="md" h="100%" withBorder>
+              <Group align="flex-start" wrap="nowrap" gap="sm">
+                <ThemeIcon size={40} radius="md" variant="light">
+                  <SearchIcon />
+                </ThemeIcon>
+                <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                  <Text size="sm" fw={600} lineClamp={1}>
+                    {t('home.price_check')}
+                  </Text>
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {t('home.desc_price_check')}
+                  </Text>
+                </Stack>
+                <Text aria-hidden="true" c="dimmed" className="rtl:rotate-180">
+                  ›
+                </Text>
+              </Group>
+            </Paper>
+          </UnstyledButton>
+        </SimpleGrid>
+      </Stack>
+    </Box>
   );
 }
 
@@ -394,79 +385,92 @@ function RegisterCard({
   canClose: boolean;
   timeText: (at: number) => string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const last = data.recent[0]?.sale.created_at;
   return (
-    <section
+    <Paper
+      component="section"
       aria-labelledby="register-heading"
-      className="rounded-card border border-border bg-surface p-4 shadow-card"
+      p="lg"
+      withBorder
     >
-      <div className="flex items-start justify-between gap-2">
-        <h2 id="register-heading" className={sectionLabel(i18n.language)}>
+      <Group justify="space-between" align="flex-start" gap="sm">
+        <Title order={3} id="register-heading" fz="sm" c="dimmed">
           {t('home.todays_register')}
-        </h2>
+        </Title>
         {last ? (
-          <p className="text-small text-text-muted">
-            {t('home.last_bill', {
-              time: timeText(Number(last)),
-            })}
-          </p>
+          <Text size="xs" c="dimmed">
+            {t('home.last_bill', { time: timeText(Number(last)) })}
+          </Text>
         ) : null}
-      </div>
-      <div className="mt-3" data-testid="today-sold">
-        <p className="text-small text-text-muted">{t('home.sold_today')}</p>
-        <p className="mt-0.5 text-total font-semibold">
+      </Group>
+      <Stack gap={2} mt="md" data-testid="today-sold">
+        <Text size="sm" c="dimmed">
+          {t('home.sold_today')}
+        </Text>
+        <Text fw={700} fz={30} lh={1.1}>
           <MoneyText paisa={data.today.sold} />
-        </p>
-        <p className="text-small text-text-muted">
+        </Text>
+        <Text size="sm" c="dimmed">
           {t('home.bills_count', { count: data.today.bills })}
-        </p>
-      </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
+        </Text>
+      </Stack>
+      <Divider my="md" />
+      <SimpleGrid cols={2} spacing="md">
         {showCash ? (
-          <div data-testid="today-cash">
-            <dt className="text-small text-text-muted">
+          <Stack gap={2} data-testid="today-cash">
+            <Text size="xs" c="dimmed">
               {t('home.cash_drawer')}
-            </dt>
-            <dd className="mt-0.5 text-body font-semibold">
+            </Text>
+            <Text fw={600}>
               <MoneyText paisa={data.cash} />
-            </dd>
-          </div>
+            </Text>
+          </Stack>
         ) : null}
         {showProfit ? (
-          <div data-testid="today-profit">
-            <dt className="text-small text-text-muted">
+          <Stack gap={2} data-testid="today-profit">
+            <Text size="xs" c="dimmed">
               {t('home.profit_today')}
-            </dt>
-            <dd className="mt-0.5 text-body font-semibold">
+            </Text>
+            <Text fw={600}>
               <MoneyText paisa={data.today.grossProfit} />
-            </dd>
-          </div>
+            </Text>
+          </Stack>
         ) : null}
-        <div data-testid="today-udhaar" className="col-span-2">
-          <dt className="text-small text-text-muted">
+        <Stack
+          gap={2}
+          style={{ gridColumn: '1 / -1' }}
+          data-testid="today-udhaar"
+        >
+          <Text size="xs" c="dimmed">
             {t('home.udhaar_today')}
-          </dt>
-          <dd className="mt-0.5 flex flex-col gap-0.5 text-body font-medium">
-            <span>
+          </Text>
+          <Group gap="lg">
+            <Text size="sm">
               {t('home.udhaar_given', {
                 amount: formatShopMoney(data.today.udhaarGiven),
               })}
-            </span>
-            <span>
+            </Text>
+            <Text size="sm">
               {t('home.udhaar_received', {
                 amount: formatShopMoney(data.today.udhaarReceived),
               })}
-            </span>
-          </dd>
-        </div>
-      </dl>
+            </Text>
+          </Group>
+        </Stack>
+      </SimpleGrid>
       {canClose ? (
-        <Link to="/day-close" className={`${buttonQuiet} mt-3 w-full`}>
+        <Button
+          component={Link}
+          to="/day-close"
+          variant="default"
+          fullWidth
+          mt="md"
+        >
           {t('home.day_close')}
-        </Link>
+        </Button>
       ) : null}
-    </section>
+    </Paper>
   );
 }
 
@@ -478,78 +482,145 @@ function RecentBillsCard({
   timeText: (at: number) => string;
 }) {
   const { t } = useTranslation();
+  const _navigate = useNavigate();
   const recent = data?.recent ?? [];
   return (
-    <section
+    <Paper
+      component="section"
       aria-labelledby="recent-heading"
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+      withBorder
+      style={{ overflow: 'hidden' }}
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <h2 id="recent-heading" className="me-auto text-h2 font-semibold">
+      <Group gap="sm" px="lg" py="md" justify="space-between">
+        <Title order={3} id="recent-heading">
           {t('home.recent_bills')}
-        </h2>
-        <Link
+        </Title>
+        <Text
+          component={Link}
           to="/sales"
-          className="text-small font-medium text-primary hover:underline"
+          size="sm"
+          fw={600}
+          c="brand"
+          style={{ textDecoration: 'none' }}
         >
           {t('home.view_all')}
-        </Link>
-      </div>
+        </Text>
+      </Group>
+      <Divider />
       {data?.recent.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-          <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+        <Stack align="center" gap="sm" py="xl" px="lg">
+          <ThemeIcon size={40} radius="xl" variant="light" color="gray">
             <SalesIcon />
-          </span>
-          <p className="text-small text-text-muted">{t('home.no_bills')}</p>
-        </div>
+          </ThemeIcon>
+          <Text size="sm" c="dimmed">
+            {t('home.no_bills')}
+          </Text>
+        </Stack>
       ) : null}
-      {recent.length > 0 ? (
-        <ul className="divide-y divide-border">
-          {recent.map(({ sale, methods }) => (
-            <li key={sale.id}>
-              <Link
-                to="/sales/$id"
-                params={{ id: sale.id }}
-                className="flex flex-col gap-1 px-4 py-3 hover:bg-surface-2"
+      {recent.map(({ sale, methods }) => (
+        <Link
+          key={sale.id}
+          to="/sales/$id"
+          params={{ id: sale.id }}
+          style={{
+            display: 'block',
+            padding: '10px 16px',
+            borderTop: '1px solid var(--mantine-color-default-border)',
+            color: 'inherit',
+            textDecoration: 'none',
+          }}
+        >
+          <Group justify="space-between" gap="sm" wrap="nowrap">
+            <Text size="sm" ff="monospace" fw={600} dir="ltr">
+              {String(sale.invoice_no)}
+            </Text>
+            <Text size="sm" fw={600}>
+              <MoneyText paisa={Number(sale.total)} />
+            </Text>
+          </Group>
+          <Group gap="xs" mt={4} wrap="wrap">
+            <Text size="xs" c="dimmed" dir="ltr">
+              {timeText(Number(sale.created_at))}
+            </Text>
+            {methods.map((m) => (
+              <Badge
+                key={m}
+                size="sm"
+                variant="light"
+                color="gray"
+                radius="xl"
+                tt="none"
               >
-                <span className="flex items-center justify-between gap-2">
-                  <bdi dir="ltr" className="font-mono text-small font-medium">
-                    {String(sale.invoice_no)}
-                  </bdi>
-                  <span className="text-body font-semibold">
-                    <MoneyText paisa={Number(sale.total)} />
-                  </span>
-                </span>
-                <span className="flex flex-wrap items-center gap-2 text-small text-text-muted">
-                  <bdi dir="ltr">{timeText(Number(sale.created_at))}</bdi>
-                  {methods.map((m) => (
-                    <span
-                      key={m}
-                      className="rounded-full bg-surface-2 px-2 py-0.5"
-                    >
-                      {t(`payment.${m}`)}
-                    </span>
-                  ))}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
+                {t(`payment.${m}`)}
+              </Badge>
+            ))}
+          </Group>
+        </Link>
+      ))}
+    </Paper>
   );
+}
+
+function AttentionList({ items }: { items: readonly AttentionItem[] }) {
+  const { t, i18n } = useTranslation();
+  return (
+    <Box component="section" aria-labelledby="attention-heading">
+      <Stack gap="sm">
+        <Title order={3} id="attention-heading" fz="sm" c="dimmed">
+          {t('home.attention')}
+        </Title>
+        <Paper withBorder style={{ overflow: 'hidden' }}>
+          {items.map((item) => (
+            <UnstyledButton
+              key={item.kind}
+              component={Link}
+              to={ATTENTION_LINK[item.kind] ?? '/'}
+              w="100%"
+              px="md"
+              py="sm"
+              data-testid={`attn-${item.kind}`}
+              style={{
+                borderTop: '1px solid var(--mantine-color-default-border)',
+              }}
+            >
+              <Group gap="sm" wrap="nowrap">
+                <Box
+                  aria-hidden="true"
+                  w={8}
+                  h={8}
+                  style={{
+                    borderRadius: 999,
+                    background: 'currentColor',
+                    color: attentionColor(item),
+                  }}
+                />
+                <Text size="sm" fw={550} style={{ flex: 1 }}>
+                  {attentionText(t, i18n.language, item)}
+                </Text>
+                <Text aria-hidden="true" c="dimmed" className="rtl:rotate-180">
+                  ›
+                </Text>
+              </Group>
+            </UnstyledButton>
+          ))}
+        </Paper>
+      </Stack>
+    </Box>
+  );
+}
+
+function attentionColor(item: AttentionItem): string {
+  if (item.kind === 'sync_stale')
+    return item.severe
+      ? 'var(--mantine-color-danger-6)'
+      : 'var(--mantine-color-warning-7)';
+  if (item.kind === 'clock_wrong' || item.kind === 'sync_pending_old')
+    return 'var(--mantine-color-warning-7)';
+  return 'var(--mantine-color-brand-6)';
 }
 
 function attentionKey(kind: string): string {
   return kind === 'promises_due' ? 'promises' : kind;
-}
-
-function attentionTone(item: AttentionItem): string {
-  if (item.kind === 'sync_stale')
-    return item.severe ? 'text-danger' : 'text-warning-subtle-ink';
-  if (item.kind === 'clock_wrong' || item.kind === 'sync_pending_old')
-    return 'text-warning-subtle-ink';
-  return '';
 }
 
 function attentionText(

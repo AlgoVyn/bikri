@@ -1,3 +1,4 @@
+import { Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsIcon } from '../components/icons.tsx';
@@ -69,18 +70,26 @@ export function SettingsSplit({
 function SettingsPlaceholder() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-[32rem] flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface p-8 text-center shadow-card">
-      <span
-        aria-hidden="true"
-        className="flex size-14 items-center justify-center rounded-full bg-surface text-text-muted"
-      >
-        <SettingsIcon />
-      </span>
-      <p className="text-title font-semibold">{t('office.settings.choose')}</p>
-      <p className="max-w-xs text-small text-text-muted">
-        {t('office.settings.choose_hint')}
-      </p>
-    </div>
+    <Paper
+      withBorder
+      p="xl"
+      style={{
+        minHeight: 512,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Stack align="center" gap="sm" maw={320}>
+        <ThemeIcon size={56} radius="xl" variant="light" color="gray">
+          <SettingsIcon />
+        </ThemeIcon>
+        <Title order={3}>{t('office.settings.choose')}</Title>
+        <Text size="sm" c="dimmed" ta="center">
+          {t('office.settings.choose_hint')}
+        </Text>
+      </Stack>
+    </Paper>
   );
 }
 

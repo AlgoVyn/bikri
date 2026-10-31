@@ -1,4 +1,14 @@
 import { businessDate } from '@bikri/core';
+import {
+  ActionIcon,
+  Box,
+  Group,
+  Kbd,
+  Paper,
+  Text,
+  TextInput,
+  UnstyledButton,
+} from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useState } from 'react';
@@ -79,10 +89,11 @@ export function GlobalSearch() {
   ];
 
   return (
-    <search className="relative">
-      <button
-        type="button"
-        className="flex size-11 items-center justify-center rounded-control text-text-muted lg:hidden"
+    <Box component="search" style={{ position: 'relative' }}>
+      <ActionIcon
+        variant="subtle"
+        size="lg"
+        hiddenFrom="sm"
         aria-label={t('shell.search_label')}
         aria-expanded={phoneOpen}
         onClick={() => {
@@ -94,15 +105,29 @@ export function GlobalSearch() {
         }}
       >
         <SearchIcon />
-      </button>
-      <div
-        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} h-11 items-center gap-2 rounded-control border border-border bg-surface-2 px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 lg:flex lg:w-96`}
+      </ActionIcon>
+      <Box
+        className={
+          phoneOpen
+            ? 'fixed inset-x-2 top-[68px] z-50'
+            : 'hidden sm:block sm:relative sm:z-auto'
+        }
       >
-        <SearchIcon />
-        <input
+        <TextInput
           id="global-search"
           type="search"
           role="combobox"
+          size="sm"
+          radius="md"
+          autoComplete="off"
+          placeholder={t('shell.search_label')}
+          leftSection={<SearchIcon />}
+          rightSection={
+            <Kbd visibleFrom="sm" size="xs">
+              /
+            </Kbd>
+          }
+          rightSectionWidth={32}
           aria-label={t('shell.search_label')}
           aria-expanded={open && query.trim() !== ''}
           aria-controls={listId}
@@ -112,9 +137,6 @@ export function GlobalSearch() {
               : undefined
           }
           aria-autocomplete="list"
-          autoComplete="off"
-          placeholder={t('shell.search_label')}
-          className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -148,22 +170,37 @@ export function GlobalSearch() {
               }
             }
           }}
+          styles={{
+            input: {
+              background: 'var(--mantine-color-default)',
+              borderColor: 'var(--mantine-color-default-border)',
+            },
+          }}
+          w={{ base: '100%', sm: 380 }}
         />
-        <kbd className="hidden rounded border border-border bg-surface px-1.5 font-mono text-small text-text-muted lg:inline">
-          /
-        </kbd>
-      </div>
+      </Box>
       {open && query.trim() !== '' ? (
-        <div
+        <Paper
           id={listId}
           role="listbox"
           aria-label={t('shell.search_label')}
-          className="fixed inset-x-2 top-topbar z-40 max-h-[60dvh] overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-lg lg:absolute lg:inset-x-auto lg:end-0 lg:top-12 lg:w-80"
+          withBorder
+          shadow="lg"
+          style={{
+            position: 'fixed',
+            insetInline: 8,
+            top: phoneOpen ? 120 : 68,
+            zIndex: 60,
+            maxHeight: '60dvh',
+            overflowY: 'auto',
+            padding: 4,
+          }}
+          className="sm:absolute sm:inset-x-auto sm:top-11 sm:end-0 sm:w-96"
         >
           {hits.length === 0 ? (
-            <p className="px-3 py-2 text-text-muted">
+            <Text size="sm" c="dimmed" px="sm" py="xs">
               {t('shell.search_none')}
-            </p>
+            </Text>
           ) : null}
           {groups.map((group) => {
             const inGroup = hits.filter((h) => h.kind === group.kind);
@@ -171,41 +208,51 @@ export function GlobalSearch() {
             return (
               // biome-ignore lint/a11y/useSemanticElements: an ARIA listbox group, not a form fieldset
               <div key={group.kind} role="group" aria-label={group.label}>
-                <p className="px-3 pt-2 text-small text-text-muted">
+                <Text size="xs" c="dimmed" px="sm" pt="xs" pb={4}>
                   {group.label}
-                </p>
+                </Text>
                 {inGroup.map((hit) => {
                   const index = hits.indexOf(hit);
                   return (
-                    <div
+                    <UnstyledButton
                       key={`${hit.kind}-${hit.id}`}
                       id={optionId(index)}
                       role="option"
                       tabIndex={-1}
                       aria-selected={index === active}
-                      className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle"
+                      w="100%"
+                      px="sm"
+                      py={6}
+                      style={{
+                        borderRadius: 8,
+                        background:
+                          index === active
+                            ? 'var(--mantine-color-brand-0)'
+                            : undefined,
+                      }}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         go(hit);
                       }}
                     >
-                      <span className="truncate">{hit.title}</span>
-                      {hit.detail ? (
-                        <bdi
-                          dir="ltr"
-                          className="shrink-0 text-small text-text-muted"
-                        >
-                          {hit.detail}
-                        </bdi>
-                      ) : null}
-                    </div>
+                      <Group justify="space-between" gap="sm" wrap="nowrap">
+                        <Text size="sm" truncate>
+                          {hit.title}
+                        </Text>
+                        {hit.detail ? (
+                          <Text size="xs" c="dimmed" dir="ltr" ff="monospace">
+                            {hit.detail}
+                          </Text>
+                        ) : null}
+                      </Group>
+                    </UnstyledButton>
                   );
                 })}
               </div>
             );
           })}
-        </div>
+        </Paper>
       ) : null}
-    </search>
+    </Box>
   );
 }

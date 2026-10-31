@@ -65,26 +65,36 @@ export function storedTheme(): ThemePref {
   return 'system';
 }
 
+function resolveDark(theme: ThemePref): boolean {
+  return (
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-color-scheme: dark)').matches)
+  );
+}
+
 /** Applies the device theme to the document without opening a shop database. */
 function applyThemeColor(theme: ThemePref): void {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  const dark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof matchMedia !== 'undefined' &&
-      matchMedia('(prefers-color-scheme: dark)').matches);
   meta.setAttribute(
     'content',
-    dark ? BROWSER_CHROME.dark : BROWSER_CHROME.light,
+    resolveDark(theme) ? BROWSER_CHROME.dark : BROWSER_CHROME.light,
   );
 }
 
-export function applyStoredTheme(): void {
+function applySchemeAttributes(theme: ThemePref): void {
   const root = document.documentElement;
-  const theme = storedTheme();
   if (theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = theme;
+  // Mantine's CSS uses a separate attribute; keep both systems aligned.
+  root.dataset.mantineColorScheme = resolveDark(theme) ? 'dark' : 'light';
+}
+
+export function applyStoredTheme(): void {
+  const theme = storedTheme();
+  applySchemeAttributes(theme);
   applyThemeColor(theme);
 }
 
@@ -94,11 +104,17 @@ export function applyDevicePrefs(
   lang = 'en',
 ): void {
   const root = document.documentElement;
-  if (prefs.theme === 'system') delete root.dataset.theme;
-  else root.dataset.theme = prefs.theme;
+  applySchemeAttributes(prefs.theme);
   applyThemeColor(prefs.theme);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, prefs.theme);
+    // Same-window storage events do not fire automatically; notify Mantine's manager.
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: THEME_STORAGE_KEY,
+        newValue: prefs.theme,
+      }),
+    );
   } catch {
     // Storage can be disabled; this page still uses the theme.
   }

@@ -1,8 +1,16 @@
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  TextInput,
+} from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoreIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -32,9 +40,6 @@ const LabelsDialog = lazy(() =>
 
 const ROW_PX = 72;
 const OVERSCAN = 8;
-
-const selectClass =
-  'h-11 rounded-control border border-border-strong bg-surface px-2 text-text';
 
 /** Products list (screens/08): search, filters, sort, CSV, virtualised rows. */
 export function ProductList({
@@ -128,34 +133,39 @@ export function ProductList({
         actions={
           <>
             {selecting && selected.size > 0 ? (
-              <button
-                type="button"
-                className={buttonPrimary}
-                onClick={() => setLabelsOpen(true)}
-              >
+              <Button onClick={() => setLabelsOpen(true)}>
                 {t('products.print_labels', { count: selected.size })}
-              </button>
+              </Button>
             ) : null}
             {canEdit ? (
-              <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
+              <Button component={Link} to="/products/new">
                 {t('products.add')}
-              </Link>
+              </Button>
             ) : null}
             <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                className="flex size-11 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2"
+              <ActionIcon
+                variant="default"
+                size="lg"
                 aria-label={t('products.more_actions')}
                 aria-expanded={menuOpen}
                 aria-controls="product-actions"
                 onClick={() => setMenuOpen((open) => !open)}
               >
                 <MoreIcon />
-              </button>
+              </ActionIcon>
               {menuOpen ? (
-                <div
+                <Paper
                   id="product-actions"
-                  className="absolute end-0 top-12 z-30 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
+                  withBorder
+                  shadow="md"
+                  p={4}
+                  style={{
+                    position: 'absolute',
+                    insetInlineEnd: 0,
+                    top: 48,
+                    zIndex: 30,
+                    width: 224,
+                  }}
                 >
                   {canLabel ? (
                     <button
@@ -226,7 +236,7 @@ export function ProductList({
                       {t('count.title')}
                     </Link>
                   ) : null}
-                </div>
+                </Paper>
               ) : null}
             </div>
           </>
@@ -234,83 +244,74 @@ export function ProductList({
       />
 
       {total === 0 ? null : (
-        <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
-          <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
-            <span className="mb-1 text-small">{t('products.search')}</span>
-            <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-              <SearchIcon />
-              <input
-                type="search"
-                autoComplete="off"
-                className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </span>
-          </label>
-          <button
-            type="button"
-            className={`${buttonQuiet} gap-2 lg:hidden`}
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((open) => !open)}
-          >
-            {t('common.filters')}
-            {activeFilters > 0 ? (
-              <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-                {activeFilters}
-              </span>
-            ) : null}
-          </button>
-          <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-            <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
-              <span className="mb-1 text-small">
-                {t('products.category_filter')}
-              </span>
-              <select
-                className={selectClass}
+        <Paper component="search" withBorder p="md">
+          <Group align="flex-end" gap="sm" wrap="wrap">
+            <TextInput
+              label={t('products.search')}
+              leftSection={<SearchIcon />}
+              type="search"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ flex: '2 1 14rem', minWidth: 0 }}
+            />
+            <Button
+              variant="default"
+              hiddenFrom="lg"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              {t('common.filters')}
+              {activeFilters > 0 ? (
+                <Badge ml={6} circle size="sm">
+                  {activeFilters}
+                </Badge>
+              ) : null}
+            </Button>
+            <Group
+              gap="sm"
+              align="flex-end"
+              wrap="wrap"
+              className={filtersOpen ? 'contents' : 'hidden lg:flex'}
+            >
+              <NativeSelect
+                label={t('products.category_filter')}
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-              >
-                <option value="">{t('products.all_categories')}</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {categoryName(c, i18n.language)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-[1_1_7rem] flex-col">
-              <span className="mb-1 text-small">
-                {t('products.stock_filter')}
-              </span>
-              <select
-                className={selectClass}
+                style={{ minWidth: 144 }}
+                data={[
+                  { value: '', label: t('products.all_categories') },
+                  ...categories.map((c) => ({
+                    value: c.id,
+                    label: categoryName(c, i18n.language),
+                  })),
+                ]}
+              />
+              <NativeSelect
+                label={t('products.stock_filter')}
                 value={stock}
                 onChange={(e) => setStock(e.target.value as StockFilter)}
-              >
-                <option value="all">{t('products.stock_all')}</option>
-                <option value="low">{t('products.stock_low')}</option>
-                <option value="out">{t('products.stock_out')}</option>
-                <option value="untracked">
-                  {t('products.stock_untracked')}
-                </option>
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
-              <span className="mb-1 text-small">{t('products.sort')}</span>
-              <select
-                className={selectClass}
+                data={[
+                  { value: 'all', label: t('products.stock_all') },
+                  { value: 'low', label: t('products.stock_low') },
+                  { value: 'out', label: t('products.stock_out') },
+                  { value: 'untracked', label: t('products.stock_untracked') },
+                ]}
+              />
+              <NativeSelect
+                label={t('products.sort')}
                 value={sort}
                 onChange={(e) => setSort(e.target.value as ProductSort)}
-              >
-                <option value="name">{t('products.sort_name')}</option>
-                <option value="price">{t('products.sort_price')}</option>
-                <option value="stock">{t('products.sort_stock')}</option>
-                <option value="best">{t('products.sort_best')}</option>
-              </select>
-            </label>
-          </div>
-        </search>
+                data={[
+                  { value: 'name', label: t('products.sort_name') },
+                  { value: 'price', label: t('products.sort_price') },
+                  { value: 'stock', label: t('products.sort_stock') },
+                  { value: 'best', label: t('products.sort_best') },
+                ]}
+              />
+            </Group>
+          </Group>
+        </Paper>
       )}
 
       {total === 0 ? (

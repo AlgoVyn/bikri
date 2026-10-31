@@ -1,3 +1,4 @@
+import { NativeSelect } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
 
@@ -6,20 +7,21 @@ export function LanguageSelect() {
   const { t, i18n } = useTranslation();
   const language = isLocale(i18n.language) ? i18n.language : 'en';
   return (
-    <label className="inline-flex items-center">
-      <span className="sr-only">{t('shell.language')}</span>
-      <select
-        className="h-11 max-w-24 rounded-control border border-border-strong bg-surface px-1 text-text max-lg:max-w-20"
-        value={language}
-        onChange={(event) => {
-          const next = event.target.value;
-          if (isLocale(next)) void setLanguage(next);
-        }}
-      >
-        <option value="en">{t('shell.lang_en')}</option>
-        <option value="ur">{t('shell.lang_ur')}</option>
-        <option value="roman-ur">{t('shell.lang_roman_ur')}</option>
-      </select>
-    </label>
+    <NativeSelect
+      aria-label={t('shell.language')}
+      size="xs"
+      w={{ base: 110, sm: 132 }}
+      value={language}
+      data={[
+        { value: 'en', label: t('shell.lang_en') },
+        { value: 'ur', label: t('shell.lang_ur') },
+        { value: 'roman-ur', label: t('shell.lang_roman_ur') },
+      ]}
+      onChange={(event) => {
+        const next = event.currentTarget.value;
+        if (isLocale(next)) void setLanguage(next);
+      }}
+      styles={{ input: { minHeight: 36 } }}
+    />
   );
 }

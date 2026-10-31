@@ -1,0 +1,6 @@
+/*
+  One cascade order for Tailwind and Mantine. Mantine's component styles sit above
+  Tailwind's preflight but below utilities and our unlayered app CSS, so a utility
+  class can still adjust a Mantine primitive locally without fighting it globally.
+*/
+@layer theme, base, mantine, components, utilities;

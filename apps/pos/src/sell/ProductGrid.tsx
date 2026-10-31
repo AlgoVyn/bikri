@@ -1,4 +1,13 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
+import {
+  Badge,
+  Box,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -164,42 +173,83 @@ function Tile({
                 : 'bg-success-subtle text-success-subtle-ink',
           };
   return (
-    <button
-      type="button"
+    <UnstyledButton
       data-index={index}
       data-testid="sell-tile"
       aria-current={active || undefined}
-      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card hover:border-border-strong ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+      h="100%"
+      w="100%"
       onClick={() => onAdd(row)}
     >
-      {cartQty > 0 ? (
-        <span className="absolute end-2 top-2 flex size-6 items-center justify-center rounded-full bg-primary text-small font-semibold text-primary-ink">
-          {formatQtyFromMilli(cartQty, unit)}
-        </span>
-      ) : null}
-      <ProductThumb
-        name={name}
-        imageKey={p.image_key}
-        color={row.category?.color}
-        size="md"
-      />
-      <span
-        className={`${latin ? 'ltr-name' : ''} line-clamp-2 w-full shrink-0 text-small font-medium`}
+      <Paper
+        h="100%"
+        p="sm"
+        radius="lg"
+        withBorder
+        shadow={active ? 'md' : 'xs'}
+        style={{
+          borderColor: active
+            ? 'var(--mantine-color-brand-6)'
+            : 'var(--mantine-color-default-border)',
+          boxShadow: active
+            ? '0 0 0 2px var(--mantine-color-brand-2)'
+            : undefined,
+          transition: 'border-color 120ms ease, box-shadow 120ms ease',
+        }}
       >
-        {name}
-      </span>
-      <span className="mt-auto flex w-full shrink-0 items-center justify-between gap-1 text-small">
-        <span className="font-semibold">
-          <MoneyText paisa={Number(p.price ?? 0)} />
-        </span>
-        {pill ? (
-          <span
-            className={`whitespace-nowrap rounded-full px-2 text-small ${pill.cls}`}
+        <Stack gap="xs" h="100%">
+          <Box pos="relative">
+            <ProductThumb
+              name={name}
+              imageKey={p.image_key}
+              color={row.category?.color}
+              size="md"
+            />
+            {cartQty > 0 ? (
+              <Badge
+                circle
+                color="brand"
+                size="lg"
+                tt="none"
+                style={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}
+              >
+                {formatQtyFromMilli(cartQty, unit)}
+              </Badge>
+            ) : null}
+          </Box>
+          <Text
+            size="sm"
+            fw={600}
+            lineClamp={2}
+            className={latin ? 'ltr-name' : undefined}
+            style={{ minHeight: 36 }}
           >
-            {pill.text}
-          </span>
-        ) : null}
-      </span>
-    </button>
+            {name}
+          </Text>
+          <Group justify="space-between" gap={4} mt="auto" wrap="nowrap">
+            <Text size="sm" fw={700}>
+              <MoneyText paisa={Number(p.price ?? 0)} />
+            </Text>
+            {pill ? (
+              <Badge
+                size="sm"
+                variant="filled"
+                color={
+                  pill.cls.includes('danger')
+                    ? 'danger'
+                    : pill.cls.includes('warning')
+                      ? 'warning'
+                      : 'success'
+                }
+                tt="none"
+                radius="xl"
+              >
+                {pill.text}
+              </Badge>
+            ) : null}
+          </Group>
+        </Stack>
+      </Paper>
+    </UnstyledButton>
   );
 }
