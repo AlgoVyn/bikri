@@ -1,14 +1,19 @@
 import { isQtyUnit, newId } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Paper,
+  Radio,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonDanger,
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -208,34 +213,32 @@ export function RefundDialog({
   if (done) {
     return (
       <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
-        <p className="text-title font-semibold" data-testid="refund-saved">
-          {t('office.refund.done')}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => {
-              void queueRefundPrint(getDb(), done).then(() =>
-                toast.push(t('office.bill.print_queued')),
-              );
-            }}
-          >
-            {t('office.bill.print_refund')}
-          </button>
-          {reasonKey === 'exchange' ? (
-            <button
+        <Stack gap="sm">
+          <Text fz="lg" fw={600} data-testid="refund-saved">
+            {t('office.refund.done')}
+          </Text>
+          <Group gap="sm">
+            <Button
               type="button"
-              className={buttonPrimary}
-              onClick={() => void startExchange()}
+              variant="default"
+              onClick={() => {
+                void queueRefundPrint(getDb(), done).then(() =>
+                  toast.push(t('office.bill.print_queued')),
+                );
+              }}
             >
-              {t('office.refund.start_new_sale')}
-            </button>
-          ) : null}
-          <button type="button" className={buttonPrimary} onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+              {t('office.bill.print_refund')}
+            </Button>
+            {reasonKey === 'exchange' ? (
+              <Button type="button" onClick={() => void startExchange()}>
+                {t('office.refund.start_new_sale')}
+              </Button>
+            ) : null}
+            <Button type="button" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     );
   }
@@ -248,289 +251,302 @@ export function RefundDialog({
       wide
       description={t('office.refund.hint')}
     >
-      <fieldset>
-        <legend className="mb-1 text-small">{t('office.refund.mode')}</legend>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            aria-pressed={mode === 'whole'}
-            className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-            onClick={() => setMode('whole')}
-          >
-            {t('office.refund.mode_whole')}
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'items'}
-            className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-            onClick={() => setMode('items')}
-          >
-            {t('office.refund.mode_items')}
-          </button>
-        </div>
-      </fieldset>
+      <Stack gap="md">
+        <Box component="fieldset" style={{ border: 0, margin: 0, padding: 0 }}>
+          <Text component="legend" size="sm" mb={4}>
+            {t('office.refund.mode')}
+          </Text>
+          <Group gap="xs">
+            <Button
+              type="button"
+              size="compact-sm"
+              variant={mode === 'whole' ? 'light' : 'default'}
+              aria-pressed={mode === 'whole'}
+              onClick={() => setMode('whole')}
+            >
+              {t('office.refund.mode_whole')}
+            </Button>
+            <Button
+              type="button"
+              size="compact-sm"
+              variant={mode === 'items' ? 'light' : 'default'}
+              aria-pressed={mode === 'items'}
+              onClick={() => setMode('items')}
+            >
+              {t('office.refund.mode_items')}
+            </Button>
+          </Group>
+        </Box>
 
-      {!detail ? (
-        <p className="sr-only">{t('common.loading')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {detail.lines.map(({ line, refundedMilli, keptMilli, unit }) => {
-            const selected = chosen.some((c) => c.saleLineId === line.id);
-            const amount =
-              plan?.lines.find((l) => l.saleLineId === line.id)?.amount ?? 0;
-            const qtyUnit = isQtyUnit(unit) ? unit : 'pc';
-            return (
-              <li
-                key={line.id}
-                className="flex flex-col gap-1 rounded-control border border-border p-2"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  {mode === 'items' ? (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        disabled={keptMilli <= 0}
-                        onChange={(e) =>
-                          setQty((current) => ({
-                            ...current,
-                            [line.id]: e.target.checked ? keptMilli : 0,
-                          }))
-                        }
-                      />
-                      <span className="font-medium">
-                        {String(line.name_snapshot)}
-                      </span>
-                    </label>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <span aria-hidden="true">•</span>
-                      <span className="font-medium">
-                        {String(line.name_snapshot)}
-                      </span>
-                    </span>
-                  )}
-                  <span className="text-small text-text-muted">
-                    {t('office.refund.sold', {
-                      qty: `${Number(line.qty_milli) / 1000} ${t(`unit.${qtyUnit}`)}`,
-                    })}
-                    {refundedMilli > 0
-                      ? ` · ${t('office.refund.already', {
-                          qty: refundedMilli / 1000,
-                        })}`
-                      : ''}
-                  </span>
-                </div>
-                {selected ? (
-                  <div className="flex flex-wrap items-end gap-2">
-                    {mode === 'items' ? (
-                      <div className="w-36">
-                        <QtyInput
-                          label={t('office.refund.qty')}
-                          unit={qtyUnit}
-                          value={qty[line.id] ?? 0}
-                          onChange={(milli) =>
+        {!detail ? (
+          <Text size="sm" c="dimmed">
+            {t('common.loading')}
+          </Text>
+        ) : (
+          <Stack gap="sm">
+            {detail.lines.map(({ line, refundedMilli, keptMilli, unit }) => {
+              const selected = chosen.some((c) => c.saleLineId === line.id);
+              const amount =
+                plan?.lines.find((l) => l.saleLineId === line.id)?.amount ?? 0;
+              const qtyUnit = isQtyUnit(unit) ? unit : 'pc';
+              return (
+                <Paper key={line.id} withBorder p="sm">
+                  <Stack gap="xs">
+                    <Group justify="space-between" gap="sm" wrap="wrap">
+                      {mode === 'items' ? (
+                        <Checkbox
+                          label={String(line.name_snapshot)}
+                          checked={selected}
+                          disabled={keptMilli <= 0}
+                          onChange={(event) =>
                             setQty((current) => ({
                               ...current,
-                              [line.id]: Math.min(
-                                Math.max(0, milli ?? 0),
-                                keptMilli,
-                              ),
+                              [line.id]: event.currentTarget.checked
+                                ? keptMilli
+                                : 0,
                             }))
                           }
                         />
-                      </div>
-                    ) : (
-                      <p className="text-small text-text-muted">
-                        {t('office.refund.qty')}: {keptMilli / 1000}{' '}
-                        {t(`unit.${qtyUnit}`)}
-                      </p>
-                    )}
-                    <p className="ms-auto text-end">
-                      <MoneyText paisa={amount} />
-                    </p>
-                    <label className="flex items-center gap-1 text-small">
-                      <input
-                        type="checkbox"
-                        checked={restock[line.id] !== false}
-                        onChange={(e) =>
-                          setRestock((current) => ({
-                            ...current,
-                            [line.id]: e.target.checked,
-                          }))
-                        }
-                      />
-                      {t('office.refund.restock')}
-                    </label>
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <fieldset>
-        <legend className="mb-1 text-small">{t('office.refund.reason')}</legend>
-        <div className="flex flex-wrap gap-2">
-          {REFUND_REASONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              aria-pressed={reasonKey === r}
-              className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-              onClick={() => setReasonKey(r)}
-            >
-              {reasonLabel(t, r, 'refund')}
-            </button>
-          ))}
-        </div>
-        {reasonKey === 'other' ? (
-          <input
-            className={`${fieldClass} mt-2`}
-            maxLength={120}
-            placeholder={t('office.refund.reason_other_label')}
-            value={reasonText}
-            onChange={(e) => setReasonText(e.target.value)}
-          />
-        ) : null}
-      </fieldset>
-
-      {detail && Number(detail.sale.udhaar_amount) > 0 ? (
-        <div className="rounded-control bg-surface-2 p-2 text-small">
-          <p className="font-medium">{t('office.refund.split_title')}</p>
-          <p>
-            {t('office.refund.split_body', {
-              exact: formatShopMoney(plan?.exact ?? 0),
-              paid: formatShopMoney(plan?.amount ?? 0),
-              udhaar: formatShopMoney(plan?.udhaarPart ?? 0),
-              name: detail.customer ? String(detail.customer.name) : '',
+                      ) : (
+                        <Text size="sm" fw={500}>
+                          • {String(line.name_snapshot)}
+                        </Text>
+                      )}
+                      <Text size="sm" c="dimmed">
+                        {t('office.refund.sold', {
+                          qty: `${Number(line.qty_milli) / 1000} ${t(`unit.${qtyUnit}`)}`,
+                        })}
+                        {refundedMilli > 0
+                          ? ` · ${t('office.refund.already', {
+                              qty: refundedMilli / 1000,
+                            })}`
+                          : ''}
+                      </Text>
+                    </Group>
+                    {selected ? (
+                      <Group align="flex-end" gap="sm" wrap="wrap">
+                        {mode === 'items' ? (
+                          <Box w={144}>
+                            <QtyInput
+                              label={t('office.refund.qty')}
+                              unit={qtyUnit}
+                              value={qty[line.id] ?? 0}
+                              onChange={(milli) =>
+                                setQty((current) => ({
+                                  ...current,
+                                  [line.id]: Math.min(
+                                    Math.max(0, milli ?? 0),
+                                    keptMilli,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Box>
+                        ) : (
+                          <Text size="sm" c="dimmed">
+                            {t('office.refund.qty')}: {keptMilli / 1000}{' '}
+                            {t(`unit.${qtyUnit}`)}
+                          </Text>
+                        )}
+                        <Text size="sm" ms="auto" ta="end">
+                          <MoneyText paisa={amount} />
+                        </Text>
+                        <Checkbox
+                          size="sm"
+                          label={t('office.refund.restock')}
+                          checked={restock[line.id] !== false}
+                          onChange={(event) =>
+                            setRestock((current) => ({
+                              ...current,
+                              [line.id]: event.currentTarget.checked,
+                            }))
+                          }
+                        />
+                      </Group>
+                    ) : null}
+                  </Stack>
+                </Paper>
+              );
             })}
-          </p>
-        </div>
-      ) : null}
+          </Stack>
+        )}
 
-      {plan && plan.paidExact > 0 ? (
-        <fieldset>
-          <legend className="mb-1 text-small">
-            {t('office.refund.method')}
-          </legend>
-          <div className="flex flex-wrap gap-3">
-            {methods.map((m) => (
-              <label key={m} className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="refund-method"
-                  checked={method === m}
-                  onChange={() => setMethod(m)}
-                />
-                {t(METHOD_KEYS[m])}
-              </label>
+        <Box component="fieldset" style={{ border: 0, margin: 0, padding: 0 }}>
+          <Text component="legend" size="sm" mb={4}>
+            {t('office.refund.reason')}
+          </Text>
+          <Group gap="xs">
+            {REFUND_REASONS.map((r) => (
+              <Button
+                key={r}
+                type="button"
+                size="compact-sm"
+                variant={reasonKey === r ? 'light' : 'default'}
+                aria-pressed={reasonKey === r}
+                onClick={() => setReasonKey(r)}
+              >
+                {reasonLabel(t, r, 'refund')}
+              </Button>
             ))}
-          </div>
-        </fieldset>
-      ) : plan && plan.udhaarPart > 0 ? (
-        <p className="rounded-control bg-warning-subtle p-2 text-warning-subtle-ink">
-          {t('office.refund.khata_only', {
-            amount: formatShopMoney(plan.udhaarPart),
-            name: detail?.customer ? String(detail.customer.name) : '',
-          })}
-        </p>
-      ) : null}
-
-      {plan ? (
-        <dl className="rounded-control border border-border p-2 text-small">
-          <div className="flex justify-between gap-2">
-            <dt>{t('office.refund.exact')}</dt>
-            <dd>
-              <MoneyText paisa={plan.exact} />
-            </dd>
-          </div>
-          {plan.method === 'cash' && plan.rounding !== 0 ? (
-            <div className="flex justify-between gap-2">
-              <dt>{t('office.refund.rounding')}</dt>
-              <dd>
-                <MoneyText paisa={plan.rounding} />
-              </dd>
-            </div>
+          </Group>
+          {reasonKey === 'other' ? (
+            <TextInput
+              mt="xs"
+              maxLength={120}
+              placeholder={t('office.refund.reason_other_label')}
+              aria-label={t('office.refund.reason_other_label')}
+              value={reasonText}
+              onChange={(event) => setReasonText(event.currentTarget.value)}
+            />
           ) : null}
-          <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 text-total font-semibold">
-            <dt>
-              {plan.amount > 0
-                ? t('office.refund.refund_amount')
-                : t('office.refund.reduce_khata')}
-            </dt>
-            <dd>
-              <MoneyText
-                paisa={plan.amount > 0 ? plan.amount : plan.udhaarPart}
-              />
-            </dd>
-          </div>
-          {plan.udhaarPart > 0 ? (
-            <div className="mt-1 flex justify-between gap-2">
-              <dt>
-                {t('office.refund.khata_after', {
-                  name: detail?.customer ? String(detail.customer.name) : '',
-                })}
-              </dt>
-              <dd>
-                <MoneyText paisa={plan.khataAfter} />
-              </dd>
-            </div>
-          ) : null}
-        </dl>
-      ) : null}
+        </Box>
 
-      {errorCode && errorCode !== 'nothing' ? (
-        <p className="text-danger" role="alert">
-          {t(`office.refund.error_${errorCode}`)}
-        </p>
-      ) : null}
-      {reason.length > 120 ? (
-        <p className="text-danger" role="alert">
-          {t('office.refund.error_reason')}
-        </p>
-      ) : null}
+        {detail && Number(detail.sale.udhaar_amount) > 0 ? (
+          <Paper p="sm" bg="var(--mantine-color-default-hover)">
+            <Text size="sm" fw={500}>
+              {t('office.refund.split_title')}
+            </Text>
+            <Text size="sm">
+              {t('office.refund.split_body', {
+                exact: formatShopMoney(plan?.exact ?? 0),
+                paid: formatShopMoney(plan?.amount ?? 0),
+                udhaar: formatShopMoney(plan?.udhaarPart ?? 0),
+                name: detail.customer ? String(detail.customer.name) : '',
+              })}
+            </Text>
+          </Paper>
+        ) : null}
 
-      {plan && reason.length === 0 ? (
-        <p className="text-small text-text-muted">
-          {t('office.refund.choose_reason')}
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={buttonQuiet} onClick={onClose}>
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonDanger}
-          disabled={!canSave}
-          aria-busy={pending}
-          onClick={() => {
-            if (!can('refund.create')) {
-              setApproving(true);
-              return;
+        {plan && plan.paidExact > 0 ? (
+          <Radio.Group
+            label={t('office.refund.method')}
+            value={method}
+            onChange={(value) =>
+              setMethod(value as 'cash' | 'card' | 'bank_wallet')
             }
-            void save(null);
-          }}
-        >
-          {plan && plan.amount > 0
-            ? t('office.refund.button', {
-                amount: formatShopMoney(plan.amount),
-              })
-            : plan && plan.udhaarPart > 0
-              ? t('office.refund.button_khata', {
-                  amount: formatShopMoney(plan.udhaarPart),
+          >
+            <Group gap="sm" mt="xs">
+              {methods.map((m) => (
+                <Radio key={m} value={m} label={t(METHOD_KEYS[m])} />
+              ))}
+            </Group>
+          </Radio.Group>
+        ) : plan && plan.udhaarPart > 0 ? (
+          <Paper p="sm" bg="var(--mantine-color-warning-subtle)">
+            <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+              {t('office.refund.khata_only', {
+                amount: formatShopMoney(plan.udhaarPart),
+                name: detail?.customer ? String(detail.customer.name) : '',
+              })}
+            </Text>
+          </Paper>
+        ) : null}
+
+        {plan ? (
+          <Paper withBorder p="sm">
+            <Stack gap={4}>
+              <Group justify="space-between" gap="sm">
+                <Text size="sm">{t('office.refund.exact')}</Text>
+                <Text size="sm">
+                  <MoneyText paisa={plan.exact} />
+                </Text>
+              </Group>
+              {plan.method === 'cash' && plan.rounding !== 0 ? (
+                <Group justify="space-between" gap="sm">
+                  <Text size="sm">{t('office.refund.rounding')}</Text>
+                  <Text size="sm">
+                    <MoneyText paisa={plan.rounding} />
+                  </Text>
+                </Group>
+              ) : null}
+              <Group
+                justify="space-between"
+                gap="sm"
+                pt="xs"
+                style={{
+                  borderTop: '1px solid var(--mantine-color-default-border)',
+                }}
+              >
+                <Text size="md" fw={600}>
+                  {plan.amount > 0
+                    ? t('office.refund.refund_amount')
+                    : t('office.refund.reduce_khata')}
+                </Text>
+                <Text size="md" fw={600}>
+                  <MoneyText
+                    paisa={plan.amount > 0 ? plan.amount : plan.udhaarPart}
+                  />
+                </Text>
+              </Group>
+              {plan.udhaarPart > 0 ? (
+                <Group justify="space-between" gap="sm">
+                  <Text size="sm">
+                    {t('office.refund.khata_after', {
+                      name: detail?.customer
+                        ? String(detail.customer.name)
+                        : '',
+                    })}
+                  </Text>
+                  <Text size="sm">
+                    <MoneyText paisa={plan.khataAfter} />
+                  </Text>
+                </Group>
+              ) : null}
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {errorCode && errorCode !== 'nothing' ? (
+          <Text c="danger" role="alert" size="sm">
+            {t(`office.refund.error_${errorCode}`)}
+          </Text>
+        ) : null}
+        {reason.length > 120 ? (
+          <Text c="danger" role="alert" size="sm">
+            {t('office.refund.error_reason')}
+          </Text>
+        ) : null}
+        {plan && reason.length === 0 ? (
+          <Text size="sm" c="dimmed">
+            {t('office.refund.choose_reason')}
+          </Text>
+        ) : null}
+
+        <Group justify="flex-end" gap="sm">
+          <Button type="button" variant="default" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            color="danger"
+            disabled={!canSave}
+            aria-busy={pending}
+            loading={pending}
+            onClick={() => {
+              if (!can('refund.create')) {
+                setApproving(true);
+                return;
+              }
+              void save(null);
+            }}
+          >
+            {plan && plan.amount > 0
+              ? t('office.refund.button', {
+                  amount: formatShopMoney(plan.amount),
                 })
-              : t('office.refund.button_empty')}
-        </button>
-      </div>
-      {!can('refund.create') ? (
-        <p className="text-small text-text-muted">
-          {t('office.refund.override_hint')}
-        </p>
-      ) : null}
+              : plan && plan.udhaarPart > 0
+                ? t('office.refund.button_khata', {
+                    amount: formatShopMoney(plan.udhaarPart),
+                  })
+                : t('office.refund.button_empty')}
+          </Button>
+        </Group>
+        {!can('refund.create') ? (
+          <Text size="sm" c="dimmed">
+            {t('office.refund.override_hint')}
+          </Text>
+        ) : null}
+      </Stack>
 
       <ApprovalDialog
         open={approving}

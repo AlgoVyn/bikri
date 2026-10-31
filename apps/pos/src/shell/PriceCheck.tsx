@@ -1,8 +1,16 @@
 import type { MasterRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { addProduct, CartFullError } from '../data/cart.ts';
@@ -137,147 +145,151 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   const avg = Number(product?.avg_cost ?? 0);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor={inputId} className="font-medium">
-          {t('pricecheck.search')}
-        </label>
-        <input
-          ref={inputRef}
-          id={inputId}
-          data-autofocus
-          type="search"
-          autoComplete="off"
-          enterKeyHint="search"
-          className="h-14 rounded-control border border-border-strong bg-surface px-3 text-title"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            if (card && shown?.q === query.trim() && canSell) void addToCart();
-            else void lookup(query);
-          }}
-        />
-      </div>
+    <Stack gap="md">
+      <TextInput
+        ref={inputRef}
+        id={inputId}
+        data-autofocus
+        type="search"
+        autoComplete="off"
+        enterKeyHint="search"
+        label={t('pricecheck.search')}
+        size="lg"
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          if (card && shown?.q === query.trim() && canSell) void addToCart();
+          else void lookup(query);
+        }}
+      />
 
       {query.trim() !== '' && shown?.q !== query.trim() ? (
-        <p className="text-small text-text-muted" role="status">
+        <Text size="sm" c="dimmed" role="status">
           {searching ? t('common.loading') : t('pricecheck.press_enter')}
-        </p>
+        </Text>
       ) : null}
 
       {shown?.result.kind === 'none' ? (
-        <div role="status" className="flex flex-col items-start gap-2">
-          <p className="text-title">{t('pricecheck.not_found')}</p>
+        <Stack gap="sm" role="status">
+          <Text fz="lg">{t('pricecheck.not_found')}</Text>
           {can('catalog.edit') ? (
             <Link
               to="/products/new"
               search={/^\d{4,}$/u.test(shown.q) ? { barcode: shown.q } : {}}
-              className={buttonPrimary}
+              style={{ textDecoration: 'none', alignSelf: 'flex-start' }}
               onClick={onClose}
             >
-              {t('pricecheck.add_product')}
+              <Button component="span">{t('pricecheck.add_product')}</Button>
             </Link>
           ) : null}
-        </div>
+        </Stack>
       ) : null}
 
       {shown?.result.kind === 'matches' ? (
-        <ul
+        <Box
+          component="ul"
           aria-label={t('pricecheck.matches')}
-          className="flex flex-col gap-1"
+          style={{ listStyle: 'none', margin: 0, padding: 0 }}
         >
           {shown.result.products.map((p) => (
-            <li key={p.id}>
-              <button
+            <Box component="li" key={p.id}>
+              <Button
                 type="button"
-                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-border px-3 text-start"
+                variant="default"
+                fullWidth
+                justify="space-between"
+                mb={4}
                 onClick={() => void pick(p)}
               >
-                <span className="ltr-name">{String(p.name_en)}</span>
+                <Text component="span" size="sm" className="ltr-name">
+                  {String(p.name_en)}
+                </Text>
                 <MoneyText paisa={Number(p.price ?? 0)} />
-              </button>
-            </li>
+              </Button>
+            </Box>
           ))}
-        </ul>
+        </Box>
       ) : null}
 
       {card && product ? (
-        <section
+        <Paper
+          component="section"
+          withBorder
+          p="md"
           aria-label={String(product.name_en)}
           data-testid="price-card"
-          className="flex gap-4 rounded-card border border-border p-4"
         >
-          <ProductThumb
-            name={String(product.name_en)}
-            imageKey={product.image_key}
-            color={product.color}
-            size="lg"
-          />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-title font-semibold">
-              {String(product.name_en)}
-            </p>
-            {product.name_ur ? (
-              <p lang="ur" dir="rtl" className="text-title">
-                {String(product.name_ur)}
-              </p>
-            ) : null}
-            <p className="text-price font-bold" data-testid="price-card-price">
-              <MoneyText paisa={price} />
-            </p>
-            {card.onHandMilli === null ? null : (
-              <p
-                data-testid="price-card-stock"
-                className={card.onHandMilli > 0 ? '' : 'text-danger'}
-              >
-                {card.onHandMilli > 0
-                  ? t('pricecheck.in_stock', {
-                      qty: qtyWithUnit(t, card.onHandMilli, unit),
-                    })
-                  : t('pricecheck.out_of_stock')}
-              </p>
-            )}
-            {card.barcodes.length > 0 ? (
-              <p className="text-small text-text-muted">
-                {t('pricecheck.barcodes')}{' '}
-                <bdi dir="ltr">{card.barcodes.join(', ')}</bdi>
-              </p>
-            ) : null}
-            {can('cost.view') ? (
-              <p
-                className="text-small text-text-muted"
-                data-testid="price-card-cost"
-              >
-                {t('pricecheck.cost')} <MoneyText paisa={avg} /> ·{' '}
-                {t('pricecheck.margin')}{' '}
-                <bdi dir="ltr">{marginText(price, avg) ?? '—'}</bdi>
-              </p>
-            ) : null}
-          </div>
-        </section>
+          <Group align="flex-start" gap="md" wrap="nowrap">
+            <ProductThumb
+              name={String(product.name_en)}
+              imageKey={product.image_key}
+              color={product.color}
+              size="lg"
+            />
+            <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
+              <Text fz="lg" fw={600}>
+                {String(product.name_en)}
+              </Text>
+              {product.name_ur ? (
+                <Text lang="ur" dir="rtl" fz="lg">
+                  {String(product.name_ur)}
+                </Text>
+              ) : null}
+              <Text fz={28} fw={700} data-testid="price-card-price">
+                <MoneyText paisa={price} />
+              </Text>
+              {card.onHandMilli === null ? null : (
+                <Text
+                  size="sm"
+                  c={card.onHandMilli > 0 ? undefined : 'danger'}
+                  data-testid="price-card-stock"
+                >
+                  {card.onHandMilli > 0
+                    ? t('pricecheck.in_stock', {
+                        qty: qtyWithUnit(t, card.onHandMilli, unit),
+                      })
+                    : t('pricecheck.out_of_stock')}
+                </Text>
+              )}
+              {card.barcodes.length > 0 ? (
+                <Text size="sm" c="dimmed">
+                  {t('pricecheck.barcodes')}{' '}
+                  <Text component="bdi" dir="ltr" inherit>
+                    {card.barcodes.join(', ')}
+                  </Text>
+                </Text>
+              ) : null}
+              {can('cost.view') ? (
+                <Text size="sm" c="dimmed" data-testid="price-card-cost">
+                  {t('pricecheck.cost')} <MoneyText paisa={avg} /> ·{' '}
+                  {t('pricecheck.margin')}{' '}
+                  <Text component="bdi" dir="ltr" inherit>
+                    {marginText(price, avg) ?? '—'}
+                  </Text>
+                </Text>
+              ) : null}
+            </Stack>
+          </Group>
+        </Paper>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={buttonQuiet} onClick={onClose}>
+      <Group justify="flex-end" gap="sm">
+        <Button type="button" variant="default" onClick={onClose}>
           {t('pricecheck.close')}
-        </button>
+        </Button>
         {shown ? (
-          <button type="button" className={buttonQuiet} onClick={scanAnother}>
+          <Button type="button" variant="default" onClick={scanAnother}>
             {t('pricecheck.scan_another')}
-          </button>
+          </Button>
         ) : null}
         {card && canSell ? (
-          <button
-            type="button"
-            className={buttonPrimary}
-            onClick={() => void addToCart()}
-          >
+          <Button type="button" onClick={() => void addToCart()}>
             {t('pricecheck.add_to_cart')}
-          </button>
+          </Button>
         ) : null}
-      </div>
-    </div>
+      </Group>
+    </Stack>
   );
 }

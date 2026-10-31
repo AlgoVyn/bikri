@@ -61,6 +61,7 @@ export function MoneyInput({
   leading,
   placeholder,
   compact = false,
+  autoFocus = false,
 }: {
   id?: string;
   label: string;
@@ -77,6 +78,8 @@ export function MoneyInput({
   placeholder?: string;
   /** 36 px field whose label is for assistive tech only (dense cart rows). */
   compact?: boolean;
+  /** Focus the amount when the dialog opens (e.g. the cash received field). */
+  autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -118,6 +121,7 @@ export function MoneyInput({
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
+          data-autofocus={autoFocus ? true : undefined}
           className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
           value={shown}
           aria-invalid={invalid || undefined}

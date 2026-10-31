@@ -1,13 +1,17 @@
 import { parsePkPhone } from '@bikri/core';
 import type { HeldBill } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
@@ -41,14 +45,14 @@ function Actions({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <button type="button" className={buttonQuiet} onClick={onCancel}>
+    <Group justify="flex-end" gap="sm">
+      <Button type="button" variant="default" onClick={onCancel}>
         {t('common.cancel')}
-      </button>
-      <button type="submit" className={buttonPrimary} disabled={disabled}>
+      </Button>
+      <Button type="submit" disabled={disabled}>
         {submit}
-      </button>
-    </div>
+      </Button>
+    </Group>
   );
 }
 
@@ -92,41 +96,38 @@ export function QuickSaleDialog({
   };
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={t('sell.quick_sale')}>
-      <form className="flex flex-col gap-3" onSubmit={submit}>
-        <div>
-          <label htmlFor={nameId} className="mb-1 block text-small">
-            {t('sell.quick_description')}
-          </label>
-          <input
+      <Box component="form" onSubmit={submit}>
+        <Stack gap="sm">
+          <TextInput
             id={nameId}
-            className={fieldClass}
+            label={t('sell.quick_description')}
             maxLength={60}
             placeholder={t('sell.quick_default')}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(event) => setName(event.currentTarget.value)}
           />
-        </div>
-        <MoneyInput
-          label={t('sell.quick_price')}
-          value={price}
-          onChange={setPrice}
-        />
-        {error ? (
-          <p className="text-small text-danger">
-            {t('sell.quick_price_required')}
-          </p>
-        ) : null}
-        <QtyInput
-          label={t('ui.qty_label')}
-          unit="pc"
-          value={qty}
-          onChange={setQty}
-        />
-        <Actions
-          submit={t('sell.add_to_cart')}
-          onCancel={() => onOpenChange(false)}
-        />
-      </form>
+          <MoneyInput
+            label={t('sell.quick_price')}
+            value={price}
+            onChange={setPrice}
+          />
+          {error ? (
+            <Text size="sm" c="danger">
+              {t('sell.quick_price_required')}
+            </Text>
+          ) : null}
+          <QtyInput
+            label={t('ui.qty_label')}
+            unit="pc"
+            value={qty}
+            onChange={setQty}
+          />
+          <Actions
+            submit={t('sell.add_to_cart')}
+            onCancel={() => onOpenChange(false)}
+          />
+        </Stack>
+      </Box>
     </Modal>
   );
 }
@@ -166,34 +167,31 @@ export function BillDiscountDialog({
       onOpenChange={onOpenChange}
       title={t('sell.bill_discount')}
     >
-      <form className="flex flex-col gap-3" onSubmit={submit}>
-        <DiscountToggle type={type} onType={setType} />
-        {type === 'amount' ? (
-          <MoneyInput
-            label={t('sell.discount')}
-            value={amount}
-            onChange={setAmount}
-          />
-        ) : (
-          <div>
-            <label htmlFor={pctId} className="mb-1 block text-small">
-              {t('sell.discount_pct')}
-            </label>
-            <input
+      <Box component="form" onSubmit={submit}>
+        <Stack gap="sm">
+          <DiscountToggle type={type} onType={setType} />
+          {type === 'amount' ? (
+            <MoneyInput
+              label={t('sell.discount')}
+              value={amount}
+              onChange={setAmount}
+            />
+          ) : (
+            <TextInput
               id={pctId}
+              label={t('sell.discount_pct')}
               dir="ltr"
               inputMode="decimal"
-              className={fieldClass}
               value={pct}
-              onChange={(e) => setPct(e.target.value)}
+              onChange={(event) => setPct(event.currentTarget.value)}
             />
-          </div>
-        )}
-        <Actions
-          submit={t('sell.apply')}
-          onCancel={() => onOpenChange(false)}
-        />
-      </form>
+          )}
+          <Actions
+            submit={t('sell.apply')}
+            onCancel={() => onOpenChange(false)}
+          />
+        </Stack>
+      </Box>
     </Modal>
   );
 }
@@ -218,28 +216,28 @@ export function HoldDialog({
   }, [open, defaultLabel]);
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={t('sell.hold_title')}>
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <Box
+        component="form"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
           onHold(label.trim() || defaultLabel);
           onOpenChange(false);
         }}
       >
-        <div>
-          <label htmlFor={id} className="mb-1 block text-small">
-            {t('sell.hold_label')}
-          </label>
-          <input
+        <Stack gap="sm">
+          <TextInput
             id={id}
-            className={fieldClass}
+            label={t('sell.hold_label')}
             maxLength={40}
             value={label}
-            onChange={(e) => setLabel(e.target.value)}
+            onChange={(event) => setLabel(event.currentTarget.value)}
           />
-        </div>
-        <Actions submit={t('sell.hold')} onCancel={() => onOpenChange(false)} />
-      </form>
+          <Actions
+            submit={t('sell.hold')}
+            onCancel={() => onOpenChange(false)}
+          />
+        </Stack>
+      </Box>
     </Modal>
   );
 }
@@ -289,74 +287,83 @@ export function HeldBillsDialog({
       wide
     >
       {held.length === 0 ? (
-        <p className="text-text-muted">{t('sell.held_empty')}</p>
+        <Text c="dimmed">{t('sell.held_empty')}</Text>
       ) : null}
-      <ul className="flex flex-col gap-2" aria-label={t('sell.held_title')}>
+      <Stack
+        gap="sm"
+        component="ul"
+        aria-label={t('sell.held_title')}
+        style={{ listStyle: 'none', margin: 0, padding: 0 }}
+      >
         {held.map((h) => (
-          <li
+          <Paper
             key={h.id}
-            className="flex flex-col gap-2 rounded-card border border-border p-2"
+            component="li"
+            withBorder
+            p="sm"
             data-testid="held-bill"
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-medium">{h.label}</span>
-              <MoneyText paisa={cartTotals({ ...h, id: 'c1' }, money).total} />
-            </div>
-            <p className="text-small text-text-muted">
-              <bdi dir="ltr">{timeOf(h.held_at, i18n.language)}</bdi> ·{' '}
-              {t('sell.items', { count: h.lines.length })} ·{' '}
-              {staff?.get(h.held_by) ?? ''}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {activeEmpty ? (
-                <button
-                  type="button"
-                  className={buttonPrimary}
-                  onClick={() => onResume(h, null)}
-                >
-                  {t('sell.resume')}
-                </button>
-              ) : (
-                emptyTabs.map((tab) => (
-                  <button
-                    key={tab}
+            <Stack gap="xs">
+              <Group justify="space-between" align="baseline" gap="sm">
+                <Text fw={500}>{h.label}</Text>
+                <MoneyText
+                  paisa={cartTotals({ ...h, id: 'c1' }, money).total}
+                />
+              </Group>
+              <Text size="sm" c="dimmed">
+                <Text component="bdi" dir="ltr" inherit>
+                  {timeOf(h.held_at, i18n.language)}
+                </Text>{' '}
+                · {t('sell.items', { count: h.lines.length })} ·{' '}
+                {staff?.get(h.held_by) ?? ''}
+              </Text>
+              <Group gap="xs">
+                {activeEmpty ? (
+                  <Button type="button" onClick={() => onResume(h, null)}>
+                    {t('sell.resume')}
+                  </Button>
+                ) : (
+                  emptyTabs.map((tab) => (
+                    <Button
+                      key={tab}
+                      type="button"
+                      variant="default"
+                      onClick={() => onResume(h, tab)}
+                    >
+                      {t('sell.resume_into', { n: CART_IDS.indexOf(tab) + 1 })}
+                    </Button>
+                  ))
+                )}
+                {!activeEmpty && emptyTabs.length === 0 ? (
+                  <Text size="sm" c="dimmed">
+                    {t('sell.no_free_cart')}
+                  </Text>
+                ) : null}
+                {confirm === h.id ? (
+                  <Button
                     type="button"
-                    className={buttonQuiet}
-                    onClick={() => onResume(h, tab)}
+                    color="danger"
+                    onClick={() => {
+                      setConfirm(null);
+                      onDelete(h);
+                    }}
                   >
-                    {t('sell.resume_into', { n: CART_IDS.indexOf(tab) + 1 })}
-                  </button>
-                ))
-              )}
-              {!activeEmpty && emptyTabs.length === 0 ? (
-                <span className="text-small text-text-muted">
-                  {t('sell.no_free_cart')}
-                </span>
-              ) : null}
-              {confirm === h.id ? (
-                <button
-                  type="button"
-                  className={`${buttonQuiet} text-danger`}
-                  onClick={() => {
-                    setConfirm(null);
-                    onDelete(h);
-                  }}
-                >
-                  {t('sell.delete_confirm')}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={buttonQuiet}
-                  onClick={() => setConfirm(h.id)}
-                >
-                  {t('sell.delete_held')}
-                </button>
-              )}
-            </div>
-          </li>
+                    {t('sell.delete_confirm')}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={() => setConfirm(h.id)}
+                  >
+                    {t('sell.delete_held')}
+                  </Button>
+                )}
+              </Group>
+            </Stack>
+          </Paper>
         ))}
-      </ul>
+      </Stack>
     </Modal>
   );
 }
@@ -422,98 +429,111 @@ export function CustomerDialog({
       title={t('sell.customer_title')}
     >
       {creating ? (
-        <form className="flex flex-col gap-3" onSubmit={(e) => void create(e)}>
-          <div>
-            <label htmlFor={nameId} className="mb-1 block text-small">
-              {t('sell.customer_name')}
-            </label>
-            <input
+        <Box component="form" onSubmit={(e: FormEvent) => void create(e)}>
+          <Stack gap="sm">
+            <TextInput
               id={nameId}
-              className={fieldClass}
+              label={t('sell.customer_name')}
               maxLength={60}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.currentTarget.value)}
             />
-          </div>
-          <PhoneInput
-            label={t('ui.phone_label')}
-            value={phone ?? ''}
-            onChange={setPhone}
-          />
-          {error ? <p className="text-small text-danger">{error}</p> : null}
-          <Actions
-            submit={t('sell.customer_save')}
-            onCancel={() => onOpenChange(false)}
-          />
-        </form>
+            <PhoneInput
+              label={t('ui.phone_label')}
+              value={phone ?? ''}
+              onChange={setPhone}
+            />
+            {error ? (
+              <Text size="sm" c="danger">
+                {error}
+              </Text>
+            ) : null}
+            <Actions
+              submit={t('sell.customer_save')}
+              onCancel={() => onOpenChange(false)}
+            />
+          </Stack>
+        </Box>
       ) : (
-        <>
-          <div>
-            <label htmlFor={searchId} className="mb-1 block text-small">
-              {t('sell.customer_search')}
-            </label>
-            <input
-              id={searchId}
-              type="search"
-              className={fieldClass}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <ul
-            className="flex max-h-72 flex-col gap-1 overflow-y-auto"
+        <Stack gap="sm">
+          <TextInput
+            id={searchId}
+            type="search"
+            label={t('sell.customer_search')}
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+          />
+          <Box
+            component="ul"
             aria-label={t('sell.customer_title')}
+            style={{
+              listStyle: 'none',
+              margin: 0,
+              padding: 0,
+              maxHeight: 288,
+              overflowY: 'auto',
+            }}
           >
-            <li>
-              <button
+            <Box component="li">
+              <Button
                 type="button"
-                className="min-h-11 w-full rounded-control px-2 text-start hover:bg-surface-2"
+                variant="transparent"
+                fullWidth
+                justify="flex-start"
                 onClick={() => pick(null)}
               >
                 {t('sell.walk_in')}
-              </button>
-            </li>
+              </Button>
+            </Box>
             {hits.map((h) => (
-              <li key={h.customer.id}>
-                <button
+              <Box component="li" key={h.customer.id}>
+                <Button
                   type="button"
-                  className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control px-2 text-start hover:bg-surface-2"
+                  variant="transparent"
+                  fullWidth
+                  justify="space-between"
                   onClick={() => pick(h.customer.id)}
                 >
-                  <span>
+                  <Text component="span" size="sm">
                     {String(h.customer.name)}
                     {h.customer.phone ? (
-                      <bdi
+                      <Text
+                        component="bdi"
                         dir="ltr"
-                        className="ms-2 text-small text-text-muted"
+                        size="sm"
+                        c="dimmed"
+                        ms={8}
                       >
                         {parsePkPhone(String(h.customer.phone), 'any')
                           ?.display ?? String(h.customer.phone)}
-                      </bdi>
+                      </Text>
                     ) : null}
-                  </span>
+                  </Text>
                   {h.balance > 0 ? (
-                    <span className="text-small text-warning">
-                      {t('sell.owes', { amount: formatShopMoney(h.balance) })}
-                    </span>
+                    <Text component="span" size="sm" c="var(--color-warning)">
+                      {t('sell.owes', {
+                        amount: formatShopMoney(h.balance),
+                      })}
+                    </Text>
                   ) : null}
-                </button>
-              </li>
+                </Button>
+              </Box>
             ))}
-          </ul>
+          </Box>
           {canCreate ? (
-            <button
+            <Button
               type="button"
-              className={buttonQuiet}
+              variant="default"
               onClick={() => {
                 setCreating(true);
                 setName(/\d/u.test(query) ? '' : query);
               }}
+              style={{ alignSelf: 'flex-start' }}
             >
               {t('sell.new_customer')}
-            </button>
+            </Button>
           ) : null}
-        </>
+        </Stack>
       )}
     </Modal>
   );

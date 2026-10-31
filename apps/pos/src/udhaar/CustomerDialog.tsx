@@ -1,14 +1,20 @@
 import type { MasterRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import {
-  buttonDanger,
-  buttonPrimary,
-  buttonQuiet,
-} from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -168,112 +174,112 @@ export function CustomerDialog({
             : t('office.udhaar.new_customer')
         }
       >
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-small sm:col-span-2">
-            {t('office.udhaar.name')}
-            <input
-              className="h-11 rounded-control border border-border-strong bg-surface px-3"
-              value={name}
-              maxLength={60}
-              onChange={(e) => setName(e.target.value)}
+        <Stack gap="sm">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <Box style={{ gridColumn: '1 / -1' }}>
+              <TextInput
+                label={t('office.udhaar.name')}
+                value={name}
+                maxLength={60}
+                onChange={(event) => setName(event.currentTarget.value)}
+              />
+            </Box>
+            <PhoneInput
+              label={t('office.udhaar.phone')}
+              value={phone}
+              onChange={(next) => setPhone(next ?? '')}
             />
-          </label>
-          <PhoneInput
-            label={t('office.udhaar.phone')}
-            value={phone}
-            onChange={(next) => setPhone(next ?? '')}
-          />
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.udhaar.address')}
-            <input
-              className="h-11 rounded-control border border-border-strong bg-surface px-3"
+            <TextInput
+              label={t('office.udhaar.address')}
               value={address}
               maxLength={120}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(event) => setAddress(event.currentTarget.value)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-small sm:col-span-2">
-            {t('office.udhaar.note')}
-            <input
-              className="h-11 rounded-control border border-border-strong bg-surface px-3"
-              value={note}
-              maxLength={200}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </label>
-          {role !== 'cashier' ? (
-            <MoneyInput
-              label={t('office.udhaar.credit_limit')}
-              value={limit}
-              onChange={setLimit}
-            />
-          ) : null}
-          {role === 'owner' ? (
-            <label className="flex min-h-11 items-center gap-2 self-end text-small">
-              <input
-                type="checkbox"
-                checked={hard}
-                onChange={(e) => setHard(e.target.checked)}
+            <Box style={{ gridColumn: '1 / -1' }}>
+              <TextInput
+                label={t('office.udhaar.note')}
+                value={note}
+                maxLength={200}
+                onChange={(event) => setNote(event.currentTarget.value)}
               />
-              {t('office.udhaar.hard_limit')}
-            </label>
-          ) : null}
-          {!editing ? (
-            <MoneyInput
-              label={t('office.udhaar.opening_balance')}
-              value={opening}
-              onChange={setOpening}
-            />
-          ) : null}
-        </div>
-        <p className="text-small text-text-muted">
-          {t('office.udhaar.credit_hint')}
-        </p>
-        {duplicate ? (
-          <p
-            role="alert"
-            className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink"
-          >
-            {t('office.udhaar.duplicate_phone', { name: duplicate.name })}{' '}
-            <Link
-              to="/udhaar/$customerId"
-              params={{ customerId: duplicate.id }}
-              className="underline"
-            >
-              {t('office.udhaar.open_existing')}
-            </Link>
-          </p>
-        ) : null}
-        <div className="flex flex-wrap justify-between gap-2">
-          <span>
-            {canDelete ? (
-              <button
-                type="button"
-                className={buttonDanger}
-                onClick={() => setConfirmDelete(true)}
-              >
-                {t('office.udhaar.delete')}
-              </button>
+            </Box>
+            {role !== 'cashier' ? (
+              <MoneyInput
+                label={t('office.udhaar.credit_limit')}
+                value={limit}
+                onChange={setLimit}
+              />
             ) : null}
-          </span>
-          <span className="flex gap-2">
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => onOpenChange(false)}
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={name.trim() === '' || pending}
-              onClick={() => void save()}
-            >
-              {t('office.udhaar.save')}
-            </button>
-          </span>
-        </div>
+            {role === 'owner' ? (
+              <Checkbox
+                label={t('office.udhaar.hard_limit')}
+                checked={hard}
+                onChange={(event) => setHard(event.currentTarget.checked)}
+                style={{ alignSelf: 'end', marginBottom: 10 }}
+              />
+            ) : null}
+            {!editing ? (
+              <MoneyInput
+                label={t('office.udhaar.opening_balance')}
+                value={opening}
+                onChange={setOpening}
+              />
+            ) : null}
+          </SimpleGrid>
+          <Text size="sm" c="dimmed">
+            {t('office.udhaar.credit_hint')}
+          </Text>
+          {duplicate ? (
+            <Paper p="sm" bg="var(--mantine-color-warning-subtle)">
+              <Text
+                role="alert"
+                size="sm"
+                c="var(--mantine-color-warning-subtle-ink)"
+              >
+                {t('office.udhaar.duplicate_phone', {
+                  name: duplicate.name,
+                })}{' '}
+                <Link
+                  to="/udhaar/$customerId"
+                  params={{ customerId: duplicate.id }}
+                  className="bikri-link"
+                >
+                  {t('office.udhaar.open_existing')}
+                </Link>
+              </Text>
+            </Paper>
+          ) : null}
+          <Group justify="space-between" gap="sm">
+            <Box>
+              {canDelete ? (
+                <Button
+                  type="button"
+                  color="danger"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  {t('office.udhaar.delete')}
+                </Button>
+              ) : null}
+            </Box>
+            <Group gap="sm">
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => onOpenChange(false)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="button"
+                disabled={name.trim() === '' || pending}
+                loading={pending}
+                onClick={() => void save()}
+              >
+                {t('office.udhaar.save')}
+              </Button>
+            </Group>
+          </Group>
+        </Stack>
       </Modal>
       <ConfirmDialog
         open={confirmDelete}

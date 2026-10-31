@@ -1,9 +1,18 @@
 import { businessDate, newId } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -23,9 +32,6 @@ const PROVIDERS = [
   'Bank transfer',
   'Other',
 ] as const;
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Receive money from a customer (screens/12). */
 export function ReceivePaymentDialog({
@@ -122,129 +128,124 @@ export function ReceivePaymentDialog({
         title={t('office.udhaar.receive_money')}
         description={t('office.udhaar.receive_for', { name: customerName })}
       >
-        <div className="grid gap-2 sm:grid-cols-2">
-          <MoneyInput
-            label={t('office.udhaar.amount')}
-            value={amount}
-            onChange={setAmount}
-          />
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.udhaar.payment_date')}
-            <input
+        <Stack gap="sm">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <MoneyInput
+              label={t('office.udhaar.amount')}
+              value={amount}
+              onChange={setAmount}
+            />
+            <TextInput
               type="date"
-              className={field}
+              label={t('office.udhaar.payment_date')}
               min={minDate}
               max={today}
               value={date}
               disabled={role !== 'owner'}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(event) => setDate(event.currentTarget.value)}
             />
-          </label>
-          <fieldset className="sm:col-span-2">
-            <legend className="mb-1 text-small">
-              {t('office.udhaar.method')}
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {METHODS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={method === m}
-                  className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-                  onClick={() => setMethod(m)}
-                >
-                  {t(`payment.${m}`)}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          {method === 'bank_wallet' ? (
-            <>
-              <label className="flex flex-col gap-1 text-small">
-                {t('office.udhaar.provider')}
-                <select
-                  className={field}
+            <Box
+              component="fieldset"
+              style={{
+                border: 0,
+                margin: 0,
+                padding: 0,
+                gridColumn: '1 / -1',
+              }}
+            >
+              <Text component="legend" size="sm" mb={4}>
+                {t('office.udhaar.method')}
+              </Text>
+              <Group gap="xs">
+                {METHODS.map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="compact-sm"
+                    variant={method === m ? 'light' : 'default'}
+                    aria-pressed={method === m}
+                    onClick={() => setMethod(m)}
+                  >
+                    {t(`payment.${m}`)}
+                  </Button>
+                ))}
+              </Group>
+            </Box>
+            {method === 'bank_wallet' ? (
+              <>
+                <NativeSelect
+                  label={t('office.udhaar.provider')}
                   value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                >
-                  {PROVIDERS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-small">
-                {t('office.udhaar.reference')}
-                <input
-                  className={field}
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
+                  onChange={(event) => setProvider(event.currentTarget.value)}
+                  data={PROVIDERS.map((p) => ({ value: p, label: p }))}
                 />
-              </label>
-            </>
-          ) : null}
-          {method === 'card' ? (
-            <label className="flex flex-col gap-1 text-small sm:col-span-2">
-              {t('office.udhaar.reference')}
-              <input
-                className={field}
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
+                <TextInput
+                  label={t('office.udhaar.reference')}
+                  value={reference}
+                  onChange={(event) => setReference(event.currentTarget.value)}
+                />
+              </>
+            ) : null}
+            {method === 'card' ? (
+              <Box style={{ gridColumn: '1 / -1' }}>
+                <TextInput
+                  label={t('office.udhaar.reference')}
+                  value={reference}
+                  onChange={(event) => setReference(event.currentTarget.value)}
+                />
+              </Box>
+            ) : null}
+            <Box style={{ gridColumn: '1 / -1' }}>
+              <TextInput
+                label={t('office.udhaar.note')}
+                value={note}
+                maxLength={120}
+                onChange={(event) => setNote(event.currentTarget.value)}
               />
-            </label>
+            </Box>
+          </SimpleGrid>
+          <Text size="sm" data-testid="payment-after">
+            {after >= 0
+              ? t('office.udhaar.balance_after', {
+                  amount: formatShopMoney(after),
+                })
+              : t('office.udhaar.credit_after', {
+                  amount: formatShopMoney(-after),
+                })}
+          </Text>
+          {role !== 'owner' ? (
+            <Text size="sm" c="dimmed">
+              {t('office.udhaar.payment_backdate_owner')}
+            </Text>
           ) : null}
-          <label className="flex flex-col gap-1 text-small sm:col-span-2">
-            {t('office.udhaar.note')}
-            <input
-              className={field}
-              value={note}
-              maxLength={120}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </label>
-        </div>
-        <p className="text-small" data-testid="payment-after">
-          {after >= 0
-            ? t('office.udhaar.balance_after', {
-                amount: formatShopMoney(after),
-              })
-            : t('office.udhaar.credit_after', {
-                amount: formatShopMoney(-after),
-              })}
-        </p>
-        {role !== 'owner' ? (
-          <p className="text-small text-text-muted">
-            {t('office.udhaar.payment_backdate_owner')}
-          </p>
-        ) : null}
-        {!can('payment.receive') ? (
-          <p role="alert" className="text-danger">
-            {t('office.udhaar.payment_no_permission')}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => onOpenChange(false)}
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
-            className={buttonPrimary}
-            disabled={
-              !amount || amount <= 0 || pending || !can('payment.receive')
-            }
-            onClick={() => {
-              if (over) setOverpay(true);
-              else void save();
-            }}
-          >
-            {t('office.udhaar.save_payment')}
-          </button>
-        </div>
+          {!can('payment.receive') ? (
+            <Text role="alert" c="danger" size="sm">
+              {t('office.udhaar.payment_no_permission')}
+            </Text>
+          ) : null}
+          <Group justify="flex-end" gap="sm">
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => onOpenChange(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !amount || amount <= 0 || pending || !can('payment.receive')
+              }
+              loading={pending}
+              onClick={() => {
+                if (over) setOverpay(true);
+                else void save();
+              }}
+            >
+              {t('office.udhaar.save_payment')}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
       <ConfirmDialog
         open={overpay}

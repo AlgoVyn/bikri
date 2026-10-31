@@ -1,5 +1,16 @@
 import { type CartResult, cashChips, newId } from '@bikri/core';
 import type { Cart, SyncedRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   type FormEvent,
@@ -12,11 +23,6 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import {
   BankIcon,
   CardIcon,
@@ -128,22 +134,26 @@ export function PayDialog({
       title={done ? t('pay.done_title') : t('sell.take_payment')}
       header={
         done ? null : (
-          <div className="text-end">
-            <p className="text-small text-text-muted">
+          <Box ta="end">
+            <Text size="sm" c="dimmed">
               {t('sell.total_to_pay')}
-            </p>
-            <p
-              className="text-total font-semibold whitespace-nowrap max-sm:text-title"
+            </Text>
+            <Text
+              fz={{ base: 20, sm: 28 }}
+              fw={600}
+              style={{ whiteSpace: 'nowrap' }}
               data-testid="pay-total"
             >
               <MoneyText paisa={totals.total} />
-            </p>
-          </div>
+            </Text>
+          </Box>
         )
       }
     >
       {done ? (
-        <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
+        <Suspense
+          fallback={<Text className="sr-only">{t('common.loading')}</Text>}
+        >
           <SaleComplete
             done={done}
             onNewSale={() => onOpenChange(false)}
@@ -326,189 +336,206 @@ function PayStep({
         : t('pay.done_paid', { amount: formatShopMoney(total) });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
-      <div
-        role="tablist"
-        aria-label={t('pay.method')}
-        className="grid grid-cols-2 gap-2"
-      >
-        {PAY_METHODS.map((m) => {
-          const Icon = METHOD_ICON[m];
-          const active = row?.method === m;
-          return (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={`flex min-h-20 items-center gap-2 rounded-control border p-3 text-start ${
-                active
-                  ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
-                  : 'border-border bg-surface text-text-muted hover:bg-surface-2'
-              }`}
-              onClick={() => chooseMethod(m)}
-            >
-              <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-control ${
-                  active
-                    ? 'bg-surface text-primary'
-                    : 'bg-surface-2 text-text-muted'
-                }`}
+    <Box component="form" onSubmit={(e: FormEvent) => void submit(e)}>
+      <Stack gap="md">
+        <SimpleGrid
+          cols={2}
+          spacing="sm"
+          role="tablist"
+          aria-label={t('pay.method')}
+        >
+          {PAY_METHODS.map((m) => {
+            const Icon = METHOD_ICON[m];
+            const active = row?.method === m;
+            return (
+              <Button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                variant={active ? 'light' : 'default'}
+                h="auto"
+                p="sm"
+                justify="flex-start"
+                styles={{ label: { width: '100%' } }}
+                onClick={() => chooseMethod(m)}
               >
-                <Icon />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-small font-medium">
-                  {t(METHOD_KEY[m])}
-                </span>
-                <span
-                  className={`block text-small ${active ? 'text-primary-subtle-ink' : 'text-text-muted'}`}
-                >
-                  {t(METHOD_HINT[m])}
-                </span>
-              </span>
-              {active ? (
-                <span
-                  aria-hidden="true"
-                  className="text-title text-primary-subtle-ink"
-                >
-                  ✓
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+                <Group gap="sm" wrap="nowrap" w="100%">
+                  <Box
+                    w={36}
+                    h={36}
+                    style={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      background: active
+                        ? 'var(--mantine-color-body)'
+                        : 'var(--mantine-color-default-hover)',
+                    }}
+                  >
+                    <Icon />
+                  </Box>
+                  <Box style={{ minWidth: 0, flex: 1, textAlign: 'start' }}>
+                    <Text size="sm" fw={500}>
+                      {t(METHOD_KEY[m])}
+                    </Text>
+                    <Text size="xs" c={active ? undefined : 'dimmed'}>
+                      {t(METHOD_HINT[m])}
+                    </Text>
+                  </Box>
+                  {active ? (
+                    <Text aria-hidden="true" fz="lg">
+                      ✓
+                    </Text>
+                  ) : null}
+                </Group>
+              </Button>
+            );
+          })}
+        </SimpleGrid>
 
-      {row ? (
-        <MethodPanel
-          key={`${activeRow}-${row.method}`}
-          row={row}
-          due={dueFor(activeRow)}
-          change={s.change}
-          remaining={s.remaining}
-          onChange={(patch) => setRow(activeRow, patch)}
-          customer={customer}
-          credit={credit ?? null}
-          hardBlocked={hardBlocked}
-          onPickCustomer={() => setPicker(true)}
-          onOverride={() =>
-            requestOverride('udhaar.hard_limit', (by) => {
-              void mutateCart(cartId, (c) =>
-                addOverride(c, {
-                  permission: 'udhaar.hard_limit',
-                  approved_by: by,
-                }),
-              );
-            })
-          }
-        />
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        {rows.length > 1 ? (
-          <ul aria-label={t('pay.split_list')} className="flex flex-col gap-1">
-            {rows.map((r, i) => (
-              <li
-                // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity; position is what the cashier edits
-                key={`${i}-${r.method}`}
-                data-testid="pay-row"
-                className={`flex items-center gap-2 rounded-control border px-2 ${i === activeRow ? 'border-primary' : 'border-border'}`}
-              >
-                <button
-                  type="button"
-                  className="min-h-11 flex-1 text-start"
-                  onClick={() => setActiveRow(i)}
-                >
-                  {t(METHOD_KEY[r.method])} · <MoneyText paisa={r.amount} />
-                </button>
-                <button
-                  type="button"
-                  className="min-h-11 px-2 text-danger"
-                  onClick={() => removeRow(i)}
-                >
-                  {t('pay.remove')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={addSplit}
-            disabled={rows.length >= 4}
-          >
-            {t('pay.split')}
-          </button>
-          <p data-testid="pay-running" aria-live="polite">
-            {t('pay.running', {
-              paid: formatShopMoney(s.paidTotal + s.udhaar),
-              remaining: formatShopMoney(s.remaining),
-            })}
-          </p>
-        </div>
-        {s.overpaid ? (
-          <p className="text-danger" role="alert">
-            {t('pay.overpaid')}
-          </p>
-        ) : null}
-        {needsCustomer ? (
-          <p className="text-danger" role="alert">
-            {t('pay.need_customer')}
-          </p>
-        ) : null}
-        {udhaarDenied ? (
-          <p className="text-danger" role="alert">
-            {t('pay.no_udhaar')}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex min-h-11 items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-5"
-            checked={printOn}
-            onChange={(e) => setPrint(e.target.checked)}
+        {row ? (
+          <MethodPanel
+            key={`${activeRow}-${row.method}`}
+            row={row}
+            due={dueFor(activeRow)}
+            change={s.change}
+            remaining={s.remaining}
+            onChange={(patch) => setRow(activeRow, patch)}
+            customer={customer}
+            credit={credit ?? null}
+            hardBlocked={hardBlocked}
+            onPickCustomer={() => setPicker(true)}
+            onOverride={() =>
+              requestOverride('udhaar.hard_limit', (by) => {
+                void mutateCart(cartId, (c) =>
+                  addOverride(c, {
+                    permission: 'udhaar.hard_limit',
+                    approved_by: by,
+                  }),
+                );
+              })
+            }
           />
-          {t('pay.print')}
-        </label>
-        {customer?.customer.phone ? (
-          <label className="flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.checked)}
-            />
-            {t('pay.whatsapp')}
-          </label>
         ) : null}
-        <div>
-          <label htmlFor={noteId} className="mb-1 block text-small">
-            {t('pay.note')}
-          </label>
-          <input
+
+        <Stack gap="xs">
+          {rows.length > 1 ? (
+            <Box
+              component="ul"
+              aria-label={t('pay.split_list')}
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
+            >
+              {rows.map((r, i) => (
+                <Paper
+                  // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity; position is what the cashier edits
+                  key={`${i}-${r.method}`}
+                  withBorder
+                  p="xs"
+                  mt={4}
+                  data-testid="pay-row"
+                  style={{
+                    borderColor:
+                      i === activeRow
+                        ? 'var(--mantine-color-brand-6)'
+                        : undefined,
+                  }}
+                >
+                  <Group gap="sm" wrap="nowrap">
+                    <Button
+                      type="button"
+                      variant="transparent"
+                      size="compact-sm"
+                      justify="flex-start"
+                      style={{ flex: 1 }}
+                      onClick={() => setActiveRow(i)}
+                    >
+                      {t(METHOD_KEY[r.method])} · <MoneyText paisa={r.amount} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="transparent"
+                      color="danger"
+                      size="compact-sm"
+                      onClick={() => removeRow(i)}
+                    >
+                      {t('pay.remove')}
+                    </Button>
+                  </Group>
+                </Paper>
+              ))}
+            </Box>
+          ) : null}
+          <Group justify="space-between" gap="sm" wrap="wrap">
+            <Button
+              type="button"
+              variant="default"
+              size="compact-sm"
+              onClick={addSplit}
+              disabled={rows.length >= 4}
+            >
+              {t('pay.split')}
+            </Button>
+            <Text size="sm" data-testid="pay-running" aria-live="polite">
+              {t('pay.running', {
+                paid: formatShopMoney(s.paidTotal + s.udhaar),
+                remaining: formatShopMoney(s.remaining),
+              })}
+            </Text>
+          </Group>
+          {s.overpaid ? (
+            <Text c="danger" role="alert" size="sm">
+              {t('pay.overpaid')}
+            </Text>
+          ) : null}
+          {needsCustomer ? (
+            <Text c="danger" role="alert" size="sm">
+              {t('pay.need_customer')}
+            </Text>
+          ) : null}
+          {udhaarDenied ? (
+            <Text c="danger" role="alert" size="sm">
+              {t('pay.no_udhaar')}
+            </Text>
+          ) : null}
+        </Stack>
+
+        <Stack gap="xs">
+          <Checkbox
+            label={t('pay.print')}
+            checked={printOn}
+            onChange={(event) => setPrint(event.currentTarget.checked)}
+          />
+          {customer?.customer.phone ? (
+            <Checkbox
+              label={t('pay.whatsapp')}
+              checked={whatsapp}
+              onChange={(event) => setWhatsapp(event.currentTarget.checked)}
+            />
+          ) : null}
+          <TextInput
             id={noteId}
-            className={fieldClass}
+            label={t('pay.note')}
             maxLength={120}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(event) => setNote(event.currentTarget.value)}
           />
-        </div>
-      </div>
+        </Stack>
 
-      <button
-        type="submit"
-        className={`${buttonPrimary} min-h-14 text-title`}
-        disabled={!valid || pending}
-        data-testid="pay-done"
-      >
-        {label}
-      </button>
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          disabled={!valid || pending}
+          loading={pending}
+          data-testid="pay-done"
+        >
+          {label}
+        </Button>
+      </Stack>
+
       <CustomerDialog
         open={picker}
         onOpenChange={setPicker}
@@ -518,7 +545,7 @@ function PayStep({
         actor={staff?.id ?? null}
         canCreate={can('party.edit')}
       />
-    </form>
+    </Box>
   );
 }
 
@@ -553,183 +580,196 @@ function MethodPanel({
     // The cashier types the received amount straight away (prefilled, all selected).
     received.current?.querySelector('input')?.select();
   }, []);
-  const amountInput = (label: string, large = false) => (
+  const amountInput = (label: string, large = false, autoFocus = false) => (
     <MoneyInput
       label={label}
       large={large}
+      autoFocus={autoFocus}
       value={row.amount}
       onChange={(v) => onChange({ amount: v ?? 0 })}
     />
   );
   if (row.method === 'cash') {
     return (
-      <div className="flex flex-col gap-2">
-        <div ref={received}>{amountInput(t('pay.received'), true)}</div>
-        <div className="flex flex-wrap gap-2">
+      <Stack gap="sm">
+        <Box ref={received}>{amountInput(t('pay.received'), true, true)}</Box>
+        <Group gap="xs">
           {[due, ...cashChips(due)].map((v, i) => (
-            <button
+            <Button
               key={v}
               type="button"
-              className={buttonQuiet}
+              variant="default"
+              size="compact-sm"
               onClick={() => onChange({ amount: v })}
             >
               {i === 0 ? t('pay.exact') : <MoneyText paisa={v} />}
-            </button>
+            </Button>
           ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-control border border-border bg-surface-2 p-2">
-            <p className="text-small text-text-muted">
+        </Group>
+        <SimpleGrid cols={2} spacing="sm">
+          <Paper p="sm" bg="var(--mantine-color-default-hover)">
+            <Text size="sm" c="dimmed">
               {t('pay.change_label')}
-            </p>
+            </Text>
             {change > 0 ? (
-              <p
-                className="text-title font-semibold text-success"
+              <Text
+                fz={20}
+                fw={600}
+                c="var(--color-success)"
                 data-testid="pay-change"
                 aria-live="polite"
               >
                 <MoneyText paisa={change} />
-              </p>
+              </Text>
             ) : (
-              <p className="text-title font-semibold">—</p>
+              <Text fz={20} fw={600}>
+                —
+              </Text>
             )}
-          </div>
-          <div className="rounded-control border border-border bg-surface-2 p-2">
-            <p className="text-small text-text-muted">{t('pay.due_label')}</p>
+          </Paper>
+          <Paper p="sm" bg="var(--mantine-color-default-hover)">
+            <Text size="sm" c="dimmed">
+              {t('pay.due_label')}
+            </Text>
             {remaining > 0 ? (
-              <p
-                className="text-title font-semibold text-warning"
+              <Text
+                fz={20}
+                fw={600}
+                c="var(--color-warning)"
                 data-testid="pay-due"
                 aria-live="polite"
               >
                 <MoneyText paisa={remaining} />
-              </p>
+              </Text>
             ) : (
-              <p className="text-title font-semibold">—</p>
+              <Text fz={20} fw={600}>
+                —
+              </Text>
             )}
-          </div>
-        </div>
-      </div>
+          </Paper>
+        </SimpleGrid>
+      </Stack>
     );
   }
   if (row.method === 'bank_wallet') {
     return (
-      <div className="flex flex-col gap-2">
-        {/* biome-ignore lint/a11y/useSemanticElements: provider chips */}
-        <div
-          role="group"
-          aria-label={t('pay.provider')}
-          className="flex flex-wrap gap-2"
-        >
+      <Stack gap="sm">
+        <Group gap="xs" role="group" aria-label={t('pay.provider')}>
           {WALLET_PROVIDERS.map((p) => (
-            <button
+            <Button
               key={p}
               type="button"
+              size="compact-sm"
+              radius="xl"
+              variant={row.provider === p ? 'filled' : 'default'}
               aria-pressed={row.provider === p}
-              className={`min-h-11 rounded-full border px-3 ${row.provider === p ? 'border-primary bg-primary text-primary-ink' : 'border-border'}`}
               onClick={() => onChange({ provider: p })}
             >
               {t(`pay.provider_${p.toLowerCase().replace(' ', '_')}`)}
-            </button>
+            </Button>
           ))}
-        </div>
-        <div>
-          <label htmlFor={refId} className="mb-1 block text-small">
-            {t('pay.reference')}
-          </label>
-          <input
-            id={refId}
-            className={fieldClass}
-            maxLength={40}
-            value={row.reference ?? ''}
-            onChange={(e) => onChange({ reference: e.target.value })}
-          />
-        </div>
+        </Group>
+        <TextInput
+          id={refId}
+          label={t('pay.reference')}
+          maxLength={40}
+          value={row.reference ?? ''}
+          onChange={(event) =>
+            onChange({ reference: event.currentTarget.value })
+          }
+        />
         {amountInput(t('pay.amount'))}
-      </div>
+      </Stack>
     );
   }
   if (row.method === 'card') {
     return (
-      <div className="flex flex-col gap-2">
-        <div>
-          <label htmlFor={last4Id} className="mb-1 block text-small">
-            {t('pay.last4')}
-          </label>
-          <input
-            id={last4Id}
-            inputMode="numeric"
-            dir="ltr"
-            className={fieldClass}
-            maxLength={4}
-            value={row.last4 ?? ''}
-            onChange={(e) =>
-              onChange({ last4: e.target.value.replace(/\D/gu, '') })
-            }
-          />
-        </div>
-        <div>
-          <label htmlFor={refId} className="mb-1 block text-small">
-            {t('pay.reference')}
-          </label>
-          <input
-            id={refId}
-            className={fieldClass}
-            maxLength={40}
-            value={row.reference ?? ''}
-            onChange={(e) => onChange({ reference: e.target.value })}
-          />
-        </div>
+      <Stack gap="sm">
+        <TextInput
+          id={last4Id}
+          label={t('pay.last4')}
+          inputMode="numeric"
+          dir="ltr"
+          maxLength={4}
+          value={row.last4 ?? ''}
+          onChange={(event) =>
+            onChange({ last4: event.currentTarget.value.replace(/\D/gu, '') })
+          }
+        />
+        <TextInput
+          id={refId}
+          label={t('pay.reference')}
+          maxLength={40}
+          value={row.reference ?? ''}
+          onChange={(event) =>
+            onChange({ reference: event.currentTarget.value })
+          }
+        />
         {amountInput(t('pay.amount'))}
-      </div>
+      </Stack>
     );
   }
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex min-h-11 items-center justify-between gap-2 rounded-control border border-border px-3">
-        <span data-testid="pay-customer">
-          {customer ? String(customer.customer.name) : t('pay.no_customer')}
-        </span>
-        <button
-          type="button"
-          className="min-h-11 px-2 text-primary"
-          onClick={onPickCustomer}
-        >
-          {customer ? t('sell.change_customer') : t('pay.choose_customer')}
-        </button>
-      </div>
+    <Stack gap="sm">
+      <Paper withBorder p="sm">
+        <Group justify="space-between" gap="sm" wrap="nowrap">
+          <Text size="sm" data-testid="pay-customer">
+            {customer ? String(customer.customer.name) : t('pay.no_customer')}
+          </Text>
+          <Button
+            type="button"
+            variant="transparent"
+            size="compact-sm"
+            onClick={onPickCustomer}
+          >
+            {customer ? t('sell.change_customer') : t('pay.choose_customer')}
+          </Button>
+        </Group>
+      </Paper>
       {credit ? (
-        <p
-          data-testid="pay-credit"
-          className={credit.over_limit ? 'text-warning' : 'text-text-muted'}
-        >
-          {t('pay.credit_line', {
-            owes: formatShopMoney(credit.balance),
-            after: formatShopMoney(credit.balance_after),
-          })}
-          {credit.limit !== null
-            ? ` · ${t('pay.credit_limit', { limit: formatShopMoney(credit.limit) })}`
-            : ''}
+        <Box data-testid="pay-credit">
+          <Text
+            size="sm"
+            c={
+              credit.over_limit
+                ? 'var(--color-warning)'
+                : 'var(--mantine-color-dimmed)'
+            }
+          >
+            {t('pay.credit_line', {
+              owes: formatShopMoney(credit.balance),
+              after: formatShopMoney(credit.balance_after),
+            })}
+            {credit.limit !== null
+              ? ` · ${t('pay.credit_limit', {
+                  limit: formatShopMoney(credit.limit),
+                })}`
+              : ''}
+          </Text>
           {credit.over_limit ? (
-            <span className="block font-medium" role="status">
+            <Text size="sm" fw={500} c="var(--color-warning)" role="status">
               {t('pay.over_limit', {
                 over: formatShopMoney(credit.over_by),
                 limit: formatShopMoney(credit.limit ?? 0),
               })}
-            </span>
+            </Text>
           ) : null}
-        </p>
+        </Box>
       ) : null}
       {hardBlocked ? (
-        <button
+        <Button
           type="button"
-          className="self-start text-primary underline"
+          variant="transparent"
+          size="compact-sm"
+          px={0}
           onClick={onOverride}
+          style={{ alignSelf: 'flex-start' }}
         >
           {t('pay.manager_override')}
-        </button>
+        </Button>
       ) : null}
       {amountInput(t('pay.amount'))}
-    </div>
+    </Stack>
   );
 }

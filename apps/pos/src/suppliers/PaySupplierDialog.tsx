@@ -1,7 +1,15 @@
 import { newId } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -12,8 +20,6 @@ import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Method = 'cash' | 'card' | 'bank_wallet';
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Pay supplier (screens/13). */
 export function PaySupplierDialog({
@@ -82,70 +88,70 @@ export function PaySupplierDialog({
       title={t('office.suppliers.pay_supplier')}
       description={t('office.suppliers.pay_for', { name: supplierName })}
     >
-      <div className="grid gap-2 sm:grid-cols-2">
-        <MoneyInput
-          label={t('office.suppliers.amount')}
-          value={amount}
-          onChange={setAmount}
-        />
-        <fieldset>
-          <legend className="mb-1 text-small">
-            {t('office.suppliers.method')}
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {(['cash', 'bank_wallet', 'card'] as Method[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={method === m}
-                className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-                onClick={() => setMethod(m)}
-              >
-                {t(`payment.${m}`)}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.reference')}
-          <input
-            className={field}
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
+      <Stack gap="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <MoneyInput
+            label={t('office.suppliers.amount')}
+            value={amount}
+            onChange={setAmount}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.note')}
-          <input
-            className={field}
+          <Box
+            component="fieldset"
+            style={{ border: 0, margin: 0, padding: 0 }}
+          >
+            <Text component="legend" size="sm" mb={4}>
+              {t('office.suppliers.method')}
+            </Text>
+            <Group gap="xs">
+              {(['cash', 'bank_wallet', 'card'] as Method[]).map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  size="compact-sm"
+                  variant={method === m ? 'light' : 'default'}
+                  aria-pressed={method === m}
+                  onClick={() => setMethod(m)}
+                >
+                  {t(`payment.${m}`)}
+                </Button>
+              ))}
+            </Group>
+          </Box>
+          <TextInput
+            label={t('office.suppliers.reference')}
+            value={reference}
+            onChange={(event) => setReference(event.currentTarget.value)}
+          />
+          <TextInput
+            label={t('office.suppliers.note')}
             value={note}
             maxLength={120}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(event) => setNote(event.currentTarget.value)}
           />
-        </label>
-      </div>
-      <p className="text-small text-text-muted">
-        {t('office.suppliers.balance_after', {
-          amount: formatShopMoney(balance - (amount ?? 0)),
-        })}
-      </p>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={!amount || amount <= 0 || pending}
-          onClick={() => void save()}
-        >
-          {t('office.suppliers.save_payment')}
-        </button>
-      </div>
+        </SimpleGrid>
+        <Text size="sm" c="dimmed">
+          {t('office.suppliers.balance_after', {
+            amount: formatShopMoney(balance - (amount ?? 0)),
+          })}
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={!amount || amount <= 0 || pending}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.suppliers.save_payment')}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

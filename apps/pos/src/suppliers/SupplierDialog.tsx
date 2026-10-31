@@ -1,7 +1,14 @@
 import type { MasterRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  SimpleGrid,
+  Stack,
+  TextInput,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -78,8 +85,6 @@ export function SupplierDialog({
     }
   };
 
-  const field =
-    'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
   return (
     <Modal
       open={open}
@@ -90,64 +95,61 @@ export function SupplierDialog({
           : t('office.suppliers.new_supplier')
       }
     >
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small sm:col-span-2">
-          {t('office.suppliers.name')}
-          <input
-            className={field}
-            maxLength={60}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+      <Stack gap="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <Box style={{ gridColumn: '1 / -1' }}>
+            <TextInput
+              label={t('office.suppliers.name')}
+              maxLength={60}
+              value={name}
+              onChange={(event) => setName(event.currentTarget.value)}
+            />
+          </Box>
+          <PhoneInput
+            label={t('office.suppliers.phone')}
+            value={phone}
+            onChange={(next) => setPhone(next ?? '')}
           />
-        </label>
-        <PhoneInput
-          label={t('office.suppliers.phone')}
-          value={phone}
-          onChange={(next) => setPhone(next ?? '')}
-        />
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.address')}
-          <input
-            className={field}
+          <TextInput
+            label={t('office.suppliers.address')}
             maxLength={120}
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(event) => setAddress(event.currentTarget.value)}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-small sm:col-span-2">
-          {t('office.suppliers.note')}
-          <input
-            className={field}
-            maxLength={200}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </label>
-        {!editing ? (
-          <MoneyInput
-            label={t('office.suppliers.opening_balance')}
-            value={opening}
-            onChange={setOpening}
-          />
-        ) : null}
-      </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={name.trim() === '' || pending}
-          onClick={() => void save()}
-        >
-          {t('office.suppliers.save')}
-        </button>
-      </div>
+          <Box style={{ gridColumn: '1 / -1' }}>
+            <TextInput
+              label={t('office.suppliers.note')}
+              maxLength={200}
+              value={note}
+              onChange={(event) => setNote(event.currentTarget.value)}
+            />
+          </Box>
+          {!editing ? (
+            <MoneyInput
+              label={t('office.suppliers.opening_balance')}
+              value={opening}
+              onChange={setOpening}
+            />
+          ) : null}
+        </SimpleGrid>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={name.trim() === '' || pending}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.suppliers.save')}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

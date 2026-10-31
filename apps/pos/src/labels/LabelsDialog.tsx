@@ -5,10 +5,21 @@ import {
   LabelError,
   type LabelSizeId,
 } from '@bikri/printer';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  NativeSelect,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -251,176 +262,208 @@ function LabelsDialogContent({
       title={t('office.labels.dialog_title')}
       wide
     >
-      {rowsWithProducts.length === 0 ? (
-        <p className="text-small text-text-muted">{t('office.labels.empty')}</p>
-      ) : null}
-      <ul className="flex flex-col divide-y divide-border rounded-card border border-border">
-        {rowsWithProducts.map((row) => (
-          <li
-            key={row.productId}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 p-2 sm:grid-cols-[minmax(0,1fr)_10rem_9rem]"
+      <Stack gap="sm">
+        {rowsWithProducts.length === 0 ? (
+          <Text size="sm" c="dimmed">
+            {t('office.labels.empty')}
+          </Text>
+        ) : null}
+        <Paper withBorder>
+          <Box
+            component="ul"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
           >
-            <span className="col-span-2 min-w-0 sm:col-span-1">
-              <span className="block truncate font-medium">
-                {labelName(row.product)}
-              </span>
-              <span className="block text-small text-text-muted">
-                {row.barcode ?? t('office.labels.no_barcode')}
-              </span>
-            </span>
-            <span className="justify-self-start sm:justify-self-end">
-              {row.barcode ? (
-                <MoneyText paisa={Number(row.product.price ?? 0)} />
-              ) : can('catalog.edit') ? (
-                <button
-                  type="button"
-                  className={`${buttonQuiet} whitespace-nowrap`}
-                  onClick={() => void generate(row.product)}
-                >
-                  {t('office.labels.generate')}
-                </button>
-              ) : (
-                <span className="text-small text-text-muted">
-                  {t('office.labels.ask_manager')}
-                </span>
-              )}
-            </span>
-            <div className="w-32 justify-self-end sm:w-36">
-              <QtyInput
-                dense
-                label={t('office.labels.copies')}
-                ariaLabel={`${t('office.labels.copies')} ${labelName(row.product)}`}
-                unit="pc"
-                value={row.copies * 1000}
-                onChange={(value) =>
-                  setRows((current) =>
-                    current.map((item) =>
-                      item.productId === row.productId
-                        ? {
-                            ...item,
-                            copies: Math.max(
-                              0,
-                              Math.min(500, Math.round((value ?? 0) / 1000)),
-                            ),
-                          }
-                        : item,
-                    ),
-                  )
-                }
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+            {rowsWithProducts.map((row, index) => (
+              <Box
+                component="li"
+                key={row.productId}
+                p="sm"
+                style={{
+                  borderTop:
+                    index > 0
+                      ? '1px solid var(--mantine-color-default-border)'
+                      : undefined,
+                }}
+              >
+                <Group justify="space-between" gap="sm" wrap="wrap">
+                  <Box style={{ flex: '1 1 12rem', minWidth: 0 }}>
+                    <Text fw={500} truncate>
+                      {labelName(row.product)}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {row.barcode ?? t('office.labels.no_barcode')}
+                    </Text>
+                  </Box>
+                  <Box>
+                    {row.barcode ? (
+                      <MoneyText paisa={Number(row.product.price ?? 0)} />
+                    ) : can('catalog.edit') ? (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="compact-sm"
+                        onClick={() => void generate(row.product)}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        {t('office.labels.generate')}
+                      </Button>
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        {t('office.labels.ask_manager')}
+                      </Text>
+                    )}
+                  </Box>
+                  <Box w={{ base: 128, sm: 144 }}>
+                    <QtyInput
+                      dense
+                      label={t('office.labels.copies')}
+                      ariaLabel={`${t('office.labels.copies')} ${labelName(row.product)}`}
+                      unit="pc"
+                      value={row.copies * 1000}
+                      onChange={(value) =>
+                        setRows((current) =>
+                          current.map((item) =>
+                            item.productId === row.productId
+                              ? {
+                                  ...item,
+                                  copies: Math.max(
+                                    0,
+                                    Math.min(
+                                      500,
+                                      Math.round((value ?? 0) / 1000),
+                                    ),
+                                  ),
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </Box>
+                </Group>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
 
-      <label className="flex flex-col gap-1 text-small">
-        {t('office.labels.search')}
-        <input
-          className="h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text"
+        <TextInput
+          label={t('office.labels.search')}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => setQuery(event.currentTarget.value)}
           placeholder={t('office.labels.search_placeholder')}
         />
-      </label>
-      <div className="flex flex-wrap gap-1">
-        {searchMatches.map((product) => (
-          <button
-            key={product.id}
-            type="button"
-            className={`${buttonQuiet} px-3`}
-            onClick={() => addRow(product)}
-          >
-            {labelName(product)}
-          </button>
-        ))}
-      </div>
+        <Group gap="xs">
+          {searchMatches.map((product) => (
+            <Button
+              key={product.id}
+              type="button"
+              variant="default"
+              size="compact-sm"
+              onClick={() => addRow(product)}
+            >
+              {labelName(product)}
+            </Button>
+          ))}
+        </Group>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.labels.size')}
-          <select
-            className="h-11 rounded-control border border-border-strong bg-surface px-2"
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <NativeSelect
+            label={t('office.labels.size')}
             value={settings.size}
             onChange={(event) =>
               setSettings({
                 ...settings,
-                size: event.target.value as LabelSizeId,
+                size: event.currentTarget.value as LabelSizeId,
               })
             }
-          >
-            <option value="50x25">{t('office.labels.size_50x25')}</option>
-            <option value="38x25">{t('office.labels.size_38x25')}</option>
-            <option value="40x30">{t('office.labels.size_40x30')}</option>
-            <option value="a4">{t('office.labels.size_a4')}</option>
-          </select>
-        </label>
-        <label className="flex min-h-11 items-center gap-2 text-small">
-          <input
-            type="checkbox"
-            className="size-5"
+            data={[
+              { value: '50x25', label: t('office.labels.size_50x25') },
+              { value: '38x25', label: t('office.labels.size_38x25') },
+              { value: '40x30', label: t('office.labels.size_40x30') },
+              { value: 'a4', label: t('office.labels.size_a4') },
+            ]}
+          />
+          <Checkbox
+            label={t('office.labels.show_shop')}
             checked={settings.showShop}
             onChange={(event) =>
-              setSettings({ ...settings, showShop: event.target.checked })
+              setSettings({
+                ...settings,
+                showShop: event.currentTarget.checked,
+              })
             }
+            mt={10}
           />
-          {t('office.labels.show_shop')}
-        </label>
-        <label className="flex min-h-11 items-center gap-2 text-small">
-          <input
-            type="checkbox"
-            className="size-5"
+          <Checkbox
+            label={t('office.labels.show_price')}
             checked={settings.showPrice}
             onChange={(event) =>
-              setSettings({ ...settings, showPrice: event.target.checked })
+              setSettings({
+                ...settings,
+                showPrice: event.currentTarget.checked,
+              })
             }
           />
-          {t('office.labels.show_price')}
-        </label>
-      </div>
+        </SimpleGrid>
 
-      {preview ? (
-        <div className="flex flex-col gap-1">
-          <p className="text-small text-text-muted">
-            {t('office.labels.preview')}
-          </p>
-          <div
-            data-testid="label-preview"
-            className="mx-auto w-full overflow-auto rounded-control border border-border bg-white p-2"
-            style={{ maxWidth: `${Math.min(preview.widthMm * 2, 200)}mm` }}
+        {preview ? (
+          <Box>
+            <Text size="sm" c="dimmed" mb={4}>
+              {t('office.labels.preview')}
+            </Text>
+            <Box
+              data-testid="label-preview"
+              mx="auto"
+              w="100%"
+              p="xs"
+              bg="white"
+              style={{
+                maxWidth: `${Math.min(preview.widthMm * 2, 200)}mm`,
+                overflow: 'auto',
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-default)',
+              }}
+            >
+              <Box
+                mx="auto"
+                style={{ width: `${preview.widthMm}mm` }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: our own SVG
+                dangerouslySetInnerHTML={{ __html: preview.svg }}
+              />
+            </Box>
+          </Box>
+        ) : null}
+        {previewError ? (
+          <Text size="sm" c="danger">
+            {previewError}
+          </Text>
+        ) : null}
+        {error ? (
+          <Text size="sm" c="danger">
+            {error}
+          </Text>
+        ) : null}
+        <Text size="sm" c="dimmed">
+          {t('office.labels.print_hint')}
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
           >
-            <div
-              className="mx-auto"
-              style={{ width: `${preview.widthMm}mm` }}
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: our own SVG
-              dangerouslySetInnerHTML={{ __html: preview.svg }}
-            />
-          </div>
-        </div>
-      ) : null}
-      {previewError ? (
-        <p className="text-small text-danger">{previewError}</p>
-      ) : null}
-      {error ? <p className="text-small text-danger">{error}</p> : null}
-      <p className="text-small text-text-muted">
-        {t('office.labels.print_hint')}
-      </p>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={totalCopies === 0 || printing}
-          onClick={print}
-        >
-          {t('office.labels.print_n', { count: totalCopies })}
-        </button>
-      </div>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={totalCopies === 0 || printing}
+            loading={printing}
+            onClick={print}
+          >
+            {t('office.labels.print_n', { count: totalCopies })}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

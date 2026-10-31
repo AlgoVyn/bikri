@@ -1,8 +1,16 @@
 import type { PrintJob } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -89,22 +97,22 @@ function PrintStatus({
           ? t('done.printing')
           : t('done.print_waiting');
   return (
-    <p
-      role="status"
-      data-testid="print-status"
-      className={`flex items-center gap-2 text-small ${job.status === 'failed' ? 'text-danger' : 'text-text-muted'}`}
-    >
-      {text}
+    <Group gap="xs" role="status" data-testid="print-status">
+      <Text size="sm" c={job.status === 'failed' ? 'danger' : 'dimmed'}>
+        {text}
+      </Text>
       {job.status === 'failed' ? (
-        <button
+        <Button
           type="button"
-          className="underline"
+          variant="transparent"
+          size="compact-xs"
+          px={0}
           onClick={() => void retryPrintJob(getDb(), job.id)}
         >
           {t('done.retry')}
-        </button>
+        </Button>
       ) : null}
-    </p>
+    </Group>
   );
 }
 
@@ -204,92 +212,117 @@ export function SaleComplete({
   const udhaar = Number(sale.udhaar_amount ?? 0);
   const whatsapp = Boolean(done.customerPhone);
   return (
-    <div
-      className="mx-auto flex w-full max-w-md flex-col items-center gap-3 py-4 text-center"
+    <Stack
+      align="center"
+      gap="sm"
+      maw={448}
+      mx="auto"
+      w="100%"
+      py="md"
+      ta="center"
       data-testid="sale-complete"
     >
-      <span
+      <Box
         aria-hidden="true"
-        className="flex size-16 items-center justify-center rounded-full bg-success-subtle text-figure text-success-subtle-ink"
+        w={64}
+        h={64}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 999,
+          background: 'var(--mantine-color-success-light)',
+          color: 'var(--color-success)',
+          fontSize: 32,
+        }}
       >
         ✓
-      </span>
-      <p className="text-title" data-testid="sale-saved">
+      </Box>
+      <Text fz="lg" data-testid="sale-saved">
         {t('pay.saved', { invoice })}
-      </p>
+      </Text>
       {change > 0 ? (
-        <p className="text-figure font-semibold" data-testid="done-change">
+        <Text fz={24} fw={600} data-testid="done-change">
           {t('pay.change', { amount: formatShopMoney(change) })}
-        </p>
+        </Text>
       ) : null}
       {udhaar > 0 ? (
-        <p data-testid="done-udhaar">
+        <Text size="sm" data-testid="done-udhaar">
           {t('pay.udhaar_written', {
             amount: formatShopMoney(udhaar),
             name: done.customerName,
             balance: formatShopMoney(done.balance),
           })}
-        </p>
+        </Text>
       ) : null}
-      <dl className="w-full rounded-card border border-border bg-surface-2/50 p-3 text-start text-small">
-        <div className="flex items-center justify-between gap-2">
-          <dt className="text-text-muted">
-            {t('sell.items', { count: Number(sale.line_count ?? 0) })}
-          </dt>
-          <dd>
-            <MoneyText paisa={Number(sale.total ?? 0)} />
-          </dd>
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <dt className="text-text-muted">{t('done.paid')}</dt>
-          <dd>
-            <MoneyText paisa={Number(sale.paid_total ?? 0)} />
-          </dd>
-        </div>
-        {done.customerName ? (
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <dt className="text-text-muted">{t('done.customer')}</dt>
-            <dd className="truncate">{done.customerName}</dd>
-          </div>
-        ) : null}
-      </dl>
+      <Paper withBorder p="sm" w="100%" ta="start">
+        <Stack gap={4}>
+          <Group justify="space-between" gap="sm">
+            <Text size="sm" c="dimmed">
+              {t('sell.items', { count: Number(sale.line_count ?? 0) })}
+            </Text>
+            <Text size="sm">
+              <MoneyText paisa={Number(sale.total ?? 0)} />
+            </Text>
+          </Group>
+          <Group justify="space-between" gap="sm">
+            <Text size="sm" c="dimmed">
+              {t('done.paid')}
+            </Text>
+            <Text size="sm">
+              <MoneyText paisa={Number(sale.paid_total ?? 0)} />
+            </Text>
+          </Group>
+          {done.customerName ? (
+            <Group justify="space-between" gap="sm" wrap="nowrap">
+              <Text size="sm" c="dimmed">
+                {t('done.customer')}
+              </Text>
+              <Text size="sm" truncate>
+                {done.customerName}
+              </Text>
+            </Group>
+          ) : null}
+        </Stack>
+      </Paper>
       <PrintStatus job={job} hasPrinter={settings?.printer ?? false} />
-      <button
+      <Button
         ref={newSale}
         type="button"
-        className={`${buttonPrimary} min-h-14 w-full text-title`}
+        size="lg"
+        fullWidth
         onClick={onNewSale}
       >
         {t('pay.new_sale')}
-      </button>
-      <div className="grid w-full grid-cols-2 gap-2">
-        <button
+      </Button>
+      <SimpleGrid cols={2} spacing="sm" w="100%">
+        <Button
           type="button"
-          className={`${buttonQuiet} gap-2`}
+          variant="default"
           onClick={() => void printAgain()}
         >
           {t('done.print_again')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={buttonQuiet}
+          variant="default"
           aria-busy={busy === 'share'}
           onClick={() => void share()}
         >
           {whatsapp ? t('done.share_whatsapp') : t('done.share')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={buttonQuiet}
+          variant="default"
           aria-busy={busy === 'pdf'}
           onClick={() => void pdf()}
         >
           {t('done.download_pdf')}
-        </button>
-        <button type="button" className={buttonQuiet} onClick={onOpenBill}>
+        </Button>
+        <Button type="button" variant="default" onClick={onOpenBill}>
           {t('done.open_bill')}
-        </button>
-      </div>
-    </div>
+        </Button>
+      </SimpleGrid>
+    </Stack>
   );
 }

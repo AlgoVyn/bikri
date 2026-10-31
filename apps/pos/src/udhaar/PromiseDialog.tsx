@@ -1,7 +1,14 @@
 import { businessDate } from '@bikri/core';
+import {
+  Button,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -10,9 +17,6 @@ import { createPromise, PromiseError } from '../data/udhaar.ts';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
 /** Add a promise to pay (screens/12). */
 export function PromiseDialog({
@@ -79,52 +83,50 @@ export function PromiseDialog({
       title={t('office.udhaar.add_promise')}
       description={t('office.udhaar.promise_for', { name: customerName })}
     >
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.udhaar.promise_date')}
-          <input
+      <Stack gap="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <TextInput
             type="date"
-            className={field}
+            label={t('office.udhaar.promise_date')}
             min={businessDate(Date.now())}
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(event) => setDate(event.currentTarget.value)}
           />
-        </label>
-        <MoneyInput
-          label={t('office.udhaar.promise_amount')}
-          value={amount}
-          onChange={setAmount}
-        />
-      </div>
-      <p className="text-small text-text-muted">
-        {t('office.udhaar.promise_whole', { amount: formatShopMoney(balance) })}
-      </p>
-      <label className="flex flex-col gap-1 text-small">
-        {t('office.udhaar.note')}
-        <input
-          className={field}
+          <MoneyInput
+            label={t('office.udhaar.promise_amount')}
+            value={amount}
+            onChange={setAmount}
+          />
+        </SimpleGrid>
+        <Text size="sm" c="dimmed">
+          {t('office.udhaar.promise_whole', {
+            amount: formatShopMoney(balance),
+          })}
+        </Text>
+        <TextInput
+          label={t('office.udhaar.note')}
           value={note}
           maxLength={120}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(event) => setNote(event.currentTarget.value)}
         />
-      </label>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => onOpenChange(false)}
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={pending || date === ''}
-          onClick={() => void save()}
-        >
-          {t('office.udhaar.save_promise')}
-        </button>
-      </div>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => onOpenChange(false)}
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={pending || date === ''}
+            loading={pending}
+            onClick={() => void save()}
+          >
+            {t('office.udhaar.save_promise')}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }
