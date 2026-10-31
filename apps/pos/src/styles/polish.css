@@ -487,3 +487,10 @@ main section + section {
     justify-content: flex-start;
   }
 }
+
+/* Phones: the search action belongs with the other header actions, not floating mid-bar. */
+@media (max-width: 47.99em) {
+  .bikri-topbar-search {
+    justify-content: flex-end;
+  }
+}

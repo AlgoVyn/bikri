@@ -189,6 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </UnstyledButton>
             </Group>
             <Box
+              className="bikri-topbar-search"
               style={{
                 flex: 1,
                 minWidth: 0,
