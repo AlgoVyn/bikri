@@ -1,8 +1,17 @@
+import {
+  ActionIcon,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -20,9 +29,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { tileBg } from './tiles.ts';
 
-const textField =
-  'h-11 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-3 text-body text-text';
-
 /** Categories (screens/08): add, rename, colour, reorder, delete when empty. */
 export function CategoriesPage() {
   const { t } = useTranslation();
@@ -36,214 +42,241 @@ export function CategoriesPage() {
     return <Navigate to="/products" replace />;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-      <SubpageHeader
-        backTo="/products"
-        backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
-        title={t('categories.title')}
-      />
-      <form
-        className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3 sm:flex-row"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          await addCategory(
-            getDb(),
-            name,
-            CATEGORY_COLORS[(categories?.length ?? 0) % CATEGORY_COLORS.length],
-            { actor: staff?.id ?? null },
-            nameUr,
-          );
-          setName('');
-          setNameUr('');
-        }}
-      >
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <label className="sr-only" htmlFor="new-category">
-            {t('categories.new')}
-          </label>
-          <input
-            id="new-category"
-            className={textField}
-            placeholder={t('categories.new')}
-            maxLength={40}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            className={textField}
-            placeholder={t('categories.name_ur')}
-            aria-label={t('categories.name_ur')}
-            lang="ur"
-            dir="rtl"
-            maxLength={40}
-            value={nameUr}
-            onChange={(e) => setNameUr(e.target.value)}
-          />
-        </div>
-        <button
-          type="submit"
-          className={`${buttonPrimary} sm:self-end`}
-          disabled={!name.trim()}
-        >
-          {t('form.add')}
-        </button>
-      </form>
-      {categories && categories.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border-strong px-4 py-8 text-center text-text-muted">
-          {t('categories.empty')}
-        </p>
-      ) : null}
-      <ul className="flex flex-col gap-2">
-        {categories?.map((c, i) => {
-          const label = String(c.name_en);
-          return (
-            <li
-              key={c.id}
-              className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3"
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className={`size-6 shrink-0 rounded-full ${tileBg(c.color)}`}
-                />
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <input
-                    aria-label={t('categories.name', { name: label })}
-                    className={textField}
-                    maxLength={40}
-                    defaultValue={label}
-                    onBlur={(e) => {
-                      const next = e.target.value.trim();
-                      if (next && next !== label)
-                        void updateCategory(
-                          getDb(),
-                          c.id,
-                          { name_en: next },
-                          {
-                            actor: staff?.id ?? null,
-                          },
-                        );
-                      else e.target.value = label;
-                    }}
-                  />
-                  <input
-                    aria-label={t('categories.name_ur')}
-                    className={textField}
-                    lang="ur"
-                    dir="rtl"
-                    maxLength={40}
-                    placeholder={t('categories.name_ur')}
-                    defaultValue={String(c.name_ur ?? '')}
-                    onBlur={(e) => {
-                      const next = e.target.value.trim();
-                      if (next !== String(c.name_ur ?? ''))
-                        void updateCategory(
-                          getDb(),
-                          c.id,
-                          { name_ur: next },
-                          {
-                            actor: staff?.id ?? null,
-                          },
-                        );
-                    }}
-                  />
-                </span>
-                <span className="shrink-0 self-start text-small text-text-muted">
-                  {t('categories.products', { count: c.productCount })}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <fieldset className="flex flex-wrap gap-1">
-                  <legend className="sr-only">
-                    {t('categories.color', { name: label })}
-                  </legend>
-                  {CATEGORY_COLORS.map((color, n) => (
-                    <label
-                      key={color}
-                      className="flex size-11 cursor-pointer items-center justify-center"
+    <Box mx="auto" maw={672} p="md" w="100%">
+      <Stack gap="md">
+        <SubpageHeader
+          backTo="/products"
+          backLabel={t('import.back_to_products')}
+          icon={<ProductsIcon />}
+          title={t('categories.title')}
+        />
+        <Paper withBorder p="sm">
+          <Box
+            component="form"
+            onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              if (!name.trim()) return;
+              await addCategory(
+                getDb(),
+                name,
+                CATEGORY_COLORS[
+                  (categories?.length ?? 0) % CATEGORY_COLORS.length
+                ],
+                { actor: staff?.id ?? null },
+                nameUr,
+              );
+              setName('');
+              setNameUr('');
+            }}
+          >
+            <Stack gap="sm">
+              <TextInput
+                id="new-category"
+                label={t('categories.new')}
+                placeholder={t('categories.new')}
+                maxLength={40}
+                value={name}
+                onChange={(event) => setName(event.currentTarget.value)}
+              />
+              <TextInput
+                label={t('categories.name_ur')}
+                placeholder={t('categories.name_ur')}
+                aria-label={t('categories.name_ur')}
+                lang="ur"
+                dir="rtl"
+                maxLength={40}
+                value={nameUr}
+                onChange={(event) => setNameUr(event.currentTarget.value)}
+              />
+              <Button
+                type="submit"
+                disabled={!name.trim()}
+                style={{ alignSelf: 'flex-end' }}
+              >
+                {t('form.add')}
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+        {categories && categories.length === 0 ? (
+          <Paper
+            withBorder
+            p="xl"
+            style={{ borderStyle: 'dashed', background: 'transparent' }}
+          >
+            <Text c="dimmed" ta="center">
+              {t('categories.empty')}
+            </Text>
+          </Paper>
+        ) : null}
+        <Stack gap="sm">
+          {categories?.map((c, i) => {
+            const label = String(c.name_en);
+            return (
+              <Paper key={c.id} withBorder p="sm">
+                <Stack gap="sm">
+                  <Group align="flex-start" gap="sm" wrap="nowrap">
+                    <Box
+                      aria-hidden="true"
+                      w={24}
+                      h={24}
+                      mt={6}
+                      style={{ borderRadius: 999 }}
+                      className={tileBg(c.color)}
+                    />
+                    <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <TextInput
+                        aria-label={t('categories.name', { name: label })}
+                        maxLength={40}
+                        defaultValue={label}
+                        onBlur={(event) => {
+                          const next = event.currentTarget.value.trim();
+                          if (next && next !== label)
+                            void updateCategory(
+                              getDb(),
+                              c.id,
+                              { name_en: next },
+                              { actor: staff?.id ?? null },
+                            );
+                          else event.currentTarget.value = label;
+                        }}
+                      />
+                      <TextInput
+                        aria-label={t('categories.name_ur')}
+                        lang="ur"
+                        dir="rtl"
+                        maxLength={40}
+                        placeholder={t('categories.name_ur')}
+                        defaultValue={String(c.name_ur ?? '')}
+                        onBlur={(event) => {
+                          const next = event.currentTarget.value.trim();
+                          if (next !== String(c.name_ur ?? ''))
+                            void updateCategory(
+                              getDb(),
+                              c.id,
+                              { name_ur: next },
+                              { actor: staff?.id ?? null },
+                            );
+                        }}
+                      />
+                    </Stack>
+                    <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                      {t('categories.products', { count: c.productCount })}
+                    </Text>
+                  </Group>
+                  <Group justify="space-between" gap="sm" wrap="wrap">
+                    <Box
+                      component="fieldset"
+                      style={{ border: 0, margin: 0, padding: 0 }}
                     >
-                      <input
-                        type="radio"
-                        name={`color-${c.id}`}
-                        className="peer sr-only"
-                        checked={c.color === color}
-                        onChange={() =>
-                          void updateCategory(
-                            getDb(),
-                            c.id,
-                            { color },
-                            {
-                              actor: staff?.id ?? null,
-                            },
-                          )
+                      <Text component="legend" className="sr-only">
+                        {t('categories.color', { name: label })}
+                      </Text>
+                      <Group gap={0}>
+                        {CATEGORY_COLORS.map((color, n) => (
+                          <Box
+                            key={color}
+                            component="label"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 44,
+                              height: 44,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`color-${c.id}`}
+                              className="sr-only"
+                              checked={c.color === color}
+                              onChange={() =>
+                                void updateCategory(
+                                  getDb(),
+                                  c.id,
+                                  { color },
+                                  { actor: staff?.id ?? null },
+                                )
+                              }
+                            />
+                            <span className="sr-only">
+                              {t('categories.color_n', { n: n + 1 })}
+                            </span>
+                            <Box
+                              aria-hidden="true"
+                              w={28}
+                              h={28}
+                              style={{
+                                borderRadius: 999,
+                                outline:
+                                  c.color === color
+                                    ? '2px solid var(--mantine-color-text)'
+                                    : undefined,
+                                outlineOffset: 2,
+                              }}
+                              className={tileBg(color)}
+                            />
+                          </Box>
+                        ))}
+                      </Group>
+                    </Box>
+                    <Group gap={4} ms="auto">
+                      <ActionIcon
+                        variant="default"
+                        size={44}
+                        disabled={i === 0}
+                        aria-label={t('categories.up', { name: label })}
+                        onClick={() =>
+                          void moveCategory(getDb(), c.id, -1, {
+                            actor: staff?.id ?? null,
+                          })
                         }
-                      />
-                      <span className="sr-only">
-                        {t('categories.color_n', { n: n + 1 })}
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className={`size-7 rounded-full ${tileBg(color)} peer-checked:ring-2 peer-checked:ring-text peer-checked:ring-offset-2 peer-focus-visible:outline-2`}
-                      />
-                    </label>
-                  ))}
-                </fieldset>
-                <div className="ms-auto flex gap-1">
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    disabled={i === 0}
-                    aria-label={t('categories.up', { name: label })}
-                    onClick={() =>
-                      void moveCategory(getDb(), c.id, -1, {
-                        actor: staff?.id ?? null,
-                      })
-                    }
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    disabled={i === categories.length - 1}
-                    aria-label={t('categories.down', { name: label })}
-                    onClick={() =>
-                      void moveCategory(getDb(), c.id, 1, {
-                        actor: staff?.id ?? null,
-                      })
-                    }
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    aria-label={t('categories.delete', { name: label })}
-                    onClick={async () => {
-                      try {
-                        await removeCategory(getDb(), c.id, {
-                          actor: staff?.id ?? null,
-                        });
-                      } catch (error) {
-                        if (error instanceof CategoryInUseError) {
-                          toast.push(
-                            t('categories.in_use', { count: error.count }),
-                            'error',
-                          );
-                        } else throw error;
-                      }
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+                      >
+                        ↑
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="default"
+                        size={44}
+                        disabled={i === (categories?.length ?? 0) - 1}
+                        aria-label={t('categories.down', { name: label })}
+                        onClick={() =>
+                          void moveCategory(getDb(), c.id, 1, {
+                            actor: staff?.id ?? null,
+                          })
+                        }
+                      >
+                        ↓
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="default"
+                        size={44}
+                        aria-label={t('categories.delete', { name: label })}
+                        onClick={async () => {
+                          try {
+                            await removeCategory(getDb(), c.id, {
+                              actor: staff?.id ?? null,
+                            });
+                          } catch (error) {
+                            if (error instanceof CategoryInUseError) {
+                              toast.push(
+                                t('categories.in_use', { count: error.count }),
+                                'error',
+                              );
+                            } else throw error;
+                          }
+                        }}
+                      >
+                        ×
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
+      </Stack>
+    </Box>
   );
 }

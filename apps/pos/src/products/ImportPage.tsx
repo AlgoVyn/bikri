@@ -1,7 +1,19 @@
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  ThemeIcon,
+} from '@mantine/core';
 import { Link, Navigate } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -27,8 +39,6 @@ import { downloadText } from '../lib/download.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { readSheetFile } from './sheetFile.ts';
 
-const selectClass =
-  'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 const PREVIEW_LIMIT = 200;
 
 type Stage =
@@ -96,8 +106,12 @@ export function ImportPage() {
     try {
       const ctx = await ledgerContext(getDb(), staff?.id ?? '');
       const result = await runImport(getDb(), preview, ctx, {
-        onProgress: (done, all) =>
-          setStage({ step: 'importing', done, total: all, preview }),
+        onProgress: (done, all) => {
+          // Importing 1,000 rows re-renders the progress card; update in batches so the
+          // database work stays well inside the 10 s budget on a phone.
+          if (done === all || done % 100 === 0)
+            setStage({ step: 'importing', done, total: all, preview });
+        },
       });
       setStage({ step: 'done', result, preview });
       toast.push(
@@ -114,201 +128,223 @@ export function ImportPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <SubpageHeader
-        backTo="/products"
-        backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
-        title={t('import.title')}
-      />
-      <ol
-        className="flex flex-wrap items-center gap-x-2 gap-y-1"
-        aria-label={t('import.steps')}
-      >
-        {(['choose', 'map', 'preview', 'importing'] as const).map((s, i) => {
-          const active =
-            stage.step === s || (s === 'importing' && stage.step === 'done');
-          return (
-            <li
-              key={s}
-              aria-current={active ? 'step' : undefined}
-              className="flex items-center gap-2"
-            >
-              <span
-                className={`flex size-6 items-center justify-center rounded-full text-small ${active ? 'bg-primary font-semibold text-primary-ink' : 'bg-surface-2 text-text-muted'}`}
-              >
-                {i + 1}
-              </span>
-              <span
-                className={`text-small ${active ? 'font-semibold text-text' : 'text-text-muted'}`}
-              >
-                {t(`import.step_${s}`)}
-              </span>
-              {i < 3 ? (
-                <span aria-hidden="true" className="text-text-muted">
-                  ›
-                </span>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-
-      {stage.step === 'choose' ? (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <p>
-            {t('import.choose_hint', {
-              max: MAX_IMPORT_ROWS.toLocaleString('en'),
-            })}
-          </p>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={fileId}
-              className="flex min-h-11 w-fit cursor-pointer items-center rounded-control border border-dashed border-border-strong bg-surface px-4 font-medium hover:bg-surface-2"
-            >
-              {t('import.choose_file')}
-            </label>
-            <input
-              id={fileId}
-              type="file"
-              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="sr-only"
-              onChange={(e) => void onFile(e.target.files?.[0])}
-            />
-            {fileName ? (
-              <p className="text-small text-text-muted">{fileName}</p>
-            ) : null}
-          </div>
-          {readError ? (
-            <p role="alert" className="text-danger">
-              {readError}
-            </p>
-          ) : null}
-          <div>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => downloadText(TEMPLATE_FILE, templateCsv())}
-            >
-              {t('import.template')}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {stage.step === 'map' ? (
-        <MapColumns
-          headers={stage.grid[0] ?? []}
-          mapping={stage.mapping}
-          rows={stage.grid.length - 1}
-          file={stage.file}
-          onChange={(mapping) => setStage({ ...stage, mapping })}
-          onBack={() => setStage({ step: 'choose' })}
-          onNext={() => void toPreview(stage.grid, stage.mapping, stage.file)}
+    <Box mx="auto" maw={1024} p="md" w="100%">
+      <Stack gap="md">
+        <SubpageHeader
+          backTo="/products"
+          backLabel={t('import.back_to_products')}
+          icon={<ProductsIcon />}
+          title={t('import.title')}
         />
-      ) : null}
-
-      {stage.step === 'preview' ? (
-        <section className="flex flex-col gap-3">
-          <p role="status" className="text-title" data-testid="import-summary">
-            {t('import.summary', {
-              created: stage.preview.summary.new,
-              updated: stage.preview.summary.updates,
-              errors: stage.preview.summary.errors,
-            })}
-          </p>
-          {stage.preview.rows.some((r) => r.ignored.length > 0) ? (
-            <p className="text-text-muted">{t('import.ignored_note')}</p>
-          ) : null}
-          <PreviewTable preview={stage.preview} message={message} />
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() =>
-                setStage({
-                  step: 'map',
-                  grid: stage.grid,
-                  mapping: stage.mapping,
-                  file: stage.file,
-                })
-              }
-            >
-              {t('import.back')}
-            </button>
-            {stage.preview.summary.errors > 0 ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                onClick={() => downloadErrors(stage.preview)}
+        <Group
+          component="ol"
+          gap="sm"
+          wrap="wrap"
+          aria-label={t('import.steps')}
+          style={{ listStyle: 'none', margin: 0, padding: 0 }}
+        >
+          {(['choose', 'map', 'preview', 'importing'] as const).map((s, i) => {
+            const active =
+              stage.step === s || (s === 'importing' && stage.step === 'done');
+            return (
+              <Group
+                component="li"
+                key={s}
+                gap={8}
+                aria-current={active ? 'step' : undefined}
+                wrap="nowrap"
               >
-                {t('import.download_errors')}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={
-                stage.preview.summary.new + stage.preview.summary.updates === 0
-              }
-              onClick={() => void doImport(stage.preview)}
-            >
-              {t('import.import_rows', {
-                count:
-                  stage.preview.summary.new + stage.preview.summary.updates,
-              })}
-            </button>
-          </div>
-        </section>
-      ) : null}
+                <ThemeIcon
+                  size={24}
+                  radius="xl"
+                  variant={active ? 'filled' : 'light'}
+                  color={active ? 'brand' : 'gray'}
+                >
+                  <Text size="xs" fw={600}>
+                    {i + 1}
+                  </Text>
+                </ThemeIcon>
+                <Text
+                  size="sm"
+                  fw={active ? 600 : undefined}
+                  c={active ? undefined : 'dimmed'}
+                >
+                  {t(`import.step_${s}`)}
+                </Text>
+                {i < 3 ? (
+                  <Text aria-hidden="true" c="dimmed">
+                    ›
+                  </Text>
+                ) : null}
+              </Group>
+            );
+          })}
+        </Group>
 
-      {stage.step === 'importing' ? (
-        <section className="flex flex-col gap-2">
-          <p>
-            {t('import.importing', { done: stage.done, total: stage.total })}
-          </p>
-          <progress
-            className="h-3 w-full"
-            aria-label={t('import.progress')}
-            max={Math.max(1, stage.total)}
-            value={stage.done}
+        {stage.step === 'choose' ? (
+          <Paper withBorder p="lg">
+            <Stack gap="sm">
+              <Text>
+                {t('import.choose_hint', {
+                  max: MAX_IMPORT_ROWS.toLocaleString('en'),
+                })}
+              </Text>
+              <Box>
+                <Button component="label" htmlFor={fileId} variant="default">
+                  {t('import.choose_file')}
+                </Button>
+                <input
+                  id={fileId}
+                  type="file"
+                  accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="sr-only"
+                  onChange={(event) => void onFile(event.target.files?.[0])}
+                />
+                {fileName ? (
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {fileName}
+                  </Text>
+                ) : null}
+              </Box>
+              {readError ? (
+                <Text c="danger" role="alert" size="sm">
+                  {readError}
+                </Text>
+              ) : null}
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => downloadText(TEMPLATE_FILE, templateCsv())}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {t('import.template')}
+              </Button>
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {stage.step === 'map' ? (
+          <MapColumns
+            headers={stage.grid[0] ?? []}
+            mapping={stage.mapping}
+            rows={stage.grid.length - 1}
+            file={stage.file}
+            onChange={(mapping) => setStage({ ...stage, mapping })}
+            onBack={() => setStage({ step: 'choose' })}
+            onNext={() => void toPreview(stage.grid, stage.mapping, stage.file)}
           />
-        </section>
-      ) : null}
+        ) : null}
 
-      {stage.step === 'done' ? (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <p role="status" className="text-title" data-testid="import-result">
-            {t('import.result', {
-              created: stage.result.created,
-              updated: stage.result.updated,
-              skipped: stage.result.skipped,
-            })}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/products" className={buttonPrimary}>
-              {t('import.back_to_products')}
-            </Link>
-            {stage.result.skipped > 0 ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                onClick={() => downloadErrors(stage.preview)}
-              >
-                {t('import.download_errors')}
-              </button>
+        {stage.step === 'preview' ? (
+          <Stack gap="sm">
+            <Text role="status" fz="lg" data-testid="import-summary">
+              {t('import.summary', {
+                created: stage.preview.summary.new,
+                updated: stage.preview.summary.updates,
+                errors: stage.preview.summary.errors,
+              })}
+            </Text>
+            {stage.preview.rows.some((r) => r.ignored.length > 0) ? (
+              <Text c="dimmed">{t('import.ignored_note')}</Text>
             ) : null}
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => setStage({ step: 'choose' })}
-            >
-              {t('import.another')}
-            </button>
-          </div>
-        </section>
-      ) : null}
-    </div>
+            <PreviewTable preview={stage.preview} message={message} />
+            <Group justify="flex-end" gap="sm">
+              <Button
+                type="button"
+                variant="default"
+                onClick={() =>
+                  setStage({
+                    step: 'map',
+                    grid: stage.grid,
+                    mapping: stage.mapping,
+                    file: stage.file,
+                  })
+                }
+              >
+                {t('import.back')}
+              </Button>
+              {stage.preview.summary.errors > 0 ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => downloadErrors(stage.preview)}
+                >
+                  {t('import.download_errors')}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                disabled={
+                  stage.preview.summary.new + stage.preview.summary.updates ===
+                  0
+                }
+                onClick={() => void doImport(stage.preview)}
+              >
+                {t('import.import_rows', {
+                  count:
+                    stage.preview.summary.new + stage.preview.summary.updates,
+                })}
+              </Button>
+            </Group>
+          </Stack>
+        ) : null}
+
+        {stage.step === 'importing' ? (
+          <Paper withBorder p="lg">
+            <Stack gap="sm">
+              <Text>
+                {t('import.importing', {
+                  done: stage.done,
+                  total: stage.total,
+                })}
+              </Text>
+              <Progress
+                value={(stage.done / Math.max(1, stage.total)) * 100}
+                size="md"
+                aria-label={t('import.progress')}
+              />
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {stage.step === 'done' ? (
+          <Paper withBorder p="lg">
+            <Stack gap="sm">
+              <Text role="status" fz="lg" data-testid="import-result">
+                {t('import.result', {
+                  created: stage.result.created,
+                  updated: stage.result.updated,
+                  skipped: stage.result.skipped,
+                })}
+              </Text>
+              <Group gap="sm">
+                <Link to="/products" style={{ textDecoration: 'none' }}>
+                  <Button component="span">
+                    {t('import.back_to_products')}
+                  </Button>
+                </Link>
+                {stage.result.skipped > 0 ? (
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={() => downloadErrors(stage.preview)}
+                  >
+                    {t('import.download_errors')}
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => setStage({ step: 'choose' })}
+                >
+                  {t('import.another')}
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+        ) : null}
+      </Stack>
+    </Box>
   );
 }
 
@@ -342,53 +378,40 @@ function MapColumns({
     onChange(next);
   };
   return (
-    <section className="flex flex-col gap-3">
-      <p>{t('import.map_hint', { file, count: rows })}</p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <Stack gap="sm">
+      <Text>{t('import.map_hint', { file, count: rows })}</Text>
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
         {TEMPLATE_COLUMNS.map((field) => (
-          <div key={field} className="flex flex-col gap-1">
-            <label
-              htmlFor={`${base}-${field}`}
-              className="text-small font-medium"
-            >
-              {t(`import.field.${field}`)}
-            </label>
-            <select
-              id={`${base}-${field}`}
-              className={selectClass}
-              value={mapping[field] === undefined ? '' : String(mapping[field])}
-              onChange={(e) => set(field, e.target.value)}
-            >
-              <option value="">{t('import.not_in_file')}</option>
-              {headers.map((h, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: columns are identified by position
-                <option key={i} value={String(i)}>
-                  {h || t('import.column_n', { n: i + 1 })}
-                </option>
-              ))}
-            </select>
-          </div>
+          <NativeSelect
+            key={field}
+            id={`${base}-${field}`}
+            label={t(`import.field.${field}`)}
+            value={mapping[field] === undefined ? '' : String(mapping[field])}
+            onChange={(event) => set(field, event.currentTarget.value)}
+            data={[
+              { value: '', label: t('import.not_in_file') },
+              ...headers.map((h, i) => ({
+                value: String(i),
+                label: h || t('import.column_n', { n: i + 1 }),
+              })),
+            ]}
+          />
         ))}
-      </div>
+      </SimpleGrid>
       {canMatch ? null : (
-        <p role="alert" className="text-danger">
+        <Text c="danger" role="alert" size="sm">
           {t('import.need_name')}
-        </p>
+        </Text>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={buttonQuiet} onClick={onBack}>
+      <Group justify="flex-end" gap="sm">
+        <Button type="button" variant="default" onClick={onBack}>
           {t('import.back')}
-        </button>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={!canMatch}
-          onClick={onNext}
-        >
+        </Button>
+        <Button type="button" disabled={!canMatch} onClick={onNext}>
           {t('import.to_preview')}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Group>
+    </Stack>
   );
 }
 
@@ -402,53 +425,63 @@ function PreviewTable({
   const { t } = useTranslation();
   const shown = preview.rows.slice(0, PREVIEW_LIMIT);
   return (
-    <div className="overflow-x-auto rounded-card border border-border">
-      <table className="w-full text-start text-small">
-        <thead className="bg-surface-2">
-          <tr>
-            <th className="px-2 py-2 text-start">{t('import.col_line')}</th>
-            <th className="px-2 py-2 text-start">
-              {t('import.field.name_en')}
-            </th>
-            <th className="px-2 py-2 text-end">{t('import.field.price')}</th>
-            <th className="px-2 py-2 text-start">{t('import.col_action')}</th>
-            <th className="px-2 py-2 text-start">{t('import.col_errors')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((r) => (
-            <tr
-              key={r.line}
-              data-testid="import-row"
-              className="border-t border-border"
-            >
-              <td className="px-2 py-1">{r.line}</td>
-              <td className="px-2 py-1">{r.parsed.name_en}</td>
-              <td className="px-2 py-1 text-end">
-                {r.parsed.price === null ? (
-                  ''
-                ) : (
-                  <MoneyText paisa={r.parsed.price} />
-                )}
-              </td>
-              <td className="px-2 py-1">{t(`import.action_${r.action}`)}</td>
-              <td
-                className={`px-2 py-1 ${r.errors.length ? 'bg-danger-subtle text-danger-subtle-ink' : ''}`}
-              >
-                {r.errors.map(message).join(' · ')}
-                {r.ignored.length > 0 ? t('import.ignored_cells') : ''}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <Paper withBorder>
+      <Box
+        tabIndex={0}
+        role="region"
+        aria-label={t('import.step_preview')}
+        style={{ overflowX: 'auto' }}
+      >
+        <Table fz="sm" miw={640}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('import.col_line')}</Table.Th>
+              <Table.Th>{t('import.field.name_en')}</Table.Th>
+              <Table.Th ta="end">{t('import.field.price')}</Table.Th>
+              <Table.Th>{t('import.col_action')}</Table.Th>
+              <Table.Th>{t('import.col_errors')}</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {shown.map((r) => (
+              <Table.Tr key={r.line} data-testid="import-row">
+                <Table.Td>{r.line}</Table.Td>
+                <Table.Td>{r.parsed.name_en}</Table.Td>
+                <Table.Td ta="end">
+                  {r.parsed.price === null ? (
+                    ''
+                  ) : (
+                    <MoneyText paisa={r.parsed.price} />
+                  )}
+                </Table.Td>
+                <Table.Td>{t(`import.action_${r.action}`)}</Table.Td>
+                <Table.Td
+                  bg={
+                    r.errors.length
+                      ? 'var(--mantine-color-danger-subtle)'
+                      : undefined
+                  }
+                  c={
+                    r.errors.length
+                      ? 'var(--mantine-color-danger-subtle-ink)'
+                      : undefined
+                  }
+                >
+                  {r.errors.map(message).join(' · ')}
+                  {r.ignored.length > 0 ? t('import.ignored_cells') : ''}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Box>
       {preview.rows.length > PREVIEW_LIMIT ? (
-        <p className="p-2 text-small text-text-muted">
+        <Text size="sm" c="dimmed" p="xs">
           {t('import.more_rows', {
             count: preview.rows.length - PREVIEW_LIMIT,
           })}
-        </p>
+        </Text>
       ) : null}
-    </div>
+    </Paper>
   );
 }
