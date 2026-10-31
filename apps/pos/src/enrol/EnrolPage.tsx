@@ -5,6 +5,7 @@ import {
   Button,
   Group,
   Paper,
+  Progress,
   Stack,
   Text,
   TextInput,
@@ -13,12 +14,6 @@ import {
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonDanger,
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import {
@@ -238,53 +233,53 @@ export function EnrolPage({
         : 0;
     return card(
       <>
-        <p role="status" className="text-body">
-          {t('enrol.connected', { shop: stage.shop })}
-        </p>
+        <Text role="status">{t('enrol.connected', { shop: stage.shop })}</Text>
         {stage.kind === 'downloading' ? (
           <>
-            <p className="text-small text-text-muted">
+            <Text size="sm" c="dimmed">
               {stage.total > 0
                 ? t('enrol.downloading_count', {
                     done: stage.done.toLocaleString(),
                     total: stage.total.toLocaleString(),
                   })
                 : t('enrol.downloading')}
-            </p>
-            <progress
-              className="w-full"
-              max={100}
+            </Text>
+            <Progress
               value={pct}
+              size="sm"
               aria-label={t('enrol.downloading')}
             />
           </>
         ) : (
           <>
-            <p role="alert" className="text-danger">
+            <Text role="alert" c="danger">
               {t('enrol.download_failed', { message: stage.message })}
-            </p>
-            <button
+            </Text>
+            <Button
               type="button"
-              className={buttonPrimary}
               onClick={() => void download(stage.db, stage.shop)}
+              style={{ alignSelf: 'flex-start' }}
             >
               {t('enrol.retry')}
-            </button>
+            </Button>
           </>
         )}
-        <button
+        <Button
           type="button"
-          className="self-start text-primary text-small underline"
+          variant="transparent"
+          size="compact-sm"
+          px={0}
           onClick={() =>
             void leave(stage.db, { kind: 'left', shop: stage.shop })
           }
+          style={{ alignSelf: 'flex-start' }}
         >
           {t('enrol.not_mine')}
-        </button>
+        </Button>
         {leaveError ? (
-          <p role="alert" className="text-danger text-small">
+          <Text role="alert" c="danger" size="sm">
             {leaveError}
-          </p>
+          </Text>
         ) : null}
       </>,
     );
@@ -293,54 +288,60 @@ export function EnrolPage({
   if (connected) {
     return card(
       <>
-        <h1 className="font-semibold text-h2">
-          {t('enrol.already', { shop: connected.shop })}
-        </h1>
-        <button type="button" className={buttonPrimary} onClick={onDone}>
+        <Title order={2}>{t('enrol.already', { shop: connected.shop })}</Title>
+        <Button
+          type="button"
+          onClick={onDone}
+          style={{ alignSelf: 'flex-start' }}
+        >
           {t('enrol.open', { shop: connected.shop })}
-        </button>
+        </Button>
         {confirmLeave ? (
-          <div className="flex flex-col gap-2 rounded-control border border-border p-3">
-            <p>{t('enrol.leave_confirm', { shop: connected.shop })}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={buttonDanger}
-                onClick={() => void leave(connected.db, null)}
-              >
-                {t('enrol.leave')}
-              </button>
-              <button
-                type="button"
-                className={buttonQuiet}
-                onClick={() => setConfirmLeave(false)}
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
+          <Paper withBorder p="sm">
+            <Stack gap="sm">
+              <Text>{t('enrol.leave_confirm', { shop: connected.shop })}</Text>
+              <Group gap="sm">
+                <Button
+                  type="button"
+                  color="danger"
+                  onClick={() => void leave(connected.db, null)}
+                >
+                  {t('enrol.leave')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => setConfirmLeave(false)}
+                >
+                  {t('common.cancel')}
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
         ) : (
-          <button
+          <Button
             type="button"
-            className={buttonQuiet}
+            variant="default"
             onClick={() => setConfirmLeave(true)}
+            style={{ alignSelf: 'flex-start' }}
           >
             {t('enrol.leave')}
-          </button>
+          </Button>
         )}
         {leaveError ? (
-          <div className="flex flex-col gap-2">
-            <p role="alert" className="text-danger text-small">
+          <Stack gap="sm">
+            <Text role="alert" c="danger" size="sm">
               {leaveError}
-            </p>
-            <button
+            </Text>
+            <Button
               type="button"
-              className={buttonQuiet}
+              variant="default"
               onClick={() => void exportUnsynced(connected.db)}
+              style={{ alignSelf: 'flex-start' }}
             >
               {t('enrol.export_unsynced')}
-            </button>
-          </div>
+            </Button>
+          </Stack>
         ) : null}
       </>,
     );
@@ -372,10 +373,10 @@ export function EnrolPage({
       {tab === 'new' ? (
         <p className="text-small">{t('enrol.new_shop_help')}</p>
       ) : null}
-      <form
-        className="flex flex-col gap-3"
+      <Box
+        component="form"
         noValidate
-        onSubmit={(e) => {
+        onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           void connect();
         }}
@@ -407,12 +408,14 @@ export function EnrolPage({
           onChange={(e) => setName(e.currentTarget.value)}
         />
         {codeError ? (
-          <p id="enrol-error" role="alert" className="text-danger text-small">
+          <Text id="enrol-error" role="alert" c="danger" size="sm">
             {codeError}
-          </p>
+          </Text>
         ) : null}
         {!online ? (
-          <p className="text-small text-text-muted">{t('enrol.err_offline')}</p>
+          <Text size="sm" c="dimmed">
+            {t('enrol.err_offline')}
+          </Text>
         ) : null}
         <Button
           type="submit"
@@ -422,26 +425,36 @@ export function EnrolPage({
         >
           {busy ? t('enrol.connecting') : t('enrol.connect')}
         </Button>
-      </form>
+      </Box>
       {tab === 'new' ? (
-        <details className="text-small">
-          <summary className="cursor-pointer text-primary">
+        <Box component="details">
+          <Text
+            component="summary"
+            size="sm"
+            c="var(--mantine-color-brand-7)"
+            style={{ cursor: 'pointer' }}
+          >
             {t('enrol.privacy_link')}
-          </summary>
-          <p className="mt-2">{t('enrol.privacy_text')}</p>
-        </details>
+          </Text>
+          <Text size="sm" mt="xs">
+            {t('enrol.privacy_text')}
+          </Text>
+        </Box>
       ) : null}
       {revoked && db ? (
-        <div className="flex flex-col gap-2 rounded-control border border-border p-3">
-          <p>{t('enrol.revoked')}</p>
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void exportUnsynced(db)}
-          >
-            {t('enrol.export_unsynced')}
-          </button>
-        </div>
+        <Paper withBorder p="sm">
+          <Stack gap="sm">
+            <Text>{t('enrol.revoked')}</Text>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => void exportUnsynced(db)}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {t('enrol.export_unsynced')}
+            </Button>
+          </Stack>
+        </Paper>
       ) : null}
     </>,
   );

@@ -1,3 +1,15 @@
+import {
+  Box,
+  Button,
+  FileInput,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -23,7 +35,7 @@ import {
   restoreAction,
   writeRestoreState,
 } from './restore.ts';
-import { dangerBtn, Field, Panel, primaryBtn } from './ui.tsx';
+import { Panel } from './ui.tsx';
 import { unzip, ZipError } from './zip.ts';
 
 const STEP_KEYS = [
@@ -91,112 +103,132 @@ export function RestoreTab({
     <Panel
       title={t('admin.tab_restore')}
       description={t('admin.restore_intro')}
-      className="max-w-3xl"
     >
-      <div className="flex flex-col gap-4">
-        <Field id="restore-file" label={t('admin.restore_file')}>
-          <input
-            id="restore-file"
-            type="file"
-            accept=".zip,application/zip"
-            disabled={running}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file === undefined) return;
-              void file.arrayBuffer().then(async (buffer) => {
-                try {
-                  const parsed = parseExport(
-                    await unzip(new Uint8Array(buffer)),
-                  );
-                  if (parsed.tenant.id !== tenantId) {
-                    setZip(null);
-                    setError(t('admin.restore_wrong_shop'));
-                    toast.push(t('admin.restore_wrong_shop'), 'error');
-                    return;
-                  }
-                  const stored =
-                    readRestoreState(tenantId, sessionStorage) ??
-                    initialRestoreState();
-                  const base =
-                    stored.phase === 'done' ? initialRestoreState() : stored;
-                  if (
-                    base.exportedAt !== null &&
-                    base.exportedAt !== parsed.exported_at &&
-                    hasStarted(base)
-                  ) {
-                    setZip(null);
-                    setError(t('admin.restore_different_zip'));
-                    toast.push(t('admin.restore_different_zip'), 'error');
-                    return;
-                  }
-                  const next = { ...base, exportedAt: parsed.exported_at };
-                  setZip(parsed);
-                  setError(null);
-                  commit(next);
-                } catch {
+      <Stack gap="md">
+        <FileInput
+          id="restore-file"
+          label={t('admin.restore_file')}
+          accept=".zip,application/zip"
+          disabled={running}
+          value={null}
+          onChange={(file) => {
+            if (file === null) return;
+            void file.arrayBuffer().then(async (buffer) => {
+              try {
+                const parsed = parseExport(await unzip(new Uint8Array(buffer)));
+                if (parsed.tenant.id !== tenantId) {
                   setZip(null);
-                  setError(t('admin.restore_bad_zip'));
-                  toast.push(t('admin.restore_bad_zip'), 'error');
+                  setError(t('admin.restore_wrong_shop'));
+                  toast.push(t('admin.restore_wrong_shop'), 'error');
+                  return;
                 }
-              });
-            }}
-          />
-        </Field>
-        <section aria-labelledby="restore-steps">
-          <h2
-            id="restore-steps"
-            className="text-small font-medium text-text-muted"
-          >
+                const stored =
+                  readRestoreState(tenantId, sessionStorage) ??
+                  initialRestoreState();
+                const base =
+                  stored.phase === 'done' ? initialRestoreState() : stored;
+                if (
+                  base.exportedAt !== null &&
+                  base.exportedAt !== parsed.exported_at &&
+                  hasStarted(base)
+                ) {
+                  setZip(null);
+                  setError(t('admin.restore_different_zip'));
+                  toast.push(t('admin.restore_different_zip'), 'error');
+                  return;
+                }
+                const next = { ...base, exportedAt: parsed.exported_at };
+                setZip(parsed);
+                setError(null);
+                commit(next);
+              } catch {
+                setZip(null);
+                setError(t('admin.restore_bad_zip'));
+                toast.push(t('admin.restore_bad_zip'), 'error');
+              }
+            });
+          }}
+        />
+        <Box component="section" aria-labelledby="restore-steps">
+          <Title order={3} fz="sm" c="dimmed" id="restore-steps">
             {t('admin.restore_steps')}
-          </h2>
-          <ol className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          </Title>
+          <SimpleGrid
+            component="ol"
+            cols={{ base: 1, sm: 2, lg: 3 }}
+            spacing="xs"
+            mt="xs"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          >
             {STEP_KEYS.map((key, index) => {
               const done = index < current;
               const active = index === current;
               return (
-                <li
+                <Paper
+                  component="li"
                   key={key}
+                  withBorder
+                  p="sm"
                   aria-current={active ? 'step' : undefined}
-                  className={`flex items-center gap-2 rounded-control border px-3 py-2 text-small ${
+                  bg={
                     active
-                      ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
+                      ? 'var(--mantine-color-brand-light)'
                       : done
-                        ? 'border-success-subtle bg-success-subtle text-success-subtle-ink'
-                        : 'border-border text-text-muted'
-                  }`}
+                        ? 'var(--mantine-color-success-light)'
+                        : undefined
+                  }
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full bg-surface/70 text-caption font-semibold"
-                  >
-                    {done ? '✓' : index + 1}
-                  </span>
-                  {t(key)}
-                </li>
+                  <Group gap="xs" wrap="nowrap">
+                    <ThemeIcon
+                      size={20}
+                      radius="xl"
+                      variant={done ? 'filled' : 'light'}
+                      color={done ? 'success' : active ? 'brand' : 'gray'}
+                    >
+                      <Text size="xs" fw={600}>
+                        {done ? '✓' : index + 1}
+                      </Text>
+                    </ThemeIcon>
+                    <Text
+                      size="sm"
+                      fw={active ? 500 : undefined}
+                      c={!active && !done ? 'dimmed' : undefined}
+                    >
+                      {t(key)}
+                    </Text>
+                  </Group>
+                </Paper>
               );
             })}
-          </ol>
-        </section>
+          </SimpleGrid>
+        </Box>
         {note !== null ? (
-          <p className="rounded-control bg-info-subtle px-3 py-2 text-small text-info-subtle-ink tabular-nums">
-            {note}
-          </p>
+          <Paper p="sm" bg="var(--color-info-subtle)">
+            <Text size="sm" c="var(--color-info-subtle-ink)">
+              {note}
+            </Text>
+          </Paper>
         ) : null}
         {error !== null ? (
-          <p className="text-small text-danger" role="alert">
+          <Text size="sm" c="danger" role="alert">
             {error}
-          </p>
+          </Text>
         ) : null}
         {state.phase === 'done' ? (
-          <p className="rounded-control bg-success-subtle px-3 py-2 text-small text-success-subtle-ink">
-            {t('admin.restore_done')}
-          </p>
+          <Paper p="sm" bg="var(--mantine-color-success-light)">
+            <Text size="sm" c="var(--color-success)">
+              {t('admin.restore_done')}
+            </Text>
+          </Paper>
         ) : null}
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-          <button
+        <Group
+          gap="sm"
+          pt="md"
+          style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+        >
+          <Button
             type="button"
-            className={primaryBtn}
+            loading={running}
             disabled={running || zip === null || state.phase === 'done'}
             onClick={() => {
               if (zip === null) {
@@ -345,24 +377,24 @@ export function RestoreTab({
             }}
           >
             {state.aborted ? t('admin.restore_resume') : t('admin.restore_run')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={dangerBtn}
+            color="danger"
             disabled={!running}
             onClick={() => {
               abortRef.current = true;
             }}
           >
             {t('admin.restore_abort')}
-          </button>
-        </div>
+          </Button>
+        </Group>
         {zip === null && hasStarted(state) && state.phase !== 'done' ? (
           <p className="text-small text-text-muted">
             {t('admin.restore_need_file')}
           </p>
         ) : null}
-      </div>
+      </Stack>
     </Panel>
   );
 }
