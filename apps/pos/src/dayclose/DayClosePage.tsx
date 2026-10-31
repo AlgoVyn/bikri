@@ -216,7 +216,7 @@ export function DayClosePage() {
                     component="span"
                     c={
                       Number(closed.difference) === 0
-                        ? 'teal'
+                        ? 'var(--color-success)'
                         : Number(closed.difference) < 0
                           ? 'danger'
                           : 'yellow'
@@ -531,7 +531,7 @@ export function DayClosePage() {
                     fw={600}
                     c={
                       result.difference === 0
-                        ? 'teal'
+                        ? 'var(--color-success)'
                         : result.difference < 0
                           ? 'danger'
                           : 'yellow'

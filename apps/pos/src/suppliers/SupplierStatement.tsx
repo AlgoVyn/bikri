@@ -200,7 +200,13 @@ export function SupplierStatement({
           fz={32}
           fw={600}
           lh={1.15}
-          c={balance > 0 ? undefined : balance < 0 ? 'teal' : 'dimmed'}
+          c={
+            balance > 0
+              ? undefined
+              : balance < 0
+                ? 'var(--color-success)'
+                : 'dimmed'
+          }
           data-testid="supplier-balance"
         >
           {supplierBalanceLabel(t, balance)}

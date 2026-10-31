@@ -337,10 +337,9 @@ describe('sync isolation', () => {
         created_at: now,
       };
       const saleLine = newId(now);
-      const sale = saleOps(shop, shop.till, 1)[0]!.row as Record<
-        string,
-        unknown
-      >;
+      const [saleOp] = saleOps(shop, shop.till, 1);
+      if (!saleOp) throw new Error('sale op missing');
+      const sale = saleOp.row as Record<string, unknown>;
       const refund = {
         id: ids.refund,
         sale_id: ids.sale,

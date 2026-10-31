@@ -1,10 +1,21 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  NativeSelect,
+  Paper,
+  Radio,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -60,64 +71,60 @@ export function StockCountPage() {
 
   if (!draft) {
     return (
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
-        <SubpageHeader
-          backTo="/products"
-          backLabel={t('import.back_to_products')}
-          icon={<ProductsIcon />}
-          title={t('count.title')}
-        />
-        <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 font-medium">{t('count.scope')}</legend>
-            {(['all', 'category', 'low'] as const).map((k) => (
-              <label key={k} className="flex min-h-11 items-center gap-2">
-                <input
-                  type="radio"
-                  name="scope"
-                  checked={scopeKind === k}
-                  onChange={() => setScopeKind(k)}
-                />
-                {t(`count.scope_${k}`)}
-              </label>
-            ))}
-          </fieldset>
-          {scopeKind === 'category' ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-small font-medium">
-                {t('count.category')}
-              </span>
-              <select
-                className="h-11 rounded-control border border-border-strong bg-surface px-2"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+      <Box mx="auto" maw={672} p="md" w="100%">
+        <Stack gap="md">
+          <SubpageHeader
+            backTo="/products"
+            backLabel={t('import.back_to_products')}
+            icon={<ProductsIcon />}
+            title={t('count.title')}
+          />
+          <Paper withBorder p="lg">
+            <Stack gap="md">
+              <Radio.Group
+                label={t('count.scope')}
+                value={scopeKind}
+                onChange={(value) => setScopeKind(value as CountScope['kind'])}
               >
-                <option value="">—</option>
-                {categories?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {String(c.name_en)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <button
-            type="button"
-            className={`${buttonPrimary} self-start`}
-            disabled={scopeKind === 'category' && !categoryId}
-            onClick={() =>
-              void startCount(
-                getDb(),
-                scopeKind === 'category'
-                  ? { kind: 'category', categoryId }
-                  : { kind: scopeKind },
-              )
-            }
-          >
-            {t('count.start')}
-          </button>
-        </section>
-      </div>
+                <Stack gap="xs" mt="xs">
+                  {(['all', 'category', 'low'] as const).map((k) => (
+                    <Radio key={k} value={k} label={t(`count.scope_${k}`)} />
+                  ))}
+                </Stack>
+              </Radio.Group>
+              {scopeKind === 'category' ? (
+                <NativeSelect
+                  label={t('count.category')}
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.currentTarget.value)}
+                  data={[
+                    { value: '', label: '—' },
+                    ...(categories?.map((c) => ({
+                      value: c.id,
+                      label: String(c.name_en),
+                    })) ?? []),
+                  ]}
+                />
+              ) : null}
+              <Button
+                type="button"
+                disabled={scopeKind === 'category' && !categoryId}
+                onClick={() =>
+                  void startCount(
+                    getDb(),
+                    scopeKind === 'category'
+                      ? { kind: 'category', categoryId }
+                      : { kind: scopeKind },
+                  )
+                }
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {t('count.start')}
+              </Button>
+            </Stack>
+          </Paper>
+        </Stack>
+      </Box>
     );
   }
 
@@ -142,122 +149,143 @@ export function StockCountPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <SubpageHeader
-        backTo="/products"
-        backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
-        title={t('count.title')}
-      />
-      <p className="text-text-muted" data-testid="count-progress">
-        {t('count.progress', {
-          counted,
-          total: Object.keys(draft.expected).length,
-        })}
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (scan.trim()) void onScan(scan);
-          setScan('');
-        }}
-      >
-        <label htmlFor={scanId} className="text-small font-medium">
-          {t('count.scan')}
-        </label>
-        <input
-          id={scanId}
-          className="h-11 w-full rounded-control border border-border-strong bg-surface px-3 font-mono"
-          value={scan}
-          onChange={(e) => setScan(e.target.value)}
-          autoComplete="off"
+    <Box mx="auto" maw={768} p="md" w="100%">
+      <Stack gap="md">
+        <SubpageHeader
+          backTo="/products"
+          backLabel={t('import.back_to_products')}
+          icon={<ProductsIcon />}
+          title={t('count.title')}
         />
-      </form>
-      <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-        {products?.map((p) => {
-          const unit = String(p.unit ?? 'pc') as QtyUnit;
-          const expected = draft.expected[p.id] ?? 0;
-          const value = Object.hasOwn(draft.counted, p.id)
-            ? (draft.counted[p.id] ?? 0)
-            : null;
-          const diff = value === null ? null : value - expected;
-          return (
-            <li
-              key={p.id}
-              data-testid="count-row"
-              className="flex flex-col gap-2 p-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem_minmax(11rem,13rem)_6rem] sm:items-start sm:gap-3"
-            >
-              <span className="font-medium">{String(p.name_en)}</span>
-              <span className="flex items-baseline gap-2 text-small sm:block">
-                <span className="text-text-muted sm:mb-1 sm:block">
-                  {t('count.expected')}
-                </span>
-                <bdi
-                  dir="ltr"
-                  className="font-mono sm:flex sm:h-9 sm:items-center"
-                  data-testid="count-expected"
+        <Text c="dimmed" data-testid="count-progress">
+          {t('count.progress', {
+            counted,
+            total: Object.keys(draft.expected).length,
+          })}
+        </Text>
+        <Box
+          component="form"
+          onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            if (scan.trim()) void onScan(scan);
+            setScan('');
+          }}
+        >
+          <TextInput
+            id={scanId}
+            label={t('count.scan')}
+            value={scan}
+            onChange={(event) => setScan(event.currentTarget.value)}
+            autoComplete="off"
+            styles={{
+              input: { fontFamily: 'var(--mantine-font-family-monospace)' },
+            }}
+          />
+        </Box>
+        <Paper withBorder p={0}>
+          <Box
+            component="ul"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          >
+            {products?.map((p, index) => {
+              const unit = String(p.unit ?? 'pc') as QtyUnit;
+              const expected = draft.expected[p.id] ?? 0;
+              const value = Object.hasOwn(draft.counted, p.id)
+                ? (draft.counted[p.id] ?? 0)
+                : null;
+              const diff = value === null ? null : value - expected;
+              return (
+                <Box
+                  component="li"
+                  key={p.id}
+                  data-testid="count-row"
+                  p="sm"
+                  style={{
+                    borderTop:
+                      index > 0
+                        ? '1px solid var(--mantine-color-default-border)'
+                        : undefined,
+                  }}
                 >
-                  {formatQtyFromMilli(expected, unit)}
-                </bdi>
-              </span>
-              <QtyInput
-                dense
-                label={t('count.counted')}
-                ariaLabel={t('count.counted_for', { name: String(p.name_en) })}
-                unit={unit}
-                value={value}
-                onChange={(v) => void setCounted(draft, p.id, v)}
-              />
-              <span className="flex items-baseline gap-2 text-small sm:block">
-                <span className="text-text-muted sm:mb-1 sm:block">
-                  {t('count.difference')}
-                </span>
-                <bdi
-                  dir="ltr"
-                  className={`font-mono sm:flex sm:h-9 sm:items-center ${
-                    diff === null
-                      ? ''
-                      : diff < 0
-                        ? 'text-danger'
-                        : diff > 0
-                          ? 'text-success'
-                          : ''
-                  }`}
-                  data-testid="count-diff"
-                >
-                  {diff === null
-                    ? '—'
-                    : `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${formatQtyFromMilli(Math.abs(diff), unit)}`}
-                </bdi>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          type="checkbox"
+                  <Stack gap="xs">
+                    <Text fw={500}>{String(p.name_en)}</Text>
+                    <Group gap="md" align="flex-start" wrap="wrap">
+                      <Box>
+                        <Text size="sm" c="dimmed">
+                          {t('count.expected')}
+                        </Text>
+                        <Text
+                          size="sm"
+                          ff="monospace"
+                          component="bdi"
+                          dir="ltr"
+                          data-testid="count-expected"
+                        >
+                          {formatQtyFromMilli(expected, unit)}
+                        </Text>
+                      </Box>
+                      <Box style={{ flex: '1 1 11rem', maxWidth: 208 }}>
+                        <QtyInput
+                          dense
+                          label={t('count.counted')}
+                          ariaLabel={t('count.counted_for', {
+                            name: String(p.name_en),
+                          })}
+                          unit={unit}
+                          value={value}
+                          onChange={(v) => void setCounted(draft, p.id, v)}
+                        />
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="dimmed">
+                          {t('count.difference')}
+                        </Text>
+                        <Text
+                          size="sm"
+                          ff="monospace"
+                          component="bdi"
+                          dir="ltr"
+                          data-testid="count-diff"
+                          c={
+                            diff === null
+                              ? undefined
+                              : diff < 0
+                                ? 'danger'
+                                : diff > 0
+                                  ? 'var(--color-success)'
+                                  : undefined
+                          }
+                        >
+                          {diff === null
+                            ? '—'
+                            : `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${formatQtyFromMilli(Math.abs(diff), unit)}`}
+                        </Text>
+                      </Box>
+                    </Group>
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Box>
+        </Paper>
+        <Checkbox
+          label={t('count.zero_uncounted')}
           checked={zero}
-          onChange={(e) => setZero(e.target.checked)}
+          onChange={(event) => setZero(event.currentTarget.checked)}
         />
-        {t('count.zero_uncounted')}
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={buttonPrimary}
-          onClick={() => void finish()}
-        >
-          {t('count.finish')}
-        </button>
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => void discardCount(getDb())}
-        >
-          {t('count.discard')}
-        </button>
-      </div>
-    </div>
+        <Group gap="sm">
+          <Button type="button" onClick={() => void finish()}>
+            {t('count.finish')}
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => void discardCount(getDb())}
+          >
+            {t('count.discard')}
+          </Button>
+        </Group>
+      </Stack>
+    </Box>
   );
 }

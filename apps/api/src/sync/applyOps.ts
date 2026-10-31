@@ -1002,11 +1002,7 @@ function checkOp(
     // outside that one bootstrap group (05 §5).
     const bootstrap = bootstrapOwnerId(look, group);
     const persisted = updater ? look.staff.get(updater.id) : undefined;
-    if (
-      !updater ||
-      updater.role !== 'owner' ||
-      (!persisted && updater.id !== bootstrap)
-    )
+    if (updater?.role !== 'owner' || (!persisted && updater?.id !== bootstrap))
       throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'branches') {
@@ -1129,7 +1125,7 @@ function planOp(
               candidate.kind === 'insert' &&
               candidate.row?.sale_id === saleId,
           )
-          .findIndex((candidate) => candidate === op) > 0;
+          .indexOf(op) > 0;
       if (look.existingVoids.has(saleId) || duplicateInGroup) {
         return {
           op,

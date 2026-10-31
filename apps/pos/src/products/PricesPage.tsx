@@ -1,9 +1,20 @@
 import { normaliseNumericText, parseMoneyToPaisa } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -20,8 +31,6 @@ import { ledgerContext, listCategories } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
-const fieldClass =
-  'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 const PREVIEW_LIMIT = 200;
 type Kind = PriceChange['kind'];
 
@@ -95,172 +104,164 @@ export function PricesPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-      <SubpageHeader
-        backTo="/products"
-        backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
-        title={t('prices.title')}
-      />
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1" htmlFor={`${id}-cat`}>
-            <span className="text-small font-medium">
-              {t('products.category_filter')}
-            </span>
-            <select
-              id={`${id}-cat`}
-              className={fieldClass}
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value);
-                reset();
-              }}
-            >
-              <option value="">{t('products.all_categories')}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {String(c.name_en)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1" htmlFor={`${id}-brand`}>
-            <span className="text-small font-medium">{t('prices.brand')}</span>
-            <input
-              id={`${id}-brand`}
-              className={fieldClass}
-              value={brand}
-              placeholder={t('prices.any_brand')}
-              onChange={(e) => {
-                setBrand(e.target.value);
-                reset();
-              }}
-            />
-          </label>
-          <label className="flex flex-col gap-1" htmlFor={`${id}-kind`}>
-            <span className="text-small font-medium">{t('prices.change')}</span>
-            <select
-              id={`${id}-kind`}
-              className={fieldClass}
-              value={kind}
-              onChange={(e) => {
-                setKind(e.target.value as Kind);
-                reset();
-              }}
-            >
-              <option value="percent">{t('prices.kind_percent')}</option>
-              <option value="amount">{t('prices.kind_amount')}</option>
-              <option value="set">{t('prices.kind_set')}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1" htmlFor={`${id}-value`}>
-            <span className="text-small font-medium">
-              {kind === 'percent'
-                ? t('prices.value_percent')
-                : t('prices.value_rs')}
-            </span>
-            <input
-              id={`${id}-value`}
-              className={fieldClass}
-              inputMode="decimal"
-              dir="ltr"
-              value={value}
-              aria-invalid={error ? true : undefined}
-              onChange={(e) => {
-                setValue(e.target.value);
-                reset();
-              }}
-            />
-          </label>
-          <label className="flex flex-col gap-1" htmlFor={`${id}-round`}>
-            <span className="text-small font-medium">
-              {t('prices.rounding')}
-            </span>
-            <select
-              id={`${id}-round`}
-              className={fieldClass}
-              value={String(rounding)}
-              onChange={(e) => {
-                setRounding(Number(e.target.value) as Rounding);
-                reset();
-              }}
-            >
-              {ROUNDINGS.map((r) => (
-                <option key={r} value={String(r)}>
-                  {r === 0
-                    ? t('prices.round_none')
-                    : t('prices.round_rs', { n: r / 100 })}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {error ? (
-          <p role="alert" className="text-danger">
-            {error}
-          </p>
-        ) : null}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void preview()}
-          >
-            {t('prices.preview')}
-          </button>
-        </div>
-      </section>
+    <Box mx="auto" maw={896} p="md" w="100%">
+      <Stack gap="md">
+        <SubpageHeader
+          backTo="/products"
+          backLabel={t('import.back_to_products')}
+          icon={<ProductsIcon />}
+          title={t('prices.title')}
+        />
+        <Paper withBorder p="lg">
+          <Stack gap="sm">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <NativeSelect
+                id={`${id}-cat`}
+                label={t('products.category_filter')}
+                value={categoryId}
+                onChange={(event) => {
+                  setCategoryId(event.currentTarget.value);
+                  reset();
+                }}
+                data={[
+                  { value: '', label: t('products.all_categories') },
+                  ...categories.map((c) => ({
+                    value: c.id,
+                    label: String(c.name_en),
+                  })),
+                ]}
+              />
+              <TextInput
+                id={`${id}-brand`}
+                label={t('prices.brand')}
+                value={brand}
+                placeholder={t('prices.any_brand')}
+                onChange={(event) => {
+                  setBrand(event.currentTarget.value);
+                  reset();
+                }}
+              />
+              <NativeSelect
+                id={`${id}-kind`}
+                label={t('prices.change')}
+                value={kind}
+                onChange={(event) => {
+                  setKind(event.currentTarget.value as Kind);
+                  reset();
+                }}
+                data={[
+                  { value: 'percent', label: t('prices.kind_percent') },
+                  { value: 'amount', label: t('prices.kind_amount') },
+                  { value: 'set', label: t('prices.kind_set') },
+                ]}
+              />
+              <TextInput
+                id={`${id}-value`}
+                label={
+                  kind === 'percent'
+                    ? t('prices.value_percent')
+                    : t('prices.value_rs')
+                }
+                inputMode="decimal"
+                dir="ltr"
+                value={value}
+                error={error ?? undefined}
+                onChange={(event) => {
+                  setValue(event.currentTarget.value);
+                  reset();
+                }}
+              />
+              <NativeSelect
+                id={`${id}-round`}
+                label={t('prices.rounding')}
+                value={String(rounding)}
+                onChange={(event) => {
+                  setRounding(Number(event.currentTarget.value) as Rounding);
+                  reset();
+                }}
+                data={ROUNDINGS.map((r) => ({
+                  value: String(r),
+                  label:
+                    r === 0
+                      ? t('prices.round_none')
+                      : t('prices.round_rs', { n: r / 100 }),
+                }))}
+              />
+            </SimpleGrid>
+            {error ? (
+              <Text c="danger" role="alert" size="sm">
+                {error}
+              </Text>
+            ) : null}
+            <Group justify="flex-end">
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => void preview()}
+              >
+                {t('prices.preview')}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
 
-      {rows ? (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <p role="status" data-testid="prices-summary">
-            {t('prices.summary', { count: changed.length, total: rows.length })}
-          </p>
-          <div className="overflow-x-auto rounded-card border border-border">
-            <table className="w-full text-small">
-              <thead className="bg-surface-2">
-                <tr>
-                  <th className="px-2 py-2 text-start">
-                    {t('import.field.name_en')}
-                  </th>
-                  <th className="px-2 py-2 text-end">{t('prices.old')}</th>
-                  <th className="px-2 py-2 text-end">{t('prices.new')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, PREVIEW_LIMIT).map((r) => (
-                  <tr
-                    key={r.product.id}
-                    data-testid="price-row"
-                    className="border-t border-border"
-                  >
-                    <td className="px-2 py-1">{String(r.product.name_en)}</td>
-                    <td className="px-2 py-1 text-end">
-                      <MoneyText paisa={r.old} />
-                    </td>
-                    <td
-                      className={`px-2 py-1 text-end ${r.next !== r.old ? 'font-semibold' : ''}`}
-                    >
-                      <MoneyText paisa={r.next} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={busy || changed.length === 0}
-              onClick={() => void apply()}
-            >
-              {t('prices.apply', { count: changed.length })}
-            </button>
-          </div>
-        </section>
-      ) : null}
-    </div>
+        {rows ? (
+          <Paper withBorder p="lg">
+            <Stack gap="sm">
+              <Text role="status" size="sm" data-testid="prices-summary">
+                {t('prices.summary', {
+                  count: changed.length,
+                  total: rows.length,
+                })}
+              </Text>
+              <Box
+                tabIndex={0}
+                role="region"
+                aria-label={t('prices.title')}
+                style={{ overflowX: 'auto' }}
+              >
+                <Table fz="sm" miw={480}>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('import.field.name_en')}</Table.Th>
+                      <Table.Th ta="end">{t('prices.old')}</Table.Th>
+                      <Table.Th ta="end">{t('prices.new')}</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {rows.slice(0, PREVIEW_LIMIT).map((r) => (
+                      <Table.Tr key={r.product.id} data-testid="price-row">
+                        <Table.Td>{String(r.product.name_en)}</Table.Td>
+                        <Table.Td ta="end">
+                          <MoneyText paisa={r.old} />
+                        </Table.Td>
+                        <Table.Td ta="end">
+                          <Text
+                            size="sm"
+                            fw={r.next !== r.old ? 600 : undefined}
+                          >
+                            <MoneyText paisa={r.next} />
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Box>
+              <Group justify="flex-end">
+                <Button
+                  type="button"
+                  disabled={busy || changed.length === 0}
+                  loading={busy}
+                  onClick={() => void apply()}
+                >
+                  {t('prices.apply', { count: changed.length })}
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+        ) : null}
+      </Stack>
+    </Box>
   );
 }

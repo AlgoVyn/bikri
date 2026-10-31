@@ -1,9 +1,19 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Radio,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -114,131 +124,121 @@ export function AdjustDialog({
       title={t('adjust.title', { name: String(product.name_en) })}
       description={t('adjust.on_hand', { qty: qtyWithUnit(t, onHand, unit) })}
     >
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
+      <Box
+        component="form"
+        onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
           void save();
         }}
       >
-        <div
-          role="tablist"
-          aria-label={t('adjust.kind')}
-          className="grid grid-cols-2 gap-1 sm:grid-cols-4"
-        >
-          {KINDS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              role="tab"
-              aria-selected={kind === k}
-              className={`${buttonQuiet} ${kind === k ? 'border-primary bg-primary-subtle font-semibold' : ''}`}
-              onClick={() => pickKind(k)}
-            >
-              {t(`adjust.kind_${k}`)}
-            </button>
-          ))}
-        </div>
-        {reasons.length > 0 ? (
-          <label className="flex flex-col gap-1" htmlFor={reasonId}>
-            <span className="text-small font-medium">{t('adjust.reason')}</span>
-            <select
-              id={reasonId}
-              className="h-11 rounded-control border border-border-strong bg-surface px-2"
-              value={reason}
-              onChange={(e) => setReason(e.target.value as AdjustReason)}
-            >
-              {reasons.map((r) => (
-                <option key={r} value={r}>
-                  {t(`stock.reason.${r}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        {kind === 'fix' ? (
-          <fieldset className="flex gap-2">
-            <legend className="sr-only">{t('adjust.direction')}</legend>
-            {[false, true].map((m) => (
-              <label
-                key={String(m)}
-                className={`${buttonQuiet} gap-2 ${minus === m ? 'border-primary' : ''}`}
+        <Stack gap="sm">
+          <SimpleGrid
+            cols={{ base: 2, sm: 4 }}
+            spacing="xs"
+            role="tablist"
+            aria-label={t('adjust.kind')}
+          >
+            {KINDS.map((k) => (
+              <Button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={kind === k}
+                variant={kind === k ? 'light' : 'default'}
+                onClick={() => pickKind(k)}
               >
-                <input
-                  type="radio"
-                  name="dir"
-                  checked={minus === m}
-                  onChange={() => setMinus(m)}
-                />
-                {t(m ? 'adjust.remove' : 'adjust.add')}
-              </label>
+                {t(`adjust.kind_${k}`)}
+              </Button>
             ))}
-          </fieldset>
-        ) : null}
-        <QtyInput
-          label={kind === 'count' ? t('adjust.counted') : t('adjust.qty')}
-          unit={unit}
-          value={qty}
-          onChange={setQty}
-        />
-        {needsCost(effectiveReason) ? (
-          <MoneyInput
-            label={t('adjust.unit_cost')}
-            value={cost}
-            onChange={setCost}
+          </SimpleGrid>
+          {reasons.length > 0 ? (
+            <NativeSelect
+              id={reasonId}
+              label={t('adjust.reason')}
+              value={reason}
+              onChange={(event) =>
+                setReason(event.currentTarget.value as AdjustReason)
+              }
+              data={reasons.map((r) => ({
+                value: r,
+                label: t(`stock.reason.${r}`),
+              }))}
+            />
+          ) : null}
+          {kind === 'fix' ? (
+            <Radio.Group
+              label={t('adjust.direction')}
+              value={minus ? 'remove' : 'add'}
+              onChange={(value) => setMinus(value === 'remove')}
+            >
+              <Group gap="sm" mt="xs">
+                <Radio value="add" label={t('adjust.add')} />
+                <Radio value="remove" label={t('adjust.remove')} />
+              </Group>
+            </Radio.Group>
+          ) : null}
+          <QtyInput
+            label={kind === 'count' ? t('adjust.counted') : t('adjust.qty')}
+            unit={unit}
+            value={qty}
+            onChange={setQty}
           />
-        ) : null}
-        <label className="flex flex-col gap-1" htmlFor={noteId}>
-          <span className="text-small font-medium">
-            {needsNote(effectiveReason)
-              ? t('adjust.note_required')
-              : t('adjust.note')}
-          </span>
-          <input
+          {needsCost(effectiveReason) ? (
+            <MoneyInput
+              label={t('adjust.unit_cost')}
+              value={cost}
+              onChange={setCost}
+            />
+          ) : null}
+          <TextInput
             id={noteId}
-            className="h-11 rounded-control border border-border-strong bg-surface px-3"
+            label={
+              needsNote(effectiveReason)
+                ? t('adjust.note_required')
+                : t('adjust.note')
+            }
             maxLength={NOTE_MAX}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(event) => setNote(event.currentTarget.value)}
           />
-        </label>
-        <p data-testid="adjust-new" className="font-medium">
-          {t('adjust.new_on_hand', {
-            qty: qtyWithUnit(t, onHand + delta, unit),
-          })}{' '}
-          {delta !== 0 ? (
-            <bdi dir="ltr" className="text-text-muted">
-              ({delta > 0 ? '+' : '−'}
-              {formatQtyFromMilli(Math.abs(delta), unit)})
-            </bdi>
+          <Text fw={500} data-testid="adjust-new">
+            {t('adjust.new_on_hand', {
+              qty: qtyWithUnit(t, onHand + delta, unit),
+            })}{' '}
+            {delta !== 0 ? (
+              <Text component="bdi" dir="ltr" c="dimmed" size="sm">
+                ({delta > 0 ? '+' : '−'}
+                {formatQtyFromMilli(Math.abs(delta), unit)})
+              </Text>
+            ) : null}
+          </Text>
+          {kind === 'in' && can('purchase.create') ? (
+            <Text size="sm" c="dimmed">
+              {t('adjust.delivery_hint')}{' '}
+              <Link to="/suppliers" className="bikri-link">
+                {t('adjust.record_delivery')}
+              </Link>
+            </Text>
           ) : null}
-        </p>
-        {kind === 'in' && can('purchase.create') ? (
-          <p className="text-small text-text-muted">
-            {t('adjust.delivery_hint')}{' '}
-            <Link to="/suppliers" className="text-primary underline">
-              {t('adjust.record_delivery')}
-            </Link>
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-danger">
-            {error}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className={buttonQuiet} onClick={onClose}>
-            {t('common.cancel')}
-          </button>
-          <button
-            type="submit"
-            className={buttonPrimary}
-            disabled={saving || qty === null}
-          >
-            {t('form.save')}
-          </button>
-        </div>
-      </form>
+          {error ? (
+            <Text c="danger" role="alert" size="sm">
+              {error}
+            </Text>
+          ) : null}
+          <Group justify="flex-end" gap="sm">
+            <Button type="button" variant="default" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving || qty === null}
+              loading={saving}
+            >
+              {t('form.save')}
+            </Button>
+          </Group>
+        </Stack>
+      </Box>
     </Modal>
   );
 }

@@ -315,7 +315,7 @@ export function UdhaarList({
                             row.balance > 0
                               ? undefined
                               : row.balance < 0
-                                ? 'teal'
+                                ? 'var(--color-success)'
                                 : 'dimmed'
                           }
                           style={{ whiteSpace: 'nowrap' }}
