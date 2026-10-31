@@ -92,7 +92,7 @@ const mono = 'JetBrains Mono, ui-monospace, monospace';
 
 export const bikriTheme = createTheme({
   primaryColor: 'brand',
-  primaryShade: { light: 6, dark: 4 },
+  primaryShade: { light: 6, dark: 6 },
   colors: { brand, dark, success, warning, danger, accent },
   fontFamily: sans,
   fontFamilyMonospace: mono,
@@ -230,15 +230,16 @@ export const bikriCssVariables: CSSVariablesResolver = () => ({
     '--mantine-color-success': '#047857',
   },
   dark: {
-    '--mantine-color-body': '#0f172a',
-    '--mantine-color-text': '#f1f5f9',
+    '--mantine-color-body': '#0b1220',
+    '--mantine-color-text': '#e8eef8',
     '--mantine-color-dimmed': '#94a3b8',
-    '--mantine-color-placeholder': '#64748b',
-    '--mantine-color-default': '#1e293b',
-    '--mantine-color-default-hover': '#273449',
-    '--mantine-color-default-border': '#334155',
-    '--mantine-color-anchor': '#4da6ff',
+    '--mantine-color-placeholder': '#6f7f96',
+    '--mantine-color-default': '#111a2b',
+    '--mantine-color-default-hover': '#172235',
+    '--mantine-color-default-border': 'rgba(148, 163, 184, 0.16)',
+    '--mantine-color-anchor': '#7dd3fc',
     '--mantine-color-error': '#f87171',
     '--mantine-color-success': '#34d399',
+    '--paper-bg': '#111a2b',
   },
 });
