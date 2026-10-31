@@ -1,8 +1,22 @@
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  NativeSelect,
+  NumberInput,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
@@ -27,11 +41,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
-const area =
-  'min-h-20 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-text';
 
 /** Shop profile, receipt/tax and the single v1 branch (screens/17). */
 export function ShopSettingsPage() {
@@ -180,397 +189,376 @@ function ShopForm() {
 
   return (
     <SettingsPageLayout title={t('office.settings.title')} icon={<StoreIcon />}>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">{t('setup.shop_title')}</h2>
-        <label className="flex flex-col gap-1 text-small">
-          {t('setup.shop_name')}
-          <input
-            className={field}
+      <Paper withBorder p="lg">
+        <Stack gap="sm">
+          <Title order={2} fz="lg">
+            {t('setup.shop_title')}
+          </Title>
+          <TextInput
+            label={t('setup.shop_name')}
             maxLength={60}
             value={form.name}
             onChange={(event) => setForm({ ...form, name: event.target.value })}
           />
-        </label>
-        <fieldset>
-          <legend className="mb-1 text-small">
-            {t('setup.business_type')}
-          </legend>
-          <select
-            className={`${field} sm:hidden`}
-            aria-label={t('setup.business_type')}
-            value={form.business_type}
-            onChange={(event) =>
-              setForm({
-                ...form,
-                business_type: event.target.value,
-              })
-            }
+          <Box
+            component="fieldset"
+            style={{ border: 0, margin: 0, padding: 0 }}
           >
-            {BUSINESS_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {t(`setup.biz.${type}`)}
-              </option>
-            ))}
-          </select>
-          <div className="hidden flex-wrap gap-2 sm:flex">
-            {BUSINESS_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                aria-pressed={form.business_type === type}
-                className={`${buttonQuiet} px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-ink`}
-                onClick={() => setForm({ ...form, business_type: type })}
-              >
-                {t(`setup.biz.${type}`)}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.phone')}
-            <input
-              className={field}
+            <Text component="legend" size="sm" mb={4}>
+              {t('setup.business_type')}
+            </Text>
+            <NativeSelect
+              hiddenFrom="sm"
+              aria-label={t('setup.business_type')}
+              value={form.business_type}
+              onChange={(event) =>
+                setForm({ ...form, business_type: event.target.value })
+              }
+              data={BUSINESS_TYPES.map((type) => ({
+                value: type,
+                label: t(`setup.biz.${type}`),
+              }))}
+            />
+            <Group visibleFrom="sm" gap="xs">
+              {BUSINESS_TYPES.map((type) => (
+                <Button
+                  key={type}
+                  type="button"
+                  variant={form.business_type === type ? 'filled' : 'default'}
+                  aria-pressed={form.business_type === type}
+                  onClick={() => setForm({ ...form, business_type: type })}
+                >
+                  {t(`setup.biz.${type}`)}
+                </Button>
+              ))}
+            </Group>
+          </Box>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <TextInput
+              label={t('setup.phone')}
               value={form.phone}
               onChange={(event) =>
                 setForm({ ...form, phone: event.target.value })
               }
             />
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.city')}
-            <input
-              className={field}
+            <TextInput
+              label={t('setup.city')}
               maxLength={40}
               value={form.city}
               onChange={(event) =>
                 setForm({ ...form, city: event.target.value })
               }
             />
-          </label>
-        </div>
-        <label className="flex flex-col gap-1 text-small">
-          {t('setup.address')}
-          <input
-            className={field}
+          </SimpleGrid>
+          <TextInput
+            label={t('setup.address')}
             maxLength={120}
             value={form.address}
             onChange={(event) =>
               setForm({ ...form, address: event.target.value })
             }
           />
-        </label>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.ntn')}
-            <input
-              className={field}
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <TextInput
+              label={t('setup.ntn')}
               value={form.ntn}
               onChange={(event) =>
                 setForm({ ...form, ntn: event.target.value })
               }
             />
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.strn')}
-            <input
-              className={field}
+            <TextInput
+              label={t('setup.strn')}
               value={form.strn}
               onChange={(event) =>
                 setForm({ ...form, strn: event.target.value })
               }
             />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/svg+xml"
-            aria-label={t('office.settings.logo')}
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void chooseLogo(file);
-              event.target.value = '';
-            }}
-          />
-          <button
+          </SimpleGrid>
+          <Group gap="sm">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              aria-label={t('office.settings.logo')}
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void chooseLogo(file);
+                event.target.value = '';
+              }}
+            />
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => fileRef.current?.click()}
+            >
+              {t('setup.logo_choose')}
+            </Button>
+            {logo ? (
+              <Button
+                type="button"
+                variant="default"
+                disabled={readOnly}
+                onClick={() => void saveLogo()}
+              >
+                {t('office.settings.save_logo')}
+              </Button>
+            ) : null}
+            {logoUrl ? (
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => void removeLogo()}
+              >
+                {t('setup.logo_remove')}
+              </Button>
+            ) : null}
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={t('setup.logo_preview')}
+                className="h-10"
+              />
+            ) : null}
+          </Group>
+          <Button
             type="button"
-            className={buttonQuiet}
-            onClick={() => fileRef.current?.click()}
+            disabled={saving || readOnly}
+            loading={saving}
+            onClick={() => void saveShop()}
+            style={{ alignSelf: 'flex-start' }}
           >
-            {t('setup.logo_choose')}
-          </button>
-          {logo ? (
-            <button
-              type="button"
-              className={buttonQuiet}
-              disabled={readOnly}
-              onClick={() => void saveLogo()}
-            >
-              {t('office.settings.save_logo')}
-            </button>
-          ) : null}
-          {logoUrl ? (
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => void removeLogo()}
-            >
-              {t('setup.logo_remove')}
-            </button>
-          ) : null}
-          {logoUrl ? (
-            <img src={logoUrl} alt={t('setup.logo_preview')} className="h-10" />
-          ) : null}
-        </div>
-        <button
-          type="button"
-          className={`${buttonPrimary} self-start`}
-          disabled={saving || readOnly}
-          onClick={() => void saveShop()}
-        >
-          {t('office.settings.save')}
-        </button>
-      </section>
+            {t('office.settings.save')}
+          </Button>
+        </Stack>
+      </Paper>
 
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">{t('setup.receipt_title')}</h2>
-        <label className="flex flex-col gap-1 text-small">
-          {t('setup.header')}
-          <textarea
-            className={area}
+      <Paper withBorder p="lg">
+        <Stack gap="sm">
+          <Title order={2} fz="lg">
+            {t('setup.receipt_title')}
+          </Title>
+          <Textarea
+            label={t('setup.header')}
             maxLength={120}
+            autosize
+            minRows={2}
             value={form.receipt_header}
             onChange={(event) =>
               setForm({ ...form, receipt_header: event.target.value })
             }
           />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('setup.footer')}
-          <textarea
-            className={area}
+          <Textarea
+            label={t('setup.footer')}
             maxLength={160}
+            autosize
+            minRows={2}
             value={form.receipt_footer}
             onChange={(event) =>
               setForm({ ...form, receipt_footer: event.target.value })
             }
           />
-        </label>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.tax')}
-            <input
-              type="number"
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            <NumberInput
+              label={t('setup.tax')}
               min={0}
               max={50}
               step={0.01}
-              className={field}
+              decimalScale={2}
               value={form.tax_rate_bp / 100}
-              onChange={(event) =>
+              onChange={(value) =>
                 setForm({
                   ...form,
                   tax_rate_bp: Math.round(
-                    Math.max(0, Math.min(50, Number(event.target.value) || 0)) *
-                      100,
+                    Math.max(0, Math.min(50, Number(value) || 0)) * 100,
                   ),
                 })
               }
             />
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.settings.tax_label')}
-            <input
-              className={field}
+            <TextInput
+              label={t('office.settings.tax_label')}
               maxLength={30}
               value={form.tax_label}
               onChange={(event) =>
                 setForm({ ...form, tax_label: event.target.value })
               }
             />
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.settings.round_total')}
-            <select
-              className={field}
+            <NativeSelect
+              label={t('office.settings.round_total')}
               value={form.round_total_to}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  round_total_to: Number(event.target.value) as
+                  round_total_to: Number(event.currentTarget.value) as
                     | 1
                     | 100
                     | 500
                     | 1000,
                 })
               }
-            >
-              <option value={1}>{t('setup.round_none')}</option>
-              <option value={100}>{t('setup.round_rs', { n: 1 })}</option>
-              <option value={500}>{t('setup.round_rs', { n: 5 })}</option>
-              <option value={1000}>{t('setup.round_rs', { n: 10 })}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.settings.refund_rounding')}
-            <select
-              className={field}
+              data={[
+                { value: '1', label: t('setup.round_none') },
+                { value: '100', label: t('setup.round_rs', { n: 1 }) },
+                { value: '500', label: t('setup.round_rs', { n: 5 }) },
+                { value: '1000', label: t('setup.round_rs', { n: 10 }) },
+              ]}
+            />
+            <NativeSelect
+              label={t('office.settings.refund_rounding')}
               value={form.refund_rounding}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  refund_rounding: event.target.value as
+                  refund_rounding: event.currentTarget.value as
                     | 'nearest'
                     | 'down'
                     | 'none',
                 })
               }
-            >
-              <option value="nearest">
-                {t('office.settings.round_nearest')}
-              </option>
-              <option value="down">{t('office.settings.round_down')}</option>
-              <option value="none">{t('office.settings.round_exact')}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.settings.receipt_language')}
-            <select
-              className={field}
+              data={[
+                {
+                  value: 'nearest',
+                  label: t('office.settings.round_nearest'),
+                },
+                { value: 'down', label: t('office.settings.round_down') },
+                { value: 'none', label: t('office.settings.round_exact') },
+              ]}
+            />
+            <NativeSelect
+              label={t('office.settings.receipt_language')}
               value={form.receipt_language}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  receipt_language: event.target.value as 'app' | 'en' | 'ur',
+                  receipt_language: event.currentTarget.value as
+                    | 'app'
+                    | 'en'
+                    | 'ur',
                 })
               }
-            >
-              <option value="app">{t('office.settings.lang_app')}</option>
-              <option value="en">{t('office.settings.lang_en')}</option>
-              <option value="ur">{t('office.settings.lang_ur')}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.settings.number_grouping')}
-            <select
-              className={field}
+              data={[
+                { value: 'app', label: t('office.settings.lang_app') },
+                { value: 'en', label: t('office.settings.lang_en') },
+                { value: 'ur', label: t('office.settings.lang_ur') },
+              ]}
+            />
+            <NativeSelect
+              label={t('office.settings.number_grouping')}
               value={form.number_grouping}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  number_grouping: event.target.value as 'intl' | 'lakh',
+                  number_grouping: event.currentTarget.value as 'intl' | 'lakh',
                 })
               }
-            >
-              <option value="intl">{t('office.settings.grouping_intl')}</option>
-              <option value="lakh">{t('office.settings.grouping_lakh')}</option>
-            </select>
-          </label>
-        </div>
-        {form.tax_rate_bp > 0 ? (
-          <label className="flex items-center gap-2 text-small">
-            <input
-              type="checkbox"
+              data={[
+                {
+                  value: 'intl',
+                  label: t('office.settings.grouping_intl'),
+                },
+                {
+                  value: 'lakh',
+                  label: t('office.settings.grouping_lakh'),
+                },
+              ]}
+            />
+          </SimpleGrid>
+          {form.tax_rate_bp > 0 ? (
+            <Checkbox
+              label={t('setup.inclusive')}
               checked={form.tax_mode === 'inclusive'}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  tax_mode: event.target.checked ? 'inclusive' : 'exclusive',
+                  tax_mode: event.currentTarget.checked
+                    ? 'inclusive'
+                    : 'exclusive',
                 })
               }
             />
-            {t('setup.inclusive')}
-          </label>
-        ) : (
-          <p className="text-small text-text-muted">
-            {t('office.settings.tax_off_hint')}
-          </p>
-        )}
-        <p className="text-small text-text-muted">
-          {t('office.settings.applies_new')}
-        </p>
-        <div className="grid gap-1 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-small">
-            <input
-              type="checkbox"
+          ) : (
+            <Text size="sm" c="dimmed">
+              {t('office.settings.tax_off_hint')}
+            </Text>
+          )}
+          <Text size="sm" c="dimmed">
+            {t('office.settings.applies_new')}
+          </Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+            <Checkbox
+              label={t('office.settings.show_cashier')}
               checked={form.show_cashier_on_receipt}
               onChange={(event) =>
                 setForm({
                   ...form,
-                  show_cashier_on_receipt: event.target.checked,
+                  show_cashier_on_receipt: event.currentTarget.checked,
                 })
               }
             />
-            {t('office.settings.show_cashier')}
-          </label>
-          <label className="flex items-center gap-2 text-small">
-            <input
-              type="checkbox"
+            <Checkbox
+              label={t('office.settings.show_payment_details')}
               checked={form.show_payment_details}
               onChange={(event) =>
-                setForm({ ...form, show_payment_details: event.target.checked })
+                setForm({
+                  ...form,
+                  show_payment_details: event.currentTarget.checked,
+                })
               }
             />
-            {t('office.settings.show_payment_details')}
-          </label>
-          <label className="flex items-center gap-2 text-small">
-            <input
-              type="checkbox"
+            <Checkbox
+              label={t('office.settings.show_you_saved')}
               checked={form.show_you_saved}
               onChange={(event) =>
-                setForm({ ...form, show_you_saved: event.target.checked })
+                setForm({
+                  ...form,
+                  show_you_saved: event.currentTarget.checked,
+                })
               }
             />
-            {t('office.settings.show_you_saved')}
-          </label>
-          <label className="flex items-center gap-2 text-small">
-            <input
-              type="checkbox"
+            <Checkbox
+              label={t('office.settings.print_warranty')}
               checked={form.print_warranty}
               onChange={(event) =>
-                setForm({ ...form, print_warranty: event.target.checked })
+                setForm({
+                  ...form,
+                  print_warranty: event.currentTarget.checked,
+                })
               }
             />
-            {t('office.settings.print_warranty')}
-          </label>
-        </div>
-        <ReceiptPreview
-          shop={preview}
-          logoUrl={logoUrl}
-          paperMm={data?.printer?.paper_mm === 58 ? 58 : 80}
-        />
-        <button
-          type="button"
-          className={`${buttonPrimary} self-start`}
-          disabled={saving || readOnly}
-          onClick={() => void saveShop()}
-        >
-          {t('office.settings.save')}
-        </button>
-      </section>
+          </SimpleGrid>
+          <ReceiptPreview
+            shop={preview}
+            logoUrl={logoUrl}
+            paperMm={data.printer?.paper_mm === 58 ? 58 : 80}
+          />
+          <Button
+            type="button"
+            disabled={saving || readOnly}
+            loading={saving}
+            onClick={() => void saveShop()}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {t('office.settings.save')}
+          </Button>
+        </Stack>
+      </Paper>
 
       {data.branch ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-          <h2 className="text-title font-semibold">
-            {t('office.settings.branch')}
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-small">
-              {t('office.settings.branch_name')}
-              <input
-                className={field}
+        <Paper withBorder p="lg">
+          <Stack gap="sm">
+            <Title order={2} fz="lg">
+              {t('office.settings.branch')}
+            </Title>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <TextInput
+                label={t('office.settings.branch_name')}
                 value={branch.name}
                 onChange={(event) =>
                   setBranch({ ...branch, name: event.target.value })
                 }
               />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              {t('office.settings.bill_prefix')}
-              <input
-                className={field}
+              <TextInput
+                label={t('office.settings.bill_prefix')}
                 maxLength={6}
                 value={branch.bill_prefix}
                 onChange={(event) =>
@@ -580,65 +568,60 @@ function ShopForm() {
                   })
                 }
               />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              {t('setup.address')}
-              <input
-                className={field}
+              <TextInput
+                label={t('setup.address')}
                 value={branch.address}
                 onChange={(event) =>
                   setBranch({ ...branch, address: event.target.value })
                 }
               />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              {t('setup.phone')}
-              <input
-                className={field}
+              <TextInput
+                label={t('setup.phone')}
                 value={branch.phone}
                 onChange={(event) =>
                   setBranch({ ...branch, phone: event.target.value })
                 }
               />
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={readOnly}
-              onClick={() => void saveBranch()}
-            >
-              {t('office.settings.save')}
-            </button>
-            <button
-              type="button"
-              className={buttonQuiet}
-              disabled
-              title={t('office.settings.add_branch_soon')}
-            >
-              {t('office.settings.add_branch')}
-            </button>
-          </div>
-        </section>
+            </SimpleGrid>
+            <Group gap="sm">
+              <Button
+                type="button"
+                disabled={readOnly}
+                onClick={() => void saveBranch()}
+              >
+                {t('office.settings.save')}
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                disabled
+                title={t('office.settings.add_branch_soon')}
+              >
+                {t('office.settings.add_branch')}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
       ) : null}
 
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">
-          {t('office.settings.categories')}
-        </h2>
-        <p className="text-small text-text-muted">
-          {t('office.settings.categories_hint')}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/products" className={buttonQuiet}>
-            {t('office.settings.open_products')}
-          </Link>
-          <Link to="/expenses" className={buttonQuiet}>
-            {t('office.settings.open_expenses')}
-          </Link>
-        </div>
-      </section>
+      <Paper withBorder p="lg">
+        <Stack gap="sm">
+          <Title order={2} fz="lg">
+            {t('office.settings.categories')}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {t('office.settings.categories_hint')}
+          </Text>
+          <Group gap="sm">
+            <Button component={Link} to="/products" variant="default">
+              {t('office.settings.open_products')}
+            </Button>
+            <Button component={Link} to="/expenses" variant="default">
+              {t('office.settings.open_expenses')}
+            </Button>
+          </Group>
+        </Stack>
+      </Paper>
     </SettingsPageLayout>
   );
 }

@@ -7,10 +7,27 @@ import {
   roleAllows,
 } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
+import {
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Divider,
+  Group,
+  NativeSelect,
+  NumberInput,
+  Paper,
+  PasswordInput,
+  ScrollArea,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  UnstyledButton,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { UsersIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -29,8 +46,6 @@ import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
 
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 const ROLES: Role[] = ['owner', 'manager', 'cashier'];
 
 /** Cashiers, roles, PINs and permission overrides (screens/17). */
@@ -52,54 +67,67 @@ function StaffList() {
   const rows = useLiveQuery(() => staffList(getDb()), []) ?? [];
   return (
     <SettingsPageLayout title={t('office.staff.title')} icon={<UsersIcon />}>
-      <div className="flex justify-end">
-        <button
+      <Group justify="flex-end">
+        <Button
           type="button"
-          className={buttonPrimary}
           disabled={readOnly}
           onClick={() => setAdding(true)}
         >
           {t('office.staff.add')}
-        </button>
-      </div>
+        </Button>
+      </Group>
       {rows.length === 0 ? (
         <EmptyState message={t('office.staff.empty')} />
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {rows.map((row) => (
-            <li key={row.staff.id}>
-              <button
-                type="button"
-                className="flex min-h-14 w-full flex-wrap items-center gap-2 p-3 text-start hover:bg-surface-2"
-                disabled={readOnly}
-                onClick={() => setEditing(row.staff)}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">
-                    {String(row.staff.name)}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {t(`office.staff.role_${String(row.staff.role)}`)}
-                    {' · '}
-                    {row.staff.active === 1
-                      ? t('office.staff.active')
-                      : t('office.staff.inactive')}
-                  </span>
-                </span>
-                {row.isLastOwner ? (
-                  <span className="rounded-pill bg-primary-subtle px-2 py-0.5 text-small text-primary-subtle-ink">
-                    {t('office.staff.last_owner')}
-                  </span>
-                ) : null}
-                <span className="text-small text-text-muted">
-                  {row.staff.pin_hash
-                    ? t('office.staff.pin_set')
-                    : t('office.staff.pin_not_set')}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <Paper withBorder>
+          <Box
+            component="ul"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          >
+            {rows.map((row, index) => (
+              <Box component="li" key={row.staff.id}>
+                {index > 0 ? <Divider /> : null}
+                <UnstyledButton
+                  w="100%"
+                  p="sm"
+                  disabled={readOnly}
+                  onClick={() => setEditing(row.staff)}
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 8,
+                    textAlign: 'start',
+                    minHeight: 56,
+                  }}
+                >
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text fw={500} truncate>
+                      {String(row.staff.name)}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {t(`office.staff.role_${String(row.staff.role)}`)}
+                      {' · '}
+                      {row.staff.active === 1
+                        ? t('office.staff.active')
+                        : t('office.staff.inactive')}
+                    </Text>
+                  </Box>
+                  {row.isLastOwner ? (
+                    <Badge color="brand" variant="light" radius="xl" tt="none">
+                      {t('office.staff.last_owner')}
+                    </Badge>
+                  ) : null}
+                  <Text size="sm" c="dimmed">
+                    {row.staff.pin_hash
+                      ? t('office.staff.pin_set')
+                      : t('office.staff.pin_not_set')}
+                  </Text>
+                </UnstyledButton>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
       )}
       <StaffDialog
         open={adding || editing !== null}
@@ -233,146 +261,134 @@ function StaffDialog({
       title={row ? t('office.staff.edit') : t('office.staff.add')}
       wide
     >
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.staff.name')}
-          <input
-            className={field}
-            maxLength={40}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.staff.role')}
-          <select
-            className={field}
-            value={role}
-            disabled={isLastOwner}
-            onChange={(event) => setRole(event.target.value as Role)}
-          >
-            {ROLES.map((item) => (
-              <option key={item} value={item}>
-                {t(`office.staff.role_${item}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.staff.max_discount')}
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.5}
-            className={field}
-            value={maxDiscountBp / 100}
-            onChange={(event) =>
-              setMaxDiscountBp(
-                Math.round(
-                  Math.max(0, Math.min(100, Number(event.target.value) || 0)) *
-                    100,
-                ),
-              )
-            }
-          />
-        </label>
-        <label className="flex items-center gap-2 self-end text-small">
-          <input
-            type="checkbox"
-            checked={active}
-            disabled={isLastOwner}
-            onChange={(event) => setActive(event.target.checked)}
-          />
-          {t('office.staff.active')}
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {row ? t('office.staff.new_pin') : t('office.staff.pin')}
-          <input
-            type="password"
-            inputMode="numeric"
-            autoComplete="new-password"
-            className={field}
-            maxLength={6}
-            value={pin}
-            onChange={(event) =>
-              setPin(event.target.value.replace(/[^0-9]/gu, ''))
-            }
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.staff.pin_again')}
-          <input
-            type="password"
-            inputMode="numeric"
-            autoComplete="new-password"
-            className={field}
-            maxLength={6}
-            value={pin2}
-            onChange={(event) =>
-              setPin2(event.target.value.replace(/[^0-9]/gu, ''))
-            }
-          />
-        </label>
-      </div>
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <TextInput
+          label={t('office.staff.name')}
+          maxLength={40}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <NativeSelect
+          label={t('office.staff.role')}
+          value={role}
+          disabled={isLastOwner}
+          onChange={(event) => setRole(event.currentTarget.value as Role)}
+          data={ROLES.map((item) => ({
+            value: item,
+            label: t(`office.staff.role_${item}`),
+          }))}
+        />
+        <NumberInput
+          label={t('office.staff.max_discount')}
+          min={0}
+          max={100}
+          step={0.5}
+          decimalScale={2}
+          value={maxDiscountBp / 100}
+          onChange={(value) =>
+            setMaxDiscountBp(
+              Math.round(Math.max(0, Math.min(100, Number(value) || 0)) * 100),
+            )
+          }
+        />
+        <Checkbox
+          label={t('office.staff.active')}
+          checked={active}
+          disabled={isLastOwner}
+          onChange={(event) => setActive(event.currentTarget.checked)}
+          style={{ alignSelf: 'end' }}
+        />
+        <PasswordInput
+          label={row ? t('office.staff.new_pin') : t('office.staff.pin')}
+          inputMode="numeric"
+          autoComplete="new-password"
+          maxLength={6}
+          value={pin}
+          onChange={(event) =>
+            setPin(event.currentTarget.value.replace(/[^0-9]/gu, ''))
+          }
+        />
+        <PasswordInput
+          label={t('office.staff.pin_again')}
+          inputMode="numeric"
+          autoComplete="new-password"
+          maxLength={6}
+          value={pin2}
+          onChange={(event) =>
+            setPin2(event.currentTarget.value.replace(/[^0-9]/gu, ''))
+          }
+        />
+      </SimpleGrid>
       {isLastOwner ? (
-        <div className="flex flex-col gap-1 rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink">
-          <p className="font-medium">{t('office.staff.last_owner')}</p>
-          <p>{t('office.staff.last_owner_hint')}</p>
-        </div>
+        <Paper p="sm" bg="var(--mantine-color-warning-subtle)">
+          <Text size="sm" fw={500}>
+            {t('office.staff.last_owner')}
+          </Text>
+          <Text size="sm">{t('office.staff.last_owner_hint')}</Text>
+        </Paper>
       ) : null}
-      <fieldset>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <legend className="text-small">
+      <Box component="fieldset" style={{ border: 0, margin: 0, padding: 0 }}>
+        <Group justify="space-between" gap="sm" mb={4}>
+          <Text component="legend" size="sm">
             {t('office.staff.permissions')}
-          </legend>
-          <button
+          </Text>
+          <Button
             type="button"
-            className="text-small underline"
+            variant="transparent"
+            size="compact-sm"
             onClick={() => setOverrides({})}
           >
             {t('office.staff.reset_permissions')}
-          </button>
-        </div>
-        <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-control border border-border p-2 sm:grid-cols-2">
-          {PERMISSIONS.map((permission) => (
-            <li key={permission}>
-              <label className="flex items-center gap-2 text-small">
-                <input
-                  type="checkbox"
+          </Button>
+        </Group>
+        <ScrollArea.Autosize mah={256}>
+          <Paper withBorder p="xs">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={4}>
+              {PERMISSIONS.map((permission) => (
+                <Checkbox
+                  key={permission}
+                  size="sm"
                   checked={checked(permission)}
-                  onChange={(event) => toggle(permission, event.target.checked)}
+                  onChange={(event) =>
+                    toggle(permission, event.currentTarget.checked)
+                  }
+                  label={
+                    <Group gap={6} wrap="nowrap">
+                      <Text size="sm" style={{ flex: 1, minWidth: 0 }}>
+                        {t(
+                          `office.staff.perm_${permission.replaceAll('.', '_')}`,
+                        )}
+                      </Text>
+                      {overrides[permission] !== undefined ? (
+                        <Text size="xs" c="dimmed">
+                          {t('office.staff.override')}
+                        </Text>
+                      ) : null}
+                    </Group>
+                  }
                 />
-                <span className="min-w-0 flex-1">
-                  {t(`office.staff.perm_${permission.replaceAll('.', '_')}`)}
-                </span>
-                {overrides[permission] !== undefined ? (
-                  <span className="text-text-muted">
-                    {t('office.staff.override')}
-                  </span>
-                ) : null}
-              </label>
-            </li>
-          ))}
-        </ul>
-      </fieldset>
-      <div className="flex justify-end gap-2">
-        <button
+              ))}
+            </SimpleGrid>
+          </Paper>
+        </ScrollArea.Autosize>
+      </Box>
+      <Group justify="flex-end" gap="sm">
+        <Button
           type="button"
-          className={buttonQuiet}
+          variant="default"
           onClick={() => onOpenChange(false)}
         >
           {t('common.cancel')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={buttonPrimary}
           disabled={pending || name.trim() === '' || readOnly}
+          loading={pending}
           onClick={() => void save()}
         >
           {t('office.staff.save')}
-        </button>
-      </div>
+        </Button>
+      </Group>
     </Modal>
   );
 }
