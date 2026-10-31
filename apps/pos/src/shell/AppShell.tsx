@@ -197,17 +197,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     {t('common.app_name')}
                   </Text>
-                  {shopName ? (
-                    <Text
-                      size="10px"
-                      c="dimmed"
-                      truncate
-                      maw={160}
-                      visibleFrom="sm"
-                    >
-                      {shopName}
-                    </Text>
-                  ) : null}
                 </Stack>
               </UnstyledButton>
             </Group>
