@@ -173,14 +173,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
           <SyncBadge />
           <PrinterDot />
-          {import.meta.env.DEV ? (
-            <Link
-              to="/dev/ui"
-              className="text-small text-primary max-lg:hidden"
-            >
-              {t('shell.ui_kit')}
-            </Link>
-          ) : null}
           <LanguageSelect />
           <StaffMenu />
         </div>
