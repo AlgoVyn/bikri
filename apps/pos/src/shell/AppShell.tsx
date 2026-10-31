@@ -40,12 +40,6 @@ import {
   useShopName,
 } from './TopBarParts.tsx';
 
-const EXTRA_TITLES: Record<string, string> = {
-  '/day-close': 'home.day_close',
-  '/stock/count': 'count.title',
-  '/labels': 'products.print_label',
-};
-
 const _railText = 'rgba(241, 245, 249, 0.72)';
 const railMuted = 'rgba(184, 198, 219, 0.78)';
 
@@ -66,12 +60,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const allowed = (item: NavItem) => item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
   const current = navItemFor(pathname);
-  const extraTitle = EXTRA_TITLES[pathname.replace(/\/+$/u, '')];
-  const screenTitle = current
-    ? t(current.label)
-    : extraTitle
-      ? t(extraTitle)
-      : null;
   const blocked = current !== undefined && !allowed(current);
   const more = visible.filter((item) => !item.bar);
 
@@ -222,20 +210,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   ) : null}
                 </Stack>
               </UnstyledButton>
-              <Divider
-                orientation="vertical"
-                visibleFrom="md"
-                color="var(--mantine-color-default-border)"
-              />
-              <Text
-                data-testid="screen-title-bar"
-                fw={650}
-                size="sm"
-                truncate
-                visibleFrom="sm"
-              >
-                {screenTitle ?? shopName ?? t('common.app_name')}
-              </Text>
             </Group>
             <Box
               style={{

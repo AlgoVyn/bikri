@@ -1,3 +1,4 @@
+import { Box, Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -5,7 +6,7 @@ import { downloadBlob } from '../lib/download.ts';
 import { adminErrorMessage } from './api.ts';
 import { buildTenantExport, type ExportProgress } from './exportZip.ts';
 import { barPercent, formatCount } from './format.ts';
-import { Panel, primaryBtn } from './ui.tsx';
+import { Panel } from './ui.tsx';
 
 export function ExportTab({ tenantId }: { tenantId: string }) {
   const { t, i18n } = useTranslation();
@@ -20,12 +21,14 @@ export function ExportTab({ tenantId }: { tenantId: string }) {
       description={t('admin.export_hint')}
       className="max-w-2xl"
     >
-      <div className="flex flex-col gap-4">
-        <p className="text-small text-text-muted">{t('admin.export_intro')}</p>
-        <div>
-          <button
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          {t('admin.export_intro')}
+        </Text>
+        <Box>
+          <Button
             type="button"
-            className={primaryBtn}
+            loading={pending}
             disabled={pending}
             onClick={() => {
               setPending(true);
@@ -63,32 +66,39 @@ export function ExportTab({ tenantId }: { tenantId: string }) {
             }}
           >
             {t('admin.export_start')}
-          </button>
-        </div>
+          </Button>
+        </Box>
         {rows.length > 0 ? (
-          <ul className="flex flex-col gap-3" aria-live="polite">
+          <Box
+            component="ul"
+            aria-live="polite"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          >
             {rows.map((row) => (
-              <li key={row.tbl}>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-small">
-                  <span className="font-medium">{row.tbl}</span>
-                  <span className="text-text-muted tabular-nums">
+              <Box component="li" key={row.tbl} mb="sm">
+                <Group justify="space-between" gap="sm" wrap="wrap">
+                  <Text size="sm" fw={500}>
+                    {row.tbl}
+                  </Text>
+                  <Text size="sm" c="dimmed">
                     {t('admin.of_limit', {
                       value: formatCount(row.done, lang),
                       limit: formatCount(row.total, lang),
                     })}
-                  </span>
-                </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${barPercent(row.done, row.total)}%` }}
-                  />
-                </div>
-              </li>
+                  </Text>
+                </Group>
+                <Progress
+                  mt={4}
+                  value={barPercent(row.done, row.total)}
+                  size="sm"
+                  color="brand"
+                  aria-label={`${row.tbl}: ${formatCount(row.done, lang)} / ${formatCount(row.total, lang)}`}
+                />
+              </Box>
             ))}
-          </ul>
+          </Box>
         ) : null}
-      </div>
+      </Stack>
     </Panel>
   );
 }

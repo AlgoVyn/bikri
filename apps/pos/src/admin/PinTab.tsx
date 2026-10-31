@@ -1,9 +1,18 @@
 import { hashPin, isWeakPin, PIN_ITERATIONS } from '@bikri/core';
+import {
+  Box,
+  Button,
+  NativeSelect,
+  PasswordInput,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import { adminErrorMessage, listOwners, resetOwnerPin } from './api.ts';
-import { Field, inputClass, Panel, primaryBtn } from './ui.tsx';
+import { Panel } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 export function PinTab({ tenantId }: { tenantId: string }) {
@@ -25,18 +34,18 @@ export function PinTab({ tenantId }: { tenantId: string }) {
 
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
+      <Stack gap="sm" align="flex-start">
+        <Text c="dimmed">{query.error}</Text>
+        <Button type="button" onClick={query.reload}>
           {t('admin.retry')}
-        </button>
-      </p>
+        </Button>
+      </Stack>
     ) : (
-      <p className="sr-only">{t('common.loading')}</p>
+      <Text className="sr-only">{t('common.loading')}</Text>
     );
   }
   if (query.data.owners.length === 0) {
-    return <p className="text-text-muted">{t('admin.pin_empty')}</p>;
+    return <Text c="dimmed">{t('admin.pin_empty')}</Text>;
   }
 
   return (
@@ -45,9 +54,9 @@ export function PinTab({ tenantId }: { tenantId: string }) {
       description={t('admin.pin_subtitle')}
       className="max-w-xl"
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
+      <Box
+        component="form"
+        onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           if (pending || ownerId === '') return;
           if (pin !== again) {
@@ -60,7 +69,6 @@ export function PinTab({ tenantId }: { tenantId: string }) {
           }
           setFormError(null);
           setPending(true);
-          // The PIN stays in this browser. Only the PBKDF2 hash is posted.
           void hashPin(pin, PIN_ITERATIONS)
             .then((hashed) =>
               resetOwnerPin(tenantId, {
@@ -86,75 +94,74 @@ export function PinTab({ tenantId }: { tenantId: string }) {
             });
         }}
       >
-        <p className="rounded-control border border-warning-subtle bg-warning-subtle px-3 py-2 text-small text-warning-subtle-ink">
-          {t('admin.pin_reminder')}
-        </p>
-        <Field id="pin-owner" label={t('admin.pin_owner')}>
-          <select
+        <Stack gap="md">
+          <Text
+            size="sm"
+            p="sm"
+            bg="var(--mantine-color-warning-subtle)"
+            c="var(--mantine-color-warning-subtle-ink)"
+          >
+            {t('admin.pin_reminder')}
+          </Text>
+          <NativeSelect
             id="pin-owner"
-            className={inputClass}
+            label={t('admin.pin_owner')}
             value={ownerId}
-            onChange={(event) => {
-              setOwnerId(event.target.value);
-            }}
-          >
-            {query.data.owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            id="pin-new"
-            label={t('admin.pin_new')}
-            hint={t('admin.pin_hint')}
-          >
-            <input
+            onChange={(event) => setOwnerId(event.currentTarget.value)}
+            data={query.data.owners.map((owner) => ({
+              value: owner.id,
+              label: owner.name,
+            }))}
+          />
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <PasswordInput
               id="pin-new"
-              type="password"
+              label={t('admin.pin_new')}
+              description={t('admin.pin_hint')}
               inputMode="numeric"
               autoComplete="new-password"
-              className={`${inputClass} font-mono`}
               value={pin}
               maxLength={6}
               aria-describedby="pin-new-hint"
-              onChange={(event) => {
-                setPin(event.target.value);
+              styles={{
+                input: { fontFamily: 'var(--mantine-font-family-monospace)' },
               }}
+              onChange={(event) => setPin(event.currentTarget.value)}
             />
-          </Field>
-          <Field id="pin-again" label={t('admin.pin_again')}>
-            <input
+            <PasswordInput
               id="pin-again"
-              type="password"
+              label={t('admin.pin_again')}
               inputMode="numeric"
               autoComplete="new-password"
-              className={`${inputClass} font-mono`}
               value={again}
               maxLength={6}
-              onChange={(event) => {
-                setAgain(event.target.value);
+              styles={{
+                input: { fontFamily: 'var(--mantine-font-family-monospace)' },
               }}
+              onChange={(event) => setAgain(event.currentTarget.value)}
             />
-          </Field>
-        </div>
-        {formError !== null ? (
-          <p className="text-small text-danger" role="alert">
-            {formError}
-          </p>
-        ) : null}
-        <div className="border-t border-border pt-4">
-          <button
-            type="submit"
-            className={primaryBtn}
-            disabled={pending || ownerId === ''}
+          </SimpleGrid>
+          {formError !== null ? (
+            <Text size="sm" c="danger" role="alert">
+              {formError}
+            </Text>
+          ) : null}
+          <Box
+            pt="md"
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+            }}
           >
-            {t('admin.pin_reset')}
-          </button>
-        </div>
-      </form>
+            <Button
+              type="submit"
+              disabled={pending || ownerId === ''}
+              loading={pending}
+            >
+              {t('admin.pin_reset')}
+            </Button>
+          </Box>
+        </Stack>
+      </Box>
     </Panel>
   );
 }

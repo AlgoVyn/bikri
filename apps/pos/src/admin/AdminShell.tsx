@@ -1,4 +1,12 @@
-import { AppShell, Box, Group, Stack, Text, ThemeIcon } from '@mantine/core';
+import {
+  AppShell,
+  Box,
+  Divider,
+  Group,
+  Stack,
+  Text,
+  ThemeIcon,
+} from '@mantine/core';
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -71,60 +79,55 @@ export function AdminShell() {
         {t('admin.skip_content')}
       </a>
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Box hiddenFrom="lg">
-              <Link to="/admin" className="flex items-center gap-2">
-                <ThemeIcon
-                  size={34}
-                  radius="md"
-                  color="accent"
-                  variant="filled"
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap" gap="sm">
+          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+            <Box
+              component={Link}
+              to="/admin"
+              data-testid="admin-brand-topbar"
+              className="bikri-topbar-brand"
+            >
+              <ThemeIcon size={36} radius="md" color="accent" variant="filled">
+                <SalesIcon />
+              </ThemeIcon>
+              <Stack gap={0} style={{ minWidth: 0 }}>
+                <Text
+                  fw={800}
+                  size="sm"
+                  tt="uppercase"
+                  style={{ letterSpacing: '0.14em', lineHeight: 1.1 }}
                 >
-                  <SalesIcon />
-                </ThemeIcon>
-                <Text size="sm" fw={700} tt="uppercase">
                   {t('common.app_name')}
                 </Text>
-              </Link>
+                <Text size="10px" c="dimmed" truncate visibleFrom="sm">
+                  {t('admin.operator_label')}
+                </Text>
+              </Stack>
             </Box>
-            <Text size="sm" c="dimmed" visibleFrom="lg">
-              {t('admin.operator_label')}
+            <Divider
+              orientation="vertical"
+              visibleFrom="md"
+              color="var(--mantine-color-default-border)"
+            />
+            <Text size="sm" fw={600} visibleFrom="sm" truncate>
+              {t('admin.title')}
             </Text>
           </Group>
-          <LanguageSelect />
+          <Group gap="sm" wrap="nowrap">
+            <Text size="xs" c="dimmed" visibleFrom="lg">
+              {t('admin.access_note')}
+            </Text>
+            <LanguageSelect />
+          </Group>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar p={0} aria-label={t('admin.title')}>
         <Stack justify="space-between" h="100%" gap={0}>
           <Box>
-            <Box
-              component={Link}
-              to="/admin"
-              px="md"
-              py="md"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                borderBottom: '1px solid rgb(255 255 255 / 0.10)',
-                textDecoration: 'none',
-              }}
-            >
-              <ThemeIcon size={36} radius="md" color="accent" variant="filled">
-                <SalesIcon />
-              </ThemeIcon>
-              <Stack gap={0} style={{ minWidth: 0 }}>
-                <Text size="xs" fw={700} tt="uppercase" c="white">
-                  {t('common.app_name')}
-                </Text>
-                <Text size="xs" c="rgba(184,198,219,0.8)" truncate>
-                  {t('admin.title')}
-                </Text>
-              </Stack>
+            <Box pt="sm">
+              <AdminNav />
             </Box>
-            <AdminNav />
           </Box>
           <Group gap="sm" px="md" py="md" wrap="nowrap">
             <Box
