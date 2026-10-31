@@ -149,3 +149,26 @@
 [data-mantine-color-scheme="dark"] .bikri-link {
   color: var(--mantine-color-brand-4);
 }
+
+/* Shared list rows that stay real router links. */
+.bikri-list-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 8px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.bikri-list-link:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.bikri-list-link[aria-current="page"] {
+  background: var(--mantine-color-brand-0);
+}
+
+[data-mantine-color-scheme="dark"] .bikri-list-link[aria-current="page"] {
+  background: var(--mantine-color-brand-9);
+}

@@ -1,8 +1,16 @@
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -15,11 +23,7 @@ import { rememberListScroll } from '../lib/listScroll.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import {
-  dateText,
-  supplierBalanceLabel,
-  supplierBalanceTone,
-} from './format.ts';
+import { dateText, supplierBalanceLabel } from './format.ts';
 import { SupplierDialog } from './SupplierDialog.tsx';
 
 /** Suppliers list (screens/13). */
@@ -48,149 +52,177 @@ export function SupplierList({
   });
 
   return (
-    <div
-      className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
-      }
+    <Box
+      p={embedded ? undefined : 'md'}
+      mx={embedded ? undefined : 'auto'}
+      maw={embedded ? undefined : 1152}
+      w="100%"
     >
-      <PageHeader
-        icon={<SuppliersIcon />}
-        tone="bg-success-subtle text-success-subtle-ink"
-        title={t('office.suppliers.title')}
-        subtitle={t('office.suppliers.subtitle')}
-        headingLevel={detailOpen ? 'h2' : 'h1'}
-        actions={
-          <>
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText(
-                    'bikri-suppliers.csv',
-                    suppliersCsv(data.rows, data.tz),
-                  )
-                }
-              >
-                {t('office.suppliers.export_csv')}
-              </button>
-            ) : null}
-            {can('purchase.create') ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.suppliers.new_supplier')}
-              </button>
-            ) : null}
-          </>
-        }
-      />
-
-      {data ? (
-        <p className="rounded-card border border-border bg-surface p-3 text-small">
-          {t('office.suppliers.total_owed')}:{' '}
-          <span className="text-title font-semibold">
-            <MoneyText paisa={data.totalOwed} />
-          </span>
-        </p>
-      ) : null}
-
-      <search className="rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-0 flex-col">
-          <span className="mb-1 text-small">
-            {t('office.suppliers.search')}
-          </span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
-              placeholder={t('office.suppliers.search_placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-      </search>
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
+      <Stack gap="sm">
+        <PageHeader
           icon={<SuppliersIcon />}
-          message={
-            query
-              ? t('office.suppliers.no_match')
-              : t('office.suppliers.no_suppliers')
-          }
-          actionLabel={
-            can('purchase.create') && !readOnly
-              ? t('office.suppliers.new_supplier')
-              : undefined
-          }
-          onAction={
-            can('purchase.create') && !readOnly
-              ? () => setNewOpen(true)
-              : undefined
+          tone="bg-success-subtle text-success-subtle-ink"
+          title={t('office.suppliers.title')}
+          subtitle={t('office.suppliers.subtitle')}
+          headingLevel={detailOpen ? 'h2' : 'h1'}
+          actions={
+            <>
+              {can('export.data') ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={!data || data.rows.length === 0}
+                  onClick={() =>
+                    data &&
+                    downloadText(
+                      'bikri-suppliers.csv',
+                      suppliersCsv(data.rows, data.tz),
+                    )
+                  }
+                >
+                  {t('office.suppliers.export_csv')}
+                </Button>
+              ) : null}
+              {can('purchase.create') ? (
+                <Button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.suppliers.new_supplier')}
+                </Button>
+              ) : null}
+            </>
           }
         />
-      ) : null}
 
-      {data && data.rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {data.rows.map((row) => (
-            <li key={row.supplier.id}>
-              <Link
-                to="/suppliers/$supplierId"
-                params={{ supplierId: row.supplier.id }}
-                resetScroll={false}
-                onClick={rememberListScroll}
-                aria-current={
-                  row.supplier.id === selectedId ? 'page' : undefined
-                }
-                className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
-              >
-                <span className="min-w-0 flex-[2_1_10rem]">
-                  <span className="block truncate font-medium">
-                    {String(row.supplier.name)}
-                  </span>
-                  <span dir="ltr" className="block text-small text-text-muted">
-                    {String(row.supplier.phone ?? '')}
-                  </span>
-                </span>
-                <span className="min-w-0 flex-[1_1_9rem] text-small">
-                  <span
-                    className={`block whitespace-nowrap font-medium ${supplierBalanceTone(row.balance)}`}
+        {data ? (
+          <Paper withBorder p="sm">
+            <Group gap={6} align="baseline">
+              <Text size="sm">{t('office.suppliers.total_owed')}:</Text>
+              <Text fz={24} fw={600}>
+                <MoneyText paisa={data.totalOwed} />
+              </Text>
+            </Group>
+          </Paper>
+        ) : null}
+
+        <Box component="search">
+          <Paper withBorder p="sm">
+            <TextInput
+              type="search"
+              label={t('office.suppliers.search')}
+              placeholder={t('office.suppliers.search_placeholder')}
+              leftSection={<SearchIcon />}
+              autoComplete="off"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+          </Paper>
+        </Box>
+
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            icon={<SuppliersIcon />}
+            message={
+              query
+                ? t('office.suppliers.no_match')
+                : t('office.suppliers.no_suppliers')
+            }
+            actionLabel={
+              can('purchase.create') && !readOnly
+                ? t('office.suppliers.new_supplier')
+                : undefined
+            }
+            onAction={
+              can('purchase.create') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
+
+        {data && data.rows.length > 0 ? (
+          <Paper withBorder p={0}>
+            <Box
+              component="ul"
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
+            >
+              {data.rows.map((row, index) => (
+                <Box
+                  component="li"
+                  key={row.supplier.id}
+                  style={
+                    index > 0
+                      ? {
+                          borderTop:
+                            '1px solid var(--mantine-color-default-border)',
+                        }
+                      : undefined
+                  }
+                >
+                  <Link
+                    to="/suppliers/$supplierId"
+                    params={{ supplierId: row.supplier.id }}
+                    resetScroll={false}
+                    onClick={rememberListScroll}
+                    aria-current={
+                      row.supplier.id === selectedId ? 'page' : undefined
+                    }
+                    className="bikri-list-link"
                   >
-                    {supplierBalanceLabel(t, row.balance)}
-                  </span>
-                </span>
-                <span className="min-w-0 flex-[1_1_9rem] text-small text-text-muted">
-                  {row.lastDeliveryAt
-                    ? t('office.suppliers.last_delivery', {
-                        date: dateText(
-                          new Date(row.lastDeliveryAt)
-                            .toISOString()
-                            .slice(0, 10),
-                          i18n.language,
-                          data.tz,
-                        ),
-                      })
-                    : t('office.suppliers.never')}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+                    <Box style={{ flex: '2 1 10rem', minWidth: 0 }}>
+                      <Text fw={500} truncate>
+                        {String(row.supplier.name)}
+                      </Text>
+                      <Text size="sm" c="dimmed" dir="ltr">
+                        {String(row.supplier.phone ?? '')}
+                      </Text>
+                    </Box>
+                    <Text
+                      size="sm"
+                      fw={500}
+                      style={{
+                        flex: '1 1 9rem',
+                        minWidth: 0,
+                        whiteSpace: 'nowrap',
+                      }}
+                      c={
+                        row.balance > 0
+                          ? undefined
+                          : row.balance < 0
+                            ? 'teal'
+                            : 'dimmed'
+                      }
+                    >
+                      {supplierBalanceLabel(t, row.balance)}
+                    </Text>
+                    <Text
+                      size="sm"
+                      c="dimmed"
+                      style={{ flex: '1 1 9rem', minWidth: 0 }}
+                    >
+                      {row.lastDeliveryAt
+                        ? t('office.suppliers.last_delivery', {
+                            date: dateText(
+                              new Date(row.lastDeliveryAt)
+                                .toISOString()
+                                .slice(0, 10),
+                              i18n.language,
+                              data.tz,
+                            ),
+                          })
+                        : t('office.suppliers.never')}
+                    </Text>
+                  </Link>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
+        ) : null}
 
-      <SupplierDialog open={newOpen} onOpenChange={setNewOpen} />
-    </div>
+        <SupplierDialog open={newOpen} onOpenChange={setNewOpen} />
+      </Stack>
+    </Box>
   );
 }

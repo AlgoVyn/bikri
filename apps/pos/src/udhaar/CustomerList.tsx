@@ -1,9 +1,20 @@
 import { businessDate } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Grid,
+  Group,
+  NativeSelect,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -23,10 +34,7 @@ import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
-import { ageLabel, balanceLabel, balanceTone, limitPercent } from './format.ts';
-
-const selectClass =
-  'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
+import { ageLabel, balanceLabel, limitPercent } from './format.ts';
 
 /** Customers list (screens/12). */
 export function UdhaarList({
@@ -88,243 +96,289 @@ export function UdhaarList({
   const sorts: CustomerSort[] = ['balance', 'oldest', 'name', 'activity'];
 
   return (
-    <div
-      className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : 'mx-auto flex max-w-6xl flex-col gap-3 p-4'
-      }
+    <Box
+      p={embedded ? undefined : 'md'}
+      mx={embedded ? undefined : 'auto'}
+      maw={embedded ? undefined : 1152}
+      w="100%"
     >
-      <PageHeader
-        icon={<UdhaarIcon />}
-        tone="bg-warning-subtle text-warning-subtle-ink"
-        title={t('office.udhaar.title')}
-        subtitle={t('office.udhaar.subtitle')}
-        headingLevel={detailOpen ? 'h2' : 'h1'}
-        actions={
-          <>
-            <Link to="/udhaar/chase" className={buttonQuiet}>
-              {t('office.udhaar.chase_list')}
-            </Link>
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText(
-                    'bikri-udhaar.csv',
-                    customersCsv(data.rows, data.tz),
-                  )
-                }
-              >
-                {t('office.udhaar.export_csv')}
-              </button>
-            ) : null}
-            {can('party.edit') ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.udhaar.new_customer')}
-              </button>
-            ) : null}
-          </>
-        }
-      />
-
-      {data ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Card
-            testid="udhaar-total"
-            className="col-span-2 sm:col-span-1"
-            label={t('office.udhaar.total_owed')}
-            value={<MoneyText paisa={data.totalOwed} />}
-          />
-          <Card
-            testid="udhaar-owing"
-            label={t('office.udhaar.customers_owing')}
-            value={String(data.owingCount)}
-          />
-          <Card
-            label={t('office.udhaar.received_this_month')}
-            value={<MoneyText paisa={data.receivedThisMonth} />}
-          />
-        </div>
-      ) : null}
-
-      <search className="flex flex-wrap items-end gap-2 rounded-card border border-border bg-surface p-3 shadow-card">
-        <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
-          <span className="mb-1 text-small">{t('office.udhaar.search')}</span>
-          <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
-            <SearchIcon />
-            <input
-              type="search"
-              autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-body outline-none"
-              placeholder={t('office.udhaar.search_placeholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-        <button
-          type="button"
-          className={`${buttonQuiet} gap-2 self-end sm:hidden`}
-          aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {t('common.filters')}
-          {activeFilterCount > 0 ? (
-            <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-              {activeFilterCount}
-            </span>
-          ) : null}
-        </button>
-        <div
-          className={
-            filtersOpen
-              ? 'flex w-full flex-wrap items-end gap-2'
-              : 'hidden sm:flex sm:flex-wrap sm:items-end sm:gap-2'
-          }
-        >
-          <label className="flex flex-col">
-            <span className="mb-1 text-small">{t('office.udhaar.filter')}</span>
-            <select
-              className={selectClass}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as CustomerFilter)}
-            >
-              {filters.map((value) => (
-                <option key={value} value={value}>
-                  {t(`office.udhaar.filter_${value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col">
-            <span className="mb-1 text-small">{t('office.udhaar.sort')}</span>
-            <select
-              className={selectClass}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as CustomerSort)}
-            >
-              {sorts.map((value) => (
-                <option key={value} value={value}>
-                  {t(`office.udhaar.sort_${value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </search>
-
-      {data && data.rows.length === 0 ? (
-        <EmptyState
+      <Stack gap="sm">
+        <PageHeader
           icon={<UdhaarIcon />}
-          message={
-            query || filter !== 'all'
-              ? t('office.udhaar.no_match')
-              : t('office.udhaar.no_customers')
-          }
-          actionLabel={
-            can('party.edit') && !readOnly
-              ? t('office.udhaar.new_customer')
-              : undefined
-          }
-          onAction={
-            can('party.edit') && !readOnly ? () => setNewOpen(true) : undefined
+          tone="bg-warning-subtle text-warning-subtle-ink"
+          title={t('office.udhaar.title')}
+          subtitle={t('office.udhaar.subtitle')}
+          headingLevel={detailOpen ? 'h2' : 'h1'}
+          actions={
+            <>
+              <Button component={Link} to="/udhaar/chase" variant="default">
+                {t('office.udhaar.chase_list')}
+              </Button>
+              {can('export.data') ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={!data || data.rows.length === 0}
+                  onClick={() =>
+                    data &&
+                    downloadText(
+                      'bikri-udhaar.csv',
+                      customersCsv(data.rows, data.tz),
+                    )
+                  }
+                >
+                  {t('office.udhaar.export_csv')}
+                </Button>
+              ) : null}
+              {can('party.edit') ? (
+                <Button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.udhaar.new_customer')}
+                </Button>
+              ) : null}
+            </>
           }
         />
-      ) : null}
 
-      {data && data.rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {data.rows.map((row) => {
-            const percent = limitPercent(
-              row.balance,
-              row.customer.credit_limit === null ||
-                row.customer.credit_limit === undefined
-                ? null
-                : Number(row.customer.credit_limit),
-            );
-            return (
-              <li key={row.customer.id}>
-                <Link
-                  to="/udhaar/$customerId"
-                  params={{ customerId: row.customer.id }}
-                  resetScroll={false}
-                  onClick={rememberListScroll}
-                  aria-current={
-                    row.customer.id === selectedId ? 'page' : undefined
-                  }
-                  className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 hover:bg-surface-2 ${row.customer.id === selectedId ? 'bg-primary-subtle' : ''}`}
-                >
-                  <span className="min-w-0 flex-[2_1_10rem]">
-                    <span className="line-clamp-2 break-words font-medium">
-                      {String(row.customer.name)}
-                    </span>
-                    <span
-                      dir="ltr"
-                      className="block text-small text-text-muted"
+        {data ? (
+          <Grid gap="sm">
+            <Grid.Col span={{ base: 12, sm: 4 }}>
+              <Card
+                testid="udhaar-total"
+                label={t('office.udhaar.total_owed')}
+                value={<MoneyText paisa={data.totalOwed} />}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 4 }}>
+              <Card
+                testid="udhaar-owing"
+                label={t('office.udhaar.customers_owing')}
+                value={String(data.owingCount)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 4 }}>
+              <Card
+                label={t('office.udhaar.received_this_month')}
+                value={<MoneyText paisa={data.receivedThisMonth} />}
+              />
+            </Grid.Col>
+          </Grid>
+        ) : null}
+
+        <Box component="search">
+          <Paper withBorder p="sm">
+            <Group align="flex-end" gap="sm">
+              <TextInput
+                type="search"
+                label={t('office.udhaar.search')}
+                placeholder={t('office.udhaar.search_placeholder')}
+                leftSection={<SearchIcon />}
+                autoComplete="off"
+                value={query}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                style={{ flex: '2 1 14rem', minWidth: 0 }}
+              />
+              <Button
+                type="button"
+                variant="default"
+                hiddenFrom="sm"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                {t('common.filters')}
+                {activeFilterCount > 0 ? (
+                  <Box
+                    component="span"
+                    ms={6}
+                    px={6}
+                    style={{
+                      borderRadius: 999,
+                      background: 'var(--mantine-color-brand-6)',
+                      color: 'var(--mantine-color-white)',
+                    }}
+                  >
+                    {activeFilterCount}
+                  </Box>
+                ) : null}
+              </Button>
+            </Group>
+            <Group
+              align="flex-end"
+              gap="sm"
+              mt="sm"
+              display={filtersOpen ? undefined : { base: 'none', sm: 'flex' }}
+            >
+              <NativeSelect
+                label={t('office.udhaar.filter')}
+                value={filter}
+                onChange={(event) =>
+                  setFilter(event.currentTarget.value as CustomerFilter)
+                }
+                data={filters.map((value) => ({
+                  value,
+                  label: t(`office.udhaar.filter_${value}`),
+                }))}
+              />
+              <NativeSelect
+                label={t('office.udhaar.sort')}
+                value={sort}
+                onChange={(event) =>
+                  setSort(event.currentTarget.value as CustomerSort)
+                }
+                data={sorts.map((value) => ({
+                  value,
+                  label: t(`office.udhaar.sort_${value}`),
+                }))}
+              />
+            </Group>
+          </Paper>
+        </Box>
+
+        {data && data.rows.length === 0 ? (
+          <EmptyState
+            icon={<UdhaarIcon />}
+            message={
+              query || filter !== 'all'
+                ? t('office.udhaar.no_match')
+                : t('office.udhaar.no_customers')
+            }
+            actionLabel={
+              can('party.edit') && !readOnly
+                ? t('office.udhaar.new_customer')
+                : undefined
+            }
+            onAction={
+              can('party.edit') && !readOnly
+                ? () => setNewOpen(true)
+                : undefined
+            }
+          />
+        ) : null}
+
+        {data && data.rows.length > 0 ? (
+          <Paper withBorder p={0}>
+            <Box
+              component="ul"
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
+            >
+              {data.rows.map((row, index) => {
+                const percent = limitPercent(
+                  row.balance,
+                  row.customer.credit_limit === null ||
+                    row.customer.credit_limit === undefined
+                    ? null
+                    : Number(row.customer.credit_limit),
+                );
+                return (
+                  <Box
+                    component="li"
+                    key={row.customer.id}
+                    style={
+                      index > 0
+                        ? {
+                            borderTop:
+                              '1px solid var(--mantine-color-default-border)',
+                          }
+                        : undefined
+                    }
+                  >
+                    <Link
+                      to="/udhaar/$customerId"
+                      params={{ customerId: row.customer.id }}
+                      resetScroll={false}
+                      onClick={rememberListScroll}
+                      aria-current={
+                        row.customer.id === selectedId ? 'page' : undefined
+                      }
+                      className="bikri-list-link"
                     >
-                      {String(row.customer.phone ?? '')}
-                    </span>
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small">
-                    <span
-                      className={`block whitespace-nowrap font-medium ${balanceTone(row.balance)}`}
-                    >
-                      {balanceLabel(t, row.balance)}
-                    </span>
-                    <span className="block text-text-muted">
-                      {ageLabel(t, row.oldestUnpaidAt)}
-                    </span>
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small">
-                    {percent !== null ? (
-                      <>
-                        <span
-                          className="mb-1 block h-2 overflow-hidden rounded-full bg-surface-2"
-                          role="img"
-                          aria-label={t('office.udhaar.limit_bar', {
-                            percent,
-                          })}
+                      <Box style={{ flex: '2 1 10rem', minWidth: 0 }}>
+                        <Text
+                          fw={500}
+                          lineClamp={2}
+                          style={{ overflowWrap: 'anywhere' }}
                         >
-                          <span
-                            className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </span>
-                        <span className="flex flex-wrap items-center gap-x-1 text-text-muted">
-                          <MoneyText paisa={row.balance} />
-                          <span aria-hidden="true">/</span>
-                          <MoneyText
-                            paisa={Number(row.customer.credit_limit ?? 0)}
-                          />
-                        </span>
-                      </>
-                    ) : null}
-                  </span>
-                  <span className="min-w-0 flex-[1_1_8rem] text-small text-text-muted">
-                    {row.promise
-                      ? t('office.udhaar.promise_on', {
-                          date: String(row.promise.promised_on),
-                        })
-                      : ''}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+                          {String(row.customer.name)}
+                        </Text>
+                        <Text size="sm" c="dimmed" dir="ltr">
+                          {String(row.customer.phone ?? '')}
+                        </Text>
+                      </Box>
+                      <Box style={{ flex: '1 1 8rem', minWidth: 0 }}>
+                        <Text
+                          size="sm"
+                          fw={500}
+                          c={
+                            row.balance > 0
+                              ? undefined
+                              : row.balance < 0
+                                ? 'teal'
+                                : 'dimmed'
+                          }
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          {balanceLabel(t, row.balance)}
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {ageLabel(t, row.oldestUnpaidAt)}
+                        </Text>
+                      </Box>
+                      <Box style={{ flex: '1 1 8rem', minWidth: 0 }}>
+                        {percent !== null ? (
+                          <>
+                            <Box
+                              role="img"
+                              mb={4}
+                              aria-label={t('office.udhaar.limit_bar', {
+                                percent,
+                              })}
+                            >
+                              <Progress
+                                value={percent}
+                                size="sm"
+                                color={
+                                  percent >= 100
+                                    ? 'danger'
+                                    : percent >= 80
+                                      ? 'warning'
+                                      : 'brand'
+                                }
+                              />
+                            </Box>
+                            <Text size="sm" c="dimmed">
+                              <MoneyText paisa={row.balance} /> /{' '}
+                              <MoneyText
+                                paisa={Number(row.customer.credit_limit ?? 0)}
+                              />
+                            </Text>
+                          </>
+                        ) : null}
+                      </Box>
+                      <Text
+                        size="sm"
+                        c="dimmed"
+                        style={{ flex: '1 1 8rem', minWidth: 0 }}
+                      >
+                        {row.promise
+                          ? t('office.udhaar.promise_on', {
+                              date: String(row.promise.promised_on),
+                            })
+                          : ''}
+                      </Text>
+                    </Link>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Paper>
+        ) : null}
 
-      <CustomerDialog open={newOpen} onOpenChange={setNewOpen} />
-    </div>
+        <CustomerDialog open={newOpen} onOpenChange={setNewOpen} />
+      </Stack>
+    </Box>
   );
 }
 
@@ -332,20 +386,19 @@ function Card({
   label,
   value,
   testid,
-  className = '',
 }: {
   label: string;
   value: ReactNode;
   testid?: string;
-  className?: string;
 }) {
   return (
-    <div
-      className={`rounded-card border border-border bg-surface p-2 sm:p-3 ${className}`}
-      data-testid={testid}
-    >
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="text-title font-semibold">{value}</p>
-    </div>
+    <Paper withBorder p="sm" h="100%" data-testid={testid}>
+      <Text size="sm" c="dimmed">
+        {label}
+      </Text>
+      <Text fz={24} fw={600}>
+        {value}
+      </Text>
+    </Paper>
   );
 }
