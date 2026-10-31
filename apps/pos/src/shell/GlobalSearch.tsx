@@ -93,7 +93,7 @@ export function GlobalSearch() {
       <ActionIcon
         variant="subtle"
         size="lg"
-        hiddenFrom="sm"
+        hiddenFrom="md"
         aria-label={t('shell.search_label')}
         aria-expanded={phoneOpen}
         onClick={() => {
@@ -107,11 +107,7 @@ export function GlobalSearch() {
         <SearchIcon />
       </ActionIcon>
       <Box
-        className={
-          phoneOpen
-            ? 'fixed inset-x-2 top-[68px] z-50'
-            : 'hidden sm:block sm:relative sm:z-auto'
-        }
+        className={phoneOpen ? 'bikri-mobile-search' : 'bikri-search-inline'}
       >
         <TextInput
           id="global-search"
@@ -123,7 +119,7 @@ export function GlobalSearch() {
           placeholder={t('shell.search_label')}
           leftSection={<SearchIcon />}
           rightSection={
-            <Kbd visibleFrom="sm" size="xs">
+            <Kbd visibleFrom="md" size="xs">
               /
             </Kbd>
           }

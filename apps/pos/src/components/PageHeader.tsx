@@ -28,7 +28,13 @@ export function PageHeader({
         ? 'red'
         : 'brand';
   return (
-    <Group justify="space-between" align="flex-end" gap="md" wrap="wrap">
+    <Group
+      justify="space-between"
+      align="flex-end"
+      gap="md"
+      wrap="wrap"
+      className="bikri-page-header"
+    >
       <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
         {icon ? (
           <ThemeIcon size={44} radius="md" variant="light" color={color}>
@@ -45,7 +51,12 @@ export function PageHeader({
         </Stack>
       </Group>
       {actions ? (
-        <Group gap="sm" wrap="wrap" justify="flex-end">
+        <Group
+          gap="sm"
+          wrap="wrap"
+          justify="flex-end"
+          className="bikri-page-actions"
+        >
           {actions}
         </Group>
       ) : null}

@@ -449,3 +449,41 @@ main section + section {
 [data-mantine-color-scheme="dark"] .bikri-settings-row[data-active]:hover {
   background: rgb(77 166 255 / 0.16);
 }
+
+/* Search: inline from tablet up, full-width sheet on phones. */
+.bikri-search-inline {
+  display: none;
+}
+
+@media (min-width: 48em) {
+  .bikri-search-inline {
+    position: relative;
+    z-index: auto;
+    display: block;
+    width: 100%;
+  }
+}
+
+.bikri-mobile-search {
+  position: fixed;
+  inset-inline: 0;
+  top: 60px;
+  z-index: 50;
+  padding: 8px;
+  background: var(--mantine-color-body);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  box-shadow: 0 12px 24px rgb(15 23 42 / 0.12);
+}
+
+/* Small screens: page actions must not wrap into a detached right-hand row. */
+@media (max-width: 47.99em) {
+  .bikri-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bikri-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

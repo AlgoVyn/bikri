@@ -37,7 +37,13 @@ export function SubpageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <Group justify="space-between" align="flex-end" gap="md" wrap="wrap">
+    <Group
+      justify="space-between"
+      align="flex-end"
+      gap="md"
+      wrap="wrap"
+      className="bikri-page-header"
+    >
       <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
         <ActionIcon
           component={Link}
@@ -67,7 +73,12 @@ export function SubpageHeader({
         </Stack>
       </Group>
       {actions ? (
-        <Group gap="sm" wrap="wrap" justify="flex-end">
+        <Group
+          gap="sm"
+          wrap="wrap"
+          justify="flex-end"
+          className="bikri-page-actions"
+        >
           {actions}
         </Group>
       ) : null}
