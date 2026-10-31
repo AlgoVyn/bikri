@@ -172,3 +172,19 @@
 [data-mantine-color-scheme="dark"] .bikri-list-link[aria-current="page"] {
   background: var(--mantine-color-brand-9);
 }
+
+/* Top-bar brand lockup: logo and wordmark are one link. */
+.bikri-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 2px 4px;
+  color: var(--mantine-color-text);
+  text-decoration: none;
+}
+
+.bikri-topbar-brand:hover {
+  background: var(--mantine-color-default-hover);
+}

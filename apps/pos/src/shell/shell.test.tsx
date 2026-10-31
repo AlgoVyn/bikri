@@ -114,10 +114,10 @@ describe('app shell', () => {
     await setLanguage('en');
   });
 
-  it('shows all nine rail items to the owner, with the Bikri brand', async () => {
+  it('shows all nine rail items to the owner, with the Bikri brand in the top bar', async () => {
     await renderAt(`${BASE_PATH}/`);
     const rail = await screen.findByRole('navigation', { name: 'Main' });
-    expect(screen.getByTestId('brand-rail').textContent).toContain('Bikri');
+    expect(screen.getByTestId('brand-topbar').textContent).toContain('Bikri');
     expect((await screen.findByTestId('rail-shop-name')).textContent).toBe(
       'Algovyn Mobiles',
     );

@@ -6,6 +6,7 @@ import {
   Menu,
   Stack,
   Text,
+  ThemeIcon,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
@@ -185,21 +186,68 @@ export function AppShell({ children }: { children: ReactNode }) {
             gap="sm"
           >
             <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+              <UnstyledButton
+                component={Link}
+                to="/"
+                data-testid="brand-topbar"
+                className="bikri-topbar-brand"
+              >
+                <ThemeIcon
+                  size={36}
+                  radius="md"
+                  color="accent"
+                  variant="filled"
+                >
+                  <SalesIcon />
+                </ThemeIcon>
+                <Stack gap={0} style={{ minWidth: 0 }}>
+                  <Text
+                    fw={800}
+                    size="sm"
+                    tt="uppercase"
+                    style={{ letterSpacing: '0.14em', lineHeight: 1.1 }}
+                  >
+                    {t('common.app_name')}
+                  </Text>
+                  {shopName ? (
+                    <Text
+                      size="10px"
+                      c="dimmed"
+                      truncate
+                      maw={160}
+                      visibleFrom="sm"
+                    >
+                      {shopName}
+                    </Text>
+                  ) : null}
+                </Stack>
+              </UnstyledButton>
+              <Divider
+                orientation="vertical"
+                visibleFrom="md"
+                color="var(--mantine-color-default-border)"
+              />
               <Text
                 data-testid="screen-title-bar"
                 fw={650}
                 size="sm"
                 truncate
-                hiddenFrom="lg"
+                visibleFrom="sm"
               >
                 {screenTitle ?? shopName ?? t('common.app_name')}
               </Text>
-              <Text fw={550} size="sm" truncate visibleFrom="lg">
-                {screenTitle ?? t('common.app_name')}
-              </Text>
             </Group>
-            <Group gap={4} wrap="nowrap">
+            <Box
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                justifyContent: 'center',
+              }}
+            >
               <GlobalSearch />
+            </Box>
+            <Group gap={4} wrap="nowrap">
               {updateReady ? (
                 <UnstyledButton
                   onClick={() => applyUpdate()}
@@ -231,37 +279,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MantineAppShell.Navbar p={0} aria-label={t('nav.rail')}>
             <Stack justify="space-between" h="100%" gap={0}>
               <Stack gap={4} p={8} pt="md" style={{ overflowY: 'auto' }}>
-                <Stack
-                  gap={2}
-                  align="center"
-                  mb="sm"
-                  px={2}
-                  data-testid="brand-rail"
-                >
-                  <Box
-                    aria-hidden="true"
-                    style={{
-                      display: 'flex',
-                      width: 38,
-                      height: 38,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: 12,
-                      background: 'var(--mantine-color-accent, #4bc2bf)',
-                      color: '#182e55',
-                    }}
-                  >
-                    <SalesIcon />
-                  </Box>
-                  <Text
-                    size="9px"
-                    fw={700}
-                    tt="uppercase"
-                    style={{ letterSpacing: '0.18em', color: railMuted }}
-                  >
-                    {t('common.app_name')}
-                  </Text>
-                </Stack>
                 {visible.map((item) => {
                   const active = current?.to === item.to;
                   return (

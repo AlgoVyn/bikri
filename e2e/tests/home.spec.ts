@@ -69,7 +69,7 @@ test.describe('Home and shell (T-013)', () => {
       await expect(page).toHaveURL(/\/bikri\/reports$/);
       await nav.getByRole('link', { name: /Home/ }).click();
     } else {
-      await expect(page.getByTestId('brand-rail')).toContainText('Bikri');
+      await expect(page.getByTestId('brand-topbar')).toContainText('Bikri');
       await expect(page.getByTestId('rail-shop-name')).toHaveText(
         'Algovyn Mobiles',
       );
