@@ -100,3 +100,41 @@
     border-radius: 0 !important;
   }
 }
+
+/* Operator-console navigation shares the till rail's quiet navy treatment. */
+.bikri-admin-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: rgba(184, 198, 219, 0.82);
+  text-decoration: none;
+}
+
+.bikri-admin-nav:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: #f1f5f9;
+}
+
+.bikri-admin-nav[aria-current="page"] {
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+}
+
+.bikri-admin-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--mantine-color-dimmed);
+  text-decoration: none;
+}
+
+.bikri-admin-tab[aria-current="page"] {
+  background: var(--mantine-color-brand-0);
+  color: var(--mantine-color-brand-9);
+}

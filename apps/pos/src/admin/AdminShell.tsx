@@ -1,3 +1,4 @@
+import { AppShell, Box, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +18,28 @@ const NAV = [
   { to: '/admin/backups', label: 'admin.nav_backups', Icon: CloudIcon },
 ] as const;
 
-const navLink =
-  'relative flex min-h-11 items-center gap-3 rounded-control px-3 text-small text-text-muted hover:bg-surface-2 aria-[current=page]:bg-primary-subtle aria-[current=page]:font-medium aria-[current=page]:text-primary-subtle-ink lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink lg:aria-[current=page]:bg-white/10 lg:aria-[current=page]:text-white';
+function AdminNav({ mobile = false }: { mobile?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <Group gap={4} wrap={mobile ? 'nowrap' : 'wrap'} p={mobile ? 0 : 'sm'}>
+      {NAV.map((item) => (
+        <Link
+          key={item.to}
+          to={item.to}
+          activeOptions={{ exact: item.to === '/admin' }}
+          className={mobile ? 'bikri-admin-tab' : 'bikri-admin-nav'}
+        >
+          <item.Icon />
+          <Text size="sm" fw={550}>
+            {t(item.label)}
+          </Text>
+        </Link>
+      ))}
+    </Group>
+  );
+}
 
+/** Operator console shell: same brand language as the till, separate from the shop DB. */
 export function AdminShell() {
   const { t } = useTranslation();
   const ready = useAreaStrings('admin');
@@ -31,104 +51,112 @@ export function AdminShell() {
   }, [t, ready]);
   if (!ready) return <p className="sr-only">{t('common.loading')}</p>;
   return (
-    <div className="min-h-dvh bg-bg text-text">
-      <a
-        href="#admin-main"
-        className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-ink"
-      >
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{ width: 244, breakpoint: 'lg', collapsed: { mobile: true } }}
+      padding={0}
+      styles={{
+        header: {
+          background: 'var(--mantine-color-body)',
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+        },
+        navbar: {
+          background: 'var(--bikri-rail, #182e55)',
+          border: 0,
+        },
+        main: { background: 'var(--mantine-color-body)' },
+      }}
+    >
+      <a href="#admin-main" className="sr-only focus:not-sr-only">
         {t('admin.skip_content')}
       </a>
-      <div className="lg:grid lg:min-h-dvh lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <aside className="hidden border-e border-white/10 bg-rail lg:flex lg:flex-col">
-          <Link
-            to="/admin"
-            className="flex h-topbar shrink-0 items-center gap-2.5 border-b border-white/10 px-4"
-          >
-            <span
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
-            >
-              <SalesIcon />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-caption font-semibold uppercase tracking-[0.18em] text-rail-ink">
-                {t('common.app_name')}
-              </span>
-              <span className="block truncate text-caption text-rail-muted">
-                {t('admin.title')}
-              </span>
-            </span>
-          </Link>
-          <nav
-            aria-label={t('admin.title')}
-            className="flex flex-1 flex-col gap-1 p-3"
-          >
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={{ exact: item.to === '/admin' }}
-                className={navLink}
-              >
-                <item.Icon />
-                <span>{t(item.label)}</span>
-              </Link>
-            ))}
-          </nav>
-          <p className="flex items-center gap-2 border-t border-white/10 px-4 py-3 text-caption text-rail-muted">
-            <span
-              aria-hidden="true"
-              className="size-1.5 rounded-full bg-accent"
-            />
-            {t('admin.access_note')}
-          </p>
-        </aside>
-        <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-30 border-b border-border bg-surface shadow-topbar">
-            <div className="flex h-topbar items-center gap-2 px-4">
-              <Link to="/admin" className="flex items-center gap-2 lg:hidden">
-                <span
-                  aria-hidden="true"
-                  className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
+      <AppShell.Header>
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap">
+            <Box hiddenFrom="lg">
+              <Link to="/admin" className="flex items-center gap-2">
+                <ThemeIcon
+                  size={34}
+                  radius="md"
+                  color="accent"
+                  variant="filled"
                 >
                   <SalesIcon />
-                </span>
-                <span className="text-small font-semibold uppercase tracking-[0.16em]">
+                </ThemeIcon>
+                <Text size="sm" fw={700} tt="uppercase">
                   {t('common.app_name')}
-                </span>
+                </Text>
               </Link>
-              <span className="hidden text-small text-text-muted lg:block">
-                {t('admin.operator_label')}
-              </span>
-              <div className="ms-auto flex items-center gap-2">
-                <LanguageSelect />
-              </div>
-            </div>
-            <nav
-              aria-label={t('admin.title')}
-              className="flex gap-1 overflow-x-auto px-3 pb-2 lg:hidden"
+            </Box>
+            <Text size="sm" c="dimmed" visibleFrom="lg">
+              {t('admin.operator_label')}
+            </Text>
+          </Group>
+          <LanguageSelect />
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Navbar p={0} aria-label={t('admin.title')}>
+        <Stack justify="space-between" h="100%" gap={0}>
+          <Box>
+            <Box
+              component={Link}
+              to="/admin"
+              px="md"
+              py="md"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                borderBottom: '1px solid rgb(255 255 255 / 0.10)',
+                textDecoration: 'none',
+              }}
             >
-              {NAV.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  activeOptions={{ exact: item.to === '/admin' }}
-                  className={`${navLink} shrink-0`}
-                >
-                  <item.Icon />
-                  <span>{t(item.label)}</span>
-                </Link>
-              ))}
-            </nav>
-          </header>
-          <main
-            id="admin-main"
-            className="mx-auto w-full max-w-[1280px] flex-1 p-4 lg:p-6"
-          >
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    </div>
+              <ThemeIcon size={36} radius="md" color="accent" variant="filled">
+                <SalesIcon />
+              </ThemeIcon>
+              <Stack gap={0} style={{ minWidth: 0 }}>
+                <Text size="xs" fw={700} tt="uppercase" c="white">
+                  {t('common.app_name')}
+                </Text>
+                <Text size="xs" c="rgba(184,198,219,0.8)" truncate>
+                  {t('admin.title')}
+                </Text>
+              </Stack>
+            </Box>
+            <AdminNav />
+          </Box>
+          <Group gap="sm" px="md" py="md" wrap="nowrap">
+            <Box
+              aria-hidden="true"
+              w={6}
+              h={6}
+              style={{
+                borderRadius: 999,
+                background: 'var(--mantine-color-accent-4)',
+              }}
+            />
+            <Text size="xs" c="rgba(184,198,219,0.8)">
+              {t('admin.access_note')}
+            </Text>
+          </Group>
+        </Stack>
+      </AppShell.Navbar>
+
+      <AppShell.Main>
+        <Box hiddenFrom="lg" px="sm" pt="xs">
+          <AdminNav mobile />
+        </Box>
+        <Box
+          id="admin-main"
+          maw={1280}
+          mx="auto"
+          w="100%"
+          p={{ base: 'md', lg: 'lg' }}
+        >
+          <Outlet />
+        </Box>
+      </AppShell.Main>
+    </AppShell>
   );
 }

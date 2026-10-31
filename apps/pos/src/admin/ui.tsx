@@ -1,3 +1,4 @@
+import { Badge, Box, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import {
   type ReactNode,
   type RefObject,
@@ -86,25 +87,35 @@ export const dangerBtn = buttonDanger;
 export const inputClass =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text focus:border-primary';
 
-const STATUS_TONE: Record<string, string> = {
-  active: 'bg-success-subtle text-success-subtle-ink',
-  read_only: 'bg-warning-subtle text-warning-subtle-ink',
-  suspended: 'bg-danger-subtle text-danger-subtle-ink',
-  maintenance: 'bg-warning-subtle text-warning-subtle-ink',
-  deleting: 'bg-danger-subtle text-danger-subtle-ink',
-  deleted: 'bg-surface-2 text-text-muted',
+const STATUS_COLOR: Record<string, string> = {
+  active: 'success',
+  read_only: 'warning',
+  suspended: 'danger',
+  maintenance: 'warning',
+  deleting: 'danger',
+  deleted: 'gray',
 };
 
 /** Status pill shared by shop tables, tenant headers and device rows. */
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
   return (
-    <span
-      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium ${STATUS_TONE[status] ?? 'bg-surface-2 text-text-muted'}`}
+    <Badge
+      color={STATUS_COLOR[status] ?? 'gray'}
+      variant="light"
+      radius="xl"
+      tt="none"
+      leftSection={
+        <Box
+          aria-hidden="true"
+          w={6}
+          h={6}
+          style={{ borderRadius: 999, background: 'currentColor' }}
+        />
+      }
     >
-      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {t(statusLabelKey(status))}
-    </span>
+    </Badge>
   );
 }
 
@@ -126,27 +137,43 @@ export function Panel({
 }) {
   const id = useId();
   return (
-    <section
-      className={`rounded-card border border-border bg-surface shadow-card ${className}`}
+    <Paper
+      component="section"
+      withBorder
+      className={className}
       aria-labelledby={title !== undefined ? id : undefined}
     >
       {title !== undefined ? (
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-          <div className="min-w-0">
-            <h2 id={id} className="text-h2 font-semibold">
+        <Group
+          justify="space-between"
+          align="flex-start"
+          gap="sm"
+          px="md"
+          py="sm"
+          wrap="wrap"
+          style={{
+            borderBottom: '1px solid var(--mantine-color-default-border)',
+          }}
+        >
+          <Stack gap={2} style={{ minWidth: 0 }}>
+            <Title order={2} id={id}>
               {title}
-            </h2>
+            </Title>
             {description !== undefined ? (
-              <p className="mt-0.5 text-small text-text-muted">{description}</p>
+              <Text size="sm" c="dimmed">
+                {description}
+              </Text>
             ) : null}
-          </div>
+          </Stack>
           {actions !== undefined ? (
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
+            <Group gap="sm" wrap="wrap" justify="flex-end">
+              {actions}
+            </Group>
           ) : null}
-        </div>
+        </Group>
       ) : null}
-      <div className={bodyClassName}>{children}</div>
-    </section>
+      <Box className={bodyClassName}>{children}</Box>
+    </Paper>
   );
 }
 
@@ -163,17 +190,25 @@ export function StatCard({
   compact?: boolean;
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-4 shadow-card">
-      <p className="text-small font-medium text-text-muted">{label}</p>
-      <p
-        className={`mt-1 font-semibold tabular-nums ${compact ? 'text-title' : 'text-figure'}`}
+    <Paper p="md" withBorder>
+      <Text size="sm" fw={500} c="dimmed">
+        {label}
+      </Text>
+      <Text
+        mt={4}
+        fw={650}
+        fz={compact ? 'lg' : 32}
+        lh={1.15}
+        style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         {value}
-      </p>
+      </Text>
       {hint !== undefined ? (
-        <p className="mt-0.5 text-small text-text-muted">{hint}</p>
+        <Text mt={2} size="sm" c="dimmed">
+          {hint}
+        </Text>
       ) : null}
-    </div>
+    </Paper>
   );
 }
 
