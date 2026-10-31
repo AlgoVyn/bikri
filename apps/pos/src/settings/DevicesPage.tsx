@@ -2,16 +2,23 @@ import { formatShopMoney } from '../lib/money';
 /** Settings → Devices on an admin device (screens/17, T-038): codes, devices, import unsynced ops. */
 
 import type { BikriDb } from '@bikri/db';
+import {
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  NativeSelect,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import {
-  buttonDanger,
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import { DeviceIcon, UploadIcon } from '../components/icons.tsx';
 import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
@@ -210,40 +217,61 @@ export function DevicesPage() {
   if (support) {
     return (
       <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
-        <p className="p-4 text-small text-text-muted">
-          {t('devices.support_view')}
-        </p>
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {localDevices.map((device) => (
-            <li
-              key={String(device.id)}
-              className="flex flex-wrap items-center justify-between gap-2 p-3"
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {t('devices.support_view')}
+          </Text>
+          <Paper withBorder>
+            <Box
+              component="ul"
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
             >
-              <span className="font-medium">{String(device.name)}</span>
-              <span className="text-small text-text-muted">
-                {String(device.device_code)}
-                {' · '}
-                {String(
-                  branches.find((b) => b.id === device.branch_id)?.name ?? '—',
-                )}
-                {device.revoked_at ? ` · ${t('devices.revoked')}` : ''}
-              </span>
-            </li>
-          ))}
-        </ul>
+              {localDevices.map((device, index) => (
+                <Box
+                  component="li"
+                  key={String(device.id)}
+                  p="sm"
+                  style={{
+                    borderTop:
+                      index > 0
+                        ? '1px solid var(--mantine-color-default-border)'
+                        : undefined,
+                  }}
+                >
+                  <Group justify="space-between" gap="sm" wrap="wrap">
+                    <Text fw={500}>{String(device.name)}</Text>
+                    <Text size="sm" c="dimmed">
+                      {String(device.device_code)}
+                      {' · '}
+                      {String(
+                        branches.find((b) => b.id === device.branch_id)?.name ??
+                          '—',
+                      )}
+                      {device.revoked_at ? ` · ${t('devices.revoked')}` : ''}
+                    </Text>
+                  </Group>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
+        </Stack>
       </SettingsPageLayout>
     );
   }
   if (!me?.is_admin || role !== 'owner')
     return (
       <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
-        <p className="p-4 text-text-muted">{t('devices.admin_only')}</p>
+        <Text p="lg" c="dimmed">
+          {t('devices.admin_only')}
+        </Text>
       </SettingsPageLayout>
     );
   if (!online)
     return (
       <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
-        <p className="p-4 text-text-muted">{t('devices.online_only')}</p>
+        <Text p="lg" c="dimmed">
+          {t('devices.online_only')}
+        </Text>
       </SettingsPageLayout>
     );
 
@@ -253,426 +281,493 @@ export function DevicesPage() {
 
   return (
     <SettingsPageLayout title={t('devices.title')} icon={<DeviceIcon />}>
-      {error ? (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      ) : null}
-      {enrolled === false ? (
-        <p className="text-small text-text-muted">{t('owner.not_enrolled')}</p>
-      ) : null}
+      <Stack gap="md">
+        {error ? (
+          <Text role="alert" c="danger">
+            {error}
+          </Text>
+        ) : null}
+        {enrolled === false ? (
+          <Text size="sm" c="dimmed">
+            {t('owner.not_enrolled')}
+          </Text>
+        ) : null}
 
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-h2 font-semibold">{t('devices.add_title')}</h2>
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!staffId || !form.name.trim()) return;
-            void guard(async () => {
-              const res = await shopRequest<NewCode>(
-                db,
-                staffId,
-                '/enrolment-codes',
-                {
-                  method: 'POST',
-                  json: {
-                    device_name: form.name.trim(),
-                    branch_id: branchId,
-                    is_admin: form.admin,
-                  },
-                },
-              );
-              setFresh(res);
-              setForm({ name: '', branch: '', admin: false });
-              await load();
-            });
-          }}
-        >
-          <label className="flex min-w-48 flex-1 flex-col gap-1">
-            <span>{t('devices.name')}</span>
-            <input
-              className={fieldClass}
-              maxLength={40}
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span>{t('devices.branch')}</span>
-            <select
-              className={fieldClass}
-              value={branchId}
-              onChange={(e) => setForm({ ...form, branch: e.target.value })}
+        <Paper withBorder p="lg">
+          <Stack gap="sm">
+            <Title order={2} fz="lg">
+              {t('devices.add_title')}
+            </Title>
+            <Box
+              component="form"
+              onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                if (!staffId || !form.name.trim()) return;
+                void guard(async () => {
+                  const res = await shopRequest<NewCode>(
+                    db,
+                    staffId,
+                    '/enrolment-codes',
+                    {
+                      method: 'POST',
+                      json: {
+                        device_name: form.name.trim(),
+                        branch_id: branchId,
+                        is_admin: form.admin,
+                      },
+                    },
+                  );
+                  setFresh(res);
+                  setForm({ name: '', branch: '', admin: false });
+                  await load();
+                });
+              }}
             >
-              {branches.map((b) => (
-                <option key={String(b.id)} value={String(b.id)}>
-                  {String(b.name)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.admin}
-              onChange={(e) => setForm({ ...form, admin: e.target.checked })}
-            />
-            <span>{t('devices.can_manage')}</span>
-          </label>
-          <button type="submit" className={buttonPrimary}>
-            {t('devices.make_code')}
-          </button>
-        </form>
-        {fresh && fresh.expires_at > now ? (
-          <div
-            className="flex flex-wrap items-center gap-4"
-            data-testid="new-code"
-          >
-            <QrCode value={fresh.link} label={t('devices.qr_label')} />
-            <div className="flex flex-col gap-1">
-              <p className="font-mono text-h1 tracking-widest">
-                {formatCode(fresh.code)}
-              </p>
-              <p className="text-small text-text-muted">
-                {t('devices.code_expires', {
-                  time: `${Math.floor((fresh.expires_at - now) / 60000)}:${String(Math.floor(((fresh.expires_at - now) % 60000) / 1000)).padStart(2, '0')}`,
-                })}
-              </p>
-            </div>
-          </div>
-        ) : null}
-        {codes.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <h3 className="font-medium">{t('devices.unused_codes')}</h3>
-            <ul className="flex flex-col divide-y divide-border">
-              {codes.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between gap-2 py-2"
-                >
-                  <span>
-                    {c.device_name}
-                    {c.is_admin ? ` · ${t('devices.admin')}` : ''} ·{' '}
-                    {timeText(i18n.language, c.expires_at)}
-                  </span>
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    onClick={() =>
-                      void guard(async () => {
-                        if (!staffId) return;
-                        await shopRequest(
-                          db,
-                          staffId,
-                          `/enrolment-codes/${encodeURIComponent(c.id)}`,
-                          { method: 'DELETE' },
-                        );
-                        if (fresh) setFresh(null);
-                        await load();
-                      })
-                    }
+              <Group align="flex-end" gap="sm" wrap="wrap">
+                <TextInput
+                  label={t('devices.name')}
+                  maxLength={40}
+                  required
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm({ ...form, name: event.currentTarget.value })
+                  }
+                  style={{ flex: '1 1 12rem', minWidth: 0 }}
+                />
+                <NativeSelect
+                  label={t('devices.branch')}
+                  value={branchId}
+                  onChange={(event) =>
+                    setForm({ ...form, branch: event.currentTarget.value })
+                  }
+                  data={branches.map((b) => ({
+                    value: String(b.id),
+                    label: String(b.name),
+                  }))}
+                />
+                <Checkbox
+                  label={t('devices.can_manage')}
+                  checked={form.admin}
+                  onChange={(event) =>
+                    setForm({ ...form, admin: event.currentTarget.checked })
+                  }
+                  mb={10}
+                />
+                <Button type="submit">{t('devices.make_code')}</Button>
+              </Group>
+            </Box>
+            {fresh && fresh.expires_at > now ? (
+              <Group gap="md" align="center" data-testid="new-code" wrap="wrap">
+                <QrCode value={fresh.link} label={t('devices.qr_label')} />
+                <Stack gap={4}>
+                  <Text
+                    ff="monospace"
+                    fz={28}
+                    fw={600}
+                    style={{ letterSpacing: '0.12em' }}
                   >
-                    {t('common.cancel')}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-h2 font-semibold">{t('devices.list_title')}</h2>
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void guard(load)}
-          >
-            {t('devices.load')}
-          </button>
-        </div>
-        {devices === null ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void guard(load)}
-          >
-            {t('devices.load')}
-          </button>
-        ) : (
-          <ul
-            className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface"
-            data-testid="device-list"
-          >
-            {devices.map((d) => (
-              <li key={d.id} className="flex flex-col gap-2 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {renaming?.id === d.id ? (
-                    <form
-                      className="flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void guard(async () => {
-                          if (!staffId) return;
-                          await shopRequest(db, staffId, `/devices/${d.id}`, {
-                            method: 'PATCH',
-                            json: { name: renaming.name.trim() },
-                          });
-                          setRenaming(null);
-                          await load();
-                        });
+                    {formatCode(fresh.code)}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    {t('devices.code_expires', {
+                      time: `${Math.floor((fresh.expires_at - now) / 60000)}:${String(Math.floor(((fresh.expires_at - now) % 60000) / 1000)).padStart(2, '0')}`,
+                    })}
+                  </Text>
+                </Stack>
+              </Group>
+            ) : null}
+            {codes.length > 0 ? (
+              <Box>
+                <Text fw={500} mb={4}>
+                  {t('devices.unused_codes')}
+                </Text>
+                <Box
+                  component="ul"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                >
+                  {codes.map((c, index) => (
+                    <Box
+                      component="li"
+                      key={c.id}
+                      py="xs"
+                      style={{
+                        borderTop:
+                          index > 0
+                            ? '1px solid var(--mantine-color-default-border)'
+                            : undefined,
                       }}
                     >
-                      <input
-                        className={fieldClass}
-                        maxLength={40}
-                        value={renaming.name}
-                        onChange={(e) =>
-                          setRenaming({ id: d.id, name: e.target.value })
-                        }
-                        aria-label={t('devices.name')}
-                      />
-                      <button type="submit" className={buttonPrimary}>
-                        {t('devices.save')}
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="font-medium">{d.name}</span>
-                  )}
-                  <span className="rounded-full bg-surface-2 px-2 text-small">
-                    {d.device_code}
-                  </span>
-                  {d.is_admin ? (
-                    <span className="rounded-full bg-info-subtle px-2 text-small text-info-subtle-ink">
-                      {t('devices.admin')}
-                    </span>
-                  ) : null}
-                  {d.kind === 'support' ? (
-                    <span className="rounded-full bg-warning-subtle px-2 text-small text-warning-subtle-ink">
-                      {t('devices.support', {
-                        time: timeText(i18n.language, d.expires_at),
-                      })}
-                    </span>
-                  ) : null}
-                  {d.id === me.id ? (
-                    <span className="text-small text-text-muted">
-                      {t('devices.this_device')}
-                    </span>
-                  ) : null}
-                  {d.revoked_at ? (
-                    <span className="text-small text-danger">
-                      {t('devices.revoked')}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-small text-text-muted">
-                  {t('devices.meta', {
-                    branch: branchName(d.branch_id),
-                    seen: timeText(i18n.language, d.last_seen_at),
-                    version: d.app_version ?? '—',
-                    pending: d.pending_ops,
-                  })}
-                </p>
-                {d.revoked_at ? null : (
-                  <div className="flex flex-wrap gap-2">
-                    {d.kind === 'till' ? (
-                      <>
-                        <button
+                      <Group justify="space-between" gap="sm" wrap="wrap">
+                        <Text size="sm">
+                          {c.device_name}
+                          {c.is_admin ? ` · ${t('devices.admin')}` : ''} ·{' '}
+                          {timeText(i18n.language, c.expires_at)}
+                        </Text>
+                        <Button
                           type="button"
-                          className={buttonQuiet}
-                          onClick={() =>
-                            setRenaming({ id: d.id, name: d.name })
-                          }
-                        >
-                          {t('devices.rename')}
-                        </button>
-                        {branches.length > 1 ? (
-                          <select
-                            className={fieldClass}
-                            aria-label={t('devices.move')}
-                            value={d.branch_id}
-                            onChange={(e) =>
-                              void guard(async () => {
-                                if (!staffId) return;
-                                await shopRequest(
-                                  db,
-                                  staffId,
-                                  `/devices/${d.id}`,
-                                  {
-                                    method: 'PATCH',
-                                    json: { branch_id: e.target.value },
-                                  },
-                                );
-                                await load();
-                              })
-                            }
-                          >
-                            {branches.map((b) => (
-                              <option key={String(b.id)} value={String(b.id)}>
-                                {String(b.name)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
-                        <button
-                          type="button"
-                          className={buttonQuiet}
+                          variant="default"
+                          size="compact-sm"
                           onClick={() =>
                             void guard(async () => {
                               if (!staffId) return;
                               await shopRequest(
                                 db,
                                 staffId,
-                                `/devices/${d.id}`,
-                                {
-                                  method: 'PATCH',
-                                  json: { is_admin: !d.is_admin },
-                                },
+                                `/enrolment-codes/${encodeURIComponent(c.id)}`,
+                                { method: 'DELETE' },
                               );
+                              if (fresh) setFresh(null);
                               await load();
                             })
                           }
                         >
-                          {d.is_admin
-                            ? t('devices.remove_admin')
-                            : t('devices.make_admin')}
-                        </button>
-                      </>
-                    ) : null}
-                    <button
-                      type="button"
-                      className={buttonDanger}
-                      onClick={() => setConfirmRevoke(d)}
+                          {t('common.cancel')}
+                        </Button>
+                      </Group>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ) : null}
+          </Stack>
+        </Paper>
+
+        <Box component="section">
+          <Stack gap="sm">
+            <Group justify="space-between" gap="sm">
+              <Title order={2} fz="lg">
+                {t('devices.list_title')}
+              </Title>
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => void guard(load)}
+              >
+                {t('devices.load')}
+              </Button>
+            </Group>
+            {devices === null ? (
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => void guard(load)}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {t('devices.load')}
+              </Button>
+            ) : (
+              <Paper withBorder data-testid="device-list">
+                <Box
+                  component="ul"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                >
+                  {devices.map((d, index) => (
+                    <Box
+                      component="li"
+                      key={d.id}
+                      p="sm"
+                      style={{
+                        borderTop:
+                          index > 0
+                            ? '1px solid var(--mantine-color-default-border)'
+                            : undefined,
+                      }}
                     >
-                      {t('devices.revoke')}
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                      <Stack gap="xs">
+                        <Group gap="xs" wrap="wrap" align="center">
+                          {renaming?.id === d.id ? (
+                            <Box
+                              component="form"
+                              onSubmit={(
+                                event: React.FormEvent<HTMLFormElement>,
+                              ) => {
+                                event.preventDefault();
+                                void guard(async () => {
+                                  if (!staffId) return;
+                                  await shopRequest(
+                                    db,
+                                    staffId,
+                                    `/devices/${d.id}`,
+                                    {
+                                      method: 'PATCH',
+                                      json: { name: renaming.name.trim() },
+                                    },
+                                  );
+                                  setRenaming(null);
+                                  await load();
+                                });
+                              }}
+                            >
+                              <Group gap="xs">
+                                <TextInput
+                                  maxLength={40}
+                                  value={renaming.name}
+                                  onChange={(event) =>
+                                    setRenaming({
+                                      id: d.id,
+                                      name: event.currentTarget.value,
+                                    })
+                                  }
+                                  aria-label={t('devices.name')}
+                                />
+                                <Button type="submit">
+                                  {t('devices.save')}
+                                </Button>
+                              </Group>
+                            </Box>
+                          ) : (
+                            <Text fw={500}>{d.name}</Text>
+                          )}
+                          <Badge variant="light" color="gray" tt="none">
+                            {d.device_code}
+                          </Badge>
+                          {d.is_admin ? (
+                            <Badge variant="light" color="brand" tt="none">
+                              {t('devices.admin')}
+                            </Badge>
+                          ) : null}
+                          {d.kind === 'support' ? (
+                            <Badge variant="light" color="warning" tt="none">
+                              {t('devices.support', {
+                                time: timeText(i18n.language, d.expires_at),
+                              })}
+                            </Badge>
+                          ) : null}
+                          {d.id === me.id ? (
+                            <Text size="sm" c="dimmed">
+                              {t('devices.this_device')}
+                            </Text>
+                          ) : null}
+                          {d.revoked_at ? (
+                            <Text size="sm" c="danger">
+                              {t('devices.revoked')}
+                            </Text>
+                          ) : null}
+                        </Group>
+                        <Text size="sm" c="dimmed">
+                          {t('devices.meta', {
+                            branch: branchName(d.branch_id),
+                            seen: timeText(i18n.language, d.last_seen_at),
+                            version: d.app_version ?? '—',
+                            pending: d.pending_ops,
+                          })}
+                        </Text>
+                        {d.revoked_at ? null : (
+                          <Group gap="xs" wrap="wrap">
+                            {d.kind === 'till' ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="default"
+                                  size="compact-sm"
+                                  onClick={() =>
+                                    setRenaming({ id: d.id, name: d.name })
+                                  }
+                                >
+                                  {t('devices.rename')}
+                                </Button>
+                                {branches.length > 1 ? (
+                                  <NativeSelect
+                                    aria-label={t('devices.move')}
+                                    value={d.branch_id}
+                                    onChange={(event) =>
+                                      void guard(async () => {
+                                        if (!staffId) return;
+                                        await shopRequest(
+                                          db,
+                                          staffId,
+                                          `/devices/${d.id}`,
+                                          {
+                                            method: 'PATCH',
+                                            json: {
+                                              branch_id:
+                                                event.currentTarget.value,
+                                            },
+                                          },
+                                        );
+                                        await load();
+                                      })
+                                    }
+                                    data={branches.map((b) => ({
+                                      value: String(b.id),
+                                      label: String(b.name),
+                                    }))}
+                                    w={160}
+                                  />
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  variant="default"
+                                  size="compact-sm"
+                                  onClick={() =>
+                                    void guard(async () => {
+                                      if (!staffId) return;
+                                      await shopRequest(
+                                        db,
+                                        staffId,
+                                        `/devices/${d.id}`,
+                                        {
+                                          method: 'PATCH',
+                                          json: { is_admin: !d.is_admin },
+                                        },
+                                      );
+                                      await load();
+                                    })
+                                  }
+                                >
+                                  {d.is_admin
+                                    ? t('devices.remove_admin')
+                                    : t('devices.make_admin')}
+                                </Button>
+                              </>
+                            ) : null}
+                            <Button
+                              type="button"
+                              color="danger"
+                              size="compact-sm"
+                              onClick={() => setConfirmRevoke(d)}
+                            >
+                              {t('devices.revoke')}
+                            </Button>
+                          </Group>
+                        )}
+                      </Stack>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            )}
+          </Stack>
+        </Box>
 
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-h2 font-semibold">{t('devices.import_title')}</h2>
-        <p className="text-small text-text-muted">{t('devices.import_help')}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            id="unsynced-file"
-            type="file"
-            accept="application/json,.json"
-            className="peer sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              setFileName(f.name);
-              void f.text().then((text) => {
-                const p = previewUnsynced(text, db.tenantId);
-                if ('error' in p) {
-                  setImportState(null);
-                  setError(
-                    p.error === 'other_shop'
-                      ? t('devices.import_other_shop')
-                      : t('devices.import_invalid'),
-                  );
-                } else {
-                  setError(null);
-                  setImportState({ kind: 'preview', p });
-                }
-              });
-            }}
-          />
-          <label
-            htmlFor="unsynced-file"
-            className={`${buttonQuiet} cursor-pointer gap-2 peer-focus-visible:ring-2 peer-focus-visible:ring-primary`}
-          >
-            <UploadIcon />
-            {t('devices.import_choose')}
-          </label>
-          <span className="text-small text-text-muted" aria-live="polite">
-            {fileName ?? t('devices.import_no_file')}
-          </span>
-        </div>
-        {importState?.kind === 'preview' ? (
-          <div className="flex flex-col gap-2" data-testid="import-preview">
-            <p>
-              {t('devices.import_preview', {
-                count: importState.p.count,
-                from: timeText(i18n.language, importState.p.from),
-                to: timeText(i18n.language, importState.p.to),
-                sales: formatShopMoney(importState.p.sales),
-                payments: formatShopMoney(importState.p.payments),
-              })}
-            </p>
-            <button
-              type="button"
-              className={buttonPrimary}
-              onClick={() => {
-                const file = importState.p.file;
-                void guard(async () => {
-                  if (!staffId) return;
-                  setImportState({
-                    kind: 'running',
-                    done: 0,
-                    total: file.ops.length,
+        <Paper withBorder p="lg">
+          <Stack gap="sm">
+            <Title order={2} fz="lg">
+              {t('devices.import_title')}
+            </Title>
+            <Text size="sm" c="dimmed">
+              {t('devices.import_help')}
+            </Text>
+            <Group gap="sm" align="center">
+              <input
+                id="unsynced-file"
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={(event) => {
+                  const f = event.target.files?.[0];
+                  if (!f) return;
+                  setFileName(f.name);
+                  void f.text().then((text) => {
+                    const p = previewUnsynced(text, db.tenantId);
+                    if ('error' in p) {
+                      setImportState(null);
+                      setError(
+                        p.error === 'other_shop'
+                          ? t('devices.import_other_shop')
+                          : t('devices.import_invalid'),
+                      );
+                    } else {
+                      setError(null);
+                      setImportState({ kind: 'preview', p });
+                    }
                   });
-                  const out = await importUnsynced(db, staffId, file, (done) =>
-                    setImportState({
-                      kind: 'running',
-                      done,
-                      total: file.ops.length,
-                    }),
-                  );
-                  setImportState({ kind: 'done', ...out });
-                });
-              }}
-            >
-              {t('devices.import_go')}
-            </button>
-          </div>
-        ) : null}
-        {importState?.kind === 'running' ? (
-          <p role="status">
-            {t('devices.import_running', {
-              done: importState.done,
-              total: importState.total,
-            })}
-          </p>
-        ) : null}
-        {importState?.kind === 'done' ? (
-          <p role="status">
-            {t('devices.import_done', {
-              applied: importState.applied,
-              rejected: importState.rejected,
-            })}
-          </p>
-        ) : null}
-      </section>
+                }}
+              />
+              <Button
+                component="label"
+                htmlFor="unsynced-file"
+                variant="default"
+                leftSection={<UploadIcon />}
+              >
+                {t('devices.import_choose')}
+              </Button>
+              <Text size="sm" c="dimmed" aria-live="polite">
+                {fileName ?? t('devices.import_no_file')}
+              </Text>
+            </Group>
+            {importState?.kind === 'preview' ? (
+              <Stack gap="sm" data-testid="import-preview">
+                <Text>
+                  {t('devices.import_preview', {
+                    count: importState.p.count,
+                    from: timeText(i18n.language, importState.p.from),
+                    to: timeText(i18n.language, importState.p.to),
+                    sales: formatShopMoney(importState.p.sales),
+                    payments: formatShopMoney(importState.p.payments),
+                  })}
+                </Text>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const file = importState.p.file;
+                    void guard(async () => {
+                      if (!staffId) return;
+                      setImportState({
+                        kind: 'running',
+                        done: 0,
+                        total: file.ops.length,
+                      });
+                      const out = await importUnsynced(
+                        db,
+                        staffId,
+                        file,
+                        (done) =>
+                          setImportState({
+                            kind: 'running',
+                            done,
+                            total: file.ops.length,
+                          }),
+                      );
+                      setImportState({ kind: 'done', ...out });
+                    });
+                  }}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  {t('devices.import_go')}
+                </Button>
+              </Stack>
+            ) : null}
+            {importState?.kind === 'running' ? (
+              <Text role="status">
+                {t('devices.import_running', {
+                  done: importState.done,
+                  total: importState.total,
+                })}
+              </Text>
+            ) : null}
+            {importState?.kind === 'done' ? (
+              <Text role="status">
+                {t('devices.import_done', {
+                  applied: importState.applied,
+                  rejected: importState.rejected,
+                })}
+              </Text>
+            ) : null}
+          </Stack>
+        </Paper>
 
-      <ConfirmDialog
-        open={confirmRevoke !== null}
-        onOpenChange={(o) => (o ? undefined : setConfirmRevoke(null))}
-        title={t('devices.revoke_title', { name: confirmRevoke?.name ?? '' })}
-        body={t('devices.revoke_body')}
-        confirmLabel={t('devices.revoke')}
-        onConfirm={() => {
-          const d = confirmRevoke;
-          if (!d) return;
-          void guard(async () => {
-            if (!staffId) return;
-            await shopRequest(db, staffId, `/devices/${d.id}/revoke`, {
-              method: 'POST',
-              json: {},
+        <ConfirmDialog
+          open={confirmRevoke !== null}
+          onOpenChange={(o) => (o ? undefined : setConfirmRevoke(null))}
+          title={t('devices.revoke_title', { name: confirmRevoke?.name ?? '' })}
+          body={t('devices.revoke_body')}
+          confirmLabel={t('devices.revoke')}
+          onConfirm={() => {
+            const d = confirmRevoke;
+            if (!d) return;
+            void guard(async () => {
+              if (!staffId) return;
+              await shopRequest(db, staffId, `/devices/${d.id}/revoke`, {
+                method: 'POST',
+                json: {},
+              });
+              await load();
             });
-            await load();
-          });
-        }}
-      />
-      {dialog}
+          }}
+        />
+        {dialog}
+      </Stack>
     </SettingsPageLayout>
   );
 }
