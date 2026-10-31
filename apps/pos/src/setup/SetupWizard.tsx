@@ -7,27 +7,22 @@ import {
 import {
   Box,
   Button,
+  Checkbox,
   Group,
+  NativeSelect,
   Paper,
   Progress,
+  SimpleGrid,
+  Stack,
   Text,
+  Textarea,
+  TextInput,
   ThemeIcon,
+  Title,
 } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
-import {
-  type FormEvent,
-  type ReactNode,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonPrimary,
-  buttonQuiet,
-  fieldClass,
-} from '../components/classes.ts';
 import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
@@ -94,42 +89,6 @@ export function parseTaxPercent(text: string): number | null {
   const [whole = '0', frac = ''] = clean.split('.');
   const bp = Number(whole) * 100 + Number(frac.padEnd(2, '0'));
   return bp <= 2500 ? bp : null;
-}
-
-function Field({
-  id,
-  label,
-  error,
-  required = false,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  /** Shows a visible required mark (screens/01: name, phone and address are required). */
-  required?: boolean;
-  children: ReactNode;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-small text-text">
-        {label}
-        {required ? (
-          <span className="text-danger">
-            <span aria-hidden="true"> *</span>
-            <span className="sr-only"> ({t('common.required')})</span>
-          </span>
-        ) : null}
-      </label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-small text-danger">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 export function SetupWizard() {
@@ -324,10 +283,6 @@ export function SetupWizard() {
   if (!loaded) return null;
   const language = isLocale(i18n.language) ? i18n.language : 'en';
   const err = (k: string) => errors[k];
-  const described = (k: string) =>
-    errors[k]
-      ? { 'aria-invalid': true as const, 'aria-describedby': `${id(k)}-error` }
-      : {};
 
   return (
     <Box
@@ -379,13 +334,13 @@ export function SetupWizard() {
           ) : null}
 
           {step === 0 ? (
-            <section className="flex flex-col gap-4">
-              <h1 className="text-h1 font-semibold">{t('setup.welcome')}</h1>
-              <p className="text-text-muted">{t('setup.welcome_hint')}</p>
-              <p className="text-small text-text-muted">
+            <Stack gap="md">
+              <Title order={1}>{t('setup.welcome')}</Title>
+              <Text c="dimmed">{t('setup.welcome_hint')}</Text>
+              <Text size="sm" c="dimmed">
                 {t('setup.offline_hint')}
-              </p>
-              <div className="grid gap-2 sm:grid-cols-3">
+              </Text>
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
                 {LANGS.map(([code, key]) => (
                   <Button
                     key={code}
@@ -398,43 +353,50 @@ export function SetupWizard() {
                     {t(key)}
                   </Button>
                 ))}
-              </div>
+              </SimpleGrid>
               <Button type="submit" size="lg">
                 {t('setup.start')}
               </Button>
-            </section>
+            </Stack>
           ) : null}
 
           {step === 1 ? (
-            <section className="flex flex-col gap-3">
-              <h1 className="text-h1 font-semibold">{t('setup.shop_title')}</h1>
-              <Field
+            <Stack gap="sm">
+              <Title order={1}>{t('setup.shop_title')}</Title>
+              <TextInput
                 id={id('shop_name')}
-                label={t('setup.shop_name')}
-                error={err('shop_name')}
+                label={
+                  <>
+                    {t('setup.shop_name')}
+                    <span className="sr-only"> ({t('common.required')})</span>
+                  </>
+                }
                 required
+                value={shop.name}
+                maxLength={60}
+                error={err('shop_name')}
+                onChange={(event) =>
+                  setShop({ ...shop, name: event.currentTarget.value })
+                }
+              />
+              <Box
+                component="fieldset"
+                style={{ border: 0, margin: 0, padding: 0 }}
               >
-                <input
-                  id={id('shop_name')}
-                  className={fieldClass}
-                  value={shop.name}
-                  maxLength={60}
-                  required
-                  onChange={(e) => setShop({ ...shop, name: e.target.value })}
-                  {...described('shop_name')}
-                />
-              </Field>
-              <fieldset>
-                <legend className="mb-1 text-small">
+                <Text component="legend" size="sm" mb={4}>
                   {t('setup.business_type')}
-                </legend>
-                <div className="flex flex-wrap gap-2">
+                </Text>
+                <Group gap="xs">
                   {BUSINESS_TYPES.map((type) => (
-                    <button
+                    <Button
                       key={type}
                       type="button"
+                      size="compact-sm"
+                      radius="xl"
+                      variant={
+                        shop.business_type === type ? 'filled' : 'default'
+                      }
                       aria-pressed={shop.business_type === type}
-                      className="min-h-11 rounded-pill border border-border-strong px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-ink"
                       onClick={() =>
                         setShop({
                           ...shop,
@@ -443,117 +405,98 @@ export function SetupWizard() {
                       }
                     >
                       {t(`setup.biz.${type}`)}
-                    </button>
+                    </Button>
                   ))}
-                </div>
-              </fieldset>
-              <p className="text-small text-text-muted">
+                </Group>
+              </Box>
+              <Text size="sm" c="dimmed">
                 {t('setup.currency')}: PKR (Rs)
-              </p>
-              <div>
-                <PhoneInput
-                  id={id('phone')}
-                  label={t('setup.phone')}
-                  required
-                  kind="any"
-                  value={shop.phone}
-                  onChange={(e164) => setShop({ ...shop, phone: e164 ?? '' })}
-                />
-                {err('phone') ? (
-                  <p
-                    id={`${id('phone')}-error`}
-                    className="mt-1 text-small text-danger"
-                  >
-                    {err('phone')}
-                  </p>
-                ) : null}
-              </div>
-              <Field
-                id={id('address')}
-                label={t('setup.address')}
-                error={err('address')}
+              </Text>
+              <PhoneInput
+                id={id('phone')}
+                label={`${t('setup.phone')} (${t('common.required')})`}
                 required
-              >
-                <textarea
-                  id={id('address')}
-                  rows={2}
-                  maxLength={120}
-                  className={`${fieldClass} h-auto py-2 font-sans`}
-                  value={shop.address}
-                  required
-                  onChange={(e) =>
-                    setShop({ ...shop, address: e.target.value })
-                  }
-                  {...described('address')}
-                />
-              </Field>
-              <Field
+                kind="any"
+                value={shop.phone}
+                onChange={(e164) => setShop({ ...shop, phone: e164 ?? '' })}
+              />
+              {err('phone') ? (
+                <Text id={`${id('phone')}-error`} size="sm" c="danger">
+                  {err('phone')}
+                </Text>
+              ) : null}
+              <Textarea
+                id={id('address')}
+                label={
+                  <>
+                    {t('setup.address')}
+                    <span className="sr-only"> ({t('common.required')})</span>
+                  </>
+                }
+                required
+                minRows={2}
+                maxLength={120}
+                value={shop.address}
+                error={err('address')}
+                onChange={(event) =>
+                  setShop({ ...shop, address: event.currentTarget.value })
+                }
+              />
+              <TextInput
                 id={id('city')}
                 label={t('setup.city')}
+                maxLength={40}
+                value={shop.city}
                 error={err('city')}
-              >
-                <input
-                  id={id('city')}
-                  className={fieldClass}
-                  maxLength={40}
-                  value={shop.city}
-                  onChange={(e) => setShop({ ...shop, city: e.target.value })}
-                />
-              </Field>
-              <button
+                onChange={(event) =>
+                  setShop({ ...shop, city: event.currentTarget.value })
+                }
+              />
+              <Button
                 type="button"
+                variant="transparent"
+                size="compact-sm"
+                px={0}
                 aria-expanded={showMore}
-                className="self-start text-small text-primary"
                 onClick={() => setShowMore(!showMore)}
+                style={{ alignSelf: 'flex-start' }}
               >
                 {t('setup.more')}
-              </button>
+              </Button>
               {showMore ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field id={id('ntn')} label={t('setup.ntn')}>
-                    <input
-                      id={id('ntn')}
-                      className={fieldClass}
-                      value={shop.ntn}
-                      onChange={(e) =>
-                        setShop({ ...shop, ntn: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field id={id('strn')} label={t('setup.strn')}>
-                    <input
-                      id={id('strn')}
-                      className={fieldClass}
-                      value={shop.strn}
-                      onChange={(e) =>
-                        setShop({ ...shop, strn: e.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  <TextInput
+                    id={id('ntn')}
+                    label={t('setup.ntn')}
+                    value={shop.ntn}
+                    onChange={(event) =>
+                      setShop({ ...shop, ntn: event.currentTarget.value })
+                    }
+                  />
+                  <TextInput
+                    id={id('strn')}
+                    label={t('setup.strn')}
+                    value={shop.strn}
+                    onChange={(event) =>
+                      setShop({ ...shop, strn: event.currentTarget.value })
+                    }
+                  />
+                </SimpleGrid>
               ) : null}
-            </section>
+            </Stack>
           ) : null}
 
           {step === 2 ? (
-            <section className="flex flex-col gap-3">
-              <h1 className="text-h1 font-semibold">
-                {t('setup.owner_title')}
-              </h1>
-              <Field
+            <Stack gap="sm">
+              <Title order={1}>{t('setup.owner_title')}</Title>
+              <TextInput
                 id={id('owner_name')}
                 label={t('setup.owner_name')}
+                maxLength={40}
+                value={ownerName}
                 error={err('owner_name')}
-              >
-                <input
-                  id={id('owner_name')}
-                  className={fieldClass}
-                  maxLength={40}
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  {...described('owner_name')}
-                />
-              </Field>
+                onChange={(event) => setOwnerName(event.currentTarget.value)}
+              />
               <PinBoxes
                 idPrefix={id('pin')}
                 label={t('setup.pin')}
@@ -568,32 +511,33 @@ export function SetupWizard() {
                 onChange={setPin2}
                 error={err('pin2')}
               />
-              <p className="text-small text-text-muted">
+              <Text size="sm" c="dimmed">
                 {t('setup.pin_hint')}
-              </p>
-            </section>
+              </Text>
+            </Stack>
           ) : null}
 
           {step === 3 ? (
-            <section className="grid gap-4 md:grid-cols-[1fr_340px]">
-              <div className="flex flex-col gap-3">
-                <h1 className="text-h1 font-semibold">
-                  {t('setup.receipt_title')}
-                </h1>
-                <div>
-                  <span className="mb-1 block text-small">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+              <Stack gap="sm">
+                <Title order={1}>{t('setup.receipt_title')}</Title>
+                <Box
+                  component="fieldset"
+                  style={{ border: 0, margin: 0, padding: 0 }}
+                >
+                  <Text component="legend" size="sm" mb={4}>
                     {t('setup.logo')}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <label className={buttonQuiet}>
+                  </Text>
+                  <Group gap="sm">
+                    <Button component="label" variant="default">
                       {t('setup.logo_choose')}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/svg+xml"
                         className="sr-only"
                         data-testid="logo-input"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
                           if (!file) return;
                           try {
                             setLogo(await processLogo(file));
@@ -610,122 +554,107 @@ export function SetupWizard() {
                           }
                         }}
                       />
-                    </label>
+                    </Button>
                     {logo ? (
-                      <button
+                      <Button
                         type="button"
-                        className="text-small text-primary"
+                        variant="transparent"
+                        size="compact-sm"
+                        px={0}
                         onClick={() => setLogo(null)}
                       >
                         {t('setup.logo_remove')}
-                      </button>
+                      </Button>
                     ) : null}
-                  </div>
+                  </Group>
                   {err('logo') ? (
-                    <p className="mt-1 text-small text-danger">{err('logo')}</p>
+                    <Text size="sm" c="danger" mt={4}>
+                      {err('logo')}
+                    </Text>
                   ) : null}
-                </div>
-                <Field
+                </Box>
+                <Textarea
                   id={id('header')}
                   label={t('setup.header')}
+                  minRows={3}
+                  maxLength={120}
+                  value={receipt.header}
                   error={err('header')}
-                >
-                  <textarea
-                    id={id('header')}
-                    rows={3}
-                    maxLength={120}
-                    className={`${fieldClass} h-auto py-2 font-sans`}
-                    value={receipt.header}
-                    onChange={(e) =>
-                      setReceipt({ ...receipt, header: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field
+                  onChange={(event) =>
+                    setReceipt({
+                      ...receipt,
+                      header: event.currentTarget.value,
+                    })
+                  }
+                />
+                <Textarea
                   id={id('footer')}
                   label={t('setup.footer')}
+                  minRows={3}
+                  maxLength={160}
+                  value={receipt.footer}
                   error={err('footer')}
-                >
-                  <textarea
-                    id={id('footer')}
-                    rows={3}
-                    maxLength={160}
-                    className={`${fieldClass} h-auto py-2 font-sans`}
-                    value={receipt.footer}
-                    onChange={(e) =>
-                      setReceipt({ ...receipt, footer: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field id={id('tax')} label={t('setup.tax')} error={err('tax')}>
-                  <input
-                    id={id('tax')}
-                    inputMode="decimal"
-                    className={fieldClass}
-                    value={taxText}
-                    aria-describedby={`${id('tax')}-hint`}
-                    onChange={(e) => {
-                      setTaxText(e.target.value);
-                      const bp = parseTaxPercent(e.target.value);
-                      if (bp !== null)
-                        setReceipt({
-                          ...receipt,
-                          tax_rate_bp: bp,
-                          inclusive: bp > 0 && receipt.inclusive,
-                        });
-                    }}
-                  />
-                  <p
-                    id={`${id('tax')}-hint`}
-                    className="mt-1 text-small text-text-muted"
-                  >
-                    {t('setup.tax_hint')}
-                  </p>
-                </Field>
-                {receipt.tax_rate_bp > 0 ? (
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      aria-checked={receipt.inclusive}
-                      className="mt-1 h-5 w-5"
-                      checked={receipt.inclusive}
-                      onChange={(e) =>
-                        setReceipt({ ...receipt, inclusive: e.target.checked })
-                      }
-                    />
-                    <span>
-                      {t('setup.inclusive')}
-                      <span className="block text-small text-text-muted">
-                        {t('setup.inclusive_hint')}
-                      </span>
-                    </span>
-                  </label>
-                ) : null}
-                <Field id={id('round')} label={t('setup.round')}>
-                  <select
-                    id={id('round')}
-                    className={fieldClass}
-                    value={receipt.round_total_to}
-                    onChange={(e) =>
+                  onChange={(event) =>
+                    setReceipt({
+                      ...receipt,
+                      footer: event.currentTarget.value,
+                    })
+                  }
+                />
+                <TextInput
+                  id={id('tax')}
+                  label={t('setup.tax')}
+                  description={t('setup.tax_hint')}
+                  inputMode="decimal"
+                  value={taxText}
+                  error={err('tax')}
+                  aria-describedby={`${id('tax')}-hint`}
+                  onChange={(event) => {
+                    const next = event.currentTarget.value;
+                    setTaxText(next);
+                    const bp = parseTaxPercent(next);
+                    if (bp !== null)
                       setReceipt({
                         ...receipt,
-                        round_total_to: Number(
-                          e.target.value,
-                        ) as SetupInput['receipt']['round_total_to'],
+                        tax_rate_bp: bp,
+                        inclusive: bp > 0 && receipt.inclusive,
+                      });
+                  }}
+                />
+                {receipt.tax_rate_bp > 0 ? (
+                  <Checkbox
+                    label={t('setup.inclusive')}
+                    description={t('setup.inclusive_hint')}
+                    checked={receipt.inclusive}
+                    onChange={(event) =>
+                      setReceipt({
+                        ...receipt,
+                        inclusive: event.currentTarget.checked,
                       })
                     }
-                  >
-                    {ROUND_OPTIONS.map((v) => (
-                      <option key={v} value={v}>
-                        {v === 1
-                          ? t('setup.round_none')
-                          : t('setup.round_rs', { n: v / 100 })}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
+                  />
+                ) : null}
+                <NativeSelect
+                  id={id('round')}
+                  label={t('setup.round')}
+                  value={receipt.round_total_to}
+                  onChange={(event) =>
+                    setReceipt({
+                      ...receipt,
+                      round_total_to: Number(
+                        event.currentTarget.value,
+                      ) as SetupInput['receipt']['round_total_to'],
+                    })
+                  }
+                  data={ROUND_OPTIONS.map((v) => ({
+                    value: String(v),
+                    label:
+                      v === 1
+                        ? t('setup.round_none')
+                        : t('setup.round_rs', { n: v / 100 }),
+                  }))}
+                />
+              </Stack>
               <ReceiptPreview
                 logoUrl={logo?.previewUrl ?? null}
                 shop={{
@@ -736,19 +665,18 @@ export function SetupWizard() {
                   inclusive: receipt.inclusive,
                 }}
               />
-            </section>
+            </SimpleGrid>
           ) : null}
 
           {step === 4 ? (
-            <section className="flex flex-col gap-3">
-              <h1 className="text-h1 font-semibold">
-                {t('setup.products_title')}
-              </h1>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
+            <Stack gap="sm">
+              <Title order={1}>{t('setup.products_title')}</Title>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                <Button
                   type="button"
+                  variant={product !== null ? 'light' : 'default'}
+                  h={64}
                   aria-pressed={product !== null}
-                  className={`${buttonQuiet} min-h-16 aria-pressed:border-primary`}
                   onClick={() =>
                     setProduct(
                       product ?? {
@@ -763,73 +691,77 @@ export function SetupWizard() {
                   }
                 >
                   {t('setup.add_one')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className={`${buttonQuiet} min-h-16 flex-col`}
+                  variant="default"
+                  h={64}
                   disabled={busy}
                   onClick={() => void finish(false, '/products/import')}
                 >
-                  {t('setup.import')}
-                  <span className="text-small text-text-muted">
-                    {t('setup.import_hint')}
-                  </span>
-                </button>
-              </div>
+                  <Stack gap={0} align="center">
+                    <Text size="sm">{t('setup.import')}</Text>
+                    <Text size="xs" c="dimmed">
+                      {t('setup.import_hint')}
+                    </Text>
+                  </Stack>
+                </Button>
+              </SimpleGrid>
               {product ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  <Box style={{ gridColumn: '1 / -1' }}>
+                    <TextInput
                       id={id('product_name')}
                       label={t('setup.product_name')}
+                      maxLength={80}
+                      value={product.name}
                       error={err('product_name')}
-                    >
-                      <input
-                        id={id('product_name')}
-                        className={fieldClass}
-                        maxLength={80}
-                        value={product.name}
-                        onChange={(e) =>
-                          setProduct({ ...product, name: e.target.value })
-                        }
-                        {...described('product_name')}
-                      />
-                    </Field>
-                  </div>
-                  <Field id={id('barcode')} label={t('setup.barcode')}>
-                    <input
-                      id={id('barcode')}
-                      className={fieldClass}
-                      value={product.barcode}
-                      onChange={(e) =>
-                        setProduct({ ...product, barcode: e.target.value })
+                      onChange={(event) =>
+                        setProduct({
+                          ...product,
+                          name: event.currentTarget.value,
+                        })
                       }
                     />
-                  </Field>
-                  <Field id={id('sku')} label={t('setup.sku')}>
-                    <div className="flex gap-2">
-                      <input
-                        id={id('sku')}
-                        className={fieldClass}
-                        value={product.sku}
-                        onChange={(e) =>
-                          setProduct({ ...product, sku: e.target.value })
-                        }
-                      />
-                      <button
-                        type="button"
-                        className={buttonQuiet}
-                        onClick={() =>
-                          setProduct({
-                            ...product,
-                            sku: generateSku(product.name),
-                          })
-                        }
-                      >
-                        {t('setup.generate')}
-                      </button>
-                    </div>
-                  </Field>
+                  </Box>
+                  <TextInput
+                    id={id('barcode')}
+                    label={t('setup.barcode')}
+                    value={product.barcode}
+                    onChange={(event) =>
+                      setProduct({
+                        ...product,
+                        barcode: event.currentTarget.value,
+                      })
+                    }
+                  />
+                  <Group gap="xs" align="flex-end" wrap="nowrap">
+                    <TextInput
+                      id={id('sku')}
+                      label={t('setup.sku')}
+                      value={product.sku}
+                      onChange={(event) =>
+                        setProduct({
+                          ...product,
+                          sku: event.currentTarget.value,
+                        })
+                      }
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      type="button"
+                      variant="default"
+                      onClick={() =>
+                        setProduct({
+                          ...product,
+                          sku: generateSku(product.name),
+                        })
+                      }
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      {t('setup.generate')}
+                    </Button>
+                  </Group>
                   <MoneyInput
                     label={t('setup.cost')}
                     value={product.cost}
@@ -840,20 +772,21 @@ export function SetupWizard() {
                     value={product.price}
                     onChange={(v) => setProduct({ ...product, price: v ?? 0 })}
                   />
-                  <Field id={id('opening')} label={t('setup.opening_stock')}>
-                    <input
-                      id={id('opening')}
-                      inputMode="decimal"
-                      className={fieldClass}
-                      value={product.opening}
-                      onChange={(e) =>
-                        setProduct({ ...product, opening: e.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
+                  <TextInput
+                    id={id('opening')}
+                    label={t('setup.opening_stock')}
+                    inputMode="decimal"
+                    value={product.opening}
+                    onChange={(event) =>
+                      setProduct({
+                        ...product,
+                        opening: event.currentTarget.value,
+                      })
+                    }
+                  />
+                </SimpleGrid>
               ) : null}
-            </section>
+            </Stack>
           ) : null}
 
           {step > 0 ? (
