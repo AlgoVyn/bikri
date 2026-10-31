@@ -132,3 +132,122 @@ h4 {
 .bikri-topbar-brand .mantine-ThemeIcon-root {
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
 }
+
+/* Product list: semantic grid for the virtualised rows. */
+.bikri-product-header {
+  display: none;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-dimmed);
+}
+
+.bikri-product-row {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+
+.bikri-product-row:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.bikri-product-row[aria-current="page"],
+.bikri-product-row[data-selected="true"] {
+  background: var(--mantine-color-brand-0);
+}
+
+[data-mantine-color-scheme="dark"] .bikri-product-row[aria-current="page"],
+[data-mantine-color-scheme="dark"] .bikri-product-row[data-selected="true"] {
+  background: var(--mantine-color-brand-9);
+}
+
+.bikri-product-select-box {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 4px;
+}
+
+.bikri-product-row[data-selected="true"] .bikri-product-select-box {
+  border-color: var(--mantine-color-brand-6);
+  background: var(--mantine-color-brand-6);
+  color: var(--mantine-color-white);
+}
+
+.bikri-product-meta {
+  display: block;
+  overflow: hidden;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bikri-product-name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: 500;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bikri-product-cell-desktop,
+.bikri-product-mobile-stock {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .bikri-product-header {
+    display: grid;
+    grid-template-columns:
+      2.5rem minmax(0, 3fr) minmax(0, 1.3fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 0.8fr);
+  }
+
+  .bikri-product-header[data-cost="true"] {
+    grid-template-columns:
+      2.5rem minmax(0, 3fr) minmax(0, 1.2fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  }
+
+  .bikri-product-row {
+    grid-template-columns:
+      2.5rem minmax(0, 3fr) minmax(0, 1.3fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 0.8fr);
+  }
+
+  .bikri-product-row[data-cost="true"] {
+    grid-template-columns:
+      2.5rem minmax(0, 3fr) minmax(0, 1.2fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  }
+
+  .bikri-product-row[data-embedded="true"],
+  .bikri-product-header[data-embedded="true"] {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  }
+
+  .bikri-product-cell-desktop {
+    display: block;
+  }
+
+  .bikri-product-mobile-stock {
+    display: none;
+  }
+}

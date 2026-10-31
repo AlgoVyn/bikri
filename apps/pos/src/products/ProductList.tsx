@@ -362,13 +362,6 @@ export function ProductList({
   );
 }
 
-const gridCols = (showCost: boolean, embedded: boolean) => {
-  if (embedded) return 'grid-cols-[2.5rem_minmax(0,1fr)_auto]';
-  return showCost
-    ? 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]'
-    : 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]';
-};
-
 function ListHeader({
   showCost,
   embedded,
@@ -380,24 +373,36 @@ function ListHeader({
   return (
     <div
       aria-hidden="true"
-      className={`hidden gap-3 border-b border-border px-3 pb-1 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
+      className="bikri-product-header"
+      data-cost={showCost}
+      data-embedded={embedded}
     >
       <span />
       <span>{t('products.col_name')}</span>
       {embedded ? (
-        <span className="text-end">{t('products.col_price')}</span>
+        <span style={{ textAlign: 'end' }}>{t('products.col_price')}</span>
       ) : (
         <>
           <span>{t('products.col_category')}</span>
-          <span className="text-end">{t('products.col_price')}</span>
-          <span className="text-end">{t('products.col_stock')}</span>
+          <span style={{ textAlign: 'end' }}>{t('products.col_price')}</span>
+          <span style={{ textAlign: 'end' }}>{t('products.col_stock')}</span>
           {showCost ? (
-            <span className="text-end">{t('products.col_avg_cost')}</span>
+            <span style={{ textAlign: 'end' }}>
+              {t('products.col_avg_cost')}
+            </span>
           ) : null}
           {showCost ? (
-            <span className="text-end">{t('products.col_margin')}</span>
+            <span style={{ textAlign: 'end' }}>{t('products.col_margin')}</span>
           ) : null}
-          <span className="truncate text-end" title={t('products.col_sold30')}>
+          <span
+            style={{
+              textAlign: 'end',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={t('products.col_sold30')}
+          >
             {t('products.col_sold30')}
           </span>
         </>
@@ -510,8 +515,12 @@ function ProductRow({
   const margin = marginText(Number(p.price), Number(p.avg_cost ?? 0));
   return (
     <li
-      className="absolute inset-x-0"
-      style={{ top: index * ROW_PX, height: ROW_PX }}
+      style={{
+        position: 'absolute',
+        insetInline: 0,
+        top: index * ROW_PX,
+        height: ROW_PX,
+      }}
       aria-setsize={setSize}
       aria-posinset={index + 1}
     >
@@ -520,34 +529,40 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
+          className="bikri-product-row"
+          data-cost={showCost}
+          data-embedded={embedded}
+          data-selected={selected}
         >
-          <span
-            aria-hidden="true"
-            className={`flex size-5 items-center justify-center rounded border ${selected ? 'border-primary bg-primary text-primary-ink' : 'border-border-strong'}`}
-          >
+          <span aria-hidden="true" className="bikri-product-select-box">
             {selected ? '✓' : ''}
           </span>
-          <span className="min-w-0">
-            <span
-              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
-            >
+          <span style={{ minWidth: 0 }}>
+            <span className="ltr-name bikri-product-name">
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small text-text-muted">
+            <span className="bikri-product-meta">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
           {embedded ? null : (
-            <span className="hidden truncate text-text-muted lg:block">
+            <span
+              className="bikri-product-cell-desktop"
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: 'var(--mantine-color-dimmed)',
+              }}
+            >
               {categoryName(row.category, i18n.language) ||
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+          <span style={{ textAlign: 'end' }}>
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+              className={`${embedded ? '' : 'bikri-product-mobile-stock'} ${stockTone}`}
             >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
@@ -556,22 +571,34 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <>
-              <span className={`hidden text-end lg:block ${stockTone}`}>
+              <span
+                className={`bikri-product-cell-desktop ${stockTone}`}
+                style={{ textAlign: 'end' }}
+              >
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span
+                  className="bikri-product-cell-desktop"
+                  style={{ textAlign: 'end' }}
+                >
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span
+                  className="bikri-product-cell-desktop"
+                  style={{ textAlign: 'end' }}
+                >
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-end lg:block">
+              <span
+                className="bikri-product-cell-desktop"
+                style={{ textAlign: 'end' }}
+              >
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
@@ -584,33 +611,41 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
+          className="bikri-product-row"
+          data-cost={showCost}
+          data-embedded={embedded}
         >
           <ProductThumb
             name={String(p.name_en)}
             imageKey={p.image_key}
             color={row.category?.color}
           />
-          <span className="min-w-0">
-            <span
-              className={`ltr-name font-medium ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
-            >
+          <span style={{ minWidth: 0 }}>
+            <span className="ltr-name bikri-product-name">
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small text-text-muted">
+            <span className="bikri-product-meta">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
           {embedded ? null : (
-            <span className="hidden truncate text-text-muted lg:block">
+            <span
+              className="bikri-product-cell-desktop"
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: 'var(--mantine-color-dimmed)',
+              }}
+            >
               {categoryName(row.category, i18n.language) ||
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+          <span style={{ textAlign: 'end' }}>
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+              className={`${embedded ? '' : 'bikri-product-mobile-stock'} ${stockTone}`}
             >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
@@ -619,22 +654,34 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <>
-              <span className={`hidden text-end lg:block ${stockTone}`}>
+              <span
+                className={`bikri-product-cell-desktop ${stockTone}`}
+                style={{ textAlign: 'end' }}
+              >
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span
+                  className="bikri-product-cell-desktop"
+                  style={{ textAlign: 'end' }}
+                >
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span
+                  className="bikri-product-cell-desktop"
+                  style={{ textAlign: 'end' }}
+                >
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-end lg:block">
+              <span
+                className="bikri-product-cell-desktop"
+                style={{ textAlign: 'end' }}
+              >
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
