@@ -38,10 +38,16 @@ describe('UI kit accessibility', () => {
       throw new Error('kit actions missing');
     }
     await user.click(confirm);
+    expect(
+      await screen.findByRole('dialog', { name: 'Are you sure?' }),
+    ).toBeTruthy();
     violations = await seriousViolations();
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
     await user.keyboard('{Escape}');
     await user.click(override);
+    expect(
+      await screen.findByRole('dialog', { name: 'Manager PIN needed' }),
+    ).toBeTruthy();
     violations = await seriousViolations();
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
   });

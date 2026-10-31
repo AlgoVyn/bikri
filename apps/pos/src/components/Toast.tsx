@@ -1,3 +1,4 @@
+import { Box, Button, Group, Paper, Text } from '@mantine/core';
 import {
   createContext,
   type ReactNode,
@@ -97,43 +98,68 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed end-4 bottom-4 z-50 flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2">
+      <Box
+        style={{
+          position: 'fixed',
+          insetInlineEnd: 16,
+          bottom: 16,
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          width: 'min(20rem, calc(100% - 2rem))',
+          pointerEvents: 'none',
+        }}
+      >
         {items.map((item) => (
-          <div
+          <Paper
             key={item.id}
             role={item.tone === 'error' ? 'alert' : 'status'}
-            className={
-              item.tone === 'error'
-                ? 'pointer-events-auto flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
-                : 'pointer-events-auto flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
-            }
+            withBorder={item.tone !== 'error'}
+            p="xs"
+            shadow="sm"
+            style={{
+              pointerEvents: 'auto',
+              background:
+                item.tone === 'error'
+                  ? 'var(--mantine-color-danger-subtle)'
+                  : 'var(--mantine-color-body)',
+              color:
+                item.tone === 'error'
+                  ? 'var(--mantine-color-danger-subtle-ink)'
+                  : undefined,
+            }}
           >
-            <span className="min-w-0 flex-1">{item.message}</span>
-            {item.actions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className="min-h-11 shrink-0 px-2 font-medium underline"
+            <Group gap="sm" wrap="nowrap" align="center">
+              <Text size="sm" style={{ flex: 1, minWidth: 0 }}>
+                {item.message}
+              </Text>
+              {item.actions.map((action) => (
+                <Button
+                  key={action.label}
+                  variant="subtle"
+                  size="compact-xs"
+                  onClick={() => {
+                    dismiss(item.id);
+                    action.onClick();
+                  }}
+                >
+                  {action.label}
+                </Button>
+              ))}
+              <Button
+                variant="subtle"
+                size="compact-xs"
                 onClick={() => {
                   dismiss(item.id);
-                  action.onClick();
                 }}
               >
-                {action.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="min-h-11 shrink-0 px-2"
-              onClick={() => {
-                dismiss(item.id);
-              }}
-            >
-              {t('common.dismiss')}
-            </button>
-          </div>
+                {t('common.dismiss')}
+              </Button>
+            </Group>
+          </Paper>
         ))}
-      </div>
+      </Box>
     </ToastContext.Provider>
   );
 }

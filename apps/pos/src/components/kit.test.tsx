@@ -266,9 +266,11 @@ describe('dialogs, export, toast, and key hints', () => {
   it('dismisses info toasts after 4 seconds and keeps errors', async () => {
     vi.useFakeTimers();
     render(
-      <ToastProvider>
-        <ToastHarness />
-      </ToastProvider>,
+      <MantineRoot>
+        <ToastProvider>
+          <ToastHarness />
+        </ToastProvider>
+      </MantineRoot>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'info' }));
     expect(screen.getByRole('status').textContent).toContain('Saved.');
@@ -314,11 +316,13 @@ describe('dialogs, export, toast, and key hints', () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
     render(
-      <EmptyState
-        message="Nothing here yet."
-        actionLabel="Add"
-        onAction={onAction}
-      />,
+      <MantineRoot>
+        <EmptyState
+          message="Nothing here yet."
+          actionLabel="Add"
+          onAction={onAction}
+        />
+      </MantineRoot>,
     );
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(onAction).toHaveBeenCalledOnce();

@@ -1,6 +1,7 @@
+import { Button, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import type { ReactNode } from 'react';
-import { buttonPrimary } from './classes.ts';
 
+/** Shared empty state: dashed surface, icon, one sentence and one action. */
 export function EmptyState({
   icon,
   heading,
@@ -15,19 +16,29 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-border-strong px-4 py-14 text-center">
-      {icon !== undefined ? (
-        <div className="flex size-14 items-center justify-center rounded-full bg-surface-2 text-text-muted">
-          {icon}
-        </div>
-      ) : null}
-      {heading !== undefined ? <h1 className="sr-only">{heading}</h1> : null}
-      <p className="max-w-sm text-body font-medium text-text">{message}</p>
-      {actionLabel !== undefined && onAction !== undefined ? (
-        <button type="button" className={buttonPrimary} onClick={onAction}>
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
+    <Paper
+      withBorder
+      p="xl"
+      style={{
+        borderStyle: 'dashed',
+        background: 'transparent',
+        textAlign: 'center',
+      }}
+    >
+      <Stack align="center" gap="sm">
+        {icon !== undefined ? (
+          <ThemeIcon size={56} radius="xl" variant="light" color="gray">
+            {icon}
+          </ThemeIcon>
+        ) : null}
+        {heading !== undefined ? <h1 className="sr-only">{heading}</h1> : null}
+        <Text maw={420} fw={500}>
+          {message}
+        </Text>
+        {actionLabel !== undefined && onAction !== undefined ? (
+          <Button onClick={onAction}>{actionLabel}</Button>
+        ) : null}
+      </Stack>
+    </Paper>
   );
 }
