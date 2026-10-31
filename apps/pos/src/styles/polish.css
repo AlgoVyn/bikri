@@ -436,3 +436,16 @@ main section + section {
   background: rgb(77 166 255 / 0.1);
   color: #e0f2fe;
 }
+
+/* Settings selection: adaptive tint, never a light-theme white bar in dark mode. */
+.bikri-settings-row[data-active] {
+  background: var(--mantine-color-brand-0);
+}
+
+[data-mantine-color-scheme="dark"] .bikri-settings-row[data-active] {
+  background: rgb(77 166 255 / 0.12);
+}
+
+[data-mantine-color-scheme="dark"] .bikri-settings-row[data-active]:hover {
+  background: rgb(77 166 255 / 0.16);
+}

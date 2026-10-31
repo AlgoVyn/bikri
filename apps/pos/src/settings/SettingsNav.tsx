@@ -252,12 +252,13 @@ function SettingsRow({
       resetScroll={false}
       onClick={rememberListScroll}
       aria-current={current ? 'page' : undefined}
+      data-active={current || undefined}
+      className="bikri-settings-row"
       w="100%"
       px="md"
       py="sm"
       style={{
         borderTop: '1px solid var(--mantine-color-default-border)',
-        background: current ? 'var(--mantine-color-brand-0)' : undefined,
       }}
     >
       <Group gap="md" wrap="nowrap">
@@ -270,7 +271,11 @@ function SettingsRow({
           {icon}
         </ThemeIcon>
         <Box style={{ minWidth: 0, flex: 1 }}>
-          <Text size="sm" fw={600} c={current ? 'brand.9' : undefined}>
+          <Text
+            size="sm"
+            fw={600}
+            c={current ? 'var(--color-primary)' : undefined}
+          >
             {title}
           </Text>
           <Text size="xs" c="dimmed" lineClamp={2}>
