@@ -442,8 +442,12 @@ describe('sync isolation', () => {
     };
     const firstA = rows(a, 'A');
     const firstB = rows(b, 'B');
-    await pushOk(a.till, [...firstA.slice(0, 6), firstA[8]!, firstA[9]!]);
-    await pushOk(b.till, [...firstB.slice(0, 6), firstB[8]!, firstB[9]!]);
+    const keepIdx = (list: typeof firstA) => [
+      ...list.slice(0, 6),
+      ...list.slice(8, 10),
+    ];
+    await pushOk(a.till, keepIdx(firstA));
+    await pushOk(b.till, keepIdx(firstB));
     await pushOk(a.till, firstA.slice(6, 8));
     await pushOk(b.till, firstB.slice(6, 8));
 

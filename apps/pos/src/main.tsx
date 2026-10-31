@@ -7,9 +7,7 @@ import { rememberPersistentStorage } from './pwa/persist.ts';
 import { registerAppUpdate } from './pwa/registerSW.ts';
 import { MantineRoot } from './ui/MantineRoot.tsx';
 import './styles/layers.css';
-import '@mantine/core/styles.layer.css';
-import '@mantine/notifications/styles.layer.css';
-import './styles.css';
+import './styles/compat.css';
 
 await initI18n();
 if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev') {

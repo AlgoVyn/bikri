@@ -20,7 +20,8 @@
       "!**/playwright-report",
       "!**/test-results",
       "!docs/fixtures",
-      "!pnpm-lock.yaml"
+      "!pnpm-lock.yaml",
+      "!apps/pos/src/styles/compat.css"
     ]
   },
   "markdown": {
