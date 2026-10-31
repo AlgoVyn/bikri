@@ -380,3 +380,8 @@ main h1 {
 main section + section {
   margin-top: 0;
 }
+
+/* Dark hero: deep navy instead of a large saturated blue block. */
+[data-mantine-color-scheme="dark"] .bikri-home-hero {
+  background: linear-gradient(135deg, #142b4d 0%, #091a33 100%) !important;
+}

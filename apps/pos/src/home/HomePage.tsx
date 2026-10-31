@@ -234,6 +234,7 @@ export function HomePage() {
 
       <UnstyledButton component={Link} to="/sell" w="100%">
         <Paper
+          className="bikri-home-hero"
           p={{ base: 'lg', sm: 'xl' }}
           radius="lg"
           style={{
@@ -276,6 +277,7 @@ export function HomePage() {
         <Grid.Col span={{ base: 12, lg: 8 }} order={{ base: 2, lg: 1 }}>
           <Stack gap="xl">
             <QuickActions tiles={tiles} />
+            <RecentBillsCard data={data} timeText={timeText} />
             {data && data.attention.length > 0 ? (
               <AttentionList items={data.attention} />
             ) : null}
@@ -292,7 +294,6 @@ export function HomePage() {
                 timeText={timeText}
               />
             ) : null}
-            <RecentBillsCard data={data} timeText={timeText} />
           </Stack>
         </Grid.Col>
       </Grid>

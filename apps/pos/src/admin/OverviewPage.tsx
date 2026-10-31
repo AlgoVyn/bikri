@@ -115,7 +115,7 @@ export function OverviewPage() {
         }
       />
 
-      <SimpleGrid cols={{ base: 2, xl: 4 }} spacing="sm">
+      <SimpleGrid cols={{ base: 2, lg: 4 }} spacing="sm">
         <StatCard
           label={t('admin.stat_shops')}
           value={formatCount(tenants.length, lang)}

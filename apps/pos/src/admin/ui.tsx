@@ -25,6 +25,7 @@ import {
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
+import { StatusPill } from '../components/StatusPill.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 
@@ -75,7 +76,7 @@ export const dangerBtn = buttonDanger;
 export const inputClass =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text focus:border-primary';
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'gray'> = {
   active: 'success',
   read_only: 'warning',
   suspended: 'danger',
@@ -88,22 +89,10 @@ const STATUS_COLOR: Record<string, string> = {
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
   return (
-    <Badge
-      color={STATUS_COLOR[status] ?? 'gray'}
-      variant="light"
-      radius="xl"
-      tt="none"
-      leftSection={
-        <Box
-          aria-hidden="true"
-          w={6}
-          h={6}
-          style={{ borderRadius: 999, background: 'currentColor' }}
-        />
-      }
-    >
-      {t(statusLabelKey(status))}
-    </Badge>
+    <StatusPill
+      label={t(statusLabelKey(status))}
+      tone={STATUS_TONE[status] ?? 'gray'}
+    />
   );
 }
 

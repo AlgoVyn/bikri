@@ -6,7 +6,6 @@ import {
   Menu,
   Stack,
   Text,
-  ThemeIcon,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
@@ -14,12 +13,8 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { Fragment, type ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  MoreIcon,
-  SalesIcon,
-  SearchIcon,
-  SettingsIcon,
-} from '../components/icons.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
+import { MoreIcon, SearchIcon, SettingsIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -180,14 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 data-testid="brand-topbar"
                 className="bikri-topbar-brand"
               >
-                <ThemeIcon
-                  size={36}
-                  radius="md"
-                  color="accent"
-                  variant="filled"
-                >
-                  <SalesIcon />
-                </ThemeIcon>
+                <BrandMark size={36} />
                 <Stack gap={0} style={{ minWidth: 0 }}>
                   <Text
                     fw={800}
@@ -265,7 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           data-active={active || undefined}
                         >
                           <item.Icon />
-                          <Text size="10px" lh={1.15} ta="center" tt="none">
+                          <Text size="11px" lh={1.15} ta="center" tt="none">
                             {t(item.label)}
                           </Text>
                         </Link>
@@ -285,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     onClick={() => openPriceCheck(true)}
                   >
                     <SearchIcon />
-                    <Text size="10px" lh={1.15} ta="center">
+                    <Text size="11px" lh={1.15} ta="center">
                       {t('pricecheck.title')}
                     </Text>
                   </UnstyledButton>

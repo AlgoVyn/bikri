@@ -2,12 +2,8 @@ import { AppShell, Box, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { Link, Outlet } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  CloudIcon,
-  ReportsIcon,
-  SalesIcon,
-  StoreIcon,
-} from '../components/icons.tsx';
+import { BrandMark } from '../components/BrandMark.tsx';
+import { CloudIcon, ReportsIcon, StoreIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useAreaStrings } from '../i18n/areas.tsx';
 import { applyStoredTheme } from '../shell/devicePrefs.ts';
@@ -21,7 +17,15 @@ const NAV = [
 function AdminNav({ mobile = false }: { mobile?: boolean }) {
   const { t } = useTranslation();
   return (
-    <Group gap={4} wrap={mobile ? 'nowrap' : 'wrap'} p={mobile ? 0 : 'sm'}>
+    <Group
+      component="nav"
+      gap={4}
+      wrap={mobile ? 'nowrap' : 'wrap'}
+      p={mobile ? 0 : 'sm'}
+      style={
+        mobile ? undefined : { flexDirection: 'column', alignItems: 'stretch' }
+      }
+    >
       {NAV.map((item) => (
         <Link
           key={item.to}
@@ -79,9 +83,7 @@ export function AdminShell() {
               data-testid="admin-brand-topbar"
               className="bikri-topbar-brand"
             >
-              <ThemeIcon size={36} radius="md" color="accent" variant="filled">
-                <SalesIcon />
-              </ThemeIcon>
+              <BrandMark size={36} />
               <Text
                 fw={800}
                 size="sm"

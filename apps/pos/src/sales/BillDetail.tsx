@@ -1,7 +1,6 @@
 import { businessDate, newId, saleLineFinal } from '@bikri/core';
 import {
   ActionIcon,
-  Badge,
   Box,
   Button,
   Group,
@@ -19,6 +18,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { StatusPill } from '../components/StatusPill.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, type CartId, isEmptyCart, loadCarts } from '../data/cart.ts';
 import { ledgerContext } from '../data/catalog.ts';
@@ -325,8 +325,10 @@ export function BillDetail({
           >
             {String(sale.invoice_no)}
           </Title>
-          <Badge
-            color={
+          <StatusPill
+            testId="bill-status"
+            label={statusLabel(t, status)}
+            tone={
               status === 'paid'
                 ? 'success'
                 : status === 'part_refunded'
@@ -335,13 +337,7 @@ export function BillDetail({
                     ? 'danger'
                     : 'gray'
             }
-            variant="light"
-            radius="xl"
-            tt="none"
-            data-testid="bill-status"
-          >
-            {statusLabel(t, status)}
-          </Badge>
+          />
         </Group>
 
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">

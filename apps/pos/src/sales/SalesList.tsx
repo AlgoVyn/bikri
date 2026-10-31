@@ -19,6 +19,7 @@ import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { StatusPill } from '../components/StatusPill.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
@@ -44,7 +45,6 @@ import {
   methodLabel,
   qtyText,
   statusLabel,
-  statusTone,
   timeText,
 } from './format.ts';
 
@@ -597,10 +597,19 @@ function SaleRow({
             </span>
           ))}
         </span>
-        <span
-          className={`justify-self-start whitespace-nowrap rounded-full px-2 text-small font-medium sm:justify-self-end ${statusTone(status)}`}
-        >
-          {statusLabel(t, status)}
+        <span className="justify-self-start sm:justify-self-end">
+          <StatusPill
+            label={statusLabel(t, status)}
+            tone={
+              status === 'paid'
+                ? 'success'
+                : status === 'part_refunded'
+                  ? 'warning'
+                  : status === 'void'
+                    ? 'danger'
+                    : 'gray'
+            }
+          />
         </span>
       </Link>
       {row.printFailed ? (
