@@ -1,3 +1,16 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  FileInput,
+  Group,
+  Paper,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -10,15 +23,7 @@ import {
 } from './api.ts';
 import { formatCount, formatWhen, OPS_CHUNK } from './format.ts';
 import type { DeviceInfo, IssuedCode, UnsyncedOp } from './types.ts';
-import {
-  AdminConfirm,
-  Field,
-  inputClass,
-  PairingPanel,
-  Panel,
-  primaryBtn,
-  quietBtn,
-} from './ui.tsx';
+import { AdminConfirm, PairingPanel, Panel } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 type Preview = {
@@ -128,27 +133,27 @@ export function DevicesTab({
 
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
+      <Stack gap="sm" align="flex-start">
+        <Text c="dimmed">{query.error}</Text>
+        <Button type="button" onClick={query.reload}>
           {t('admin.retry')}
-        </button>
-      </p>
+        </Button>
+      </Stack>
     ) : (
-      <p className="sr-only">{t('common.loading')}</p>
+      <Text className="sr-only">{t('common.loading')}</Text>
     );
   }
   const devices = query.data.devices;
 
   return (
-    <div className="flex flex-col gap-4">
+    <Stack gap="md">
       <Panel
         title={t('admin.issue_code')}
         description={t('admin.issue_code_hint')}
       >
-        <form
-          className="flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(event) => {
+        <Box
+          component="form"
+          onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             const deviceName = name.trim();
             if (deviceName.length < 1 || pending) return;
@@ -170,43 +175,33 @@ export function DevicesTab({
               });
           }}
         >
-          <div className="min-w-0 flex-1">
-            <Field id="device-name" label={t('admin.device_name')}>
-              <input
-                id="device-name"
-                className={inputClass}
-                value={name}
-                maxLength={40}
-                required
-                autoComplete="off"
-                onChange={(event) => {
-                  setName(event.target.value);
-                }}
-              />
-            </Field>
-          </div>
-          <label
-            className="flex min-h-11 items-center gap-2 pb-1 sm:pb-0"
-            htmlFor="device-admin"
-          >
-            <input
-              id="device-admin"
-              type="checkbox"
-              checked={admin}
-              onChange={(event) => {
-                setAdmin(event.target.checked);
-              }}
+          <Group align="flex-end" gap="sm" wrap="wrap">
+            <TextInput
+              id="device-name"
+              label={t('admin.device_name')}
+              value={name}
+              maxLength={40}
+              required
+              autoComplete="off"
+              onChange={(event) => setName(event.currentTarget.value)}
+              style={{ flex: '1 1 14rem', minWidth: 0 }}
             />
-            {t('admin.grants_admin')}
-          </label>
-          <button
-            type="submit"
-            className={primaryBtn}
-            disabled={pending || name.trim() === ''}
-          >
-            {t('admin.issue')}
-          </button>
-        </form>
+            <Checkbox
+              id="device-admin"
+              label={t('admin.grants_admin')}
+              checked={admin}
+              onChange={(event) => setAdmin(event.currentTarget.checked)}
+              mb={10}
+            />
+            <Button
+              type="submit"
+              disabled={pending || name.trim() === ''}
+              loading={pending}
+            >
+              {t('admin.issue')}
+            </Button>
+          </Group>
+        </Box>
       </Panel>
 
       {issued !== null ? (
@@ -230,35 +225,28 @@ export function DevicesTab({
             {t('admin.devices_empty')}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-start text-small">
-              <caption className="sr-only">{t('admin.tab_devices')}</caption>
-              <thead className="border-b border-border bg-surface-2 text-text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_name')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_kind')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_last_seen')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-end font-medium">
-                    {t('admin.col_pending')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_ro_seen')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.col_status')}
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-start font-medium">
-                    {t('admin.revoke')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+          <Box
+            tabIndex={0}
+            role="region"
+            aria-label={t('admin.tab_devices')}
+            style={{ overflowX: 'auto' }}
+          >
+            <Table fz="sm" miw={860}>
+              <Table.Caption className="sr-only">
+                {t('admin.tab_devices')}
+              </Table.Caption>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('admin.col_name')}</Table.Th>
+                  <Table.Th>{t('admin.col_kind')}</Table.Th>
+                  <Table.Th>{t('admin.col_last_seen')}</Table.Th>
+                  <Table.Th ta="end">{t('admin.col_pending')}</Table.Th>
+                  <Table.Th>{t('admin.col_ro_seen')}</Table.Th>
+                  <Table.Th>{t('admin.col_status')}</Table.Th>
+                  <Table.Th>{t('admin.revoke')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {devices.map((device) => (
                   <DeviceRow
                     key={device.id}
@@ -269,68 +257,65 @@ export function DevicesTab({
                     }}
                   />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Tbody>
+            </Table>
+          </Box>
         )}
       </Panel>
 
       <Panel title={t('admin.import_ops')} description={t('admin.import_hint')}>
-        <div className="flex max-w-xl flex-col gap-3">
-          <Field id="unsynced-file" label={t('admin.import_choose')}>
-            <input
-              id="unsynced-file"
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file === undefined) return;
-                void file.text().then((text) => {
-                  const parsed = parseUnsynced(text);
-                  if (parsed === null) {
-                    setPreview(null);
-                    toast.push(t('admin.import_bad'), 'error');
-                    return;
-                  }
-                  if (parsed.tenant_id !== tenantId) {
-                    setPreview(null);
-                    toast.push(t('admin.import_tenant_mismatch'), 'error');
-                    return;
-                  }
-                  const device = devices.find(
-                    (item) => item.id === parsed.device_id,
-                  );
-                  if (device === undefined || device.revoked_at === null) {
-                    setPreview(null);
-                    toast.push(t('admin.import_not_revoked'), 'error');
-                    return;
-                  }
-                  setPreview({
-                    deviceId: parsed.device_id,
-                    name: device.name,
-                    ops: parsed.ops,
-                  });
-                  setProgress(null);
+        <Stack gap="sm" maw={640}>
+          <FileInput
+            id="unsynced-file"
+            label={t('admin.import_choose')}
+            accept="application/json,.json"
+            value={null}
+            onChange={(file) => {
+              if (file === null) return;
+              void file.text().then((text) => {
+                const parsed = parseUnsynced(text);
+                if (parsed === null) {
+                  setPreview(null);
+                  toast.push(t('admin.import_bad'), 'error');
+                  return;
+                }
+                if (parsed.tenant_id !== tenantId) {
+                  setPreview(null);
+                  toast.push(t('admin.import_tenant_mismatch'), 'error');
+                  return;
+                }
+                const device = devices.find(
+                  (item) => item.id === parsed.device_id,
+                );
+                if (device === undefined || device.revoked_at === null) {
+                  setPreview(null);
+                  toast.push(t('admin.import_not_revoked'), 'error');
+                  return;
+                }
+                setPreview({
+                  deviceId: parsed.device_id,
+                  name: device.name,
+                  ops: parsed.ops,
                 });
-              }}
-            />
-          </Field>
+                setProgress(null);
+              });
+            }}
+          />
           {preview !== null ? (
-            <p className="rounded-control bg-info-subtle px-3 py-2 text-small text-info-subtle-ink">
-              {t('admin.import_preview', {
-                count: formatCount(preview.ops.length, lang),
-                device: preview.name,
-              })}
-            </p>
+            <Paper p="sm" bg="var(--color-info-subtle)">
+              <Text size="sm" c="var(--color-info-subtle-ink)">
+                {t('admin.import_preview', {
+                  count: formatCount(preview.ops.length, lang),
+                  device: preview.name,
+                })}
+              </Text>
+            </Paper>
           ) : null}
-          {progress !== null ? (
-            <p className="text-small tabular-nums">{progress}</p>
-          ) : null}
-          <button
+          {progress !== null ? <Text size="sm">{progress}</Text> : null}
+          <Button
             type="button"
-            className={`${primaryBtn} self-start`}
             disabled={preview === null || pending}
+            loading={pending}
             onClick={() => {
               if (preview === null) return;
               const job = preview;
@@ -362,10 +347,11 @@ export function DevicesTab({
                   setPending(false);
                 });
             }}
+            style={{ alignSelf: 'flex-start' }}
           >
             {t('admin.import_run')}
-          </button>
-        </div>
+          </Button>
+        </Stack>
       </Panel>
       <AdminConfirm
         open={revokeId !== null}
@@ -395,7 +381,7 @@ export function DevicesTab({
             });
         }}
       />
-    </div>
+    </Stack>
   );
 }
 
@@ -411,67 +397,65 @@ function DeviceRow({
   const { t } = useTranslation();
   const revoked = device.revoked_at !== null;
   return (
-    <tr className="border-b border-border last:border-b-0 hover:bg-surface-2/60">
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{device.name}</span>
+    <Table.Tr>
+      <Table.Td>
+        <Group gap="xs" wrap="wrap">
+          <Text fw={500}>{device.name}</Text>
           {device.is_admin ? (
-            <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-caption font-medium text-primary-subtle-ink">
+            <Badge variant="light" color="brand" tt="none" radius="xl">
               {t('admin.col_admin')}
-            </span>
+            </Badge>
           ) : null}
-        </div>
-        <p className="font-mono text-small text-text-muted">
+        </Group>
+        <Text size="sm" ff="monospace" c="dimmed">
           {device.device_code} · {device.branch_id}
-        </p>
-      </td>
-      <td className="px-4 py-3">
+        </Text>
+      </Table.Td>
+      <Table.Td>
         {t(
           device.kind === 'support' ? 'admin.kind_support' : 'admin.kind_till',
         )}
-      </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      </Table.Td>
+      <Table.Td style={{ whiteSpace: 'nowrap' }}>
         {device.last_seen_at === null
           ? t('admin.never')
           : formatWhen(device.last_seen_at, lang)}
         {device.app_version !== null ? (
-          <p className="font-mono text-small text-text-muted">
+          <Text size="sm" ff="monospace" c="dimmed">
             v{device.app_version}
-          </p>
+          </Text>
         ) : null}
-      </td>
-      <td className="px-4 py-3 text-end tabular-nums">
-        {formatCount(device.pending_ops, lang)}
-      </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      </Table.Td>
+      <Table.Td ta="end">{formatCount(device.pending_ops, lang)}</Table.Td>
+      <Table.Td style={{ whiteSpace: 'nowrap' }}>
         {device.read_only_seen_at === null
           ? '—'
           : formatWhen(device.read_only_seen_at, lang)}
-      </td>
-      <td className="px-4 py-3">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium ${
-            revoked
-              ? 'bg-danger-subtle text-danger-subtle-ink'
-              : 'bg-success-subtle text-success-subtle-ink'
-          }`}
+      </Table.Td>
+      <Table.Td>
+        <Badge
+          variant="light"
+          color={revoked ? 'danger' : 'success'}
+          tt="none"
+          radius="xl"
         >
-          <span
-            aria-hidden="true"
-            className="size-1.5 rounded-full bg-current"
-          />
           {revoked ? t('admin.revoked') : t('admin.active_device')}
-        </span>
-      </td>
-      <td className="px-4 py-3">
+        </Badge>
+      </Table.Td>
+      <Table.Td>
         {revoked ? (
-          <span className="text-text-muted">—</span>
+          <Text c="dimmed">—</Text>
         ) : (
-          <button type="button" className={quietBtn} onClick={onRevoke}>
+          <Button
+            type="button"
+            variant="default"
+            size="compact-sm"
+            onClick={onRevoke}
+          >
             {t('admin.revoke')}
-          </button>
+          </Button>
         )}
-      </td>
-    </tr>
+      </Table.Td>
+    </Table.Tr>
   );
 }
