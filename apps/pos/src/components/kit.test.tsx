@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initI18n } from '../i18n/i18n.ts';
+import { MantineRoot } from '../ui/MantineRoot.tsx';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { EmptyState } from './EmptyState.tsx';
 import { ExportMenu } from './ExportMenu.tsx';
@@ -195,7 +196,9 @@ describe('dialogs, export, toast, and key hints', () => {
     const onConfirm = vi.fn();
     const onOpenChange = vi.fn();
     render(
-      <ConfirmDialog open onOpenChange={onOpenChange} onConfirm={onConfirm} />,
+      <MantineRoot>
+        <ConfirmDialog open onOpenChange={onOpenChange} onConfirm={onConfirm} />
+      </MantineRoot>,
     );
     const cancel = screen.getByRole('button', { name: 'Cancel' });
     expect(document.activeElement).toBe(cancel);
@@ -211,7 +214,9 @@ describe('dialogs, export, toast, and key hints', () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     render(
-      <ConfirmDialog open onOpenChange={onOpenChange} onConfirm={() => {}} />,
+      <MantineRoot>
+        <ConfirmDialog open onOpenChange={onOpenChange} onConfirm={() => {}} />
+      </MantineRoot>,
     );
     await user.keyboard('{Escape}');
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -223,7 +228,11 @@ describe('dialogs, export, toast, and key hints', () => {
     const verify = vi.fn<(pin: string) => Promise<boolean>>();
     verify.mockResolvedValueOnce(false);
     verify.mockResolvedValueOnce(true);
-    render(<OverrideDialog open onOpenChange={onOpenChange} verify={verify} />);
+    render(
+      <MantineRoot>
+        <OverrideDialog open onOpenChange={onOpenChange} verify={verify} />
+      </MantineRoot>,
+    );
     const pin = screen.getByLabelText('Manager PIN');
     await user.type(pin, '12');
     await user.click(screen.getByRole('button', { name: 'Approve' }));

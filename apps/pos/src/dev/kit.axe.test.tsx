@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { initI18n } from '../i18n/i18n.ts';
+import { MantineRoot } from '../ui/MantineRoot.tsx';
 import { UiKitPage } from './UiKitPage.tsx';
 
 beforeEach(async () => {
@@ -20,7 +21,11 @@ async function seriousViolations(): Promise<axe.Result[]> {
 describe('UI kit accessibility', () => {
   it('has no serious or critical axe violations, including open dialogs', async () => {
     const user = userEvent.setup();
-    render(<UiKitPage />);
+    render(
+      <MantineRoot>
+        <UiKitPage />
+      </MantineRoot>,
+    );
     expect(screen.getByRole('heading', { name: 'UI kit' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Urdu' })).toBeTruthy();
     let violations = await seriousViolations();

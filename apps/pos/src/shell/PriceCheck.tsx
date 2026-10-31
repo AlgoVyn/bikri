@@ -145,6 +145,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
         <input
           ref={inputRef}
           id={inputId}
+          data-autofocus
           type="search"
           autoComplete="off"
           enterKeyHint="search"

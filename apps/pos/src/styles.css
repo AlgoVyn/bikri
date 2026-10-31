@@ -89,3 +89,14 @@
 .bikri-tab-item[data-active] {
   color: var(--mantine-color-brand-6);
 }
+
+/* The pay sheet is a full-screen dialog below the tablet breakpoint. */
+@media (max-width: 47.99em) {
+  .bikri-modal-full {
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+}

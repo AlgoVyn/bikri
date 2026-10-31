@@ -1,11 +1,7 @@
-import * as Dialog from '@radix-ui/react-dialog';
+import { Button, Group, NativeSelect, PasswordInput } from '@mantine/core';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet, fieldClass } from './classes.ts';
-
-const overlayClass = 'fixed inset-0 z-40 bg-text/40';
-const contentClass =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal bg-surface p-4 text-text shadow-modal';
+import { Modal } from '../sell/Modal.tsx';
 
 const PIN_PATTERN = /^\d{4,6}$/u;
 
@@ -14,6 +10,7 @@ export type OverrideProfile = {
   label: string;
 };
 
+/** Manager/owner PIN approval for a below-cost sale or an over-limit action. */
 export function OverrideDialog({
   open,
   onOpenChange,
@@ -32,7 +29,6 @@ export function OverrideDialog({
 }) {
   const { t } = useTranslation();
   const pinId = useId();
-  const errorId = useId();
   const profileId = useId();
   const [pin, setPin] = useState('');
   const [profileIdValue, setProfileIdValue] = useState(profiles?.[0]?.id ?? '');
@@ -76,85 +72,51 @@ export function OverrideDialog({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className={overlayClass} />
-        <Dialog.Content className={contentClass}>
-          <Dialog.Title className="text-title">{titleText}</Dialog.Title>
-          <Dialog.Description>{bodyText}</Dialog.Description>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(event) => void onSubmit(event)}
-          >
-            {choices.length > 0 ? (
-              <div>
-                <label
-                  htmlFor={profileId}
-                  className="mb-1 block text-small text-text"
-                >
-                  {t('ui.override_profile')}
-                </label>
-                <select
-                  id={profileId}
-                  className={fieldClass}
-                  value={profileIdValue}
-                  onChange={(event) => {
-                    setProfileIdValue(event.target.value);
-                  }}
-                >
-                  {choices.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            <div>
-              <label
-                htmlFor={pinId}
-                className="mb-1 block text-small text-text"
-              >
-                {t('ui.override_pin')}
-              </label>
-              <input
-                id={pinId}
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                dir="ltr"
-                maxLength={6}
-                className={fieldClass}
-                value={pin}
-                aria-invalid={error !== null || undefined}
-                aria-describedby={error !== null ? errorId : undefined}
-                onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/gu, '').slice(0, 6));
-                }}
-              />
-              {error !== null ? (
-                <p id={errorId} className="mt-1 text-small text-danger">
-                  {error}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Dialog.Close asChild>
-                <button type="button" className={buttonQuiet}>
-                  {t('common.cancel')}
-                </button>
-              </Dialog.Close>
-              <button
-                type="submit"
-                className={buttonPrimary}
-                disabled={pending}
-              >
-                {t('ui.override_submit')}
-              </button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={titleText}
+      description={bodyText}
+    >
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(event) => void onSubmit(event)}
+      >
+        {choices.length > 0 ? (
+          <NativeSelect
+            id={profileId}
+            label={t('ui.override_profile')}
+            value={profileIdValue}
+            onChange={(event) => setProfileIdValue(event.currentTarget.value)}
+            data={choices.map((profile) => ({
+              value: profile.id,
+              label: profile.label,
+            }))}
+          />
+        ) : null}
+        <PasswordInput
+          id={pinId}
+          label={t('ui.override_pin')}
+          data-autofocus
+          inputMode="numeric"
+          autoComplete="off"
+          dir="ltr"
+          maxLength={6}
+          value={pin}
+          error={error}
+          onChange={(event) =>
+            setPin(event.currentTarget.value.replace(/\D/gu, '').slice(0, 6))
+          }
+        />
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" loading={pending}>
+            {t('ui.override_submit')}
+          </Button>
+        </Group>
+      </form>
+    </Modal>
   );
 }

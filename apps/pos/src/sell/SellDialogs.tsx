@@ -1,6 +1,5 @@
 import { parsePkPhone } from '@bikri/core';
 import type { HeldBill } from '@bikri/db';
-import * as Dialog from '@radix-ui/react-dialog';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,15 +30,21 @@ import { formatShopMoney } from '../lib/money';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
 import { Modal } from './Modal.tsx';
 
-function Actions({ submit, disabled }: { submit: string; disabled?: boolean }) {
+function Actions({
+  submit,
+  disabled,
+  onCancel,
+}: {
+  submit: string;
+  disabled?: boolean;
+  onCancel: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Dialog.Close asChild>
-        <button type="button" className={buttonQuiet}>
-          {t('common.cancel')}
-        </button>
-      </Dialog.Close>
+      <button type="button" className={buttonQuiet} onClick={onCancel}>
+        {t('common.cancel')}
+      </button>
       <button type="submit" className={buttonPrimary} disabled={disabled}>
         {submit}
       </button>
@@ -117,7 +122,10 @@ export function QuickSaleDialog({
           value={qty}
           onChange={setQty}
         />
-        <Actions submit={t('sell.add_to_cart')} />
+        <Actions
+          submit={t('sell.add_to_cart')}
+          onCancel={() => onOpenChange(false)}
+        />
       </form>
     </Modal>
   );
@@ -181,7 +189,10 @@ export function BillDiscountDialog({
             />
           </div>
         )}
-        <Actions submit={t('sell.apply')} />
+        <Actions
+          submit={t('sell.apply')}
+          onCancel={() => onOpenChange(false)}
+        />
       </form>
     </Modal>
   );
@@ -227,7 +238,7 @@ export function HoldDialog({
             onChange={(e) => setLabel(e.target.value)}
           />
         </div>
-        <Actions submit={t('sell.hold')} />
+        <Actions submit={t('sell.hold')} onCancel={() => onOpenChange(false)} />
       </form>
     </Modal>
   );
@@ -430,7 +441,10 @@ export function CustomerDialog({
             onChange={setPhone}
           />
           {error ? <p className="text-small text-danger">{error}</p> : null}
-          <Actions submit={t('sell.customer_save')} />
+          <Actions
+            submit={t('sell.customer_save')}
+            onCancel={() => onOpenChange(false)}
+          />
         </form>
       ) : (
         <>

@@ -1,9 +1,21 @@
 /** PIN lock (screens/03, T-035): profile chips, PIN dots and keypad; offline, local only. */
 import type { MasterRow } from '@bikri/db';
+import {
+  Avatar,
+  Box,
+  Button,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
 import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
@@ -160,68 +172,93 @@ export function LockScreen() {
     'flex h-16 items-center justify-center rounded-card border border-border bg-surface text-h2 font-semibold';
 
   return (
-    <main
-      className="flex min-h-dvh flex-col bg-bg p-4"
+    <Box
+      component="main"
+      mih="100dvh"
+      bg="var(--mantine-color-body)"
+      p="md"
+      style={{ display: 'flex', flexDirection: 'column' }}
       data-testid="lock-screen"
     >
-      <header className="flex items-center justify-between gap-3">
-        <div
-          className="flex min-w-0 items-center gap-2"
-          data-testid="brand-lock"
-        >
-          <span
-            aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
-          >
+      <Group justify="space-between" align="center" gap="sm">
+        <Group gap="sm" wrap="nowrap" data-testid="brand-lock">
+          <ThemeIcon size={38} radius="md" color="accent" variant="filled">
             <SalesIcon />
-          </span>
-          <div className="min-w-0">
-            <p className="text-small font-semibold uppercase tracking-[0.14em] text-text-muted">
+          </ThemeIcon>
+          <Stack gap={0} style={{ minWidth: 0 }}>
+            <Text size="xs" fw={700} c="dimmed" tt="uppercase">
               {t('common.app_name')}
-            </p>
-            <p className="truncate font-medium">
+            </Text>
+            <Text size="sm" fw={600} truncate>
               {shopName ?? t('common.app_name')}
-            </p>
-          </div>
-        </div>
+            </Text>
+          </Stack>
+        </Group>
         <LanguageSelect />
-      </header>
+      </Group>
       <Banners />
-      <section className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5">
-        <h1 className="text-h1 font-semibold">{t('lock.who')}</h1>
-        <div className="flex flex-wrap justify-center gap-2">
+      <Stack
+        gap="lg"
+        align="center"
+        justify="center"
+        style={{ flex: 1 }}
+        maw={420}
+        mx="auto"
+        w="100%"
+      >
+        <Title order={1}>{t('lock.who')}</Title>
+        <Group justify="center" gap="sm">
           {data.profiles.map((p) => {
             const until = locks[String(p.id)];
             return (
-              <button
+              <UnstyledButton
                 key={String(p.id)}
-                type="button"
                 aria-pressed={chosen?.id === p.id}
-                className={`flex min-h-14 items-center gap-2 rounded-full border px-3 ${chosen?.id === p.id ? 'border-primary bg-primary-subtle' : 'border-border bg-surface'}`}
                 onClick={() => {
                   setChosen(p);
                   setPin('');
                   setMessage(null);
                 }}
               >
-                <span className="flex size-9 items-center justify-center rounded-full bg-primary font-semibold text-primary-ink">
-                  {String(p.name).slice(0, 1).toUpperCase()}
-                </span>
-                <span className="flex flex-col items-start">
-                  <span className="font-medium">{String(p.name)}</span>
-                  <span className="text-small text-text-muted">
-                    {until && until > now
-                      ? t('lock.locked_for', { time: mmss(until - now) })
-                      : t(`shell.role_${String(p.role)}`)}
-                  </span>
-                </span>
-              </button>
+                <Paper
+                  withBorder
+                  p="xs"
+                  pr="md"
+                  radius="xl"
+                  style={{
+                    borderColor:
+                      chosen?.id === p.id
+                        ? 'var(--mantine-color-brand-6)'
+                        : undefined,
+                    background:
+                      chosen?.id === p.id
+                        ? 'var(--mantine-color-brand-0)'
+                        : undefined,
+                  }}
+                >
+                  <Group gap="sm" wrap="nowrap">
+                    <Avatar color="brand" radius="xl">
+                      {String(p.name).slice(0, 1).toUpperCase()}
+                    </Avatar>
+                    <Stack gap={0}>
+                      <Text size="sm" fw={600}>
+                        {String(p.name)}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {until && until > now
+                          ? t('lock.locked_for', { time: mmss(until - now) })
+                          : t(`shell.role_${String(p.role)}`)}
+                      </Text>
+                    </Stack>
+                  </Group>
+                </Paper>
+              </UnstyledButton>
             );
           })}
           {data.support ? (
-            <button
-              type="button"
-              className="flex min-h-14 items-center gap-2 rounded-full border border-border bg-surface px-3"
+            <Button
+              variant="default"
+              radius="xl"
               onClick={() =>
                 unlock({
                   staff_id: SUPPORT_PROFILE_ID,
@@ -230,89 +267,106 @@ export function LockScreen() {
                 })
               }
             >
-              <span className="font-medium">{t('lock.support_profile')}</span>
-            </button>
+              {t('lock.support_profile')}
+            </Button>
           ) : null}
-        </div>
+        </Group>
         {chosen ? (
           <>
-            <div
-              className={`flex gap-3 ${shake ? 'motion-safe:animate-[shake_200ms]' : ''}`}
+            <Group
+              gap="sm"
               aria-label={t('lock.pin_entered', {
                 count: pin.length,
                 total: length,
               })}
               role="status"
+              className={
+                shake ? 'motion-safe:animate-[shake_200ms]' : undefined
+              }
             >
               {DOT_KEYS.slice(0, length).map((k, i) => (
-                <span
+                <Box
                   key={k}
-                  className={`size-4 rounded-full border-2 border-primary ${i < pin.length ? 'bg-primary' : ''}`}
+                  w={16}
+                  h={16}
+                  style={{
+                    borderRadius: 999,
+                    border: '2px solid var(--mantine-color-brand-6)',
+                    background:
+                      i < pin.length
+                        ? 'var(--mantine-color-brand-6)'
+                        : 'transparent',
+                  }}
                 />
               ))}
-            </div>
+            </Group>
             {message ? (
-              <p role="alert" className="text-danger">
+              <Text role="alert" c="red" size="sm">
                 {message}
-              </p>
+              </Text>
             ) : null}
-            <div className="grid w-full max-w-72 grid-cols-3 gap-2">
+            <SimpleGrid cols={3} spacing="sm" w="100%" maw={300}>
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-                <button
+                <Button
                   key={d}
-                  type="button"
-                  className={key}
+                  variant="default"
+                  size="xl"
+                  h={64}
+                  fz="1.2rem"
                   disabled={isLocked || busy}
                   onClick={() => press(d)}
                 >
                   {d}
-                </button>
+                </Button>
               ))}
-              <button
-                type="button"
-                className={`${key} text-body`}
+              <Button
+                variant="default"
+                size="xl"
+                h={64}
                 onClick={() => setPin('')}
               >
                 {t('lock.clear')}
-              </button>
-              <button
-                type="button"
-                className={key}
+              </Button>
+              <Button
+                variant="default"
+                size="xl"
+                h={64}
                 disabled={isLocked || busy}
                 onClick={() => press('0')}
               >
                 0
-              </button>
-              <button
-                type="button"
-                className={key}
+              </Button>
+              <Button
+                variant="default"
+                size="xl"
+                h={64}
                 aria-label={t('lock.backspace')}
                 onClick={() => setPin((p) => p.slice(0, -1))}
               >
                 ⌫
-              </button>
-            </div>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => setForgot((f) => !f)}
-            >
+              </Button>
+            </SimpleGrid>
+            <Button variant="subtle" onClick={() => setForgot((f) => !f)}>
               {t('lock.forgot')}
-            </button>
+            </Button>
             {forgot ? (
-              <p className="text-small text-text-muted">
+              <Text size="sm" c="dimmed" ta="center">
                 {chosen.role === 'owner'
                   ? t('lock.forgot_owner')
                   : t('lock.forgot_staff')}
-              </p>
+              </Text>
             ) : null}
           </>
         ) : null}
-      </section>
-      <footer className="text-center text-small text-text-muted">
-        <p>{fmt.format(now)}</p>
-        <p>{t('lock.kept')}</p>
-      </footer>
-    </main>
+      </Stack>
+      <Stack gap={2} align="center">
+        <Text size="sm" c="dimmed">
+          {fmt.format(now)}
+        </Text>
+        <Text size="sm" c="dimmed">
+          {t('lock.kept')}
+        </Text>
+      </Stack>
+    </Box>
   );
 }

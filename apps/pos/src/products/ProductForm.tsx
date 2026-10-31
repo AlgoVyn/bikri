@@ -1,4 +1,5 @@
 import { QTY_UNITS, type QtyUnit } from '@bikri/core';
+import { Button, Group, Paper, Stack } from '@mantine/core';
 import { Navigate, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -9,8 +10,10 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   addCategory,
@@ -372,509 +375,522 @@ export function ProductFormPage({
         void submit(false);
       }}
     >
-      <h1 className="text-h1 font-semibold">
-        {isEdit ? t('form.edit_title') : t('form.new_title')}
-      </h1>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('import.back_to_products')}
+        icon={<ProductsIcon />}
+        title={isEdit ? t('form.edit_title') : t('form.new_title')}
+      />
 
-      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-card">
-        <fieldset className="flex flex-wrap items-center gap-3">
-          <legend className="mb-1 text-small">{t('form.photo')}</legend>
-          {(draft.photo === undefined ? existingUrl : photoUrl) ? (
-            <img
-              src={(draft.photo === undefined ? existingUrl : photoUrl) ?? ''}
-              alt={t('form.photo_preview')}
-              data-testid="form-photo"
-              className="size-20 rounded-card object-cover"
-            />
-          ) : (
-            <span
-              aria-hidden="true"
-              className="size-20 rounded-card border border-dashed border-border-strong"
-            />
-          )}
-          <label
-            className={`${buttonQuiet} cursor-pointer focus-within:outline-2`}
-          >
-            {t('form.photo_pick')}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="sr-only"
-              aria-describedby={
-                photoError ? `${fieldId('photo')}-error` : undefined
-              }
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                try {
-                  const photo = await processPhoto(file);
-                  setPhotoError(false);
-                  if (photoUrl) URL.revokeObjectURL(photoUrl);
-                  setPhotoUrl(URL.createObjectURL(photo.blob));
-                  set('photo', photo);
-                } catch (error) {
-                  if (error instanceof PhotoError) setPhotoError(true);
-                  else throw error;
+      <Paper withBorder p="lg">
+        <Stack gap="lg">
+          <fieldset className="flex flex-wrap items-center gap-3">
+            <legend className="mb-1 text-small">{t('form.photo')}</legend>
+            {(draft.photo === undefined ? existingUrl : photoUrl) ? (
+              <img
+                src={(draft.photo === undefined ? existingUrl : photoUrl) ?? ''}
+                alt={t('form.photo_preview')}
+                data-testid="form-photo"
+                className="size-20 rounded-card object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="size-20 rounded-card border border-dashed border-border-strong"
+              />
+            )}
+            <label
+              className={`${buttonQuiet} cursor-pointer focus-within:outline-2`}
+            >
+              {t('form.photo_pick')}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                aria-describedby={
+                  photoError ? `${fieldId('photo')}-error` : undefined
                 }
-              }}
-            />
-          </label>
-          {(draft.photo === undefined && existingKey) || draft.photo ? (
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => {
-                set('photo', existingKey ? null : undefined);
-                setPhotoUrl(null);
-              }}
-            >
-              {t('form.photo_remove')}
-            </button>
-          ) : null}
-          {photoError ? (
-            <p
-              id={`${fieldId('photo')}-error`}
-              className="w-full text-small text-danger"
-            >
-              {t('form.photo_error')}
-            </p>
-          ) : null}
-        </fieldset>
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  try {
+                    const photo = await processPhoto(file);
+                    setPhotoError(false);
+                    if (photoUrl) URL.revokeObjectURL(photoUrl);
+                    setPhotoUrl(URL.createObjectURL(photo.blob));
+                    set('photo', photo);
+                  } catch (error) {
+                    if (error instanceof PhotoError) setPhotoError(true);
+                    else throw error;
+                  }
+                }}
+              />
+            </label>
+            {(draft.photo === undefined && existingKey) || draft.photo ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => {
+                  set('photo', existingKey ? null : undefined);
+                  setPhotoUrl(null);
+                }}
+              >
+                {t('form.photo_remove')}
+              </button>
+            ) : null}
+            {photoError ? (
+              <p
+                id={`${fieldId('photo')}-error`}
+                className="w-full text-small text-danger"
+              >
+                {t('form.photo_error')}
+              </p>
+            ) : null}
+          </fieldset>
 
-        <div>
-          <label htmlFor={fieldId('name_en')} className="mb-1 block text-small">
-            {t('form.name_en')}
-          </label>
-          <input
-            ref={nameRef}
-            id={fieldId('name_en')}
-            className={textField}
-            maxLength={80}
-            value={draft.name_en}
-            aria-invalid={errors.name_en ? true : undefined}
-            aria-describedby={
-              errors.name_en
-                ? `${fieldId('name_en')}-error`
-                : sameName
-                  ? `${fieldId('name_en')}-warn`
-                  : undefined
-            }
-            onChange={(e) => set('name_en', e.target.value)}
-          />
-          {errorText('name_en', errors.name_en)}
-          {!errors.name_en && sameName ? (
-            <p
-              id={`${fieldId('name_en')}-warn`}
-              className="mt-1 text-small text-warning"
-            >
-              {t('form.name_duplicate')}
-            </p>
-          ) : null}
-        </div>
-
-        <div>
-          <label htmlFor={fieldId('name_ur')} className="mb-1 block text-small">
-            {t('form.name_ur')}
-          </label>
-          <input
-            id={fieldId('name_ur')}
-            dir="rtl"
-            lang="ur"
-            className={`${textField} font-urdu`}
-            maxLength={80}
-            value={draft.name_ur}
-            onChange={(e) => set('name_ur', e.target.value)}
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label
-              htmlFor={fieldId('category')}
+              htmlFor={fieldId('name_en')}
               className="mb-1 block text-small"
             >
-              {t('form.category')}
+              {t('form.name_en')}
+            </label>
+            <input
+              ref={nameRef}
+              id={fieldId('name_en')}
+              className={textField}
+              maxLength={80}
+              value={draft.name_en}
+              aria-invalid={errors.name_en ? true : undefined}
+              aria-describedby={
+                errors.name_en
+                  ? `${fieldId('name_en')}-error`
+                  : sameName
+                    ? `${fieldId('name_en')}-warn`
+                    : undefined
+              }
+              onChange={(e) => set('name_en', e.target.value)}
+            />
+            {errorText('name_en', errors.name_en)}
+            {!errors.name_en && sameName ? (
+              <p
+                id={`${fieldId('name_en')}-warn`}
+                className="mt-1 text-small text-warning"
+              >
+                {t('form.name_duplicate')}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label
+              htmlFor={fieldId('name_ur')}
+              className="mb-1 block text-small"
+            >
+              {t('form.name_ur')}
+            </label>
+            <input
+              id={fieldId('name_ur')}
+              dir="rtl"
+              lang="ur"
+              className={`${textField} font-urdu`}
+              maxLength={80}
+              value={draft.name_ur}
+              onChange={(e) => set('name_ur', e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor={fieldId('category')}
+                className="mb-1 block text-small"
+              >
+                {t('form.category')}
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id={fieldId('category')}
+                  className={`${textField} min-w-0 flex-1`}
+                  value={draft.category_id}
+                  onChange={(e) => set('category_id', e.target.value)}
+                >
+                  <option value="">{t('form.no_category')}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {categoryName(c, i18n.language)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={`${buttonQuiet} shrink-0 whitespace-nowrap`}
+                  onClick={() => setNewCategory('')}
+                >
+                  {t('form.new_category')}
+                </button>
+              </div>
+              {newCategory !== null ? (
+                <div className="mt-2 flex gap-2">
+                  <label className="sr-only" htmlFor={fieldId('new-category')}>
+                    {t('form.new_category_name')}
+                  </label>
+                  <input
+                    id={fieldId('new-category')}
+                    className={`${textField} min-w-0 flex-1`}
+                    placeholder={t('form.new_category_name')}
+                    maxLength={40}
+                    // biome-ignore lint/a11y/noAutofocus: opened by the user's own click
+                    autoFocus
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (
+                          e.currentTarget
+                            .nextElementSibling as HTMLButtonElement | null
+                        )?.click();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={`${buttonQuiet} shrink-0`}
+                    disabled={!newCategory.trim()}
+                    onClick={async () => {
+                      const created = await addCategory(
+                        getDb(),
+                        newCategory,
+                        't1',
+                        {
+                          actor: staff?.id ?? null,
+                        },
+                      );
+                      set('category_id', created.id);
+                      setNewCategory(null);
+                    }}
+                  >
+                    {t('form.add')}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <label
+                htmlFor={fieldId('brand')}
+                className="mb-1 block text-small"
+              >
+                {t('form.brand')}
+              </label>
+              <input
+                id={fieldId('brand')}
+                className={textField}
+                maxLength={40}
+                list={fieldId('brands')}
+                value={draft.brand}
+                onChange={(e) => set('brand', e.target.value)}
+              />
+              <datalist id={fieldId('brands')}>
+                {brands.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-small">
+              {t('products.barcodes')}
+            </legend>
+            {draft.barcodes.map((code, i) => {
+              const key = `barcode-${i}`;
+              const err = errors.barcodes?.[i];
+              return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: barcode rows have no id until saved
+                <div key={i}>
+                  <div className="flex gap-2">
+                    <label className="sr-only" htmlFor={fieldId(key)}>
+                      {t('form.barcode', { n: i + 1 })}
+                    </label>
+                    <input
+                      id={fieldId(key)}
+                      dir="ltr"
+                      inputMode="numeric"
+                      className={fieldClass}
+                      maxLength={64}
+                      value={code}
+                      aria-invalid={err ? true : undefined}
+                      aria-describedby={
+                        err ? `${fieldId(key)}-error` : undefined
+                      }
+                      onChange={(e) =>
+                        set(
+                          'barcodes',
+                          draft.barcodes.map((b, j) =>
+                            j === i ? e.target.value : b,
+                          ),
+                        )
+                      }
+                    />
+                    {draft.barcodes.length > 1 ? (
+                      <button
+                        type="button"
+                        className={buttonQuiet}
+                        aria-label={t('form.remove_barcode', { n: i + 1 })}
+                        onClick={() =>
+                          set(
+                            'barcodes',
+                            draft.barcodes.filter((_, j) => j !== i),
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                  {errorText(key, err)}
+                </div>
+              );
+            })}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => set('barcodes', [...draft.barcodes, ''])}
+              >
+                {t('form.add_barcode')}
+              </button>
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={async () => {
+                  const code = await generateBarcode(getDb());
+                  const list = [...draft.barcodes];
+                  const empty = list.findIndex((b) => !b.trim());
+                  if (empty >= 0) list[empty] = code;
+                  else list.push(code);
+                  set('barcodes', list);
+                }}
+              >
+                {t('form.generate_barcode')}
+              </button>
+            </div>
+          </fieldset>
+
+          <div>
+            <label htmlFor={fieldId('sku')} className="mb-1 block text-small">
+              {t('form.sku')}
             </label>
             <div className="flex gap-2">
-              <select
-                id={fieldId('category')}
-                className={`${textField} min-w-0 flex-1`}
-                value={draft.category_id}
-                onChange={(e) => set('category_id', e.target.value)}
-              >
-                <option value="">{t('form.no_category')}</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {categoryName(c, i18n.language)}
-                  </option>
-                ))}
-              </select>
+              <input
+                id={fieldId('sku')}
+                dir="ltr"
+                className={fieldClass}
+                maxLength={40}
+                value={draft.sku}
+                aria-invalid={errors.sku ? true : undefined}
+                aria-describedby={
+                  errors.sku
+                    ? `${fieldId('sku')}-error`
+                    : `${fieldId('sku')}-hint`
+                }
+                onChange={(e) => set('sku', e.target.value)}
+              />
               <button
                 type="button"
                 className={`${buttonQuiet} shrink-0 whitespace-nowrap`}
-                onClick={() => setNewCategory('')}
+                onClick={async () =>
+                  set('sku', await uniqueSku(getDb(), draft.name_en || 'item'))
+                }
               >
-                {t('form.new_category')}
+                {t('form.generate_sku')}
               </button>
             </div>
-            {newCategory !== null ? (
-              <div className="mt-2 flex gap-2">
-                <label className="sr-only" htmlFor={fieldId('new-category')}>
-                  {t('form.new_category_name')}
-                </label>
-                <input
-                  id={fieldId('new-category')}
-                  className={`${textField} min-w-0 flex-1`}
-                  placeholder={t('form.new_category_name')}
-                  maxLength={40}
-                  // biome-ignore lint/a11y/noAutofocus: opened by the user's own click
-                  autoFocus
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (
-                        e.currentTarget
-                          .nextElementSibling as HTMLButtonElement | null
-                      )?.click();
-                    }
-                  }}
+            {errors.sku ? (
+              errorText('sku', errors.sku)
+            ) : (
+              <p
+                id={`${fieldId('sku')}-hint`}
+                className="mt-1 text-small text-text-muted"
+              >
+                {t('form.sku_hint')}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <MoneyInput
+                id={fieldId('price')}
+                label={t('form.price')}
+                value={draft.price}
+                onChange={(v) => set('price', v)}
+              />
+              {errorText('price', errors.price)}
+            </div>
+            {showCost ? (
+              <div>
+                <MoneyInput
+                  id={fieldId('cost')}
+                  label={t('form.cost')}
+                  value={draft.cost}
+                  onChange={(v) => set('cost', v)}
                 />
-                <button
-                  type="button"
-                  className={`${buttonQuiet} shrink-0`}
-                  disabled={!newCategory.trim()}
-                  onClick={async () => {
-                    const created = await addCategory(
-                      getDb(),
-                      newCategory,
-                      't1',
-                      {
-                        actor: staff?.id ?? null,
-                      },
-                    );
-                    set('category_id', created.id);
-                    setNewCategory(null);
-                  }}
-                >
-                  {t('form.add')}
-                </button>
+                {isEdit ? (
+                  <p className="mt-1 text-small text-text-muted">
+                    {t('form.cost_edit_hint')}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
-          <div>
-            <label htmlFor={fieldId('brand')} className="mb-1 block text-small">
-              {t('form.brand')}
-            </label>
-            <input
-              id={fieldId('brand')}
-              className={textField}
-              maxLength={40}
-              list={fieldId('brands')}
-              value={draft.brand}
-              onChange={(e) => set('brand', e.target.value)}
-            />
-            <datalist id={fieldId('brands')}>
-              {brands.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
-          </div>
-        </div>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-small">{t('products.barcodes')}</legend>
-          {draft.barcodes.map((code, i) => {
-            const key = `barcode-${i}`;
-            const err = errors.barcodes?.[i];
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: barcode rows have no id until saved
-              <div key={i}>
-                <div className="flex gap-2">
-                  <label className="sr-only" htmlFor={fieldId(key)}>
-                    {t('form.barcode', { n: i + 1 })}
-                  </label>
-                  <input
-                    id={fieldId(key)}
-                    dir="ltr"
-                    inputMode="numeric"
-                    className={fieldClass}
-                    maxLength={64}
-                    value={code}
-                    aria-invalid={err ? true : undefined}
-                    aria-describedby={err ? `${fieldId(key)}-error` : undefined}
-                    onChange={(e) =>
-                      set(
-                        'barcodes',
-                        draft.barcodes.map((b, j) =>
-                          j === i ? e.target.value : b,
-                        ),
-                      )
-                    }
-                  />
-                  {draft.barcodes.length > 1 ? (
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      aria-label={t('form.remove_barcode', { n: i + 1 })}
-                      onClick={() =>
-                        set(
-                          'barcodes',
-                          draft.barcodes.filter((_, j) => j !== i),
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </div>
-                {errorText(key, err)}
-              </div>
-            );
-          })}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => set('barcodes', [...draft.barcodes, ''])}
-            >
-              {t('form.add_barcode')}
-            </button>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={async () => {
-                const code = await generateBarcode(getDb());
-                const list = [...draft.barcodes];
-                const empty = list.findIndex((b) => !b.trim());
-                if (empty >= 0) list[empty] = code;
-                else list.push(code);
-                set('barcodes', list);
-              }}
-            >
-              {t('form.generate_barcode')}
-            </button>
-          </div>
-        </fieldset>
-
-        <div>
-          <label htmlFor={fieldId('sku')} className="mb-1 block text-small">
-            {t('form.sku')}
-          </label>
-          <div className="flex gap-2">
-            <input
-              id={fieldId('sku')}
-              dir="ltr"
-              className={fieldClass}
-              maxLength={40}
-              value={draft.sku}
-              aria-invalid={errors.sku ? true : undefined}
-              aria-describedby={
-                errors.sku
-                  ? `${fieldId('sku')}-error`
-                  : `${fieldId('sku')}-hint`
-              }
-              onChange={(e) => set('sku', e.target.value)}
-            />
-            <button
-              type="button"
-              className={`${buttonQuiet} shrink-0 whitespace-nowrap`}
-              onClick={async () =>
-                set('sku', await uniqueSku(getDb(), draft.name_en || 'item'))
-              }
-            >
-              {t('form.generate_sku')}
-            </button>
-          </div>
-          {errors.sku ? (
-            errorText('sku', errors.sku)
-          ) : (
-            <p
-              id={`${fieldId('sku')}-hint`}
-              className="mt-1 text-small text-text-muted"
-            >
-              {t('form.sku_hint')}
-            </p>
-          )}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <MoneyInput
-              id={fieldId('price')}
-              label={t('form.price')}
-              value={draft.price}
-              onChange={(v) => set('price', v)}
-            />
-            {errorText('price', errors.price)}
-          </div>
-          {showCost ? (
-            <div>
-              <MoneyInput
-                id={fieldId('cost')}
-                label={t('form.cost')}
-                value={draft.cost}
-                onChange={(v) => set('cost', v)}
-              />
-              {isEdit ? (
-                <p className="mt-1 text-small text-text-muted">
-                  {t('form.cost_edit_hint')}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor={fieldId('unit')} className="mb-1 block text-small">
-              {t('form.unit')}
-            </label>
-            <select
-              id={fieldId('unit')}
-              className={textField}
-              value={draft.unit}
-              onChange={(e) => set('unit', e.target.value as QtyUnit)}
-            >
-              {QTY_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {t(`unit.${u}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex min-h-11 items-center gap-3 self-end">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-checked={draft.track_stock}
-              className="size-5"
-              checked={draft.track_stock}
-              onChange={(e) => set('track_stock', e.target.checked)}
-            />
-            {t('form.track_stock')}
-          </label>
-        </div>
-
-        {draft.track_stock ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            {isEdit ? null : (
-              <QtyInput
-                id={fieldId('opening')}
-                label={t('form.opening')}
-                unit={draft.unit}
-                value={draft.opening}
-                onChange={(v) => set('opening', v)}
-              />
-            )}
-            <QtyInput
-              id={fieldId('min')}
-              label={t('form.min_stock')}
-              unit={draft.unit}
-              value={draft.min_stock}
-              onChange={(v) => set('min_stock', v)}
-            />
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor={fieldId('warranty')}
-              className="mb-1 block text-small"
-            >
-              {t('form.warranty')}
-            </label>
-            <select
-              id={fieldId('warranty')}
-              className={textField}
-              value={draft.warranty}
-              onChange={(e) => set('warranty', e.target.value)}
-            >
-              <option value="0">{t('form.warranty_none')}</option>
-              <option value="7">{t('form.warranty_7')}</option>
-              <option value="30">{t('form.warranty_30')}</option>
-              <option value="90">{t('form.warranty_90')}</option>
-              <option value="180">{t('form.warranty_180')}</option>
-              <option value="365">{t('form.warranty_365')}</option>
-              <option value="custom">{t('form.warranty_custom')}</option>
-            </select>
-          </div>
-          {draft.warranty === 'custom' ? (
             <div>
               <label
-                htmlFor={fieldId('warranty_days')}
+                htmlFor={fieldId('unit')}
                 className="mb-1 block text-small"
               >
-                {t('form.warranty_days')}
+                {t('form.unit')}
               </label>
+              <select
+                id={fieldId('unit')}
+                className={textField}
+                value={draft.unit}
+                onChange={(e) => set('unit', e.target.value as QtyUnit)}
+              >
+                {QTY_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {t(`unit.${u}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex min-h-11 items-center gap-3 self-end">
               <input
-                id={fieldId('warranty_days')}
-                inputMode="numeric"
-                dir="ltr"
-                className={fieldClass}
-                value={draft.warranty_days}
-                aria-invalid={errors.warranty_days ? true : undefined}
-                aria-describedby={
-                  errors.warranty_days
-                    ? `${fieldId('warranty_days')}-error`
-                    : undefined
-                }
-                onChange={(e) =>
-                  set('warranty_days', e.target.value.replace(/\D/gu, ''))
-                }
+                type="checkbox"
+                role="switch"
+                aria-checked={draft.track_stock}
+                className="size-5"
+                checked={draft.track_stock}
+                onChange={(e) => set('track_stock', e.target.checked)}
               />
-              {errorText('warranty_days', errors.warranty_days)}
+              {t('form.track_stock')}
+            </label>
+          </div>
+
+          {draft.track_stock ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {isEdit ? null : (
+                <QtyInput
+                  id={fieldId('opening')}
+                  label={t('form.opening')}
+                  unit={draft.unit}
+                  value={draft.opening}
+                  onChange={(v) => set('opening', v)}
+                />
+              )}
+              <QtyInput
+                id={fieldId('min')}
+                label={t('form.min_stock')}
+                unit={draft.unit}
+                value={draft.min_stock}
+                onChange={(v) => set('min_stock', v)}
+              />
             </div>
           ) : null}
-        </div>
 
-        <div>
-          <label htmlFor={fieldId('notes')} className="mb-1 block text-small">
-            {t('form.notes')}
-          </label>
-          <textarea
-            id={fieldId('notes')}
-            className="min-h-20 w-full rounded-control border border-border-strong bg-surface p-3 text-body text-text"
-            maxLength={500}
-            value={draft.notes}
-            onChange={(e) => set('notes', e.target.value)}
-          />
-        </div>
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor={fieldId('warranty')}
+                className="mb-1 block text-small"
+              >
+                {t('form.warranty')}
+              </label>
+              <select
+                id={fieldId('warranty')}
+                className={textField}
+                value={draft.warranty}
+                onChange={(e) => set('warranty', e.target.value)}
+              >
+                <option value="0">{t('form.warranty_none')}</option>
+                <option value="7">{t('form.warranty_7')}</option>
+                <option value="30">{t('form.warranty_30')}</option>
+                <option value="90">{t('form.warranty_90')}</option>
+                <option value="180">{t('form.warranty_180')}</option>
+                <option value="365">{t('form.warranty_365')}</option>
+                <option value="custom">{t('form.warranty_custom')}</option>
+              </select>
+            </div>
+            {draft.warranty === 'custom' ? (
+              <div>
+                <label
+                  htmlFor={fieldId('warranty_days')}
+                  className="mb-1 block text-small"
+                >
+                  {t('form.warranty_days')}
+                </label>
+                <input
+                  id={fieldId('warranty_days')}
+                  inputMode="numeric"
+                  dir="ltr"
+                  className={fieldClass}
+                  value={draft.warranty_days}
+                  aria-invalid={errors.warranty_days ? true : undefined}
+                  aria-describedby={
+                    errors.warranty_days
+                      ? `${fieldId('warranty_days')}-error`
+                      : undefined
+                  }
+                  onChange={(e) =>
+                    set('warranty_days', e.target.value.replace(/\D/gu, ''))
+                  }
+                />
+                {errorText('warranty_days', errors.warranty_days)}
+              </div>
+            ) : null}
+          </div>
 
-      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
-        <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            className={`${buttonQuiet} gap-2`}
+          <div>
+            <label htmlFor={fieldId('notes')} className="mb-1 block text-small">
+              {t('form.notes')}
+            </label>
+            <textarea
+              id={fieldId('notes')}
+              className="min-h-20 w-full rounded-control border border-border-strong bg-surface p-3 text-body text-text"
+              maxLength={500}
+              value={draft.notes}
+              onChange={(e) => set('notes', e.target.value)}
+            />
+          </div>
+        </Stack>
+      </Paper>
+
+      <div className="fixed inset-x-0 bottom-[76px] z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-[88px]">
+        <Group justify="flex-end" gap="sm" mx="auto" w="100%" maw={896}>
+          <Button
+            variant="default"
             onClick={() => (dirty ? setConfirmDiscard(true) : leave())}
           >
             {t('common.cancel')}
-          </button>
+          </Button>
           {isEdit ? null : (
-            <button
-              type="button"
-              className={`${buttonQuiet} gap-2`}
+            <Button
+              variant="default"
               disabled={saving}
               onClick={() => void submit(true)}
             >
               {t('form.save_another')}
-              <span className="max-lg:hidden"></span>
-            </button>
+            </Button>
           )}
-          <button
-            type="submit"
-            className={`${buttonPrimary} gap-2`}
-            disabled={saving}
-          >
+          <Button type="submit" disabled={saving}>
             {t('form.save')}
-            <span className="max-lg:hidden"></span>
-          </button>
-        </div>
+          </Button>
+        </Group>
       </div>
 
       <ConfirmDialog
