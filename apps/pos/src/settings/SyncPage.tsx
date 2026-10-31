@@ -2,14 +2,10 @@
 
 import { newId } from '@bikri/core';
 import type { OutboxEntry, SyncedRow } from '@bikri/db';
+import { Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  buttonDanger,
-  buttonPrimary,
-  buttonQuiet,
-} from '../components/classes.ts';
 import { CloudIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -143,167 +139,233 @@ export function SyncPage() {
 
   return (
     <SettingsPageLayout title={t('syncpage.title')} icon={<CloudIcon />}>
-      <div className="flex flex-col gap-4" data-testid="sync-page">
+      <Stack gap="md" data-testid="sync-page">
         {!data.enrolled ? (
-          <p className="text-text-muted">{t('syncpage.not_enrolled')}</p>
+          <Text c="dimmed">{t('syncpage.not_enrolled')}</Text>
         ) : null}
         {data.pullErrors.length > 0 ? (
-          <div
-            role="status"
-            className="rounded-control bg-warning-subtle p-3 text-small text-warning-subtle-ink"
-          >
-            <p>
+          <Paper role="status" p="sm" bg="var(--mantine-color-warning-subtle)">
+            <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
               {t('syncpage.pull_errors', { count: data.pullErrors.length })}
-            </p>
-            <ul className="mt-1 list-inside list-disc">
+            </Text>
+            <Box
+              component="ul"
+              mt={4}
+              ps="md"
+              style={{ color: 'var(--mantine-color-warning-subtle-ink)' }}
+            >
               {data.pullErrors.slice(-3).map((row) => (
-                <li key={`${row.at}-${row.tbl}-${row.id}`}>
+                <Text
+                  component="li"
+                  size="sm"
+                  key={`${row.at}-${row.tbl}-${row.id}`}
+                >
                   {row.tbl} · {row.id} · {row.message}
-                </li>
+                </Text>
               ))}
-            </ul>
-          </div>
+            </Box>
+          </Paper>
         ) : null}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-card border border-border bg-surface p-4">
-          <dt className="text-text-muted">{t('syncpage.last_sync')}</dt>
-          <dd>{formatWhen(i18n.language, sync.lastSyncAt ?? data.lastSync)}</dd>
-          <dt className="text-text-muted">{t('syncpage.waiting')}</dt>
-          <dd data-testid="sync-pending">{data.pending}</dd>
-          <dt className="text-text-muted">{t('syncpage.device')}</dt>
-          <dd>
-            {data.device ? `${data.device.name} · ${data.device.code}` : '—'}
-          </dd>
-          <dt className="text-text-muted">{t('syncpage.storage')}</dt>
-          <dd>
-            {storage
-              ? t('syncpage.storage_value', {
-                  mb: (storage.usage / 1_048_576).toFixed(1),
-                  persisted: storage.persisted
-                    ? t('syncpage.persisted_yes')
-                    : t('syncpage.persisted_no'),
-                })
-              : '—'}
-          </dd>
-        </dl>
+        <Paper withBorder p="md">
+          <Stack gap="xs">
+            <Group justify="space-between" gap="sm">
+              <Text size="sm" c="dimmed">
+                {t('syncpage.last_sync')}
+              </Text>
+              <Text size="sm">
+                {formatWhen(i18n.language, sync.lastSyncAt ?? data.lastSync)}
+              </Text>
+            </Group>
+            <Group justify="space-between" gap="sm">
+              <Text size="sm" c="dimmed">
+                {t('syncpage.waiting')}
+              </Text>
+              <Text size="sm" data-testid="sync-pending">
+                {data.pending}
+              </Text>
+            </Group>
+            <Group justify="space-between" gap="sm">
+              <Text size="sm" c="dimmed">
+                {t('syncpage.device')}
+              </Text>
+              <Text size="sm">
+                {data.device
+                  ? `${data.device.name} · ${data.device.code}`
+                  : '—'}
+              </Text>
+            </Group>
+            <Group justify="space-between" gap="sm">
+              <Text size="sm" c="dimmed">
+                {t('syncpage.storage')}
+              </Text>
+              <Text size="sm">
+                {storage
+                  ? t('syncpage.storage_value', {
+                      mb: (storage.usage / 1_048_576).toFixed(1),
+                      persisted: storage.persisted
+                        ? t('syncpage.persisted_yes')
+                        : t('syncpage.persisted_no'),
+                    })
+                  : '—'}
+              </Text>
+            </Group>
+          </Stack>
+        </Paper>
         {sync.phase === 'quota' && sync.quotaUntil ? (
-          <p
-            role="status"
-            className="rounded-control bg-warning-subtle p-3 text-warning-subtle-ink"
-          >
-            {t('syncpage.quota', {
-              time: formatWhen(i18n.language, sync.quotaUntil),
-            })}
-          </p>
+          <Paper role="status" p="sm" bg="var(--mantine-color-warning-subtle)">
+            <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+              {t('syncpage.quota', {
+                time: formatWhen(i18n.language, sync.quotaUntil),
+              })}
+            </Text>
+          </Paper>
         ) : null}
         {data.readOnly && data.pending > 0 ? (
-          <p
-            role="status"
-            className="rounded-control bg-warning-subtle p-3 text-warning-subtle-ink"
-          >
-            {t('syncpage.read_only_waiting')}
-          </p>
+          <Paper role="status" p="sm" bg="var(--mantine-color-warning-subtle)">
+            <Text size="sm" c="var(--mantine-color-warning-subtle-ink)">
+              {t('syncpage.read_only_waiting')}
+            </Text>
+          </Paper>
         ) : null}
         {sync.phase === 'error' && sync.error ? (
-          <p role="alert" className="text-danger">
+          <Text role="alert" c="danger" size="sm">
             {t('syncpage.problem', { message: sync.error })}
-          </p>
+          </Text>
         ) : null}
         {error ? (
-          <p role="alert" className="text-danger">
+          <Text role="alert" c="danger" size="sm">
             {error}
-          </p>
+          </Text>
         ) : null}
-        <div>
-          <button
-            type="button"
-            className={buttonPrimary}
-            disabled={busy || !data.enrolled}
-            onClick={() => {
-              setBusy(true);
-              void syncNow().finally(() => setBusy(false));
-            }}
-          >
-            {busy ? t('shell.sync_syncing') : t('syncpage.sync_now')}
-          </button>
-        </div>
+        <Button
+          type="button"
+          disabled={busy || !data.enrolled}
+          loading={busy}
+          onClick={() => {
+            setBusy(true);
+            void syncNow().finally(() => setBusy(false));
+          }}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {busy ? t('shell.sync_syncing') : t('syncpage.sync_now')}
+        </Button>
 
         {data.failed.length > 0 ? (
-          <section className="flex flex-col gap-2">
-            <h2 className="text-h2 font-semibold">
-              {t('syncpage.failed_title', { count: data.failed.length })}
-            </h2>
-            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-              {data.failed.map((e) => (
-                <li
-                  key={e.seq}
-                  className="flex flex-wrap items-center justify-between gap-2 p-3"
-                  data-testid="failed-op"
+          <Box component="section">
+            <Stack gap="sm">
+              <Title order={2} fz="lg">
+                {t('syncpage.failed_title', { count: data.failed.length })}
+              </Title>
+              <Paper withBorder>
+                <Box
+                  component="ul"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
                 >
-                  <span>
-                    {e.tbl} · {e.kind} ·{' '}
-                    <span className="text-danger">{e.last_error ?? '—'}</span>
-                  </span>
-                  <span className="flex gap-2">
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      onClick={() => void retryFailed(db, [e.seq as number])}
+                  {data.failed.map((e, index) => (
+                    <Box
+                      component="li"
+                      key={e.seq}
+                      data-testid="failed-op"
+                      p="sm"
+                      style={{
+                        borderTop:
+                          index > 0
+                            ? '1px solid var(--mantine-color-default-border)'
+                            : undefined,
+                      }}
                     >
-                      {t('syncpage.retry')}
-                    </button>
-                    {owner ? (
-                      <button
-                        type="button"
-                        className={buttonDanger}
-                        onClick={() => void discard([e])}
-                      >
-                        {t('syncpage.discard')}
-                      </button>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+                      <Group justify="space-between" gap="sm" wrap="wrap">
+                        <Text size="sm">
+                          {e.tbl} · {e.kind} ·{' '}
+                          <Text component="span" c="danger" inherit>
+                            {e.last_error ?? '—'}
+                          </Text>
+                        </Text>
+                        <Group gap="xs">
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="compact-sm"
+                            onClick={() =>
+                              void retryFailed(db, [e.seq as number])
+                            }
+                          >
+                            {t('syncpage.retry')}
+                          </Button>
+                          {owner ? (
+                            <Button
+                              type="button"
+                              color="danger"
+                              size="compact-sm"
+                              onClick={() => void discard([e])}
+                            >
+                              {t('syncpage.discard')}
+                            </Button>
+                          ) : null}
+                        </Group>
+                      </Group>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            </Stack>
+          </Box>
         ) : null}
 
-        <section className="flex flex-col gap-2">
-          <h2 className="text-h2 font-semibold">
-            {t('syncpage.conflicts_title')}
-          </h2>
-          {data.conflicts.length === 0 ? (
-            <p className="text-text-muted">{t('syncpage.no_conflicts')}</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-              {data.conflicts.map((c) => (
-                <li
-                  key={String(c.id)}
-                  className="flex flex-wrap items-center justify-between gap-2 p-3"
-                  data-testid="conflict"
+        <Box component="section">
+          <Stack gap="sm">
+            <Title order={2} fz="lg">
+              {t('syncpage.conflicts_title')}
+            </Title>
+            {data.conflicts.length === 0 ? (
+              <Text c="dimmed">{t('syncpage.no_conflicts')}</Text>
+            ) : (
+              <Paper withBorder>
+                <Box
+                  component="ul"
+                  style={{ listStyle: 'none', margin: 0, padding: 0 }}
                 >
-                  <span>
-                    {t(`syncpage.conflict_${String(c.kind)}`, {
-                      defaultValue: String(c.kind),
-                    })}{' '}
-                    · {String(c.tbl)} ·{' '}
-                    {formatWhen(i18n.language, Number(c.at))}
-                  </span>
-                  {owner && data.device?.is_admin ? (
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      onClick={() => void acknowledge(String(c.id))}
+                  {data.conflicts.map((c, index) => (
+                    <Box
+                      component="li"
+                      key={String(c.id)}
+                      data-testid="conflict"
+                      p="sm"
+                      style={{
+                        borderTop:
+                          index > 0
+                            ? '1px solid var(--mantine-color-default-border)'
+                            : undefined,
+                      }}
                     >
-                      {t('syncpage.acknowledge')}
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                      <Group justify="space-between" gap="sm" wrap="wrap">
+                        <Text size="sm">
+                          {t(`syncpage.conflict_${String(c.kind)}`, {
+                            defaultValue: String(c.kind),
+                          })}{' '}
+                          · {String(c.tbl)} ·{' '}
+                          {formatWhen(i18n.language, Number(c.at))}
+                        </Text>
+                        {owner && data.device?.is_admin ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="compact-sm"
+                            onClick={() => void acknowledge(String(c.id))}
+                          >
+                            {t('syncpage.acknowledge')}
+                          </Button>
+                        ) : null}
+                      </Group>
+                    </Box>
+                  ))}
+                </Box>
+              </Paper>
+            )}
+          </Stack>
+        </Box>
         {dialog}
-      </div>
+      </Stack>
     </SettingsPageLayout>
   );
 }

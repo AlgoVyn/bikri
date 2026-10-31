@@ -1,8 +1,19 @@
 import { businessDate } from '@bikri/core';
+import {
+  Box,
+  Button,
+  Group,
+  NativeSelect,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ClockIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
@@ -18,9 +29,6 @@ import { addDays, longDate, timeText } from '../reports/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
-
-const field =
-  'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 
 /** Activity viewer over audit_log (screens/17). */
 export function ActivityPage() {
@@ -71,159 +79,150 @@ function ActivityContent() {
     }, []) ?? 'Asia/Karachi';
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
-      <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.from')}
-          <input
-            type="date"
-            className={field}
-            value={filters.from}
-            max={filters.to}
-            onChange={(event) => update({ from: event.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.to')}
-          <input
-            type="date"
-            className={field}
-            value={filters.to}
-            min={filters.from}
-            max={today}
-            onChange={(event) => update({ to: event.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.action')}
-          <select
-            className={field}
-            value={filters.action ?? ''}
-            onChange={(event) =>
-              update({ action: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_actions')}</option>
-            {AUDIT_ACTIONS.map((action) => (
-              <option key={action} value={action}>
-                {t(`office.activity.action_${action}`, {
-                  defaultValue: action,
-                })}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.staff')}
-          <select
-            className={field}
-            value={filters.staffId ?? ''}
-            onChange={(event) =>
-              update({ staffId: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_staff')}</option>
-            {options?.staff.map((row) => (
-              <option key={row.id} value={row.id}>
-                {String(row.name)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.device')}
-          <select
-            className={field}
-            value={filters.deviceId ?? ''}
-            onChange={(event) =>
-              update({ deviceId: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_devices')}</option>
-            {options?.devices.map((row) => (
-              <option key={row.id} value={row.id}>
-                {String(row.name ?? row.code ?? '')}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {can('export.data') ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!rows || rows.length === 0}
-            onClick={() =>
-              rows &&
-              downloadText('bikri-activity.csv', auditCsv(rows, timeZone))
-            }
-          >
-            {t('office.activity.export_csv')}
-          </button>
-        </div>
-      ) : null}
-      {rows && rows.length === 0 ? (
-        <EmptyState message={t('office.activity.empty')} />
-      ) : null}
-      {rows && rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full min-w-[44rem] border-collapse text-small">
-            <thead>
-              <tr className="border-b border-border bg-surface-2">
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.time')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.staff')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.device')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.action')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.summary')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((entry) => (
-                <tr
-                  key={String(entry.row.id)}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <bdi dir="ltr">
-                      {longDate(
-                        businessDate(Number(entry.row.created_at), timeZone),
-                        i18n.language,
-                      )}{' '}
-                      {timeText(
-                        Number(entry.row.created_at),
-                        i18n.language,
-                        timeZone,
-                      )}
-                    </bdi>
-                  </td>
-                  <td className="px-3 py-2">
-                    {entry.staffName || String(entry.row.staff_id ?? '—')}
-                  </td>
-                  <td className="px-3 py-2">
-                    {entry.deviceName || String(entry.row.device_id ?? '—')}
-                  </td>
-                  <td className="px-3 py-2">
-                    {t(`office.activity.action_${String(entry.row.action)}`, {
-                      defaultValue: String(entry.row.action),
-                    })}
-                  </td>
-                  <td className="px-3 py-2 text-text-muted">{entry.summary}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+      <Stack gap="sm">
+        <Paper withBorder p="sm">
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="sm">
+            <TextInput
+              type="date"
+              label={t('office.activity.from')}
+              value={filters.from}
+              max={filters.to}
+              onChange={(event) => update({ from: event.currentTarget.value })}
+            />
+            <TextInput
+              type="date"
+              label={t('office.activity.to')}
+              value={filters.to}
+              min={filters.from}
+              max={today}
+              onChange={(event) => update({ to: event.currentTarget.value })}
+            />
+            <NativeSelect
+              label={t('office.activity.action')}
+              value={filters.action ?? ''}
+              onChange={(event) =>
+                update({ action: event.currentTarget.value || undefined })
+              }
+              data={[
+                { value: '', label: t('office.activity.all_actions') },
+                ...AUDIT_ACTIONS.map((action) => ({
+                  value: action,
+                  label: t(`office.activity.action_${action}`, {
+                    defaultValue: action,
+                  }),
+                })),
+              ]}
+            />
+            <NativeSelect
+              label={t('office.activity.staff')}
+              value={filters.staffId ?? ''}
+              onChange={(event) =>
+                update({ staffId: event.currentTarget.value || undefined })
+              }
+              data={[
+                { value: '', label: t('office.activity.all_staff') },
+                ...(options?.staff.map((row) => ({
+                  value: row.id,
+                  label: String(row.name),
+                })) ?? []),
+              ]}
+            />
+            <NativeSelect
+              label={t('office.activity.device')}
+              value={filters.deviceId ?? ''}
+              onChange={(event) =>
+                update({ deviceId: event.currentTarget.value || undefined })
+              }
+              data={[
+                { value: '', label: t('office.activity.all_devices') },
+                ...(options?.devices.map((row) => ({
+                  value: row.id,
+                  label: String(row.name ?? row.code ?? ''),
+                })) ?? []),
+              ]}
+            />
+          </SimpleGrid>
+        </Paper>
+        {can('export.data') ? (
+          <Group justify="flex-end">
+            <Button
+              type="button"
+              variant="default"
+              disabled={!rows || rows.length === 0}
+              onClick={() =>
+                rows &&
+                downloadText('bikri-activity.csv', auditCsv(rows, timeZone))
+              }
+            >
+              {t('office.activity.export_csv')}
+            </Button>
+          </Group>
+        ) : null}
+        {rows && rows.length === 0 ? (
+          <EmptyState message={t('office.activity.empty')} />
+        ) : null}
+        {rows && rows.length > 0 ? (
+          <Paper withBorder>
+            <Box
+              tabIndex={0}
+              role="region"
+              aria-label={t('office.activity.title')}
+              style={{ overflowX: 'auto' }}
+            >
+              <Table fz="sm" miw={704}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('office.activity.time')}</Table.Th>
+                    <Table.Th>{t('office.activity.staff')}</Table.Th>
+                    <Table.Th>{t('office.activity.device')}</Table.Th>
+                    <Table.Th>{t('office.activity.action')}</Table.Th>
+                    <Table.Th>{t('office.activity.summary')}</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {rows.map((entry) => (
+                    <Table.Tr key={String(entry.row.id)}>
+                      <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                        <Text size="sm" component="bdi" dir="ltr">
+                          {longDate(
+                            businessDate(
+                              Number(entry.row.created_at),
+                              timeZone,
+                            ),
+                            i18n.language,
+                          )}{' '}
+                          {timeText(
+                            Number(entry.row.created_at),
+                            i18n.language,
+                            timeZone,
+                          )}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        {entry.staffName || String(entry.row.staff_id ?? '—')}
+                      </Table.Td>
+                      <Table.Td>
+                        {entry.deviceName || String(entry.row.device_id ?? '—')}
+                      </Table.Td>
+                      <Table.Td>
+                        {t(
+                          `office.activity.action_${String(entry.row.action)}`,
+                          { defaultValue: String(entry.row.action) },
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm" c="dimmed">
+                          {entry.summary}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          </Paper>
+        ) : null}
+      </Stack>
     </SettingsPageLayout>
   );
 }

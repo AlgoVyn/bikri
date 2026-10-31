@@ -1,7 +1,7 @@
+import { Box, Button, Progress, Stack, Text, Title } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { CloudIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -56,9 +56,9 @@ function BackupContent() {
   if (!can('export.data') || role !== 'owner')
     return (
       <SettingsPageLayout title={t('office.backup.title')} icon={<CloudIcon />}>
-        <p className="p-6 text-center text-text-muted">
+        <Text p="lg" ta="center" c="dimmed">
           {t('office.backup.no_permission')}
-        </p>
+        </Text>
       </SettingsPageLayout>
     );
 
@@ -117,89 +117,112 @@ function BackupContent() {
 
   return (
     <SettingsPageLayout title={t('office.backup.title')} icon={<CloudIcon />}>
-      <section className="rounded-card border border-border bg-surface p-4">
-        <p>{t('office.backup.nightly')}</p>
-        <p className="mt-1 text-small text-text-muted">
-          {t('office.backup.hint')}
-        </p>
-        <button
-          type="button"
-          className={`${buttonPrimary} mt-3`}
-          disabled={building}
-          aria-busy={building}
-          onClick={() => void download()}
-        >
-          {building ? t('office.backup.building') : t('office.backup.download')}
-        </button>
-        {building && progress ? (
-          <div className="mt-3 flex flex-col gap-1">
-            <progress
-              className="h-2 w-full"
-              max={progress.total}
-              value={progress.index + 1}
-            />
-            <p className="text-small text-text-muted">
-              {t('office.backup.progress', {
-                table: progress.table,
-                index: progress.index + 1,
-                total: progress.total,
-                rows: progress.rows,
-              })}
-            </p>
-          </div>
-        ) : null}
-        {done ? (
-          <p className="mt-2 text-small text-success-subtle-ink" role="status">
-            {t('office.backup.finished', { filename: done })}
-          </p>
-        ) : null}
-        <p className="mt-3 text-small text-text-muted">
-          {t('office.backup.includes')}
-        </p>
-      </section>
+      <Box component="section">
+        <Stack gap="sm">
+          <Text>{t('office.backup.nightly')}</Text>
+          <Text size="sm" c="dimmed">
+            {t('office.backup.hint')}
+          </Text>
+          <Button
+            type="button"
+            disabled={building}
+            aria-busy={building}
+            loading={building}
+            onClick={() => void download()}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {building
+              ? t('office.backup.building')
+              : t('office.backup.download')}
+          </Button>
+          {building && progress ? (
+            <Stack gap={4}>
+              <Progress
+                value={((progress.index + 1) / progress.total) * 100}
+                size="sm"
+                aria-label={t('office.backup.progress', {
+                  table: progress.table,
+                  index: progress.index + 1,
+                  total: progress.total,
+                  rows: progress.rows,
+                })}
+              />
+              <Text size="sm" c="dimmed">
+                {t('office.backup.progress', {
+                  table: progress.table,
+                  index: progress.index + 1,
+                  total: progress.total,
+                  rows: progress.rows,
+                })}
+              </Text>
+            </Stack>
+          ) : null}
+          {done ? (
+            <Text size="sm" c="var(--color-success)" role="status">
+              {t('office.backup.finished', { filename: done })}
+            </Text>
+          ) : null}
+          <Text size="sm" c="dimmed">
+            {t('office.backup.includes')}
+          </Text>
+        </Stack>
+      </Box>
 
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">
-          {t('office.backup.server')}
-        </h2>
-        <p className="mt-1 text-small text-text-muted">
-          {serverAllowed
-            ? t('office.backup.server_hint')
-            : t('office.backup.server_unavailable')}
-        </p>
-        <button
-          type="button"
-          className={buttonQuiet}
-          disabled={!serverAllowed || serverBuilding}
-          aria-busy={serverBuilding}
-          onClick={() => void downloadServer()}
-        >
-          {serverBuilding
-            ? t('office.backup.server_building')
-            : t('office.backup.server')}
-        </button>
-        {serverProgress ? (
-          <p className="mt-1 text-small text-text-muted">{serverProgress}</p>
-        ) : null}
-        {serverDone ? (
-          <p className="mt-1 text-small text-success-subtle-ink" role="status">
-            {t('office.backup.server_finished', { filename: serverDone })}
-          </p>
-        ) : null}
-      </section>
+      <Box component="section">
+        <Stack gap="sm">
+          <Title order={2} fz="lg">
+            {t('office.backup.server')}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {serverAllowed
+              ? t('office.backup.server_hint')
+              : t('office.backup.server_unavailable')}
+          </Text>
+          <Button
+            type="button"
+            variant="default"
+            disabled={!serverAllowed || serverBuilding}
+            aria-busy={serverBuilding}
+            loading={serverBuilding}
+            onClick={() => void downloadServer()}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {serverBuilding
+              ? t('office.backup.server_building')
+              : t('office.backup.server')}
+          </Button>
+          {serverProgress ? (
+            <Text size="sm" c="dimmed">
+              {serverProgress}
+            </Text>
+          ) : null}
+          {serverDone ? (
+            <Text size="sm" c="var(--color-success)" role="status">
+              {t('office.backup.server_finished', { filename: serverDone })}
+            </Text>
+          ) : null}
+        </Stack>
+      </Box>
       {dialog}
 
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">
-          {t('office.backup.restore')}
-        </h2>
-        <p className="mt-1 text-small text-text-muted">
-          {t('office.backup.restore_hint')}
-        </p>
-        <button type="button" className={buttonQuiet} disabled>
-          {t('office.backup.restore')}
-        </button>
-      </section>
+      <Box component="section">
+        <Stack gap="sm">
+          <Title order={2} fz="lg">
+            {t('office.backup.restore')}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {t('office.backup.restore_hint')}
+          </Text>
+          <Button
+            type="button"
+            variant="default"
+            disabled
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {t('office.backup.restore')}
+          </Button>
+        </Stack>
+      </Box>
     </SettingsPageLayout>
   );
 }
