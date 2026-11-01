@@ -23,6 +23,7 @@ import {
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import {
   balanceLabel,
   balanceTone,
@@ -37,12 +38,13 @@ import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 export function ChaseList() {
   const { t, i18n } = useTranslation();
   const { can, staff } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const canEditPromises = can('party.edit');
   const [selected, setSelected] = useState<ChaseRow | null>(null);
   const [dialog, setDialog] = useState<'promise' | 'receive' | null>(null);
 
   useEffect(() => {
-    if (!canEditPromises) return;
+    if (!canEditPromises || readOnly) return;
     void (async () => {
       const db = getDb();
       const tz = await shopTimeZone(db);
@@ -51,7 +53,7 @@ export function ChaseList() {
         actor: staff?.id ?? null,
       });
     })().catch(() => undefined);
-  }, [canEditPromises, staff?.id]);
+  }, [canEditPromises, staff?.id, readOnly]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -176,7 +178,7 @@ export function ChaseList() {
                       {t('office.udhaar.call')}
                     </a>
                   ) : null}
-                  {can('party.edit') ? (
+                  {can('party.edit') && !readOnly ? (
                     <button
                       type="button"
                       className={buttonQuiet}
@@ -188,7 +190,7 @@ export function ChaseList() {
                       {t('office.udhaar.promise')}
                     </button>
                   ) : null}
-                  {can('payment.receive') ? (
+                  {can('payment.receive') && !readOnly ? (
                     <button
                       type="button"
                       className={buttonPrimary}

@@ -13,7 +13,7 @@ function DeliveryRoute() {
   const { supplierId } = Route.useParams();
   return (
     <AreaStrings area="office">
-      <PermissionGate permission="purchase.create">
+      <PermissionGate permission="purchase.create" blockReadOnly>
         <DeliveryPage supplierId={supplierId} />
       </PermissionGate>
     </AreaStrings>

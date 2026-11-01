@@ -11,6 +11,8 @@ export type CurrentStaff = {
   can: (permission: Permission) => boolean;
   /** The view-only Algovyn support profile (13 §7.5). */
   support: boolean;
+  /** The branch of this till; a cashier's history scope (screens/10). */
+  branchId: string | null;
 };
 
 /** What the support profile may do: look, never write. */
@@ -45,6 +47,12 @@ export function useCurrentStaff(): CurrentStaff {
       null
     );
   }, [session?.staff_id, localTenant]);
+  const deviceBranch = useLiveQuery(async () => {
+    const row = await getDb().kv.get('device');
+    const branch = (row?.value as { branch_id?: unknown } | undefined)
+      ?.branch_id;
+    return branch ? String(branch) : null;
+  }, []);
   const live = staff && staff.active === 1 && !staff.deleted_at ? staff : null;
   const loaded = staff !== undefined;
   useEffect(() => {
@@ -62,6 +70,7 @@ export function useCurrentStaff(): CurrentStaff {
       role: 'cashier',
       can: (p) => SUPPORT_ALLOWED.has(p),
       support: true,
+      branchId: deviceBranch ?? null,
     };
   const role = (live?.role ??
     (loaded ? 'cashier' : (session?.role ?? 'owner'))) as Role;
@@ -71,5 +80,6 @@ export function useCurrentStaff(): CurrentStaff {
     role,
     can: (p) => canDo(role, json, p),
     support: false,
+    branchId: deviceBranch ?? null,
   };
 }

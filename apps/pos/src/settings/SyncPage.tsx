@@ -15,6 +15,7 @@ import { CloudIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { writeAction } from '../data/write.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { syncNow } from '../sync/engine.ts';
@@ -27,17 +28,19 @@ import { shopErrorMessage, useShopAdmin } from './OwnerSignin.tsx';
 export function formatWhen(
   lang: string,
   at: number | null | undefined,
+  timeZone = 'Asia/Karachi',
 ): string {
   if (!at) return '—';
   return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Asia/Karachi',
+    timeZone,
   }).format(at);
 }
 
 export function SyncPage() {
   const { t, i18n } = useTranslation();
+  const timeZone = useShopTimeZone();
   const db = getDb();
   const { staff, role } = useCurrentStaff();
   const staffId = staff ? String(staff.id) : null;
@@ -62,6 +65,7 @@ export function SyncPage() {
       status,
       token,
       pullErrors,
+      failedFiles,
     ] = await Promise.all([
       db.outbox.where('status').equals('pending').count(),
       db.outbox.where('status').equals('failed').toArray(),
@@ -75,6 +79,7 @@ export function SyncPage() {
         'pull_errors',
         [],
       ),
+      db.file_queue.where('status').equals('failed').toArray(),
     ]);
     return {
       pending,
@@ -87,6 +92,7 @@ export function SyncPage() {
       readOnly: status?.status === 'read_only',
       enrolled: Boolean(token),
       pullErrors,
+      failedFiles,
     };
   }, [db]);
 
@@ -175,7 +181,13 @@ export function SyncPage() {
         ) : null}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-card border border-border bg-surface p-4">
           <dt className="text-text-muted">{t('syncpage.last_sync')}</dt>
-          <dd>{formatWhen(i18n.language, sync.lastSyncAt ?? data.lastSync)}</dd>
+          <dd>
+            {formatWhen(
+              i18n.language,
+              sync.lastSyncAt ?? data.lastSync,
+              timeZone,
+            )}
+          </dd>
           <dt className="text-text-muted">{t('syncpage.waiting')}</dt>
           <dd data-testid="sync-pending">{data.pending}</dd>
           <dt className="text-text-muted">{t('syncpage.device')}</dt>
@@ -200,7 +212,7 @@ export function SyncPage() {
             className="rounded-control bg-warning-subtle p-3 text-warning-subtle-ink"
           >
             {t('syncpage.quota', {
-              time: formatWhen(i18n.language, sync.quotaUntil),
+              time: formatWhen(i18n.language, sync.quotaUntil, timeZone),
             })}
           </p>
         ) : null}
@@ -276,6 +288,48 @@ export function SyncPage() {
           </section>
         ) : null}
 
+        {data.failedFiles.length > 0 ? (
+          <section className="flex flex-col gap-2" data-testid="failed-files">
+            <h2 className="text-h2 font-semibold">
+              {t('syncpage.files_title', {
+                count: data.failedFiles.length,
+              })}
+            </h2>
+            <p className="text-small text-text-muted">
+              {t('syncpage.files_hint')}
+            </p>
+            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+              {data.failedFiles.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center justify-between gap-2 p-3"
+                >
+                  <span>
+                    {t(`syncpage.file_kind_${e.kind}`)} · {e.target_id}
+                  </span>
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => {
+                      if (e.id === undefined) return;
+                      void db.file_queue
+                        .update(e.id, {
+                          status: 'pending',
+                          // Legacy entries queued before the permission check did
+                          // not carry a staff id; retry as the unlocked profile.
+                          staff_id: staffId ?? e.staff_id ?? null,
+                        })
+                        .then(() => syncNow());
+                    }}
+                  >
+                    {t('syncpage.file_retry')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section className="flex flex-col gap-2">
           <h2 className="text-h2 font-semibold">
             {t('syncpage.conflicts_title')}
@@ -295,7 +349,7 @@ export function SyncPage() {
                       defaultValue: String(c.kind),
                     })}{' '}
                     · {String(c.tbl)} ·{' '}
-                    {formatWhen(i18n.language, Number(c.at))}
+                    {formatWhen(i18n.language, Number(c.at), timeZone)}
                   </span>
                   {owner && data.device?.is_admin ? (
                     <button

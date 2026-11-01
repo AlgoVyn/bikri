@@ -7,6 +7,7 @@ import {
   closeDay,
   dayCloseCsv,
   dayCloseData,
+  dayCloseInfo,
   queueDayClosePrint,
 } from './dayClose.ts';
 import { loadDayCloseReceipt } from './dayCloseReceipt.ts';
@@ -52,6 +53,67 @@ function payment(id: string, over: Record<string, unknown>): SyncedRow {
 }
 
 describe('day close (T-047)', () => {
+  it('informational card/bank/udhaar figures net voids and refunds like Reports', async () => {
+    const { db } = await setup('info');
+    await db.sales.bulkAdd([
+      {
+        id: 's-void',
+        status: 'void',
+        udhaar_amount: 100000,
+        device_id: 'dev-1',
+        business_date: TODAY,
+        created_at: NOW - 900,
+      } as SyncedRow,
+      {
+        id: 's-live',
+        status: 'paid',
+        udhaar_amount: 100000,
+        device_id: 'dev-1',
+        business_date: TODAY,
+        created_at: NOW - 800,
+      } as SyncedRow,
+    ]);
+    await db.payments.bulkAdd([
+      payment('void-in', {
+        method: 'card',
+        amount: 100000,
+        purpose: 'sale',
+        created_at: NOW - 900,
+      }),
+      payment('void-out', {
+        direction: 'out',
+        method: 'card',
+        amount: 100000,
+        purpose: 'void',
+        created_at: NOW - 850,
+      }),
+      payment('live-card', {
+        method: 'card',
+        amount: 300000,
+        purpose: 'sale',
+        created_at: NOW - 800,
+      }),
+    ]);
+    await db.refunds.add({
+      id: 'refund-live',
+      sale_id: 's-live',
+      method: 'card',
+      amount: 50000,
+      udhaar_part: 20000,
+      device_id: 'dev-1',
+      business_date: TODAY,
+      created_at: NOW - 700,
+    } as SyncedRow);
+    const info = await dayCloseInfo(db, 'dev-1', NOW - 10000, NOW);
+    expect(info).toMatchObject({
+      cardTotal: 250000,
+      bankTotal: 0,
+      udhaarGiven: 80000,
+      bills: 1,
+      refunds: 1,
+    });
+  });
+
   it('AC 1: vector D1 stores the exact components and difference', async () => {
     const { db, ctx } = await setup();
     await db.payments.bulkAdd([

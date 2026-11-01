@@ -14,6 +14,7 @@ import {
   SUPPORT_PROFILE_ID,
   tryUnlock,
 } from '../data/pinLock.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { Banners } from '../shell/Banners.tsx';
 import { applyDevicePrefs, loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
@@ -35,6 +36,7 @@ function mmss(ms: number): string {
 
 export function LockScreen() {
   const { t, i18n } = useTranslation();
+  const timeZone = useShopTimeZone();
 
   // The lock screen sits outside AppShell, so apply the device's chosen theme here too.
   useEffect(() => {
@@ -153,7 +155,7 @@ export function LockScreen() {
       month: 'long',
       hour: 'numeric',
       minute: '2-digit',
-      timeZone: 'Asia/Karachi',
+      timeZone,
     },
   );
   const key =

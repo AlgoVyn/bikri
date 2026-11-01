@@ -20,6 +20,7 @@ import {
   updateShopSettings,
 } from '../data/settings.ts';
 import type { LogoData } from '../data/setup.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { ditheredPreview, LogoError, processLogo } from '../setup/logo.ts';
 import { ReceiptPreview } from '../setup/ReceiptPreview.tsx';
@@ -171,9 +172,18 @@ function ShopForm() {
     }
   };
   const removeLogo = async () => {
-    await updateShopLogo(getDb(), null, staff?.id ?? null);
-    setLogo(null);
-    toast.push(t('office.settings.saved'));
+    try {
+      await updateShopLogo(getDb(), null, staff?.id ?? null);
+      setLogo(null);
+      toast.push(t('office.settings.saved'));
+    } catch (err) {
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('errors.generic'),
+        'error',
+      );
+    }
   };
 
   if (!data) return <PageLoading compact />;
@@ -316,6 +326,7 @@ function ShopForm() {
             <button
               type="button"
               className={buttonQuiet}
+              disabled={readOnly}
               onClick={() => void removeLogo()}
             >
               {t('setup.logo_remove')}

@@ -295,11 +295,12 @@ function PayStep({
   useHotkey(
     (ev) => /^[1-4]$/u.test(ev.key) && !ev.ctrlKey && !ev.altKey && !ev.metaKey,
     (ev) => chooseMethod(PAY_METHODS[Number(ev.key) - 1] as PayMethod),
+    { inDialog: true },
   );
   useHotkey(
     (ev) => ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey),
     addSplit,
-    { inFields: true },
+    { inFields: true, inDialog: true },
   );
 
   const label =

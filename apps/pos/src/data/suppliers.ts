@@ -19,7 +19,8 @@ export type SupplierInput = {
 export type SupplierRow = {
   supplier: MasterRow;
   balance: number;
-  lastDeliveryAt: number | null;
+  /** The latest delivery's business date (`YYYY-MM-DD`), not its entry time. */
+  lastDeliveryDate: string | null;
 };
 
 export type SupplierList = {
@@ -89,37 +90,39 @@ export async function supplierList(
   const purchases = await (
     src.table('purchases') as Table<SyncedRow>
   ).toArray();
-  const last = new Map<string, number>();
+  const last = new Map<string, string>();
   for (const purchase of purchases) {
     const key = String(purchase.supplier_id);
-    last.set(key, Math.max(last.get(key) ?? 0, n(purchase.created_at)));
+    const date = String(purchase.business_date ?? '');
+    if (date > (last.get(key) ?? '')) last.set(key, date);
   }
-  const rows: SupplierRow[] = [];
+  const all: SupplierRow[] = [];
   for (const supplier of (
     await (src.table('suppliers') as Table<MasterRow>).toArray()
   ).filter((row) => !row.deleted_at)) {
-    const name = String(supplier.name ?? '').toLowerCase();
-    const phone = String(supplier.phone ?? '').replace(/\D/gu, '');
-    if (
-      query !== '' &&
-      !(
-        words.every((word) => name.includes(word)) ||
-        (digits.length >= 3 && phone.includes(digits))
-      )
-    )
-      continue;
-    rows.push({
+    all.push({
       supplier,
       balance: balances.get(supplier.id)?.balance ?? 0,
-      lastDeliveryAt: last.get(supplier.id) ?? null,
+      lastDeliveryDate: last.get(supplier.id) ?? null,
     });
   }
+  const rows = all.filter((row) => {
+    if (query === '') return true;
+    const name = String(row.supplier.name ?? '').toLowerCase();
+    const phone = String(row.supplier.phone ?? '').replace(/\D/gu, '');
+    return (
+      words.every((word) => name.includes(word)) ||
+      (digits.length >= 3 && phone.includes(digits))
+    );
+  });
   rows.sort((a, b) =>
     String(a.supplier.name).localeCompare(String(b.supplier.name)),
   );
   return {
     rows,
-    totalOwed: rows.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
+    // screens/13: "total you owe suppliers" is a shop total, not a search result
+    // (same rule as the customer list, D-126).
+    totalOwed: all.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
   };
 }
 
@@ -199,20 +202,8 @@ export async function deleteSupplier(
   await writeAction(db, (w) => w.remove('suppliers', id), { now, actor });
 }
 
-export function suppliersCsv(
-  rows: readonly SupplierRow[],
-  timeZone: string,
-): string {
+export function suppliersCsv(rows: readonly SupplierRow[]): string {
   const header = ['name', 'phone', 'balance', 'last_delivery'];
-  const date = (at: number | null): string =>
-    at === null
-      ? ''
-      : new Intl.DateTimeFormat('en-CA', {
-          timeZone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(at);
   return [header.join(',')]
     .concat(
       rows.map((row) =>
@@ -220,7 +211,7 @@ export function suppliersCsv(
           String(row.supplier.name),
           String(row.supplier.phone ?? ''),
           rupeesCsv(row.balance),
-          date(row.lastDeliveryAt),
+          String(row.lastDeliveryDate ?? ''),
         ]
           .map(csvCell)
           .join(','),
@@ -244,6 +235,7 @@ export async function supplierStatement(
       .toArray()
   ).sort(
     (a, b) =>
+      String(a.business_date).localeCompare(String(b.business_date)) ||
       n(a.created_at) - n(b.created_at) ||
       String(a.id).localeCompare(String(b.id)),
   );

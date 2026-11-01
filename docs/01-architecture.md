@@ -49,7 +49,7 @@ Bikri lives at **`https://algovyn.com/bikri/`** (decision D-021). It is not a su
 | Hono | `new Hono().basePath('/bikri/api')` |
 | PWA manifest | `id: '/bikri/'`, `start_url: '/bikri/'`, `scope: '/bikri/'` (§6) |
 | Service worker | file `/bikri/sw.js` → default scope `/bikri/`; never registered at `/` |
-| Vite dev server | `http://localhost:5173/bikri/`, proxy `/bikri/api` → `wrangler dev` on `:8787` |
+| Vite dev server | `http://localhost:5173/bikri/`, proxy `/bikri/api` → `wrangler dev` on `:8787` (the dev script allows both origins: `http://localhost:8787`, `http://localhost:5173`) |
 
 ## 2. System diagram
 
@@ -250,7 +250,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   ],
   "vars": {
     "APP_VERSION": "0.1.0",
-    "SCHEMA_VERSION": "1",
+    "SCHEMA_VERSION": "2",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain

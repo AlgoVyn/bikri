@@ -140,7 +140,7 @@ describe('expenses and cash moves (T-046)', () => {
       from: `${TODAY.slice(0, 7)}-01`,
       to: `${TODAY.slice(0, 7)}-31`,
     });
-    const csv = expensesCsv(list.rows, TZ);
+    const csv = expensesCsv(list.rows);
     expect(csv.split('\r\n')[0]).toBe(
       'date,category,payee,note,amount,method,staff,device',
     );

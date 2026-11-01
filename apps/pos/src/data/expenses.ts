@@ -141,10 +141,7 @@ export async function expenseList(
   };
 }
 
-export function expensesCsv(
-  rows: readonly ExpenseRow[],
-  timeZone: string,
-): string {
+export function expensesCsv(rows: readonly ExpenseRow[]): string {
   const header = [
     'date',
     'category',

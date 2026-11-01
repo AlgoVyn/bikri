@@ -6,7 +6,7 @@ import {
   type LabelSizeId,
 } from '@bikri/printer';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -15,11 +15,13 @@ import { useToast } from '../components/Toast.tsx';
 import { addProductBarcode, generateBarcode } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { printLabelHtml } from './printLabels.ts';
 
 export type LabelSeed = { productId: string; copies: number };
@@ -73,19 +75,28 @@ function LabelsDialogContent({
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [rows, setRows] = useState<LabelSeed[]>([]);
   const [settings, setSettings] = useState<LabelSettings>(DEFAULT);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  // A fresh array literal from the parent must not reset copies while the dialog is
+  // open; only a genuinely different seed (or opening it) re-initialises the rows.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
+  const seedKey = initial
+    .map((row) => `${row.productId}:${row.copies}`)
+    .join('|');
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-initialise only when the dialog opens or the seed really changes (the parent passes a fresh array)
   useEffect(() => {
     if (!open) return;
-    setRows(initial);
+    setRows(initialRef.current);
     setQuery('');
     setError(null);
     setPrinting(false);
-  }, [open, initial]);
+  }, [open, seedKey]);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -186,8 +197,13 @@ function LabelsDialogContent({
       const code = await generateBarcode(getDb());
       await addProductBarcode(getDb(), product.id, code, staff?.id ?? null);
       toast.push(t('office.labels.generated', { code }));
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('errors.generic'),
+        'error',
+      );
     }
   };
 
@@ -271,7 +287,7 @@ function LabelsDialogContent({
             <span className="justify-self-start sm:justify-self-end">
               {row.barcode ? (
                 <MoneyText paisa={Number(row.product.price ?? 0)} />
-              ) : can('catalog.edit') ? (
+              ) : can('catalog.edit') && !readOnly ? (
                 <button
                   type="button"
                   className={`${buttonQuiet} whitespace-nowrap`}

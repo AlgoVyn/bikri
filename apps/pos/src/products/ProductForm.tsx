@@ -139,6 +139,7 @@ export function ProductFormPage({
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const pendingAnother = useRef(false);
+  const pendingSave = useRef(false);
   const [existingKey, setExistingKey] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
@@ -294,20 +295,22 @@ export function ProductFormPage({
   }
 
   async function submit(another: boolean, freeConfirmed = false) {
-    if (saving || !draft) return;
-    const found = await validate(draft);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
-      focusFirstError(found);
-      return;
-    }
-    if (draft.price === 0 && !freeConfirmed) {
-      setConfirmFree(true);
-      pendingAnother.current = another;
-      return;
-    }
+    if (pendingSave.current || !draft) return;
+    // Set synchronously: a double click must not start a second product (two ids).
+    pendingSave.current = true;
     setSaving(true);
     try {
+      const found = await validate(draft);
+      setErrors(found);
+      if (Object.keys(found).length > 0) {
+        focusFirstError(found);
+        return;
+      }
+      if (draft.price === 0 && !freeConfirmed) {
+        setConfirmFree(true);
+        pendingAnother.current = another;
+        return;
+      }
       const db = getDb();
       const ctx = await ledgerContext(db, String(staff?.id ?? ''));
       const input: ProductInput = {
@@ -348,8 +351,15 @@ export function ProductFormPage({
         });
       else if (error instanceof DuplicateSkuError)
         setErrors({ sku: t('form.sku_taken') });
-      else throw error;
+      else
+        toast.push(
+          error instanceof Error && error.message
+            ? error.message
+            : t('errors.generic'),
+          'error',
+        );
     } finally {
+      pendingSave.current = false;
       setSaving(false);
     }
   }
@@ -635,12 +645,23 @@ export function ProductFormPage({
                         type="button"
                         className={buttonQuiet}
                         aria-label={t('form.remove_barcode', { n: i + 1 })}
-                        onClick={() =>
+                        onClick={() => {
                           set(
                             'barcodes',
                             draft.barcodes.filter((_, j) => j !== i),
-                          )
-                        }
+                          );
+                          if (errors.barcodes) {
+                            const next: Record<number, string> = {};
+                            for (const [key, value] of Object.entries(
+                              errors.barcodes,
+                            )) {
+                              const at = Number(key);
+                              if (at < i) next[at] = value;
+                              else if (at > i) next[at - 1] = value;
+                            }
+                            setErrors({ ...errors, barcodes: next });
+                          }
+                        }}
                       >
                         ×
                       </button>

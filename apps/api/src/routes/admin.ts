@@ -80,6 +80,12 @@ admin.get('/usage', async (c) => {
   return c.json({
     email: c.var.operator,
     ...overview,
+    open_conflicts: list.tenants
+      .filter((tenant) => tenant.conflicts > 0)
+      .map((tenant) => ({
+        tenant_id: tenant.id,
+        count: tenant.conflicts,
+      })),
     last_backup: last
       ? { key: last.key, size: last.size, uploaded: last.uploaded.getTime() }
       : null,

@@ -91,6 +91,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
       : (parsed.data.device_name ?? code.device_name),
     branch_id: code.branch_id,
     device_code: '',
+    device_code_history: '',
     token_hash: await sha256Hex(token),
     is_admin: support ? 0 : code.grants_admin,
     kind: support ? 'support' : 'till',

@@ -72,18 +72,34 @@ export async function dayCloseInfo(
     .where('[device_id+created_at]')
     .between([deviceId, start], [deviceId, end], false, true)
     .toArray();
-  const saleSum = (method: string) =>
-    payments
+  const saleSum = (method: string) => {
+    const inflow = payments
       .filter(
         (p) =>
           p.direction === 'in' && p.purpose === 'sale' && p.method === method,
       )
       .reduce((sum, p) => sum + n(p.amount), 0);
+    // Reports net a void's payout and a refund's paid part on the day they happen
+    // (07 §9); the informational day-close figures must agree with them.
+    const voids = payments
+      .filter(
+        (p) =>
+          p.direction === 'out' && p.purpose === 'void' && p.method === method,
+      )
+      .reduce((sum, p) => sum + n(p.amount), 0);
+    const refunded = refunds
+      .filter((r) => String(r.method ?? '') === method)
+      .reduce((sum, r) => sum + n(r.amount), 0);
+    return inflow - voids - refunded;
+  };
+  const liveSales = sales.filter((s) => s.status !== 'void');
   return {
     cardTotal: saleSum('card'),
     bankTotal: saleSum('bank_wallet'),
-    udhaarGiven: sales.reduce((sum, s) => sum + n(s.udhaar_amount), 0),
-    bills: sales.filter((s) => s.status !== 'void').length,
+    udhaarGiven:
+      liveSales.reduce((sum, s) => sum + n(s.udhaar_amount), 0) -
+      refunds.reduce((sum, r) => sum + n(r.udhaar_part), 0),
+    bills: liveSales.length,
     refunds: refunds.length,
   };
 }

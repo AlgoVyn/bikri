@@ -675,9 +675,20 @@ export async function chaseList(
     today: options.today,
   });
   const owing = list.rows.filter((row) => row.balance > 0);
-  const payments = (
-    await (src.table('payments') as Table<SyncedRow>).toArray()
-  ).filter((p) => p.direction === 'in' && p.purpose === 'customer_payment');
+  // Only the owing customers' payments: loading the whole payments table on a
+  // multi-year shop is needless and slows the chase list.
+  const owingIds = [...new Set(owing.map((row) => String(row.customer.id)))];
+  const payments =
+    owingIds.length === 0
+      ? []
+      : (
+          await (src.table('payments') as Table<SyncedRow>)
+            .where('[party_type+party_id]')
+            .anyOf(owingIds.map((id) => ['customer', id]))
+            .toArray()
+        ).filter(
+          (p) => p.direction === 'in' && p.purpose === 'customer_payment',
+        );
   const lastPayment = new Map<string, number>();
   for (const p of payments) {
     const key = String(p.party_id);

@@ -19,6 +19,7 @@ import { getDb } from '../data/db.ts';
 import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierBalance } from '../data/suppliers.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -40,7 +41,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { staff } = useCurrentStaff();
+  const { staff, can } = useCurrentStaff();
   const [lines, setLines] = useState<Line[]>([]);
   const [query, setQuery] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -189,7 +190,9 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         params: { supplierId },
       });
     } catch (err) {
-      if (err instanceof DeliveryError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof DeliveryError)
         toast.push(t(`office.suppliers.delivery_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
@@ -301,11 +304,13 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                       {String(p.name_en)}
                     </span>
                     <span className="text-text-muted">{String(p.sku)}</span>
-                    <span className="ms-auto">
-                      <MoneyText
-                        paisa={Number(p.last_cost || p.avg_cost || 0)}
-                      />
-                    </span>
+                    {can('cost.view') ? (
+                      <span className="ms-auto">
+                        <MoneyText
+                          paisa={Number(p.last_cost || p.avg_cost || 0)}
+                        />
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -388,35 +393,48 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                       }
                     />
                     <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
-                      <label className="flex min-h-11 items-center gap-2 text-small">
-                        <input
-                          type="checkbox"
-                          className="size-5"
-                          checked={line.updatePrice}
-                          onChange={(e) =>
-                            setLines((current) =>
-                              current.map((l, i) =>
-                                i === index
-                                  ? { ...l, updatePrice: e.target.checked }
-                                  : l,
-                              ),
-                            )
-                          }
-                        />
-                        {t('office.suppliers.update_price')}
-                      </label>
-                      {line.updatePrice ? (
-                        <MoneyInput
-                          label={t('office.suppliers.price')}
-                          value={line.price}
-                          onChange={(paisa) =>
-                            setLines((current) =>
-                              current.map((l, i) =>
-                                i === index ? { ...l, price: paisa ?? 0 } : l,
-                              ),
-                            )
-                          }
-                        />
+                      {can('catalog.edit') ? (
+                        <>
+                          <label className="flex min-h-11 items-center gap-2 text-small">
+                            <input
+                              type="checkbox"
+                              className="size-5"
+                              checked={line.updatePrice}
+                              onChange={(e) =>
+                                setLines((current) =>
+                                  current.map((l, i) =>
+                                    i === index
+                                      ? { ...l, updatePrice: e.target.checked }
+                                      : l,
+                                  ),
+                                )
+                              }
+                            />
+                            {t('office.suppliers.update_price')}
+                          </label>
+                          {line.updatePrice ? (
+                            <MoneyInput
+                              label={t('office.suppliers.price')}
+                              value={line.price}
+                              onChange={(paisa) =>
+                                setLines((current) =>
+                                  current.map((l, i) =>
+                                    i === index
+                                      ? { ...l, price: paisa ?? 0 }
+                                      : l,
+                                  ),
+                                )
+                              }
+                            />
+                          ) : (
+                            <p className="text-small text-text-muted">
+                              {t('office.suppliers.price')}:{' '}
+                              <MoneyText
+                                paisa={Number(line.product.price ?? 0)}
+                              />
+                            </p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-small text-text-muted">
                           {t('office.suppliers.price')}:{' '}

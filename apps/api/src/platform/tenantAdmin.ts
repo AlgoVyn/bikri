@@ -23,6 +23,8 @@ export type TenantListRow = {
   today: { rows_written: number; rows_read: number; pushes: number };
   daily_write_budget: number;
   setup_completed: boolean;
+  /** Open sync conflicts of this shop (`needs_owner`). */
+  conflicts: number;
 };
 
 export async function listTenants(
@@ -38,6 +40,7 @@ export async function listTenants(
        (SELECT COUNT(*) FROM devices d WHERE d.tenant_id = t.id AND d.revoked_at IS NULL) AS devices,
        (SELECT MAX(last_seen_at) FROM devices d WHERE d.tenant_id = t.id) AS last_seen_at,
        (SELECT COUNT(*) FROM shop s WHERE s.tenant_id = t.id AND s.setup_completed_at IS NOT NULL) AS setup,
+       (SELECT COUNT(*) FROM sync_conflicts s WHERE s.tenant_id = t.id AND s.resolution = 'needs_owner') AS conflicts,
        COALESCE(u.rows_written, 0) AS rows_written, COALESCE(u.rows_read, 0) AS rows_read, COALESCE(u.pushes, 0) AS pushes
      FROM tenants t LEFT JOIN tenant_usage u ON u.tenant_id = t.id AND u.day = ?1
      WHERE t.status <> 'deleted' ORDER BY t.display_name`,
@@ -63,6 +66,7 @@ export async function listTenants(
       },
       daily_write_budget: Number(row.daily_write_budget),
       setup_completed: Number(row.setup) > 0,
+      conflicts: Number(row.conflicts),
     };
   });
   return { tenants, account_today: { rows_written: w, rows_read: r } };
@@ -85,14 +89,11 @@ export async function usageHistory(env: Env, tenantId: string, days = 7) {
 /** Account-wide figures for the console Overview (screens/19). */
 export async function accountOverview(env: Env, now: number) {
   const day = utcDay(now);
-  const [size, statuses, conflicts] = await env.DB.batch([
+  const [size, statuses] = await env.DB.batch([
     env.DB.prepare(
       'SELECT COALESCE(SUM(rows_written), 0) AS w, COALESCE(SUM(rows_read), 0) AS r FROM tenant_usage WHERE day = ?1',
     ).bind(day),
     env.DB.prepare('SELECT status, COUNT(*) AS n FROM tenants GROUP BY status'),
-    env.DB.prepare(
-      "SELECT tenant_id, COUNT(*) AS n FROM sync_conflicts WHERE resolution = 'needs_owner' GROUP BY tenant_id",
-    ),
   ]);
   const totals = (size?.results?.[0] ?? { w: 0, r: 0 }) as {
     w: number;
@@ -108,12 +109,6 @@ export async function accountOverview(env: Env, now: number) {
     db_size_bytes: size?.meta.size_after ?? null,
     today: { rows_written: totals.w, rows_read: totals.r },
     tenants_by_status: by,
-    open_conflicts: (
-      (conflicts?.results ?? []) as { tenant_id: string; n: number }[]
-    ).map((row) => ({
-      tenant_id: String(row.tenant_id),
-      count: Number(row.n),
-    })),
   };
 }
 

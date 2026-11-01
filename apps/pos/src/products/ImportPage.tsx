@@ -28,8 +28,10 @@ import {
   TEMPLATE_FILE,
   templateCsv,
 } from '../data/importProducts.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { downloadText } from '../lib/download.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { readSheetFile } from './sheetFile.ts';
 
 const selectClass =
@@ -54,12 +56,22 @@ export function ImportPage() {
   const { t } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const [stage, setStage] = useState<Stage>({ step: 'choose' });
   const [readError, setReadError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileId = useId();
   if (!can('catalog.edit')) return <Navigate to="/products" replace />;
+  if (readOnly)
+    return (
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-3 p-8 text-center">
+        <p className="text-text-muted">{t('tenant.readOnly.blocked')}</p>
+        <Link to="/products" className={buttonQuiet}>
+          {t('office.products.title')}
+        </Link>
+      </div>
+    );
 
   const message = (e: RowError) =>
     t(`import.err.${e.code}`, { name: e.name ?? '', max: MAX_IMPORT_ROWS });
@@ -113,9 +125,14 @@ export function ImportPage() {
         }),
         'info',
       );
-    } catch {
+    } catch (err) {
       setStage({ step: 'choose' });
-      toast.push(t('import.import_failed'), 'error');
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('import.import_failed'),
+        'error',
+      );
     }
   };
 

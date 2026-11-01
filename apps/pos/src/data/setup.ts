@@ -173,6 +173,7 @@ export async function finishSetup(
           target_id: 'shop',
           blob: logo.png,
           sha256: logo.sha256,
+          staff_id: ownerId,
           status: 'pending',
         } as never);
         await w

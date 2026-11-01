@@ -14,7 +14,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/sync/push` | device | Push outbox ops ([03 §4.1](03-sync.md#41-push--post-apisyncpush)) |
 | GET | `/sync/pull` | device | Pull changes since a cursor ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) |
 | GET | `/sync/snapshot` | device | Full copy of the tenant's synced tables, paged per table ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)) |
-| PUT | `/files/:kind/:id/:sha256` | device | Upload a product image or logo |
+| PUT | `/files/:kind/:id/:sha256` | device + `X-Bikri-Staff` with `catalog.edit` (photo) or `settings.shop` (logo) | Upload a product image or logo |
 | GET | `/files/*key` | device | Download a file from R2 |
 | GET/POST/DELETE | `/shop/enrolment-codes` | admin device + owner | List, create, cancel enrolment codes for this shop ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) |
 | GET | `/shop/devices` | admin device + owner | List this shop's devices |
@@ -138,7 +138,7 @@ Specified in [03-sync §4](03-sync.md#4-protocol). Limits: ≤ 200 ops, ≤ 1 MB
 ### 3.5 `PUT /api/files/:kind/:id/:sha256`
 - `kind` ∈ `product_image`, `logo`. `id` = product ID (or `shop` for logo). `sha256` = hex digest of the body (client computes).
 - Body: raw bytes, `Content-Type: image/webp | image/png | image/jpeg`, ≤ 2 MB (client resizes first: product images 512×512 max WebP q=0.8; logo PNG ≤ 576 px wide).
-- Server verifies the digest, writes R2 key `t/<tenant_id>/products/<id>/<sha256>.webp` or `t/<tenant_id>/shop/logo-<sha256>.png` (the tenant prefix is added by the server from the token and never shown to the till), returns the **relative** key:
+- Server verifies the digest and the staff permission (`catalog.edit` for a product photo, `settings.shop` for the logo; no header → `403 FORBIDDEN`), writes R2 key `t/<tenant_id>/products/<id>/<sha256>.webp` or `t/<tenant_id>/shop/logo-<sha256>.png` (the tenant prefix is added by the server from the token and never shown to the till), returns the **relative** key:
 ```json
 201 { "key": "products/01J9.../9f2c...e1.webp", "size": 24311 }
 ```

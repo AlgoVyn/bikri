@@ -855,6 +855,19 @@ BEGIN
 END;
 ```
 
+### 2.4 Device code history and open-conflict index (migration `0005_device_code_history.sql`)
+
+Moving a device to another branch assigns a new `device_code`, but bills queued offline before the move still carry the old code. `devices.device_code_history` (comma-separated, last 20 codes) lets the server accept them; the till also updates its local `kv.device` from the pulled row. The index serves the operator overview and the shop's Sync screen (`resolution = 'needs_owner'`).
+
+```sql
+-- A device keeps the codes it was enrolled/moved with, so a bill queued before a
+-- branch move still matches its invoice (the server accepts any historical code).
+ALTER TABLE devices ADD COLUMN device_code_history TEXT NOT NULL DEFAULT '';
+
+-- The operator and the tenant's Sync screen count open conflicts per shop.
+CREATE INDEX sync_conflicts_open ON sync_conflicts (tenant_id, resolution);
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

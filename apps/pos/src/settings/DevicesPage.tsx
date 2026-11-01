@@ -17,6 +17,7 @@ import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
 import { formatCode } from '../data/enrol.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { OwnerSigninRequired, shopRequest } from '../sync/shopApi.ts';
@@ -126,17 +127,22 @@ export async function importUnsynced(
   return { applied, rejected };
 }
 
-function timeText(lang: string, at: number | null): string {
+function timeText(
+  lang: string,
+  at: number | null,
+  timeZone = 'Asia/Karachi',
+): string {
   if (!at) return '—';
   return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Asia/Karachi',
+    timeZone,
   }).format(at);
 }
 
 export function DevicesPage() {
   const { t, i18n } = useTranslation();
+  const timeZone = useShopTimeZone();
   const db = getDb();
   const online = useOnline();
   const { staff, role, support } = useCurrentStaff();
@@ -355,7 +361,7 @@ export function DevicesPage() {
                   <span>
                     {c.device_name}
                     {c.is_admin ? ` · ${t('devices.admin')}` : ''} ·{' '}
-                    {timeText(i18n.language, c.expires_at)}
+                    {timeText(i18n.language, c.expires_at, timeZone)}
                   </span>
                   <button
                     type="button"
@@ -453,7 +459,7 @@ export function DevicesPage() {
                   {d.kind === 'support' ? (
                     <span className="rounded-full bg-warning-subtle px-2 text-small text-warning-subtle-ink">
                       {t('devices.support', {
-                        time: timeText(i18n.language, d.expires_at),
+                        time: timeText(i18n.language, d.expires_at, timeZone),
                       })}
                     </span>
                   ) : null}
@@ -471,7 +477,7 @@ export function DevicesPage() {
                 <p className="text-small text-text-muted">
                   {t('devices.meta', {
                     branch: branchName(d.branch_id),
-                    seen: timeText(i18n.language, d.last_seen_at),
+                    seen: timeText(i18n.language, d.last_seen_at, timeZone),
                     version: d.app_version ?? '—',
                     pending: d.pending_ops,
                   })}
@@ -608,8 +614,8 @@ export function DevicesPage() {
             <p>
               {t('devices.import_preview', {
                 count: importState.p.count,
-                from: timeText(i18n.language, importState.p.from),
-                to: timeText(i18n.language, importState.p.to),
+                from: timeText(i18n.language, importState.p.from, timeZone),
+                to: timeText(i18n.language, importState.p.to, timeZone),
                 sales: formatShopMoney(importState.p.sales),
                 payments: formatShopMoney(importState.p.payments),
               })}

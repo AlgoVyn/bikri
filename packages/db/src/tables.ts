@@ -87,6 +87,7 @@ export const TABLE_COLUMNS = {
     'app_version',
     'created_at',
     'updated_at',
+    'device_code_history',
   ],
   enrolment_codes: [
     'code_hash',

@@ -21,12 +21,13 @@ function upload(
   path: string,
   body: Uint8Array,
   type = 'image/webp',
+  staffId: string = IDS.owner,
 ) {
   return api(`/files/${path}`, {
     method: 'PUT',
     token,
     body,
-    headers: { 'content-type': type },
+    headers: { 'content-type': type, 'x-bikri-staff': staffId },
   });
 }
 
@@ -88,9 +89,33 @@ describe('files (T-033, I7)', () => {
     expect(await env.FILES.head(`t/${b.tenantId}/${key}`)).not.toBeNull();
   });
 
-  it('checks digest, type and size; read-only shops and support devices cannot upload', async () => {
+  it('checks digest, type and size; permissions, read-only shops and support devices', async () => {
     const a = await seedShop('Files C');
     const digest = await sha(IMG);
+    // A cashier lacks catalog.edit, so the photo upload is refused.
+    expect(
+      (
+        await upload(
+          a.till.token,
+          `product_image/${IDS.product}/${digest}`,
+          IMG,
+          'image/webp',
+          IDS.cashier,
+        )
+      ).status,
+    ).toBe(403);
+    // The logo needs shop settings, not just any unlocked staff member.
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `logo/shop/${digest}`,
+          IMG,
+          'image/png',
+          IDS.cashier,
+        )
+      ).status,
+    ).toBe(403);
     expect(
       (
         await upload(

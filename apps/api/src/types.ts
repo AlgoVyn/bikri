@@ -40,6 +40,8 @@ export type DeviceRow = {
   name: string;
   branch_id: string;
   device_code: string;
+  /** Comma-separated codes this device used before a branch move (oldest first). */
+  device_code_history: string;
   token_hash: string;
   is_admin: number;
   kind: 'till' | 'support';

@@ -47,7 +47,7 @@ export function SupplierStatement({
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
-  const { can } = useCurrentStaff();
+  const { can, role } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -214,22 +214,26 @@ export function SupplierStatement({
                 ) : null}
               </>
             }
-            more={
-              can('purchase.create')
+            more={[
+              ...(can('purchase.create')
                 ? [
                     {
                       label: t('office.suppliers.return_supplier'),
                       to: `/suppliers/${supplierId}/return/new`,
                       disabled: readOnly,
                     },
+                  ]
+                : []),
+              ...(can('party.edit') && role !== 'cashier'
+                ? [
                     {
                       label: t('office.suppliers.edit'),
                       disabled: readOnly,
                       onSelect: () => setEditOpen(true),
                     },
                   ]
-                : []
-            }
+                : []),
+            ]}
           />
         }
       />

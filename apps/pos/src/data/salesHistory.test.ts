@@ -114,6 +114,7 @@ describe('sales history (screens/10)', () => {
     expect(refunded.rows.map((r) => r.sale.id)).toEqual([firstId]);
     const byStaff = await salesHistory(db, { ...day, staffId: 'st-1' });
     expect(byStaff.rows).toHaveLength(2);
+
     const byDevice = await salesHistory(db, { ...day, deviceId: 'dev-1' });
     expect(byDevice.rows).toHaveLength(2);
     expect(
@@ -134,6 +135,20 @@ describe('sales history (screens/10)', () => {
     expect((await salesHistory(db, { ...day, query: 'nothing' })).rows).toEqual(
       [],
     );
+
+    // The summary describes the filtered bills: a refund on another device's bill
+    // must not be subtracted from this device's "sold".
+    await db.sales.update(firstId, { device_id: 'dev-2' });
+    const ownDevice = await salesHistory(db, { ...day, deviceId: 'dev-1' });
+    expect(ownDevice.rows.map((r) => r.sale.id)).toEqual([secondId]);
+    expect(ownDevice.summary).toMatchObject({
+      bills: 1,
+      refunds: 0,
+      sold: 4200000,
+    });
+    const all = await salesHistory(db, day);
+    expect(all.summary.refunds).toBe(346000);
+    expect(all.summary.sold).toBe(4200000 + 4300000 - 346000);
   });
 
   it('exports the documented CSV header and one row per bill', async () => {

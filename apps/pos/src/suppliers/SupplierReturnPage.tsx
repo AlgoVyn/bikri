@@ -25,6 +25,7 @@ import {
   supplierReturnData,
 } from '../data/supplierReturns.ts';
 import { supplierBalance } from '../data/suppliers.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -235,9 +236,11 @@ export function SupplierReturnPage({
       });
     } catch (err) {
       toast.push(
-        err instanceof SupplierReturnError
-          ? t(`office.suppliers.return_error_${err.code}`)
-          : t('errors.generic'),
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof SupplierReturnError
+            ? t(`office.suppliers.return_error_${err.code}`)
+            : t('errors.generic'),
         'error',
       );
     } finally {

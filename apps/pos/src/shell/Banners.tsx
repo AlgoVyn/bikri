@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useOnline } from './TopBarParts.tsx';
 
@@ -12,6 +13,7 @@ type Support = { until: number; reason: string };
 /** Offline, read-only (13 §7.2) and support-access (13 §7.5) banners on every screen. */
 export function Banners() {
   const { t, i18n } = useTranslation();
+  const timeZone = useShopTimeZone();
   const online = useOnline();
   const { staff, role } = useCurrentStaff();
   const toast = useToast();
@@ -59,7 +61,7 @@ export function Banners() {
     ? new Intl.DateTimeFormat(i18n.language === 'ur' ? 'ur-PK' : 'en-PK', {
         dateStyle: 'medium',
         timeStyle: 'short',
-        timeZone: 'Asia/Karachi',
+        timeZone,
       }).format(support.until)
     : '';
   return (

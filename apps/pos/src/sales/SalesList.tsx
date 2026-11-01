@@ -1,4 +1,3 @@
-import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,11 +25,13 @@ import {
   salesHistory,
   shopTimeZone,
 } from '../data/salesHistory.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { cashierTodayOnly } from '../state/reportScope.ts';
 import {
   dayHeading,
   methodLabel,
@@ -88,11 +89,11 @@ export function SalesList({
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { staff, can } = useCurrentStaff();
-  const limited = !can('report.view');
-  const now = Date.now();
-  const today = businessDate(now);
-  const yesterday = businessDate(now - 86_400_000);
+  const { can, role, support, branchId } = useCurrentStaff();
+  const limited = !can('report.view') || cashierTodayOnly(role, support);
+  const timeZone =
+    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const { today, yesterday } = useBusinessDates(timeZone);
   const [stored] = useState(() =>
     readDateFilter('sales', SALES_PRESETS, 'today', today),
   );
@@ -124,7 +125,6 @@ export function SalesList({
 
   const data = useLiveQuery(async () => {
     const db = getDb();
-    const timeZone = await shopTimeZone(db);
     const range = limited
       ? rangeFor('today', Date.now(), timeZone)
       : rangeFor(preset, Date.now(), timeZone, custom);
@@ -135,7 +135,7 @@ export function SalesList({
       status: status || null,
       staffId: staffId || null,
       deviceId: deviceId || null,
-      branchId: limited && staff?.branch_id ? String(staff.branch_id) : null,
+      branchId: limited ? branchId : null,
     });
     return { ...history, timeZone, range };
   }, [
@@ -148,7 +148,9 @@ export function SalesList({
     staffId,
     deviceId,
     limited,
-    staff?.branch_id,
+    branchId,
+    timeZone,
+    today,
   ]);
   const options = useLiveQuery(() => salesFilterOptions(getDb()), []) ?? {
     staff: [],

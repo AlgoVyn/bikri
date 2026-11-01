@@ -14,7 +14,7 @@ import { Banners } from './Banners.tsx';
 import { Breadcrumbs } from './Breadcrumbs.tsx';
 import { CommandPalette } from './CommandPalette.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
-import { ignoresHotkey } from './hotkeys.ts';
+import { dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
@@ -112,7 +112,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (
         event.defaultPrevented ||
         event.metaKey ||
-        ignoresHotkey(event.target)
+        ignoresHotkey(event.target) ||
+        dialogOpen()
       )
         return;
       if (

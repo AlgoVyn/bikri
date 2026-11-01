@@ -365,6 +365,62 @@ describe('push (03 §4.1, §9)', () => {
     });
     expect(wrongDevice.status).toBe(403);
   });
+
+  it('accepts a bill queued with a device code from before a branch move', async () => {
+    const shop = await seedShop('Old code');
+    await env.DB.prepare(
+      'UPDATE devices SET device_code_history = ?3 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, shop.till.id, 'Z')
+      .run();
+    const pushed = await pushOk(
+      shop.till,
+      saleOps(shop, { ...shop.till, code: 'Z' }, 1),
+    );
+    expect(pushed.results.map((r) => r.error_code ?? null)).toEqual([
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('rejects a delivery whose line count and total do not reconcile', async () => {
+    const shop = await seedShop('Delivery shape');
+    const supplierId = newId();
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO suppliers (tenant_id, id, name, phone, address, note, created_at, updated_at, updated_by) VALUES (?1, ?2, 'Shape Co', '', '', '', ?3, ?3, ?4)`,
+    )
+      .bind(shop.tenantId, supplierId, now, IDS.owner)
+      .run();
+    const purchaseId = newId();
+    const res = await pushOk(shop.till, [
+      op('purchases', 'insert', {
+        id: purchaseId,
+        supplier_id: supplierId,
+        supplier_invoice_no: '',
+        other_charges: 0,
+        total: 100000,
+        paid_now: 0,
+        paid_method: null,
+        line_count: 1,
+        note: '',
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      }),
+    ]);
+    expect(res.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM purchases WHERE tenant_id = ?1 AND id = ?2',
+        shop.tenantId,
+        purchaseId,
+      ),
+    ).toBe(0);
+  });
 });
 
 function refundPayment(
@@ -494,6 +550,75 @@ describe('void rules (05 §5, D-044)', () => {
       null,
       null,
     ]);
+  });
+
+  it('a void arriving after a refund is accepted and flagged for the owner', async () => {
+    const shop = await seedShop('Void after refund');
+    const sale = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, sale);
+    const refund = {
+      id: newId(),
+      sale_id: sale[0]?.row?.id,
+      kind: 'partial',
+      reason: 'Faulty',
+      method: 'cash',
+      exact_amount: 1000,
+      udhaar_part: 0,
+      rounding: 0,
+      amount: 1000,
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+    };
+    const line = {
+      id: newId(),
+      refund_id: refund.id,
+      sale_line_id: sale[1]?.row?.id,
+      qty_milli: 1000,
+      amount: 1000,
+      restock: 1,
+      created_at: Date.now(),
+    };
+    const refundTx = newId();
+    await pushOk(shop.till, [
+      op('refunds', 'insert', refund, { tx_id: refundTx }),
+      op('refund_lines', 'insert', line, { tx_id: refundTx }),
+      op('payments', 'insert', refundPayment(shop, refund), {
+        tx_id: refundTx,
+      }),
+    ]);
+    const voidId = newId();
+    const res = await pushOk(shop.till, [
+      op('sale_voids', 'insert', {
+        id: voidId,
+        sale_id: sale[0]?.row?.id,
+        reason: 'Wrong item',
+        replacement_sale_id: null,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: Date.now(),
+      }),
+    ]);
+    expect(res.results[0]?.error_code ?? null).toBeNull();
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM sync_conflicts WHERE tenant_id = ?1 AND kind = 'refund_after_void' AND row_id = ?2",
+        shop.tenantId,
+        voidId,
+      ),
+    ).toBe(1);
+    expect(
+      (
+        await env.DB.prepare(
+          'SELECT status FROM sales WHERE tenant_id = ?1 AND id = ?2',
+        )
+          .bind(shop.tenantId, sale[0]?.row?.id)
+          .first<{ status: string }>()
+      )?.status,
+    ).toBe('void');
   });
 });
 

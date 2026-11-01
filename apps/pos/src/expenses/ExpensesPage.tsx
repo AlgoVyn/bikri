@@ -26,6 +26,7 @@ import {
   reverseExpense,
 } from '../data/expenses.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
@@ -58,8 +59,10 @@ export function ExpensesPage() {
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
   const readOnly = useReadOnly();
+  const tz = useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const { today } = useBusinessDates(tz);
   const [stored] = useState(() =>
-    readDateFilter('expenses', PRESETS, 'month', businessDate(Date.now())),
+    readDateFilter('expenses', PRESETS, 'month', businessDate(Date.now(), tz)),
   );
   const [preset, setPreset] = useState<Preset>(stored.preset);
   const [custom, setCustom] = useState({
@@ -69,16 +72,6 @@ export function ExpensesPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
   const [reversing, setReversing] = useState<ExpenseRow | null>(null);
-  const [today, setToday] = useState(businessDate(Date.now()));
-  const [tz, setTz] = useState('Asia/Karachi');
-
-  useEffect(() => {
-    void (async () => {
-      const zone = await shopTimeZone(getDb());
-      setTz(zone);
-      setToday(businessDate(Date.now(), zone));
-    })();
-  }, []);
 
   const customValid = custom.from <= custom.to;
   const range = (() => {
@@ -173,7 +166,7 @@ export function ExpensesPage() {
                 disabled={!data || data.rows.length === 0}
                 onClick={() =>
                   data &&
-                  downloadText('bikri-expenses.csv', expensesCsv(data.rows, tz))
+                  downloadText('bikri-expenses.csv', expensesCsv(data.rows))
                 }
               >
                 {t('office.expenses.export_csv')}

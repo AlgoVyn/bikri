@@ -1,4 +1,4 @@
-import { businessDate, type Permission } from '@bikri/core';
+import type { Permission } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
@@ -27,6 +27,8 @@ import {
 } from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
+import { shopTimeZone } from '../data/salesHistory.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { formatTimestamp } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
 import { NAV } from '../shell/nav.ts';
@@ -66,8 +68,6 @@ const QUICK_DESC: Record<string, string> = {
   '/settings': 'home.desc_settings',
 };
 
-const DAY_MS = 86_400_000;
-
 /** Home groups its actions by the job the cashier is doing (screens/04). */
 const RUN_ROUTES = new Set(['/day-close', '/sales', '/udhaar']);
 
@@ -102,9 +102,9 @@ export function HomePage() {
     }
   });
   const online = useOnline();
-  const now = Date.now();
-  const today = businessDate(now);
-  const yesterday = businessDate(now - DAY_MS);
+  const timeZone =
+    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const { today, yesterday, now } = useBusinessDates(timeZone);
 
   const data = useLiveQuery(async (): Promise<HomeData> => {
     const db = getDb();
@@ -128,14 +128,9 @@ export function HomePage() {
     };
   }, [today, yesterday, role]);
 
-  const dateText = formatTimestamp(
-    now,
-    i18n.language,
-    'Asia/Karachi',
-    'weekdayLong',
-  );
+  const dateText = formatTimestamp(now, i18n.language, timeZone, 'weekdayLong');
   const timeText = (at: number) =>
-    formatTimestamp(at, i18n.language, 'Asia/Karachi', 'time');
+    formatTimestamp(at, i18n.language, timeZone, 'time');
 
   const loadSamples = async () => {
     if (!staff || readOnly) return;
@@ -383,7 +378,7 @@ export function HomePage() {
                           className="size-2 shrink-0 rounded-full bg-current"
                         />
                         <span className="min-w-0 flex-1">
-                          {attentionText(t, i18n.language, item)}
+                          {attentionText(t, i18n.language, timeZone, item)}
                         </span>
                         <span
                           aria-hidden="true"
@@ -821,6 +816,7 @@ function attentionTone(item: AttentionItem): string {
 function attentionText(
   t: (key: string, opts?: Record<string, unknown>) => string,
   lang: string,
+  timeZone: string,
   item: AttentionItem,
 ): string {
   switch (item.kind) {
@@ -837,7 +833,7 @@ function attentionText(
         time: new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
           dateStyle: 'medium',
           timeStyle: 'short',
-          timeZone: 'Asia/Karachi',
+          timeZone,
         }).format(item.since),
       });
     case 'clock_wrong':

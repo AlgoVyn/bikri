@@ -81,6 +81,25 @@ export async function mergeRows(
     const had =
       ledger && opts.caches ? (await table.get(row.id)) !== undefined : true;
     await table.put(row);
+    // A device moved to another branch (or renamed) keeps its local identity; the
+    // next invoice must use the new code, not the one stored at enrolment.
+    if (tbl === 'devices') {
+      const stored = (await tx.table('kv').get('device')) as
+        | { value?: { id?: string } }
+        | undefined;
+      if (stored?.value?.id === row.id) {
+        await tx.table('kv').put({
+          key: 'device',
+          value: {
+            ...stored.value,
+            name: row.name,
+            code: row.device_code,
+            branch_id: row.branch_id,
+            is_admin: row.is_admin === 1,
+          },
+        });
+      }
+    }
     if (ledger && opts.caches && !had) {
       const src = { table: (name: string) => tx.table(name) };
       if (tbl === 'stock_movements') await applyStockMovement(src, row);

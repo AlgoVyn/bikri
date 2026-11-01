@@ -69,6 +69,12 @@ inclusive:  line_final   = net − bill_discount_alloc + rounding_alloc         
             line_revenue = net − bill_discount_alloc − tax_alloc                  (ex-tax, so profit never includes tax)
 ```
 
+When a negative `rounding` would take a line below zero, the allocation switches to
+`allocateRounding(rounding, bases)` (bases = net − bill discount + tax for exclusive,
+net − bill discount for inclusive), which keeps every `line_final` non-negative at the
+cost of a different per-line split when a bill discount and rounding almost cancel the
+line. `Σ line_final = total` still holds, and refunds use the stored `line_final` (D-161).
+
 Receipts and the cart show tax differently per mode: exclusive adds a `Sales tax 17%` row before the total; inclusive shows the total and then `Includes Sales tax 17%: Rs 1,700` ([06 §4.1](06-printing.md#41-sale-receipt-80-mm-48-columns)).
 
 ### 3.1 Discount limits

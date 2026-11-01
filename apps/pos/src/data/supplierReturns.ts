@@ -1,6 +1,10 @@
-import { businessDate, mulDivRound, newId } from '@bikri/core';
+import {
+  businessDate,
+  computeSupplierReturn,
+  MAX_LINES_PER_DOCUMENT,
+  newId,
+} from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
-import type { Table } from 'dexie';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
 
@@ -175,7 +179,7 @@ export async function planSupplierReturn(
   const reason = input.reason.trim();
   if (reason.length === 0 || reason.length > 120)
     throw new SupplierReturnError('reason');
-  if (input.lines.length === 0 || input.lines.length > 60)
+  if (input.lines.length === 0 || input.lines.length > MAX_LINES_PER_DOCUMENT)
     throw new SupplierReturnError('lines');
   const purchase = input.purchaseId
     ? await db.purchases.get(input.purchaseId)
@@ -190,8 +194,13 @@ export async function planSupplierReturn(
       .filter((row): row is MasterRow => row !== undefined)
       .map((row) => [row.id, row]),
   );
-  let total = 0;
-  const lines: SupplierReturnPlanLine[] = [];
+  const resolved: Array<{
+    product: MasterRow;
+    purchaseLineId: string | null;
+    qtyMilli: number;
+    linkedCost: number | null;
+    unitCredit: number | null;
+  }> = [];
   for (const line of input.lines) {
     const product = products.get(line.productId);
     if (!product) throw new SupplierReturnError('supplier');
@@ -206,41 +215,71 @@ export async function planSupplierReturn(
         (purchase && purchaseLine.purchase_id !== purchase.id)
       )
         throw new SupplierReturnError('purchase');
-      linkedCost = n(purchaseLine.landed_unit_cost);
-      if (linkedCost <= 0) linkedCost = null;
+      const landed = n(purchaseLine.landed_unit_cost);
+      linkedCost = landed > 0 ? landed : null;
     }
-    const unitCredit =
-      line.unitCredit ??
-      linkedCost ??
-      (n(product.avg_cost) > 0 ? n(product.avg_cost) : n(product.last_cost));
-    if (!Number.isSafeInteger(unitCredit) || unitCredit < 0)
+    if (
+      line.unitCredit !== null &&
+      line.unitCredit !== undefined &&
+      (!Number.isSafeInteger(line.unitCredit) || line.unitCredit < 0)
+    )
       throw new SupplierReturnError('cost');
-    const lineTotal = mulDivRound(line.qtyMilli, unitCredit, 1000);
-    total += lineTotal;
-    lines.push({
+    resolved.push({
       product,
       purchaseLineId: line.purchaseLineId ?? null,
       qtyMilli: line.qtyMilli,
-      unitCredit,
-      lineTotal,
-      costSnapshot: n(product.avg_cost),
-      trackStock: product.track_stock === 1,
+      linkedCost,
+      unitCredit: line.unitCredit ?? null,
     });
   }
-  if (total <= 0) throw new SupplierReturnError('total');
   const balance = await db.party_balances.get(['supplier', input.supplierId]);
   const balanceBefore = balance?.balance ?? 0;
-  const suggestedRefund = Math.max(0, total - Math.max(0, balanceBefore));
   const refundReceived = Math.max(0, input.refundReceived);
-  if (refundReceived > total) throw new SupplierReturnError('refund');
+  let priced: ReturnType<typeof computeSupplierReturn>;
+  try {
+    // 07 §10 lives in core; price the lines with the tested function.
+    priced = computeSupplierReturn({
+      supplier_balance_before: balanceBefore,
+      lines: resolved.map((line) => ({
+        qty_milli: line.qtyMilli,
+        avg_cost: n(line.product.avg_cost),
+        last_cost: n(line.product.last_cost),
+        linked_landed_unit_cost: line.linkedCost,
+        ...(line.unitCredit !== null ? { unit_credit: line.unitCredit } : {}),
+      })),
+      refund_received: 0,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('return total must be positive')
+    )
+      throw new SupplierReturnError('total');
+    throw new SupplierReturnError('cost');
+  }
+  if (priced.total <= 0) throw new SupplierReturnError('total');
+  if (refundReceived > priced.total) throw new SupplierReturnError('refund');
   if (refundReceived > 0 && !input.refundMethod)
     throw new SupplierReturnError('method');
+  const lines: SupplierReturnPlanLine[] = resolved.map((line, index) => {
+    const pricedLine = priced.lines[index];
+    if (!pricedLine) throw new SupplierReturnError('lines');
+    return {
+      product: line.product,
+      purchaseLineId: line.purchaseLineId,
+      qtyMilli: line.qtyMilli,
+      unitCredit: pricedLine.unit_credit,
+      lineTotal: pricedLine.line_total,
+      costSnapshot: pricedLine.cost_snapshot,
+      trackStock: line.product.track_stock === 1,
+    };
+  });
   return {
     lines,
-    total,
-    suggestedRefund,
+    total: priced.total,
+    suggestedRefund: priced.suggested_refund,
     balanceBefore,
-    balanceAfter: balanceBefore - total + refundReceived,
+    balanceAfter: balanceBefore - priced.total + refundReceived,
   };
 }
 

@@ -72,10 +72,7 @@ export function SupplierList({
                 disabled={!data || data.rows.length === 0}
                 onClick={() =>
                   data &&
-                  downloadText(
-                    'bikri-suppliers.csv',
-                    suppliersCsv(data.rows, data.tz),
-                  )
+                  downloadText('bikri-suppliers.csv', suppliersCsv(data.rows))
                 }
               >
                 {t('office.suppliers.export_csv')}
@@ -186,12 +183,10 @@ export function SupplierList({
                     </span>
                   </span>
                   <span className="min-w-0 flex-[1_1_9rem] text-small text-text-muted">
-                    {row.lastDeliveryAt
+                    {row.lastDeliveryDate
                       ? t('office.suppliers.last_delivery', {
                           date: dateText(
-                            new Date(row.lastDeliveryAt)
-                              .toISOString()
-                              .slice(0, 10),
+                            row.lastDeliveryDate,
                             i18n.language,
                             data.tz,
                           ),

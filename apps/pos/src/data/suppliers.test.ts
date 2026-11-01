@@ -1,5 +1,4 @@
 import { businessDate } from '@bikri/core';
-import type { SyncedRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import {
@@ -104,6 +103,60 @@ describe('suppliers and deliveries (T-045)', () => {
         balance: 600000,
       },
     ]);
+  });
+
+  it('the header total ignores the search and the statement follows business dates', async () => {
+    const { db, ctx } = await setup('order');
+    const item = await product(db, ctx);
+    const alpha = await createSupplier(db, { name: 'Alpha' }, ctx, 'st-1', NOW);
+    const bravo = await createSupplier(db, { name: 'Bravo' }, ctx, 'st-1', NOW);
+    const delivery = (
+      id: string,
+      supplierId: string,
+      date: string,
+      cost: number,
+    ) =>
+      saveDelivery(
+        db,
+        {
+          purchaseId: id,
+          supplierId,
+          invoiceNo: '',
+          date,
+          lines: [{ productId: item.id, qtyMilli: 1000, unitCost: cost }],
+          otherCharges: 0,
+          paidNow: 0,
+        },
+        ctx,
+        { today: '2026-10-31', now: NOW + 2000 },
+      );
+    await delivery('p-alpha', alpha.id, '2026-10-01', 100000);
+    await delivery('p-bravo', bravo.id, '2026-10-02', 200000);
+
+    const filtered = await supplierList(db, { query: 'alpha' });
+    expect(filtered.rows.map((row) => row.supplier.name)).toEqual(['Alpha']);
+    expect(filtered.rows[0]?.lastDeliveryDate).toBe('2026-10-01');
+    // screens/13: total you owe suppliers is a shop total (D-126), not a search result.
+    expect(filtered.totalOwed).toBe(300000);
+
+    // A payment dated 10 Oct is entered after a back-dated delivery; the ledger is
+    // chronological by business date, like the customer statement.
+    await paySupplier(
+      db,
+      {
+        paymentId: 'pay-alpha',
+        supplierId: alpha.id,
+        amount: 100000,
+        method: 'cash',
+      },
+      ctx,
+      Date.parse('2026-10-10T12:00:00+05:00'),
+    );
+    const statement = await supplierStatement(db, alpha.id);
+    expect(
+      statement.rows.map((row) => String(row.entry.business_date)),
+    ).toEqual(['2026-10-01', '2026-10-10']);
+    expect(statement.rows.at(-1)?.balance).toBe(0);
   });
 
   it('AC 2/3: paid now 5,500 cash is a supplier payment and reduces the balance and expected cash', async () => {
@@ -284,7 +337,7 @@ describe('suppliers and deliveries (T-045)', () => {
     );
     expect(await supplierBalance(db, supplier.id)).toBe(1500000);
     const [supplierRow] = (await supplierList(db)).rows;
-    expect(suppliersCsv([supplierRow] as never, TZ).split('\r\n')[0]).toBe(
+    expect(suppliersCsv([supplierRow] as never).split('\r\n')[0]).toBe(
       'name,phone,balance,last_delivery',
     );
     const statement = await supplierStatement(db, supplier.id);

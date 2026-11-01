@@ -1,6 +1,7 @@
 import {
   businessDate,
   computePurchase,
+  MAX_LINES_PER_DOCUMENT,
   MAX_OPS_PER_TX,
   newId,
   nextAvgCost,
@@ -54,7 +55,7 @@ export class DeliveryError extends Error {
   }
 }
 
-const MAX_LINES = 60;
+const MAX_LINES = MAX_LINES_PER_DOCUMENT;
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);

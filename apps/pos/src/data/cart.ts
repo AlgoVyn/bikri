@@ -2,6 +2,8 @@ import {
   type CartResult,
   type CostMethod,
   computeCart,
+  MAX_LINES_PER_DOCUMENT,
+  mulDivRound,
   newId,
   type TaxMode,
 } from '@bikri/core';
@@ -17,8 +19,8 @@ import type {
 /** Open carts on one till (screens/05: Customer 1/2/3). */
 export const CART_IDS = ['c1', 'c2', 'c3'] as const;
 export type CartId = (typeof CART_IDS)[number];
-/** One bill's sync ops stay ≤ 200 (03 §3). */
-export const MAX_CART_LINES = 60;
+/** One bill's sync ops stay ≤ 200 (03 §3); shared with refunds, deliveries and returns. */
+export const MAX_CART_LINES = MAX_LINES_PER_DOCUMENT;
 export const HELD_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 export const NOTE_MAX = 60;
 
@@ -262,7 +264,7 @@ export function cartTotals(cart: Cart, money: ShopMoney): CartResult {
 
 /** Line gross (qty × price), the cap for a line discount in rupees. */
 export function lineGross(line: CartLine): number {
-  return Math.round((line.qty_milli * line.unit_price) / 1000);
+  return mulDivRound(line.qty_milli, line.unit_price, 1000);
 }
 
 /** What Take payment needs before it opens (07 §3.1–§3.2). */

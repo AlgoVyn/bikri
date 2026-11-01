@@ -21,6 +21,7 @@ import {
   OUT_REASONS,
   StockAdjustError,
 } from '../data/stock.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { qtyWithUnit } from './format.ts';
@@ -94,9 +95,11 @@ export function AdjustDialog({
       onClose();
     } catch (err) {
       setError(
-        err instanceof StockAdjustError
-          ? t(`adjust.err_${err.field}`)
-          : t('adjust.err_product'),
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof StockAdjustError
+            ? t(`adjust.err_${err.field}`)
+            : t('adjust.err_product'),
       );
     } finally {
       setSaving(false);

@@ -23,6 +23,7 @@ export function SuggestedPage() {
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [picked, setPicked] = useState<Record<string, number | null>>({});
+  const [pending, setPending] = useState(false);
   const chosen = Object.entries(picked).filter(
     ([, price]) => price !== null,
   ) as [string, number][];
@@ -78,14 +79,27 @@ export function SuggestedPage() {
       <button
         type="button"
         className={buttonPrimary}
-        disabled={chosen.length === 0}
+        disabled={pending || chosen.length === 0}
         onClick={async () => {
-          const db = getDb();
-          const ctx = await ledgerContext(db, String(staff?.id ?? ''));
-          for (const [name, price] of chosen)
-            await saveNewProduct(db, { name_en: name, price }, ctx);
-          toast.push(t('suggested.added', { count: chosen.length }));
-          void navigate({ to: '/products' });
+          if (pending) return;
+          setPending(true);
+          try {
+            const db = getDb();
+            const ctx = await ledgerContext(db, String(staff?.id ?? ''));
+            for (const [name, price] of chosen)
+              await saveNewProduct(db, { name_en: name, price }, ctx);
+            toast.push(t('suggested.added', { count: chosen.length }));
+            void navigate({ to: '/products' });
+          } catch (err) {
+            toast.push(
+              err instanceof Error && err.message
+                ? err.message
+                : t('errors.generic'),
+              'error',
+            );
+          } finally {
+            setPending(false);
+          }
         }}
       >
         {t('suggested.add', { count: chosen.length })}

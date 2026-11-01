@@ -178,7 +178,7 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 | Deletes vs. edits | A delete always wins over a concurrent edit (row stays soft-deleted; the edit's fields are applied but `deleted_at` stays set). |
 | Unique conflicts (same SKU or barcode created on two devices offline) | Second op is `rejected` with `UNIQUE_VIOLATION`; the till shows it in Settings → Sync and on the product with "Change SKU/barcode and retry". |
 | Negative stock | Allowed. Products with on-hand < 0 appear in Reports → Stock exceptions. |
-| Over-refund / refund-after-void (two tills act on the same bill offline) | Both rows are **accepted** (the money already left a drawer — real events are never rejected). The server records a `sync_conflicts` row (`kind = 'over_refund'` or `'refund_after_void'`, with both row IDs); the shop owner sees it in Settings → Sync → Conflicts and on the bill, and settles it manually (e.g. a pay-in). |
+| Over-refund / refund-after-void (two tills act on the same bill offline) | Both rows are **accepted** (the money already left a drawer — real events are never rejected). The server records a `sync_conflicts` row (`kind = 'over_refund'`, or `'refund_after_void'`, with both row IDs; a **void arriving after a refund** is accepted and flagged the same way); the shop owner sees it in Settings → Sync → Conflicts and on the bill, and settles it manually (e.g. a pay-in). |
 | Over-return to a supplier (more returned against a delivery line than was received) | Accepted, `sync_conflicts` `kind = 'over_return'`, shown in Settings → Sync → Conflicts. |
 | Credit limit exceeded on two devices offline | Allowed (limit is a warning unless `hard_limit`); the second device's sale still syncs. |
 
@@ -228,7 +228,7 @@ A revoked device gets `401 DEVICE_REVOKED`; it stops syncing, shows "This device
 4. Device A deletes product, device B edits it → row stays deleted.
 5. Sale referencing a customer created in the same batch, ops in reverse order → batch succeeds (deferred FKs).
 6. Push with one invalid op (bad CHECK) among 10 → 9 applied, 1 rejected.
-7. Push with schema_version 0 when server is 1 → 409, outbox unchanged.
+7. Push with schema_version 0 when the server's `MIN_CLIENT_SCHEMA` is 1 → 409, outbox unchanged.
 8. Pull with 1,200 changes → 3 pages, cursor ends at max seq, local caches correct.
 9. Offline for 3 days with 400 sales, then reconnect → all ops pushed in batches of ≤ 200 ops (about 16 requests), stock levels match server-computed sums.
 10. Stock count on device A while device B sells offline → final on-hand = counted − B's sales after the count.

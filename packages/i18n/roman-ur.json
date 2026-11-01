@@ -883,7 +883,10 @@
     "printer_label": "Printer",
     "printer_failed": "Print fail",
     "printer_no": "Printer nahin",
-    "skip_content": "Content par jayein"
+    "skip_content": "Content par jayein",
+    "error_title": "Kuch ghalat ho gaya",
+    "error_body": "Aap ki sale aur data mehfooz hai. Jari rakhne ke liye app dobara kholain.",
+    "reload": "Dobara kholain"
   },
   "stock": {
     "reason": {
@@ -1060,7 +1063,13 @@
     "pull_errors": "{{count}} qatarein apply nahin ho sakin; sync jaari raha.",
     "discard_title": "Yeh tabdeeli discard karein?",
     "discard_body": "Yeh {{what}} is till se mustaqil tor par hat jayegi aur server tak kabhi nahi pohanchegi.",
-    "discard_confirm": "Discard"
+    "discard_confirm": "Discard",
+    "files_title_one": "{{count}} photo ya logo upload nakaam hua",
+    "files_title_other": "{{count}} photos ya logos upload nakaam hue",
+    "files_hint": "Sale aur reports mutasir nahi hain. Online hone par dobara koshish karein.",
+    "file_retry": "Dobara koshish",
+    "file_kind_product_image": "Product ki photo",
+    "file_kind_logo": "Dukan ka logo"
   },
   "lock": {
     "who": "Kaun bech raha hai?",

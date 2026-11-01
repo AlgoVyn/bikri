@@ -205,6 +205,8 @@ export type FileQueueEntry = {
   target_id: string;
   blob: Blob;
   sha256: string;
+  /** The staff member who chose the file; the server checks their permission. */
+  staff_id?: string | null;
   status: 'pending' | 'uploading' | 'failed';
 };
 

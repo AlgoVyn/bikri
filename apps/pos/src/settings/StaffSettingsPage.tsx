@@ -33,6 +33,17 @@ const field =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 const ROLES: Role[] = ['owner', 'manager', 'cashier'];
 
+/**
+ * The server accepts shop/staff/branch upserts and the shop-admin API only from an
+ * owner (05 §5), so granting these to a manager would save locally and be rejected
+ * on push. They stay owner-only.
+ */
+const OWNER_ONLY: ReadonlySet<Permission> = new Set([
+  'settings.shop',
+  'settings.staff',
+  'devices.manage',
+]);
+
 /** Cashiers, roles, PINs and permission overrides (screens/17). */
 export function StaffSettingsPage() {
   return (
@@ -210,13 +221,19 @@ function StaffDialog({
     setPending(true);
     try {
       const pinHash = pin === '' ? undefined : await hashPin(pin);
+      const permissions: Record<string, boolean> = {};
+      for (const [permission, value] of Object.entries(overrides)) {
+        if (role !== 'owner' && OWNER_ONLY.has(permission as Permission))
+          continue;
+        permissions[permission] = value;
+      }
       const input: StaffInput = {
         ...(row ? { id: String(row.id) } : {}),
         name,
         role,
         active,
         maxDiscountBp,
-        permissions: overrides,
+        permissions,
         ...(pinHash ? { pin: { ...pinHash, pin_length: pin.length } } : {}),
       };
       await saveStaff(getDb(), input, actor?.id ?? null);
@@ -344,25 +361,31 @@ function StaffDialog({
           </button>
         </div>
         <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-control border border-border p-2 sm:grid-cols-2">
-          {PERMISSIONS.map((permission) => (
-            <li key={permission}>
-              <label className="flex items-center gap-2 text-small">
-                <input
-                  type="checkbox"
-                  checked={checked(permission)}
-                  onChange={(event) => toggle(permission, event.target.checked)}
-                />
-                <span className="min-w-0 flex-1">
-                  {t(`office.staff.perm_${permission.replaceAll('.', '_')}`)}
-                </span>
-                {overrides[permission] !== undefined ? (
-                  <span className="text-text-muted">
-                    {t('office.staff.override')}
+          {PERMISSIONS.map((permission) => {
+            const ownerOnly = role !== 'owner' && OWNER_ONLY.has(permission);
+            return (
+              <li key={permission}>
+                <label className="flex items-center gap-2 text-small">
+                  <input
+                    type="checkbox"
+                    disabled={ownerOnly}
+                    checked={ownerOnly ? false : checked(permission)}
+                    onChange={(event) =>
+                      toggle(permission, event.target.checked)
+                    }
+                  />
+                  <span className="min-w-0 flex-1">
+                    {t(`office.staff.perm_${permission.replaceAll('.', '_')}`)}
                   </span>
-                ) : null}
-              </label>
-            </li>
-          ))}
+                  {overrides[permission] !== undefined && !ownerOnly ? (
+                    <span className="text-text-muted">
+                      {t('office.staff.override')}
+                    </span>
+                  ) : null}
+                </label>
+              </li>
+            );
+          })}
         </ul>
       </fieldset>
       <div className="flex justify-end gap-2">

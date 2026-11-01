@@ -245,6 +245,16 @@ async function recomputeDiscardedStatuses(
     const sales = tx.table('sales') as Table<SyncedRow, string>;
     const sale = await sales.get(saleId);
     if (!sale) continue;
+    const voided = await tx
+      .table('sale_voids')
+      .where('sale_id')
+      .equals(saleId)
+      .count();
+    if (voided > 0) {
+      if (sale.status !== 'void')
+        await sales.update(saleId, { status: 'void' });
+      continue;
+    }
     const refunds = (await tx
       .table('refunds')
       .where('sale_id')

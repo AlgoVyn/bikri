@@ -1,4 +1,3 @@
-import { businessDate } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useState } from 'react';
@@ -6,7 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { SearchIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { type SearchHit, searchAll } from '../data/search.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { seesAllDates } from '../state/reportScope.ts';
 import { ignoresHotkey } from './hotkeys.ts';
 
 /** Top-bar search over products, customers and bills (screens/04). `/` focuses it. */
@@ -18,19 +20,20 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { can } = useCurrentStaff();
-  const allDates = can('report.view');
+  const { can, role, support, branchId } = useCurrentStaff();
+  const allDates = seesAllDates(role, support, can('report.view'));
+  const timeZone = useShopTimeZone();
+  const { today } = useBusinessDates(timeZone);
   const hits =
     useLiveQuery(async () => {
       if (!query.trim()) return [];
       const db = getDb();
-      const shop = await db.shop.get('shop');
-      const timeZone = String(shop?.timezone ?? '').trim() || 'Asia/Karachi';
       return searchAll(db, query, {
         allDates,
-        today: businessDate(Date.now(), timeZone),
+        today,
+        branchId: allDates ? null : branchId,
       });
-    }, [query, allDates]) ?? [];
+    }, [query, allDates, branchId, today]) ?? [];
   const optionId = (index: number) => `${listId}-opt-${index}`;
   useEffect(() => {
     if (!open || active < 0) return;

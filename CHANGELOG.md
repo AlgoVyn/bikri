@@ -52,6 +52,15 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Pushes reconcile sale lines, payments and udhaar; pulls validate rows and quarantine unique collisions; exports are cut off at their start time.
 - A branch move is blocked while the device has waiting ops; maintenance can return to read-only or suspended.
 - Products exports follow `export.data`; promise/import writes chunk by op cost; reports aggregate in a worker; field-merge conflicts reach pull; WhatsApp share opens its tab synchronously; the operator pairing panel shows a QR.
+
+### Second review remediation (2026-11-02)
+- Cashiers are limited to today's bills of their branch everywhere (Sales, bill detail, refund URL, global search), and the Sales summary only nets refunds of the visible filtered bills.
+- Read-only shops cannot open or submit import, stock adjust, delivery, return, chase-list, new-customer, barcode-generation or logo-removal writes; `ReadOnlyError` shows the read-only message.
+- A root route error screen, hotkeys disabled under modals, label rows that survive parent renders, and synchronous double-click guards on product and starter-catalogue saves.
+- Supplier total-owed ignores the search; the supplier ledger follows business dates; day-close card/bank/udhaar figures net voids and refunds like Reports; `avgBill` uses `mulDivRound`.
+- The server accepts a void after a refund but logs a `refund_after_void` conflict; a rejected refund/void discards with the correct status. Device codes survive a branch move (migration 0005) and purchases/stock movements are reconciled. File uploads check the staff permission, and failed uploads appear in Settings → Sync with Retry.
+- The Vite dev origin is allowed by the dev script; `docs/07` documents the negative-rounding guard (D-162).
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

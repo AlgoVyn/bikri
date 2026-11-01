@@ -27,6 +27,7 @@ import {
   findCustomers,
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatShopMoney } from '../lib/money';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
 import { Modal } from './Modal.tsx';
@@ -233,17 +234,22 @@ export function HoldDialog({
   );
 }
 
-export function timeOf(at: number, lang: string): string {
+export function timeOf(
+  at: number,
+  lang: string,
+  timeZone = 'Asia/Karachi',
+): string {
   return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Asia/Karachi',
+    timeZone,
   }).format(at);
 }
 
 /** F6: held bills on this device; resume into the active tab or an empty one. */
 export function HeldBillsDialog({
+  timeZone = 'Asia/Karachi',
   open,
   onOpenChange,
   money,
@@ -259,6 +265,7 @@ export function HeldBillsDialog({
   emptyTabs: CartId[];
   onResume: (held: HeldBill, into: CartId | null) => void;
   onDelete: (held: HeldBill) => void;
+  timeZone?: string;
 }) {
   const { t, i18n } = useTranslation();
   const held = useLiveQuery(() => listHeld(getDb()), [open]) ?? [];
@@ -292,8 +299,8 @@ export function HeldBillsDialog({
               <MoneyText paisa={cartTotals({ ...h, id: 'c1' }, money).total} />
             </div>
             <p className="text-small text-text-muted">
-              <bdi dir="ltr">{timeOf(h.held_at, i18n.language)}</bdi> ·{' '}
-              {t('sell.items', { count: h.lines.length })} ·{' '}
+              <bdi dir="ltr">{timeOf(h.held_at, i18n.language, timeZone)}</bdi>{' '}
+              · {t('sell.items', { count: h.lines.length })} ·{' '}
               {staff?.get(h.held_by) ?? ''}
             </p>
             <div className="flex flex-wrap gap-2">
@@ -398,9 +405,11 @@ export function CustomerDialog({
       pick(c.id);
     } catch (err) {
       setError(
-        err instanceof DuplicatePhoneError
-          ? t('sell.phone_taken', { name: err.ownerName })
-          : t('errors.generic'),
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof DuplicatePhoneError
+            ? t('sell.phone_taken', { name: err.ownerName })
+            : t('errors.generic'),
       );
     }
   };

@@ -1,3 +1,4 @@
+import { mulDivRound } from '@bikri/core';
 import {
   type Block,
   formatReceiptMoney,
@@ -37,7 +38,7 @@ export function previewBlocks(shop: PreviewShop, uiLanguage = 'en'): Block[] {
     (receiptLanguage === 'ur' ? 'سیلز ٹیکس' : 'Sales tax');
   const tax =
     shop.tax_rate_bp > 0 && !shop.inclusive
-      ? Math.round((SAMPLE_PRICE * shop.tax_rate_bp) / 10_000)
+      ? mulDivRound(SAMPLE_PRICE, shop.tax_rate_bp, 10_000)
       : 0;
   const blocks: Block[] = [{ t: 'logo' }];
   if (shop.name.trim())

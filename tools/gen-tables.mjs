@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Generates packages/db/src/tables.ts (column lists per D1 table) from 0001_init.sql.
 // Run after changing the migration: `node tools/gen-tables.mjs && pnpm exec biome format --write packages/db/src/tables.ts`.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,6 +20,23 @@ for (const m of SQL.matchAll(/CREATE TABLE (\w+) \(([\s\S]*?)\n\) STRICT;/g)) {
     if (c) cols.push(c[1]);
   }
   tables[m[1]] = cols;
+}
+
+// Later migrations may add columns (ALTER TABLE ... ADD COLUMN); keep the list in
+// the same order D1 reports them (appended after the CREATE TABLE columns).
+const migrationDir = join(ROOT, 'packages/db/migrations');
+for (const name of readdirSync(migrationDir)
+  .filter((file) => /^\d{4}_.+\.sql$/u.test(file) && file !== '0001_init.sql')
+  .sort()) {
+  const text = readFileSync(join(migrationDir, name), 'utf8');
+  for (const m of text.matchAll(
+    /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+([a-z_][a-z0-9_]*)/gi,
+  )) {
+    const table = m[1];
+    const column = m[2];
+    if (tables[table] && !tables[table].includes(column))
+      tables[table].push(column);
+  }
 }
 
 const body = Object.entries(tables)

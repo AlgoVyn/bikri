@@ -159,7 +159,7 @@ export type PushResponse = {
   support: unknown;
 };
 
-export async function push(dev: Dev, ops: PushOp[], schemaVersion = 1) {
+export async function push(dev: Dev, ops: PushOp[], schemaVersion = 2) {
   return api('/sync/push', {
     method: 'POST',
     token: dev.token,

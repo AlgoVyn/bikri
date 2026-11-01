@@ -883,7 +883,10 @@
     "printer_label": "Printer",
     "printer_failed": "Print failed",
     "printer_no": "No printer",
-    "skip_content": "Skip to content"
+    "skip_content": "Skip to content",
+    "error_title": "Something went wrong",
+    "error_body": "Your sale and data are safe. Reload the app to continue.",
+    "reload": "Reload"
   },
   "stock": {
     "reason": {
@@ -1060,7 +1063,13 @@
     "pull_errors": "{{count}} rows could not be applied; sync continued.",
     "discard_title": "Discard this change?",
     "discard_body": "This permanently removes {{what}} from this till. It will never reach the server.",
-    "discard_confirm": "Discard"
+    "discard_confirm": "Discard",
+    "files_title_one": "{{count}} photo or logo upload failed",
+    "files_title_other": "{{count}} photo or logo uploads failed",
+    "files_hint": "Sales and reports are unaffected. Retry when you are online.",
+    "file_retry": "Retry",
+    "file_kind_product_image": "Product photo",
+    "file_kind_logo": "Shop logo"
   },
   "lock": {
     "who": "Who's selling?",

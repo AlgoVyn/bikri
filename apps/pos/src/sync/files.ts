@@ -24,6 +24,7 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
           headers: {
             authorization: `Bearer ${token}`,
             'content-type': e.blob.type || 'image/webp',
+            ...(e.staff_id ? { 'x-bikri-staff': e.staff_id } : {}),
           },
           body: e.blob,
           credentials: 'omit',

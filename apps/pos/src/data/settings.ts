@@ -600,6 +600,7 @@ export async function updateShopLogo(
           target_id: 'shop',
           blob: logo.png,
           sha256: logo.sha256,
+          staff_id: actor,
           status: 'pending',
         } as never);
         await w

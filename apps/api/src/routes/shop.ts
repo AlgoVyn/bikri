@@ -443,6 +443,11 @@ shop.patch('/devices/:id', async (c) => {
     if (!(await branchExists(db, body.branch_id)))
       throw new ApiError('NOT_FOUND', 404, 'No such branch');
     next.branch_id = body.branch_id;
+    const codes = [
+      ...(d.device_code_history ? d.device_code_history.split(',') : []),
+      d.device_code,
+    ].slice(-20);
+    next.device_code_history = codes.join(',');
     next.device_code = await allocateDeviceCode(db, body.branch_id);
   }
   const now = Date.now();
@@ -451,11 +456,12 @@ shop.patch('/devices/:id', async (c) => {
       ? " AND (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0"
       : '';
   const update = db.prepare(
-    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, is_admin = ?6, updated_at = ?7 WHERE tenant_id = ?1 AND id = ?2${adminGuard}`,
+    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, device_code_history = ?6, is_admin = ?7, updated_at = ?8 WHERE tenant_id = ?1 AND id = ?2${adminGuard}`,
     d.id,
     next.name,
     next.branch_id,
     next.device_code,
+    next.device_code_history,
     next.is_admin,
     now,
   );

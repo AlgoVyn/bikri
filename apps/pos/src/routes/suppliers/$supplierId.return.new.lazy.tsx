@@ -12,7 +12,7 @@ function ReturnRoute() {
   const { purchase } = Route.useSearch();
   return (
     <AreaStrings area="office">
-      <PermissionGate permission="purchase.create">
+      <PermissionGate permission="purchase.create" blockReadOnly>
         <SupplierReturnPage
           supplierId={supplierId}
           initialPurchaseId={purchase}

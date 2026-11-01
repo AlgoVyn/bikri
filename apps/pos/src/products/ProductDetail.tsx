@@ -22,6 +22,8 @@ import {
   stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { shopTimeZone } from '../data/salesHistory.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
@@ -56,6 +58,8 @@ export function ProductDetailPage({
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const timeZone =
+    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const detail = useLiveQuery(() => productDetail(getDb(), id), [id]);
@@ -120,7 +124,7 @@ export function ProductDetailPage({
           balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
           by: h.staffName,
         })),
-        'Asia/Karachi',
+        timeZone,
       ),
     );
   };
@@ -400,6 +404,7 @@ export function ProductDetailPage({
                           {formatTimestamp(
                             Number(h.movement.created_at),
                             i18n.language,
+                            timeZone,
                           )}
                         </bdi>
                       </td>
@@ -450,7 +455,15 @@ export function ProductDetailPage({
           } catch (error) {
             if (error instanceof ProductInUseError)
               toast.push(t('products.in_use'), 'error');
-            else throw error;
+            else
+              toast.push(
+                error instanceof ReadOnlyError
+                  ? t('tenant.readOnly.blocked')
+                  : error instanceof Error && error.message
+                    ? error.message
+                    : t('errors.generic'),
+                'error',
+              );
           }
         }}
       />

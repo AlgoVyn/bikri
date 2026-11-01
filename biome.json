@@ -68,6 +68,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
     }
   ]
 }

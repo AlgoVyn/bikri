@@ -1,3 +1,4 @@
+import { can, type Role } from '@bikri/core';
 import type { Context } from 'hono';
 import { hex } from '../auth/crypto.ts';
 import { ApiError } from '../errors.ts';
@@ -49,6 +50,20 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
       400,
       'sha256 must be 64 hex characters',
     );
+  // A file belongs to the product/shop, so the upload needs the same permission as the
+  // row that points at it: catalogue edits for photos, shop settings for the logo.
+  const staffId = c.req.header('x-bikri-staff') ?? '';
+  const staff = await c.var.db.first<{
+    role: Role;
+    permissions_json: string;
+  }>(
+    'SELECT role, permissions_json FROM staff WHERE tenant_id = ?1 AND id = ?2 AND active = 1 AND deleted_at IS NULL',
+    staffId,
+  );
+  const permission =
+    kind === 'product_image' ? 'catalog.edit' : 'settings.shop';
+  if (!staff || !can(staff.role, staff.permissions_json, permission))
+    throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
   const type = (c.req.header('content-type') ?? '').split(';')[0]?.trim() ?? '';
   if (!TYPES.has(type))
     throw new ApiError(

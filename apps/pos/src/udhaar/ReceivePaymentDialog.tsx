@@ -13,6 +13,7 @@ import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -115,7 +116,9 @@ export function ReceivePaymentDialog({
       );
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof PaymentError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof PaymentError)
         toast.push(t(`office.udhaar.payment_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {

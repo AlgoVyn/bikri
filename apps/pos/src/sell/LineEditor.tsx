@@ -1,3 +1,4 @@
+import { mulDivRound } from '@bikri/core';
 import type { CartLine } from '@bikri/db';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,9 +61,8 @@ export function LineEditor({
 }) {
   const { t } = useTranslation();
   const noteId = useId();
-  const cost = Math.round((line.qty_milli * line.unit_cost) / 1000);
-  const margin =
-    revenue > 0 ? Math.round(((revenue - cost) * 100) / revenue) : 0;
+  const cost = mulDivRound(line.qty_milli, line.unit_cost, 1000);
+  const margin = revenue > 0 ? mulDivRound(revenue - cost, 100, revenue) : 0;
   return (
     <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
       <div>

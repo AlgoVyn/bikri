@@ -59,6 +59,7 @@ function useScanKeys(
         buffer = '';
         return;
       }
+      if (e.key === ' ') return;
       if (e.key.length !== 1) return;
       e.preventDefault();
       buffer = fast ? buffer + e.key : e.key;

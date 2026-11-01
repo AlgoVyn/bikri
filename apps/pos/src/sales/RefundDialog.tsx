@@ -27,6 +27,7 @@ import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { cashierTodayOnly } from '../state/reportScope.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
@@ -50,7 +51,7 @@ export function RefundDialog({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { staff, can } = useCurrentStaff();
+  const { staff, can, role, support, branchId } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [mode, setMode] = useState<'whole' | 'items'>('whole');
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -214,8 +215,11 @@ export function RefundDialog({
   if (
     detail &&
     today !== undefined &&
-    !can('report.view') &&
-    String(detail.sale.business_date) !== today
+    (!can('report.view') || cashierTodayOnly(role, support)) &&
+    (String(detail.sale.business_date) !== today ||
+      (cashierTodayOnly(role, support) &&
+        branchId !== null &&
+        String(detail.sale.branch_id) !== branchId))
   ) {
     return (
       <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>

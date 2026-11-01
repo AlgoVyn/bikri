@@ -26,6 +26,7 @@ import {
   shopTimeZone,
 } from '../data/salesHistory.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
 import {
@@ -38,6 +39,7 @@ import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { cashierTodayOnly } from '../state/reportScope.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
@@ -59,7 +61,7 @@ export function BillDetail({
   const navigate = useNavigate();
   const toast = useToast();
   const readOnly = useReadOnly();
-  const { staff, role, can } = useCurrentStaff();
+  const { staff, role, can, support, branchId } = useCurrentStaff();
   const [voidOpen, setVoidOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
@@ -182,8 +184,10 @@ export function BillDetail({
     );
   if (!data) return <PageLoading compact />;
   if (
-    !can('report.view') &&
-    String(data.detail.sale.business_date) !== data.today
+    !can('report.view') ||
+    (cashierTodayOnly(role, support) &&
+      (String(data.detail.sale.business_date) !== data.today ||
+        (branchId !== null && String(data.detail.sale.branch_id) !== branchId)))
   ) {
     return <p className="p-4 text-text-muted">{t('shell.no_access')}</p>;
   }
@@ -234,7 +238,14 @@ export function BillDetail({
         toast.push(t(`office.bill.void_error_${err.code}`), 'error');
         return;
       }
-      throw err;
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof Error && err.message
+            ? err.message
+            : t('errors.generic'),
+        'error',
+      );
     }
   };
 
@@ -263,7 +274,14 @@ export function BillDetail({
         toast.push(t(`office.bill.reissue_error_${err.code}`), 'error');
         return;
       }
-      throw err;
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof Error && err.message
+            ? err.message
+            : t('errors.generic'),
+        'error',
+      );
     }
   };
 

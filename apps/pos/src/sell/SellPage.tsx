@@ -36,6 +36,7 @@ import {
 } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { categoryName } from '../lib/category.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -78,6 +79,7 @@ export function SellPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { staff, can } = useCurrentStaff();
+  const timeZone = useShopTimeZone();
   const readOnly = useReadOnly();
   const money = useShopMoney();
   const rows = useSellProducts();
@@ -354,7 +356,9 @@ export function SellPage() {
   );
   const holdLabel =
     customerName ||
-    t('sell.held_default', { time: timeOf(Date.now(), i18n.language) });
+    t('sell.held_default', {
+      time: timeOf(Date.now(), i18n.language, timeZone),
+    });
 
   const onHold = async (label: string) => {
     await cartsSettled();
@@ -783,6 +787,7 @@ export function SellPage() {
         money={money}
         activeEmpty={isEmptyCart(cart)}
         emptyTabs={emptyTabs}
+        timeZone={timeZone}
         onResume={(h, into) => void onResume(h, into)}
         onDelete={(h) => void deleteHeld(getDb(), h.id)}
       />
@@ -791,7 +796,7 @@ export function SellPage() {
         onOpenChange={(o) => setDialog(o ? 'customer' : null)}
         onPick={(id) => void mutate((c) => ({ ...c, customer_id: id }))}
         actor={staff?.id ?? null}
-        canCreate={can('party.edit')}
+        canCreate={can('party.edit') && !readOnly}
       />
       <ConfirmDialog
         open={dialog === 'clear'}

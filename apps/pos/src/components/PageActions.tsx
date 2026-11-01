@@ -144,7 +144,14 @@ export function PageActions({
                     to={item.to as never}
                     className={itemClass}
                     aria-disabled={item.disabled || undefined}
-                    onClick={() => setOpen(false)}
+                    tabIndex={item.disabled ? -1 : undefined}
+                    onClick={(event) => {
+                      if (item.disabled) {
+                        event.preventDefault();
+                        return;
+                      }
+                      setOpen(false);
+                    }}
                   >
                     {item.label}
                   </Link>

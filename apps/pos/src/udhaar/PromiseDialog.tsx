@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -34,16 +35,23 @@ export function PromiseDialog({
   const toast = useToast();
   const { staff } = useCurrentStaff();
   const [date, setDate] = useState(businessDate(Date.now()));
+  const [tz, setTz] = useState('Asia/Karachi');
   const [amount, setAmount] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setDate(businessDate(Date.now()));
     setAmount(null);
     setNote('');
     setPending(false);
+    // The shop's business date can differ from Karachi's; seed and bound the field with it.
+    void shopTimeZone(getDb())
+      .then((zone) => {
+        setTz(zone);
+        setDate(businessDate(Date.now(), zone));
+      })
+      .catch(() => undefined);
   }, [open]);
 
   const save = async () => {
@@ -66,7 +74,9 @@ export function PromiseDialog({
       toast.push(t('office.udhaar.promise_saved'));
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof PromiseError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof PromiseError)
         toast.push(t(`office.udhaar.promise_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
@@ -86,7 +96,7 @@ export function PromiseDialog({
         <DateField
           label={t('office.udhaar.promise_date')}
           value={date}
-          min={businessDate(Date.now())}
+          min={businessDate(Date.now(), tz)}
           onChange={setDate}
         />
         <MoneyInput

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
-import { IDS, json, seedShop } from './helpers/fixtures.ts';
+import { IDS, seedShop } from './helpers/fixtures.ts';
 import {
   op,
   type PushResponse,

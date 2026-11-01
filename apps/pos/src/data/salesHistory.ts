@@ -1,4 +1,4 @@
-import { businessDate } from '@bikri/core';
+import { businessDate, mulDivRound } from '@bikri/core';
 import type { MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
@@ -379,8 +379,18 @@ export async function salesHistory(
     .where('business_date')
     .between(filter.from, filter.to, true, true)
     .toArray();
+  // The summary describes the visible list: when the list is narrowed (cashier,
+  // device, method, status or search), only refunds of those bills count.
+  const narrowed =
+    Boolean(filter.staffId) ||
+    Boolean(filter.deviceId) ||
+    Boolean(filter.method) ||
+    Boolean(filter.status) ||
+    (filter.query ?? '').trim() !== '';
+  const visible = new Set(live.map((row) => String(row.sale.id)));
   const refunds = rangeRefunds
     .filter((r) => !filter.branchId || r.branch_id === filter.branchId)
+    .filter((r) => !narrowed || visible.has(String(r.sale_id)))
     .reduce((sum, r) => sum + n(r.amount) + n(r.udhaar_part), 0);
   const bills = live.length;
   const sold = soldGross - refunds;
@@ -391,7 +401,7 @@ export async function salesHistory(
       bills,
       sold,
       refunds,
-      avgBill: bills > 0 ? Math.round(sold / bills) : 0,
+      avgBill: bills > 0 ? mulDivRound(sold, 1, bills) : 0,
     },
   };
 }

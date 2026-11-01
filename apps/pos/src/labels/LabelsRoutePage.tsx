@@ -9,7 +9,7 @@ type Seed = { rows: LabelSeed[]; returnTo: string };
 export function LabelsRoutePage() {
   return (
     <AreaStrings area="office">
-      <PermissionGate permission="catalog.edit">
+      <PermissionGate anyOf={['catalog.edit', 'purchase.create']}>
         <LabelsRouteContent />
       </PermissionGate>
     </AreaStrings>

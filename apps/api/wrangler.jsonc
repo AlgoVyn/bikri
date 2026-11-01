@@ -32,7 +32,7 @@
   ],
   "vars": {
     "APP_VERSION": "0.1.0",
-    "SCHEMA_VERSION": "1",
+    "SCHEMA_VERSION": "2",
     "MIN_CLIENT_SCHEMA": "1",
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "odd-rain-0287.cloudflareaccess.com", // Zero Trust team domain (Access app "Bikri admin")

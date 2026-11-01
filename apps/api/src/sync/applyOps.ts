@@ -486,8 +486,17 @@ function checkSupplierReturn(
     throw new Reject('CONSTRAINT_FAILED');
   let sum = 0;
   for (const l of lines) {
+    const qty = Number(l.qty_milli);
+    const credit = Number(l.unit_credit);
     const total = Number(l.line_total);
-    if (total !== mulDivRound(Number(l.qty_milli), Number(l.unit_credit), 1000))
+    if (
+      !Number.isSafeInteger(qty) ||
+      qty <= 0 ||
+      !Number.isSafeInteger(credit) ||
+      credit < 0 ||
+      !Number.isSafeInteger(total) ||
+      total !== mulDivRound(qty, credit, 1000)
+    )
       throw new Reject('CONSTRAINT_FAILED');
     sum += total;
     if (typeof l.purchase_line_id === 'string') {
@@ -734,6 +743,112 @@ function checkStockMovement(
     (typeof row.ref_id !== 'string' || !sourceInGroup(group, table, row.ref_id))
   )
     throw new Reject('CONSTRAINT_FAILED');
+  // A source movement must move the document's own goods, not an arbitrary product.
+  const movementsFor = (refId: string, productId: string) =>
+    group.filter(
+      (candidate) =>
+        candidate.tbl === 'stock_movements' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.reason_code === reason &&
+        candidate.row?.ref_id === refId &&
+        candidate.row?.product_id === productId,
+    );
+  if (reason === 'sale' && typeof row.ref_id === 'string') {
+    const ref = row.ref_id;
+    const productId = String(row.product_id);
+    const sold = linkedInGroup(group, 'sale_lines', 'sale_id', ref)
+      .filter((line) => line.product_id === productId)
+      .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
+    const moved = movementsFor(ref, productId).reduce(
+      (sum, movement) => sum - Number(movement.row?.qty_delta_milli ?? 0),
+      0,
+    );
+    if (qty >= 0 || sold <= 0 || moved > sold)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (reason === 'purchase' && typeof row.ref_id === 'string') {
+    const ref = row.ref_id;
+    const productId = String(row.product_id);
+    const received = linkedInGroup(group, 'purchase_lines', 'purchase_id', ref)
+      .filter((line) => line.product_id === productId)
+      .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
+    const moved = movementsFor(ref, productId).reduce(
+      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      0,
+    );
+    if (qty <= 0 || received <= 0 || moved > received)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (reason === 'supplier_return' && typeof row.ref_id === 'string') {
+    const ref = row.ref_id;
+    const productId = String(row.product_id);
+    const returned = linkedInGroup(
+      group,
+      'supplier_return_lines',
+      'return_id',
+      ref,
+    )
+      .filter((line) => line.product_id === productId)
+      .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
+    const moved = movementsFor(ref, productId).reduce(
+      (sum, movement) => sum - Number(movement.row?.qty_delta_milli ?? 0),
+      0,
+    );
+    if (qty >= 0 || returned <= 0 || moved > returned)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+}
+
+/** Deliveries are reconciled with their lines, charges and paid-now payment (07 §7). */
+function checkPurchase(
+  look: Lookups,
+  group: PushOp[],
+  row: Record<string, unknown>,
+): void {
+  const id = String(row.id);
+  const lines = linkedInGroup(group, 'purchase_lines', 'purchase_id', id);
+  if (lines.length === 0 || lines.length !== Number(row.line_count))
+    throw new Reject('CONSTRAINT_FAILED');
+  let total = 0;
+  let charges = 0;
+  for (const line of lines) {
+    const qty = Number(line.qty_milli);
+    const unit = Number(line.unit_cost);
+    const lineTotal = Number(line.line_total);
+    const alloc = Number(line.charges_alloc ?? 0);
+    const landed = Number(line.landed_unit_cost);
+    if (
+      !Number.isSafeInteger(qty) ||
+      qty <= 0 ||
+      !Number.isSafeInteger(unit) ||
+      unit < 0 ||
+      !Number.isSafeInteger(lineTotal) ||
+      !Number.isSafeInteger(alloc) ||
+      alloc < 0 ||
+      !Number.isSafeInteger(landed) ||
+      lineTotal !== mulDivRound(qty, unit, 1000) ||
+      landed !== mulDivRound(lineTotal + alloc, 1000, qty)
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    total += lineTotal;
+    charges += alloc;
+  }
+  if (
+    total + Number(row.other_charges ?? 0) !== Number(row.total) ||
+    charges !== Number(row.other_charges ?? 0)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+  const paid = Number(row.paid_now ?? 0);
+  const pays = [
+    ...linkedInGroup(group, 'payments', 'purchase_id', id).map(asPayment),
+    ...(look.linkedPayments.get(`purchase:${id}`) ?? []),
+  ];
+  if (
+    paid > 0
+      ? !onePayment(pays, 'out', 'purchase_paid_now', row.paid_method, paid)
+      : pays.length > 0
+  )
+    throw new Reject('CONSTRAINT_FAILED');
 }
 /** Sales are reconciled with their lines, payments and udhaar ledger row (07 §2). */
 function checkSaleInsert(group: PushOp[], row: Record<string, unknown>): void {
@@ -869,14 +984,20 @@ function checkOp(
       Boolean(staff && can(staff.role, staff.permissions_json, p));
     switch (op.tbl) {
       case 'sales': {
-        // The prefix may come from an earlier bill_prefix setting; the device code is stable and
-        // UNIQUE(tenant_id, invoice_no) is the real collision guard (03 §4.1, 07 §2).
+        // The prefix may come from an earlier bill_prefix setting, and the device code
+        // from before a branch move; UNIQUE(tenant_id, invoice_no) is the collision guard.
         const invoice = /^[A-Z0-9]{1,6}-([A-Z]{1,2})-(\d+)$/u.exec(
           String(row.invoice_no),
         );
+        const codes = new Set([
+          ctx.device.device_code,
+          ...String(ctx.device.device_code_history ?? '')
+            .split(',')
+            .filter(Boolean),
+        ]);
         if (
           !invoice ||
-          invoice[1] !== ctx.device.device_code ||
+          !codes.has(invoice[1] ?? '') ||
           Number(invoice[2]) !== Number(row.invoice_seq)
         )
           throw new Reject('CONSTRAINT_FAILED');
@@ -897,13 +1018,21 @@ function checkOp(
           throw new Reject('FORBIDDEN');
         checkRefund(look, group, row);
         break;
-      case 'supplier_return_lines':
+      case 'supplier_return_lines': {
+        const qty = Number(row.qty_milli);
+        const credit = Number(row.unit_credit);
+        const lineTotal = Number(row.line_total);
         if (
-          Number(row.line_total) !==
-          mulDivRound(Number(row.qty_milli), Number(row.unit_credit), 1000)
+          !Number.isSafeInteger(qty) ||
+          qty <= 0 ||
+          !Number.isSafeInteger(credit) ||
+          credit < 0 ||
+          !Number.isSafeInteger(lineTotal) ||
+          lineTotal !== mulDivRound(qty, credit, 1000)
         )
           throw new Reject('CONSTRAINT_FAILED');
         break;
+      }
       case 'sale_voids': {
         const over = overrideFor(
           group,
@@ -993,7 +1122,29 @@ function checkOp(
         if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
         if (Number(row.total) < 0 || Number(row.other_charges) < 0)
           throw new Reject('CONSTRAINT_FAILED');
+        checkPurchase(look, group, row);
         break;
+      case 'purchase_lines': {
+        const qty = Number(row.qty_milli);
+        const unit = Number(row.unit_cost);
+        const lineTotal = Number(row.line_total);
+        const alloc = Number(row.charges_alloc ?? 0);
+        const landed = Number(row.landed_unit_cost);
+        if (
+          !Number.isSafeInteger(qty) ||
+          qty <= 0 ||
+          !Number.isSafeInteger(unit) ||
+          unit < 0 ||
+          !Number.isSafeInteger(lineTotal) ||
+          !Number.isSafeInteger(alloc) ||
+          alloc < 0 ||
+          !Number.isSafeInteger(landed) ||
+          lineTotal !== mulDivRound(qty, unit, 1000) ||
+          landed !== mulDivRound(lineTotal + alloc, 1000, qty)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        break;
+      }
       case 'cash_moves':
         if (!allowed('cash.move')) throw new Reject('FORBIDDEN');
         break;
@@ -1063,11 +1214,7 @@ function checkOp(
     // outside that one bootstrap group (05 §5).
     const bootstrap = bootstrapOwnerId(look, group);
     const persisted = updater ? look.staff.get(updater.id) : undefined;
-    if (
-      !updater ||
-      updater.role !== 'owner' ||
-      (!persisted && updater.id !== bootstrap)
-    )
+    if (updater?.role !== 'owner' || (!persisted && updater.id !== bootstrap))
       throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'branches') {
@@ -1084,15 +1231,31 @@ function checkOp(
     op.tbl === 'categories' ||
     op.tbl === 'product_barcodes'
   ) {
-    if (
-      !updater ||
-      !can(updater.role, updater.permissions_json, 'catalog.edit')
-    )
-      throw new Reject('FORBIDDEN');
+    const catalogueEdit = Boolean(
+      updater && can(updater.role, updater.permissions_json, 'catalog.edit'),
+    );
+    // A delivery always refreshes the product's last cost (07 §7); that single
+    // server-side consequence belongs to purchase.create, not catalog.edit.
+    const deliveryCost =
+      op.tbl === 'products' &&
+      Boolean(
+        updater &&
+          can(updater.role, updater.permissions_json, 'purchase.create'),
+      ) &&
+      (op.changed_fields ?? []).length > 0 &&
+      (op.changed_fields ?? []).every((field) => field === 'last_cost') &&
+      group.some(
+        (candidate) =>
+          candidate.tbl === 'purchase_lines' &&
+          candidate.kind === 'insert' &&
+          candidate.row?.product_id === row.id,
+      );
+    if (!catalogueEdit && !deliveryCost) throw new Reject('FORBIDDEN');
     if (
       op.tbl === 'products' &&
       row.deleted_at != null &&
-      !can(updater.role, updater.permissions_json, 'catalog.delete')
+      (!updater ||
+        !can(updater.role, updater.permissions_json, 'catalog.delete'))
     )
       throw new Reject('FORBIDDEN');
   }
@@ -1182,15 +1345,13 @@ function planOp(
   if (op.kind === 'insert') {
     if (op.tbl === 'sale_voids' && typeof row.sale_id === 'string') {
       const saleId = row.sale_id;
-      const duplicateInGroup =
-        group
-          .filter(
-            (candidate) =>
-              candidate.tbl === 'sale_voids' &&
-              candidate.kind === 'insert' &&
-              candidate.row?.sale_id === saleId,
-          )
-          .findIndex((candidate) => candidate === op) > 0;
+      const firstVoid = group.findIndex(
+        (candidate) =>
+          candidate.tbl === 'sale_voids' &&
+          candidate.kind === 'insert' &&
+          candidate.row?.sale_id === saleId,
+      );
+      const duplicateInGroup = firstVoid >= 0 && group[firstVoid] !== op;
       if (look.existingVoids.has(saleId) || duplicateInGroup) {
         return {
           op,
@@ -1363,6 +1524,21 @@ function sideEffects(
     out.push(conflictLog(conflictId));
     out.push(...saleStatus(String(row.sale_id)));
   }
+  if (tbl === 'sale_voids') {
+    // The reverse race (a refund already left the shop when this void arrives) is the
+    // same money conflict; accept the real event and let the owner settle it.
+    const conflictId = newId(now);
+    out.push(
+      db.prepare(
+        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'sale_voids', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM refunds WHERE tenant_id = ?1 AND sale_id = ?4)",
+        conflictId,
+        String(row.id),
+        String(row.sale_id),
+        now,
+      ),
+    );
+    out.push(conflictLog(conflictId));
+  }
   if (tbl === 'refunds') {
     const conflictId = newId(now);
     out.push(
@@ -1478,6 +1654,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const saleIds = new Set<string>();
   const refundIds = new Set<string>();
   const returnIds = new Set<string>();
+  const purchaseIds = new Set<string>();
   const purchaseLineIds = new Set<string>();
   const expenseIds = new Set<string>();
   const reversalIds = new Set<string>();
@@ -1517,6 +1694,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       refundIds.add(op.row.id);
     if (op.tbl === 'supplier_returns' && typeof op.row?.id === 'string')
       returnIds.add(op.row.id);
+    if (
+      op.tbl === 'purchases' &&
+      op.kind === 'insert' &&
+      typeof op.row?.id === 'string'
+    )
+      purchaseIds.add(op.row.id);
     if (
       op.tbl === 'supplier_return_lines' &&
       typeof op.row?.purchase_line_id === 'string'
@@ -1562,7 +1745,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { onHand: true }
     | { sales: true }
     | { refundUdhaar: true }
-    | { payments: 'refund' | 'sret' }
+    | { payments: 'refund' | 'sret' | 'purchase' }
     | { ledger: true }
     | { purchaseLines: true }
     | { voids: true }
@@ -1651,6 +1834,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     (p) =>
       `SELECT supplier_return_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND supplier_return_id IN (${p})`,
     { payments: 'sret' },
+  );
+  chunked(
+    purchaseIds,
+    (p) =>
+      `SELECT purchase_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND purchase_id IN (${p})`,
+    { payments: 'purchase' },
   );
   chunked(
     refundIds,

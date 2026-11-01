@@ -13,6 +13,7 @@ import {
   retryPrintJob,
 } from '../data/printJobs.ts';
 import type { PrinterKv } from '../data/receipt.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, openDrawer, printTestPage } from '../print/printService.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -47,18 +48,20 @@ function Toggle({
   );
 }
 
-function timeOf(ms: number, lang: string): string {
+function timeOf(ms: number, lang: string, timeZone = 'Asia/Karachi'): string {
   return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-GB', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone,
   }).format(ms);
 }
 
 /** Settings → Printer (screens/17, this device only). */
 export function PrinterPage() {
   const { t, i18n } = useTranslation();
+  const timeZone = useShopTimeZone();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -309,7 +312,7 @@ export function PrinterPage() {
                   : t(`printer.kind_${job.kind}`)}
                 {job.reprint ? ` · ${t('printer.reprint')}` : ''}
                 <span className="block text-small text-text-muted">
-                  {timeOf(job.created_at, i18n.language)}
+                  {timeOf(job.created_at, i18n.language, timeZone)}
                 </span>
               </span>
               <span

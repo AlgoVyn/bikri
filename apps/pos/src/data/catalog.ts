@@ -381,12 +381,14 @@ async function queuePhoto(
   w: Writer,
   productId: string,
   photo: Photo,
+  staffId: string,
 ): Promise<void> {
   await w.table<FileQueueEntry, number>('file_queue').add({
     kind: 'product_image',
     target_id: productId,
     blob: photo.blob,
     sha256: photo.sha256,
+    staff_id: staffId,
     status: 'pending',
   });
 }
@@ -446,7 +448,7 @@ export async function saveNewProduct(
         { ...rest, id, sku, image_key: imageKey },
         ctx,
       );
-      if (photo) await queuePhoto(w, id, photo);
+      if (photo) await queuePhoto(w, id, photo, ctx.staff_id);
       return created;
     },
     { actor: ctx.staff_id, ...opts },
@@ -495,7 +497,7 @@ export async function saveProductEdit(
       if (input.photo === null) patch.image_key = null;
       if (input.photo) {
         patch.image_key = photoKey(id, input.photo);
-        await queuePhoto(w, id, input.photo);
+        await queuePhoto(w, id, input.photo, ctx.staff_id);
       }
       const after = await w.update('products', id, patch);
       if (Number(before.price) !== input.price) {
