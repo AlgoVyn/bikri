@@ -2,6 +2,7 @@ import type { MasterRow } from '@bikri/db';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -89,6 +90,7 @@ export function SupplierDialog({
           ? t('office.suppliers.edit_supplier')
           : t('office.suppliers.new_supplier')
       }
+      sheet
     >
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-small sm:col-span-2">
@@ -131,23 +133,23 @@ export function SupplierDialog({
           />
         ) : null}
       </div>
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <button
           type="button"
-          className={buttonQuiet}
+          className={`${buttonQuiet} max-md:flex-1`}
           onClick={() => onOpenChange(false)}
         >
           {t('common.cancel')}
         </button>
         <button
           type="button"
-          className={buttonPrimary}
+          className={`${buttonPrimary} max-md:flex-1`}
           disabled={name.trim() === '' || pending}
           onClick={() => void save()}
         >
           {t('office.suppliers.save')}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

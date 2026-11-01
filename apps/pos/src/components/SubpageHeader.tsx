@@ -27,7 +27,7 @@ export function SubpageHeader({
   backLabel: string;
   icon?: ReactNode;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
 }) {
   return (

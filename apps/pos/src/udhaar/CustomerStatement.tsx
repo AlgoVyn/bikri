@@ -10,9 +10,11 @@ import {
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
+import { UsersIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { emptyCart } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
@@ -227,169 +229,149 @@ export function CustomerStatement({
         embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('focused')
       }
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <Link
-            to="/udhaar"
-            aria-label={t('office.udhaar.back_customers')}
-            title={t('office.udhaar.back_customers')}
-            className={
-              embedded
-                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-                : buttonQuiet
+      <SubpageHeader
+        backTo="/udhaar"
+        backLabel={t('office.udhaar.back_customers')}
+        icon={<UsersIcon />}
+        title={name}
+        subtitle={
+          phone ? (
+            <a href={`tel:${phone}`} dir="ltr" className="underline">
+              {phone}
+            </a>
+          ) : undefined
+        }
+        actions={
+          <PageActions
+            primary={
+              can('payment.receive') ? (
+                <button
+                  type="button"
+                  className={`${buttonPrimary} max-md:w-full`}
+                  disabled={readOnly}
+                  onClick={() => setReceiveOpen(true)}
+                >
+                  {t('office.udhaar.receive_money')}
+                </button>
+              ) : undefined
             }
-          >
-            {embedded ? (
-              <span
-                aria-hidden="true"
-                className="text-title leading-none rtl:rotate-180"
-              >
-                ‹
-              </span>
-            ) : (
-              t('office.udhaar.back_customers')
-            )}
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words text-h1 font-semibold">{name}</h1>
-            {phone ? (
-              <a
-                href={`tel:${phone}`}
-                dir="ltr"
-                className="text-small underline"
-              >
-                {phone}
-              </a>
-            ) : null}
-          </div>
-        </div>
-        <div className="rounded-card border border-border bg-surface p-3 shadow-card">
-          <div
-            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
-            data-testid="statement-balance"
-          >
-            <span className="text-small text-text-muted">
+            secondary={
+              <>
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  disabled={!reminder}
+                  title={
+                    reminder ? undefined : t('office.udhaar.reminder_no_phone')
+                  }
+                  onClick={() => {
+                    if (reminder) window.open(reminder, '_blank', 'noopener');
+                  }}
+                >
+                  {t('office.udhaar.send_reminder')}
+                </button>
+                {can('export.data') ? (
+                  <ExportMenu
+                    onCsv={exportCsv}
+                    onPdf={() => void exportPdf()}
+                    onShare={() => void share()}
+                  />
+                ) : null}
+              </>
+            }
+            more={[
+              ...(can('party.edit')
+                ? [
+                    {
+                      label: t('office.udhaar.add_promise'),
+                      disabled: readOnly,
+                      onSelect: () => setPromiseOpen(true),
+                    },
+                    ...(role !== 'cashier'
+                      ? [
+                          {
+                            label: t('office.udhaar.edit'),
+                            disabled: readOnly,
+                            onSelect: () => setEditOpen(true),
+                          },
+                        ]
+                      : []),
+                  ]
+                : []),
+              ...(can('sale.create')
+                ? [
+                    {
+                      label: t('office.udhaar.sell_to', { name }),
+                      onSelect: () => void sellTo(),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        }
+      />
+
+      <section className="rounded-card border border-border bg-surface p-4 shadow-card">
+        <div className="grid grid-cols-2 gap-3">
+          <div data-testid="statement-balance">
+            <p className="text-small text-text-muted">
               {balance > 0
                 ? t('office.udhaar.owes_label')
                 : balance < 0
                   ? t('office.udhaar.in_credit_label')
-                  : t('office.udhaar.settled')}
-              {balance !== 0 ? ' ' : null}
-            </span>
+                  : t('office.udhaar.settled')}{' '}
+            </p>
             {balance !== 0 ? (
-              <span
-                className={`text-title font-semibold sm:text-figure ${balanceTone(balance)}`}
+              <p
+                className={`mt-1 text-title font-semibold ${balanceTone(balance)}`}
               >
                 <MoneyText paisa={Math.abs(balance)} />
-              </span>
+              </p>
             ) : null}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-2 text-small">
-            <span>
-              {t('office.udhaar.limit')}:{' '}
+          <div>
+            <p className="text-small text-text-muted">
+              {t('office.udhaar.limit')}
+            </p>
+            <p className="mt-1 text-title font-semibold">
               {customer.credit_limit === null ||
               customer.credit_limit === undefined ? (
                 t('office.udhaar.no_limit')
               ) : (
                 <MoneyText paisa={Number(customer.credit_limit)} />
               )}
-            </span>
-            {percent !== null ? (
-              <span
-                className="h-2 w-40 overflow-hidden rounded-full bg-surface-2"
-                role="img"
-                aria-label={t('office.udhaar.limit_bar', { percent })}
-              >
-                <span
-                  className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-                  style={{ width: `${percent}%` }}
-                />
-              </span>
-            ) : null}
-            <span className="text-text-muted">
-              {ageLabel(t, data.oldest ?? null)}
-            </span>
-            {data.promise ? (
-              <span className="text-text-muted">
-                {t('office.udhaar.promise_on', {
-                  date: dateText(
-                    String(data.promise.promised_on),
-                    i18n.language,
-                    tz,
-                  ),
-                })}
-              </span>
-            ) : null}
+            </p>
           </div>
         </div>
-      </div>
-
-      <PageActions
-        primary={
-          can('payment.receive') ? (
-            <button
-              type="button"
-              className={`${buttonPrimary} max-md:w-full`}
-              disabled={readOnly}
-              onClick={() => setReceiveOpen(true)}
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-small">
+          {percent !== null ? (
+            <span
+              className="h-2 w-40 overflow-hidden rounded-full bg-surface-2"
+              role="img"
+              aria-label={t('office.udhaar.limit_bar', { percent })}
             >
-              {t('office.udhaar.receive_money')}
-            </button>
-          ) : undefined
-        }
-        secondary={
-          <>
-            <button
-              type="button"
-              className={buttonQuiet}
-              disabled={!reminder}
-              title={
-                reminder ? undefined : t('office.udhaar.reminder_no_phone')
-              }
-              onClick={() => {
-                if (reminder) window.open(reminder, '_blank', 'noopener');
-              }}
-            >
-              {t('office.udhaar.send_reminder')}
-            </button>
-            {can('export.data') ? (
-              <ExportMenu
-                onCsv={exportCsv}
-                onPdf={() => void exportPdf()}
-                onShare={() => void share()}
+              <span
+                className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
+                style={{ width: `${percent}%` }}
               />
-            ) : null}
-          </>
-        }
-        more={[
-          ...(can('party.edit')
-            ? [
-                {
-                  label: t('office.udhaar.add_promise'),
-                  disabled: readOnly,
-                  onSelect: () => setPromiseOpen(true),
-                },
-                ...(role !== 'cashier'
-                  ? [
-                      {
-                        label: t('office.udhaar.edit'),
-                        disabled: readOnly,
-                        onSelect: () => setEditOpen(true),
-                      },
-                    ]
-                  : []),
-              ]
-            : []),
-          ...(can('sale.create')
-            ? [
-                {
-                  label: t('office.udhaar.sell_to', { name }),
-                  onSelect: () => void sellTo(),
-                },
-              ]
-            : []),
-        ]}
-      />
+            </span>
+          ) : null}
+          <span className="text-text-muted">
+            {ageLabel(t, data.oldest ?? null)}
+          </span>
+          {data.promise ? (
+            <span className="text-text-muted">
+              {t('office.udhaar.promise_on', {
+                date: dateText(
+                  String(data.promise.promised_on),
+                  i18n.language,
+                  tz,
+                ),
+              })}
+            </span>
+          ) : null}
+        </div>
+      </section>
 
       <div className="flex flex-wrap items-end gap-2">
         <DateField

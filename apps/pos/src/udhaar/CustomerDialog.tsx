@@ -9,6 +9,7 @@ import {
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -167,6 +168,7 @@ export function CustomerDialog({
             ? t('office.udhaar.edit_customer')
             : t('office.udhaar.new_customer')
         }
+        sheet
       >
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-small sm:col-span-2">
@@ -244,8 +246,8 @@ export function CustomerDialog({
             </Link>
           </p>
         ) : null}
-        <div className="flex flex-wrap justify-between gap-2">
-          <span>
+        <DialogFooter>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             {canDelete ? (
               <button
                 type="button"
@@ -254,26 +256,28 @@ export function CustomerDialog({
               >
                 {t('office.udhaar.delete')}
               </button>
-            ) : null}
-          </span>
-          <span className="flex gap-2">
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => onOpenChange(false)}
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={name.trim() === '' || pending}
-              onClick={() => void save()}
-            >
-              {t('office.udhaar.save')}
-            </button>
-          </span>
-        </div>
+            ) : (
+              <span />
+            )}
+            <span className="flex gap-2">
+              <button
+                type="button"
+                className={`${buttonQuiet} max-md:flex-1`}
+                onClick={() => onOpenChange(false)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className={`${buttonPrimary} max-md:flex-1`}
+                disabled={name.trim() === '' || pending}
+                onClick={() => void save()}
+              >
+                {t('office.udhaar.save')}
+              </button>
+            </span>
+          </div>
+        </DialogFooter>
       </Modal>
       <ConfirmDialog
         open={confirmDelete}

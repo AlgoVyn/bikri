@@ -2,6 +2,7 @@ import { newId } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -82,8 +83,9 @@ export function PaySupplierDialog({
       onOpenChange={onOpenChange}
       title={t('office.suppliers.pay_supplier')}
       description={t('office.suppliers.pay_for', { name: supplierName })}
+      sheet
     >
-      <div className="flex items-center justify-between gap-2 rounded-control bg-surface-2 px-3 py-2 text-small">
+      <p className="flex items-center justify-between gap-2 border-b border-border pb-2 text-small">
         <span className="text-text-muted">
           {balance > 0
             ? t('office.suppliers.you_owe_label')
@@ -96,7 +98,7 @@ export function PaySupplierDialog({
             <MoneyText paisa={Math.abs(balance)} />
           </span>
         ) : null}
-      </div>
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <MoneyInput
           label={t('office.suppliers.amount')}
@@ -107,13 +109,17 @@ export function PaySupplierDialog({
           <legend className="mb-1 text-small">
             {t('office.suppliers.method')}
           </legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {(['cash', 'bank_wallet', 'card'] as Method[]).map((m) => (
               <button
                 key={m}
                 type="button"
                 aria-pressed={method === m}
-                className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
+                className={`min-h-11 rounded-control border px-2 text-small transition-colors duration-150 ${
+                  method === m
+                    ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
+                    : 'border-border-strong bg-surface text-text-muted hover:bg-surface-2'
+                }`}
                 onClick={() => setMethod(m)}
               >
                 {t(`payment.${m}`)}
@@ -139,28 +145,28 @@ export function PaySupplierDialog({
           />
         </label>
       </div>
-      <p className="text-small text-text-muted">
+      <p className="text-end text-small tabular-nums text-text-muted">
         {t('office.suppliers.balance_after', {
           amount: formatShopMoney(balance - (amount ?? 0)),
         })}
       </p>
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <button
           type="button"
-          className={buttonQuiet}
+          className={`${buttonQuiet} max-md:flex-1`}
           onClick={() => onOpenChange(false)}
         >
           {t('common.cancel')}
         </button>
         <button
           type="button"
-          className={buttonPrimary}
+          className={`${buttonPrimary} max-md:flex-1`}
           disabled={!amount || amount <= 0 || pending}
           onClick={() => void save()}
         >
           {t('office.suppliers.save_payment')}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

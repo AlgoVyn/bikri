@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -79,6 +80,7 @@ export function PromiseDialog({
       onOpenChange={onOpenChange}
       title={t('office.udhaar.add_promise')}
       description={t('office.udhaar.promise_for', { name: customerName })}
+      sheet
     >
       <div className="grid gap-2 sm:grid-cols-2">
         <DateField
@@ -105,23 +107,23 @@ export function PromiseDialog({
           onChange={(e) => setNote(e.target.value)}
         />
       </label>
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <button
           type="button"
-          className={buttonQuiet}
+          className={`${buttonQuiet} max-md:flex-1`}
           onClick={() => onOpenChange(false)}
         >
           {t('common.cancel')}
         </button>
         <button
           type="button"
-          className={buttonPrimary}
+          className={`${buttonPrimary} max-md:flex-1`}
           disabled={pending || date === ''}
           onClick={() => void save()}
         >
           {t('office.udhaar.save_promise')}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

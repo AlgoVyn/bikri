@@ -10,6 +10,8 @@ const SIZES = {
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,
   // Full screen below 768 px (pay modal, screens/06).
   full: `${base} w-[min(56rem,calc(100%-2rem))] max-md:m-0 max-md:h-full max-md:max-h-full max-md:w-full max-md:rounded-none`,
+  // A form sheet: rises from the bottom on phones, a compact dialog on larger screens.
+  sheet: `${base} w-[min(32rem,calc(100%-2rem))] max-md:mt-auto max-md:mb-0 max-md:max-h-[92dvh] max-md:w-full max-md:rounded-b-none max-md:pt-6 max-md:pb-0`,
 } as const;
 
 /** A titled modal dialog (focus trap, Esc closes). */
@@ -21,6 +23,7 @@ export function Modal({
   children,
   wide = false,
   full = false,
+  sheet = false,
   header,
 }: {
   open: boolean;
@@ -30,6 +33,8 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
   full?: boolean;
+  /** Phone: a bottom sheet; from 768 px: a compact dialog. */
+  sheet?: boolean;
   /** Extra content next to the title (e.g. the total to pay). */
   header?: ReactNode;
 }) {
@@ -39,9 +44,17 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content
-          className={SIZES[full ? 'full' : wide ? 'wide' : 'normal']}
+          className={
+            SIZES[full ? 'full' : sheet ? 'sheet' : wide ? 'wide' : 'normal']
+          }
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
+          {sheet ? (
+            <span
+              aria-hidden="true"
+              className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-border-strong md:hidden"
+            />
+          ) : null}
           <div className="flex flex-wrap items-baseline justify-between gap-2 pe-12">
             <Dialog.Title className="text-title">{title}</Dialog.Title>
             {header}
@@ -58,7 +71,9 @@ export function Modal({
             </button>
           </Dialog.Close>
           {description ? (
-            <Dialog.Description>{description}</Dialog.Description>
+            <Dialog.Description className="text-small text-text-muted">
+              {description}
+            </Dialog.Description>
           ) : null}
           {children}
         </Dialog.Content>

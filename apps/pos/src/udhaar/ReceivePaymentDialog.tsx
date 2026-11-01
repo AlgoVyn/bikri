@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -123,8 +124,9 @@ export function ReceivePaymentDialog({
         onOpenChange={onOpenChange}
         title={t('office.udhaar.receive_money')}
         description={t('office.udhaar.receive_for', { name: customerName })}
+        sheet
       >
-        <div className="flex items-center justify-between gap-2 rounded-control bg-surface-2 px-3 py-2 text-small">
+        <p className="flex items-center justify-between gap-2 border-b border-border pb-2 text-small">
           <span className="text-text-muted">
             {balance > 0
               ? t('office.udhaar.owes_label')
@@ -137,7 +139,7 @@ export function ReceivePaymentDialog({
               <MoneyText paisa={Math.abs(balance)} />
             </span>
           ) : null}
-        </div>
+        </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <MoneyInput
             label={t('office.udhaar.amount')}
@@ -156,13 +158,17 @@ export function ReceivePaymentDialog({
             <legend className="mb-1 text-small">
               {t('office.udhaar.method')}
             </legend>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {METHODS.map((m) => (
                 <button
                   key={m}
                   type="button"
                   aria-pressed={method === m}
-                  className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
+                  className={`min-h-11 rounded-control border px-2 text-small transition-colors duration-150 ${
+                    method === m
+                      ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
+                      : 'border-border-strong bg-surface text-text-muted hover:bg-surface-2'
+                  }`}
                   onClick={() => setMethod(m)}
                 >
                   {t(`payment.${m}`)}
@@ -216,7 +222,10 @@ export function ReceivePaymentDialog({
             />
           </label>
         </div>
-        <p className="text-small" data-testid="payment-after">
+        <p
+          className="text-end text-small tabular-nums text-text-muted"
+          data-testid="payment-after"
+        >
           {after >= 0
             ? t('office.udhaar.balance_after', {
                 amount: formatShopMoney(after),
@@ -235,17 +244,17 @@ export function ReceivePaymentDialog({
             {t('office.udhaar.payment_no_permission')}
           </p>
         ) : null}
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <button
             type="button"
-            className={buttonQuiet}
+            className={`${buttonQuiet} max-md:flex-1`}
             onClick={() => onOpenChange(false)}
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
-            className={buttonPrimary}
+            className={`${buttonPrimary} max-md:flex-1`}
             disabled={
               !amount || amount <= 0 || pending || !can('payment.receive')
             }
@@ -256,7 +265,7 @@ export function ReceivePaymentDialog({
           >
             {t('office.udhaar.save_payment')}
           </button>
-        </div>
+        </DialogFooter>
       </Modal>
       <ConfirmDialog
         open={overpay}

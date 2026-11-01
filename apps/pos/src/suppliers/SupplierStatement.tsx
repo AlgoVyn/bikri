@@ -9,9 +9,11 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
+import { SuppliersIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -153,125 +155,103 @@ export function SupplierStatement({
         embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('focused')
       }
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <Link
-            to="/suppliers"
-            aria-label={t('office.suppliers.back')}
-            title={t('office.suppliers.back')}
-            className={
-              embedded
-                ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-                : buttonQuiet
-            }
-          >
-            {embedded ? (
-              <span
-                aria-hidden="true"
-                className="text-title leading-none rtl:rotate-180"
-              >
-                ‹
-              </span>
-            ) : (
-              t('office.suppliers.back')
-            )}
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words text-h1 font-semibold">{name}</h1>
-            {supplier.phone ? (
-              <a
-                href={`tel:${String(supplier.phone)}`}
-                dir="ltr"
-                className="text-small underline"
-              >
-                {String(supplier.phone)}
-              </a>
-            ) : null}
-          </div>
-        </div>
-        <div className="rounded-card border border-border bg-surface p-3 shadow-card">
-          <div
-            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
-            data-testid="supplier-balance"
-          >
-            <span className="text-small text-text-muted">
-              {balance > 0
-                ? t('office.suppliers.you_owe_label')
-                : balance < 0
-                  ? t('office.suppliers.advance_label')
-                  : t('office.suppliers.settled')}
-              {balance !== 0 ? ' ' : null}
-            </span>
-            {balance !== 0 ? (
-              <span
-                className={`text-title font-semibold sm:text-figure ${supplierBalanceTone(balance)}`}
-              >
-                <MoneyText paisa={Math.abs(balance)} />
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <PageActions
-        primary={
-          can('purchase.create') ? (
-            <Link
-              to="/suppliers/$supplierId/delivery/new"
-              params={{ supplierId }}
-              className={`${buttonPrimary} max-md:w-full ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
-              aria-disabled={readOnly}
-              onClick={(event) => {
-                if (readOnly) event.preventDefault();
-              }}
+      <SubpageHeader
+        backTo="/suppliers"
+        backLabel={t('office.suppliers.back')}
+        icon={<SuppliersIcon />}
+        title={name}
+        subtitle={
+          supplier.phone ? (
+            <a
+              href={`tel:${String(supplier.phone)}`}
+              dir="ltr"
+              className="underline"
             >
-              {t('office.suppliers.record_delivery')}
-            </Link>
+              {String(supplier.phone)}
+            </a>
           ) : undefined
         }
-        secondary={
-          <>
-            {can('purchase.create') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={readOnly}
-                onClick={() => setPayOpen(true)}
-              >
-                {t('office.suppliers.pay_supplier')}
-              </button>
-            ) : null}
-            {can('export.data') && rows.length > 0 ? (
-              <ExportMenu
-                onCsv={() =>
-                  downloadText(
-                    `supplier-${name.replace(/\s+/gu, '-')}.csv`,
-                    supplierStatementCsv(rows),
-                  )
-                }
-                onPdf={() => void exportPdf()}
-                onShare={() => void share()}
-              />
-            ) : null}
-          </>
-        }
-        more={
-          can('purchase.create')
-            ? [
-                {
-                  label: t('office.suppliers.return_supplier'),
-                  to: `/suppliers/${supplierId}/return/new`,
-                  disabled: readOnly,
-                },
-                {
-                  label: t('office.suppliers.edit'),
-                  disabled: readOnly,
-                  onSelect: () => setEditOpen(true),
-                },
-              ]
-            : []
+        actions={
+          <PageActions
+            primary={
+              can('purchase.create') ? (
+                <Link
+                  to="/suppliers/$supplierId/delivery/new"
+                  params={{ supplierId }}
+                  className={`${buttonPrimary} max-md:w-full ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
+                  aria-disabled={readOnly}
+                  onClick={(event) => {
+                    if (readOnly) event.preventDefault();
+                  }}
+                >
+                  {t('office.suppliers.record_delivery')}
+                </Link>
+              ) : undefined
+            }
+            secondary={
+              <>
+                {can('purchase.create') ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={readOnly}
+                    onClick={() => setPayOpen(true)}
+                  >
+                    {t('office.suppliers.pay_supplier')}
+                  </button>
+                ) : null}
+                {can('export.data') && rows.length > 0 ? (
+                  <ExportMenu
+                    onCsv={() =>
+                      downloadText(
+                        `supplier-${name.replace(/\s+/gu, '-')}.csv`,
+                        supplierStatementCsv(rows),
+                      )
+                    }
+                    onPdf={() => void exportPdf()}
+                    onShare={() => void share()}
+                  />
+                ) : null}
+              </>
+            }
+            more={
+              can('purchase.create')
+                ? [
+                    {
+                      label: t('office.suppliers.return_supplier'),
+                      to: `/suppliers/${supplierId}/return/new`,
+                      disabled: readOnly,
+                    },
+                    {
+                      label: t('office.suppliers.edit'),
+                      disabled: readOnly,
+                      onSelect: () => setEditOpen(true),
+                    },
+                  ]
+                : []
+            }
+          />
         }
       />
+
+      <section className="rounded-card border border-border bg-surface p-4 shadow-card">
+        <div data-testid="supplier-balance">
+          <p className="text-small text-text-muted">
+            {balance > 0
+              ? t('office.suppliers.you_owe_label')
+              : balance < 0
+                ? t('office.suppliers.advance_label')
+                : t('office.suppliers.settled')}{' '}
+          </p>
+          {balance !== 0 ? (
+            <p
+              className={`mt-1 text-title font-semibold ${supplierBalanceTone(balance)}`}
+            >
+              <MoneyText paisa={Math.abs(balance)} />
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       <ul className="flex flex-col gap-2 sm:hidden">
         {rows.length === 0 ? (
