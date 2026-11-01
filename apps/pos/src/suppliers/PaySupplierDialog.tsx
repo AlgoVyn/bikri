@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
+import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -82,6 +83,20 @@ export function PaySupplierDialog({
       title={t('office.suppliers.pay_supplier')}
       description={t('office.suppliers.pay_for', { name: supplierName })}
     >
+      <div className="flex items-center justify-between gap-2 rounded-control bg-surface-2 px-3 py-2 text-small">
+        <span className="text-text-muted">
+          {balance > 0
+            ? t('office.suppliers.you_owe_label')
+            : balance < 0
+              ? t('office.suppliers.advance_label')
+              : t('office.suppliers.settled')}
+        </span>
+        {balance !== 0 ? (
+          <span className="font-medium">
+            <MoneyText paisa={Math.abs(balance)} />
+          </span>
+        ) : null}
+      </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <MoneyInput
           label={t('office.suppliers.amount')}

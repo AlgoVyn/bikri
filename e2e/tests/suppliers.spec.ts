@@ -123,6 +123,10 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       payments2.filter((p) => p.purpose === 'supplier_payment'),
     ).toMatchObject([{ amount: 50000 }]);
 
+    await page
+      .getByRole('main')
+      .getByRole('button', { name: 'More', exact: true })
+      .click();
     await page.getByRole('link', { name: 'Return to supplier' }).click();
     await expect(
       page.getByRole('heading', { name: 'Return to supplier' }),

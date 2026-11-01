@@ -26,6 +26,10 @@ async function openAli(page: Page, id: string) {
 }
 
 async function addPromise(page: Page, amount: string) {
+  await page
+    .getByRole('main')
+    .getByRole('button', { name: 'More', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Add promise' }).click();
   const d = dialog(page, 'Add promise');
   const today = await d.getByLabel('Date').inputValue();

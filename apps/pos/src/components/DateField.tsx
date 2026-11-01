@@ -8,6 +8,7 @@ export function DateField({
   max,
   onChange,
   hint,
+  disabled = false,
   className = '',
 }: {
   label: string;
@@ -16,6 +17,7 @@ export function DateField({
   max?: string;
   onChange: (value: string) => void;
   hint?: string;
+  disabled?: boolean;
   className?: string;
 }) {
   const id = useId();
@@ -31,8 +33,9 @@ export function DateField({
         value={value}
         min={min}
         max={max}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text tabular-nums [&::-webkit-calendar-picker-indicator]:opacity-60"
+        className="h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text tabular-nums [&::-webkit-calendar-picker-indicator]:opacity-60 disabled:bg-surface-2 disabled:text-text-muted"
       />
       {hint ? <span className="text-text-muted">{hint}</span> : null}
     </label>

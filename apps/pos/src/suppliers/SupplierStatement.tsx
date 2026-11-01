@@ -10,6 +10,7 @@ import {
 } from '../components/classes.ts';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -188,35 +189,37 @@ export function SupplierStatement({
             ) : null}
           </div>
         </div>
-        <div
-          className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
-          data-testid="supplier-balance"
-        >
-          <span className="text-small text-text-muted">
-            {balance > 0
-              ? t('office.suppliers.you_owe_label')
-              : balance < 0
-                ? t('office.suppliers.advance_label')
-                : t('office.suppliers.settled')}
-            {balance !== 0 ? ' ' : null}
-          </span>
-          {balance !== 0 ? (
-            <span
-              className={`text-h1 font-semibold sm:text-figure ${supplierBalanceTone(balance)}`}
-            >
-              <MoneyText paisa={Math.abs(balance)} />
+        <div className="rounded-card border border-border bg-surface p-3 shadow-card">
+          <div
+            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+            data-testid="supplier-balance"
+          >
+            <span className="text-small text-text-muted">
+              {balance > 0
+                ? t('office.suppliers.you_owe_label')
+                : balance < 0
+                  ? t('office.suppliers.advance_label')
+                  : t('office.suppliers.settled')}
+              {balance !== 0 ? ' ' : null}
             </span>
-          ) : null}
+            {balance !== 0 ? (
+              <span
+                className={`text-title font-semibold sm:text-figure ${supplierBalanceTone(balance)}`}
+              >
+                <MoneyText paisa={Math.abs(balance)} />
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
-        {can('purchase.create') ? (
-          <>
+      <PageActions
+        primary={
+          can('purchase.create') ? (
             <Link
               to="/suppliers/$supplierId/delivery/new"
               params={{ supplierId }}
-              className={`${buttonPrimary} gap-2 ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
+              className={`${buttonPrimary} max-md:w-full ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
               aria-disabled={readOnly}
               onClick={(event) => {
                 if (readOnly) event.preventDefault();
@@ -224,50 +227,51 @@ export function SupplierStatement({
             >
               {t('office.suppliers.record_delivery')}
             </Link>
-            <button
-              type="button"
-              className={`${buttonQuiet} gap-2`}
-              disabled={readOnly}
-              onClick={() => setPayOpen(true)}
-            >
-              {t('office.suppliers.pay_supplier')}
-            </button>
-            <Link
-              to="/suppliers/$supplierId/return/new"
-              params={{ supplierId }}
-              className={`${buttonQuiet} ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
-              aria-disabled={readOnly}
-              onClick={(event) => {
-                if (readOnly) event.preventDefault();
-              }}
-            >
-              {t('office.suppliers.return_supplier')}
-            </Link>
+          ) : undefined
+        }
+        secondary={
+          <>
+            {can('purchase.create') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={readOnly}
+                onClick={() => setPayOpen(true)}
+              >
+                {t('office.suppliers.pay_supplier')}
+              </button>
+            ) : null}
+            {can('export.data') && rows.length > 0 ? (
+              <ExportMenu
+                onCsv={() =>
+                  downloadText(
+                    `supplier-${name.replace(/\s+/gu, '-')}.csv`,
+                    supplierStatementCsv(rows),
+                  )
+                }
+                onPdf={() => void exportPdf()}
+                onShare={() => void share()}
+              />
+            ) : null}
           </>
-        ) : null}
-        {can('purchase.create') ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={readOnly}
-            onClick={() => setEditOpen(true)}
-          >
-            {t('office.suppliers.edit')}
-          </button>
-        ) : null}
-        {can('export.data') && rows.length > 0 ? (
-          <ExportMenu
-            onCsv={() =>
-              downloadText(
-                `supplier-${name.replace(/\s+/gu, '-')}.csv`,
-                supplierStatementCsv(rows),
-              )
-            }
-            onPdf={() => void exportPdf()}
-            onShare={() => void share()}
-          />
-        ) : null}
-      </div>
+        }
+        more={
+          can('purchase.create')
+            ? [
+                {
+                  label: t('office.suppliers.return_supplier'),
+                  to: `/suppliers/${supplierId}/return/new`,
+                  disabled: readOnly,
+                },
+                {
+                  label: t('office.suppliers.edit'),
+                  disabled: readOnly,
+                  onSelect: () => setEditOpen(true),
+                },
+              ]
+            : []
+        }
+      />
 
       <ul className="flex flex-col gap-2 sm:hidden">
         {rows.length === 0 ? (

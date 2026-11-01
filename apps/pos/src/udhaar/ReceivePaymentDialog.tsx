@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
+import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -122,24 +124,34 @@ export function ReceivePaymentDialog({
         title={t('office.udhaar.receive_money')}
         description={t('office.udhaar.receive_for', { name: customerName })}
       >
+        <div className="flex items-center justify-between gap-2 rounded-control bg-surface-2 px-3 py-2 text-small">
+          <span className="text-text-muted">
+            {balance > 0
+              ? t('office.udhaar.owes_label')
+              : balance < 0
+                ? t('office.udhaar.in_credit_label')
+                : t('office.udhaar.settled')}
+          </span>
+          {balance !== 0 ? (
+            <span className="font-medium">
+              <MoneyText paisa={Math.abs(balance)} />
+            </span>
+          ) : null}
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <MoneyInput
             label={t('office.udhaar.amount')}
             value={amount}
             onChange={setAmount}
           />
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.udhaar.payment_date')}
-            <input
-              type="date"
-              className={field}
-              min={minDate}
-              max={today}
-              value={date}
-              disabled={role !== 'owner'}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
+          <DateField
+            label={t('office.udhaar.payment_date')}
+            value={date}
+            min={minDate}
+            max={today}
+            disabled={role !== 'owner'}
+            onChange={setDate}
+          />
           <fieldset className="sm:col-span-2">
             <legend className="mb-1 text-small">
               {t('office.udhaar.method')}

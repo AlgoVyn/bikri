@@ -2,6 +2,7 @@ import { businessDate } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -80,16 +81,12 @@ export function PromiseDialog({
       description={t('office.udhaar.promise_for', { name: customerName })}
     >
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.udhaar.promise_date')}
-          <input
-            type="date"
-            className={field}
-            min={businessDate(Date.now())}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
+        <DateField
+          label={t('office.udhaar.promise_date')}
+          value={date}
+          min={businessDate(Date.now())}
+          onChange={setDate}
+        />
         <MoneyInput
           label={t('office.udhaar.promise_amount')}
           value={amount}
