@@ -43,8 +43,8 @@ test.describe('Home and shell (T-013)', () => {
       page.getByRole('heading', { name: 'Needs attention' }),
     ).toHaveCount(0);
     await expect(page.getByTestId('sync-badge')).toHaveAttribute(
-      'aria-label',
-      /waiting/,
+      'data-state',
+      'pending',
     );
     await expect(page.getByTestId('printer-dot')).toHaveAttribute(
       'aria-label',

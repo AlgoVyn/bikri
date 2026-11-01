@@ -157,7 +157,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         to="/settings/sync"
         data-testid="sync-badge-menu"
         data-state={state}
-        aria-label={detail === label ? label : `${label}. ${detail}`}
+        aria-label={label}
         title={detail}
         className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
       >
@@ -174,7 +174,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         type="button"
         data-testid="sync-badge"
         data-state={state}
-        aria-label={detail === label ? label : `${label}. ${detail}`}
+        aria-label={label}
         title={detail}
         aria-expanded={open}
         aria-controls={menuId}

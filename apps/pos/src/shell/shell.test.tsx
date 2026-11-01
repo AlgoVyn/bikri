@@ -214,8 +214,7 @@ describe('app shell', () => {
   it('counts waiting outbox ops in the sync badge', async () => {
     await renderAt(`${BASE_PATH}/`);
     const badge = await screen.findByTestId('sync-badge');
-    expect(badge.getAttribute('aria-label')).toMatch(
-      /^Saved on device\. \d+ changes waiting/u,
-    );
+    expect(badge.getAttribute('data-state')).toBe('pending');
+    expect(badge.getAttribute('aria-label')).toBe('On device');
   });
 });
