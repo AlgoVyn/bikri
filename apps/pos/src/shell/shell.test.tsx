@@ -48,7 +48,7 @@ describe('app shell', () => {
     ).toBeTruthy();
     expect(await screen.findByText('Add your first products')).toBeTruthy();
     await user.click(screen.getByTestId('staff-menu'));
-    await user.selectOptions(screen.getByLabelText('Language'), 'ur');
+    await user.click(screen.getByRole('radio', { name: 'اردو' }));
     expect(
       await screen.findByRole('heading', { name: 'السلام علیکم، Adnan' }),
     ).toBeTruthy();
@@ -101,7 +101,7 @@ describe('app shell', () => {
       await screen.findByRole('heading', { name: 'Settings' }),
     ).toBeTruthy();
     await user.click(screen.getByTestId('staff-menu'));
-    const language = screen.getByLabelText('Language');
+    const language = screen.getByRole('radio', { name: 'English' });
     language.focus();
     await user.keyboard('{Control>}{Shift>}{Digit2}{/Shift}{/Control}');
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();

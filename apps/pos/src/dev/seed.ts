@@ -88,6 +88,7 @@ export type TestProduct = {
   price: number;
   cost?: number;
   barcode?: string;
+  sku?: string;
   stock?: number;
   track?: boolean;
 };
@@ -106,6 +107,7 @@ export async function seedProducts(list: TestProduct[]): Promise<string[]> {
         ...(p.name_ur ? { name_ur: p.name_ur } : {}),
         price: p.price,
         cost: p.cost,
+        sku: p.sku,
         barcodes: p.barcode ? [p.barcode] : [],
         opening_milli: (p.stock ?? 0) * 1000,
         track_stock: p.track ?? true,

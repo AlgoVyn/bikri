@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { openReadyShop } from './helpers.ts';
 
-// Deterministic visual snapshots: fixed seed, reduced motion, dynamic dates/times masked.
+// Deterministic visual snapshots: fixed seed and SKUs, reduced motion, dynamic dates/times masked.
+// A fixed diff budget absorbs text rasterisation noise without hiding a button-sized change.
 // Run with --update-snapshots after an intentional design change.
 
 const WIDTHS = [
@@ -23,24 +24,74 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
     await hooks.seedProducts([
       {
         name: 'Samsung Galaxy A15 128 GB',
+        sku: 'SAM-A15',
         price: 5299000,
         cost: 4880000,
         stock: 6,
       },
-      { name: 'Infinix Hot 40', price: 3199000, cost: 2950000, stock: 11 },
+      {
+        name: 'Infinix Hot 40',
+        sku: 'INF-H40',
+        price: 3199000,
+        cost: 2950000,
+        stock: 11,
+      },
       {
         name: 'Type-C fast charger 25W',
+        sku: 'CHG-25W',
         price: 129900,
         cost: 88000,
         stock: 34,
       },
-      { name: 'Tempered glass', price: 24900, cost: 9000, stock: 2 },
-      { name: 'Wireless earbuds', price: 349900, cost: 260000, stock: 8 },
-      { name: 'Power bank 10000 mAh', price: 449900, cost: 350000, stock: 4 },
-      { name: 'USB-C cable 1 m', price: 49900, cost: 22000, stock: 60 },
-      { name: 'Bluetooth speaker', price: 289900, cost: 210000, stock: 0 },
-      { name: 'Phone cover', price: 39900, cost: 15000, stock: 25 },
-      { name: 'Car mount', price: 89900, cost: 52000, stock: 9 },
+      {
+        name: 'Tempered glass',
+        sku: 'GLS-TMP',
+        price: 24900,
+        cost: 9000,
+        stock: 2,
+      },
+      {
+        name: 'Wireless earbuds',
+        sku: 'EAR-WLS',
+        price: 349900,
+        cost: 260000,
+        stock: 8,
+      },
+      {
+        name: 'Power bank 10000 mAh',
+        sku: 'PWB-10K',
+        price: 449900,
+        cost: 350000,
+        stock: 4,
+      },
+      {
+        name: 'USB-C cable 1 m',
+        sku: 'CBL-USC',
+        price: 49900,
+        cost: 22000,
+        stock: 60,
+      },
+      {
+        name: 'Bluetooth speaker',
+        sku: 'SPK-BT',
+        price: 289900,
+        cost: 210000,
+        stock: 0,
+      },
+      {
+        name: 'Phone cover',
+        sku: 'CVR-PHN',
+        price: 39900,
+        cost: 15000,
+        stock: 25,
+      },
+      {
+        name: 'Car mount',
+        sku: 'MNT-CAR',
+        price: 89900,
+        cost: 52000,
+        stock: 9,
+      },
     ]);
     await hooks.seedTodaySales();
     await hooks.seedCustomer({
@@ -81,7 +132,7 @@ test.describe('deterministic visual snapshots', () => {
           animations: 'disabled',
           caret: 'hide',
           mask,
-          maxDiffPixelRatio: 0.01,
+          maxDiffPixels: 1500,
         });
       };
 

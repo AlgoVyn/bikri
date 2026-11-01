@@ -5,6 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased] — 1.0.0 release candidate
 
 ### Design
+- Shell refinements: the staff menu lists languages as checked rows instead of a native select, the status popover shows a sync pill beside the printer pill (both open Settings), the shop name sits at the foot of the rail, and visual snapshots use a fixed pixel budget with deterministic SKUs (D-156).
 - Operator console visual pass: the Bikri mark, a persistent operator identity chip, one-tone tenant headers, a single-surface Shops list, compact empty states, bidi-safe figures and dates in Urdu, and axe/snapshot coverage for the console (D-155).
 - Third visual pass: a single status dot, one page-header tone, plain-language reports/day close, a Settings data-safety card with search, a `Ctrl+K` command palette and `?` shortcut sheet, a designed sale-complete beat with optional sound, a Bikri mark and first-run illustration, a Nastaliq/Naskh Urdu split, a slate-100 light surface, and deterministic Playwright snapshots (D-154).
 - Second visual pass: breadcrumb and one status popover in the shell, language in the staff menu, a money signature, editorial reports with deltas/hourly/stacked mix, two-column Pay and product forms, refund running total, branded setup, a dismissible Home checklist with sample products, sortable list headers and a bulk bar, a receipt paper motif and a Balanced day-close stamp (D-153).

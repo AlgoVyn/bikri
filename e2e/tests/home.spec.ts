@@ -171,10 +171,27 @@ test.describe('Home and shell (T-013)', () => {
   test('the staff menu switches language', async ({ page }) => {
     await openReadyShop(page, '/bikri/');
     await page.getByTestId('staff-menu').click();
-    await page.getByLabel('Language').selectOption('ur');
+    await expectNoSeriousAxe(page);
+    await page.getByRole('radio', { name: 'اردو' }).locator('..').click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await setLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  });
+
+  test('the status popover links sync and printer to settings', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'desktop',
+      'the full status trigger is desktop-only',
+    );
+    await openReadyShop(page, '/bikri/');
+    await page.getByTestId('sync-badge').click();
+    await expectNoSeriousAxe(page);
+    const pill = page.getByTestId('sync-pill');
+    await expect(pill).toBeVisible();
+    await pill.click();
+    await expect(page).toHaveURL(/\/bikri\/settings\/sync$/);
   });
 
   test('a cashier sees no Suppliers, profit or drawer cash, and is turned away by URL', async ({

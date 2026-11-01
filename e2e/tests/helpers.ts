@@ -13,7 +13,7 @@ export async function openReadyShop(
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 }
 
-/** Switch language through the app (the top-bar picker now lives in the staff menu). */
+/** Switch language through the app (the picker lives in the staff menu). */
 export async function setLanguage(
   page: Page,
   locale: 'en' | 'ur' | 'roman-ur',
@@ -216,6 +216,7 @@ declare global {
           price: number;
           cost?: number;
           barcode?: string;
+          sku?: string;
           stock?: number;
           track?: boolean;
         }[],

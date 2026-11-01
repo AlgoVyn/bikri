@@ -187,15 +187,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-micro font-semibold uppercase tracking-[0.18em] text-rail-muted">
             {t('common.app_name')}
           </span>
-          {shopName ? (
-            <span
-              className="line-clamp-2 max-w-full text-center text-micro leading-tight text-rail-muted"
-              title={shopName}
-              data-testid="rail-shop-name"
-            >
-              {shopName}
-            </span>
-          ) : null}
         </div>
         {visible.map((item) => {
           const active = current?.to === item.to;
@@ -235,6 +226,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t('pricecheck.title')}
           </span>
         </button>
+        {shopName ? (
+          <div
+            className="mt-auto hidden border-t border-white/10 px-2 pb-3 pt-3 lg:block"
+            title={shopName}
+          >
+            <span
+              className="mx-auto line-clamp-2 max-w-full break-words text-center text-micro font-medium uppercase leading-tight tracking-[0.04em] text-rail-muted"
+              data-testid="rail-shop-name"
+            >
+              {shopName}
+            </span>
+          </div>
+        ) : null}
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">
             <button

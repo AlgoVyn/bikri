@@ -9,7 +9,7 @@ import {
   UserIcon,
 } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
-import { LanguageSelect } from '../components/LanguageSelect.tsx';
+import { LanguageMenu } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { unresolvedFailedCount } from '../data/printJobs.ts';
@@ -210,20 +210,26 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
           open ? 'flex' : 'hidden'
         } absolute end-0 top-10 z-40 w-64 flex-col gap-2 rounded-card border border-border bg-surface p-3 shadow-modal`}
       >
-        <div>
-          <p className="text-small font-medium">{label}</p>
-          <p className="mt-1 text-small text-text-muted">{detail}</p>
+        <div className="flex flex-col gap-1">
+          <Link
+            to="/settings/sync"
+            data-testid="sync-pill"
+            aria-label={label}
+            title={detail}
+            onClick={() => setOpen(false)}
+            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full px-2.5 text-small font-medium ${tone}`}
+          >
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full bg-current"
+            />
+            {label}
+          </Link>
+          <p className="text-small text-text-muted">{detail}</p>
         </div>
         <div className="border-t border-border pt-2">
           <PrinterDot onClick={() => setOpen(false)} />
         </div>
-        <Link
-          to="/settings/sync"
-          onClick={() => setOpen(false)}
-          className="flex min-h-11 items-center text-small font-medium text-primary hover:underline"
-        >
-          {t('shell.sync_settings')}
-        </Link>
       </div>
     </div>
   );
@@ -294,6 +300,7 @@ export function StaffMenu() {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent) => {
@@ -307,6 +314,7 @@ export function StaffMenu() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         data-testid="staff-menu"
         aria-label={t('shell.staff_menu')}
@@ -325,7 +333,7 @@ export function StaffMenu() {
       {open ? (
         <div
           id={menuId}
-          className="absolute end-0 top-12 z-40 w-56 rounded-card border border-border bg-surface p-3 shadow-lg"
+          className="absolute end-0 top-12 z-40 max-h-[calc(100dvh-4rem)] w-64 overflow-y-auto rounded-card border border-border bg-surface p-3 shadow-lg"
         >
           <div className="flex items-center gap-2">
             <span
@@ -341,8 +349,13 @@ export function StaffMenu() {
               </p>
             </div>
           </div>
-          <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2">
-            <LanguageSelect />
+          <div className="mt-2 border-b border-border pb-2">
+            <LanguageMenu
+              onPicked={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+            />
           </div>
           <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2 lg:hidden">
             <SyncBadge compact />

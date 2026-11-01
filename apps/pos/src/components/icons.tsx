@@ -214,6 +214,14 @@ export function TagIcon() {
   );
 }
 
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </Svg>
+  );
+}
+
 export function GlobeIcon() {
   return (
     <Svg>
