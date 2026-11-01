@@ -140,7 +140,7 @@
       "title": "یہ بل منسوخ کریں؟"
     },
     "refund": {
-    "selected": "{{count}} اشیاء منتخب",
+      "selected": "{{count}} اشیاء منتخب",
       "already": "پہلے {{qty}} واپس",
       "button": "{{amount}} واپس کریں",
       "button_empty": "رقم واپس",

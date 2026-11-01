@@ -140,7 +140,7 @@
       "title": "Yeh bill mansookh karein?"
     },
     "refund": {
-    "selected": "{{count}} items muntakhab",
+      "selected": "{{count}} items muntakhab",
       "already": "pehle {{qty}} wapas",
       "button": "{{amount}} wapas karein",
       "button_empty": "Raqam wapas",
