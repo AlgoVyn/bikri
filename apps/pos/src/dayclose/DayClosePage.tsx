@@ -518,7 +518,7 @@ export function DayClosePage() {
         </p>
       ) : null}
 
-      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur xl:-mx-6 xl:px-6">
+      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur max-lg:bottom-tabbar xl:-mx-6 xl:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-small text-text-muted">
             {t('office.dayclose.difference')}:{' '}
