@@ -422,6 +422,8 @@
       "unit_cost": "Per unit cost",
       "update_price": "Sale price bhi badlein",
       "you_owe": "{{amount}} dena hai",
+      "you_owe_label": "Aap ne dena hai",
+      "advance_label": "Advance",
       "subtitle": "Delivery, adaigi aur wapsi",
       "select_supplier": "Supplier muntakhib karein",
       "select_supplier_hint": "Deliveries, payments aur baqaya yahan nazar aayenge.",

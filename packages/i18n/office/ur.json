@@ -422,6 +422,8 @@
       "unit_cost": "فی اکائی لاگت",
       "update_price": "سیل کی قیمت بھی بدلیں",
       "you_owe": "{{amount}} دینا ہے",
+      "you_owe_label": "آپ نے دینا ہے",
+      "advance_label": "ایڈوانس",
       "subtitle": "ڈیلیوری، ادائیگی اور واپسی",
       "select_supplier": "سپلائر منتخب کریں",
       "select_supplier_hint": "ڈیلیوریاں، ادائیگیاں اور بقایا یہاں نظر آئیں گے۔",

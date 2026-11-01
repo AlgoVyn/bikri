@@ -27,7 +27,6 @@ import { useReadOnly } from '../state/readOnly.ts';
 import { statementPdf, statementPng } from '../udhaar/statementFile.ts';
 import {
   dateText,
-  supplierBalanceLabel,
   supplierBalanceTone,
   supplierEntryDescription,
 } from './format.ts';
@@ -189,12 +188,26 @@ export function SupplierStatement({
             ) : null}
           </div>
         </div>
-        <p
-          className={`whitespace-nowrap text-figure font-semibold ${supplierBalanceTone(balance)}`}
+        <div
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
           data-testid="supplier-balance"
         >
-          {supplierBalanceLabel(t, balance)}
-        </p>
+          <span className="text-small text-text-muted">
+            {balance > 0
+              ? t('office.suppliers.you_owe_label')
+              : balance < 0
+                ? t('office.suppliers.advance_label')
+                : t('office.suppliers.settled')}
+            {balance !== 0 ? ' ' : null}
+          </span>
+          {balance !== 0 ? (
+            <span
+              className={`text-h1 font-semibold sm:text-figure ${supplierBalanceTone(balance)}`}
+            >
+              <MoneyText paisa={Math.abs(balance)} />
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
