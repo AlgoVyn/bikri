@@ -135,7 +135,7 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 | Urdu (all surfaces) | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for body and 1.6 for headings; a dense row may opt into a tighter `leading-*` utility |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 
-All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Naskh is the only Urdu face — headings, dense UI and receipts included (D-157).
+All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Naskh is the only Urdu face — headings, dense UI and receipts included (D-157); Latin names and money inside Urdu fall back to Inter.
 
 ### Layout containers and page anatomy
 
