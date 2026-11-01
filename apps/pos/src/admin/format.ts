@@ -47,10 +47,22 @@ export function localeOf(lang: string): string {
   return lang === 'ur' ? 'ur-PK' : 'en-GB';
 }
 
+/**
+ * Urdu is right-to-left; a bare "1.7 MB" or a date would be reordered around the
+ * unit or its punctuation. Unicode isolates keep the formatted value left-to-right
+ * inside an Urdu sentence.
+ */
+function inReadingDirection(text: string, lang: string): string {
+  return lang === 'ur' ? `\u2066${text}\u2069` : text;
+}
+
 export function formatCount(value: number, lang: string): string {
-  return new Intl.NumberFormat(localeOf(lang), {
-    maximumFractionDigits: 0,
-  }).format(value);
+  return inReadingDirection(
+    new Intl.NumberFormat(localeOf(lang), {
+      maximumFractionDigits: 0,
+    }).format(value),
+    lang,
+  );
 }
 
 export function formatBytes(bytes: number, lang: string): string {
@@ -65,10 +77,11 @@ export function formatBytes(bytes: number, lang: string): string {
     maximumFractionDigits: i === 0 ? 0 : 1,
   }).format(n);
   const unit = units[i] ?? 'B';
-  return `${text} ${unit}`;
+  return inReadingDirection(`${text} ${unit}`, lang);
 }
 
-/** Date and time in Asia/Karachi. */
+/** Date and time in Asia/Karachi. Left as the locale writes it: Urdu dates carry
+ *  their own month names and separators, so isolating the whole string reorders them. */
 export function formatWhen(ms: number, lang: string): string {
   return new Intl.DateTimeFormat(localeOf(lang), {
     timeZone: 'Asia/Karachi',
@@ -87,19 +100,6 @@ export function exportFilename(slug: string, at: number): string {
 /** Full href for an operator path. Lazy pages use anchors, not the router. */
 export function adminHref(path: string): string {
   return `${BASE_PATH}${path}`;
-}
-
-/** Hue for the shop colour band, stable for a tenant id. */
-export function tenantHue(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = Math.imul(hash, 31) + id.charCodeAt(i);
-  }
-  return Math.abs(hash) % 360;
-}
-
-export function tenantBandColor(id: string): string {
-  return `hsl(${tenantHue(id)} 42% 28%)`;
 }
 
 export function barPercent(value: number, max: number): number {

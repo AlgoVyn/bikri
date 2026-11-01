@@ -116,6 +116,18 @@ test.describe('deterministic visual snapshots', () => {
         page.getByTestId('report-range'),
         page.getByTestId('report-chart'),
       ]);
+
+      // The operator console shares the shell language; these two pages are stable
+      // (no tenant rows or backup dates) so they can be snapshotted.
+      await page.goto('/bikri/admin/tenants/new');
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(500);
+      await shot('admin-new');
+
+      await page.goto('/bikri/admin/backups');
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(700);
+      await shot('admin-backups');
     });
   }
 });

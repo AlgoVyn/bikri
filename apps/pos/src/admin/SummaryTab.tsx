@@ -204,7 +204,11 @@ export function SummaryTab({
               <dt className="text-small text-text-muted">
                 {t('admin.restore_epoch')}
               </dt>
-              <dd className="font-mono text-small">{tenant.restore_epoch}</dd>
+              <dd className="tabular-nums" title={tenant.restore_epoch}>
+                {Number.isFinite(Number(tenant.restore_epoch))
+                  ? formatWhen(Number(tenant.restore_epoch), lang)
+                  : tenant.restore_epoch}
+              </dd>
             </div>
             <div>
               <dt className="text-small text-text-muted">

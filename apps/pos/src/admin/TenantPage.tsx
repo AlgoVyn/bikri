@@ -6,7 +6,7 @@ import { adminErrorMessage, getTenant, setMaintenance } from './api.ts';
 import { DeleteTab } from './DeleteTab.tsx';
 import { DevicesTab } from './DevicesTab.tsx';
 import { ExportTab } from './ExportTab.tsx';
-import { adminHref, formatWhen, tenantBandColor } from './format.ts';
+import { adminHref, formatWhen } from './format.ts';
 import { PinTab } from './PinTab.tsx';
 import { RestoreTab } from './RestoreTab.tsx';
 import {
@@ -69,7 +69,6 @@ export function TenantPage({ id }: { id: string }) {
 
   const tenant = detail.tenant;
   const maintenance = tenant.status === 'maintenance';
-  const band = tenantBandColor(tenant.id);
   const lang = i18n.language;
 
   return (
@@ -86,44 +85,39 @@ export function TenantPage({ id }: { id: string }) {
         </span>
         {t('admin.back_to_shops')}
       </a>
-      <header className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-        <div aria-hidden="true" className="h-1" style={{ background: band }} />
-        <div className="flex flex-wrap items-start gap-4 p-4 lg:p-5">
-          <span
-            aria-hidden="true"
-            className="flex size-12 shrink-0 items-center justify-center rounded-control text-white"
-            style={{ background: band }}
-          >
-            <StoreIcon />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-h1 font-semibold">{tenant.display_name}</h1>
-              <StatusBadge status={tenant.status} />
-            </div>
-            <p className="mt-0.5 font-mono text-small text-text-muted">
-              {tenant.slug}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
-              <span>
-                {t('admin.owner_email')}:{' '}
-                {tenant.owner_email ?? t('admin.never')}
-              </span>
-              <span>
-                {t('admin.devices_count', {
-                  count: detail.devices,
-                })}
-              </span>
-              <span>
-                {t('admin.created')}: {formatWhen(tenant.created_at, lang)}
-              </span>
-              <span>
-                {t('admin.setup_at')}:{' '}
-                {detail.setup_completed_at === null
-                  ? t('admin.setup_pending')
-                  : formatWhen(detail.setup_completed_at, lang)}
-              </span>
-            </div>
+      <header className="flex flex-wrap items-start gap-4 rounded-card border border-border bg-surface p-4 shadow-card lg:p-5">
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink"
+        >
+          <StoreIcon />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-h1 font-semibold">{tenant.display_name}</h1>
+            <StatusBadge status={tenant.status} />
+          </div>
+          <p className="mt-0.5 font-mono text-small text-text-muted">
+            {tenant.slug}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
+            <span>
+              {t('admin.owner_email')}: {tenant.owner_email ?? t('admin.never')}
+            </span>
+            <span>
+              {t('admin.devices_count', {
+                count: detail.devices,
+              })}
+            </span>
+            <span>
+              {t('admin.created')}: {formatWhen(tenant.created_at, lang)}
+            </span>
+            <span>
+              {t('admin.setup_at')}:{' '}
+              {detail.setup_completed_at === null
+                ? t('admin.setup_pending')
+                : formatWhen(detail.setup_completed_at, lang)}
+            </span>
           </div>
         </div>
       </header>

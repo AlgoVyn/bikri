@@ -1,15 +1,17 @@
 import { Link, Outlet } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BikriMark } from '../components/BikriMark.tsx';
 import {
   CloudIcon,
   ReportsIcon,
-  SalesIcon,
   StoreIcon,
+  UserIcon,
 } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useAreaStrings } from '../i18n/areas.tsx';
 import { applyStoredTheme } from '../shell/devicePrefs.ts';
+import { getSession } from './api.ts';
 
 const NAV = [
   { to: '/admin', label: 'admin.nav_overview', Icon: ReportsIcon },
@@ -23,8 +25,22 @@ const navLink =
 export function AdminShell() {
   const { t } = useTranslation();
   const ready = useAreaStrings('admin');
+  const [email, setEmail] = useState<string | null>(null);
   useEffect(() => {
     applyStoredTheme();
+  }, []);
+  useEffect(() => {
+    let live = true;
+    void getSession()
+      .then((session) => {
+        if (live) setEmail(session.email);
+      })
+      .catch(() => {
+        // A signed-out Access screen or an offline console shows no identity chip.
+      });
+    return () => {
+      live = false;
+    };
   }, []);
   useEffect(() => {
     if (ready) document.title = t('admin.title');
@@ -48,7 +64,7 @@ export function AdminShell() {
               aria-hidden="true"
               className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
             >
-              <SalesIcon />
+              <BikriMark className="size-5" />
             </span>
             <span className="min-w-0">
               <span className="block text-caption font-semibold uppercase tracking-[0.18em] text-rail-ink">
@@ -91,7 +107,7 @@ export function AdminShell() {
                   aria-hidden="true"
                   className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
                 >
-                  <SalesIcon />
+                  <BikriMark className="size-5" />
                 </span>
                 <span className="text-small font-semibold uppercase tracking-[0.16em]">
                   {t('common.app_name')}
@@ -101,6 +117,17 @@ export function AdminShell() {
                 {t('admin.operator_label')}
               </span>
               <div className="ms-auto flex items-center gap-2">
+                {email === null ? null : (
+                  <span
+                    title={t('admin.signed_in', { email })}
+                    className="hidden min-h-9 max-w-[18rem] items-center gap-1.5 truncate rounded-full bg-surface-2 px-3 text-small text-text-muted sm:inline-flex"
+                  >
+                    <UserIcon />
+                    <bdi dir="ltr" className="truncate">
+                      {email}
+                    </bdi>
+                  </span>
+                )}
                 <LanguageSelect />
               </div>
             </div>

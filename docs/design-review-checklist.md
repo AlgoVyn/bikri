@@ -15,7 +15,7 @@ Run this on every PR that adds or changes a screen. A **no** is a blocker unless
 
 Also run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm i18n:check`, `pnpm contrast:check` and the axe sweep before merging.
 
-`e2e/tests/layout.spec.ts` enforces the four-width and Urdu invariants, and `e2e/tests/visual.spec.ts` compares deterministic snapshots of Home, Sell, Pay, Products and Reports at 1280 and 390. To attach the full screenshot matrix (390/768/1280/1920) to the Playwright report for a manual review, run:
+`e2e/tests/layout.spec.ts` enforces the four-width and Urdu invariants, and `e2e/tests/visual.spec.ts` compares deterministic snapshots of Home, Sell, Pay, Products, Reports, the operator console’s New shop and Backups at 1280 and 390. To attach the full screenshot matrix (390/768/1280/1920) to the Playwright report for a manual review, run:
 
 ```sh
 VISUAL=1 pnpm --filter @bikri/e2e exec playwright test tests/layout.spec.ts --project=desktop --reporter=html

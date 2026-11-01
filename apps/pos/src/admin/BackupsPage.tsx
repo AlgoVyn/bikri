@@ -131,8 +131,8 @@ export function BackupsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <Panel bodyClassName="flex flex-col items-center gap-2 px-4 py-14 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+        <Panel bodyClassName="flex flex-col items-center gap-3 px-4 py-10 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
             <CloudIcon />
           </span>
           <p className="font-medium">{t('admin.backups_empty')}</p>

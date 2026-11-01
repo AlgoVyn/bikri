@@ -114,6 +114,10 @@ export function getUsage(): Promise<UsageOverview> {
   return apiJson('/admin/usage');
 }
 
+export function getSession(): Promise<{ email: string }> {
+  return apiJson('/admin/session');
+}
+
 export function listTenants(): Promise<{
   tenants: TenantListItem[];
   account_today: { rows_written: number; rows_read: number };

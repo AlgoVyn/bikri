@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openReadyShop } from './helpers.ts';
+import { expectNoSeriousAxe, openReadyShop } from './helpers.ts';
 
 // T-031 (screens/19): the operator console against `wrangler dev`, where Access is not enforced
 // for the local operator (13 §7.1). Desktop only.
@@ -69,4 +69,22 @@ test('operator console follows the language switcher and RTL direction', async (
   await expect(page.getByRole('heading', { name: 'جائزہ' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('link', { name: 'دکانیں' })).toBeVisible();
+});
+
+test('operator console has no serious axe violations', async ({ page }) => {
+  for (const path of [
+    '/bikri/admin',
+    '/bikri/admin/tenants',
+    '/bikri/admin/tenants/new',
+    '/bikri/admin/backups',
+  ]) {
+    await page.goto(path);
+    await expect(page.locator('main')).not.toBeEmpty();
+    await expectNoSeriousAxe(page);
+  }
+  // The identity chip is the operator's Access email, and it stays LTR in Urdu.
+  await page.goto('/bikri/admin');
+  await expect(
+    page.getByTitle('Signed in as operator@example.com'),
+  ).toBeVisible();
 });

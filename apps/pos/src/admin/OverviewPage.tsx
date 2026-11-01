@@ -88,18 +88,13 @@ export function OverviewPage() {
         title={t('admin.overview_title')}
         subtitle={t('admin.overview_subtitle')}
         actions={
-          <>
-            <span className="inline-flex min-h-9 items-center rounded-full bg-surface-2 px-3 text-small text-text-muted">
-              {t('admin.signed_in', { email: usage.email })}
-            </span>
-            <button
-              type="button"
-              className={quietBtn}
-              onClick={() => setTick((value) => value + 1)}
-            >
-              {t('admin.refresh')}
-            </button>
-          </>
+          <button
+            type="button"
+            className={quietBtn}
+            onClick={() => setTick((value) => value + 1)}
+          >
+            {t('admin.refresh')}
+          </button>
         }
       />
 
