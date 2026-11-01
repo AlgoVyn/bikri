@@ -29,7 +29,8 @@ import { useToast } from '../components/Toast.tsx';
 import {
   addOverride,
   type CartId,
-  hasOverride,
+  cartSignature,
+  overrideMatches,
   type ShopMoney,
 } from '../data/cart.ts';
 import { ledgerContext } from '../data/catalog.ts';
@@ -202,7 +203,8 @@ function PayStep({
     [cart.customer_id, s.udhaar],
   );
   const hardBlocked =
-    Boolean(credit?.hard_blocked) && !hasOverride(cart, 'udhaar.hard_limit');
+    Boolean(credit?.hard_blocked) &&
+    !overrideMatches(cart, 'udhaar.hard_limit', { udhaar: s.udhaar });
   const needsCustomer = s.udhaar > 0 && !cart.customer_id;
   const udhaarDenied = s.udhaar > 0 && !can('sale.udhaar');
   const valid = s.valid && !needsCustomer && !hardBlocked && !udhaarDenied;
@@ -379,10 +381,14 @@ function PayStep({
               onPickCustomer={() => setPicker(true)}
               onOverride={() =>
                 requestOverride('udhaar.hard_limit', (by) => {
+                  const bound = cartSignature(cart);
                   void mutateCart(cartId, (c) =>
                     addOverride(c, {
                       permission: 'udhaar.hard_limit',
                       approved_by: by,
+                      approved_at: Date.now(),
+                      bound_cart: bound,
+                      bound_udhaar: s.udhaar,
                     }),
                   );
                 })

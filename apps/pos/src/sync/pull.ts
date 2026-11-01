@@ -91,7 +91,10 @@ function isRowError(error: unknown): boolean {
     error instanceof Error &&
     (error.name === 'DataError' ||
       error.name === 'SchemaError' ||
-      error.name === 'ZodError')
+      error.name === 'ZodError' ||
+      error.name === 'ConstraintError' ||
+      error.name === 'BulkError' ||
+      error.name === 'PullRowError')
   );
 }
 

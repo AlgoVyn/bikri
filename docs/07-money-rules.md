@@ -147,7 +147,7 @@ Rounding (REQ-B09) of the paid part, by `shop.refund_rounding` (default `nearest
 - `nearest`: `amount = roundTo(paid_exact, 100)`; `down`: floor to rupee; `none`: exact.
 - Cap: `amount ≤ remaining_paid`; if the rounded amount exceeds it, round down to the rupee instead.
 - `rounding = amount − paid_exact` is stored on `refunds`; `amount = exact_amount − udhaar_part + rounding` (CHECK in [02](02-data-model.md#2-d1-schema-migration-0001_initsql)).
-- Card / bank-wallet paid parts use `paid_exact` exactly.
+- Card / bank-wallet paid parts use `paid_exact` exactly. If earlier cash refunds rounded up and the remaining paid part is smaller, the refund is capped at that remainder and the difference is stored as `rounding` (D-065).
 
 | ID | Case | exact | cash amount |
 |---|---|---:|---:|

@@ -493,6 +493,12 @@ export function DevicesPage() {
                           <select
                             className={fieldClass}
                             aria-label={t('devices.move')}
+                            title={
+                              d.pending_ops > 0
+                                ? t('devices.move_pending')
+                                : undefined
+                            }
+                            disabled={d.pending_ops > 0}
                             value={d.branch_id}
                             onChange={(e) =>
                               void guard(async () => {

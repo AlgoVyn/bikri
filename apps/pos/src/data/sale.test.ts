@@ -1,7 +1,13 @@
 import type { Cart } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { discardFailed } from '../sync/push.ts';
-import { addOverride, addProduct, emptyCart, loadCarts } from './cart.ts';
+import {
+  addOverride,
+  addProduct,
+  cartSignature,
+  emptyCart,
+  loadCarts,
+} from './cart.ts';
 import { createCustomer } from './customers.ts';
 import {
   completeSale,
@@ -249,6 +255,39 @@ describe('sale recipe (02 §5)', () => {
     expect((await udhaarCheck(db, 'nobody', 1)).limit).toBeNull();
   });
 
+  it('refuses a hard-limit udhaar sale until a matching override is present', async () => {
+    const { db, ctx, phone, buds } = await shopWithStock('hard-limit');
+    const customer = await createCustomer(
+      db,
+      { name: 'Bilal', phone: '' },
+      'st-1',
+      NOW,
+    );
+    await db.customers.update(customer.id, {
+      credit_limit: 0,
+      hard_limit: 1,
+    });
+    let cart: Cart = {
+      ...t2Cart(phone, buds),
+      customer_id: customer.id,
+    };
+    const rows = [
+      { method: 'cash' as const, amount: 4_000_000 },
+      { method: 'udhaar' as const, amount: 300_000 },
+    ];
+    await expect(
+      completeSale(db, sale(cart, rows), ctx, NOW),
+    ).rejects.toBeInstanceOf(SaleInvalidError);
+    cart = addOverride(cart, {
+      permission: 'udhaar.hard_limit',
+      approved_by: 'st-2',
+      bound_cart: cartSignature(cart),
+      bound_udhaar: 300_000,
+    });
+    const result = await completeSale(db, sale(cart, rows), ctx, NOW + 1);
+    expect(result.created).toBe(true);
+  });
+
   it('discards a rejected sale transaction and rebuilds its caches', async () => {
     const { db, ctx, phone, buds } = await shopWithStock('discard-sale');
     const cart = t2Cart(phone, buds);
@@ -348,6 +387,7 @@ describe('sale recipe (02 §5)', () => {
     cart = addOverride(cart, {
       permission: 'sale.discount',
       approved_by: 'st-9',
+      bound_cart: cartSignature(cart),
     });
     const input = sale(
       cart,

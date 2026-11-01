@@ -11,6 +11,7 @@ import {
   CartNotEmptyError,
   cartTotals,
   emptyCart,
+  overrideMatches,
   type ShopMoney,
   shopMoney,
   unitCostOf,
@@ -144,8 +145,24 @@ export async function completeSale(
   const rows = mergeRows(input.rows);
   const s = settle(totals.total, rows);
   if (!s.valid) throw new SaleInvalidError('payments do not cover the total');
-  if (s.udhaar > 0 && !cart.customer_id)
+  const customerId = cart.customer_id ?? null;
+  if (s.udhaar > 0 && !customerId)
     throw new SaleInvalidError('udhaar needs a customer');
+  // The manager approval is bound to the cart/amount it was given for; a changed
+  // cart or udhaar part must ask again (05 §4.1, D-160).
+  if (
+    totals.discount_share_bp > input.maxDiscountBp &&
+    !overrideMatches(cart, 'sale.discount')
+  )
+    throw new SaleInvalidError('discount override');
+  if (s.udhaar > 0) {
+    const credit = await udhaarCheck(db, customerId as string, s.udhaar);
+    if (
+      credit.hard_blocked &&
+      !overrideMatches(cart, 'udhaar.hard_limit', { udhaar: s.udhaar })
+    )
+      throw new SaleInvalidError('hard limit');
+  }
   const device = await deviceInfo(db);
   const branch = await db.branches.get(ctx.branch_id);
   if (!device || !branch) throw new SaleInvalidError('device not set up');
@@ -154,9 +171,9 @@ export async function completeSale(
     ctx.timeZone ?? (String(shop?.timezone ?? '').trim() || 'Asia/Karachi');
   const date = businessDate(now, timeZone);
   const reissue = cart.reissue ?? null;
-  const voidOverride = cart.overrides?.find(
-    (o) => o.permission === 'sale.void',
-  );
+  const voidOverride = overrideMatches(cart, 'sale.void')
+    ? cart.overrides?.find((o) => o.permission === 'sale.void')
+    : undefined;
   const base = {
     branch_id: ctx.branch_id,
     device_id: ctx.device_id,
@@ -355,9 +372,10 @@ export async function completeSale(
         await audit('discount_over_limit', {
           discount_share_bp: totals.discount_share_bp,
           limit_bp: input.maxDiscountBp,
-          approved_by:
-            cart.overrides?.find((o) => o.permission === 'sale.discount')
-              ?.approved_by ?? null,
+          approved_by: overrideMatches(cart, 'sale.discount')
+            ? (cart.overrides?.find((o) => o.permission === 'sale.discount')
+                ?.approved_by ?? null)
+            : null,
         });
       if (reissue && reissuePlan) {
         await writeVoidRows(w, reissuePlan, ctx, {

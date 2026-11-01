@@ -138,6 +138,7 @@ test.describe('Sale complete (T-018)', () => {
       page.waitForEvent('popup'),
       page.getByRole('button', { name: 'Send on WhatsApp' }).click(),
     ]);
+    await popup.waitForURL(/https:\/\/wa\.me\/923001234567/u);
     const url = new URL(popup.url());
     expect(url.origin + url.pathname).toBe('https://wa.me/923001234567');
     const text = url.searchParams.get('text') ?? '';

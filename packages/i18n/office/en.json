@@ -701,7 +701,9 @@
       "server_finished": "Downloaded {{filename}} from the server",
       "server_hint": "The server copy, including every till, needs owner email sign-in and arrives with the server export task.",
       "server_unavailable": "Only an owner on an admin device can download the server copy.",
-      "title": "Backup & export"
+      "title": "Backup & export",
+      "persist_warning": "This browser has not granted persistent storage. The OS can clear the till’s local data if space runs low. Ask again now.",
+      "persist_ask": "Ask for persistent storage"
     },
     "settings": {
       "health_title": "Data safety",

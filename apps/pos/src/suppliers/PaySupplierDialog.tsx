@@ -1,5 +1,5 @@
 import { newId } from '@bikri/core';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
@@ -41,15 +41,19 @@ export function PaySupplierDialog({
   const [paymentId, setPaymentId] = useState(() => newId());
   const [pending, setPending] = useState(false);
 
+  // The balance is a default for a new payment, not a form value: a pull that
+  // updates it must not wipe what the owner is typing (or the payment id).
+  const balanceAtOpen = useRef(balance);
+  balanceAtOpen.current = balance;
   useEffect(() => {
     if (!open) return;
-    setAmount(Math.max(0, balance));
+    setAmount(Math.max(0, balanceAtOpen.current));
     setMethod('cash');
     setReference('');
     setNote('');
     setPaymentId(newId());
     setPending(false);
-  }, [open, balance]);
+  }, [open]);
 
   const save = async () => {
     if (!amount || amount <= 0 || pending) return;

@@ -157,18 +157,10 @@ test.describe('Products (T-014)', () => {
     await expect(page.getByRole('link', { name: /Add product/ })).toHaveCount(
       0,
     );
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      (async () => {
-        await page.getByRole('button', { name: 'More actions' }).click();
-        await page.getByRole('button', { name: 'Export CSV' }).click();
-      })(),
-    ]);
-    const text = Buffer.concat(
-      await (await download.createReadStream()).toArray(),
-    ).toString('utf8');
-    expect(text).not.toContain('cost');
-    expect(text).not.toContain('1100');
+    // `export.data` is not a cashier permission; the whole actions menu is absent.
+    await expect(
+      page.getByRole('button', { name: 'More actions' }),
+    ).toHaveCount(0);
     await page.getByRole('link', { name: /Type-C cable 1 m white/ }).click();
     await expect(page.getByTestId('detail-price')).toContainText('Rs 1,499');
     await expect(page.getByTestId('detail-avg-cost')).toHaveCount(0);

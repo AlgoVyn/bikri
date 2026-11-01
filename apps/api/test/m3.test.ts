@@ -243,9 +243,32 @@ describe('M3 server rules', () => {
       paid_total: 70000,
       udhaar_amount: 80000,
     };
-    const pushedSale = await pushOk(shop.till, sale);
-    expect(codes(pushedSale)).toEqual([null, null]);
     const saleId = String(sale[0]!.row?.id);
+    const tx = sale[0]!.tx_id;
+    sale[2]!.row = { ...sale[2]!.row, amount: 70000 };
+    sale.push(
+      op(
+        'ledger_entries',
+        'insert',
+        {
+          id: newId(now),
+          party_type: 'customer',
+          party_id: IDS.customer,
+          amount: 80000,
+          source_type: 'sale',
+          source_id: saleId,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.till.id,
+          staff_id: IDS.cashier,
+          business_date: '2026-10-27',
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    );
+    const pushedSale = await pushOk(shop.till, sale);
+    expect(codes(pushedSale)).toEqual([null, null, null, null]);
     expect(
       await env.DB.prepare(
         'SELECT paid_total, udhaar_amount FROM sales WHERE tenant_id = ?1 AND id = ?2',
@@ -313,6 +336,29 @@ describe('M3 server rules', () => {
       udhaar_amount: 50000,
     };
     const saleId = String(sale[0]!.row?.id);
+    const tx = sale[0]!.tx_id;
+    sale[2]!.row = { ...sale[2]!.row, amount: 100000 };
+    sale.push(
+      op(
+        'ledger_entries',
+        'insert',
+        {
+          id: newId(now),
+          party_type: 'customer',
+          party_id: IDS.customer,
+          amount: 50000,
+          source_type: 'sale',
+          source_id: saleId,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.till.id,
+          staff_id: IDS.cashier,
+          business_date: '2026-10-27',
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    );
     const row = refund(shop, saleId, 20000, String(sale[1]?.row?.id));
     const res = await pushOk(shop.till, [
       ...sale,
@@ -320,14 +366,14 @@ describe('M3 server rules', () => {
       op('refund_lines', 'insert', row.line, { tx_id: row.row.id }),
       op('ledger_entries', 'insert', row.ledger, { tx_id: row.row.id }),
     ]);
-    expect(codes(res)).toEqual([null, null, null, null, null]);
+    expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
   });
 
   it('treats a second void of the same sale as an idempotent no-op', async () => {
     const shop = await seedShop('Void');
     const sale = saleOps(shop, shop.till, 1);
     const pushedSale = await pushOk(shop.till, sale);
-    expect(codes(pushedSale)).toEqual([null, null]);
+    expect(codes(pushedSale)).toEqual([null, null, null]);
     const saleId = String(sale[0]!.row?.id);
     const voidRow = (id: string) => ({
       id,

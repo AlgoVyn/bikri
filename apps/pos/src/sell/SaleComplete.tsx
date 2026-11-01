@@ -14,6 +14,11 @@ import {
   waLink,
 } from '../data/receipt.ts';
 import { formatShopMoney } from '../lib/money';
+import {
+  closeShareWindow,
+  navigateShareWindow,
+  openShareWindow,
+} from '../print/shareWindow.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { ignoresHotkey } from '../shell/hotkeys.ts';
 import { saleChime } from './beep.ts';
@@ -161,6 +166,7 @@ export function SaleComplete({
   const share = async () => {
     if (busy) return;
     setBusy('share');
+    const shareWindow = openShareWindow();
     try {
       const { saleReceipt, receiptPng, downloadBlob } = await import(
         '../print/receiptFiles.ts'
@@ -173,15 +179,20 @@ export function SaleComplete({
       const file = new File([png], `${invoice}.png`, { type: 'image/png' });
       if (link) {
         downloadBlob(png, file.name);
-        window.open(link, '_blank', 'noopener');
-        toast.push(t('done.image_saved'), 'info');
-      } else if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text, title: invoice });
+        if (navigateShareWindow(shareWindow, link))
+          toast.push(t('done.image_saved'), 'info');
+        else toast.push(t('done.share_blocked'), 'error');
       } else {
-        downloadBlob(png, file.name);
-        toast.push(t('done.image_saved'), 'info');
+        closeShareWindow(shareWindow);
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], text, title: invoice });
+        } else {
+          downloadBlob(png, file.name);
+          toast.push(t('done.image_saved'), 'info');
+        }
       }
     } catch (err) {
+      closeShareWindow(shareWindow);
       if ((err as Error).name !== 'AbortError')
         toast.push(t('done.share_failed'), 'error');
     } finally {

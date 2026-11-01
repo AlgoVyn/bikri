@@ -274,8 +274,9 @@ export type ExportPage = {
   has_more: boolean;
 };
 
-export function exportStart(id: string): Promise<ExportStart> {
-  return apiJson(idPath(id, '/export'));
+export function exportStart(id: string, before?: number): Promise<ExportStart> {
+  const q = before === undefined ? '' : `?before=${before}`;
+  return apiJson(idPath(id, `/export${q}`));
 }
 
 export function exportPage(
@@ -283,12 +284,14 @@ export function exportPage(
   tbl: string,
   after: string,
   limit = 1000,
+  before?: number,
 ): Promise<ExportPage> {
   const q = new URLSearchParams({
     tbl,
     after,
     limit: String(limit),
   });
+  if (before !== undefined) q.set('before', String(before));
   return apiJson(idPath(id, `/export?${q.toString()}`));
 }
 

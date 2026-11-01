@@ -30,8 +30,9 @@ export type ImportField = (typeof TEMPLATE_COLUMNS)[number];
 export type Mapping = Partial<Record<ImportField, number>>;
 
 export const MAX_IMPORT_ROWS = 5000;
-/** Rows per Dexie transaction (≤ 200 sync ops: product + barcodes + opening movement). */
+/** Hard ceiling for one import transaction; rows are grouped by their actual op cost. */
 export const IMPORT_CHUNK = 25;
+const MAX_IMPORT_OPS = 170;
 export const MAX_NAME = 120;
 export const TEMPLATE_FILE = 'bikri-products-template.csv';
 
@@ -491,8 +492,21 @@ export async function runImport(
     updated: 0,
     skipped: preview.summary.errors,
   };
-  for (let start = 0; start < valid.length; start += IMPORT_CHUNK) {
-    const chunk = valid.slice(start, start + IMPORT_CHUNK);
+  let index = 0;
+  while (index < valid.length) {
+    const chunk: PreviewRow[] = [];
+    let cost = 0;
+    while (index < valid.length) {
+      const row = valid[index] as PreviewRow;
+      // product + its barcodes + an opening movement/category; a large barcode list
+      // must shrink the chunk instead of overflowing the 200-op action limit.
+      const rowCost =
+        2 + row.parsed.barcodes.length + (row.parsed.category ? 1 : 0);
+      if (chunk.length > 0 && cost + rowCost > MAX_IMPORT_OPS) break;
+      chunk.push(row);
+      cost += rowCost;
+      index += 1;
+    }
     await writeAction(
       db,
       async (w) => {
@@ -585,10 +599,7 @@ export async function runImport(
       },
       { actor: ctx.staff_id, ...opts },
     );
-    opts.onProgress?.(
-      Math.min(start + IMPORT_CHUNK, valid.length),
-      valid.length,
-    );
+    opts.onProgress?.(index, valid.length);
   }
   return result;
 }

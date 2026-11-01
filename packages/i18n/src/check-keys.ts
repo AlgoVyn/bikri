@@ -50,6 +50,12 @@ export function compareCatalogs(
     }
   }
   const locales = [...flat.keys()];
+  const reference = flat.get('en');
+  const placeholders = (text: string) =>
+    [...text.matchAll(/\{\{\s*([\w.]+)\s*\}\}/gu)]
+      .map((match) => match[1])
+      .sort()
+      .join(',');
   for (const key of [...union].sort()) {
     for (const locale of locales) {
       const map = flat.get(locale);
@@ -60,6 +66,11 @@ export function compareCatalogs(
       const text = map.get(key) ?? '';
       if (text.trim() === '') {
         errors.push(`${locale} empty ${key}`);
+      }
+      if (reference !== undefined && locale !== 'en') {
+        const expected = placeholders(reference.get(key) ?? '');
+        if (placeholders(text) !== expected)
+          errors.push(`${locale} placeholders differ ${key}`);
       }
     }
   }

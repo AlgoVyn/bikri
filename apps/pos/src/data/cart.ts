@@ -186,8 +186,48 @@ export function addOverride(cart: Cart, override: CartOverride): Cart {
   return { ...cart, overrides: [...rest, override] };
 }
 
-export function hasOverride(cart: Cart, permission: string): boolean {
-  return (cart.overrides ?? []).some((o) => o.permission === permission);
+/**
+ * The parts of a cart a manager approval is bound to. Any line, quantity, price,
+ * discount, customer or reissue change produces a different signature, so the
+ * previous approval no longer applies.
+ */
+export function cartSignature(cart: Cart): string {
+  return JSON.stringify({
+    customer: cart.customer_id ?? null,
+    reissue: cart.reissue?.sale_id ?? null,
+    discount: cart.bill_discount ?? null,
+    lines: cart.lines.map((line) => [
+      line.key,
+      line.product_id,
+      line.qty_milli,
+      line.unit_price,
+      line.discount_type ?? null,
+      line.discount_value ?? 0,
+    ]),
+  });
+}
+
+/** Whether the cart still matches the approval given for `permission`. */
+export function overrideMatches(
+  cart: Cart,
+  permission: string,
+  options: { udhaar?: number; line?: string; price?: number } = {},
+): boolean {
+  const override = (cart.overrides ?? []).find(
+    (candidate) => candidate.permission === permission,
+  );
+  if (!override) return false;
+  if (permission === 'catalog.edit')
+    return (
+      override.bound_line === options.line &&
+      override.bound_price === options.price
+    );
+  if (override.bound_cart !== cartSignature(cart)) return false;
+  if (permission === 'udhaar.hard_limit')
+    return (
+      options.udhaar !== undefined && override.bound_udhaar === options.udhaar
+    );
+  return true;
 }
 
 /** Bill totals per 07 §3 (cart discounts use `amount`/`percent`; money rules use `rs`/`pct`). */
@@ -238,8 +278,10 @@ export function paymentChecks(
     (!staff.canDiscount || totals.discount_share_bp > staff.maxDiscountBp);
   return {
     belowCost:
-      anyBelow && !staff.canBelowCost && !hasOverride(cart, 'sale.below_cost'),
-    discount: overLimit && !hasOverride(cart, 'sale.discount'),
+      anyBelow &&
+      !staff.canBelowCost &&
+      !overrideMatches(cart, 'sale.below_cost'),
+    discount: overLimit && !overrideMatches(cart, 'sale.discount'),
   };
 }
 

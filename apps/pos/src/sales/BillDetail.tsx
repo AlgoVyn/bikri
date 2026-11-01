@@ -28,6 +28,11 @@ import {
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { formatTimestamp } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
+import {
+  closeShareWindow,
+  navigateShareWindow,
+  openShareWindow,
+} from '../print/shareWindow.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
@@ -88,6 +93,7 @@ export function BillDetail({
 
   const share = async () => {
     if (!data) return;
+    const shareWindow = openShareWindow();
     try {
       const { saleReceipt, receiptPng, downloadBlob } = await import(
         '../print/receiptFiles.ts'
@@ -105,19 +111,24 @@ export function BillDetail({
       });
       if (link) {
         downloadBlob(png, file.name);
-        window.open(link, '_blank', 'noopener');
-        toast.push(t('done.image_saved'));
-      } else if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          text,
-          title: r.input.sale.invoiceNo,
-        });
+        if (navigateShareWindow(shareWindow, link))
+          toast.push(t('done.image_saved'));
+        else toast.push(t('done.share_blocked'), 'error');
       } else {
-        downloadBlob(png, file.name);
-        toast.push(t('done.image_saved'));
+        closeShareWindow(shareWindow);
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            text,
+            title: r.input.sale.invoiceNo,
+          });
+        } else {
+          downloadBlob(png, file.name);
+          toast.push(t('done.image_saved'));
+        }
       }
     } catch (err) {
+      closeShareWindow(shareWindow);
       if ((err as Error).name !== 'AbortError')
         toast.push(t('done.share_failed'), 'error');
     }

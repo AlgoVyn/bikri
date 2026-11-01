@@ -257,6 +257,24 @@ describe('shop admin (T-038, 04 §3.8)', () => {
     )
       .bind(a.tenantId, branch2)
       .run();
+    // A device with waiting changes cannot be moved: its queued bills carry the
+    // old code and would be rejected forever.
+    await env.DB.prepare(
+      'UPDATE devices SET pending_ops = 2 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(a.tenantId, a.till.id)
+      .run();
+    const blocked = await shopApi(a, s, `/shop/devices/${a.till.id}`, {
+      method: 'PATCH',
+      json: { branch_id: branch2 },
+    });
+    expect(blocked.status).toBe(409);
+    expect((await json<Err>(blocked)).error.code).toBe('PENDING_OPS');
+    await env.DB.prepare(
+      'UPDATE devices SET pending_ops = 0 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(a.tenantId, a.till.id)
+      .run();
     const moved = await json<{
       device: { branch_id: string; device_code: string };
     }>(

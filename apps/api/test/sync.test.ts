@@ -27,13 +27,21 @@ describe('push (03 §4.1, §9)', () => {
     const shop = await seedShop('Idem');
     const ops = saleOps(shop, shop.till, 1);
     const first = await pushOk(shop.till, ops);
-    expect(first.results.map((r) => r.result)).toEqual(['applied', 'applied']);
+    expect(first.results.map((r) => r.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
     const logBefore = await count(
       'SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1',
       shop.tenantId,
     );
     const second = await pushOk(shop.till, ops);
-    expect(second.results.map((r) => r.result)).toEqual(['applied', 'applied']);
+    expect(second.results.map((r) => r.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
     expect(
       await count(
         'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
@@ -96,6 +104,8 @@ describe('push (03 §4.1, §9)', () => {
       ),
     ).toBe(1);
     const changes = await pullAll(shop.admin);
+    // A field merge is a conflict row like any other and must reach existing tills.
+    expect(changes.filter((c) => c.tbl === 'sync_conflicts')).toHaveLength(1);
     const last = changes.filter((c) => c.tbl === 'products').at(-1);
     expect(last?.row).toMatchObject({
       name_en: 'Renamed',
@@ -161,6 +171,7 @@ describe('push (03 §4.1, §9)', () => {
     });
     const res = await pushOk(shop.till, [...sale, customer]);
     expect(res.results.map((r) => r.result)).toEqual([
+      'applied',
       'applied',
       'applied',
       'applied',
@@ -544,7 +555,7 @@ describe('pull and snapshot', () => {
 describe('refund payment rows and split (04 §5)', () => {
   it('needs one matching payment for the paid part and one ledger row for the udhaar part', async () => {
     const shop = await seedShop('Refund rows');
-    const [saleOp, lineOp] = saleOps(shop, shop.till, 1, {
+    const [saleOp, lineOp, paymentOp] = saleOps(shop, shop.till, 1, {
       customerId: IDS.customer,
     });
     const sale: Record<string, unknown> = {
@@ -554,9 +565,30 @@ describe('refund payment rows and split (04 §5)', () => {
       cash_tendered: 50000,
     };
     const tx = saleOp?.tx_id ?? newId();
+    const payment = {
+      ...(paymentOp?.row as Record<string, unknown>),
+      amount: 50000,
+      cash_tendered: 50000,
+    };
+    const ledger = {
+      id: newId(),
+      party_type: 'customer',
+      party_id: IDS.customer,
+      amount: 100000,
+      source_type: 'sale',
+      source_id: sale.id,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.cashier,
+      business_date: '2026-10-27',
+      created_at: Date.now(),
+    };
     await pushOk(shop.till, [
       { ...(saleOp as PushOpLike), row: sale },
       lineOp as PushOpLike,
+      { ...(paymentOp as PushOpLike), row: payment },
+      op('ledger_entries', 'insert', ledger, { tx_id: tx }),
     ]);
     const base = (over: Record<string, unknown>) => ({
       id: newId(),

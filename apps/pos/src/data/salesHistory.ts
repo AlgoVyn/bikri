@@ -282,9 +282,13 @@ export async function salesHistory(
     }
   }
 
-  const jobs = (
-    await (src.table('print_jobs') as Table<PrintJobLite>).toArray()
-  ).filter((j) => j.sale_id !== undefined && ids.includes(j.sale_id));
+  const jobs =
+    ids.length === 0
+      ? []
+      : await (src.table('print_jobs') as Table<PrintJobLite>)
+          .where('sale_id')
+          .anyOf(ids)
+          .toArray();
 
   const customerIds = [
     ...new Set(
@@ -636,9 +640,10 @@ export async function billDetail(
         .toArray()),
     );
 
-  const jobs = (
-    await (src.table('print_jobs') as Table<PrintJobLite>).toArray()
-  ).filter((j) => j.sale_id === saleId);
+  const jobs = await (src.table('print_jobs') as Table<PrintJobLite>)
+    .where('sale_id')
+    .equals(saleId)
+    .toArray();
 
   return {
     sale,

@@ -74,7 +74,7 @@ export function CustomerStatement({
         today: businessDate(Date.now(), tz),
         actor: staff?.id ?? null,
       });
-    })();
+    })().catch(() => undefined);
   }, [canEditPromises, staff?.id]);
 
   const data = useLiveQuery(async () => {

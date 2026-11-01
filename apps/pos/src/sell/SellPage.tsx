@@ -20,13 +20,14 @@ import {
   CartFullError,
   type CartId,
   CartNotEmptyError,
+  cartSignature,
   cartTotals,
   deleteHeld,
   emptyCart,
   findByCode,
-  hasOverride,
   holdCart,
   isEmptyCart,
+  overrideMatches,
   parseQtyPrefix,
   paymentChecks,
   removeLine,
@@ -273,7 +274,7 @@ export function SellPage() {
     const voidNeeded =
       current.reissue != null &&
       !can('sale.void') &&
-      !hasOverride(current, 'sale.void');
+      !overrideMatches(current, 'sale.void');
     const need: OverridePermission | null = checks.belowCost
       ? 'sale.below_cost'
       : checks.discount
@@ -285,8 +286,14 @@ export function SellPage() {
       setOverride({
         permission: need,
         onApproved: (by) => {
+          const bound = cartSignature(current);
           void mutate((c) =>
-            addOverride(c, { permission: need, approved_by: by }),
+            addOverride(c, {
+              permission: need,
+              approved_by: by,
+              approved_at: Date.now(),
+              bound_cart: bound,
+            }),
           ).then(() => takePayment());
         },
       });
@@ -299,7 +306,19 @@ export function SellPage() {
     const apply = () =>
       void mutate((c) => updateLine(c, line.key, { unit_price: price }));
     if (price < (line.list_price ?? line.unit_price) && !can('catalog.edit')) {
-      setOverride({ permission: 'catalog.edit', onApproved: apply });
+      setOverride({
+        permission: 'catalog.edit',
+        onApproved: (by) =>
+          void mutate((c) =>
+            addOverride(updateLine(c, line.key, { unit_price: price }), {
+              permission: 'catalog.edit',
+              approved_by: by,
+              approved_at: Date.now(),
+              bound_line: line.key,
+              bound_price: price,
+            }),
+          ),
+      });
       return;
     }
     apply();

@@ -1,4 +1,4 @@
-import { isQtyUnit, newId } from '@bikri/core';
+import { businessDate, isQtyUnit, newId } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,7 +21,7 @@ import {
   RefundNotAllowedError,
   refundSale,
 } from '../data/refunds.ts';
-import { billDetail } from '../data/salesHistory.ts';
+import { billDetail, shopTimeZone } from '../data/salesHistory.ts';
 import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
@@ -64,6 +64,10 @@ export function RefundDialog({
   const [done, setDone] = useState<string | null>(null);
 
   const detail = useLiveQuery(() => billDetail(getDb(), saleId), [saleId]);
+  const today = useLiveQuery(
+    async () => businessDate(Date.now(), await shopTimeZone(getDb())),
+    [],
+  );
   const printer = useLiveQuery(
     async () =>
       ((await getDb().kv.get('printer'))?.value ?? null) as {
@@ -204,6 +208,23 @@ export function RefundDialog({
         invoice: String(detail.sale.invoice_no),
       })
     : t('office.refund.title_plain');
+
+  // The refund route is shareable; keep the same same-day/report.view rule as the
+  // bill detail so a cashier cannot read an old bill by bookmarking this URL.
+  if (
+    detail &&
+    today !== undefined &&
+    !can('report.view') &&
+    String(detail.sale.business_date) !== today
+  ) {
+    return (
+      <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
+        <p className="text-text-muted" data-testid="refund-no-access">
+          {t('shell.no_access')}
+        </p>
+      </Modal>
+    );
+  }
 
   if (done) {
     return (

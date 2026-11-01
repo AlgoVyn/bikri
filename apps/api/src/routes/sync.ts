@@ -16,7 +16,7 @@ import {
   supportPayload,
   tenantStatusPayload,
 } from '../sync/status.ts';
-import { SNAPSHOT_TABLES, selectList } from '../sync/tables.ts';
+import { columnsOf, SNAPSHOT_TABLES, selectList } from '../sync/tables.ts';
 import type { AppEnv, DeviceRow, TenantRow } from '../types.ts';
 
 const MAX_PUSH_BYTES = 1_000_000;
@@ -197,6 +197,8 @@ export const SnapshotQuery = z.object({
   tbl: z.enum(SNAPSHOT_TABLES).optional(),
   after: z.string().max(40).default(''),
   limit: z.coerce.number().int().min(1).max(1000).default(500),
+  /** Export cut-off: rows created after this are left out so children never outrun parents. */
+  before: z.coerce.number().int().positive().optional(),
 });
 
 /** Snapshot start (counts) and pages, shared by the till snapshot and exports (03 §4.3). */
@@ -210,13 +212,19 @@ export async function snapshotPayload(
     tbl: query('tbl') || undefined,
     after: query('after') ?? '',
     limit: query('limit') ?? undefined,
+    before: query('before') ?? undefined,
   });
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
     const res = await db.batch(
-      SNAPSHOT_TABLES.map((tbl) =>
-        db.prepare(`SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1`),
-      ),
+      SNAPSHOT_TABLES.map((tbl) => {
+        const cut =
+          q.before !== undefined && columnsOf(tbl).includes('created_at');
+        return db.prepare(
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${cut ? ' AND created_at <= ?2' : ''}`,
+          ...(cut ? [q.before as number] : []),
+        );
+      }),
     );
     return {
       snapshot_seq: seq,
@@ -229,10 +237,10 @@ export async function snapshotPayload(
     };
   }
   const limit = Math.min(q.limit, maxLimit);
+  const cut = q.before !== undefined && columnsOf(q.tbl).includes('created_at');
   const rows = await db.select(
-    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2 ORDER BY id LIMIT ?3`,
-    q.after,
-    limit + 1,
+    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${cut ? ' AND created_at <= ?3' : ''} ORDER BY id LIMIT ?${cut ? 4 : 3}`,
+    ...(cut ? [q.after, q.before as number, limit + 1] : [q.after, limit + 1]),
   );
   const page = rows.slice(0, limit);
   addRowsRead(tenant.id, page.length);

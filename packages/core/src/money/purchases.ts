@@ -22,8 +22,8 @@ export interface PurchaseResult {
 
 /**
  * Line totals, freight allocation and landed unit cost (02 purchase_lines, D-034).
- * `other_charges` are allocated by `line_total`. When every line total is 0,
- * allocate's W = 0 rule leaves the charges unallocated; they still sit on `total`.
+ * `other_charges` are allocated by `line_total`. Free lines (all totals 0) split the
+ * charges equally, so freight still lands in the stock value.
  */
 export function computePurchase(
   lines: readonly PurchaseLineInput[],
@@ -48,9 +48,12 @@ export function computePurchase(
       line_total: mulDivRound(line.qty_milli, line.unit_cost, 1000),
     };
   });
+  const lineTotals = priced.map((line) => line.line_total);
   const charges = allocate(
     otherCharges,
-    priced.map((line) => line.line_total),
+    lineTotals.every((total) => total === 0)
+      ? lineTotals.map(() => 1)
+      : lineTotals,
   );
   const resultLines: PurchaseLineResult[] = priced.map((line, index) => {
     const chargesAlloc = charges[index] as number;

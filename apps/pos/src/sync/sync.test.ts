@@ -206,6 +206,46 @@ describe('push (03 §3, §4.1)', () => {
     expect((await db.categories.get('c-bad'))?.name_en).toBe('Server');
   });
 
+  it('does not steal a live sending claim, but reclaims a stale one', async () => {
+    const db = await enrolled('claim');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-claim', name_en: 'Claim' }),
+      { now: 42 },
+    );
+    await db.outbox
+      .toCollection()
+      .modify({ status: 'sending', sending_at: Date.now() });
+    server.log = [];
+    await pushAll(db);
+    expect(server.log.filter((l) => l.path === '/sync/push')).toHaveLength(0);
+
+    await db.outbox
+      .toCollection()
+      .modify({ sending_at: Date.now() - 10 * 60_000 });
+    await pushAll(db);
+    expect(server.log.filter((l) => l.path === '/sync/push')).toHaveLength(1);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('discards an empty set and a local create without a server shadow', async () => {
+    const db = await enrolled('discard-edge');
+    await expect(discardFailed(db, [999])).resolves.toBeUndefined();
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-new', name_en: 'New' }),
+      { now: 42 },
+    );
+    const entry = (await db.outbox.toArray())[0];
+    await db.outbox
+      .where('seq')
+      .equals(entry?.seq ?? 0)
+      .modify({ status: 'failed' });
+    await discardFailed(db, [entry?.seq ?? 0]);
+    expect(await db.categories.get('c-new')).toBeUndefined();
+    expect(await db.outbox.count()).toBe(0);
+  });
+
   it('leaves an unanswered op pending instead of dropping or sending it twice', async () => {
     const db = await enrolled('unanswered');
     const first = {
@@ -371,6 +411,64 @@ describe('pull (03 §4.2)', () => {
     await pullAll(db);
     expect((await db.stock_levels.get('p1'))?.on_hand_milli).toBe(5000);
     expect(await getKv(db, 'restore_epoch', null)).toBe('1');
+  });
+
+  it('quarantines a malformed row and a unique collision without wedging the cursor', async () => {
+    const db = await enrolled('pull-bad');
+    server.changes = [
+      {
+        seq: 1,
+        tbl: 'products',
+        op: 'upsert',
+        row: { ...product('p1'), price: { bad: true } } as never,
+      },
+      {
+        seq: 10,
+        tbl: 'products',
+        op: 'upsert',
+        row: { ...product('p-missing'), id: '' } as never,
+      },
+      {
+        seq: 11,
+        tbl: 'products',
+        op: 'upsert',
+        row: { ...product('p-long'), notes: 'x'.repeat(4_001) } as never,
+      },
+      {
+        seq: 12,
+        tbl: 'products',
+        op: 'upsert',
+        row: { ...product('p-float'), price: 1.5 } as never,
+      },
+      { seq: 2, tbl: 'products', op: 'upsert', row: product('p2') },
+      {
+        seq: 3,
+        tbl: 'sale_voids',
+        op: 'upsert',
+        row: {
+          id: 'void-1',
+          sale_id: 'sale-1',
+          reason: 'x',
+          created_at: 1,
+        },
+      },
+      {
+        seq: 4,
+        tbl: 'sale_voids',
+        op: 'upsert',
+        row: {
+          id: 'void-2',
+          sale_id: 'sale-1',
+          reason: 'y',
+          created_at: 1,
+        },
+      },
+    ];
+    await pullAll(db);
+    expect(await db.products.get('p2')).toBeDefined();
+    expect(await getKv(db, 'pull_cursor', 0)).toBe(4);
+    const errors = await getKv<unknown[]>(db, 'pull_errors', []);
+    expect(errors).toHaveLength(5);
   });
 
   it('410 SNAPSHOT_REQUIRED runs a resumable snapshot, then continues from snapshot_seq', async () => {

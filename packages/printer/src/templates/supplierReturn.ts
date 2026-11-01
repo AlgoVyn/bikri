@@ -1,4 +1,4 @@
-import { formatReceiptDate, formatReceiptMoney } from '../format.ts';
+import { formatReceiptMoney } from '../format.ts';
 import { resolvePaper } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {

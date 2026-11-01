@@ -57,6 +57,12 @@ export const pwaOptions = {
        and navigateFallback. The manifest file is added by the plugin itself. */
     modifyURLPrefix: { '': scope },
     globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+    // The operator console is always online and must not be precached (01 §6).
+    globIgnores: [
+      '**/admin.lazy-*.js',
+      '**/backups.lazy-*.js',
+      '**/useAdminQuery-*.js',
+    ],
   },
   devOptions: {
     enabled: false,

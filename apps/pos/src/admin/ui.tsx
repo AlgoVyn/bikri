@@ -12,6 +12,7 @@ import {
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
+import { QrCode } from '../components/QrCode.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 
@@ -271,8 +272,6 @@ export function PairingPanel({
   const when = formatWhen(expiresAt, i18n.language);
   const waText = t('admin.wa_text', { name: shopName, link, code, when });
   const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-  // TODO: draw a QR of `link` if a QR generator is added. None is in the repo;
-  // do not pull in a QR dependency for the operator console.
   return (
     <section
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
@@ -313,16 +312,19 @@ export function PairingPanel({
             {t('admin.pairing_help')}
           </p>
         </div>
-        <div>
-          <p className="text-small text-text-muted">
-            {t('admin.pairing_link')}
-          </p>
-          <a
-            className="break-all font-medium text-primary underline"
-            href={link}
-          >
-            {link}
-          </a>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <QrCode value={link} label={t('admin.pairing_qr')} />
+          <div className="min-w-0">
+            <p className="text-small text-text-muted">
+              {t('admin.pairing_link')}
+            </p>
+            <a
+              className="break-all font-medium text-primary underline"
+              href={link}
+            >
+              {link}
+            </a>
+          </div>
         </div>
         <p className="text-small text-text-muted tabular-nums">{when}</p>
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">

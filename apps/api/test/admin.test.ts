@@ -314,6 +314,34 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     ).toBe(2);
   });
 
+  it('maintenance returns to the status it was in (read-only and suspended)', async () => {
+    const a = await seedShop('Maint return');
+    const setStatus = async (path: string) => {
+      const res = await api(`/admin/tenants/${a.tenantId}/${path}`, {
+        method: 'POST',
+        json: { reason: 'drill' },
+      });
+      expect(res.status).toBe(200);
+    };
+    const setMaintenance = async (on: boolean) => {
+      const res = await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+        method: 'POST',
+        json: { on },
+      });
+      expect(res.status).toBe(200);
+      return (await json<{ tenant: { status: string } }>(res)).tenant.status;
+    };
+
+    await setStatus('read-only');
+    await setMaintenance(true);
+    expect(await setMaintenance(false)).toBe('read_only');
+
+    await setStatus('reactivate');
+    await setStatus('suspend');
+    await setMaintenance(true);
+    expect(await setMaintenance(false)).toBe('suspended');
+  });
+
   it('codes, device revoke and owner PIN reset write audit rows in that tenant only', async () => {
     const a = await seedShop('Dev A');
     const b = await seedShop('Dev B');

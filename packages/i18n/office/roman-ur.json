@@ -701,7 +701,9 @@
       "server_finished": "Server se {{filename}} download ho gayi",
       "server_hint": "Server ki copy (sab tills samet) ke liye malik ka email sign-in zaroori hai; yeh server export task ke saath aayegi.",
       "server_unavailable": "Server copy sirf admin device par malik download kar sakta hai.",
-      "title": "Backup aur export"
+      "title": "Backup aur export",
+      "persist_warning": "Is browser ne persistent storage ki ijazat nahi di. Jaga kam hone par OS till ka local data saaf kar sakta hai. Abhi dobara ijazat talab karein.",
+      "persist_ask": "Persistent storage talab karein"
     },
     "settings": {
       "health_title": "Data ki hifazat",

@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonDanger } from '../components/classes.ts';
 import {
   ClockIcon,
@@ -62,14 +63,9 @@ function SettingsNavContent() {
     };
   }, []);
   const owner = role === 'owner';
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const leave = async () => {
     setLeaveError(null);
-    if (
-      !window.confirm(
-        t('enrol.leave_confirm', { shop: info?.tenant?.display_name ?? '' }),
-      )
-    )
-      return;
     const db = getDb();
     const { leaveShop, UnsyncedOpsError } = await import('../data/enrol.ts');
     try {
@@ -329,7 +325,7 @@ function SettingsNavContent() {
               <button
                 type="button"
                 className={`${buttonDanger} self-start`}
-                onClick={() => void leave()}
+                onClick={() => setConfirmLeave(true)}
               >
                 {t('office.settings.nav_leave')}
               </button>
@@ -342,6 +338,16 @@ function SettingsNavContent() {
           ) : null}
         </section>
       ) : null}
+      <ConfirmDialog
+        open={confirmLeave}
+        onOpenChange={setConfirmLeave}
+        title={t('enrol.leave')}
+        body={t('enrol.leave_confirm', {
+          shop: info?.tenant?.display_name ?? '',
+        })}
+        confirmLabel={t('office.settings.nav_leave')}
+        onConfirm={() => void leave()}
+      />
     </div>
   );
 }

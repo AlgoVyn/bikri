@@ -103,9 +103,14 @@ export async function getFile(c: Context<AppEnv>): Promise<Response> {
   const { tenant } = c.var;
   const prefix = `${c.env.BASE_PATH}/api/files/`;
   const path = new URL(c.req.url).pathname;
-  const relative = decodeURIComponent(
-    path.startsWith(prefix) ? path.slice(prefix.length) : '',
-  );
+  let relative: string;
+  try {
+    relative = decodeURIComponent(
+      path.startsWith(prefix) ? path.slice(prefix.length) : '',
+    );
+  } catch {
+    throw notFound();
+  }
   if (!READABLE.some((r) => r.test(relative))) throw notFound();
   const object = await c.env.FILES.get(tenantKey(tenant.id, relative));
   if (!object) throw notFound();

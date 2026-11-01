@@ -170,6 +170,48 @@ describe('export zip manifest', () => {
     expect(parsed.tables[0]?.rows).toEqual([{ id: 'shop' }]);
     expect(parsed.tables[1]?.rows).toEqual([]);
 
+    // A non-empty table without its JSON file is a truncated export.
+    const truncated = zipStore([
+      {
+        name: 'manifest.json',
+        data: text.encode(
+          JSON.stringify({
+            format: 'bikri-export',
+            version: 1,
+            tenant: { id: 't1', slug: 'shop', display_name: 'Shop' },
+            exported_at: 1000,
+            tables: [{ tbl: 'sales', rows: 2 }],
+          }),
+        ),
+      },
+    ]);
+    await expect(unzip(truncated).then(parseExport)).rejects.toBeInstanceOf(
+      ExportZipError,
+    );
+
+    // A row count that does not match the manifest is also rejected.
+    const short = zipStore([
+      {
+        name: 'manifest.json',
+        data: text.encode(
+          JSON.stringify({
+            format: 'bikri-export',
+            version: 2,
+            tenant: { id: 't1', display_name: 'Shop' },
+            exported_at: 1000,
+            tables: { sales: 2 },
+          }),
+        ),
+      },
+      {
+        name: 'json/sales.json',
+        data: text.encode(JSON.stringify([{ id: 's1' }])),
+      },
+    ]);
+    await expect(unzip(short).then(parseExport)).rejects.toBeInstanceOf(
+      ExportZipError,
+    );
+
     const v2 = zipStore([
       {
         name: 'manifest.json',

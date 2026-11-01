@@ -5,6 +5,7 @@ import type { OutboxEntry, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
   buttonDanger,
   buttonPrimary,
@@ -48,6 +49,9 @@ export function SyncPage() {
     usage: number;
     persisted: boolean;
   } | null>(null);
+  const [discardTarget, setDiscardTarget] = useState<OutboxEntry[] | null>(
+    null,
+  );
   const data = useLiveQuery(async () => {
     const [
       pending,
@@ -101,7 +105,12 @@ export function SyncPage() {
     const seqs = entries
       .map((e) => e.seq)
       .filter((s): s is number => s !== undefined);
-    await discardFailed(db, seqs);
+    try {
+      await discardFailed(db, seqs);
+    } catch {
+      setError(t('errors.generic'));
+      return;
+    }
     await writeAction(
       db,
       (w) =>
@@ -124,7 +133,7 @@ export function SyncPage() {
           created_at: w.now,
         }),
       { actor: staffId, allowReadOnly: true },
-    );
+    ).catch(() => setError(t('errors.generic')));
   };
 
   const acknowledge = (id: string) =>
@@ -255,7 +264,7 @@ export function SyncPage() {
                       <button
                         type="button"
                         className={buttonDanger}
-                        onClick={() => void discard([e])}
+                        onClick={() => setDiscardTarget([e])}
                       >
                         {t('syncpage.discard')}
                       </button>
@@ -304,6 +313,29 @@ export function SyncPage() {
         </section>
         {dialog}
       </div>
+      <ConfirmDialog
+        open={discardTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDiscardTarget(null);
+        }}
+        title={t('syncpage.discard_title')}
+        body={t('syncpage.discard_body', {
+          what: discardLabel(discardTarget?.[0]),
+        })}
+        confirmLabel={t('syncpage.discard_confirm')}
+        onConfirm={() => {
+          if (discardTarget !== null) void discard(discardTarget);
+          setDiscardTarget(null);
+        }}
+      />
     </SettingsPageLayout>
   );
+}
+
+/** The invoice (for ledger rows) or the table/kind for a failed outbox row. */
+function discardLabel(entry: OutboxEntry | undefined): string {
+  if (!entry) return '';
+  const invoice = entry.row?.invoice_no;
+  if (typeof invoice === 'string' && invoice !== '') return invoice;
+  return `${entry.tbl} · ${entry.kind}`;
 }

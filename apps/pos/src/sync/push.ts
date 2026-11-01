@@ -5,7 +5,8 @@ import {
   isLedgerTable,
   newId,
 } from '@bikri/core';
-import type { BikriDb, OutboxEntry } from '@bikri/db';
+import type { BikriDb, OutboxEntry, SyncedRow } from '@bikri/db';
+import type { Table, Transaction } from 'dexie';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
@@ -121,11 +122,14 @@ export async function pushAll(
     serverTime: null,
   };
   if (!device) return out;
-  // A tab closed mid-request leaves rows in `sending`; the server is idempotent, so retry them.
+  // A tab closed mid-request leaves rows in `sending`; reclaim only stale claims so a
+  // second tab cannot steal a live batch and drop a coalesced edit.
+  const staleBefore = Date.now() - 5 * 60_000;
   await db.outbox
     .where('status')
     .equals('sending')
-    .modify({ status: 'pending' });
+    .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
+    .modify({ status: 'pending', sending_at: undefined });
   for (let round = 0; round < maxRounds; round += 1) {
     const pending = await db.outbox
       .where('status')
@@ -136,7 +140,10 @@ export async function pushAll(
     const seqs = batch
       .map((entry) => entry.seq)
       .filter((seq): seq is number => seq !== undefined);
-    await db.outbox.where('seq').anyOf(seqs).modify({ status: 'sending' });
+    await db.outbox
+      .where('seq')
+      .anyOf(seqs)
+      .modify({ status: 'sending', sending_at: Date.now() });
     let res: PushResponse;
     try {
       res = await tillRequest<PushResponse>(db, '/sync/push', {
@@ -151,7 +158,10 @@ export async function pushAll(
     } catch (error) {
       // A transport error leaves the ops pending for the next tick; a mutation made while this
       // request was in flight must not coalesce into them.
-      await db.outbox.where('seq').anyOf(seqs).modify({ status: 'pending' });
+      await db.outbox
+        .where('seq')
+        .anyOf(seqs)
+        .modify({ status: 'pending', sending_at: undefined });
       throw error;
     }
     out.sent += batch.length;
@@ -162,11 +172,16 @@ export async function pushAll(
       for (const r of res.results) {
         const entry = bySeq.get(r.op_id);
         if (entry?.seq === undefined) continue;
+        const current = await db.outbox.get(entry.seq);
+        // Another tab may have reclaimed this row (or it changed) while the request
+        // was in flight; only the claim owner may settle it.
+        if (current === undefined || current.op_id !== r.op_id) continue;
         if (r.result === 'rejected') {
           out.rejected += 1;
           await db.outbox.update(entry.seq, {
             status: 'failed',
             last_error: r.error_code ?? 'REJECTED',
+            sending_at: undefined,
             attempts: entry.attempts + 1,
           });
         } else {
@@ -177,7 +192,10 @@ export async function pushAll(
       }
       for (const entry of batch) {
         if (entry.seq === undefined || answered.has(entry.op_id)) continue;
-        await db.outbox.update(entry.seq, { status: 'pending' });
+        await db.outbox.update(entry.seq, {
+          status: 'pending',
+          sending_at: undefined,
+        });
       }
       await setKv(db, 'last_push_at', Date.now());
     });
@@ -214,12 +232,46 @@ export async function retryFailed(db: BikriDb, seqs: number[]): Promise<void> {
   });
 }
 
+/**
+ * Recomputes the `sales.status` cache for documents whose refund/void rows were
+ * discarded. The status is normally changed in the same transaction as the refund or
+ * void (03 §6); discarding one reverses that change but leaves the cache behind.
+ */
+async function recomputeDiscardedStatuses(
+  tx: Transaction,
+  saleIds: ReadonlySet<string>,
+): Promise<void> {
+  for (const saleId of saleIds) {
+    const sales = tx.table('sales') as Table<SyncedRow, string>;
+    const sale = await sales.get(saleId);
+    if (!sale) continue;
+    const refunds = (await tx
+      .table('refunds')
+      .where('sale_id')
+      .equals(saleId)
+      .toArray()) as SyncedRow[];
+    const refunded = refunds.reduce(
+      (sum, row) => sum + Number(row.exact_amount ?? 0),
+      0,
+    );
+    // A sale cannot hold a void and a refund at once, so a discarded void leaves no
+    // rows here and the bill returns to paid (or to its remaining refunds).
+    const status =
+      refunded >= Number(sale.total)
+        ? 'refunded'
+        : refunded > 0
+          ? 'part_refunded'
+          : 'paid';
+    if (sale.status !== status) await sales.update(saleId, { status });
+  }
+}
+
 export async function discardFailed(
   db: BikriDb,
   seqs: number[],
 ): Promise<void> {
   let ledgerChanged = false;
-  await db.transaction('rw', db.tables, async () => {
+  await db.transaction('rw', db.tables, async (tx) => {
     const failed = (await db.outbox.where('seq').anyOf(seqs).toArray()).filter(
       (e) => e.seq !== undefined && e.status === 'failed',
     );
@@ -230,9 +282,14 @@ export async function discardFailed(
     const entries = (await db.outbox.toArray()).filter((e) =>
       txIds.includes(e.tx_id),
     );
+    const saleIds = new Set<string>();
     for (const e of entries) {
       if (e.seq === undefined) continue;
       if (isLedgerTable(e.tbl)) {
+        if (e.tbl === 'refunds' || e.tbl === 'sale_voids') {
+          const row = await db.table(e.tbl).get(e.row_id);
+          if (row && typeof row.sale_id === 'string') saleIds.add(row.sale_id);
+        }
         await db.table(e.tbl).delete(e.row_id);
         await db.pull_shadow.delete([e.tbl, e.row_id]);
         ledgerChanged = true;
@@ -248,6 +305,7 @@ export async function discardFailed(
       }
       await db.outbox.delete(e.seq);
     }
+    await recomputeDiscardedStatuses(tx, saleIds);
   });
   if (ledgerChanged) await rebuildCaches(db);
 }

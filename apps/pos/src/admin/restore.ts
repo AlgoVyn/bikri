@@ -306,16 +306,23 @@ export function parseExport(
   const exported = exportedAtOf(body.exported_at);
   if (exported === null) throw new ExportZipError();
   const order: string[] = [];
+  const expected = new Map<string, number | null>();
   if (Array.isArray(body.tables)) {
     for (const item of body.tables) {
       if (item === null || typeof item !== 'object') throw new ExportZipError();
       const tbl = (item as { tbl?: unknown }).tbl;
       if (typeof tbl !== 'string' || tbl === '') throw new ExportZipError();
       order.push(tbl);
+      const count = (item as { rows?: unknown }).rows;
+      expected.set(tbl, typeof count === 'number' && count >= 0 ? count : null);
     }
   } else if (body.tables !== null && typeof body.tables === 'object') {
-    for (const tbl of Object.keys(body.tables as Record<string, unknown>)) {
+    for (const [tbl, count] of Object.entries(
+      body.tables as Record<string, unknown>,
+    )) {
+      if (tbl === '') throw new ExportZipError();
       order.push(tbl);
+      expected.set(tbl, typeof count === 'number' && count >= 0 ? count : null);
     }
   } else {
     throw new ExportZipError();
@@ -324,9 +331,15 @@ export function parseExport(
   for (const tbl of order) {
     const text =
       fileText(files, `${tbl}.json`) ?? fileText(files, `json/${tbl}.json`);
+    // A manifest without its table file is a truncated export; restoring it would
+    // silently replace the shop's data with an empty table. An empty table may omit
+    // the file (older exports did), but a non-empty one may not.
     if (text === null) {
-      tables.push({ tbl, rows: [] });
-      continue;
+      if (expected.get(tbl) === 0) {
+        tables.push({ tbl, rows: [] });
+        continue;
+      }
+      throw new ExportZipError();
     }
     let parsed: unknown;
     try {
@@ -336,6 +349,9 @@ export function parseExport(
     }
     const rows = asRows(parsed);
     if (rows === null) throw new ExportZipError();
+    const want = expected.get(tbl);
+    if (want !== null && want !== undefined && rows.length !== want)
+      throw new ExportZipError();
     tables.push({ tbl, rows });
   }
   const seq = body.snapshot_seq;

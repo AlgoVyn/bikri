@@ -898,7 +898,7 @@ export const DEXIE_SCHEMA_V1 = {
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
   file_queue: '++id, status',
-  print_jobs: 'id, status, created_at',
+  print_jobs: 'id, sale_id, refund_id, status, created_at',
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at }
   pull_shadow: '[tbl+id]',        // server rows skipped while a local edit was pending (03 §4.2)

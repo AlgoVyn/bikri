@@ -109,6 +109,15 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
     updated_at: now,
   };
 
+  const branch = await db.first(
+    'SELECT id FROM branches WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+    device.branch_id,
+  );
+  if (!branch) {
+    recordEnrolFailure(ip, now);
+    throw badCode();
+  }
+
   // Claim the code and create the device in one batch; the INSERT only happens if this request
   // claimed the code. A device-code race (UNIQUE) fails the whole batch: retry once.
   for (let attempt = 0; ; attempt += 1) {

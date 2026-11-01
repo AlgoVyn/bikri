@@ -7,6 +7,7 @@ import {
   approversFor,
   CartFullError,
   CartNotEmptyError,
+  cartSignature,
   cartTotals,
   deleteHeld,
   emptyCart,
@@ -233,10 +234,12 @@ describe('totals and payment checks (07 §3)', () => {
     cart = addOverride(cart, {
       permission: 'sale.below_cost',
       approved_by: 'st-2',
+      bound_cart: cartSignature(cart),
     });
     cart = addOverride(cart, {
       permission: 'sale.below_cost',
       approved_by: 'st-3',
+      bound_cart: cartSignature(cart),
     });
     expect(cart.overrides).toHaveLength(1);
     expect(
@@ -262,6 +265,7 @@ describe('totals and payment checks (07 §3)', () => {
     cart = addOverride(cart, {
       permission: 'sale.discount',
       approved_by: 'st-2',
+      bound_cart: cartSignature(cart),
     });
     expect(paymentChecks(cart, cartTotals(cart, money), cashier).discount).toBe(
       false,

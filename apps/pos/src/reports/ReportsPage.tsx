@@ -1,6 +1,6 @@
 import { businessDate, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -16,10 +16,12 @@ import { getDb } from '../data/db.ts';
 import {
   addDays,
   type ReportBundle,
+  type ReportOptions,
   type ReportSummary,
   reportBundle,
 } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
+import type { ReportRange } from '../data/reports.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
@@ -103,10 +105,30 @@ export function ReportsPage() {
   });
   const [deviceId, setDeviceId] = useState('');
   const [tab, setTab] = useState<ReportTab>('summary');
+  const workerRef = useRef<Worker | null>(null);
+  const [workerReady, setWorkerReady] = useState(false);
+  const requestId = useRef(0);
 
   useEffect(() => {
     if (!limited) rememberDateFilter('reports', preset, custom.from, custom.to);
   }, [preset, custom.from, custom.to, limited]);
+
+  useEffect(() => {
+    try {
+      const worker = new Worker(new URL('./reportWorker.ts', import.meta.url), {
+        type: 'module',
+      });
+      workerRef.current = worker;
+      setWorkerReady(true);
+      return () => {
+        worker.terminate();
+        workerRef.current = null;
+      };
+    } catch {
+      // A browser without module workers falls back to the main thread below.
+      return undefined;
+    }
+  }, []);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -120,23 +142,74 @@ export function ReportsPage() {
     )
       return null;
     const range = reportRange(selected, now, timeZone, custom);
-    const bundle = await reportBundle(
-      db,
-      { ...range, deviceId: deviceId || undefined },
-      { now, today, timeZone },
-    );
+    const reportRangeValue: ReportRange = {
+      ...range,
+      deviceId: deviceId || undefined,
+    };
+    const options: ReportOptions = { now, today, timeZone };
     const span = daysBetween(range.from, range.to) + 1;
+    const previousRange: ReportRange | undefined =
+      span <= 90
+        ? {
+            ...range,
+            from: addDays(range.from, -span),
+            to: addDays(range.from, -1),
+            deviceId: deviceId || undefined,
+          }
+        : undefined;
+    // Dexie liveQuery tracks these reads; the heavy aggregation itself runs in the worker.
+    await Promise.all([
+      db.sales.count(),
+      db.payments.count(),
+      db.refunds.count(),
+      db.sale_voids.count(),
+      db.expenses.count(),
+      db.day_closes.count(),
+      db.stock_movements.count(),
+      db.ledger_entries.count(),
+      db.products.count(),
+      db.customers.count(),
+    ]);
+    const worker = workerRef.current;
+    let bundle: ReportBundle;
     let previous: ReportSummary | undefined;
-    if (span <= 90) {
-      const previousRange = {
-        ...range,
-        from: addDays(range.from, -span),
-        to: addDays(range.from, -1),
-        deviceId: deviceId || undefined,
-      };
-      previous = (
-        await reportBundle(db, previousRange, { now, today, timeZone })
-      ).summary;
+    if (worker === null) {
+      bundle = await reportBundle(db, reportRangeValue, options);
+      previous =
+        previousRange === undefined
+          ? undefined
+          : (await reportBundle(db, previousRange, options)).summary;
+    } else {
+      const id = (requestId.current += 1);
+      const result = await new Promise<{
+        bundle: ReportBundle;
+        previous?: ReportSummary;
+      }>((resolve, reject) => {
+        const onMessage = (event: MessageEvent) => {
+          const payload = event.data as {
+            id?: number;
+            bundle?: ReportBundle;
+            previous?: ReportSummary;
+            error?: string;
+          };
+          if (payload.id !== id) return;
+          worker.removeEventListener('message', onMessage);
+          if (payload.error !== undefined) reject(new Error(payload.error));
+          else if (payload.bundle !== undefined)
+            resolve({ bundle: payload.bundle, previous: payload.previous });
+          else reject(new Error('empty report'));
+        };
+        worker.addEventListener('message', onMessage);
+        worker.postMessage({
+          id,
+          tenantId: db.tenantId,
+          range: reportRangeValue,
+          previousRange,
+          options,
+        });
+      });
+      bundle = result.bundle;
+      previous = result.previous;
     }
     const devices = (await db.devices.toArray())
       .filter((device) => !device.deleted_at)
@@ -150,7 +223,7 @@ export function ReportsPage() {
       devices,
       shopName: String(shop?.name ?? ''),
     };
-  }, [preset, custom.from, custom.to, deviceId, limited]);
+  }, [preset, custom.from, custom.to, deviceId, limited, workerReady]);
 
   if (!can('report.view'))
     return (

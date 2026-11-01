@@ -128,8 +128,11 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
   // A browser that leaves shop B and joins shop A loses B's database (journey 21, I-case).
   await b.page.goto('/bikri/settings');
   await unlock(b.page);
-  b.page.once('dialog', (d) => void d.accept());
   await b.page.getByRole('button', { name: 'Leave this shop' }).click();
+  await b.page
+    .getByRole('dialog', { name: 'Leave that shop' })
+    .getByRole('button', { name: 'Leave this shop' })
+    .click();
   await expect(
     b.page.getByRole('heading', { name: 'Connect this device to your shop' }),
   ).toBeVisible();

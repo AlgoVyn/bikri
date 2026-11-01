@@ -24,6 +24,7 @@ import {
 import { ledgerContext, listCategories } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 
 const fieldClass =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
@@ -56,6 +57,7 @@ export function PricesPage() {
   const { t } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const id = useId();
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const [categoryId, setCategoryId] = useState('');
@@ -66,7 +68,8 @@ export function PricesPage() {
   const [rows, setRows] = useState<PricePreviewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  if (!can('catalog.edit')) return <Navigate to="/products" replace />;
+  if (!can('catalog.edit') || readOnly)
+    return <Navigate to="/products" replace />;
 
   const reset = () => setRows(null);
   const preview = async () => {
@@ -94,6 +97,8 @@ export function PricesPage() {
       const n = await applyPrices(getDb(), rows, ctx);
       toast.push(t('prices.applied', { count: n }), 'info');
       setRows(null);
+    } catch {
+      toast.push(t('errors.generic'), 'error');
     } finally {
       setBusy(false);
     }

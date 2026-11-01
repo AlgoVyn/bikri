@@ -26,7 +26,7 @@ import {
   stockValuePaisa,
 } from './stock.ts';
 import { computeSupplierReturn } from './supplierReturns.ts';
-import { computeCart, isBelowCost } from './totals.ts';
+import { allocateRounding, computeCart, isBelowCost } from './totals.ts';
 
 describe('mulDivRound and roundTo', () => {
   it('rounds half away from zero', () => {
@@ -123,6 +123,27 @@ describe('sumSafe and subSafe', () => {
 });
 
 describe('computeCart edges', () => {
+  it('never makes a line negative when cash rounding lands on tiny lines', () => {
+    const cart = computeCart({
+      lines: [
+        { qty_milli: 1000, unit_price: 1 },
+        { qty_milli: 1000, unit_price: 1 },
+      ],
+      bill_discount: { type: 'pct', value: 7000 },
+      tax_rate_bp: 4000,
+      round_total_to: 1000,
+    });
+    expect(cart.total).toBe(0);
+    expect(cart.lines.every((line) => line.final >= 0)).toBe(true);
+    expect(cart.lines.reduce((sum, line) => sum + line.final, 0)).toBe(
+      cart.total,
+    );
+    // The fallback still allocates when the line values cannot absorb it all.
+    expect(allocateRounding(-2, [1, 0])).toEqual([-2, 0]);
+    expect(allocateRounding(0, [1])).toEqual([0]);
+    expect(allocateRounding(1, [1, 1])).toEqual([1, 0]);
+  });
+
   it('flags below-cost lines and leaves unknown cost alone', () => {
     const cart = computeCart({
       lines: [
@@ -573,7 +594,7 @@ describe('computePurchase', () => {
     ]);
   });
 
-  it('leaves charges unallocated when every line total is zero', () => {
+  it('splits charges equally when every line total is zero', () => {
     const purchase = computePurchase(
       [
         { qty_milli: 1000, unit_cost: 0 },
@@ -581,8 +602,12 @@ describe('computePurchase', () => {
       ],
       4_000,
     );
-    expect(purchase.lines.map((line) => line.charges_alloc)).toEqual([0, 0]);
-    expect(purchase.lines.map((line) => line.landed_unit_cost)).toEqual([0, 0]);
+    expect(purchase.lines.map((line) => line.charges_alloc)).toEqual([
+      2000, 2000,
+    ]);
+    expect(purchase.lines.map((line) => line.landed_unit_cost)).toEqual([
+      2000, 4000,
+    ]);
     expect(purchase.total).toBe(4_000);
     expect(computePurchase([], 0)).toEqual({
       lines: [],

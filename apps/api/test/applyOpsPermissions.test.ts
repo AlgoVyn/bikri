@@ -213,6 +213,25 @@ describe('derived-ledger permissions (05 §5, 07 §5)', () => {
     expect(oldPrefix.results.map((r) => r.result)).toEqual([
       'applied',
       'applied',
+      'applied',
     ]);
+
+    const negative = saleOps(shop, shop.till, 3, { prefix: 'NEG' });
+    negative[1]!.row = {
+      ...negative[1]!.row,
+      gross: -1,
+      net: -1,
+    };
+    const badLine = await pushOk(shop.till, negative);
+    expect(
+      badLine.results.every((row) => row.error_code === 'CONSTRAINT_FAILED'),
+    ).toBe(true);
+
+    const shortPay = saleOps(shop, shop.till, 4, { prefix: 'PAY' });
+    shortPay[2]!.row = { ...shortPay[2]!.row, amount: 1 };
+    const badPaid = await pushOk(shop.till, shortPay);
+    expect(
+      badPaid.results.every((row) => row.error_code === 'CONSTRAINT_FAILED'),
+    ).toBe(true);
   });
 });

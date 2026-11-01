@@ -24,6 +24,15 @@ describe('compareCatalogs', () => {
     expect(errors).toContain('en empty common.a');
   });
 
+  it('fails when a placeholder differs between locales', () => {
+    const errors = compareCatalogs({
+      en: { common: { a: 'Hi {{name}}' } },
+      ur: { common: { a: 'سلام {{naam}}' } },
+      'roman-ur': { common: { a: 'Salam {{name}}' } },
+    });
+    expect(errors).toContain('ur placeholders differ common.a');
+  });
+
   it('passes when the key sets and values match', () => {
     expect(
       compareCatalogs({

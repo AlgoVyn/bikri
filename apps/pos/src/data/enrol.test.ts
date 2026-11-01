@@ -52,6 +52,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   await dropTestDbs();
   await deleteTenantDb('t-enrol');
+  setActiveTenantId(null);
   localStorage.clear();
 });
 

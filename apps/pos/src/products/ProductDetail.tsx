@@ -356,7 +356,7 @@ export function ProductDetailPage({
           <h2 id="history-heading" className="me-auto text-h2 font-semibold">
             {t('products.history')}
           </h2>
-          {detail.history.length > 0 ? (
+          {detail.history.length > 0 && can('export.data') ? (
             <button
               type="button"
               className={buttonQuiet}

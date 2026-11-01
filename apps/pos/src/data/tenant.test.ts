@@ -1,11 +1,12 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { closeDb, getDb, NoActiveTenantError } from './db.ts';
 import { getKv, setKv } from './kv.ts';
 import {
   ACTIVE_TENANT_KEY,
   activeTenantId,
   DEV_TENANT_ID,
+  handleOtherTabSwitch,
   setActiveTenantId,
   usesDevTenant,
 } from './tenant.ts';
@@ -13,6 +14,7 @@ import { writeAction } from './write.ts';
 
 afterEach(() => {
   closeDb();
+  setActiveTenantId(null);
   localStorage.clear();
 });
 
@@ -36,6 +38,20 @@ describe('active tenant (D-073)', () => {
     );
     setActiveTenantId(null);
     expect(activeTenantId({ MODE: 'production' })).toBeNull();
+  });
+
+  it('keeps this tab on its shop when another tab switches', () => {
+    setActiveTenantId('shop-a');
+    // Another tab rewrites the shared key; this tab must not start writing to it.
+    localStorage.setItem(ACTIVE_TENANT_KEY, 'shop-b');
+    expect(activeTenantId({ MODE: 'production' })).toBe('shop-a');
+    setActiveTenantId('shop-b');
+    expect(activeTenantId({ MODE: 'production' })).toBe('shop-b');
+    const reload = vi.fn();
+    handleOtherTabSwitch('shop-b', reload);
+    expect(reload).not.toHaveBeenCalled();
+    handleOtherTabSwitch('shop-c', reload);
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it('opens bikri-dev by default and a separate database per tenant', async () => {

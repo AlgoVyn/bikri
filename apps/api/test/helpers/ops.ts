@@ -118,9 +118,32 @@ export function saleOps(
     warranty_until: null,
     created_at: now,
   };
+  const payment = {
+    id: newId(now),
+    direction: 'in',
+    method: 'cash',
+    purpose: 'sale',
+    amount: total,
+    cash_tendered: total,
+    change_given: 0,
+    reference: '',
+    sale_id: saleId,
+    refund_id: null,
+    purchase_id: null,
+    supplier_return_id: null,
+    party_type: null,
+    party_id: null,
+    note: '',
+    branch_id: shop.branchId,
+    device_id: dev.id,
+    staff_id: IDS.cashier,
+    business_date: '2026-10-27',
+    created_at: now,
+  };
   return [
     op('sales', 'insert', sale, { tx_id: tx }),
     op('sale_lines', 'insert', line, { tx_id: tx }),
+    op('payments', 'insert', payment, { tx_id: tx }),
   ];
 }
 

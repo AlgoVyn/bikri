@@ -434,6 +434,12 @@ shop.patch('/devices/:id', async (c) => {
   if (body.name !== undefined) next.name = body.name;
   if (body.is_admin !== undefined) next.is_admin = body.is_admin ? 1 : 0;
   if (body.branch_id !== undefined && body.branch_id !== d.branch_id) {
+    if (d.pending_ops > 0)
+      throw new ApiError(
+        'PENDING_OPS',
+        409,
+        'Sync the waiting changes before moving the device',
+      );
     if (!(await branchExists(db, body.branch_id)))
       throw new ApiError('NOT_FOUND', 404, 'No such branch');
     next.branch_id = body.branch_id;
@@ -562,6 +568,8 @@ type ExportToken = {
   tenant_id: string;
   device_id: string;
   exp: number;
+  /** The export cut-off captured when the export started (09 §3.4). */
+  before?: number;
 };
 
 shop.get('/export', async (c) => {
@@ -578,18 +586,24 @@ shop.get('/export', async (c) => {
         (tenant.last_owner_export_at + EXPORT_EVERY - now) / 1000,
       );
     }
-    const start = await snapshotPayload(() => undefined, db, tenant, 500);
+    const start = await snapshotPayload(
+      (k) => (k === 'before' ? String(now) : undefined),
+      db,
+      tenant,
+      500,
+    );
     const token = await signToken(ownerSessionKey(c.env), {
       kind: 'export',
       tenant_id: tenant.id,
       device_id: device.id,
       exp: now + EXPORT_TTL,
+      before: now,
     } satisfies ExportToken);
     await db.batch([
       ownerExportStatement(c.env, tenant.id, now),
       ...audit(c, 'owner_export'),
     ]);
-    return c.json({ export_id: token, ...start });
+    return c.json({ export_id: token, exported_at: now, ...start });
   }
   const t = await verifyToken<ExportToken>(ownerSessionKey(c.env), exportId);
   if (
@@ -606,5 +620,12 @@ shop.get('/export', async (c) => {
   }
   if (!c.req.query('tbl'))
     throw new ApiError('VALIDATION_FAILED', 400, 'tbl is required');
-  return c.json(await snapshotPayload((k) => c.req.query(k), db, tenant, 500));
+  return c.json(
+    await snapshotPayload(
+      (k) => (k === 'before' ? String(t.before ?? now) : c.req.query(k)),
+      db,
+      tenant,
+      500,
+    ),
+  );
 });

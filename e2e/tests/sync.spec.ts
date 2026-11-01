@@ -162,8 +162,11 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   // Leave this shop on A removes its database (AC 7).
   await a.page.goto('/bikri/settings');
   await unlock(a.page);
-  a.page.once('dialog', (d) => void d.accept());
   await a.page.getByRole('button', { name: 'Leave this shop' }).click();
+  await a.page
+    .getByRole('dialog', { name: 'Leave that shop' })
+    .getByRole('button', { name: 'Leave this shop' })
+    .click();
   await expect(
     a.page.getByRole('heading', { name: 'Connect this device to your shop' }),
   ).toBeVisible();

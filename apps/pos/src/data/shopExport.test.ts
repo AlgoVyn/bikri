@@ -22,7 +22,7 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     const db = await sample();
     const progress: string[] = [];
     const exported = await buildShopExport(db, {
-      now: NOW,
+      now: NOW + 1000,
       onProgress: (entry) => progress.push(entry.table),
     });
     expect(exported.filename).toMatch(
@@ -31,7 +31,7 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     expect(exported.manifest).toMatchObject({
       format: 'bikri-export',
       version: 2,
-      exported_at: NOW,
+      exported_at: NOW + 1000,
       tenant: { display_name: 'Bikri Mobile' },
     });
     expect(Object.keys(exported.manifest.tables)).toEqual(SHOP_EXPORT_TABLES);
@@ -81,6 +81,36 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     expect(rows.some((row) => row.includes('1000.00'))).toBe(true);
     expect(rows.some((row) => row.includes(',50000,'))).toBe(false);
     expect(rows[0]).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:00/u);
+
+    // A row created after the export start is left out with its children, so a
+    // restore never receives an orphan line.
+    await db.sales.put({
+      id: 'late-sale',
+      invoice_no: 'L-1',
+      business_date: TODAY,
+      created_at: NOW + 2_000,
+    } as never);
+    await db.sale_lines.put({
+      id: 'late-line',
+      sale_id: 'late-sale',
+      created_at: NOW + 2_000,
+    } as never);
+    const later = await buildShopExport(db, { now: NOW + 1_000 });
+    const laterEntries = await unzip(later.bytes);
+    const laterText = new TextDecoder();
+    const laterSales = JSON.parse(
+      laterText.decode(
+        laterEntries.find((entry) => entry.name === 'json/sales.json')?.data,
+      ),
+    ) as { id: string }[];
+    const laterLines = JSON.parse(
+      laterText.decode(
+        laterEntries.find((entry) => entry.name === 'json/sale_lines.json')
+          ?.data,
+      ),
+    ) as { id: string }[];
+    expect(laterSales.map((sale) => sale.id)).not.toContain('late-sale');
+    expect(laterLines.map((line) => line.id)).not.toContain('late-line');
   });
 
   it('hardens CSV cells and converts percent, paisa and timestamp fields', () => {

@@ -5,7 +5,6 @@ import { addCategory, ledgerContext, saveNewProduct } from './catalog.ts';
 import {
   autoMap,
   errorsCsv,
-  IMPORT_CHUNK,
   previewImport,
   runImport,
   TEMPLATE_COLUMNS,
@@ -93,7 +92,8 @@ describe('import spreadsheet (screens/08)', () => {
     });
     expect(performance.now() - started).toBeLessThan(10_000);
     expect(result).toEqual({ created: 1000, updated: 0, skipped: 0 });
-    expect(progress).toHaveLength(1000 / IMPORT_CHUNK);
+    expect(progress.length).toBeGreaterThan(0);
+    expect(progress.at(-1)).toBe(1000);
     expect(await db.products.count()).toBe(1000);
     const opening = await db.stock_movements
 

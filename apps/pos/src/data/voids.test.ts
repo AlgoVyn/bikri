@@ -5,6 +5,7 @@ import {
   addProduct,
   addQuickSale,
   CartNotEmptyError,
+  cartSignature,
   cartTotals,
   emptyCart,
   shopMoney,
@@ -711,7 +712,13 @@ describe('void and reissue branches', () => {
     });
     const overridden = {
       ...cart,
-      overrides: [{ permission: 'sale.void', approved_by: 'st-1' }],
+      overrides: [
+        {
+          permission: 'sale.void',
+          approved_by: 'st-1',
+          bound_cart: cartSignature(cart),
+        },
+      ],
     };
     const total = cartTotals(overridden, shopMoney(null)).total;
     await completeSale(

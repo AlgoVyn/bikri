@@ -190,6 +190,45 @@ function priceLine(line: CartLineInput, method: CostMethod): PricedLine {
   };
 }
 
+/**
+ * Splits a (usually negative) cash rounding across line bases without making a line
+ * negative. A line can only absorb as much negative rounding as its own value; the
+ * remainder is spread over the still-positive lines (07 §1).
+ */
+export function allocateRounding(
+  rounding: number,
+  bases: readonly number[],
+): number[] {
+  const out = bases.map(() => 0);
+  if (rounding === 0) return out;
+  if (rounding > 0) return allocate(rounding, bases);
+  let remaining = -rounding;
+  for (let guard = 0; guard < 8 && remaining > 0; guard += 1) {
+    const capacity = bases.map((base, index) =>
+      Math.max(0, base + (out[index] as number)),
+    );
+    const total = capacity.reduce((sum, value) => sum + value, 0);
+    if (total === 0) break;
+    const parts = allocate(remaining, capacity);
+    let used = 0;
+    for (let index = 0; index < parts.length; index += 1) {
+      const take = Math.min(parts[index] as number, capacity[index] as number);
+      out[index] = (out[index] as number) - take;
+      used += take;
+    }
+    remaining -= used;
+  }
+  if (remaining > 0) {
+    const parts = allocate(
+      remaining,
+      bases.map((base) => Math.max(0, base)),
+    );
+    for (let index = 0; index < parts.length; index += 1)
+      out[index] = (out[index] as number) - (parts[index] as number);
+  }
+  return out;
+}
+
 /** Cart totals, allocations, tax and below-cost flags (07 §2–§3). */
 export function computeCart(input: CartInput): CartResult {
   const taxMode = readTaxMode(input.tax_mode);
@@ -215,7 +254,16 @@ export function computeCart(input: CartInput): CartResult {
   const nets = priced.map((line) => line.net);
   const billAlloc = allocate(billDiscount, nets);
   const taxAlloc = allocate(tax, nets);
-  const roundingAlloc = allocate(rounding, nets);
+  const bases = priced.map((line, index) => {
+    const billPart = billAlloc[index] as number;
+    const taxPart = taxAlloc[index] as number;
+    return taxMode === 'inclusive'
+      ? line.net - billPart
+      : line.net - billPart + taxPart;
+  });
+  let roundingAlloc = allocate(rounding, nets);
+  if (bases.some((base, index) => base + (roundingAlloc[index] as number) < 0))
+    roundingAlloc = allocateRounding(rounding, bases);
 
   const lines: CartLineResult[] = priced.map((line, index) => {
     const billPart = billAlloc[index] as number;

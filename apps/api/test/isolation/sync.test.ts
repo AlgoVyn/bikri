@@ -155,6 +155,7 @@ describe('sync isolation', () => {
     expect(r1.results.map((r) => [r.result, r.error_code])).toEqual([
       ['rejected', 'FOREIGN_KEY'],
       ['rejected', 'FOREIGN_KEY'],
+      ['rejected', 'FOREIGN_KEY'],
     ]);
     expect(r2.results.map((r) => r.error_code)).toEqual(
       r1.results.map((r) => r.error_code),
@@ -220,8 +221,10 @@ describe('sync isolation', () => {
     expect((await pushOk(a.admin, ops)).results.map((r) => r.result)).toEqual([
       'applied',
       'applied',
+      'applied',
     ]);
     expect((await pushOk(b.admin, bOps)).results.map((r) => r.result)).toEqual([
+      'applied',
       'applied',
       'applied',
     ]);
@@ -439,12 +442,49 @@ describe('sync isolation', () => {
           },
           { tx_id: ids.refund },
         ),
+        op(
+          'payments',
+          'insert',
+          {
+            id: newId(now),
+            direction: 'in',
+            method: 'cash',
+            purpose: 'sale',
+            amount: 150000,
+            cash_tendered: 150000,
+            change_given: 0,
+            reference: '',
+            sale_id: ids.sale,
+            refund_id: null,
+            purchase_id: null,
+            supplier_return_id: null,
+            party_type: null,
+            party_id: null,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: IDS.cashier,
+            business_date: '2026-10-27',
+            created_at: now,
+          },
+          { tx_id: ids.sale },
+        ),
       ];
     };
     const firstA = rows(a, 'A');
     const firstB = rows(b, 'B');
-    await pushOk(a.till, [...firstA.slice(0, 6), firstA[8]!, firstA[9]!]);
-    await pushOk(b.till, [...firstB.slice(0, 6), firstB[8]!, firstB[9]!]);
+    await pushOk(a.till, [
+      ...firstA.slice(0, 6),
+      firstA[8]!,
+      firstA[9]!,
+      firstA[10]!,
+    ]);
+    await pushOk(b.till, [
+      ...firstB.slice(0, 6),
+      firstB[8]!,
+      firstB[9]!,
+      firstB[10]!,
+    ]);
     await pushOk(a.till, firstA.slice(6, 8));
     await pushOk(b.till, firstB.slice(6, 8));
 
@@ -537,7 +577,7 @@ describe('sync isolation', () => {
       offline.push(...saleOps(r, r.till, i, { now: roStart - 60_000 }));
     const first = await pushOk(r.till, offline);
     expect(first.results.filter((x) => x.result === 'applied')).toHaveLength(
-      60,
+      90,
     );
     expect(first.tenant_status).toEqual({
       status: 'read_only',
@@ -584,7 +624,11 @@ describe('sync isolation', () => {
       .bind(r.tenantId)
       .run();
     const after = await pushOk(r.till, late);
-    expect(after.results.map((x) => x.result)).toEqual(['applied', 'applied']);
+    expect(after.results.map((x) => x.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
   });
 
   it('I24 / 25: support devices cannot push, can pull and snapshot, stop at expires_at', async () => {

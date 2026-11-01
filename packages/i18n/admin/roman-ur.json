@@ -271,6 +271,7 @@
     "d1_limit": "{{limit}} mein se",
     "usage_total": "7 dinon mein {{value}} qatarein",
     "refresh": "Taaza karein",
-    "owner_email_missing": "Malik ka email darj nahin. Jab tak aap Edit mein shamil nahin karenge, owner email sign-in aur devices ka intezam kaam nahin karega."
+    "owner_email_missing": "Malik ka email darj nahin. Jab tak aap Edit mein shamil nahin karenge, owner email sign-in aur devices ka intezam kaam nahin karega.",
+    "pairing_qr": "Dukaan jorne ka QR code"
   }
 }

@@ -636,14 +636,19 @@ export async function refreshPromises(
       updates.push({ id: promise.id, status: 'broken' });
   }
   if (updates.length === 0) return 0;
-  await writeAction(
-    db,
-    async (w) => {
-      for (const update of updates)
-        await w.update('promises', update.id, { status: update.status });
-    },
-    { now, actor: options.actor },
-  );
+  // Keep every action under the 200-op limit even when a large shop has many
+  // promises going due at once.
+  for (let start = 0; start < updates.length; start += 100) {
+    const chunk = updates.slice(start, start + 100);
+    await writeAction(
+      db,
+      async (w) => {
+        for (const update of chunk)
+          await w.update('promises', update.id, { status: update.status });
+      },
+      { now, actor: options.actor },
+    );
+  }
   return updates.length;
 }
 

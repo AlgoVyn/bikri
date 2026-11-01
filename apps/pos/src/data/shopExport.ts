@@ -220,7 +220,12 @@ export async function buildShopExport(
   const files: { name: string; data: Uint8Array }[] = [];
   const encoder = new TextEncoder();
   for (const [index, table] of SHOP_EXPORT_TABLES.entries()) {
-    const rows = (await db.table(table).toArray()) as Record<string, unknown>[];
+    const all = (await db.table(table).toArray()) as Record<string, unknown>[];
+    // Point-in-time: a row created after the export started is left out of both the
+    // table and its children, so a restore never gets an orphan line.
+    const rows = all.filter(
+      (row) => typeof row.created_at !== 'number' || row.created_at <= now,
+    );
     const clean = rows.map((row) => {
       const copy = { ...row };
       delete copy.tenant_id;

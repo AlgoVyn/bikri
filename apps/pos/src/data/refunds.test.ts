@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobReceipt } from '../print/receiptFiles.ts';
+import { discardFailed } from '../sync/push.ts';
 import { addProduct, addQuickSale, emptyCart } from './cart.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
@@ -649,5 +650,113 @@ describe('refund branches', () => {
         'cash',
       ),
     ).rejects.toMatchObject({ code: 'missing' });
+  });
+});
+
+describe('discarding a rejected refund', () => {
+  it('keeps a valid refund and recomputes the status from the remaining rows', async () => {
+    const { db, ctx, saleId, lines } = await t1Sale();
+    const cable = lines[0];
+    await refundSale(
+      db,
+      {
+        refundId: 'refund-keep',
+        saleId,
+        lines: [{ saleLineId: cable?.id ?? '', qtyMilli: 500, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW + 500,
+    );
+    await refundSale(
+      db,
+      {
+        refundId: 'refund-drop',
+        saleId,
+        lines: [{ saleLineId: cable?.id ?? '', qtyMilli: 500, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW + 600,
+    );
+    const drop = (await db.outbox.toArray()).find(
+      (entry) => entry.row_id === 'refund-drop',
+    );
+    expect(drop?.tx_id).toBeTruthy();
+    await db.outbox
+      .filter((entry) => entry.tx_id === drop?.tx_id)
+      .modify({ status: 'failed' });
+    await discardFailed(db, [drop?.seq as number]);
+    expect(await db.refunds.get('refund-keep')).toBeDefined();
+    expect(await db.refunds.get('refund-drop')).toBeUndefined();
+    expect((await db.sales.get(saleId))?.status).toBe('part_refunded');
+  });
+
+  it('skips the status rebuild when the refund row is already gone', async () => {
+    const { db, ctx, saleId, lines } = await t1Sale();
+    const cable = lines[0];
+    await refundSale(
+      db,
+      {
+        refundId: 'refund-gone',
+        saleId,
+        lines: [{ saleLineId: cable?.id ?? '', qtyMilli: 500, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW + 700,
+    );
+    const entry = (await db.outbox.toArray()).find(
+      (row) => row.row_id === 'refund-gone',
+    );
+    await db.outbox
+      .filter((row) => row.tx_id === entry?.tx_id)
+      .modify({ status: 'failed' });
+    await db.refunds.delete('refund-gone');
+    await discardFailed(db, [entry?.seq as number]);
+    expect(await db.sales.get(saleId)).toBeDefined();
+  });
+
+  it('restores the sale status and removes the refund rows', async () => {
+    const { db, ctx, saleId, lines } = await t1Sale();
+    const cable = lines[0];
+    await refundSale(
+      db,
+      {
+        refundId: 'refund-discard',
+        saleId,
+        lines: [{ saleLineId: cable?.id ?? '', qtyMilli: 1000, restock: true }],
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW + 1000,
+    );
+    expect((await db.sales.get(saleId))?.status).toBe('part_refunded');
+    const refundEntry = (await db.outbox.toArray()).find(
+      (entry) => entry.row_id === 'refund-discard',
+    );
+    expect(refundEntry?.tx_id).toBeTruthy();
+    const tx = refundEntry?.tx_id;
+    await db.outbox
+      .filter((entry) => entry.tx_id === tx)
+      .modify({ status: 'failed' });
+    const seq = (await db.outbox.toArray()).find(
+      (entry) => entry.row_id === 'refund-discard',
+    )?.seq;
+    expect(seq).toBeDefined();
+    await discardFailed(db, [seq as number]);
+    expect(await db.refunds.get('refund-discard')).toBeUndefined();
+    expect(
+      await db.refund_lines.where('refund_id').equals('refund-discard').count(),
+    ).toBe(0);
+    expect((await db.sales.get(saleId))?.status).toBe('paid');
   });
 });

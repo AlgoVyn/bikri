@@ -18,6 +18,7 @@ export type ServerExportTable = { tbl: string; rows: number };
 export type ServerExportStart = {
   export_id: string;
   snapshot_seq: number;
+  exported_at?: number;
   tables: ServerExportTable[];
 };
 
@@ -36,6 +37,7 @@ type Session = {
   done: string[];
   /** A server export token is valid for 2 h (04 §3.8). */
   started_at: number;
+  exported_at: number;
   tenant_id: string;
 };
 
@@ -110,13 +112,18 @@ async function buildOnce(
     session !== null &&
     session.tenant_id === db.tenantId &&
     Date.now() - session.started_at < EXPORT_TTL;
-  if (session && fresh) session = { ...session, after: {}, done: [] };
+  if (session && fresh)
+    session = {
+      ...session,
+      exported_at: session.exported_at ?? Date.now(),
+    };
   else {
     clearServerExportSession();
     const start = await shopRequest<ServerExportStart>(db, staffId, '/export');
     session = {
       export_id: start.export_id,
       snapshot_seq: start.snapshot_seq,
+      exported_at: start.exported_at ?? Date.now(),
       tables: start.tables,
       after: {},
       done: [],
@@ -166,7 +173,7 @@ async function buildOnce(
   const shop = await db.shop.get('shop');
   const displayName =
     tenant?.display_name || String(shop?.name ?? '') || 'Shop';
-  const now = Date.now();
+  const now = session.exported_at;
   const manifest: ShopExportManifest = {
     format: 'bikri-export',
     version: 2,

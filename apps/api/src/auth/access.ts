@@ -81,10 +81,16 @@ export async function verifyAccessJwt(
   if (!keys.has(header.kid)) keys = await loadKeys(url, fetcher); // key rotation: refetch once
   const key = keys.get(header.kid);
   if (!key) return null;
+  let signature: Uint8Array;
+  try {
+    signature = fromBase64url(s);
+  } catch {
+    return null;
+  }
   const ok = await crypto.subtle.verify(
     'RSASSA-PKCS1-v1_5',
     key,
-    fromBase64url(s),
+    signature,
     new TextEncoder().encode(`${h}.${p}`),
   );
   if (!ok) return null;

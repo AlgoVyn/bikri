@@ -1,6 +1,6 @@
 import { businessDate, newId } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -67,18 +67,24 @@ export function ReceivePaymentDialog({
     return d.toISOString().slice(0, 10);
   })();
 
+  // A pull can change the balance while the sheet is open; like the supplier
+  // payment, it is a default for a new payment, not a form value.
+  const balanceAtOpen = useRef(balance);
+  balanceAtOpen.current = balance;
+  const todayAtOpen = useRef(today);
+  todayAtOpen.current = today;
   useEffect(() => {
     if (!open) return;
-    setAmount(Math.max(0, balance));
+    setAmount(Math.max(0, balanceAtOpen.current));
     setMethod('cash');
     setProvider(PROVIDERS[0]);
     setReference('');
-    setDate(today);
+    setDate(todayAtOpen.current);
     setNote('');
     setPaymentId(newId());
     setOverpay(false);
     setPending(false);
-  }, [open, balance, today]);
+  }, [open]);
 
   const after = balance - (amount ?? 0);
   const over = (amount ?? 0) > Math.max(0, balance);

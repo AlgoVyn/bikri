@@ -25,8 +25,8 @@ const textPairs: readonly TokenPair[] = [
   {
     name: 'light text on bg',
     fg: '#0F172A',
-    bg: '#F8FAFC',
-    ratio: 17.06,
+    bg: '#F1F5F9',
+    ratio: 16.3,
     needed: 4.5,
   },
   {
@@ -39,8 +39,8 @@ const textPairs: readonly TokenPair[] = [
   {
     name: 'light text-muted on bg',
     fg: '#475569',
-    bg: '#F8FAFC',
-    ratio: 7.24,
+    bg: '#F1F5F9',
+    ratio: 6.92,
     needed: 4.5,
   },
   {
@@ -60,8 +60,8 @@ const textPairs: readonly TokenPair[] = [
   {
     name: 'light primary on bg',
     fg: '#006BB3',
-    bg: '#F8FAFC',
-    ratio: 5.35,
+    bg: '#F1F5F9',
+    ratio: 5.11,
     needed: 4.5,
   },
   {
@@ -87,16 +87,16 @@ const textPairs: readonly TokenPair[] = [
   },
   {
     name: 'light danger on white',
-    fg: '#DC2626',
+    fg: '#B91C1C',
     bg: '#FFFFFF',
-    ratio: 4.83,
+    ratio: 6.47,
     needed: 4.5,
   },
   {
     name: 'light white on danger',
     fg: '#FFFFFF',
-    bg: '#DC2626',
-    ratio: 4.83,
+    bg: '#B91C1C',
+    ratio: 6.47,
     needed: 4.5,
   },
   {
@@ -291,8 +291,8 @@ const textPairs: readonly TokenPair[] = [
   {
     name: 'light danger-ink on danger',
     fg: '#FFFFFF',
-    bg: '#DC2626',
-    ratio: 4.83,
+    bg: '#B91C1C',
+    ratio: 6.47,
     needed: 4.5,
   },
   {
@@ -326,22 +326,22 @@ const textPairs: readonly TokenPair[] = [
   {
     name: 'dark rail ink on rail',
     fg: '#F1F5F9',
-    bg: '#0B1729',
-    ratio: 16.4,
+    bg: '#1D3357',
+    ratio: 11.52,
     needed: 4.5,
   },
   {
     name: 'dark rail-muted on rail',
-    fg: '#9FB0C9',
-    bg: '#0B1729',
-    ratio: 8.15,
+    fg: '#A9B8CE',
+    bg: '#1D3357',
+    ratio: 6.27,
     needed: 4.5,
   },
   {
     name: 'dark rail-active on rail',
     fg: '#4BC2BF',
-    bg: '#0B1729',
-    ratio: 8.36,
+    bg: '#1D3357',
+    ratio: 5.87,
     needed: 4.5,
   },
 ];

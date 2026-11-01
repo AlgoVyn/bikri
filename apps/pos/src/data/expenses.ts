@@ -197,7 +197,7 @@ export type ExpenseOptions = {
   role: Role;
   today: string;
   now?: number;
-  override?: { approved_by: string } | null;
+  override?: { approved_by: string; amount: number } | null;
 };
 
 /** Adds an expense; a cashier is limited to cash ≤ Rs 2,000 unless a manager approves. */
@@ -225,8 +225,8 @@ export async function createExpense(
   if (!category || category.deleted_at) throw new ExpenseError('category');
   if (
     options.role === 'cashier' &&
-    !options.override &&
-    (input.method !== 'cash' || input.amount > CASHIER_EXPENSE_LIMIT)
+    (input.method !== 'cash' || input.amount > CASHIER_EXPENSE_LIMIT) &&
+    options.override?.amount !== input.amount
   )
     throw new ExpenseError('limit');
   const now = options.now ?? Date.now();
@@ -258,6 +258,7 @@ export async function createExpense(
           after_json: JSON.stringify({
             permission: 'expense.create',
             approved_by: options.override.approved_by,
+            amount: options.override.amount,
           }),
           device_id: ctx.device_id,
           staff_id: ctx.staff_id,

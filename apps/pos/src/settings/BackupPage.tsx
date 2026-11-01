@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { CloudIcon } from '../components/icons.tsx';
@@ -16,6 +16,7 @@ import {
 } from '../data/shopExport.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadBlob } from '../print/receiptImage.ts';
+import { rememberPersistentStorage } from '../pwa/persist.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { OwnerSigninRequired } from '../sync/shopApi.ts';
 import { SettingsPageLayout } from './Layout.tsx';
@@ -52,6 +53,14 @@ function BackupContent() {
   const [serverBuilding, setServerBuilding] = useState(false);
   const [serverDone, setServerDone] = useState<string | null>(null);
   const [serverProgress, setServerProgress] = useState<string | null>(null);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  useEffect(() => {
+    void navigator.storage?.persisted?.().then((value) => setPersisted(value));
+  }, []);
+  const askPersist = async () => {
+    await rememberPersistentStorage();
+    setPersisted((await navigator.storage?.persisted?.()) ?? false);
+  };
 
   if (!can('export.data') || role !== 'owner')
     return (
@@ -117,6 +126,21 @@ function BackupContent() {
 
   return (
     <SettingsPageLayout title={t('office.backup.title')} icon={<CloudIcon />}>
+      {persisted === false ? (
+        <div
+          role="status"
+          className="rounded-card border border-warning-subtle bg-warning-subtle p-3 text-small text-warning-subtle-ink"
+        >
+          <p>{t('office.backup.persist_warning')}</p>
+          <button
+            type="button"
+            className={`${buttonQuiet} mt-2`}
+            onClick={() => void askPersist()}
+          >
+            {t('office.backup.persist_ask')}
+          </button>
+        </div>
+      ) : null}
       <section className="rounded-card border border-border bg-surface p-4">
         <p>{t('office.backup.nightly')}</p>
         <p className="mt-1 text-small text-text-muted">

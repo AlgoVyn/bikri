@@ -72,12 +72,14 @@ describe('item columns (06 §4.1)', () => {
         name: 'Rice bag',
         qty: '12.345',
         amount: 'Rs 12,34,56,789.00',
+        detail: 'Rs 1,00,000 each - less Rs 2,000',
       },
       48,
       'columns',
     );
     expect(lines.join('\n')).toContain('12.345');
     expect(lines.join('\n')).toContain('Rs 12,34,56,789.00');
+    expect(lines.join('\n')).toContain('Rs 1,00,000 each - less Rs 2,000');
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(48);
   });
 

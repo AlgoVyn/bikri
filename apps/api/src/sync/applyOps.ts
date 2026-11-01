@@ -735,6 +735,72 @@ function checkStockMovement(
   )
     throw new Reject('CONSTRAINT_FAILED');
 }
+/** Sales are reconciled with their lines, payments and udhaar ledger row (07 §2). */
+function checkSaleInsert(group: PushOp[], row: Record<string, unknown>): void {
+  const n = (value: unknown) => Number(value ?? 0);
+  const lines = linkedInGroup(group, 'sale_lines', 'sale_id', String(row.id));
+  if (lines.length === 0) throw new Reject('CONSTRAINT_FAILED');
+  if (n(row.line_count) !== lines.length) throw new Reject('CONSTRAINT_FAILED');
+  if (
+    lines.reduce((sum, line) => sum + n(line.qty_milli), 0) !==
+    n(row.items_qty_milli)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+  for (const line of lines) {
+    for (const field of ['gross', 'discount', 'net'] as const) {
+      if (n(line[field]) < 0) throw new Reject('CONSTRAINT_FAILED');
+    }
+    if (n(line.qty_milli) <= 0 || n(line.unit_price) < 0)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  const sum = (field: string) =>
+    lines.reduce((total, line) => total + n(line[field]), 0);
+  if (sum('gross') !== n(row.gross_total))
+    throw new Reject('CONSTRAINT_FAILED');
+  if (sum('discount') !== n(row.item_discount_total))
+    throw new Reject('CONSTRAINT_FAILED');
+  if (sum('net') !== n(row.subtotal)) throw new Reject('CONSTRAINT_FAILED');
+  for (const field of [
+    'total',
+    'paid_total',
+    'udhaar_amount',
+    'tax',
+    'bill_discount',
+  ] as const) {
+    if (n(row[field]) < 0) throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (n(row.tax_rate_bp) < 0) throw new Reject('CONSTRAINT_FAILED');
+
+  const payments = group.filter(
+    (candidate) =>
+      candidate.tbl === 'payments' &&
+      candidate.kind === 'insert' &&
+      candidate.row?.sale_id === row.id &&
+      candidate.row?.purpose === 'sale' &&
+      candidate.row?.direction === 'in',
+  );
+  const paid = payments.reduce(
+    (total, candidate) => total + n(candidate.row?.amount),
+    0,
+  );
+  if (paid !== n(row.paid_total)) throw new Reject('CONSTRAINT_FAILED');
+
+  const udhaar = n(row.udhaar_amount);
+  const ledger = group.filter(
+    (candidate) =>
+      candidate.tbl === 'ledger_entries' &&
+      candidate.kind === 'insert' &&
+      candidate.row?.source_type === 'sale' &&
+      candidate.row?.source_id === row.id,
+  );
+  if (udhaar > 0) {
+    if (ledger.length !== 1 || n(ledger[0]?.row?.amount) !== udhaar)
+      throw new Reject('CONSTRAINT_FAILED');
+  } else if (ledger.length !== 0) {
+    throw new Reject('CONSTRAINT_FAILED');
+  }
+}
+
 function checkOp(
   ctx: ApplyContext,
   look: Lookups,
@@ -814,20 +880,7 @@ function checkOp(
           Number(invoice[2]) !== Number(row.invoice_seq)
         )
           throw new Reject('CONSTRAINT_FAILED');
-        const lines = linkedInGroup(
-          group,
-          'sale_lines',
-          'sale_id',
-          String(row.id),
-        );
-        if (lines.length === 0) throw new Reject('CONSTRAINT_FAILED');
-        if (Number(row.line_count) !== lines.length)
-          throw new Reject('CONSTRAINT_FAILED');
-        if (
-          lines.reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0) !==
-          Number(row.items_qty_milli)
-        )
-          throw new Reject('CONSTRAINT_FAILED');
+        checkSaleInsert(group, row);
         break;
       }
       case 'ledger_entries':
@@ -890,6 +943,7 @@ function checkOp(
         break;
       }
       case 'expenses': {
+        if (Number(row.amount) === 0) throw new Reject('CONSTRAINT_FAILED');
         const over = overrideFor(
           group,
           'expenses',
@@ -937,11 +991,18 @@ function checkOp(
         break;
       case 'purchases':
         if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
+        if (Number(row.total) < 0 || Number(row.other_charges) < 0)
+          throw new Reject('CONSTRAINT_FAILED');
         break;
       case 'cash_moves':
         if (!allowed('cash.move')) throw new Reject('FORBIDDEN');
         break;
       case 'payments': {
+        if (Number(row.amount) <= 0) throw new Reject('CONSTRAINT_FAILED');
+        if (!['in', 'out'].includes(String(row.direction)))
+          throw new Reject('CONSTRAINT_FAILED');
+        if (!['cash', 'card', 'bank_wallet'].includes(String(row.method)))
+          throw new Reject('CONSTRAINT_FAILED');
         const purpose = String(row.purpose);
         const ok =
           purpose === 'supplier_payment' ||
@@ -1212,10 +1273,11 @@ function planOp(
     ),
   ];
   if (merge) {
+    const conflictId = newId(now);
     stmts.push(
       db.prepare(
         "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, base_rev, server_rev, fields_json, resolution, at) SELECT ?1, ?2, ?3, ?4, ?5, 'field_merge', ?6, ?7, ?8, 'merged', ?9 WHERE changes() = 1",
-        newId(now),
+        conflictId,
         op.op_id,
         tbl,
         id,
@@ -1223,6 +1285,16 @@ function planOp(
         cur.rev,
         JSON.stringify(op.changed_fields ?? []),
         now,
+      ),
+      // Other conflict kinds log themselves; a field merge must reach existing tills too.
+      changeLog(
+        db,
+        'sync_conflicts',
+        conflictId,
+        'upsert',
+        deviceId,
+        now,
+        true,
       ),
     );
   }

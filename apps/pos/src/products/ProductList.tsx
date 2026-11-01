@@ -113,13 +113,16 @@ export function ProductList({
       },
     });
   }
-  more.push({
-    label: t('products.export_csv'),
-    disabled: !rows || rows.length === 0,
-    onSelect: () => {
-      if (rows) downloadText('bikri-products.csv', productsCsv(rows, showCost));
-    },
-  });
+  if (can('export.data')) {
+    more.push({
+      label: t('products.export_csv'),
+      disabled: !rows || rows.length === 0,
+      onSelect: () => {
+        if (rows)
+          downloadText('bikri-products.csv', productsCsv(rows, showCost));
+      },
+    });
+  }
   if (canEdit) {
     more.push(
       { label: t('import.button'), to: '/products/import' },

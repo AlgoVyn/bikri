@@ -105,7 +105,8 @@
     "share_failed": "Raseed ki tasveer nahin ban saki. Dobara koshish karein.",
     "share_whatsapp": "WhatsApp par bhejein",
     "paid": "Ada",
-    "customer": "Gahak"
+    "customer": "Gahak",
+    "share_blocked": "WhatsApp kholne ke liye is site ki pop-up ki ijazat dein, ya download shuda tasveer attach karein."
   },
   "enrol": {
     "needed": "Ye till abhi kisi dukaan se munsalik nahin. Pairing code se jorein.",
@@ -1029,7 +1030,8 @@
     "import_go": "Import karein",
     "import_running": "Import ho raha hai… {{total}} mein se {{done}}",
     "import_done": "Import mukammal: {{applied}} qabool, {{rejected}} mustarad.",
-    "import_no_file": "Koi file muntakhib nahin"
+    "import_no_file": "Koi file muntakhib nahin",
+    "move_pending": "Is device ko move karne se pehle baqi tabdeeliyan sync karein."
   },
   "syncpage": {
     "title": "Sync",
@@ -1055,7 +1057,10 @@
     "conflict_over_refund": "Bill se zyada wapsi",
     "conflict_refund_after_void": "Bill mansookh hone ke baad wapsi",
     "conflict_over_return": "Wusool se zyada wapas kiya",
-    "pull_errors": "{{count}} qatarein apply nahin ho sakin; sync jaari raha."
+    "pull_errors": "{{count}} qatarein apply nahin ho sakin; sync jaari raha.",
+    "discard_title": "Yeh tabdeeli discard karein?",
+    "discard_body": "Yeh {{what}} is till se mustaqil tor par hat jayegi aur server tak kabhi nahi pohanchegi.",
+    "discard_confirm": "Discard"
   },
   "lock": {
     "who": "Kaun bech raha hai?",

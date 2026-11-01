@@ -261,7 +261,9 @@ export function SetupWizard() {
         await navigate({ to: '/' });
         return;
       }
-      throw error;
+      // Never rethrow from a `void finish(...)` handler: the wizard would stop
+      // silently and the owner would not know the shop was not saved.
+      toast.push(t('errors.generic'), 'error');
     } finally {
       setBusy(false);
     }

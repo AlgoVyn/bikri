@@ -108,7 +108,7 @@ describe('expenses and cash moves (T-046)', () => {
         role: 'cashier',
         today: TODAY,
         now: NOW + 1000,
-        override: { approved_by: 'st-1' },
+        override: { approved_by: 'st-1', amount: 250000 },
       },
     );
     expect(allowed.id).toBe('big-override');

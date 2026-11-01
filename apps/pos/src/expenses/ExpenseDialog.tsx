@@ -1,6 +1,6 @@
 import { businessDate, newId } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
@@ -50,14 +50,16 @@ export function ExpenseDialog({
   const [note, setNote] = useState('');
   const [date, setDate] = useState(today);
   const [expenseId, setExpenseId] = useState(() => newId());
-  const [override, setOverride] = useState<string | null>(null);
+  const [override, setOverride] = useState<{
+    approved_by: string;
+    amount: number;
+  } | null>(null);
   const [approving, setApproving] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setCategoryId(categories[0]?.id ?? '');
     setAmount(null);
     setMethod('cash');
     setPayee('');
@@ -67,7 +69,24 @@ export function ExpenseDialog({
     setOverride(null);
     setApproving(false);
     setPending(false);
-  }, [open, today, categories]);
+  }, [open, today]);
+
+  // The category list can arrive after the dialog opens (or change when the owner
+  // adds one inside this form); only fill the first choice on open (or an empty
+  // choice later), never reset the rest of the form.
+  const openedOnce = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      openedOnce.current = false;
+      return;
+    }
+    if (!openedOnce.current) {
+      setCategoryId(categories[0]?.id ?? '');
+      openedOnce.current = true;
+      return;
+    }
+    setCategoryId((current) => current || (categories[0]?.id ?? ''));
+  }, [open, categories]);
 
   const minDate = (() => {
     const d = new Date(`${today}T00:00:00Z`);
@@ -78,7 +97,7 @@ export function ExpenseDialog({
     role === 'cashier' &&
     (method !== 'cash' || (amount ?? 0) > CASHIER_EXPENSE_LIMIT);
 
-  const save = async (approvedBy: string | null) => {
+  const save = async () => {
     if (!amount || amount <= 0 || !categoryId || pending) return;
     setPending(true);
     try {
@@ -99,7 +118,7 @@ export function ExpenseDialog({
         {
           role,
           today,
-          override: approvedBy ? { approved_by: approvedBy } : null,
+          override: override ? { ...override } : null,
         },
       );
       toast.push(t('office.expenses.expense_saved'));
@@ -178,7 +197,10 @@ export function ExpenseDialog({
                   type="button"
                   aria-pressed={method === m}
                   className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-                  onClick={() => setMethod(m)}
+                  onClick={() => {
+                    setMethod(m);
+                    setOverride(null);
+                  }}
                 >
                   {t(`payment.${m}`)}
                 </button>
@@ -243,7 +265,7 @@ export function ExpenseDialog({
               pending ||
               (overLimit && !override)
             }
-            onClick={() => void save(override)}
+            onClick={() => void save()}
           >
             {t('office.expenses.save')}
           </button>
@@ -264,7 +286,7 @@ export function ExpenseDialog({
         body={t('office.expenses.override_body')}
         onApproved={(approvedBy) => {
           setApproving(false);
-          setOverride(approvedBy);
+          setOverride({ approved_by: approvedBy, amount: amount ?? 0 });
         }}
       />
       <CategoryDialog

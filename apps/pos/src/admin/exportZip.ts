@@ -15,6 +15,7 @@ async function readTable(
   tbl: string,
   total: number,
   onProgress: (progress: ExportProgress) => void,
+  before: number,
 ): Promise<Record<string, unknown>[]> {
   if (total === 0) {
     onProgress({ tbl, done: 0, total: 0 });
@@ -23,7 +24,7 @@ async function readTable(
   const rows: Record<string, unknown>[] = [];
   let after = '';
   for (let guard = 0; guard < 100_000; guard += 1) {
-    const page = await exportPage(tenantId, tbl, after, EXPORT_PAGE);
+    const page = await exportPage(tenantId, tbl, after, EXPORT_PAGE, before);
     rows.push(...page.rows);
     onProgress({
       tbl,
@@ -43,15 +44,21 @@ export async function buildTenantExport(
   tenantId: string,
   onProgress: (progress: ExportProgress) => void,
 ): Promise<BuiltExport> {
-  const start: ExportStart = await exportStart(tenantId);
+  const exportedAt = Date.now();
+  const start: ExportStart = await exportStart(tenantId, exportedAt);
   const encoder = new TextEncoder();
   const collected: { tbl: string; rows: Record<string, unknown>[] }[] = [];
   for (const table of start.tables) {
     onProgress({ tbl: table.tbl, done: 0, total: table.rows });
-    const rows = await readTable(tenantId, table.tbl, table.rows, onProgress);
+    const rows = await readTable(
+      tenantId,
+      table.tbl,
+      table.rows,
+      onProgress,
+      exportedAt,
+    );
     collected.push({ tbl: table.tbl, rows });
   }
-  const exportedAt = Date.now();
   const manifest = {
     format: 'bikri-export',
     version: 1,

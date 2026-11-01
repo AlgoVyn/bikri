@@ -105,7 +105,8 @@
     "share_failed": "Could not make the receipt picture. Try again.",
     "share_whatsapp": "Send on WhatsApp",
     "paid": "Paid",
-    "customer": "Customer"
+    "customer": "Customer",
+    "share_blocked": "Allow pop-ups for this site to open WhatsApp, or attach the downloaded picture."
   },
   "enrol": {
     "needed": "This till is not part of a shop yet. Enrol it with a pairing code.",
@@ -1029,7 +1030,8 @@
     "import_go": "Import",
     "import_running": "Importing… {{done}} of {{total}}",
     "import_done": "Imported: {{applied}} accepted, {{rejected}} rejected.",
-    "import_no_file": "No file chosen"
+    "import_no_file": "No file chosen",
+    "move_pending": "Sync the waiting changes before moving this device."
   },
   "syncpage": {
     "title": "Sync",
@@ -1055,7 +1057,10 @@
     "conflict_over_refund": "Refunded more than the bill",
     "conflict_refund_after_void": "Refund after the bill was voided",
     "conflict_over_return": "Returned more than received",
-    "pull_errors": "{{count}} rows could not be applied; sync continued."
+    "pull_errors": "{{count}} rows could not be applied; sync continued.",
+    "discard_title": "Discard this change?",
+    "discard_body": "This permanently removes {{what}} from this till. It will never reach the server.",
+    "discard_confirm": "Discard"
   },
   "lock": {
     "who": "Who's selling?",

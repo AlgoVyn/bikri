@@ -50,6 +50,12 @@ export const DEXIE_SCHEMA_V1 = {
   pull_shadow: '[tbl+id]',
 } as const;
 
+/** Local-only index additions (print history by document); upgrades existing tills in place. */
+export const DEXIE_SCHEMA_V2 = {
+  ...DEXIE_SCHEMA_V1,
+  print_jobs: 'id, sale_id, refund_id, status, created_at',
+} as const;
+
 export type DexieTableName = keyof typeof DEXIE_SCHEMA_V1;
 
 export const LOCAL_ONLY_TABLES = [
@@ -101,6 +107,8 @@ export type OutboxEntry = {
   updated_by?: string | null;
   created_at: number;
   status: OutboxStatus;
+  /** When this tab claimed the row for a push; a live claim is never stolen by another tab. */
+  sending_at?: number;
   attempts: number;
   last_error?: string;
 };
@@ -135,8 +143,23 @@ export type CartLine = {
   unit?: string;
 };
 
-/** A manager approval given on this cart (05 §4.1); written to audit_log with the sale. */
-export type CartOverride = { permission: string; approved_by: string };
+/**
+ * A manager approval given on this cart (05 §4.1); written to audit_log with the sale.
+ * The bound fields make the approval apply only to the cart/amount it was given for:
+ * changing the lines, discount, customer or price asks for a fresh PIN.
+ */
+export type CartOverride = {
+  permission: string;
+  approved_by: string;
+  approved_at?: number;
+  /** `cartSignature` of the cart at approval time (all permissions except catalog.edit). */
+  bound_cart?: string;
+  /** The udhaar part the manager approved (udhaar.hard_limit). */
+  bound_udhaar?: number;
+  /** Line key and price approved for a below-list price (catalog.edit). */
+  bound_line?: string;
+  bound_price?: number;
+};
 
 /** A cart opened by "Void & reissue": on payment the old bill is voided in the same action. */
 export type CartReissue = { sale_id: string; void_id: string; reason: string };
@@ -234,6 +257,7 @@ export class BikriDb extends Dexie {
     super(tenantDbName(tenantId), options);
     this.tenantId = tenantId;
     this.version(1).stores(DEXIE_SCHEMA_V1);
+    this.version(2).stores(DEXIE_SCHEMA_V2);
   }
 }
 

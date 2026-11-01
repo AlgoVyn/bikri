@@ -267,6 +267,11 @@ export function formatItemLines(
         charsPerLine,
       ),
     );
+    if (item.detail !== undefined && item.detail.length > 0) {
+      const detailWidth = Math.max(1, charsPerLine - 2);
+      for (const detailLine of wrapText(item.detail, detailWidth))
+        lines.push(`  ${detailLine}`);
+    }
     return lines;
   }
   const wrapped =

@@ -158,12 +158,14 @@ export function statusChangeAllowed(
   to: TenantStatus,
 ): boolean {
   if (from === to) return false;
-  if (to === 'read_only') return from === 'active' || from === 'suspended';
+  if (to === 'read_only')
+    return from === 'active' || from === 'suspended' || from === 'maintenance';
   if (to === 'active')
     return (
       from === 'read_only' || from === 'suspended' || from === 'maintenance'
     );
-  if (to === 'suspended') return from === 'active' || from === 'read_only';
+  if (to === 'suspended')
+    return from === 'active' || from === 'read_only' || from === 'maintenance';
   if (to === 'maintenance')
     return from === 'active' || from === 'read_only' || from === 'suspended';
   if (to === 'deleting') return from !== 'deleted' && from !== 'deleting';

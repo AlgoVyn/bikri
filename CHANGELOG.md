@@ -46,6 +46,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Free-tier measurement: ~117 rows and ~1.9 KB permanent growth per bill, ~153 MB per shop-year including steady-state sync tables; start a new shard around 450 MB per database. See [D-127](docs/decisions.md).
 - Accessibility sweep: axe on every selling/back-office/settings route in English and the Urdu core journey, no serious/critical violations.
 
+### Review remediation (2026-11-02)
+- Restore validates the manifest and every table file/count before purging; discarding a rejected op now confirms, recomputes the bill status, and the Sync screen only reclaims stale push claims.
+- Manager approvals are bound to the cart/udhaar/price they approved; hard-limit and discount checks run again when the sale is written.
+- Pushes reconcile sale lines, payments and udhaar; pulls validate rows and quarantine unique collisions; exports are cut off at their start time.
+- A branch move is blocked while the device has waiting ops; maintenance can return to read-only or suspended.
+- Products exports follow `export.data`; promise/import writes chunk by op cost; reports aggregate in a worker; field-merge conflicts reach pull; WhatsApp share opens its tab synchronously; the operator pairing panel shows a QR.
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.
