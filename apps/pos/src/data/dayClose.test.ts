@@ -93,25 +93,57 @@ describe('day close (T-047)', () => {
         purpose: 'sale',
         created_at: NOW - 800,
       }),
+      payment('bank-in', {
+        method: 'bank_wallet',
+        amount: 400000,
+        purpose: 'sale',
+        created_at: NOW - 790,
+      }),
+      payment('bank-void', {
+        direction: 'out',
+        method: 'bank_wallet',
+        amount: 100000,
+        purpose: 'void',
+        created_at: NOW - 780,
+      }),
     ]);
-    await db.refunds.add({
-      id: 'refund-live',
-      sale_id: 's-live',
-      method: 'card',
-      amount: 50000,
-      udhaar_part: 20000,
-      device_id: 'dev-1',
-      business_date: TODAY,
-      created_at: NOW - 700,
-    } as SyncedRow);
+    await db.refunds.bulkAdd([
+      {
+        id: 'refund-live',
+        sale_id: 's-live',
+        method: 'card',
+        amount: 50000,
+        udhaar_part: 20000,
+        device_id: 'dev-1',
+        business_date: TODAY,
+        created_at: NOW - 700,
+      } as SyncedRow,
+      {
+        id: 'refund-bank',
+        sale_id: 's-live',
+        method: 'bank_wallet',
+        amount: 30000,
+        udhaar_part: 0,
+        device_id: 'dev-1',
+        business_date: TODAY,
+        created_at: NOW - 690,
+      } as SyncedRow,
+    ]);
     const info = await dayCloseInfo(db, 'dev-1', NOW - 10000, NOW);
     expect(info).toMatchObject({
       cardTotal: 250000,
-      bankTotal: 0,
+      bankTotal: 270000,
       udhaarGiven: 80000,
       bills: 1,
-      refunds: 1,
+      refunds: 2,
     });
+  });
+
+  it('first close without an opening override opens at zero', async () => {
+    const { db } = await setup('first-zero');
+    const data = await dayCloseData(db, 'dev-1', NOW);
+    expect(data.openingCash).toBe(0);
+    expect(data.firstClose).toBe(true);
   });
 
   it('AC 1: vector D1 stores the exact components and difference', async () => {

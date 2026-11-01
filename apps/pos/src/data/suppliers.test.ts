@@ -159,6 +159,93 @@ describe('suppliers and deliveries (T-045)', () => {
     expect(statement.rows.at(-1)?.balance).toBe(0);
   });
 
+  it('search is optional, the header total stays shop-wide, and deleted/empty rows are refused', async () => {
+    const { db, ctx } = await setup('list-extra');
+    const alpha = await createSupplier(
+      db,
+      { name: 'Alpha', phone: '+92 300 1112223' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const charlie = await createSupplier(
+      db,
+      { name: 'Charlie' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const delta = await createSupplier(
+      db,
+      { name: 'Delta', opening: 5000 },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const all = await supplierList(db);
+    const charlieRow = all.rows.find((row) => row.supplier.id === charlie.id);
+    expect(charlieRow?.lastDeliveryDate).toBeNull();
+    expect(suppliersCsv([charlieRow as never])).toContain('Charlie,,0,');
+    expect((await supplierList(db, { query: '' })).rows).toHaveLength(3);
+    expect(
+      (await supplierList(db, { query: '0300 111' })).rows.map(
+        (row) => row.supplier.name,
+      ),
+    ).toEqual(['Alpha']);
+    const none = await supplierList(db, { query: 'zzz' });
+    expect(none.rows).toEqual([]);
+    expect(none.totalOwed).toBe(all.totalOwed);
+    const statement = await supplierStatement(db, delta.id);
+    expect(statement.rows[0]?.kind).toBe('opening');
+    // A supplier refund is a positive ledger row and a 'refund' statement kind.
+    const refundId = 'supplier-refund';
+    await db.payments.add({
+      id: refundId,
+      direction: 'in',
+      method: 'cash',
+      purpose: 'supplier_refund',
+      amount: 5000,
+      party_type: 'supplier',
+      party_id: delta.id,
+      business_date: '2026-10-15',
+      created_at: NOW + 3000,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+    } as never);
+    await db.ledger_entries.add({
+      id: 'le-refund',
+      party_type: 'supplier',
+      party_id: delta.id,
+      amount: 5000,
+      source_type: 'payment',
+      source_id: refundId,
+      business_date: '2026-10-15',
+      created_at: NOW + 3000,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+    } as never);
+    expect(
+      (await supplierStatement(db, delta.id)).rows.some(
+        (entry) => entry.kind === 'refund',
+      ),
+    ).toBe(true);
+    await expect(
+      deleteSupplier(db, delta.id, 'st-1', NOW + 4000),
+    ).rejects.toBeInstanceOf(SupplierBalanceError);
+    await expect(
+      createSupplier(db, { name: '   ' }, ctx, 'st-1', NOW),
+    ).rejects.toThrow('name');
+    await expect(
+      createSupplier(db, { name: 'Neg', opening: -1 }, ctx, 'st-1', NOW),
+    ).rejects.toThrow('non-negative');
+    await expect(
+      updateSupplier(db, 'missing', { name: 'X' }, 'st-1', NOW),
+    ).rejects.toThrow('supplier not found');
+    expect(alpha.id).not.toBe(charlie.id);
+  });
+
   it('AC 2/3: paid now 5,500 cash is a supplier payment and reduces the balance and expected cash', async () => {
     const { db, ctx } = await setup('paid');
     const item = await product(db, ctx);

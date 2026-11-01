@@ -193,6 +193,80 @@ describe('return to supplier (screens/13 ACs 6–8, 07 §10)', () => {
     expect(again).toEqual(returned);
   });
 
+  it('rejects invalid lines, credits and refunds with the documented codes', async () => {
+    const { db } = await setup('errors-a');
+    const { on_hand_milli: _ignored, ...free } = product(
+      'free',
+      'Free',
+      0,
+      1000,
+    );
+    await db.products.add(free as never);
+    const { on_hand_milli: _cableStock, ...cable } = product(
+      'cable',
+      'Cable',
+      35000,
+      1000,
+    );
+    await db.products.add(cable as never);
+    const code = async (input: Record<string, unknown>) => {
+      try {
+        await planSupplierReturn(
+          db,
+          input as Parameters<typeof planSupplierReturn>[1],
+        );
+        return null;
+      } catch (error) {
+        return error instanceof SupplierReturnError ? error.code : 'other';
+      }
+    };
+    const base = {
+      supplierId: 'sup-1',
+      reason: 'Unsold',
+      refundReceived: 0,
+      refundMethod: null,
+    };
+    expect(
+      await code({ ...base, lines: [{ productId: 'free', qtyMilli: 1000 }] }),
+    ).toBe('total');
+    expect(
+      await code({ ...base, lines: [{ productId: 'gone', qtyMilli: 1000 }] }),
+    ).toBe('supplier');
+    expect(
+      await code({ ...base, lines: [{ productId: 'free', qtyMilli: 0 }] }),
+    ).toBe('qty');
+    expect(
+      await code({
+        ...base,
+        lines: [{ productId: 'free', qtyMilli: 1000, unitCredit: -1 }],
+      }),
+    ).toBe('cost');
+    expect(
+      await code({
+        ...base,
+        lines: [{ productId: 'cable', qtyMilli: 1000 }],
+        refundReceived: 40000,
+        refundMethod: 'cash',
+      }),
+    ).toBe('refund');
+    expect(
+      await code({
+        ...base,
+        lines: [{ productId: 'cable', qtyMilli: 1000 }],
+        refundReceived: 1000,
+        refundMethod: null,
+      }),
+    ).toBe('method');
+    expect(
+      await code({
+        ...base,
+        lines: [{ productId: 'cable', qtyMilli: 1000 }],
+        reason: '',
+      }),
+    ).toBe('reason');
+    expect(await code({ ...base, lines: [] })).toBe('lines');
+  });
+
   it('S2: no linked delivery, supplier pays Rs 550 cash and day close sees it', async () => {
     const { db, ctx } = await setup('s2');
     const { on_hand_milli: _ignored, ...p } = product(

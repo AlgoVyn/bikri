@@ -7,6 +7,7 @@ import {
   billDetail,
   rangeFor,
   salesCsv,
+  salesFilterOptions,
   salesHistory,
   shopTimeZone,
 } from './salesHistory.ts';
@@ -149,6 +150,47 @@ describe('sales history (screens/10)', () => {
     const all = await salesHistory(db, day);
     expect(all.summary.refunds).toBe(346000);
     expect(all.summary.sold).toBe(4200000 + 4300000 - 346000);
+
+    // Each remaining filter also narrows the refund deduction to visible bills.
+    for (const filter of [
+      { method: 'cash' as const },
+      { status: 'part_refunded' as const },
+      { query: 'earbuds' },
+      { staffId: 'st-1' },
+      { branchId: 'br-1' },
+    ]) {
+      const narrowed = await salesHistory(db, { ...day, ...filter });
+      expect(narrowed.summary.refunds, JSON.stringify(filter)).toBe(346000);
+    }
+  });
+
+  it('filters the staff and device pickers to active, named rows', async () => {
+    const { db } = await shopWithStock('filter-options');
+    await db.staff.bulkAdd([
+      {
+        id: 'st-off',
+        name: 'Off duty',
+        role: 'cashier',
+        active: 0,
+        deleted_at: null,
+      },
+      {
+        id: 'st-gone',
+        name: 'Gone',
+        role: 'cashier',
+        active: 1,
+        deleted_at: NOW,
+      },
+    ] as never);
+    await db.devices.bulkAdd([
+      { id: 'dev-named', name: 'Counter 1', device_code: 'A' },
+      { id: 'dev-blank', name: '', device_code: 'B' },
+    ] as never);
+    const options = await salesFilterOptions(db);
+    expect(options.staff.map((row) => row.id)).toEqual(['st-1']);
+    expect(options.staff.some((row) => row.name === 'undefined')).toBe(false);
+    expect(options.devices.some((row) => row.id === 'dev-named')).toBe(true);
+    expect(options.devices.some((row) => row.id === 'dev-blank')).toBe(false);
   });
 
   it('exports the documented CSV header and one row per bill', async () => {

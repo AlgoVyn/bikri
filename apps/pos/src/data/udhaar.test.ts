@@ -485,6 +485,13 @@ describe('udhaar data', () => {
 });
 
 describe('udhaar branch coverage', () => {
+  it('returns an empty chase list when nobody owes', async () => {
+    const { db } = await setup('chase-empty');
+    const list = await chaseList(db, { today: TODAY, now: NOW });
+    expect(list.groups).toEqual([]);
+    expect(list.total).toBe(0);
+  });
+
   it('filters over limit and promises due, and sorts by age/activity', async () => {
     const { db, ctx } = await setup('filters');
     const ali = await customer(db, 'Ali', '');
