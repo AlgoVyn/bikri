@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-017: Pay modal + sale recipe (screens/06 ACs 1–5, 7; screens/05 ACs 7–8 completion).
 
@@ -200,7 +200,7 @@ test.describe('Pay (T-017)', () => {
     await sellWith(page, [
       { name: 'Galaxy A15', price: 4200000, cost: 3800000, stock: 1 },
     ]);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await tile(page, 'Galaxy A15').click();
     await tile(page, 'Galaxy A15').click();
     await page.keyboard.press('F7');
@@ -228,6 +228,6 @@ test.describe('Pay (T-017)', () => {
       ['Galaxy A15', expect.any(String)],
       ['Repair labour', null],
     ]);
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
   });
 });

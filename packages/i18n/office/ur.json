@@ -140,6 +140,7 @@
       "title": "یہ بل منسوخ کریں؟"
     },
     "refund": {
+    "selected": "{{count}} اشیاء منتخب",
       "already": "پہلے {{qty}} واپس",
       "button": "{{amount}} واپس کریں",
       "button_empty": "رقم واپس",
@@ -489,6 +490,7 @@
       "range_invalid": "سے تاریخ تک تاریخ سے پہلے ہونی چاہیے۔"
     },
     "dayclose": {
+      "balanced": "ہم آہنگ",
       "bank": "بینک/والٹ کل",
       "bills": "بل",
       "card": "کارڈ کل",
@@ -610,6 +612,10 @@
       "out_qty": "باہر",
       "overs": "زیادہ",
       "payment_mix": "ادائیگی کی تقسیم",
+      "hourly_chart": "گھنٹے کے حساب سے فروخت",
+      "vs_previous": "پچھلی مدت کے مقابلے",
+      "delta_new": "نیا",
+      "pp": "فیصد پوائنٹ",
       "pdf_generated": "تیار شدہ",
       "pdf_range": "عرصہ",
       "phone": "فون",

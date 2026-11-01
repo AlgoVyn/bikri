@@ -22,6 +22,12 @@ export type PaymentMix = {
   udhaar: number;
 };
 
+export type HourlyPoint = {
+  hour: number;
+  sold: number;
+  bills: number;
+};
+
 export type DailyPoint = {
   date: string;
   sold: number;
@@ -50,6 +56,7 @@ export type ReportSummary = {
   refundCount: number;
   paymentMix: PaymentMix;
   daily: DailyPoint[];
+  hourly: HourlyPoint[];
 };
 
 export type ProductReportRow = {
@@ -208,9 +215,10 @@ export type ReportBundle = {
 export type ReportOptions = {
   now?: number;
   today?: string;
+  timeZone?: string;
 };
 
-function addDays(date: string, days: number): string {
+export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
@@ -360,6 +368,18 @@ export async function reportBundle(
       mix: emptyMix(),
     });
 
+  const hourly: HourlyPoint[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    sold: 0,
+    bills: 0,
+  }));
+  const hourFormat = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    hour12: false,
+    timeZone: options.timeZone ?? 'Asia/Karachi',
+  });
+  const hourOf = (at: unknown) => Number(hourFormat.format(n(at))) % 24;
+
   const sales = (
     await db.sales
       .where('business_date')
@@ -415,6 +435,11 @@ export async function reportBundle(
     day.sold += n(sale.total);
     day.bills += 1;
     day.tax += n(sale.tax);
+    const hour = hourly[hourOf(sale.created_at)];
+    if (hour) {
+      hour.sold += n(sale.total);
+      hour.bills += 1;
+    }
     const udhaar = n(sale.udhaar_amount);
     day.udhaarGiven += udhaar;
     day.mix.udhaar += udhaar;
@@ -453,6 +478,8 @@ export async function reportBundle(
     const money = n(refund.amount);
     const khata = n(refund.udhaar_part);
     day.sold -= money + khata;
+    const refundHour = hourly[hourOf(refund.created_at)];
+    if (refundHour) refundHour.sold -= money + khata;
     day.udhaarGiven -= khata;
     day.mix.udhaar -= khata;
     addMix(day.mix, String(refund.method ?? ''), -money);
@@ -571,6 +598,7 @@ export async function reportBundle(
     refunded,
     refundCount,
     daily,
+    hourly,
   };
 
   const [products, stock] = await Promise.all([

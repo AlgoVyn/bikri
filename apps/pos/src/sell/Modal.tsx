@@ -9,7 +9,7 @@ const SIZES = {
   normal: `${base} w-[min(32rem,calc(100%-2rem))]`,
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,
   // Full screen below 768 px (pay modal, screens/06).
-  full: `${base} w-[min(40rem,calc(100%-2rem))] max-md:m-0 max-md:h-full max-md:max-h-full max-md:w-full max-md:rounded-none`,
+  full: `${base} w-[min(56rem,calc(100%-2rem))] max-md:m-0 max-md:h-full max-md:max-h-full max-md:w-full max-md:rounded-none`,
 } as const;
 
 /** A titled modal dialog (focus trap, Esc closes). */

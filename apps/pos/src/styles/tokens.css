@@ -325,3 +325,30 @@ body {
 .bikri-menu {
   animation: bikri-menu-in var(--duration-fast) var(--ease-standard);
 }
+
+/* Windows High Contrast / forced colours: keep borders, focus and selection visible. */
+@media (forced-colors: active) {
+  .rounded-card {
+    border-color: CanvasText;
+  }
+
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  [aria-current="page"],
+  [aria-pressed="true"],
+  [aria-selected="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+}
+
+/* The one receipt motif: a paper edge used in Sale complete and receipt previews. */
+.receipt-paper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-block: 2px dashed var(--color-border-strong);
+  box-shadow: var(--shadow-card);
+}

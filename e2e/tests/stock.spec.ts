@@ -1,6 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, idbAll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-021: stock adjust and stock count (screens/09 ACs 1–3, 5).
 
@@ -190,7 +195,7 @@ test.describe('Stock adjust (T-021)', () => {
 
   test('Urdu: adjust dialog', async ({ page }) => {
     const [cable] = await shop(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await go(page, `/products/${cable}/adjust`);
     await expect(dialog(page)).toContainText('موجود');
     await dialog(page).getByRole('tab', { name: 'اسٹاک گیا' }).click();

@@ -4,6 +4,7 @@ import {
   expectNoHorizontalScroll,
   idbUpdate,
   openReadyShop,
+  setLanguage,
 } from './helpers.ts';
 
 // T-048: Reports (screens/16 ACs 1–6).
@@ -115,7 +116,7 @@ test.describe('Reports (T-048)', () => {
 
   test('Urdu reports', async ({ page }) => {
     await seedReports(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.getByRole('heading', { name: 'رپورٹس' })).toBeVisible();
     await expect(page.getByTestId('report-sold')).toContainText('فروخت');
     await expect(page.getByRole('tab', { name: 'مصنوعات' })).toBeVisible();

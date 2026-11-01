@@ -136,15 +136,7 @@ export function ProductList({
   }
 
   const primary =
-    selecting && selected.size > 0 ? (
-      <button
-        type="button"
-        className={buttonPrimary}
-        onClick={() => setLabelsOpen(true)}
-      >
-        {t('products.print_labels', { count: selected.size })}
-      </button>
-    ) : canEdit && !selecting ? (
+    canEdit && !selecting ? (
       <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
         {t('products.add')}
       </Link>
@@ -169,6 +161,32 @@ export function ProductList({
           />
         }
       />
+
+      {selecting ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-card border border-primary/30 bg-primary-subtle px-3 py-2">
+          <span className="me-auto text-small font-medium text-primary-subtle-ink">
+            {t('products.selected', { count: selected.size })}
+          </span>
+          <button
+            type="button"
+            className={buttonPrimary}
+            disabled={selected.size === 0}
+            onClick={() => setLabelsOpen(true)}
+          >
+            {t('products.print_labels', { count: selected.size })}
+          </button>
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => {
+              setSelecting(false);
+              setSelected(new Set());
+            }}
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      ) : null}
 
       {total === 0 ? (
         <EmptyState
@@ -269,12 +287,29 @@ export function ProductList({
           }
         >
           {rows && rows.length === 0 ? (
-            <p className="py-8 text-center text-text-muted">
-              {t('products.no_match')}
-            </p>
+            <div className="flex flex-col items-center gap-2 py-8">
+              <p className="text-text-muted">{t('products.no_match')}</p>
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => {
+                  setQuery('');
+                  setCategoryId('');
+                  setStock('all');
+                  setSort('name');
+                }}
+              >
+                {t('common.clear_filters')}
+              </button>
+            </div>
           ) : rows ? (
             <>
-              <ListHeader showCost={showCost} embedded={embedded} />
+              <ListHeader
+                showCost={showCost}
+                embedded={embedded}
+                sort={sort}
+                onSort={setSort}
+              />
               <VirtualRows
                 selectedId={selectedId}
                 rows={rows}
@@ -315,43 +350,94 @@ const gridCols = (showCost: boolean, embedded: boolean) => {
 function ListHeader({
   showCost,
   embedded,
+  sort,
+  onSort,
 }: {
   showCost: boolean;
   embedded: boolean;
+  sort: ProductSort;
+  onSort: (sort: ProductSort) => void;
 }) {
   const { t } = useTranslation();
   return (
     <div
-      aria-hidden="true"
       className={`hidden gap-3 border-b border-border px-3 pb-1 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
     >
       <span />
-      <span>{t('products.col_name')}</span>
+      <SortHeader
+        label={t('products.col_name')}
+        active={sort === 'name'}
+        onClick={() => onSort('name')}
+      />
       {embedded ? (
-        <span className="text-end">{t('products.col_price')}</span>
+        <SortHeader
+          label={t('products.col_price')}
+          active={sort === 'price'}
+          onClick={() => onSort('price')}
+          align="end"
+        />
       ) : (
         <>
           <span>{t('products.col_category')}</span>
-          <span className="text-end">{t('products.col_price')}</span>
-          <span className="text-end">{t('products.col_stock')}</span>
+          <SortHeader
+            label={t('products.col_price')}
+            active={sort === 'price'}
+            onClick={() => onSort('price')}
+            align="end"
+          />
+          <SortHeader
+            label={t('products.col_stock')}
+            active={sort === 'stock'}
+            onClick={() => onSort('stock')}
+            align="end"
+          />
           {showCost ? (
             <span className="text-end">{t('products.col_avg_cost')}</span>
           ) : null}
           {showCost ? (
             <span className="text-end">{t('products.col_margin')}</span>
           ) : null}
-          <span
-            className="text-end leading-tight"
-            title={t('products.col_sold30')}
-          >
-            {t('products.col_sold')}
-            <span className="block text-caption text-text-muted">
-              {t('products.col_sold_days')}
-            </span>
-          </span>
+          <SortHeader
+            label={t('products.col_sold')}
+            active={sort === 'best'}
+            onClick={() => onSort('best')}
+            align="end"
+            secondLine={t('products.col_sold_days')}
+          />
         </>
       )}
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  active,
+  onClick,
+  align = 'start',
+  secondLine,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  align?: 'start' | 'end';
+  secondLine?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex min-h-8 items-center gap-1 leading-tight hover:text-text ${
+        align === 'end' ? 'justify-end text-end' : 'text-start'
+      }`}
+    >
+      {label}
+      {secondLine ? (
+        <span className="block text-caption">{secondLine}</span>
+      ) : null}
+      {active ? <span aria-hidden="true">↑</span> : null}
+    </button>
   );
 }
 
@@ -533,7 +619,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}

@@ -140,6 +140,7 @@
       "title": "Void this bill?"
     },
     "refund": {
+    "selected": "{{count}} items selected",
       "already": "already refunded {{qty}}",
       "button": "Refund {{amount}}",
       "button_empty": "Refund",
@@ -489,6 +490,7 @@
       "range_invalid": "From must be on or before To."
     },
     "dayclose": {
+      "balanced": "Balanced",
       "bank": "Bank/wallet total",
       "bills": "Bills",
       "card": "Card total",
@@ -610,6 +612,10 @@
       "out_qty": "Out",
       "overs": "Overs",
       "payment_mix": "Payment mix",
+      "hourly_chart": "Sales by hour",
+      "vs_previous": "vs previous",
+      "delta_new": "New",
+      "pp": "pp",
       "pdf_generated": "Generated",
       "pdf_range": "Range",
       "phone": "Phone",

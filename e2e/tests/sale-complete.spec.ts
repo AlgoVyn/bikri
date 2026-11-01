@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-018: Sale complete + share (screens/07 ACs 1–4).
 
@@ -226,7 +226,7 @@ test.describe('Sale complete (T-018)', () => {
     page,
   }) => {
     await shop(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     const change = await sellGalaxy(page, '50000');
     await expect(page.getByTestId('done-change')).toContainText(change);
     await expect(page.getByTestId('done-change')).toContainText('8,000');

@@ -2,7 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, idbAll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-023: import spreadsheet + update prices (screens/08 ACs 5, 6).
 
@@ -197,7 +202,7 @@ test.describe('Import spreadsheet (T-023)', () => {
 
   test('Urdu: import page and errors in Urdu', async ({ page }) => {
     await openReadyShop(page, '/bikri/products/import');
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(
       page.getByRole('heading', { name: 'اسپریڈشیٹ امپورٹ کریں' }),
     ).toBeVisible();
@@ -263,7 +268,7 @@ test.describe('Update prices (T-023)', () => {
     await page.evaluate(() =>
       window.__bikriTest?.seedProducts([{ name: 'Cover', price: 50000 }]),
     );
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await page.getByRole('main').getByLabel('تبدیلی').selectOption('set');
     await page.getByLabel('روپے', { exact: true }).fill('600');
     await page.getByRole('button', { name: 'پیش نظارہ' }).click();

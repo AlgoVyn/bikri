@@ -138,14 +138,18 @@ export function SupplierList({
                 : t('office.suppliers.no_suppliers')
             }
             actionLabel={
-              can('purchase.create') && !readOnly
-                ? t('office.suppliers.new_supplier')
-                : undefined
+              query
+                ? t('common.clear_filters')
+                : can('purchase.create') && !readOnly
+                  ? t('office.suppliers.new_supplier')
+                  : undefined
             }
             onAction={
-              can('purchase.create') && !readOnly
-                ? () => setNewOpen(true)
-                : undefined
+              query
+                ? () => setQuery('')
+                : can('purchase.create') && !readOnly
+                  ? () => setNewOpen(true)
+                  : undefined
             }
           />
         ) : null}
@@ -162,7 +166,7 @@ export function SupplierList({
                   aria-current={
                     row.supplier.id === selectedId ? 'page' : undefined
                   }
-                  className={`flex min-h-11 focus-visible:outline-offset-[-2px] flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'bg-primary-subtle' : ''}`}
+                  className={`flex min-h-16 border-s-2 focus-visible:outline-offset-[-2px] flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
                     <span className="block truncate font-medium">

@@ -47,6 +47,7 @@ describe('app shell', () => {
       ),
     ).toBeTruthy();
     expect(await screen.findByText('Add your first products')).toBeTruthy();
+    await user.click(screen.getByTestId('staff-menu'));
     await user.selectOptions(screen.getByLabelText('Language'), 'ur');
     expect(
       await screen.findByRole('heading', { name: 'السلام علیکم، Adnan' }),
@@ -99,6 +100,7 @@ describe('app shell', () => {
     expect(
       await screen.findByRole('heading', { name: 'Settings' }),
     ).toBeTruthy();
+    await user.click(screen.getByTestId('staff-menu'));
     const language = screen.getByLabelText('Language');
     language.focus();
     await user.keyboard('{Control>}{Shift>}{Digit2}{/Shift}{/Control}');
@@ -213,7 +215,7 @@ describe('app shell', () => {
     await renderAt(`${BASE_PATH}/`);
     const badge = await screen.findByTestId('sync-badge');
     expect(badge.getAttribute('aria-label')).toMatch(
-      /^\d+ waiting\. \d+ changes waiting/u,
+      /^Saved on device\. \d+ changes waiting/u,
     );
   });
 });

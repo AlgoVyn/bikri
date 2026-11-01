@@ -3,6 +3,7 @@ import {
   expectNoHorizontalScroll,
   expectNoSeriousAxe,
   openReadyShop,
+  setLanguage,
 } from './helpers.ts';
 
 // T-013: app shell + Home (screens/04).
@@ -115,7 +116,7 @@ test.describe('Home and shell (T-013)', () => {
 
   test('Urdu: RTL Home with the same figures', async ({ page }) => {
     await openWithSales(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(
       page.getByRole('heading', { name: 'السلام علیکم، Adnan' }),
@@ -125,12 +126,12 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByRole('heading', { name: 'حالیہ بل' })).toBeVisible();
     await expectNoSeriousAxe(page);
     await expectNoHorizontalScroll(page);
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
   });
 
   test('Roman Urdu: translated Home without raw keys', async ({ page }) => {
     await openWithSales(page);
-    await page.getByLabel('Language').selectOption('roman-ur');
+    await setLanguage(page, 'roman-ur');
     await expect(page.locator('html')).toHaveAttribute('lang', 'roman-ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(
@@ -138,8 +139,25 @@ test.describe('Home and shell (T-013)', () => {
     ).toBeVisible();
     await expect(page.getByText('Aaj ki farokht')).toBeVisible();
     await expect(page.getByText('home.greeting')).toHaveCount(0);
-    // The label is translated too, so pick the header select by position.
-    await page.locator('header select').selectOption('en');
+    await setLanguage(page, 'en');
+  });
+
+  test('an empty shop can load a starter catalogue', async ({ page }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.getByRole('button', { name: 'Load sample products' }).click();
+    await expect(page.getByText('8 sample products added.')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Get started' }),
+    ).toBeVisible();
+  });
+
+  test('the staff menu switches language', async ({ page }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.getByTestId('staff-menu').click();
+    await page.getByLabel('Language').selectOption('ur');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await setLanguage(page, 'en');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   });
 
   test('a cashier sees no Suppliers, profit or drawer cash, and is turned away by URL', async ({
@@ -249,10 +267,10 @@ test.describe('Home and shell (T-013)', () => {
       await openWithSales(page);
       await expect(page.getByTestId('today-sold')).toBeVisible();
       await expectNoHorizontalScroll(page);
-      await page.getByLabel('Language').selectOption('ur');
+      await setLanguage(page, 'ur');
       await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
       await expectNoHorizontalScroll(page);
-      await page.getByLabel('زبان').selectOption('en');
+      await setLanguage(page, 'en');
     });
   }
 });

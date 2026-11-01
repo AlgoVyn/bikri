@@ -1,6 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, idbAll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-022: price check (screens/18 ACs 1–3).
 
@@ -187,7 +192,7 @@ test.describe('Price check (T-022)', () => {
 
   test('Urdu: name search in Urdu, labels in Urdu', async ({ page }) => {
     await shop(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await page.keyboard.press('Control+Shift+KeyP');
     await expect(dialog(page)).toBeVisible();
     await field(page).fill('کیبل');

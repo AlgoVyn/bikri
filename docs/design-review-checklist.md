@@ -8,7 +8,7 @@ Run this on every PR that adds or changes a screen. A **no** is a blocker unless
 4. **Numbers are sacred.** Is every amount right-aligned, tabular, never truncated, and in Inter (mono only for invoice numbers, SKUs and barcodes)?
 5. **Red means one thing.** Is red used only for destructive, error, overdue or below-cost states — not normal debt or a missing printer?
 6. **Every state exists.** Empty, loading, offline, read-only, error, permission-denied and no-match each look intentional and offer the next action.
-7. **Urdu is first-class.** Does the screen work at 390 and 1280 in `ur` with no clipped names, pills or money, and are numbers still Western digits inside `<bdi>`?
+7. **Urdu is first-class.** Does the screen work at 390 and 1280 in `ur` with no clipped names, pills or money, and are numbers still Western digits inside `<bdi>`? Check 200% zoom and Windows High Contrast/forced colours, and have a native Urdu speaker sign off new copy.
 8. **Touch and keyboard.** Are targets at least 44×44 px, focus visible, dialogs trapped and Esc-closable, and the screen's hotkeys working?
 9. **Motion is quiet.** Do hover/press/overlay transitions use the shared 140/200 ms values and respect reduced motion?
 10. **The four widths pass.** At 390, 768, 1280 and 1920 there is no horizontal scroll, no overlap and no money clipped; the top bar still fits.
@@ -21,4 +21,4 @@ Also run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm i18n:check`, `pnpm co
 VISUAL=1 pnpm --filter @bikri/e2e exec playwright test tests/layout.spec.ts --project=desktop --reporter=html
 ```
 
-The matrix is reviewed by a human; pixel baselines are deliberately not committed because the seeded shop includes the current date and time, which makes image diffs brittle.
+The matrix is reviewed by a human; pixel baselines are deliberately not committed because the seeded shop includes the current date and time, which makes image diffs brittle. Do a five-screen visual review every week, rotating through the list, forms, selling and settings screens.

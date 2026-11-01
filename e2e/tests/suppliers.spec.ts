@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-045: suppliers, deliveries and paying a supplier (screens/13 ACs 1–5).
 
@@ -244,7 +244,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
 
   test('Urdu: supplier list and new supplier dialog', async ({ page }) => {
     await openSuppliers(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.getByRole('heading', { name: 'سپلائر' })).toBeVisible();
     await page
       .getByRole('button', { name: /نیا سپلائر/ })

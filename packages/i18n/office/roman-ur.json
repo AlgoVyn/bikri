@@ -140,6 +140,7 @@
       "title": "Yeh bill mansookh karein?"
     },
     "refund": {
+    "selected": "{{count}} items muntakhab",
       "already": "pehle {{qty}} wapas",
       "button": "{{amount}} wapas karein",
       "button_empty": "Raqam wapas",
@@ -489,6 +490,7 @@
       "range_invalid": "Se tareekh tak tareekh se pehle honi chahiye."
     },
     "dayclose": {
+      "balanced": "Balanced",
       "bank": "Bank/wallet total",
       "bills": "Bill",
       "card": "Card total",
@@ -610,6 +612,10 @@
       "out_qty": "Bahar",
       "overs": "Zyada",
       "payment_mix": "Payment ki taqseem",
+      "hourly_chart": "Ghante ke hisaab se farokht",
+      "vs_previous": "Pichli muddat ke muqable",
+      "delta_new": "Naya",
+      "pp": "pp",
       "pdf_generated": "Taiyar shuda",
       "pdf_range": "Arsa",
       "phone": "Phone",

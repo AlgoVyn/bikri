@@ -60,7 +60,7 @@ export function QtyInput({
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <label
         htmlFor={inputId}
         className={hideLabel ? 'sr-only' : 'mb-1 block text-small text-text'}

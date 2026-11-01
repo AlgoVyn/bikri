@@ -1,3 +1,4 @@
+import type { LocaleCode } from '@bikri/i18n';
 import { renderReceiptText } from '@bikri/printer';
 import { router } from '../app.tsx';
 import { getDb } from '../data/db.ts';
@@ -20,6 +21,7 @@ declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
+      setLanguage: (locale: LocaleCode) => Promise<void>;
       finishSetupHere: () => Promise<void>;
       /** Push + pull now (T-030 engine). */
       syncNow: () => Promise<void>;
@@ -44,6 +46,10 @@ declare global {
 export function installTestHooks(): void {
   window.__bikriTest = {
     seedReadyShop,
+    setLanguage: async (locale) => {
+      const { setLanguage } = await import('../i18n/i18n.ts');
+      await setLanguage(locale);
+    },
     finishSetupHere: () => finishSetupHere(),
     syncNow: async () => (await import('../sync/engine.ts')).syncNow(),
     reset: resetDevDb,

@@ -11,7 +11,12 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
-import { type ReportBundle, reportBundle } from '../data/reportBundle.ts';
+import {
+  addDays,
+  type ReportBundle,
+  type ReportSummary,
+  reportBundle,
+} from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
@@ -19,7 +24,7 @@ import { downloadText } from '../lib/download.ts';
 import { formatShopMoney } from '../lib/money';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { DailyChart, PaymentDonut } from './charts.tsx';
+import { DailyChart, HourlyChart, PaymentMixBar } from './charts.tsx';
 import {
   bucketLabel,
   categoryName,
@@ -116,14 +121,28 @@ export function ReportsPage() {
     const bundle = await reportBundle(
       db,
       { ...range, deviceId: deviceId || undefined },
-      { now, today },
+      { now, today, timeZone },
     );
+    const span = daysBetween(range.from, range.to) + 1;
+    let previous: ReportSummary | undefined;
+    if (span <= 90) {
+      const previousRange = {
+        ...range,
+        from: addDays(range.from, -span),
+        to: addDays(range.from, -1),
+        deviceId: deviceId || undefined,
+      };
+      previous = (
+        await reportBundle(db, previousRange, { now, today, timeZone })
+      ).summary;
+    }
     const devices = (await db.devices.toArray())
       .filter((device) => !device.deleted_at)
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
     const shop = await db.shop.get('shop');
     return {
       bundle,
+      previous,
       today,
       timeZone,
       devices,
@@ -344,7 +363,12 @@ export function ReportsPage() {
         className="flex flex-col gap-3"
       >
         {tab === 'summary' ? (
-          <SummaryTab bundle={bundle} cost={cost} lang={lang} />
+          <SummaryTab
+            bundle={bundle}
+            previous={data.previous}
+            cost={cost}
+            lang={lang}
+          />
         ) : null}
         {tab === 'products' ? (
           <ProductsTab bundle={bundle} cost={cost} lang={lang} />
@@ -390,10 +414,12 @@ function reportRange(
 function Card({
   label,
   value,
+  hint,
   testId,
 }: {
   label: string;
   value: ReactNode;
+  hint?: ReactNode;
   testId?: string;
 }) {
   return (
@@ -403,7 +429,49 @@ function Card({
     >
       <p className="text-small text-text-muted">{label}</p>
       <p className="text-title font-semibold">{value}</p>
+      {hint}
     </div>
+  );
+}
+
+function Delta({
+  current,
+  previous,
+  good = 'up',
+  points = false,
+}: {
+  current: number;
+  previous?: number;
+  good?: 'up' | 'down';
+  points?: boolean;
+}) {
+  const { t } = useTranslation();
+  if (previous === undefined) return null;
+  if (previous === 0) {
+    return (
+      <span className="text-small text-text-muted">
+        {t('office.reports.delta_new')}
+      </span>
+    );
+  }
+  const change = points
+    ? current - previous
+    : ((current - previous) / Math.abs(previous)) * 100;
+  if (Math.abs(change) < 0.05) {
+    return <span className="text-small text-text-muted">—</span>;
+  }
+  const up = change > 0;
+  const positive = good === 'up' ? up : !up;
+  const value = points
+    ? `${Math.abs(change).toFixed(1)} ${t('office.reports.pp')}`
+    : `${Math.abs(Math.round(change))}%`;
+  return (
+    <span className={`text-small ${positive ? 'text-success' : 'text-danger'}`}>
+      <bdi dir="ltr">
+        {up ? '↑' : '↓'} {value}
+      </bdi>{' '}
+      <span className="text-text-muted">{t('office.reports.vs_previous')}</span>
+    </span>
   );
 }
 
@@ -479,15 +547,22 @@ function ReportTable({
 
 function SummaryTab({
   bundle,
+  previous,
   cost,
   lang,
 }: {
   bundle: ReportBundle;
+  previous?: ReportSummary;
   cost: boolean;
   lang: string;
 }) {
   const { t } = useTranslation();
   const summary = bundle.summary;
+  const comparison =
+    previous &&
+    (previous.bills > 0 || previous.sold !== 0 || previous.expenses !== 0)
+      ? previous
+      : undefined;
   const hasActivity =
     summary.bills > 0 ||
     summary.refundCount > 0 ||
@@ -505,6 +580,7 @@ function SummaryTab({
             label={t('office.reports.sold')}
             testId="report-sold"
             value={<MoneyText paisa={summary.sold} />}
+            hint={<Delta current={summary.sold} previous={comparison?.sold} />}
           />
         </li>
         <li className="min-w-0">
@@ -512,18 +588,31 @@ function SummaryTab({
             label={t('office.reports.bills')}
             testId="report-bills"
             value={summary.bills}
+            hint={
+              <Delta current={summary.bills} previous={comparison?.bills} />
+            }
           />
         </li>
         <li className="min-w-0">
           <Card
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
+            hint={
+              <Delta current={summary.avgBill} previous={comparison?.avgBill} />
+            }
           />
         </li>
         <li className="min-w-0">
           <Card
             label={t('office.reports.expenses')}
             value={<MoneyText paisa={summary.expenses} />}
+            hint={
+              <Delta
+                current={summary.expenses}
+                previous={comparison?.expenses}
+                good="down"
+              />
+            }
           />
         </li>
         {cost ? (
@@ -533,24 +622,52 @@ function SummaryTab({
                 label={t('office.reports.gross_profit')}
                 testId="report-profit"
                 value={<MoneyText paisa={summary.grossProfit} />}
+                hint={
+                  <Delta
+                    current={summary.grossProfit}
+                    previous={comparison?.grossProfit}
+                  />
+                }
               />
             </li>
             <li className="min-w-0">
               <Card
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
+                hint={
+                  <Delta
+                    current={summary.netProfit}
+                    previous={comparison?.netProfit}
+                  />
+                }
               />
             </li>
             <li className="min-w-0">
               <Card
                 label={t('office.reports.margin')}
                 value={percentText(summary.marginBp)}
+                hint={
+                  <Delta
+                    current={summary.marginBp / 100}
+                    previous={
+                      comparison ? comparison.marginBp / 100 : undefined
+                    }
+                    points
+                  />
+                }
               />
             </li>
             <li className="min-w-0">
               <Card
                 label={t('office.reports.refunds')}
                 value={<MoneyText paisa={summary.refunded} />}
+                hint={
+                  <Delta
+                    current={summary.refunded}
+                    previous={comparison?.refunded}
+                    good="down"
+                  />
+                }
               />
             </li>
           </>
@@ -572,32 +689,40 @@ function SummaryTab({
         />
       ) : (
         <>
-          <section className="rounded-card border border-border bg-surface p-3">
-            <h2 className="mb-2 text-title font-semibold">
-              {t('office.reports.daily_chart')}
-            </h2>
-            {summary.daily.filter(
+          {bundle.range.from === bundle.range.to &&
+          summary.hourly.some((point) => point.sold !== 0) ? (
+            <section className="rounded-card border border-border bg-surface p-3">
+              <h2 className="mb-2 text-title font-semibold">
+                {t('office.reports.hourly_chart')}
+              </h2>
+              <HourlyChart points={summary.hourly} t={t} />
+            </section>
+          ) : summary.daily.filter(
               (point) => point.sold !== 0 || point.grossProfit !== 0,
             ).length > 1 ? (
+            <section className="rounded-card border border-border bg-surface p-3">
+              <h2 className="mb-2 text-title font-semibold">
+                {t('office.reports.daily_chart')}
+              </h2>
               <DailyChart
                 points={summary.daily}
                 showProfit={cost}
                 lang={lang}
                 t={t}
               />
-            ) : (
-              <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
-                {t('office.reports.not_enough_days')}
-              </p>
-            )}
-          </section>
+            </section>
+          ) : (
+            <p className="text-small text-text-muted">
+              {t('office.reports.not_enough_days')}
+            </p>
+          )}
 
           <div className="grid gap-3 lg:grid-cols-2">
             <section className="rounded-card border border-border bg-surface p-3">
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.payment_mix')}
               </h2>
-              <PaymentDonut mix={summary.paymentMix} t={t} />
+              <PaymentMixBar mix={summary.paymentMix} t={t} />
             </section>
             <section className="rounded-card border border-border bg-surface p-3">
               <h2 className="mb-2 text-title font-semibold">

@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LockIcon, UserIcon } from '../components/icons.tsx';
+import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
 import { unresolvedFailedCount } from '../data/printJobs.ts';
@@ -36,11 +37,15 @@ export function useOnline(): boolean {
   return online;
 }
 
-/** Rail badge (03 §7): synced, pending, offline, error, outdated, downloading, read-only, quota. */
+/** Rail badge (03 §7): one status trigger; printer details live in its popover. */
 export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
   const online = useOnline();
   const sync = useSyncState();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   const counts = useLiveQuery(async () => {
     const db = getDb();
     const [pending, failed, status, lastSync] = await Promise.all([
@@ -58,6 +63,26 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
       lastSync: (lastSync?.value as number | undefined) ?? null,
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const inside = ref.current?.contains(document.activeElement) ?? false;
+      setOpen(false);
+      if (inside) triggerRef.current?.focus();
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [open]);
+
   if (!counts) return null;
   const ago = (at: number | null) =>
     at
@@ -97,7 +122,6 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
     label = t('shell.sync_offline');
     detail = t('shell.sync_detail_offline', { count: counts.pending });
   } else if (sync.phase === 'suspended') {
-    // 13 §7.2: a suspended shop keeps selling offline; ops stay on the device.
     state = 'paused';
     tone = 'bg-warning-subtle text-warning-subtle-ink';
     label = t('shell.sync_paused');
@@ -126,29 +150,73 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
   } else if (sync.phase === 'syncing') {
     label = t('shell.sync_syncing');
   }
+
+  if (compact) {
+    return (
+      <Link
+        to="/settings/sync"
+        data-testid="sync-badge-menu"
+        data-state={state}
+        aria-label={detail === label ? label : `${label}. ${detail}`}
+        title={detail}
+        className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
+      >
+        <span aria-hidden="true" className="size-2 rounded-full bg-current" />
+        <span>{label}</span>
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      to="/settings/sync"
-      data-testid={compact ? 'sync-badge-menu' : 'sync-badge'}
-      data-state={state}
-      // axe label-content-name-mismatch: the accessible name starts with the visible text.
-      aria-label={detail === label ? label : `${label}. ${detail}`}
-      title={detail}
-      className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
-    >
-      <span aria-hidden="true" className="size-2 rounded-full bg-current" />
-      <span className={compact ? '' : 'max-lg:hidden'}>{label}</span>
-      {state === 'pending' && !compact ? (
-        <bdi className="lg:hidden" aria-hidden="true">
-          {counts.pending}
-        </bdi>
-      ) : null}
-    </Link>
+    <div className="relative" ref={ref}>
+      <button
+        ref={triggerRef}
+        type="button"
+        data-testid="sync-badge"
+        data-state={state}
+        aria-label={detail === label ? label : `${label}. ${detail}`}
+        title={detail}
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((value) => !value)}
+        className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small transition-colors duration-150 before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${tone}`}
+      >
+        <span aria-hidden="true" className="size-2 rounded-full bg-current" />
+        <span>{label}</span>
+      </button>
+      <div
+        id={menuId}
+        className={`${
+          open ? 'flex' : 'hidden'
+        } absolute end-0 top-10 z-40 w-64 flex-col gap-2 rounded-card border border-border bg-surface p-3 shadow-modal`}
+      >
+        <div>
+          <p className="text-small font-medium">{label}</p>
+          <p className="mt-1 text-small text-text-muted">{detail}</p>
+        </div>
+        <div className="border-t border-border pt-2">
+          <PrinterDot onClick={() => setOpen(false)} />
+        </div>
+        <Link
+          to="/settings/sync"
+          onClick={() => setOpen(false)}
+          className="flex min-h-11 items-center text-small font-medium text-primary hover:underline"
+        >
+          {t('shell.sync_settings')}
+        </Link>
+      </div>
+    </div>
   );
 }
 
 /** Printer status pill: green when set up, red when this device has no printer (T-020). */
-export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
+export function PrinterDot({
+  compact = false,
+  onClick,
+}: {
+  compact?: boolean;
+  onClick?: () => void;
+} = {}) {
   const { t } = useTranslation();
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -172,6 +240,7 @@ export function PrinterDot({ compact = false }: { compact?: boolean } = {}) {
       data-testid={compact ? 'printer-dot-menu' : 'printer-dot'}
       aria-label={visible === detail ? detail : `${visible}. ${detail}`}
       title={detail}
+      onClick={onClick}
       className={`relative ${compact ? 'inline-flex' : 'hidden lg:inline-flex'} h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${
         loading
           ? 'bg-surface-2 text-text-muted'
@@ -219,6 +288,7 @@ export function StaffMenu() {
     <div ref={ref} className="relative">
       <button
         type="button"
+        data-testid="staff-menu"
         aria-label={t('shell.staff_menu')}
         aria-expanded={open}
         aria-controls={menuId}
@@ -250,6 +320,9 @@ export function StaffMenu() {
                 {support ? t('lock.support_profile') : t(`shell.role_${role}`)}
               </p>
             </div>
+          </div>
+          <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2">
+            <LanguageSelect />
           </div>
           <div className="mt-2 flex flex-col items-start gap-2 border-b border-border pb-2 lg:hidden">
             <SyncBadge compact />

@@ -131,7 +131,10 @@ describe('money and quantity fields', () => {
 
   it('keeps money LTR inside bdi', () => {
     render(<MoneyText paisa={-50000} />);
-    const node = screen.getByText('−Rs 500');
+    const node = screen.getByText(
+      (_content, element) =>
+        element?.tagName === 'BDI' && element.textContent === '−Rs 500',
+    );
     expect(node.tagName).toBe('BDI');
     expect(node.getAttribute('dir')).toBe('ltr');
   });

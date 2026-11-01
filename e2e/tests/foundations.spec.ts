@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { openReadyShop } from './helpers.ts';
+import { openReadyShop, setLanguage } from './helpers.ts';
 
 // M0 smoke journeys: T-002 routing, T-005 PWA/offline, T-006 a11y, T-007 language switching.
 
@@ -63,7 +63,7 @@ test.describe('shell and languages (T-006, T-007)', () => {
       ),
     ).toEqual([]);
 
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ur');
     const navUr = page.getByRole('navigation', { name: 'مرکزی' });
@@ -78,7 +78,7 @@ test.describe('shell and languages (T-006, T-007)', () => {
     // The choice survives a reload (localStorage `bikri.language`).
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   });
 

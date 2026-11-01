@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-043/T-044: customers, statement, payments, reminders, promises and chase (screens/12).
 
@@ -187,7 +187,7 @@ test.describe('Udhaar (T-043, T-044)', () => {
   test('Urdu statement and reminder', async ({ page }) => {
     await openReadyShop(page, '/bikri/udhaar');
     const ali = await seedAli(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await openAli(page, ali as string);
     await expect(page.getByTestId('statement-balance')).toContainText('بقایا');
     if ((page.viewportSize()?.width ?? 0) >= 640)

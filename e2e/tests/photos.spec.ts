@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { idbCount, makePng, openReadyShop } from './helpers.ts';
+import { idbCount, makePng, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-015: product photos — square 512 px WebP, stored on the device, queued for upload, shown offline.
 
@@ -100,7 +100,7 @@ test.describe('Product photos (T-015)', () => {
   test('Urdu: replace and remove a photo on edit', async ({ page }) => {
     await openReadyShop(page, '/bikri/products/new');
     const png = await makePng(page, 600, 900);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await page.getByLabel('نام (انگریزی)').fill('Cover');
     await page.getByLabel('فروخت کی قیمت').fill('300');
     await page
@@ -131,6 +131,6 @@ test.describe('Product photos (T-015)', () => {
     await expect(
       page.getByTestId('products-detail').getByTestId('product-photo'),
     ).toHaveCount(0);
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
   });
 });

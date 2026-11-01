@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       '*.test.mjs',
+      '*.test.ts',
       'backup/*.test.mjs',
       'perf/*.test.mjs',
     ],

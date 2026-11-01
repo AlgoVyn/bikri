@@ -415,6 +415,22 @@ export function SalesList({
                 ? t('office.sales.no_match')
                 : t('office.sales.empty')
             }
+            actionLabel={
+              query || method || status || staffId || deviceId
+                ? t('common.clear_filters')
+                : undefined
+            }
+            onAction={
+              query || method || status || staffId || deviceId
+                ? () => {
+                    setQuery('');
+                    setMethod('');
+                    setStatus('');
+                    setStaffId('');
+                    setDeviceId('');
+                  }
+                : undefined
+            }
           />
         ) : null}
 
@@ -515,7 +531,7 @@ function SaleRow({
         resetScroll={false}
         onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
-        className={`${SALE_GRID} min-h-11 focus-visible:outline-offset-[-2px] px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'bg-primary-subtle' : ''}`}
+        className={`${SALE_GRID} min-h-11 focus-visible:outline-offset-[-2px] px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
       >
         <span className="tabular-nums text-small text-text-muted">
           {timeText(Number(sale.created_at), i18n.language, timeZone)}

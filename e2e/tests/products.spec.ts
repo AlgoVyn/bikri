@@ -4,6 +4,7 @@ import {
   expectNoSeriousAxe,
   idbUpdate,
   openReadyShop,
+  setLanguage,
 } from './helpers.ts';
 
 // T-014: products list, detail, form, categories (screens/08 ACs 1, 2, 4, 7).
@@ -116,7 +117,7 @@ test.describe('Products (T-014)', () => {
 
   test('Urdu: RTL form and list', async ({ page }) => {
     await openReadyShop(page, '/bikri/products/new');
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(
       page.getByRole('heading', { name: 'مصنوع شامل کریں' }),
@@ -139,7 +140,7 @@ test.describe('Products (T-014)', () => {
     await page.goto('/bikri/products');
     await expect(page.getByText('1 مصنوع', { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
   });
 
   test('AC 4: a cashier sees no cost, margin or profit, and no cost in the CSV', async ({

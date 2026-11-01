@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-047: day close and Z-report (screens/15 ACs 1–7).
 
@@ -89,7 +89,7 @@ test.describe('Day close (T-047)', () => {
 
   test('Urdu day close labels', async ({ page }) => {
     await openReadyShop(page, '/bikri/day-close');
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(
       page.getByRole('heading', { name: 'دن کا حساب' }),
     ).toBeVisible();

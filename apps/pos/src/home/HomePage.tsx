@@ -1,6 +1,7 @@
 import { businessDate, type Permission } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -16,9 +17,11 @@ import {
   SellIcon,
 } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
   type AttentionItem,
+  addSampleProducts,
   attentionItems,
   recentBills,
 } from '../data/home.ts';
@@ -30,11 +33,14 @@ import { NAV } from '../shell/nav.ts';
 import { usePriceCheck } from '../shell/priceCheckStore.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { useSession } from '../state/session.ts';
 
 type HomeData = {
   branchName: string;
   products: number;
+  printer: boolean;
+  salesCount: number;
   today: Awaited<ReturnType<typeof summary>>;
   cash: number;
   attention: AttentionItem[];
@@ -85,6 +91,16 @@ export function HomePage() {
   const justSetUp = useSession((s) => s.justSetUp);
   const setJustSetUp = useSession((s) => s.setJustSetUp);
   const { staff, role, can } = useCurrentStaff();
+  const readOnly = useReadOnly();
+  const toast = useToast();
+  const [samplePending, setSamplePending] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('bikri.onboarding_dismissed') === '1';
+    } catch {
+      return false;
+    }
+  });
   const online = useOnline();
   const now = Date.now();
   const today = businessDate(now);
@@ -98,6 +114,8 @@ export function HomePage() {
     return {
       branchName: String(branch?.name ?? ''),
       products: await db.products.filter((p) => !p.deleted_at).count(),
+      printer: Boolean((await db.kv.get('printer'))?.value),
+      salesCount: await db.sales.filter((s) => s.status !== 'void').count(),
       today: await summary(db, { from: today, to: today }),
       cash: await expectedCash(db, deviceId),
       attention: await attentionItems(db, {
@@ -118,6 +136,19 @@ export function HomePage() {
   );
   const timeText = (at: number) =>
     formatTimestamp(at, i18n.language, 'Asia/Karachi', 'time');
+
+  const loadSamples = async () => {
+    if (!staff || readOnly) return;
+    setSamplePending(true);
+    try {
+      const count = await addSampleProducts(getDb(), staff.id);
+      toast.push(t('home.samples_loaded', { count }));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    } finally {
+      setSamplePending(false);
+    }
+  };
 
   const tiles: QuickTile[] = [
     {
@@ -212,6 +243,29 @@ export function HomePage() {
         </section>
       ) : null}
 
+      {data &&
+      role === 'owner' &&
+      data.products > 0 &&
+      !onboardingDismissed &&
+      !(data.products > 0 && data.printer && data.salesCount > 0) ? (
+        <GettingStarted
+          products={data.products}
+          printer={data.printer}
+          hasSale={data.salesCount > 0}
+          samplePending={samplePending}
+          samplesDisabled={readOnly}
+          onSamples={() => void loadSamples()}
+          onDismiss={() => {
+            try {
+              localStorage.setItem('bikri.onboarding_dismissed', '1');
+            } catch {
+              // Storage may be disabled.
+            }
+            setOnboardingDismissed(true);
+          }}
+        />
+      ) : null}
+
       {data && data.products === 0 ? (
         <div className="flex flex-col gap-6">
           <section
@@ -241,6 +295,14 @@ export function HomePage() {
                   <Link to="/products/suggested" className={buttonQuiet}>
                     {t('home.suggested')}
                   </Link>
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={samplePending || readOnly}
+                    onClick={() => void loadSamples()}
+                  >
+                    {t('home.load_samples')}
+                  </button>
                 </>
               ) : null}
             </div>
@@ -361,6 +423,125 @@ export function HomePage() {
 
 function sectionLabel(_lang: string): string {
   return 'text-small font-semibold text-text-muted';
+}
+
+function GettingStarted({
+  products,
+  printer,
+  hasSale,
+  samplePending,
+  samplesDisabled,
+  onSamples,
+  onDismiss,
+}: {
+  products: number;
+  printer: boolean;
+  hasSale: boolean;
+  samplePending: boolean;
+  samplesDisabled: boolean;
+  onSamples: () => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  const steps = [
+    {
+      done: products > 0,
+      title: t('home.step_products'),
+      hint: t('home.step_products_hint'),
+      action:
+        products > 0 ? null : (
+          <div className="flex flex-wrap gap-2">
+            <Link to="/products/new" className={buttonPrimary}>
+              {t('home.add_product')}
+            </Link>
+            <button
+              type="button"
+              className={buttonQuiet}
+              disabled={samplePending || samplesDisabled}
+              onClick={onSamples}
+            >
+              {t('home.load_samples')}
+            </button>
+            <Link
+              to="/products/import"
+              className="self-center text-small text-primary hover:underline"
+            >
+              {t('home.import')}
+            </Link>
+          </div>
+        ),
+    },
+    {
+      done: printer,
+      title: t('home.step_printer'),
+      hint: t('home.step_printer_hint'),
+      action: printer ? null : (
+        <Link to="/settings/printer" className={buttonQuiet}>
+          {t('home.step_printer')}
+        </Link>
+      ),
+    },
+    {
+      done: hasSale,
+      title: t('home.step_sale'),
+      hint: t('home.step_sale_hint'),
+      action: hasSale ? null : (
+        <Link to="/sell" className={buttonQuiet}>
+          {t('home.step_sale')}
+        </Link>
+      ),
+    },
+  ];
+  return (
+    <section
+      aria-labelledby="getting-started"
+      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+    >
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <h2 id="getting-started" className="me-auto text-h2 font-semibold">
+          {t('home.get_started')}
+        </h2>
+        <button
+          type="button"
+          className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2"
+          aria-label={t('common.dismiss')}
+          onClick={onDismiss}
+        >
+          <span aria-hidden="true" className="text-title leading-none">
+            ×
+          </span>
+        </button>
+      </div>
+      <ol className="divide-y divide-border">
+        {steps.map((step, index) => (
+          <li key={step.title} className="flex gap-3 px-4 py-3">
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-small font-semibold ${
+                step.done
+                  ? 'bg-success-subtle text-success-subtle-ink'
+                  : 'bg-surface-2 text-text-muted'
+              }`}
+            >
+              {step.done ? '✓' : index + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {step.title}
+                {step.done ? (
+                  <span className="ms-2 text-small font-normal text-success">
+                    {t('home.step_done')}
+                  </span>
+                ) : null}
+              </p>
+              <p className="mt-0.5 text-small text-text-muted">{step.hint}</p>
+              {step.action ? <div className="mt-2">{step.action}</div> : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
 }
 
 function QuickActions({

@@ -1,7 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, idbPut, idbUpdate, openReadyShop } from './helpers.ts';
+import {
+  idbAll,
+  idbPut,
+  idbUpdate,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-040/T-041/T-042: sales history, bill detail, refunds, void and reissue
 // (screens/10 ACs 1–5, screens/11 ACs 1–8).
@@ -211,7 +217,7 @@ test.describe('Urdu refunds (screens/11 AC 4–6)', () => {
     page,
   }) => {
     await openReadyShop(page, '/bikri/');
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await page.goto('/bikri/sales');
     await page.waitForFunction(() => window.__bikriTest !== undefined);
     await page.evaluate(() => window.__bikriTest?.seedTodaySales());

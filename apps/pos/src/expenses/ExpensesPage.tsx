@@ -309,7 +309,7 @@ export function ExpensesPage() {
                 <li
                   key={row.expense.id}
                   data-testid="expense-row"
-                  className={`flex min-h-11 flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
+                  className={`flex min-h-14 flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
                     <span className="block truncate font-medium">

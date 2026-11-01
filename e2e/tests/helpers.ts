@@ -13,6 +13,18 @@ export async function openReadyShop(
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 }
 
+/** Switch language through the app (the top-bar picker now lives in the staff menu). */
+export async function setLanguage(
+  page: Page,
+  locale: 'en' | 'ur' | 'roman-ur',
+): Promise<void> {
+  await page.evaluate(
+    (value) => window.__bikriTest?.setLanguage(value),
+    locale,
+  );
+  await page.waitForTimeout(120);
+}
+
 /** No serious/critical axe violation (08 §8; T-063). */
 export async function expectNoSeriousAxe(page: Page): Promise<void> {
   const axe = await new AxeBuilder({ page }).analyze();
@@ -172,6 +184,7 @@ declare global {
   interface Window {
     __bikriTest?: {
       seedReadyShop: () => Promise<void>;
+      setLanguage: (locale: 'en' | 'ur' | 'roman-ur') => Promise<void>;
       finishSetupHere: () => Promise<void>;
       syncNow: () => Promise<void>;
       reset: () => Promise<void>;

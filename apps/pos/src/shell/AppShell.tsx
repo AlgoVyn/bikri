@@ -3,7 +3,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
 import { MoreIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
-import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
@@ -11,17 +10,13 @@ import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Banners } from './Banners.tsx';
+import { Breadcrumbs } from './Breadcrumbs.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
 import { ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
-import {
-  PrinterDot,
-  StaffMenu,
-  SyncBadge,
-  useShopName,
-} from './TopBarParts.tsx';
+import { StaffMenu, SyncBadge, useShopName } from './TopBarParts.tsx';
 
 const navLink =
   'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted transition-colors duration-150 lg:flex-none lg:py-1.5';
@@ -157,9 +152,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {screenTitle ?? shopName ?? t('common.app_name')}
         </span>
-        <span className="min-w-0 flex-1 truncate font-medium max-lg:hidden">
-          {screenTitle ?? ''}
-        </span>
+        <Breadcrumbs current={screenTitle} />
         <div className="flex shrink-0 items-center gap-1 lg:gap-2">
           <GlobalSearch />
           {updateReady ? (
@@ -172,8 +165,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           ) : null}
           <SyncBadge />
-          <PrinterDot />
-          <LanguageSelect />
           <StaffMenu />
         </div>
       </header>

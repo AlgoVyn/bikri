@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop } from './helpers.ts';
+import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
 
 // T-046: expenses, reversal and cash in/out (screens/14 ACs 1–4).
 
@@ -102,7 +102,7 @@ test.describe('Expenses (T-046)', () => {
 
   test('Urdu expense form', async ({ page }) => {
     await openReadyShop(page, '/bikri/expenses');
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await page
       .getByRole('button', { name: /نیا خرچ/ })
       .first()

@@ -370,6 +370,16 @@ export function RefundDialog({
         </ul>
       )}
 
+      {plan ? (
+        <p
+          className="flex items-center justify-between border-t border-border px-2 py-1 text-small"
+          data-testid="refund-running"
+        >
+          <span>{t('office.refund.selected', { count: chosen.length })}</span>
+          <MoneyText paisa={plan.exact} />
+        </p>
+      ) : null}
+
       <fieldset>
         <legend className="mb-1 text-small">{t('office.refund.reason')}</legend>
         <div className="flex flex-wrap gap-2">

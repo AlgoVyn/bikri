@@ -149,3 +149,37 @@ export async function recentBills(
   }
   return out;
 }
+
+/** A small starter catalogue for a brand-new shop (Home onboarding, D-151). */
+export async function addSampleProducts(
+  db: BikriDb,
+  staffId: string,
+): Promise<number> {
+  const { ledgerContext, saveNewProduct } = await import('./catalog.ts');
+  const ctx = await ledgerContext(db, staffId);
+  const samples = [
+    { name_en: 'USB-C cable 1 m', price: 49900, cost: 22000, stock: 40 },
+    { name_en: 'Phone cover', price: 39900, cost: 15000, stock: 30 },
+    { name_en: 'Tempered glass', price: 24900, cost: 9000, stock: 25 },
+    { name_en: 'Fast charger 25 W', price: 129900, cost: 88000, stock: 18 },
+    { name_en: 'Wireless earbuds', price: 349900, cost: 260000, stock: 10 },
+    { name_en: 'Power bank 10,000 mAh', price: 449900, cost: 350000, stock: 8 },
+    { name_en: 'Car mount', price: 89900, cost: 52000, stock: 12 },
+    { name_en: 'Bluetooth speaker', price: 289900, cost: 210000, stock: 6 },
+  ];
+  for (const sample of samples) {
+    await saveNewProduct(
+      db,
+      {
+        name_en: sample.name_en,
+        price: sample.price,
+        cost: sample.cost,
+        opening_milli: sample.stock * 1000,
+        track_stock: true,
+        min_stock_milli: 2000,
+      },
+      ctx,
+    );
+  }
+  return samples.length;
+}

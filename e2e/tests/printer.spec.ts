@@ -7,6 +7,7 @@ import {
   installFakePrinters,
   openReadyShop,
   printedText,
+  setLanguage,
 } from './helpers.ts';
 
 // T-020: transports + printer setup (06 §5, §8, §9; screens/17 Printer; screens/06 AC 6).
@@ -254,7 +255,7 @@ test.describe('Printer (T-020)', () => {
 
   test('Urdu: printer settings and wizard', async ({ page }) => {
     await start(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(
       page.getByRole('heading', { name: 'پرنٹر', level: 1 }),
     ).toBeVisible();

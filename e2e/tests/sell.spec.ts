@@ -1,6 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-016: Sell screen (screens/05 ACs 1–9).
 
@@ -280,7 +284,7 @@ test.describe('Sell (T-016)', () => {
     page,
   }) => {
     await openSell(page, [{ name: 'Cable', price: 149900, stock: 3 }]);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(
       page.getByRole('combobox', { name: 'تلاش یا اسکین' }),
     ).toBeVisible();
@@ -303,7 +307,7 @@ test.describe('Sell (T-016)', () => {
       page.getByRole('button', { name: /ادائیگی لیں/ }),
     ).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await page.getByLabel('زبان').selectOption('en');
+    await setLanguage(page, 'en');
   });
 
   test('two cart lines stay fully visible on phone and in Urdu', async ({
@@ -356,13 +360,13 @@ test.describe('Sell (T-016)', () => {
     expectFits(await measure());
 
     if (isPhone(page)) await showProducts(page);
-    await page.getByLabel(/Language|زبان/).selectOption('ur');
+    await setLanguage(page, 'ur');
     await showCart(page);
     await expect(page.getByTestId('cart-line')).toHaveCount(2);
     await page.waitForTimeout(100);
     expectFits(await measure());
     if (isPhone(page)) await showProducts(page);
-    await page.getByLabel(/Language|زبان/).selectOption('en');
+    await setLanguage(page, 'en');
   });
 
   test('line price and discount are editable without opening the detail panel', async ({

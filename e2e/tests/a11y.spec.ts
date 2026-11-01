@@ -4,6 +4,7 @@ import {
   expectNoSeriousAxe,
   idbAll,
   openReadyShop,
+  setLanguage,
 } from './helpers.ts';
 
 // T-063: axe on every screen (08 §8), English and the Urdu core journey.
@@ -129,7 +130,7 @@ test.describe('accessibility sweep (T-063)', () => {
 
   test('Urdu: core selling and back-office screens', async ({ page }) => {
     const { productId, supplierId, saleId, customerId } = await prepare(page);
-    await page.getByLabel('Language').selectOption('ur');
+    await setLanguage(page, 'ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ur');
     const routes: Route[] = [

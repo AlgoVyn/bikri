@@ -23,7 +23,7 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
     await window.__bikriTest?.seedTodaySales();
   });
   await page.reload();
-  await page.waitForSelector('nav');
+  await page.waitForSelector('nav:not([data-testid="breadcrumbs"])');
 }
 
 test.describe('design layout invariants', () => {
@@ -62,7 +62,7 @@ test.describe('design layout invariants', () => {
     await seedVisualShop(page);
     await page.evaluate(() => localStorage.setItem('bikri.language', 'ur'));
     await page.reload();
-    await page.waitForSelector('nav');
+    await page.waitForSelector('nav:not([data-testid="breadcrumbs"])');
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
       for (const route of ['/', '/sell', '/products', '/sales'] as const) {
@@ -70,6 +70,23 @@ test.describe('design layout invariants', () => {
         await page.waitForTimeout(250);
         await expectNoHorizontalScroll(page);
       }
+    }
+  });
+
+  test('200% zoom equivalent keeps core screens inside 640x400', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 400 });
+    await seedVisualShop(page);
+    for (const route of [
+      '/',
+      '/sell',
+      '/products',
+      '/settings/shop',
+    ] as const) {
+      await page.evaluate((to) => window.__bikriTest?.navigate(to), route);
+      await page.waitForTimeout(250);
+      await expectNoHorizontalScroll(page);
     }
   });
 

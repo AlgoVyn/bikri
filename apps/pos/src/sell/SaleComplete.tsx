@@ -231,7 +231,10 @@ export function SaleComplete({
           })}
         </p>
       ) : null}
-      <dl className="w-full rounded-card border border-border bg-surface-2/50 p-3 text-start text-small">
+      <dl
+        data-testid="sale-receipt"
+        className="receipt-paper w-full p-3 text-start text-small"
+      >
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-muted">
             {t('sell.items', { count: Number(sale.line_count ?? 0) })}

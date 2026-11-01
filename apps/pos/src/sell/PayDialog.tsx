@@ -126,21 +126,6 @@ export function PayDialog({
       onOpenChange={onOpenChange}
       full
       title={done ? t('pay.done_title') : t('sell.take_payment')}
-      header={
-        done ? null : (
-          <div className="text-end">
-            <p className="text-small text-text-muted">
-              {t('sell.total_to_pay')}
-            </p>
-            <p
-              className="text-total font-semibold whitespace-nowrap max-sm:text-title"
-              data-testid="pay-total"
-            >
-              <MoneyText paisa={totals.total} />
-            </p>
-          </div>
-        )
-      }
     >
       {done ? (
         <Suspense fallback={<p className="sr-only">{t('common.loading')}</p>}>
@@ -327,143 +312,215 @@ function PayStep({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
-      <div
-        role="tablist"
-        aria-label={t('pay.method')}
-        className="grid grid-cols-2 gap-2"
-      >
-        {PAY_METHODS.map((m) => {
-          const Icon = METHOD_ICON[m];
-          const active = row?.method === m;
-          return (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={`flex min-h-20 items-center gap-2 rounded-control border p-3 text-start ${
-                active
-                  ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
-                  : 'border-border bg-surface text-text-muted hover:bg-surface-2'
-              }`}
-              onClick={() => chooseMethod(m)}
-            >
-              <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-control ${
-                  active
-                    ? 'bg-surface text-primary'
-                    : 'bg-surface-2 text-text-muted'
-                }`}
-              >
-                <Icon />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-small font-medium">
-                  {t(METHOD_KEY[m])}
-                </span>
-                <span
-                  className={`block text-small ${active ? 'text-primary-subtle-ink' : 'text-text-muted'}`}
-                >
-                  {t(METHOD_HINT[m])}
-                </span>
-              </span>
-              {active ? (
-                <span
-                  aria-hidden="true"
-                  className="text-title text-primary-subtle-ink"
-                >
-                  ✓
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {row ? (
-        <MethodPanel
-          key={`${activeRow}-${row.method}`}
-          row={row}
-          due={dueFor(activeRow)}
-          change={s.change}
-          remaining={s.remaining}
-          onChange={(patch) => setRow(activeRow, patch)}
-          customer={customer}
-          credit={credit ?? null}
-          hardBlocked={hardBlocked}
-          onPickCustomer={() => setPicker(true)}
-          onOverride={() =>
-            requestOverride('udhaar.hard_limit', (by) => {
-              void mutateCart(cartId, (c) =>
-                addOverride(c, {
-                  permission: 'udhaar.hard_limit',
-                  approved_by: by,
-                }),
-              );
-            })
-          }
-        />
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        {rows.length > 1 ? (
-          <ul aria-label={t('pay.split_list')} className="flex flex-col gap-1">
-            {rows.map((r, i) => (
-              <li
-                // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity; position is what the cashier edits
-                key={`${i}-${r.method}`}
-                data-testid="pay-row"
-                className={`flex items-center gap-2 rounded-control border px-2 ${i === activeRow ? 'border-primary' : 'border-border'}`}
-              >
-                <button
-                  type="button"
-                  className="min-h-11 flex-1 text-start"
-                  onClick={() => setActiveRow(i)}
-                >
-                  {t(METHOD_KEY[r.method])} · <MoneyText paisa={r.amount} />
-                </button>
-                <button
-                  type="button"
-                  className="min-h-11 px-2 text-danger"
-                  onClick={() => removeRow(i)}
-                >
-                  {t('pay.remove')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={addSplit}
-            disabled={rows.length >= 4}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <div
+            role="tablist"
+            aria-label={t('pay.method')}
+            className="grid grid-cols-2 gap-2"
           >
-            {t('pay.split')}
-          </button>
-          <p data-testid="pay-running" aria-live="polite">
-            {t('pay.running', {
-              paid: formatShopMoney(s.paidTotal + s.udhaar),
-              remaining: formatShopMoney(s.remaining),
+            {PAY_METHODS.map((m) => {
+              const Icon = METHOD_ICON[m];
+              const active = row?.method === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={`flex min-h-20 items-center gap-2 rounded-control border p-3 text-start ${
+                    active
+                      ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
+                      : 'border-border bg-surface text-text-muted hover:bg-surface-2'
+                  }`}
+                  onClick={() => chooseMethod(m)}
+                >
+                  <span
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-control ${
+                      active
+                        ? 'bg-surface text-primary'
+                        : 'bg-surface-2 text-text-muted'
+                    }`}
+                  >
+                    <Icon />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-small font-medium">
+                      {t(METHOD_KEY[m])}
+                    </span>
+                    <span
+                      className={`block text-small ${active ? 'text-primary-subtle-ink' : 'text-text-muted'}`}
+                    >
+                      {t(METHOD_HINT[m])}
+                    </span>
+                  </span>
+                  {active ? (
+                    <span
+                      aria-hidden="true"
+                      className="text-title text-primary-subtle-ink"
+                    >
+                      ✓
+                    </span>
+                  ) : null}
+                </button>
+              );
             })}
-          </p>
+          </div>
+
+          {row ? (
+            <MethodPanel
+              key={`${activeRow}-${row.method}`}
+              row={row}
+              due={dueFor(activeRow)}
+              onChange={(patch) => setRow(activeRow, patch)}
+              customer={customer}
+              credit={credit ?? null}
+              hardBlocked={hardBlocked}
+              onPickCustomer={() => setPicker(true)}
+              onOverride={() =>
+                requestOverride('udhaar.hard_limit', (by) => {
+                  void mutateCart(cartId, (c) =>
+                    addOverride(c, {
+                      permission: 'udhaar.hard_limit',
+                      approved_by: by,
+                    }),
+                  );
+                })
+              }
+            />
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            {rows.length > 1 ? (
+              <ul
+                aria-label={t('pay.split_list')}
+                className="flex flex-col gap-1"
+              >
+                {rows.map((r, i) => (
+                  <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity; position is what the cashier edits
+                    key={`${i}-${r.method}`}
+                    data-testid="pay-row"
+                    className={`flex items-center gap-2 rounded-control border px-2 ${i === activeRow ? 'border-primary' : 'border-border'}`}
+                  >
+                    <button
+                      type="button"
+                      className="min-h-11 flex-1 text-start"
+                      onClick={() => setActiveRow(i)}
+                    >
+                      {t(METHOD_KEY[r.method])} · <MoneyText paisa={r.amount} />
+                    </button>
+                    <button
+                      type="button"
+                      className="min-h-11 px-2 text-danger"
+                      onClick={() => removeRow(i)}
+                    >
+                      {t('pay.remove')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={addSplit}
+                disabled={rows.length >= 4}
+              >
+                {t('pay.split')}
+              </button>
+              <p data-testid="pay-running" aria-live="polite">
+                {t('pay.running', {
+                  paid: formatShopMoney(s.paidTotal + s.udhaar),
+                  remaining: formatShopMoney(s.remaining),
+                })}
+              </p>
+            </div>
+            {s.overpaid ? (
+              <p className="text-danger" role="alert">
+                {t('pay.overpaid')}
+              </p>
+            ) : null}
+            {needsCustomer ? (
+              <p className="text-danger" role="alert">
+                {t('pay.need_customer')}
+              </p>
+            ) : null}
+            {udhaarDenied ? (
+              <p className="text-danger" role="alert">
+                {t('pay.no_udhaar')}
+              </p>
+            ) : null}
+          </div>
         </div>
-        {s.overpaid ? (
-          <p className="text-danger" role="alert">
-            {t('pay.overpaid')}
-          </p>
-        ) : null}
-        {needsCustomer ? (
-          <p className="text-danger" role="alert">
-            {t('pay.need_customer')}
-          </p>
-        ) : null}
-        {udhaarDenied ? (
-          <p className="text-danger" role="alert">
-            {t('pay.no_udhaar')}
-          </p>
-        ) : null}
+        <aside
+          aria-label={t('pay.summary')}
+          className="flex flex-col gap-3 rounded-card border border-border bg-surface-2/50 p-3 lg:sticky lg:top-0"
+        >
+          <div>
+            <p className="text-small text-text-muted">
+              {t('sell.total_to_pay')}
+            </p>
+            <p
+              className="text-figure font-semibold whitespace-nowrap"
+              data-testid="pay-total"
+            >
+              <MoneyText paisa={total} />
+            </p>
+            <p className="text-small text-text-muted">
+              {t('pay.items_count', { count: cart.lines.length })}
+            </p>
+          </div>
+          <dl className="flex flex-col gap-2 border-t border-border pt-2 text-small">
+            <div className="flex justify-between gap-2">
+              <dt className="text-text-muted">{t('pay.paid')}</dt>
+              <dd>
+                <MoneyText paisa={s.paidTotal} />
+              </dd>
+            </div>
+            {s.udhaar > 0 ? (
+              <div className="flex justify-between gap-2">
+                <dt className="text-text-muted">{t('pay.udhaar')}</dt>
+                <dd>
+                  <MoneyText paisa={s.udhaar} />
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-control border border-border bg-surface p-2">
+              <p className="text-small text-text-muted">
+                {t('pay.change_label')}
+              </p>
+              {s.change > 0 ? (
+                <p
+                  className="text-title font-semibold text-success"
+                  data-testid="pay-change"
+                  aria-live="polite"
+                >
+                  <MoneyText paisa={s.change} />
+                </p>
+              ) : (
+                <p className="text-title font-semibold">—</p>
+              )}
+            </div>
+            <div className="rounded-control border border-border bg-surface p-2">
+              <p className="text-small text-text-muted">{t('pay.due_label')}</p>
+              {s.remaining > 0 ? (
+                <p
+                  className="text-title font-semibold text-warning"
+                  data-testid="pay-due"
+                  aria-live="polite"
+                >
+                  <MoneyText paisa={s.remaining} />
+                </p>
+              ) : (
+                <p className="text-title font-semibold">—</p>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -525,8 +582,6 @@ function PayStep({
 function MethodPanel({
   row,
   due,
-  change,
-  remaining,
   onChange,
   customer,
   credit,
@@ -536,8 +591,6 @@ function MethodPanel({
 }: {
   row: PayRow;
   due: number;
-  change: number;
-  remaining: number;
   onChange: (patch: Partial<PayRow>) => void;
   customer: ReturnType<typeof useCustomer>;
   credit: Awaited<ReturnType<typeof udhaarCheck>> | null;
@@ -576,38 +629,6 @@ function MethodPanel({
               {i === 0 ? t('pay.exact') : <MoneyText paisa={v} />}
             </button>
           ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-control border border-border bg-surface-2 p-2">
-            <p className="text-small text-text-muted">
-              {t('pay.change_label')}
-            </p>
-            {change > 0 ? (
-              <p
-                className="text-title font-semibold text-success"
-                data-testid="pay-change"
-                aria-live="polite"
-              >
-                <MoneyText paisa={change} />
-              </p>
-            ) : (
-              <p className="text-title font-semibold">—</p>
-            )}
-          </div>
-          <div className="rounded-control border border-border bg-surface-2 p-2">
-            <p className="text-small text-text-muted">{t('pay.due_label')}</p>
-            {remaining > 0 ? (
-              <p
-                className="text-title font-semibold text-warning"
-                data-testid="pay-due"
-                aria-live="polite"
-              >
-                <MoneyText paisa={remaining} />
-              </p>
-            ) : (
-              <p className="text-title font-semibold">—</p>
-            )}
-          </div>
         </div>
       </div>
     );

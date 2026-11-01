@@ -181,9 +181,16 @@ export function DayClosePage() {
       <div className={pageClass('standard')}>
         <h1 className="text-h1 font-semibold">{t('office.dayclose.title')}</h1>
         <div className="rounded-card border border-border bg-surface p-4">
-          <p className="text-title font-semibold" data-testid="day-closed">
-            {t('office.dayclose.closed')}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-title font-semibold" data-testid="day-closed">
+              {t('office.dayclose.closed')}
+            </p>
+            {Number(closed.difference) === 0 ? (
+              <span className="inline-flex -rotate-3 items-center rounded-control border-2 border-success px-2 py-0.5 text-small font-semibold uppercase tracking-wide text-success">
+                {t('office.dayclose.balanced')}
+              </span>
+            ) : null}
+          </div>
           <dl className="mt-2 grid grid-cols-2 gap-2 text-small sm:grid-cols-3">
             <Metric
               label={t('office.dayclose.expected')}

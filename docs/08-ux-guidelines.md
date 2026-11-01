@@ -19,7 +19,7 @@ The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behavio
 - **Sell**: customer tabs show each cart's total or `Empty`; the active tab is solid; product tiles show the quantity already in the cart and a green/amber/red stock pill; the cart panel and totals are visually separate surfaces.
 - **Pay**: payment methods are descriptive cards (icon + method + hint) with a visible selected check; change and remaining are shown as two summary cards.
 - **Settings**: a master–detail split on ≥ 1280 px — the grouped index (icon, title, hint and chevron) stays in the start column and the selected section fills the end column; below 1280 px the section is a full page with a back arrow.
-- **Lists and detail**: Sales, Products, Udhaar and Suppliers use the same master–detail split — the list stays on the start side and the selected bill/product/customer/supplier fills the end side with a placeholder when nothing is selected; below 1280 px the detail is a full page with a back arrow.
+- **Lists and detail**: Sales, Products, Udhaar and Suppliers keep the list full width until a row is selected; at ≥1280 px the selected bill/product/customer/supplier then opens beside it, so there is never an empty detail pane to auto-fill. Below 1280 px the detail is a full page with a back arrow.
 - **Lists**: a filter card, a summary card and the rows/table in their own card; page-level titles use the icon header.
 
 Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.
@@ -235,7 +235,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 266 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 269 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 
