@@ -180,7 +180,8 @@ export function ReportsPage() {
           ? undefined
           : (await reportBundle(db, previousRange, options)).summary;
     } else {
-      const id = (requestId.current += 1);
+      requestId.current += 1;
+      const id = requestId.current;
       const result = await new Promise<{
         bundle: ReportBundle;
         previous?: ReportSummary;

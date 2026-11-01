@@ -3,7 +3,6 @@ import type { SyncedRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import {
-  DeliveryError,
   paySupplier,
   SupplierPaymentError,
   saveDelivery,
