@@ -282,35 +282,30 @@ body {
   }
 }
 
+/* Transform-only: opacity fades make axe sample text mid-animation and fail contrast. */
 @keyframes bikri-content-in {
   from {
-    opacity: 0;
     transform: translateY(6px) scale(0.985);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
 
 @keyframes bikri-toast-in {
   from {
-    opacity: 0;
     transform: translateY(8px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
 
 @keyframes bikri-menu-in {
   from {
-    opacity: 0;
     transform: translateY(-2px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
