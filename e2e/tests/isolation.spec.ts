@@ -108,7 +108,9 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
     'data-state',
     'quota',
   );
-  await expect(a.page.getByTestId('sync-badge')).toContainText(
+  // The badge is a dot: the reason lives in its accessible name, not its text.
+  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
+    'aria-label',
     'Daily sync limit reached',
   );
   // Shop B keeps syncing.

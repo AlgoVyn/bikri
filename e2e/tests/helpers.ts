@@ -27,6 +27,20 @@ export async function setLanguage(
 
 /** No serious/critical axe violation (08 §8; T-063). */
 export async function expectNoSeriousAxe(page: Page): Promise<void> {
+  // Axe reads computed colours. A form that fills in from IndexedDB can be caught
+  // part-way through a 150 ms colour transition, which reports a false contrast
+  // failure. Freeze transitions and finite animations so the scan sees the colours
+  // the user ends on.
+  await page.addStyleTag({
+    content:
+      '*,*::before,*::after{transition:none!important;animation:none!important}',
+  });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      }),
+  );
   const axe = await new AxeBuilder({ page }).analyze();
   expect(
     axe.violations.filter(
