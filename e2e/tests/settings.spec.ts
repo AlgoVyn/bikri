@@ -208,6 +208,25 @@ test.describe('Settings (T-050)', () => {
     else expect(after).toBeGreaterThan(0);
   });
 
+  test('the Settings index keeps its own scroll and has no visible bar', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
+    await openReadyShop(page, '/bikri/settings');
+    const index = page.getByTestId('settings-index');
+    await index.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const before = await index.evaluate((element) => element.scrollTop);
+    expect(before).toBeGreaterThan(0);
+    await page.getByRole('link', { name: /About/ }).click();
+    await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+    const after = await page
+      .getByTestId('settings-index')
+      .evaluate((element) => element.scrollTop);
+    expect(after).toBeGreaterThan(0);
+  });
+
   test('every Settings section has a Back button to Settings', async ({
     page,
   }) => {
@@ -244,21 +263,19 @@ test.describe('Settings (T-050)', () => {
     await expect(page.getByRole('heading', { name: 'Printer' })).toBeVisible();
   });
 
-  test('About lists the keyboard shortcuts instead of button badges', async ({
+  test('About shows version, source and terms, not a second shortcut table', async ({
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings/about');
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
+    await expect(page.getByText(/^Version:/u)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Source code' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Terms and privacy' }),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Keyboard shortcuts' }),
-    ).toBeVisible();
-    await expect(page.getByText('Ctrl+Shift+P', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText('Ctrl+Shift+1…9', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText('Ctrl+Shift+9', { exact: true })).toHaveCount(
-      0,
-    );
+    ).toHaveCount(0);
   });
 
   test('device language, theme and text size apply immediately', async ({

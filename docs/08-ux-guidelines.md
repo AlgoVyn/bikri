@@ -193,7 +193,7 @@ Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference vie
 
 ## 6. Global hotkeys
 
-Shortcuts are listed in Settings → About; navigation items also show their key in the tooltip. They are not printed on action buttons. Disabled while typing in a text field unless noted.
+Shortcuts are listed in the `?` shortcut sheet (also linked from the staff menu); navigation items also show their key in the tooltip. They are not printed on action buttons, and About does not repeat the table. Disabled while typing in a text field unless noted.
 
 | Key | Action | Scope |
 |---|---|---|

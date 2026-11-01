@@ -522,13 +522,23 @@ function GettingStarted({
           </span>
         </button>
       </div>
-      <div aria-hidden="true" className="flex gap-1 px-4 pb-3">
-        {steps.map((step) => (
-          <span
-            key={step.title}
-            className={`h-1.5 flex-1 rounded-full ${step.done ? 'bg-success' : 'bg-surface-2'}`}
+      <div className="px-4 pb-3">
+        <div
+          role="progressbar"
+          aria-label={t('home.steps_progress', {
+            done,
+            total: steps.length,
+          })}
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuenow={done}
+          className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+        >
+          <div
+            className="h-full rounded-full bg-success transition-[width] duration-200"
+            style={{ width: `${(done / steps.length) * 100}%` }}
           />
-        ))}
+        </div>
       </div>
       <ol className="divide-y divide-border border-t border-border">
         {pending.map((step) => (

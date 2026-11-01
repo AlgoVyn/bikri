@@ -8,6 +8,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
@@ -204,52 +205,42 @@ export function ExpensesPage() {
             {t(`office.expenses.range_${p}`)}
           </button>
         ))}
+      </div>
+      <div className="flex flex-wrap items-end justify-between gap-2">
         {preset === 'custom' ? (
-          <span className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col text-small">
-              {t('office.expenses.from')}
-              <input
-                type="date"
-                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
-                value={custom.from}
-                max={custom.to}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    from: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="flex flex-col text-small">
-              {t('office.expenses.to')}
-              <input
-                type="date"
-                className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
-                value={custom.to}
-                min={custom.from}
-                onChange={(event) =>
-                  setCustom((current) => ({
-                    ...current,
-                    to: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </span>
+          <div className="flex flex-wrap items-end gap-2">
+            <DateField
+              className="w-[9.5rem]"
+              label={t('office.expenses.from')}
+              value={custom.from}
+              max={custom.to}
+              onChange={(value) =>
+                setCustom((current) => ({ ...current, from: value }))
+              }
+            />
+            <DateField
+              className="w-[9.5rem]"
+              label={t('office.expenses.to')}
+              value={custom.to}
+              min={custom.from}
+              onChange={(value) =>
+                setCustom((current) => ({ ...current, to: value }))
+              }
+            />
+          </div>
         ) : null}
-        {preset === 'custom' && !customValid ? (
-          <p role="alert" className="w-full text-small text-danger">
-            {t('office.expenses.range_invalid')}
-          </p>
-        ) : null}
-        <p className="ms-auto self-center text-small">
+        <p className="ms-auto text-small">
           {t('office.expenses.total')}:{' '}
           <span className="text-title font-semibold">
             <MoneyText paisa={data?.total ?? 0} />
           </span>
         </p>
       </div>
+      {preset === 'custom' && !customValid ? (
+        <p role="alert" className="text-small text-danger">
+          {t('office.expenses.range_invalid')}
+        </p>
+      ) : null}
 
       <ListSurface
         summary={

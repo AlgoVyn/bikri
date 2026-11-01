@@ -84,12 +84,15 @@ function StaffList() {
                   <span className="block truncate font-medium">
                     {String(row.staff.name)}
                   </span>
-                  <span className="text-small text-text-muted">
-                    {t(`office.staff.role_${String(row.staff.role)}`)}
-                    {' · '}
-                    {row.staff.active === 1
-                      ? t('office.staff.active')
-                      : t('office.staff.inactive')}
+                  <span className="flex flex-wrap items-center gap-1.5 text-small text-text-muted">
+                    <span className="rounded-pill bg-surface-2 px-2 py-0.5 text-caption font-medium">
+                      {t(`office.staff.role_${String(row.staff.role)}`)}
+                    </span>
+                    <span>
+                      {row.staff.active === 1
+                        ? t('office.staff.active')
+                        : t('office.staff.inactive')}
+                    </span>
                   </span>
                 </span>
                 {row.isLastOwner ? (

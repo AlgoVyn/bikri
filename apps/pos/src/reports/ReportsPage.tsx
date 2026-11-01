@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
@@ -276,62 +277,55 @@ export function ReportsPage() {
         }
       />
 
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className={`${scrollStrip} items-center`}>
-          {(limited
-            ? PRESETS.filter((item) => item.id === 'today')
-            : PRESETS
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={preset === item.id}
-              className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-              onClick={() => setPreset(item.id)}
-            >
-              {t(item.key)}
-            </button>
-          ))}
-          {preset === 'custom' && !limited ? (
-            <span className="flex flex-wrap items-center gap-1">
-              <label className="flex items-center gap-1 text-small">
-                {t('office.reports.from')}
-                <input
-                  type="date"
-                  className={field}
-                  value={custom.from}
-                  max={data.today}
-                  onChange={(event) =>
-                    setCustom((current) => ({
-                      ...current,
-                      from: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label className="flex items-center gap-1 text-small">
-                {t('office.reports.to')}
-                <input
-                  type="date"
-                  className={field}
-                  value={custom.to}
-                  min={custom.from}
-                  max={data.today}
-                  onChange={(event) =>
-                    setCustom((current) => ({
-                      ...current,
-                      to: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            </span>
-          ) : null}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className={`${scrollStrip} items-center`}>
+            {(limited
+              ? PRESETS.filter((item) => item.id === 'today')
+              : PRESETS
+            ).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={preset === item.id}
+                className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
+                onClick={() => setPreset(item.id)}
+              >
+                {t(item.key)}
+              </button>
+            ))}
+          </div>
+          <span
+            className="text-small text-text-muted"
+            data-testid="report-range"
+          >
+            {longDate(bundle.range.from, lang)} –{' '}
+            {longDate(bundle.range.to, lang)}
+          </span>
         </div>
-        <span className="text-small text-text-muted" data-testid="report-range">
-          {longDate(bundle.range.from, lang)} –{' '}
-          {longDate(bundle.range.to, lang)}
-        </span>
+        {preset === 'custom' && !limited ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <DateField
+              className="w-[9.5rem]"
+              label={t('office.reports.from')}
+              value={custom.from}
+              max={data.today}
+              onChange={(value) =>
+                setCustom((current) => ({ ...current, from: value }))
+              }
+            />
+            <DateField
+              className="w-[9.5rem]"
+              label={t('office.reports.to')}
+              value={custom.to}
+              min={custom.from}
+              max={data.today}
+              onChange={(value) =>
+                setCustom((current) => ({ ...current, to: value }))
+              }
+            />
+          </div>
+        ) : null}
       </div>
 
       <div

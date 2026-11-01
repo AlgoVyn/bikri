@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
@@ -242,36 +243,26 @@ export function SalesList({
               {t(p.key)}
             </button>
           ))}
-          {preset === 'custom' ? (
-            <span className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col text-small">
-                {t('office.sales.from')}
-                <input
-                  type="date"
-                  className={selectClass}
-                  value={custom.from}
-                  max={custom.to}
-                  onChange={(e) =>
-                    setCustom((c) => ({ ...c, from: e.target.value }))
-                  }
-                />
-              </label>
-              <label className="flex flex-col text-small">
-                {t('office.sales.to')}
-                <input
-                  type="date"
-                  className={selectClass}
-                  value={custom.to}
-                  min={custom.from}
-                  onChange={(e) =>
-                    setCustom((c) => ({ ...c, to: e.target.value }))
-                  }
-                />
-              </label>
-            </span>
-          ) : null}
         </div>
       )}
+      {!limited && preset === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.sales.from')}
+            value={custom.from}
+            max={custom.to}
+            onChange={(value) => setCustom((c) => ({ ...c, from: value }))}
+          />
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.sales.to')}
+            value={custom.to}
+            min={custom.from}
+            onChange={(value) => setCustom((c) => ({ ...c, to: value }))}
+          />
+        </div>
+      ) : null}
 
       <ListSurface
         toolbar={

@@ -32,3 +32,23 @@
     box-shadow: var(--shadow-card);
   }
 }
+
+/* A soft edge on phone strips hints that there is more to scroll. */
+@media (max-width: 1023.98px) {
+  .scroll-strip {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12px,
+      black calc(100% - 12px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12px,
+      black calc(100% - 12px),
+      transparent
+    );
+  }
+}

@@ -11,6 +11,8 @@ import { SettingsNav } from './SettingsNav.tsx';
  * Settings on ≥1280 px uses the reference app's master–detail split: the index stays on the
  * start side and the selected section fills the end side. Below that, a section is a full page.
  */
+let settingsNavScroll = 0;
+
 export function SettingsSplit({
   index = false,
   children,
@@ -19,6 +21,11 @@ export function SettingsSplit({
   children?: ReactNode;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
+
+  // Restore the index's own scroll after a section route remounts the nav.
+  useLayoutEffect(() => {
+    if (navRef.current) navRef.current.scrollTop = settingsNavScroll;
+  }, []);
 
   // Selecting a section is a route change, so SettingsNav remounts and the document height
   // briefly collapses. Keep the scroll of the nav on the desktop split; on smaller screens
@@ -54,7 +61,11 @@ export function SettingsSplit({
         <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
           <div
             ref={navRef}
-            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto`}
+            data-testid="settings-index"
+            onScroll={(event) => {
+              settingsNavScroll = event.currentTarget.scrollTop;
+            }}
+            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden`}
           >
             <SettingsNav />
           </div>

@@ -373,7 +373,7 @@ export function CustomerStatement({
 
       <div className="flex flex-wrap items-end gap-2">
         <DateField
-          className="w-40"
+          className="w-[9.5rem]"
           label={t('office.udhaar.from')}
           value={from}
           max={to}
@@ -381,7 +381,7 @@ export function CustomerStatement({
           hint={from ? dateText(from, i18n.language, tz) : undefined}
         />
         <DateField
-          className="w-40"
+          className="w-[9.5rem]"
           label={t('office.udhaar.to')}
           value={to}
           min={from}
