@@ -575,7 +575,7 @@ function QuickActions({
             <Link
               to={tile.to}
               title={tile.keys ? `${t(tile.label)} (${tile.keys})` : undefined}
-              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2"
+              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2 hover:shadow-card-hover"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
                 <tile.Icon />
@@ -603,7 +603,7 @@ function QuickActions({
               type="button"
               title={`${t('home.price_check')} (Ctrl+Shift+P)`}
               onClick={() => openPriceCheck(true)}
-              className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2"
+              className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2 hover:shadow-card-hover"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
                 <SearchIcon />

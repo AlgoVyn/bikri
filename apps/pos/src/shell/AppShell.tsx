@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
+import { MoreIcon, SearchIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
@@ -11,6 +12,7 @@ import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Banners } from './Banners.tsx';
 import { Breadcrumbs } from './Breadcrumbs.tsx';
+import { CommandPalette } from './CommandPalette.tsx';
 import { GlobalSearch } from './GlobalSearch.tsx';
 import { ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
@@ -180,7 +182,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-hidden="true"
             className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
           >
-            <SalesIcon />
+            <BikriMark className="size-5" />
           </span>
           <span className="text-micro font-semibold uppercase tracking-[0.18em] text-rail-muted">
             {t('common.app_name')}
@@ -293,6 +295,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {blocked ? null : children}
       </main>
       <PriceCheck />
+      <CommandPalette />
     </div>
   );
 }

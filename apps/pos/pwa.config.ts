@@ -26,7 +26,7 @@ export const pwaOptions = {
     start_url: scope,
     scope,
     theme_color: '#006BB3',
-    background_color: '#F8FAFC',
+    background_color: '#F1F5F9',
     orientation: 'any',
     icons: [
       {

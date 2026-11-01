@@ -36,16 +36,18 @@ function DisplayContent() {
   const toast = useToast();
   const stored = useLiveQuery(() => loadDevicePrefs(getDb()), []);
   const [form, setForm] = useState<DevicePrefs>(DEFAULT_PREFS);
+  const touched = useRef(false);
   const [gap, setGap] = useState<number | null>(null);
   const last = useRef<number | null>(null);
   useEffect(() => {
-    if (stored) setForm(stored);
+    if (stored && !touched.current) setForm(stored);
   }, [stored]);
   useEffect(() => {
     applyDevicePrefs(form, i18n.language);
   }, [form, i18n.language]);
 
   const change = (patch: Partial<DevicePrefs>) => {
+    touched.current = true;
     const next = { ...form, ...patch };
     setForm(next);
     applyDevicePrefs(next, i18n.language);
@@ -138,6 +140,14 @@ function DisplayContent() {
             onChange={(event) => change({ suffixEnter: event.target.checked })}
           />
           {t('office.display.suffix_enter')}
+        </label>
+        <label className="flex items-center gap-2 text-small">
+          <input
+            type="checkbox"
+            checked={form.saleSound}
+            onChange={(event) => change({ saleSound: event.target.checked })}
+          />
+          {t('office.display.sale_sound')}
         </label>
         <label className="flex flex-col gap-1 text-small">
           {t('office.display.scanner_test')}

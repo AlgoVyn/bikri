@@ -11,6 +11,7 @@ export type DevicePrefs = {
   autoLockMinutes: number;
   camera: boolean;
   suffixEnter: boolean;
+  saleSound: boolean;
 };
 
 export const THEME_STORAGE_KEY = 'bikri.theme';
@@ -21,6 +22,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   autoLockMinutes: 10,
   camera: false,
   suffixEnter: true,
+  saleSound: true,
 };
 
 export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
@@ -49,6 +51,7 @@ export async function saveDevicePrefs(
     autoLockMinutes: prefs.autoLockMinutes,
     camera: prefs.camera,
     suffixEnter: prefs.suffixEnter,
+    saleSound: prefs.saleSound,
   });
   await setKv(db, 'auto_lock_minutes', prefs.autoLockMinutes);
 }

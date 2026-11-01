@@ -10,6 +10,7 @@ import {
   DeviceIcon,
   InfoIcon,
   PrinterIcon,
+  SearchIcon,
   SettingsIcon,
   StoreIcon,
   TagIcon,
@@ -37,12 +38,27 @@ function SettingsNavContent() {
   const { t } = useTranslation();
   const { role, can, support } = useCurrentStaff();
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const info = useLiveQuery(async () => {
     const db = getDb();
+    const [device, tenant, enrolled, pending, lastSync, printer, storage] =
+      await Promise.all([
+        deviceInfo(db),
+        tenantInfo(db),
+        db.kv.get('device_token').then((row) => Boolean(row?.value)),
+        db.outbox.where('status').equals('pending').count(),
+        db.kv.get('last_sync_at').then((row) => Number(row?.value ?? 0)),
+        db.kv.get('printer').then((row) => Boolean(row?.value)),
+        navigator.storage?.estimate?.().catch(() => null) ?? null,
+      ]);
     return {
-      device: await deviceInfo(db),
-      tenant: await tenantInfo(db),
-      enrolled: Boolean((await db.kv.get('device_token'))?.value),
+      device,
+      tenant,
+      enrolled,
+      pending,
+      lastSync,
+      printer,
+      storageBytes: storage?.usage ?? null,
     };
   }, []);
   const owner = role === 'owner';
@@ -67,106 +83,217 @@ function SettingsNavContent() {
       );
     }
   };
+  const q = query.trim().toLowerCase();
+  const match = (title: string, hint: string) =>
+    !q || `${title} ${hint}`.toLowerCase().includes(q);
+  const rows = [
+    {
+      group: 'shop',
+      to: '/settings/shop',
+      icon: <StoreIcon />,
+      title: t('office.settings.nav_shop'),
+      hint: t('office.settings.nav_shop_hint'),
+      show: can('settings.shop'),
+    },
+    {
+      group: 'shop',
+      to: '/settings/cashiers',
+      icon: <UsersIcon />,
+      title: t('office.settings.nav_cashiers'),
+      hint: t('office.settings.nav_cashiers_hint'),
+      show: can('settings.staff'),
+    },
+    {
+      group: 'shop',
+      to: '/settings/activity',
+      icon: <ClockIcon />,
+      title: t('office.settings.nav_activity'),
+      hint: t('office.settings.nav_activity_hint'),
+      show: can('settings.shop'),
+    },
+    {
+      group: 'device',
+      to: '/settings/printer',
+      icon: <PrinterIcon />,
+      title: t('printer.title'),
+      hint: t('office.settings.nav_printer_hint'),
+      show: true,
+    },
+    {
+      group: 'device',
+      to: '/settings/labels',
+      icon: <TagIcon />,
+      title: t('office.settings.nav_labels'),
+      hint: t('office.settings.nav_labels_hint'),
+      show: can('catalog.edit'),
+    },
+    {
+      group: 'device',
+      to: '/settings/display',
+      icon: <SettingsIcon />,
+      title: t('office.settings.nav_display'),
+      hint: t('office.settings.nav_display_hint'),
+      show: true,
+    },
+    {
+      group: 'data',
+      to: '/settings/sync',
+      icon: <CloudIcon />,
+      title: t('syncpage.title'),
+      hint: t('office.settings.nav_sync_hint'),
+      show: true,
+    },
+    {
+      group: 'data',
+      to: '/settings/devices',
+      icon: <DeviceIcon />,
+      title: t('devices.title'),
+      hint: t('office.settings.nav_devices_hint'),
+      show:
+        support || Boolean(owner && info?.device?.is_admin && info.enrolled),
+    },
+    {
+      group: 'data',
+      to: '/settings/backup',
+      icon: <CloudIcon />,
+      title: t('office.backup.title'),
+      hint: t('office.backup.nav_hint'),
+      show: can('export.data') && owner,
+    },
+    {
+      group: 'data',
+      to: '/settings/about',
+      icon: <InfoIcon />,
+      title: t('office.settings.nav_about'),
+      hint: t('office.settings.nav_about_hint'),
+      show: true,
+    },
+  ].filter((row) => row.show && match(row.title, row.hint));
+  const groups = [
+    { id: 'shop', label: t('office.settings.nav_group_shop') },
+    { id: 'device', label: t('office.settings.nav_group_device') },
+    { id: 'data', label: t('office.settings.nav_group_data') },
+  ]
+    .map((group) => ({
+      ...group,
+      rows: rows.filter((row) => row.group === group.id),
+    }))
+    .filter((group) => group.rows.length > 0);
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={<SettingsIcon />}
-        tone="bg-surface-2 text-text-muted"
         title={t('nav.settings')}
         subtitle={t('office.settings.subtitle')}
       />
+      <section
+        aria-labelledby="data-safety"
+        className="rounded-card border border-border bg-surface p-3"
+      >
+        <h2 id="data-safety" className="text-h2 font-semibold">
+          {t('office.settings.health_title')}
+        </h2>
+        <dl className="mt-2 grid grid-cols-2 gap-2 text-small">
+          <div>
+            <dt className="text-text-muted">
+              {t('office.settings.health_sync')}
+            </dt>
+            <dd className="font-medium">
+              {info?.pending
+                ? t('office.settings.health_pending', {
+                    count: info.pending,
+                  })
+                : t('office.settings.health_up_to_date')}
+              <span className="block text-caption font-normal text-text-muted">
+                {info?.lastSync
+                  ? t('shell.sync_ago', {
+                      minutes: Math.max(
+                        0,
+                        Math.round((Date.now() - info.lastSync) / 60_000),
+                      ),
+                    })
+                  : t('shell.sync_never')}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">
+              {t('office.settings.health_storage')}
+            </dt>
+            <dd className="font-medium">
+              {info?.storageBytes
+                ? t('office.settings.health_storage_value', {
+                    mb: Math.max(1, Math.round(info.storageBytes / 1_048_576)),
+                  })
+                : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">
+              {t('office.settings.health_backup')}
+            </dt>
+            <dd className="font-medium">
+              {owner && can('export.data') ? (
+                <Link to="/settings/backup" className="text-primary">
+                  {t('office.settings.health_backup_value')}
+                </Link>
+              ) : (
+                t('office.settings.health_backup_value')
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">
+              {t('office.settings.health_printer')}
+            </dt>
+            <dd className="font-medium">
+              <Link to="/settings/printer" className="text-primary">
+                {info?.printer
+                  ? t('shell.printer_ready')
+                  : t('shell.printer_none')}
+              </Link>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <label className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+        <SearchIcon />
+        <span className="sr-only">{t('office.settings.health_search')}</span>
+        <input
+          type="search"
+          className="min-w-0 flex-1 bg-transparent text-body outline-none"
+          placeholder={t('office.settings.health_search')}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+
       <nav aria-label={t('nav.settings')} className="flex flex-col gap-4">
-        {can('settings.shop') ? (
-          <section>
+        {groups.map((group) => (
+          <section key={group.id}>
             <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-              {t('office.settings.nav_group_shop')}
+              {group.label}
             </h2>
             <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-              <SettingsRow
-                to="/settings/shop"
-                icon={<StoreIcon />}
-                title={t('office.settings.nav_shop')}
-                hint={t('office.settings.nav_shop_hint')}
-              />
-              {can('settings.staff') ? (
+              {group.rows.map((row) => (
                 <SettingsRow
-                  to="/settings/cashiers"
-                  icon={<UsersIcon />}
-                  title={t('office.settings.nav_cashiers')}
-                  hint={t('office.settings.nav_cashiers_hint')}
+                  key={row.to}
+                  to={row.to}
+                  icon={row.icon}
+                  title={row.title}
+                  hint={row.hint}
                 />
-              ) : null}
-              <SettingsRow
-                to="/settings/activity"
-                icon={<ClockIcon />}
-                title={t('office.settings.nav_activity')}
-                hint={t('office.settings.nav_activity_hint')}
-              />
+              ))}
             </ul>
           </section>
+        ))}
+        {groups.length === 0 ? (
+          <p className="px-1 text-small text-text-muted">
+            {t('office.settings.health_no_results')}
+          </p>
         ) : null}
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_device')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            <SettingsRow
-              to="/settings/printer"
-              icon={<PrinterIcon />}
-              title={t('printer.title')}
-              hint={t('office.settings.nav_printer_hint')}
-            />
-            {can('catalog.edit') ? (
-              <SettingsRow
-                to="/settings/labels"
-                icon={<TagIcon />}
-                title={t('office.settings.nav_labels')}
-                hint={t('office.settings.nav_labels_hint')}
-              />
-            ) : null}
-            <SettingsRow
-              to="/settings/display"
-              icon={<SettingsIcon />}
-              title={t('office.settings.nav_display')}
-              hint={t('office.settings.nav_display_hint')}
-            />
-          </ul>
-        </section>
-        <section>
-          <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
-            {t('office.settings.nav_group_data')}
-          </h2>
-          <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            <SettingsRow
-              to="/settings/sync"
-              icon={<CloudIcon />}
-              title={t('syncpage.title')}
-              hint={t('office.settings.nav_sync_hint')}
-            />
-            {support || (owner && info?.device?.is_admin && info.enrolled) ? (
-              <SettingsRow
-                to="/settings/devices"
-                icon={<DeviceIcon />}
-                title={t('devices.title')}
-                hint={t('office.settings.nav_devices_hint')}
-              />
-            ) : null}
-            {can('export.data') && role === 'owner' ? (
-              <SettingsRow
-                to="/settings/backup"
-                icon={<CloudIcon />}
-                title={t('office.backup.title')}
-                hint={t('office.backup.nav_hint')}
-              />
-            ) : null}
-            <SettingsRow
-              to="/settings/about"
-              icon={<InfoIcon />}
-              title={t('office.settings.nav_about')}
-              hint={t('office.settings.nav_about_hint')}
-            />
-          </ul>
-        </section>
       </nav>
       {info?.device ? (
         <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">

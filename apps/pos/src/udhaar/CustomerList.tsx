@@ -100,7 +100,6 @@ export function UdhaarList({
     >
       <PageHeader
         icon={<UdhaarIcon />}
-        tone="bg-warning-subtle text-warning-subtle-ink"
         title={t('office.udhaar.title')}
         subtitle={t('office.udhaar.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}

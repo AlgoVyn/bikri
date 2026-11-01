@@ -243,7 +243,6 @@ export function ReportsPage() {
     <div className={pageClass('standard')} data-testid="reports-page">
       <PageHeader
         icon={<ReportsIcon />}
-        tone="bg-info-subtle text-info-subtle-ink"
         title={t('office.reports.title')}
         subtitle={t('office.reports.subtitle')}
         actions={
@@ -328,7 +327,7 @@ export function ReportsPage() {
             </span>
           ) : null}
         </div>
-        <span className="text-small text-text-muted">
+        <span className="text-small text-text-muted" data-testid="report-range">
           {longDate(bundle.range.from, lang)} –{' '}
           {longDate(bundle.range.to, lang)}
         </span>
@@ -691,7 +690,10 @@ function SummaryTab({
         <>
           {bundle.range.from === bundle.range.to &&
           summary.hourly.some((point) => point.sold !== 0) ? (
-            <section className="rounded-card border border-border bg-surface p-3">
+            <section
+              data-testid="report-chart"
+              className="rounded-card border border-border bg-surface p-3"
+            >
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.hourly_chart')}
               </h2>
@@ -700,7 +702,10 @@ function SummaryTab({
           ) : summary.daily.filter(
               (point) => point.sold !== 0 || point.grossProfit !== 0,
             ).length > 1 ? (
-            <section className="rounded-card border border-border bg-surface p-3">
+            <section
+              data-testid="report-chart"
+              className="rounded-card border border-border bg-surface p-3"
+            >
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.daily_chart')}
               </h2>

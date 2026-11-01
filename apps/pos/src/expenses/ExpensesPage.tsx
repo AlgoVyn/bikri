@@ -150,7 +150,6 @@ export function ExpensesPage() {
     <div className={pageClass('standard')}>
       <PageHeader
         icon={<ExpensesIcon />}
-        tone="bg-warning-subtle text-warning-subtle-ink"
         title={t('office.expenses.title')}
         subtitle={t('office.expenses.subtitle')}
         actions={

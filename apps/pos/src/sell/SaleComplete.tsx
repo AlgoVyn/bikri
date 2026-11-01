@@ -14,7 +14,9 @@ import {
   waLink,
 } from '../data/receipt.ts';
 import { formatShopMoney } from '../lib/money';
+import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { ignoresHotkey } from '../shell/hotkeys.ts';
+import { saleChime } from './beep.ts';
 import type { Done } from './PayDialog.tsx';
 
 /** Keys closer together than this are a barcode scanner, not a person (05-sell scanner rule). */
@@ -129,6 +131,14 @@ export function SaleComplete({
   const [busy, setBusy] = useState<'share' | 'pdf' | null>(null);
   useEffect(() => newSale.current?.focus(), []);
   const job = useLiveQuery(() => latestSaleJob(getDb(), saleId), [saleId]);
+  const prefs = useLiveQuery(() => loadDevicePrefs(getDb()), []);
+  const sounded = useRef(false);
+  useEffect(() => {
+    if (!prefs?.saleSound || sounded.current) return;
+    sounded.current = true;
+    saleChime();
+    navigator.vibrate?.(12);
+  }, [prefs?.saleSound]);
   const settings = useLiveQuery(async () => {
     const kv = getDb().kv;
     return {
@@ -210,9 +220,24 @@ export function SaleComplete({
     >
       <span
         aria-hidden="true"
-        className="flex size-16 items-center justify-center rounded-full bg-success-subtle text-figure text-success-subtle-ink"
+        className="flex size-16 items-center justify-center rounded-full bg-success-subtle text-success-subtle-ink"
       >
-        ✓
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          width="34"
+          height="34"
+          fill="none"
+        >
+          <path
+            className="bikri-check"
+            d="M5 12.5 9.5 17 19 7.5"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </span>
       <p className="text-title" data-testid="sale-saved">
         {t('pay.saved', { invoice })}
@@ -233,7 +258,7 @@ export function SaleComplete({
       ) : null}
       <dl
         data-testid="sale-receipt"
-        className="receipt-paper w-full p-3 text-start text-small"
+        className="receipt-paper bikri-receipt-in w-full p-3 text-start text-small"
       >
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-muted">

@@ -97,7 +97,9 @@ test.describe('Settings (T-050)', () => {
     await navigate(page, '/settings');
     // Scope to the page: the top-bar printer pill is also a link to Printer.
     const settings = page.getByRole('main');
-    await expect(settings.getByRole('link', { name: /Printer/ })).toBeVisible();
+    await expect(
+      settings.getByRole('link', { name: /Receipt printer/ }),
+    ).toBeVisible();
     await expect(
       settings.getByRole('link', { name: /Scanner & display/ }),
     ).toBeVisible();
@@ -160,6 +162,22 @@ test.describe('Settings (T-050)', () => {
     expect(box?.width ?? 0).toBeLessThan(400);
   });
 
+  test('Data safety is visible and settings can be searched', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/settings');
+    const main = page.getByRole('main');
+    await expect(main.getByText('Data safety')).toBeVisible();
+    const search = main.getByLabel('Search settings');
+    await search.fill('printer');
+    await expect(
+      main.getByRole('link', { name: /Receipt printer/ }),
+    ).toBeVisible();
+    await expect(main.getByRole('link', { name: /Cashiers/ })).toHaveCount(0);
+    await search.fill('zzzz');
+    await expect(main.getByText('No settings match.')).toBeVisible();
+  });
+
   test('desktop Settings keeps the index beside the selected section', async ({
     page,
   }, testInfo) => {
@@ -167,7 +185,7 @@ test.describe('Settings (T-050)', () => {
     await openReadyShop(page, '/bikri/settings');
     const settings = page.getByRole('main');
     await expect(settings.getByText('Choose a setting')).toBeVisible();
-    await settings.getByRole('link', { name: /Printer/ }).click();
+    await settings.getByRole('link', { name: /Receipt printer/ }).click();
     await expect(
       settings.getByRole('heading', { name: 'Printer' }),
     ).toBeVisible();

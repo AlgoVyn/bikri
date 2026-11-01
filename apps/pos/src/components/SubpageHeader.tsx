@@ -48,7 +48,7 @@ export function SubpageHeader({
       {icon ? (
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted"
+          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink"
         >
           {icon}
         </span>

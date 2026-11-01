@@ -142,6 +142,23 @@ test.describe('Home and shell (T-013)', () => {
     await setLanguage(page, 'en');
   });
 
+  test('Ctrl+K opens commands and ? opens the shortcut sheet', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.keyboard.press('Control+k');
+    const commands = page.getByRole('dialog', { name: 'Commands' });
+    await expect(commands).toBeVisible();
+    await expectNoSeriousAxe(page);
+    await commands.getByLabel('Search commands…').fill('day close');
+    await commands.getByRole('option', { name: /Day close/ }).click();
+    await expect(page).toHaveURL(/\/bikri\/day-close$/);
+    await page.keyboard.press('?');
+    await expect(
+      page.getByRole('dialog', { name: 'Keyboard shortcuts' }),
+    ).toBeVisible();
+  });
+
   test('an empty shop can load a starter catalogue', async ({ page }) => {
     await openReadyShop(page, '/bikri/');
     await page.getByRole('button', { name: 'Load sample products' }).click();

@@ -76,7 +76,7 @@ test.describe('Day close (T-047)', () => {
   test('a short drawer needs a note and is audited', async ({ page }) => {
     await openReadyShop(page, '/bikri/day-close');
     await counted(page, '2000');
-    await expect(page.getByText('Over')).toBeVisible();
+    await expect(page.getByText('Extra cash')).toBeVisible();
     await expect(
       page.getByText('Write a note for a difference of Rs 100 or more.'),
     ).toBeVisible();

@@ -2,7 +2,13 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LockIcon, UserIcon } from '../components/icons.tsx';
+import {
+  InfoIcon,
+  LockIcon,
+  SearchIcon,
+  UserIcon,
+} from '../components/icons.tsx';
+import { KeyBadge } from '../components/KeyBadge.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
@@ -179,10 +185,24 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className={`relative hidden h-8 items-center gap-1 rounded-full px-2 text-small transition-colors duration-150 before:absolute before:-inset-2 before:content-[''] lg:inline-flex ${tone}`}
+        className="relative hidden size-11 items-center justify-center rounded-full text-text transition-colors duration-150 hover:bg-surface-2 lg:inline-flex"
       >
-        <span aria-hidden="true" className="size-2 rounded-full bg-current" />
-        <span>{label}</span>
+        <span
+          aria-hidden="true"
+          className={`size-2.5 rounded-full ${
+            state === 'synced'
+              ? 'bg-success'
+              : state === 'error'
+                ? 'bg-danger'
+                : state === 'paused' || state === 'quota'
+                  ? 'bg-warning'
+                  : state === 'pending' ||
+                      state === 'offline' ||
+                      state === 'read-only'
+                    ? 'bg-border-strong'
+                    : 'bg-info'
+          }`}
+        />
       </button>
       <div
         id={menuId}
@@ -328,6 +348,30 @@ export function StaffMenu() {
             <SyncBadge compact />
             <PrinterDot compact />
           </div>
+          <button
+            type="button"
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-control px-2 text-start hover:bg-surface-2"
+            onClick={() => {
+              setOpen(false);
+              window.dispatchEvent(new Event('bikri:commands'));
+            }}
+          >
+            <SearchIcon />
+            <span className="flex-1">{t('shell.commands')}</span>
+            <KeyBadge keys="Ctrl+K" />
+          </button>
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center gap-2 rounded-control px-2 text-start hover:bg-surface-2"
+            onClick={() => {
+              setOpen(false);
+              window.dispatchEvent(new Event('bikri:shortcuts'));
+            }}
+          >
+            <InfoIcon />
+            <span className="flex-1">{t('shell.shortcuts')}</span>
+            <KeyBadge keys="?" />
+          </button>
           <button
             type="button"
             title={`${t('shell.lock')} (Ctrl+L)`}

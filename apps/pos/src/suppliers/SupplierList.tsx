@@ -60,7 +60,6 @@ export function SupplierList({
     >
       <PageHeader
         icon={<SuppliersIcon />}
-        tone="bg-success-subtle text-success-subtle-ink"
         title={t('office.suppliers.title')}
         subtitle={t('office.suppliers.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}

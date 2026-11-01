@@ -42,7 +42,7 @@ describe('pwa options', () => {
       start_url: '/bikri/',
       scope: '/bikri/',
       theme_color: '#006BB3',
-      background_color: '#F8FAFC',
+      background_color: '#F1F5F9',
       orientation: 'any',
     });
     const icons = pwaOptions.manifest?.icons ?? [];

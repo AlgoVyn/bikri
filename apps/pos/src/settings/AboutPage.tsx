@@ -79,6 +79,8 @@ function AboutContent() {
           {
             title: t('office.about.shortcuts_global'),
             rows: [
+              ['Ctrl+K', t('shell.commands')],
+              ['?', t('shell.shortcuts')],
               ['/', t('shell.search_label')],
               ['N', t('home.new_sale')],
               ['Ctrl+Shift+P', t('home.price_check')],

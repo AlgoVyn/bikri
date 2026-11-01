@@ -14,14 +14,15 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BikriMark } from '../components/BikriMark.tsx';
 import {
   buttonPrimary,
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { SalesIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
+import { ShopIllustration } from '../components/ShopIllustration.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { tenantInfo } from '../data/localTenant.ts';
@@ -329,7 +330,7 @@ export function SetupWizard() {
                 aria-hidden="true"
                 className="flex size-10 items-center justify-center rounded-control bg-accent text-accent-ink"
               >
-                <SalesIcon />
+                <BikriMark className="size-5" />
               </span>
               <span className="text-h2 font-semibold">
                 {t('common.app_name')}
@@ -354,9 +355,7 @@ export function SetupWizard() {
               ))}
             </ul>
           </div>
-          <p className="text-small text-rail-muted">
-            {t('setup.offline_hint')}
-          </p>
+          <ShopIllustration className="h-24 w-full text-rail-muted opacity-80" />
         </aside>
         <form
           ref={cardRef}
@@ -369,7 +368,7 @@ export function SetupWizard() {
               aria-hidden="true"
               className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
             >
-              <SalesIcon />
+              <BikriMark className="size-5" />
             </span>
             <span className="text-h2 font-semibold">
               {t('common.app_name')}

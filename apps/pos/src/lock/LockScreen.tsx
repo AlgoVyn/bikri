@@ -3,8 +3,8 @@ import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonQuiet } from '../components/classes.ts';
-import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -173,7 +173,7 @@ export function LockScreen() {
             aria-hidden="true"
             className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
           >
-            <SalesIcon />
+            <BikriMark className="size-5" />
           </span>
           <div className="min-w-0">
             <p className="text-small font-semibold uppercase tracking-[0.14em] text-text-muted">

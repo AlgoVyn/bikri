@@ -38,7 +38,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 
 | Token | Light | Dark | Use | Origin |
 |---|---|---|---|---|
-| `--color-bg` | `#F8FAFC` | `#0F172A` | App background | slate-50 / slate-900 (site) |
+| `--color-bg` | `#F1F5F9` | `#0F172A` | App background | slate-100 / slate-900 (site) |
 | `--color-surface` | `#FFFFFF` | `#1E293B` | Cards, modals | site / slate-800 (site) |
 | `--color-surface-2` | `#F1F5F9` | `#273449` | Inputs, hover | slate-100 (site) / derived |
 | `--color-border` | `#E2E8F0` | `#334155` | Dividers (decorative) | slate-200 / slate-700 (site) |
@@ -57,7 +57,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
-| `--color-danger` | `#DC2626` | `#F87171` | Below cost, refunds, destructive | red-600 (site) / red-400 derived |
+| `--color-danger` | `#B91C1C` | `#F87171` | Below cost, refunds, destructive | red-700 (site scale; red-600 fails 4.5:1 on the slate-100 page) / red-400 derived |
 | `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#450A0A` / `#FECACA` | Error banners | derived (Tailwind red) |
 | `--color-warning` | `#B45309` | `#FBBF24` | Low stock, over limit, short | derived (amber-700 / amber-400; site's `#f59e0b` fails text contrast on white) |
 | `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#451A03` / `#FDE68A` | Warning banners | site notice colours / derived |
@@ -76,19 +76,19 @@ Computed with the WCAG relative-luminance formula on 27–28 Oct 2026. CI repeat
 
 | Mode | Pair | Ratio | Needed | Result |
 |---|---|---|---|---|
-| Light | text `#0F172A` on bg `#F8FAFC` | 17.06 | 4.5 | pass |
+| Light | text `#0F172A` on bg `#F1F5F9` | 16.30 | 4.5 | pass |
 | Light | text-muted `#475569` on surface-2 `#F1F5F9` | 6.92 | 4.5 | pass |
-| Light | text-muted `#475569` on bg `#F8FAFC` | 7.24 | 4.5 | pass |
+| Light | text-muted `#475569` on bg `#F1F5F9` | 6.92 | 4.5 | pass |
 | Light | white on primary `#006BB3` | 5.59 | 4.5 | pass |
 | Light | white on primary-hover `#005A96` | 7.23 | 4.5 | pass |
-| Light | primary `#006BB3` (links) on bg `#F8FAFC` | 5.35 | 4.5 | pass |
+| Light | primary `#006BB3` (links) on bg `#F1F5F9` | 5.11 | 4.5 | pass |
 | Light | primary-subtle-ink `#00497A` on `#E0F2FE` | 8.19 | 4.5 | pass |
 | Light | accent-ink `#182E55` on accent `#4BC2BF` | 6.26 | 4.5 | pass |
 | Light | white on brand-navy `#182E55` | 13.45 | 4.5 | pass |
 | Light | rail-ink `#F1F5F9` on rail `#182E55` | 12.28 | 4.5 | pass |
 | Light | rail-muted `#B8C6DB` on rail `#182E55` | 7.78 | 4.5 | pass |
 | Light | rail-active `#4BC2BF` on rail `#182E55` | 6.26 | 4.5 | pass |
-| Light | danger `#DC2626` on white / white on danger | 4.83 | 4.5 | pass |
+| Light | danger `#B91C1C` on white / white on danger | 6.47 | 4.5 | pass |
 | Light | danger-subtle ink `#991B1B` on `#FEE2E2` | 6.80 | 4.5 | pass |
 | Light | warning `#B45309` on white | 5.02 | 4.5 | pass |
 | Light | warning ink `#92400E` on `#FEF3C7` | 6.37 | 4.5 | pass |
@@ -132,10 +132,11 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 | Section title (`text-h2`) | Inter semibold | 18/26 |
 | Card / dialog title (`text-title`) | Inter semibold | 20/28 |
 | Total (`text-total`) | Inter semibold | 28/34; figures 32/40 |
-| Urdu | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.9 (Nastaliq needs more) |
+| Urdu display | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.8 for headings and receipt |
+| Urdu UI | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for tables, forms, controls and dense settings |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 
-All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use 15 px and line-height 1.5 in Urdu so Nastaliq option text fits inside a 44 px field; body text keeps the +20% size and 1.9 leading.
+All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Display headings, totals and receipts use Nastaliq; dense UI uses Naskh.
 
 ### Layout containers and page anatomy
 
@@ -197,6 +198,8 @@ Shortcuts are listed in Settings → About; navigation items also show their key
 
 | Key | Action | Scope |
 |---|---|---|
+| `Ctrl+K` | Command palette | global (works in fields) |
+| `?` | Keyboard shortcut sheet | global |
 | `N` | New sale / new item on list screens | global |
 | `F2` / `Ctrl+F` | Focus search | Sell, lists (works in fields) |
 | `/` | Global search | global |
@@ -235,7 +238,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 269 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 272 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 

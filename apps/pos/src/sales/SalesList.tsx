@@ -201,7 +201,6 @@ export function SalesList({
     >
       <PageHeader
         icon={<SalesIcon />}
-        tone="bg-info-subtle text-info-subtle-ink"
         title={t('nav.sales')}
         subtitle={t('office.sales.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}

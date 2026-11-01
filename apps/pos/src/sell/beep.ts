@@ -22,3 +22,26 @@ export function beep(): void {
 export function beepCount(): number {
   return count;
 }
+
+/** Soft two-tone confirmation when a sale is saved (optional per device). */
+export function saleChime(): void {
+  try {
+    ctx ??= new AudioContext();
+    const at = ctx.currentTime;
+    for (const [frequency, delay] of [
+      [880, 0],
+      [1320, 0.08],
+    ] as const) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.055, at + delay);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + delay + 0.18);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(at + delay);
+      osc.stop(at + delay + 0.18);
+    }
+  } catch {
+    // No audio device.
+  }
+}
