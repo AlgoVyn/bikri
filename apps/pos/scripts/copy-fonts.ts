@@ -21,21 +21,28 @@ const copies: ReadonlyArray<readonly [string, string]> = [
   [join(packageRoot('@fontsource-variable/inter'), 'LICENSE'), 'OFL-inter.txt'],
   [
     join(
-      packageRoot('@fontsource/noto-nastaliq-urdu'),
-      'files/noto-nastaliq-urdu-arabic-400-normal.woff2',
+      packageRoot('@fontsource/noto-naskh-arabic'),
+      'files/noto-naskh-arabic-arabic-400-normal.woff2',
     ),
-    'noto-nastaliq-urdu-arabic-400-normal.woff2',
+    'noto-naskh-arabic-arabic-400-normal.woff2',
   ],
   [
     join(
-      packageRoot('@fontsource/noto-nastaliq-urdu'),
-      'files/noto-nastaliq-urdu-arabic-700-normal.woff2',
+      packageRoot('@fontsource/noto-naskh-arabic'),
+      'files/noto-naskh-arabic-arabic-600-normal.woff2',
     ),
-    'noto-nastaliq-urdu-arabic-700-normal.woff2',
+    'noto-naskh-arabic-arabic-600-normal.woff2',
   ],
   [
-    join(packageRoot('@fontsource/noto-nastaliq-urdu'), 'LICENSE'),
-    'OFL-noto-nastaliq-urdu.txt',
+    join(
+      packageRoot('@fontsource/noto-naskh-arabic'),
+      'files/noto-naskh-arabic-arabic-700-normal.woff2',
+    ),
+    'noto-naskh-arabic-arabic-700-normal.woff2',
+  ],
+  [
+    join(packageRoot('@fontsource/noto-naskh-arabic'), 'LICENSE'),
+    'OFL-noto-naskh-arabic.txt',
   ],
   [
     join(

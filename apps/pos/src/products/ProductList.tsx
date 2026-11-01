@@ -8,7 +8,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { ProductsIcon, SearchIcon } from '../components/icons.tsx';
+import { FilterIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import {
@@ -216,13 +216,19 @@ export function ProductList({
               </label>
               <button
                 type="button"
-                className={`${buttonQuiet} gap-2 lg:hidden`}
+                className={`${buttonQuiet} relative gap-2 max-lg:size-11 max-lg:px-0 lg:hidden`}
+                aria-label={
+                  activeFilters > 0
+                    ? `${t('common.filters')} (${activeFilters})`
+                    : t('common.filters')
+                }
                 aria-expanded={filtersOpen}
                 onClick={() => setFiltersOpen((open) => !open)}
               >
-                {t('common.filters')}
+                <FilterIcon className="size-5" />
+                <span className="max-lg:sr-only">{t('common.filters')}</span>
                 {activeFilters > 0 ? (
-                  <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                  <span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-micro text-primary-ink lg:static lg:size-auto lg:px-1.5 lg:text-small">
                     {activeFilters}
                   </span>
                 ) : null}
@@ -564,10 +570,10 @@ function ProductRow({
             {selected ? '✓' : ''}
           </span>
           <span className="min-w-0">
-            <span className="ltr-name line-clamp-2 font-medium leading-tight">
+            <span className="ltr-name line-clamp-2 font-medium leading-tight! max-lg:text-small">
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small leading-tight text-text-muted">
+            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
@@ -625,10 +631,10 @@ function ProductRow({
             color={row.category?.color}
           />
           <span className="min-w-0">
-            <span className="ltr-name line-clamp-2 font-medium leading-tight">
+            <span className="ltr-name line-clamp-2 font-medium leading-tight! max-lg:text-small">
               {String(p.name_en)}
             </span>
-            <span className="block truncate text-small leading-tight text-text-muted">
+            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>

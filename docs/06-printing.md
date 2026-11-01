@@ -248,7 +248,7 @@ Baud choices: 9600 (default), 19200, 38400, 115200; flow control none (default) 
   ```css
   /* 80 mm */ @page { size: 80mm 297mm; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 72mm ÷ (48 × 0.6) */
   /* 58 mm */ @page { size: 58mm 297mm; margin: 0 } body { width: 48mm; margin: 0 5mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 48mm ÷ (32 × 0.6) */
-  img.logo { max-width: 60%; } .urdu { font-family: 'Noto Nastaliq Urdu'; direction: rtl; line-height: 1.9 }
+  img.logo { max-width: 60%; } .urdu { font-family: 'Noto Naskh Arabic UI'; direction: rtl; line-height: 1.7 }
   ```
   Urdu prints as real text here (the OS driver rasterises it), so no bitmap step is needed. A4: `@page { size: A4; margin: 15mm }` with a proper invoice layout (shop block, table of lines, totals block).
 - For silent printing on the counter PC: launch Chrome with `--kiosk-printing` and set the thermal printer as the Windows default with paper size "80 × 297 mm" or "Receipt". Settings → Printer → System tab shows these steps.
@@ -260,8 +260,8 @@ v1 does not implement a Bluetooth transport. Android users use System printing w
 
 ## 6. Logo and Urdu raster rendering
 
-- Before drawing, `await document.fonts.load('24px "Noto Nastaliq Urdu"')` (and Inter); canvas text silently falls back to a system font if the web font is not loaded yet. Render on the main thread's `OffscreenCanvas` (fonts loaded in the document are available there; a worker would need its own `FontFace`).
-- `renderReceiptBitmap(model, { dots, font })` draws the receipt on an `OffscreenCanvas` `dots` wide: Inter for Latin, Noto Nastaliq Urdu for Urdu (line height 1.9 for Nastaliq), black on white, RTL text aligned right.
+- Before drawing, `await document.fonts.load('24px "Noto Naskh Arabic UI"')` (and Inter); canvas text silently falls back to a system font if the web font is not loaded yet. Render on the main thread's `OffscreenCanvas` (fonts loaded in the document are available there; a worker would need its own `FontFace`).
+- `renderReceiptBitmap(model, { dots, font })` draws the receipt on an `OffscreenCanvas` `dots` wide: Inter for Latin, Noto Naskh Arabic UI for Urdu (line height 1.7), black on white, RTL text aligned right.
 - Logo (REQ-B03): uploaded in Settings → Receipt; on device it is converted to greyscale, scaled to max 60% of `dots` width and max 160 px height, then **Floyd–Steinberg dithered** to 1-bit and cached in `kv.logo_bitmap` (Uint8Array + width/height) so printing does not re-process it.
 - Text rasters use a simple threshold at 50% luminance (crisper than dithering).
 - 1-bit conversion: each row packed MSB-first, 1 = black, row length = `dots/8` bytes. Sent as `GS v 0` bands of at most 255 rows.

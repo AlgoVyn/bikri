@@ -63,7 +63,7 @@ export async function printHtmlViaSystem(
       fontStyle.textContent = fontRules.join('\n');
       win.document.head.append(fontStyle);
     }
-    // Noto Nastaliq Urdu / JetBrains Mono must be ready before the driver rasterises.
+    // Noto Naskh Arabic UI / JetBrains Mono must be ready before the driver rasterises.
     await win.document.fonts?.ready;
     // One page as long as the receipt (06 §5.3 / D-087).
     const style = win.document.createElement('style');

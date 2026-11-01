@@ -28,6 +28,10 @@
     "unit_cost": "Cost per item"
   },
   "categories": {
+    "help_title": "Where categories show",
+    "help_1": "Categories colour product tiles and filters.",
+    "help_2": "A category in use cannot be deleted.",
+    "empty_hint": "Add a category above to group your products.",
     "color": "Colour of {{name}}",
     "color_n": "Colour {{n}}",
     "delete": "Delete {{name}}",
@@ -62,6 +66,10 @@
     "filters": "Filters"
   },
   "count": {
+    "help_title": "Counting tips",
+    "help_1": "Scan or type each product count.",
+    "help_2": "Finish writes an adjustment for every difference.",
+    "help_3": "Uncounted products stay unchanged.",
     "category": "Category",
     "counted": "Counted",
     "counted_for": "Counted {{name}}",
@@ -210,6 +218,7 @@
     "wapsi": "Refund"
   },
   "home": {
+    "steps_progress": "{{done}} of {{total}} done",
     "add_product": "Add product",
     "as_of_device": "As of this device",
     "attention": "Needs attention",
@@ -274,6 +283,12 @@
     "desc_settings": "Printers & app"
   },
   "import": {
+    "drop_title": "Drop your spreadsheet here",
+    "drop_hint": "or choose a CSV/XLSX file",
+    "help_title": "Before you start",
+    "help_1": "CSV or XLSX, up to 5,000 rows.",
+    "help_2": "Match the column names once.",
+    "help_3": "Existing barcodes update products.",
     "action_error": "Skipped",
     "action_new": "New",
     "action_update": "Update",
@@ -434,6 +449,10 @@
     "title": "Price check"
   },
   "prices": {
+    "help_title": "How this works",
+    "help_1": "Preview every change before applying it.",
+    "help_2": "Rounding is applied per product.",
+    "help_3": "Stock and cost edits are separate actions.",
     "any_brand": "Any brand",
     "applied_one": "Price updated for {{count}} product",
     "applied_other": "Prices updated for {{count}} products",
@@ -803,6 +822,7 @@
     "brand_fast": "Scan, sell and print in seconds."
   },
   "shell": {
+    "recent_commands": "Recent",
     "lang_en": "English",
     "lang_roman_ur": "Roman Urdu",
     "lang_ur": "اردو",

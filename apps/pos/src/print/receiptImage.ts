@@ -21,7 +21,7 @@ export type ImageOptions = {
 
 const PAD = 16;
 const MONO = "'JetBrains Mono', ui-monospace, monospace";
-const URDU = "'Noto Nastaliq Urdu', serif";
+const URDU = "'Noto Naskh Arabic UI', serif";
 
 type Row =
   | {

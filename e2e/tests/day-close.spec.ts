@@ -18,7 +18,9 @@ test.describe('Day close (T-047)', () => {
     await page.goto('/bikri/day-close');
     await expect(page.getByText('Expected in drawer')).toBeVisible();
     await counted(page, '750');
-    await expect(page.getByText('Drawer is correct')).toBeVisible();
+    await expect(page.getByTestId('day-close-difference')).toContainText(
+      'Drawer is correct',
+    );
     await page.getByRole('button', { name: 'Close day' }).click();
     await expect(page.getByTestId('day-closed')).toBeVisible();
     const [close] = await idbAll<{
@@ -76,7 +78,9 @@ test.describe('Day close (T-047)', () => {
   test('a short drawer needs a note and is audited', async ({ page }) => {
     await openReadyShop(page, '/bikri/day-close');
     await counted(page, '2000');
-    await expect(page.getByText('Extra cash')).toBeVisible();
+    await expect(page.getByTestId('day-close-difference')).toContainText(
+      'Extra cash',
+    );
     await expect(
       page.getByText('Write a note for a difference of Rs 100 or more.'),
     ).toBeVisible();

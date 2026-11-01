@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ClockIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
@@ -72,27 +73,19 @@ function ActivityContent() {
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
       <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.from')}
-          <input
-            type="date"
-            className={field}
-            value={filters.from}
-            max={filters.to}
-            onChange={(event) => update({ from: event.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.to')}
-          <input
-            type="date"
-            className={field}
-            value={filters.to}
-            min={filters.from}
-            max={today}
-            onChange={(event) => update({ to: event.target.value })}
-          />
-        </label>
+        <DateField
+          label={t('office.activity.from')}
+          value={filters.from}
+          max={filters.to}
+          onChange={(value) => update({ from: value })}
+        />
+        <DateField
+          label={t('office.activity.to')}
+          value={filters.to}
+          min={filters.from}
+          max={today}
+          onChange={(value) => update({ to: value })}
+        />
         <label className="flex flex-col gap-1 text-small">
           {t('office.activity.action')}
           <select

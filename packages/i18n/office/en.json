@@ -613,6 +613,7 @@
       "overs": "Overs",
       "payment_mix": "How customers paid",
       "hourly_chart": "Sales by hour",
+      "hourly_single": "One sale so far — more hours will appear as you sell.",
       "vs_previous": "vs previous",
       "delta_new": "New",
       "pp": "pp",

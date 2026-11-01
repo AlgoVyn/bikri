@@ -492,15 +492,25 @@ function GettingStarted({
       ),
     },
   ];
+  const done = steps.filter((step) => step.done).length;
+  const pending = steps
+    .map((step, index) => ({ ...step, number: index + 1 }))
+    .filter((step) => !step.done);
+
+  if (pending.length === 0) return null;
+
   return (
     <section
       aria-labelledby="getting-started"
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-2 px-4 py-3">
         <h2 id="getting-started" className="me-auto text-h2 font-semibold">
           {t('home.get_started')}
         </h2>
+        <span className="text-small text-text-muted tabular-nums">
+          {t('home.steps_progress', { done, total: steps.length })}
+        </span>
         <button
           type="button"
           className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2"
@@ -512,28 +522,25 @@ function GettingStarted({
           </span>
         </button>
       </div>
-      <ol className="divide-y divide-border">
-        {steps.map((step, index) => (
+      <div aria-hidden="true" className="flex gap-1 px-4 pb-3">
+        {steps.map((step) => (
+          <span
+            key={step.title}
+            className={`h-1.5 flex-1 rounded-full ${step.done ? 'bg-success' : 'bg-surface-2'}`}
+          />
+        ))}
+      </div>
+      <ol className="divide-y divide-border border-t border-border">
+        {pending.map((step) => (
           <li key={step.title} className="flex gap-3 px-4 py-3">
             <span
               aria-hidden="true"
-              className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-small font-semibold ${
-                step.done
-                  ? 'bg-success-subtle text-success-subtle-ink'
-                  : 'bg-surface-2 text-text-muted'
-              }`}
+              className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-small font-semibold text-text-muted"
             >
-              {step.done ? '✓' : index + 1}
+              {step.number}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-medium">
-                {step.title}
-                {step.done ? (
-                  <span className="ms-2 text-small font-normal text-success">
-                    {t('home.step_done')}
-                  </span>
-                ) : null}
-              </p>
+              <p className="font-medium">{step.title}</p>
               <p className="mt-0.5 text-small text-text-muted">{step.hint}</p>
               {step.action ? <div className="mt-2">{step.action}</div> : null}
             </div>

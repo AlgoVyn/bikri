@@ -32,7 +32,7 @@ describe('self-hosted PWA assets', () => {
   it('ships OFL licences and woff2 faces', async () => {
     for (const name of [
       'OFL-inter.txt',
-      'OFL-noto-nastaliq-urdu.txt',
+      'OFL-noto-naskh-arabic.txt',
       'OFL-jetbrains-mono.txt',
     ]) {
       const text = await readFile(join(publicDir, 'fonts', name), 'utf8');
@@ -40,8 +40,9 @@ describe('self-hosted PWA assets', () => {
     }
     for (const name of [
       'inter-latin-wght-normal.woff2',
-      'noto-nastaliq-urdu-arabic-400-normal.woff2',
-      'noto-nastaliq-urdu-arabic-700-normal.woff2',
+      'noto-naskh-arabic-arabic-400-normal.woff2',
+      'noto-naskh-arabic-arabic-600-normal.woff2',
+      'noto-naskh-arabic-arabic-700-normal.woff2',
       'jetbrains-mono-latin-wght-normal.woff2',
     ]) {
       const bytes = await readFile(join(publicDir, 'fonts', name));

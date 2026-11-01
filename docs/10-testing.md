@@ -97,7 +97,7 @@ Visual snapshots: Playwright screenshots of every screen (light, dark, Urdu) sto
 | H7 | Phone camera scanning (zxing-wasm) | EAN-13 reads in < 1 s in shop lighting |
 | H8 | Power cut test: unplug PC during payment | after reboot the sale is either fully saved or not at all; no half rows |
 | H9 | 8-hour soak on the shop PC | memory budget (08 §7) |
-| H10 | Urdu UI on a 1366×768 laptop | no clipped Nastaliq text |
+| H10 | Urdu UI on a 1366×768 laptop | no clipped Urdu text |
 | H11 | Restore drill ([09 §3.2](09-backups-and-ops.md#32-restore-a-nightly-backup-to-a-new-database)): restore last night's backup into `bikri-restore` | row counts equal `manifest.json`; drill DB deleted afterwards |
 | H12 | Hotkeys in a normal Chrome tab and in the installed app window ([08 §6.1](08-ux-guidelines.md#61-hotkeys-and-the-browser)) | every documented binding or its alternative works |
 | H13 | Barcode labels on the shop's label printer (50 × 25 mm) and on an A4 3 × 8 sheet ([screens/20](screens/20-barcode-labels.md)) | 20 of 20 scans succeed with the USB scanner; text readable; no label skipped or shifted |

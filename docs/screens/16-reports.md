@@ -47,7 +47,7 @@ The summary PDF (and Share) is built with the other exports in T-049; this scree
 
 ## PDF
 
-Generated with pdf-lib on the device: A4 portrait, shop logo + name, range, generated at/by, summary table, chart as embedded PNG, page numbers; Urdu text rendered via embedded Noto Nastaliq subset.
+Generated with pdf-lib on the device: A4 portrait, shop logo + name, range, generated at/by, summary table, chart as embedded PNG, page numbers; Urdu text rendered via an embedded Noto Naskh Arabic subset.
 
 ## Acceptance criteria
 

@@ -185,11 +185,11 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="relative hidden size-11 items-center justify-center rounded-full text-text transition-colors duration-150 hover:bg-surface-2 lg:inline-flex"
+        className="relative hidden h-9 items-center gap-1.5 rounded-full px-2.5 text-small text-text transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 lg:inline-flex"
       >
         <span
           aria-hidden="true"
-          className={`size-2.5 rounded-full ${
+          className={`size-2.5 shrink-0 rounded-full ${
             state === 'synced'
               ? 'bg-success'
               : state === 'error'
@@ -203,6 +203,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
                     : 'bg-info'
           }`}
         />
+        <span className="hidden max-w-40 truncate xl:inline">{label}</span>
       </button>
       <div
         id={menuId}
@@ -349,7 +350,7 @@ export function StaffMenu() {
               </p>
             </div>
           </div>
-          <div className="mt-2 border-b border-border pb-2">
+          <div className="mt-2 border-y border-border py-2">
             <LanguageMenu
               onPicked={() => {
                 setOpen(false);

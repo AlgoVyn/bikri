@@ -138,7 +138,7 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 - tsconfig: `strict: true`, `module: "preserve"`, `moduleResolution: "bundler"`, `target: "es2024"`, `verbatimModuleSyntax: true`, `noUncheckedIndexedAccess: true`. Do not use options deprecated in TS 6.0 (e.g. `baseUrl`, `moduleResolution: "node"`/`"node10"`, `target: "es5"`, `outFile`); 7.0 removes them. Use `paths` relative to the tsconfig and pnpm workspace packages instead of `baseUrl`.
 - Editors: use the workspace TypeScript version.
 
-Fonts (self-hosted, precached): **Inter** (UI Latin, tabular numerals), **Noto Nastaliq Urdu** (Urdu UI and receipts), **JetBrains Mono** (receipt preview only). All are SIL OFL.
+Fonts (self-hosted, precached): **Inter** (UI Latin, tabular numerals), **Noto Naskh Arabic UI** (Urdu UI and receipts), **JetBrains Mono** (receipt preview only). All are SIL OFL.
 
 ## 4. Repository layout
 

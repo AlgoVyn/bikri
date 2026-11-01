@@ -29,6 +29,21 @@ import { useSession } from '../state/session.ts';
 import { ignoresHotkey } from './hotkeys.ts';
 import { usePriceCheck } from './priceCheckStore.ts';
 
+const RECENT_KEY = 'bikri.recent_commands';
+
+function readRecent(): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    return Array.isArray(raw)
+      ? raw
+          .filter((item): item is string => typeof item === 'string')
+          .slice(0, 3)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 type Command = {
   id: string;
   label: string;
@@ -49,6 +64,7 @@ export function CommandPalette() {
   const [mode, setMode] = useState<'commands' | 'shortcuts'>('commands');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  const [recentIds, setRecentIds] = useState<string[]>(readRecent);
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -186,6 +202,34 @@ export function CommandPalette() {
     );
   }, [commands, query]);
 
+  const recentCommands = useMemo(() => {
+    const byId = new Map(commands.map((command) => [command.id, command]));
+    return recentIds
+      .map((id) => byId.get(id))
+      .filter((command): command is Command => command !== undefined);
+  }, [commands, recentIds]);
+
+  const ordered = useMemo(() => {
+    if (query.trim() !== '') return filtered;
+    const recent = new Set(recentCommands.map((command) => command.id));
+    return [
+      ...recentCommands,
+      ...commands.filter((command) => !recent.has(command.id)),
+    ];
+  }, [commands, filtered, query, recentCommands]);
+
+  const remember = (id: string) => {
+    setRecentIds((current) => {
+      const next = [id, ...current.filter((item) => item !== id)].slice(0, 3);
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      } catch {
+        // Storage may be disabled; this session still remembers.
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -228,6 +272,37 @@ export function CommandPalette() {
     if (open && mode === 'commands') inputRef.current?.focus();
   }, [open, mode]);
 
+  const option = (command: Command, index: number) => (
+    <button
+      key={command.id}
+      id={`${listId}-${command.id}`}
+      type="button"
+      role="option"
+      aria-selected={index === active}
+      onMouseEnter={() => setActive(index)}
+      onClick={() => {
+        remember(command.id);
+        command.run();
+      }}
+      className={`flex min-h-11 items-center gap-3 rounded-control px-3 text-start ${
+        index === active ? 'bg-primary-subtle' : ''
+      }`}
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center text-text-muted">
+        {command.icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-small font-medium">{command.label}</span>
+        {command.hint ? (
+          <span className="block text-small text-text-muted">
+            {command.hint}
+          </span>
+        ) : null}
+      </span>
+      {command.keys ? <KeyBadge keys={command.keys} always /> : null}
+    </button>
+  );
+
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
@@ -253,25 +328,25 @@ export function CommandPalette() {
                   onKeyDown={(event) => {
                     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                       event.preventDefault();
-                      if (filtered.length === 0) return;
+                      if (ordered.length === 0) return;
                       const delta = event.key === 'ArrowDown' ? 1 : -1;
                       setActive(
-                        (active + delta + filtered.length) % filtered.length,
+                        (active + delta + ordered.length) % ordered.length,
                       );
                     } else if (event.key === 'Enter') {
                       event.preventDefault();
-                      filtered[active]?.run();
+                      ordered[active]?.run();
                     }
                   }}
                   placeholder={t('shell.commands_placeholder')}
                   aria-label={t('shell.commands_placeholder')}
                   aria-controls={listId}
                   aria-activedescendant={
-                    filtered[active]
-                      ? `${listId}-${filtered[active].id}`
+                    ordered[active]
+                      ? `${listId}-${ordered[active].id}`
                       : undefined
                   }
-                  className="h-14 min-w-0 flex-1 bg-transparent text-title outline-none"
+                  className="h-14 min-w-0 flex-1 bg-transparent text-title outline-none!"
                 />
                 <KeyBadge keys="Esc" />
               </div>
@@ -281,38 +356,31 @@ export function CommandPalette() {
                 aria-label={t('shell.commands')}
                 className="flex flex-col gap-0.5 overflow-y-auto p-1"
               >
-                {filtered.map((command, index) => (
-                  <button
-                    key={command.id}
-                    id={`${listId}-${command.id}`}
-                    type="button"
-                    role="option"
-                    aria-selected={index === active}
-                    onMouseEnter={() => setActive(index)}
-                    onClick={command.run}
-                    className={`flex min-h-11 items-center gap-3 rounded-control px-3 text-start ${
-                      index === active ? 'bg-primary-subtle' : ''
-                    }`}
-                  >
-                    <span className="flex size-5 shrink-0 items-center justify-center text-text-muted">
-                      {command.icon}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-small font-medium">
-                        {command.label}
-                      </span>
-                      {command.hint ? (
-                        <span className="block text-small text-text-muted">
-                          {command.hint}
-                        </span>
-                      ) : null}
-                    </span>
-                    {command.keys ? (
-                      <KeyBadge keys={command.keys} always />
-                    ) : null}
-                  </button>
-                ))}
-                {filtered.length === 0 ? (
+                {query.trim() === '' && recentCommands.length > 0 ? (
+                  <div>
+                    <p
+                      aria-hidden="true"
+                      className="px-3 pb-1 pt-2 text-caption font-semibold uppercase tracking-[0.12em] text-text-muted"
+                    >
+                      {t('shell.recent_commands')}
+                    </p>
+                    {recentCommands.map((command) =>
+                      option(command, ordered.indexOf(command)),
+                    )}
+                  </div>
+                ) : null}
+                <div>
+                  {(query.trim() === ''
+                    ? commands.filter(
+                        (command) =>
+                          !recentCommands.some(
+                            (recent) => recent.id === command.id,
+                          ),
+                      )
+                    : filtered
+                  ).map((command) => option(command, ordered.indexOf(command)))}
+                </div>
+                {ordered.length === 0 ? (
                   <p className="px-3 py-4 text-small text-text-muted">
                     {t('shell.commands_none')}
                   </p>

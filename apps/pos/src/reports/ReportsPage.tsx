@@ -9,6 +9,7 @@ import { ReportsIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { scrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -276,7 +277,7 @@ export function ReportsPage() {
       />
 
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-1">
+        <div className={`${scrollStrip} items-center`}>
           {(limited
             ? PRESETS.filter((item) => item.id === 'today')
             : PRESETS
@@ -336,7 +337,7 @@ export function ReportsPage() {
       <div
         role="tablist"
         aria-label={t('office.reports.title')}
-        className="flex flex-wrap gap-1"
+        className={scrollStrip}
       >
         {TABS.map((item) => (
           <button
@@ -698,6 +699,12 @@ function SummaryTab({
                 {t('office.reports.hourly_chart')}
               </h2>
               <HourlyChart points={summary.hourly} t={t} />
+              {summary.hourly.filter((point) => point.sold !== 0).length ===
+              1 ? (
+                <p className="mt-2 text-small text-text-muted">
+                  {t('office.reports.hourly_single')}
+                </p>
+              ) : null}
             </section>
           ) : summary.daily.filter(
               (point) => point.sold !== 0 || point.grossProfit !== 0,

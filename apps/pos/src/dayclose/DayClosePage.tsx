@@ -517,14 +517,36 @@ export function DayClosePage() {
           {t('office.dayclose.recent')}
         </p>
       ) : null}
-      <button
-        type="button"
-        className={`${buttonPrimary} min-h-14`}
-        disabled={pending || noteNeeded || blind || readOnly}
-        onClick={() => void close()}
-      >
-        {t('office.dayclose.close')}
-      </button>
+
+      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur xl:-mx-6 xl:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-small text-text-muted">
+            {t('office.dayclose.difference')}:{' '}
+            <span
+              data-testid="day-close-difference"
+              className={
+                result.difference === 0
+                  ? 'font-semibold text-success-subtle-ink'
+                  : result.difference < 0
+                    ? 'font-semibold text-danger'
+                    : 'font-semibold text-warning-subtle-ink'
+              }
+            >
+              {result.difference === 0
+                ? t('office.dayclose.correct')
+                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${Math.abs(result.difference) / 100}`}
+            </span>
+          </p>
+          <button
+            type="button"
+            className={`${buttonPrimary} min-h-12`}
+            disabled={pending || noteNeeded || blind || readOnly}
+            onClick={() => void close()}
+          >
+            {t('office.dayclose.close')}
+          </button>
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirmAgain}

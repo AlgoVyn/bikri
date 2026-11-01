@@ -192,7 +192,7 @@ export function ProductDetailPage({
         {can('sale.create') && !readOnly ? (
           <button
             type="button"
-            className={buttonQuiet}
+            className={buttonPrimary}
             onClick={() => void addToSale()}
           >
             {t('products.sell')}
@@ -202,7 +202,7 @@ export function ProductDetailPage({
           <Link
             to="/products/$id/edit"
             params={{ id }}
-            className={`${buttonPrimary} gap-2`}
+            className={`${buttonQuiet} gap-2`}
           >
             {t('products.edit')}
           </Link>

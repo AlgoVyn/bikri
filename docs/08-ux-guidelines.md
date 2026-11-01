@@ -132,11 +132,10 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 | Section title (`text-h2`) | Inter semibold | 18/26 |
 | Card / dialog title (`text-title`) | Inter semibold | 20/28 |
 | Total (`text-total`) | Inter semibold | 28/34; figures 32/40 |
-| Urdu display | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.8 for headings and receipt |
-| Urdu UI | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for tables, forms, controls and dense settings; a dense row may opt into a tighter `leading-*` utility |
+| Urdu (all surfaces) | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for body and 1.6 for headings; a dense row may opt into a tighter `leading-*` utility |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 
-All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Display headings, totals and receipts use Nastaliq; dense UI uses Naskh.
+All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Naskh is the only Urdu face — headings, dense UI and receipts included (D-157).
 
 ### Layout containers and page anatomy
 
@@ -238,7 +237,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 272 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 276 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 

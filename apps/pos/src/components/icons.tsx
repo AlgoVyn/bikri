@@ -94,6 +94,14 @@ export function ClockIcon() {
   );
 }
 
+export function FilterIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M4 6h16l-6 7v5l-4 2v-7L4 6Z" />
+    </Svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <Svg>

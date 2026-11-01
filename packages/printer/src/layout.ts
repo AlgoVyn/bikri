@@ -336,8 +336,8 @@ function pushText(
     if (paragraph.length === 0) {
       continue;
     }
-    // Nastaliq width is not the code-unit count. Hand the whole line to the renderer.
-    // Urdu/Nastaliq glyphs are wider than a monospace cell; use a safer wrap width and let
+    // Urdu width is not the code-unit count. Hand the whole line to the renderer.
+    // Urdu glyphs are wider than a monospace cell; use a safer wrap width and let
     // the raster renderer draw each line instead of handing it one clipped paragraph.
     const wrapWidth = hasNonAscii(paragraph)
       ? Math.max(1, Math.floor(width * 0.6))

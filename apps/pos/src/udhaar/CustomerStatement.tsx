@@ -8,6 +8,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -371,34 +372,20 @@ export function CustomerStatement({
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col text-small">
-          {t('office.udhaar.from')}
-          <input
-            type="date"
-            className="h-11 rounded-control border border-border-strong bg-surface px-2"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-          {from ? (
-            <span className="text-text-muted">
-              {dateText(from, i18n.language, tz)}
-            </span>
-          ) : null}
-        </label>
-        <label className="flex flex-col text-small">
-          {t('office.udhaar.to')}
-          <input
-            type="date"
-            className="h-11 rounded-control border border-border-strong bg-surface px-2"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-          {to ? (
-            <span className="text-text-muted">
-              {dateText(to, i18n.language, tz)}
-            </span>
-          ) : null}
-        </label>
+        <DateField
+          label={t('office.udhaar.from')}
+          value={from}
+          max={to}
+          onChange={setFrom}
+          hint={from ? dateText(from, i18n.language, tz) : undefined}
+        />
+        <DateField
+          label={t('office.udhaar.to')}
+          value={to}
+          min={from}
+          onChange={setTo}
+          hint={to ? dateText(to, i18n.language, tz) : undefined}
+        />
         {from || to ? (
           <button
             type="button"

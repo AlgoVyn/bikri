@@ -13,6 +13,7 @@ import { ExpensesIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { scrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -191,7 +192,7 @@ export function ExpensesPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-1">
+      <div className={scrollStrip}>
         {PRESETS.map((p) => (
           <button
             key={p}

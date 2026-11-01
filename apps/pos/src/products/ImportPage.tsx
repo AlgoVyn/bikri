@@ -6,9 +6,10 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
-import { ProductsIcon } from '../components/icons.tsx';
+import { CheckIcon, ProductsIcon, UploadIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
+import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -56,6 +57,7 @@ export function ImportPage() {
   const [stage, setStage] = useState<Stage>({ step: 'choose' });
   const [readError, setReadError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const fileId = useId();
   if (!can('catalog.edit')) return <Navigate to="/products" replace />;
 
@@ -125,53 +127,90 @@ export function ImportPage() {
         icon={<ProductsIcon />}
         title={t('import.title')}
       />
-      <ol
-        className="flex flex-wrap items-center gap-x-2 gap-y-1"
-        aria-label={t('import.steps')}
-      >
+      <ol className="flex flex-wrap gap-2" aria-label={t('import.steps')}>
         {(['choose', 'map', 'preview', 'importing'] as const).map((s, i) => {
           const active =
             stage.step === s || (s === 'importing' && stage.step === 'done');
+          const done =
+            i <
+            (stage.step === 'done'
+              ? 3
+              : ['choose', 'map', 'preview', 'importing'].indexOf(stage.step));
           return (
             <li
               key={s}
               aria-current={active ? 'step' : undefined}
-              className="flex items-center gap-2"
+              className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-small ${
+                active
+                  ? 'border-primary bg-primary font-semibold text-primary-ink'
+                  : done
+                    ? 'border-success-subtle bg-success-subtle text-success-subtle-ink'
+                    : 'border-border bg-surface text-text-muted'
+              }`}
             >
-              <span
-                className={`flex size-6 items-center justify-center rounded-full text-small ${active ? 'bg-primary font-semibold text-primary-ink' : 'bg-surface-2 text-text-muted'}`}
-              >
-                {i + 1}
+              <span className="flex size-5 items-center justify-center rounded-full bg-white/20 text-caption font-semibold">
+                {done ? <CheckIcon className="size-3.5" /> : i + 1}
               </span>
-              <span
-                className={`text-small ${active ? 'font-semibold text-text' : 'text-text-muted'}`}
-              >
-                {t(`import.step_${s}`)}
-              </span>
-              {i < 3 ? (
-                <span aria-hidden="true" className="text-text-muted">
-                  ›
-                </span>
-              ) : null}
+              {t(`import.step_${s}`)}
             </li>
           );
         })}
       </ol>
 
-      {stage.step === 'choose' ? (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <p>
-            {t('import.choose_hint', {
-              max: MAX_IMPORT_ROWS.toLocaleString('en'),
-            })}
-          </p>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={fileId}
-              className="flex min-h-11 w-fit cursor-pointer items-center rounded-control border border-dashed border-border-strong bg-surface px-4 font-medium hover:bg-surface-2"
+      <TaskLayout
+        aside={
+          <TaskAside
+            title={t('import.help_title')}
+            items={[t('import.help_1'), t('import.help_2'), t('import.help_3')]}
+          />
+        }
+      >
+        {stage.step === 'choose' ? (
+          <fieldset
+            className="m-0 flex min-w-0 flex-col items-center gap-3 rounded-card border-2 border-dashed border-border-strong bg-surface px-6 py-10 text-center transition-colors duration-150 data-[dragging=true]:border-primary data-[dragging=true]:bg-primary-subtle/40"
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              void onFile(event.dataTransfer.files?.[0]);
+            }}
+            data-dragging={dragging}
+          >
+            <span
+              aria-hidden="true"
+              className="flex size-12 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
             >
-              {t('import.choose_file')}
-            </label>
+              <UploadIcon />
+            </span>
+            <div>
+              <p className="text-title font-semibold">
+                {t('import.drop_title')}
+              </p>
+              <p className="mt-1 text-small text-text-muted">
+                {t('import.drop_hint')}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <label htmlFor={fileId} className={buttonPrimary}>
+                {t('import.choose_file')}
+              </label>
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => downloadText(TEMPLATE_FILE, templateCsv())}
+              >
+                {t('import.template')}
+              </button>
+            </div>
+            <p className="max-w-md text-small text-text-muted">
+              {t('import.choose_hint', {
+                max: MAX_IMPORT_ROWS.toLocaleString('en'),
+              })}
+            </p>
             <input
               id={fileId}
               type="file"
@@ -182,136 +221,132 @@ export function ImportPage() {
             {fileName ? (
               <p className="text-small text-text-muted">{fileName}</p>
             ) : null}
-          </div>
-          {readError ? (
-            <p role="alert" className="text-danger">
-              {readError}
-            </p>
-          ) : null}
-          <div>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => downloadText(TEMPLATE_FILE, templateCsv())}
-            >
-              {t('import.template')}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {stage.step === 'map' ? (
-        <MapColumns
-          headers={stage.grid[0] ?? []}
-          mapping={stage.mapping}
-          rows={stage.grid.length - 1}
-          file={stage.file}
-          onChange={(mapping) => setStage({ ...stage, mapping })}
-          onBack={() => setStage({ step: 'choose' })}
-          onNext={() => void toPreview(stage.grid, stage.mapping, stage.file)}
-        />
-      ) : null}
-
-      {stage.step === 'preview' ? (
-        <section className="flex flex-col gap-3">
-          <p role="status" className="text-title" data-testid="import-summary">
-            {t('import.summary', {
-              created: stage.preview.summary.new,
-              updated: stage.preview.summary.updates,
-              errors: stage.preview.summary.errors,
-            })}
-          </p>
-          {stage.preview.rows.some((r) => r.ignored.length > 0) ? (
-            <p className="text-text-muted">{t('import.ignored_note')}</p>
-          ) : null}
-          <PreviewTable preview={stage.preview} message={message} />
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() =>
-                setStage({
-                  step: 'map',
-                  grid: stage.grid,
-                  mapping: stage.mapping,
-                  file: stage.file,
-                })
-              }
-            >
-              {t('import.back')}
-            </button>
-            {stage.preview.summary.errors > 0 ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                onClick={() => downloadErrors(stage.preview)}
-              >
-                {t('import.download_errors')}
-              </button>
+            {readError ? (
+              <p role="alert" className="text-danger">
+                {readError}
+              </p>
             ) : null}
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={
-                stage.preview.summary.new + stage.preview.summary.updates === 0
-              }
-              onClick={() => void doImport(stage.preview)}
-            >
-              {t('import.import_rows', {
-                count:
-                  stage.preview.summary.new + stage.preview.summary.updates,
-              })}
-            </button>
-          </div>
-        </section>
-      ) : null}
+          </fieldset>
+        ) : null}
 
-      {stage.step === 'importing' ? (
-        <section className="flex flex-col gap-2">
-          <p>
-            {t('import.importing', { done: stage.done, total: stage.total })}
-          </p>
-          <progress
-            className="h-3 w-full"
-            aria-label={t('import.progress')}
-            max={Math.max(1, stage.total)}
-            value={stage.done}
+        {stage.step === 'map' ? (
+          <MapColumns
+            headers={stage.grid[0] ?? []}
+            mapping={stage.mapping}
+            rows={stage.grid.length - 1}
+            file={stage.file}
+            onChange={(mapping) => setStage({ ...stage, mapping })}
+            onBack={() => setStage({ step: 'choose' })}
+            onNext={() => void toPreview(stage.grid, stage.mapping, stage.file)}
           />
-        </section>
-      ) : null}
+        ) : null}
 
-      {stage.step === 'done' ? (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <p role="status" className="text-title" data-testid="import-result">
-            {t('import.result', {
-              created: stage.result.created,
-              updated: stage.result.updated,
-              skipped: stage.result.skipped,
-            })}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/products" className={buttonPrimary}>
-              {t('import.back_to_products')}
-            </Link>
-            {stage.result.skipped > 0 ? (
+        {stage.step === 'preview' ? (
+          <section className="flex flex-col gap-3">
+            <p
+              role="status"
+              className="text-title"
+              data-testid="import-summary"
+            >
+              {t('import.summary', {
+                created: stage.preview.summary.new,
+                updated: stage.preview.summary.updates,
+                errors: stage.preview.summary.errors,
+              })}
+            </p>
+            {stage.preview.rows.some((r) => r.ignored.length > 0) ? (
+              <p className="text-text-muted">{t('import.ignored_note')}</p>
+            ) : null}
+            <PreviewTable preview={stage.preview} message={message} />
+            <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 className={buttonQuiet}
-                onClick={() => downloadErrors(stage.preview)}
+                onClick={() =>
+                  setStage({
+                    step: 'map',
+                    grid: stage.grid,
+                    mapping: stage.mapping,
+                    file: stage.file,
+                  })
+                }
               >
-                {t('import.download_errors')}
+                {t('import.back')}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => setStage({ step: 'choose' })}
-            >
-              {t('import.another')}
-            </button>
-          </div>
-        </section>
-      ) : null}
+              {stage.preview.summary.errors > 0 ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  onClick={() => downloadErrors(stage.preview)}
+                >
+                  {t('import.download_errors')}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={buttonPrimary}
+                disabled={
+                  stage.preview.summary.new + stage.preview.summary.updates ===
+                  0
+                }
+                onClick={() => void doImport(stage.preview)}
+              >
+                {t('import.import_rows', {
+                  count:
+                    stage.preview.summary.new + stage.preview.summary.updates,
+                })}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {stage.step === 'importing' ? (
+          <section className="flex flex-col gap-2">
+            <p>
+              {t('import.importing', { done: stage.done, total: stage.total })}
+            </p>
+            <progress
+              className="h-3 w-full"
+              aria-label={t('import.progress')}
+              max={Math.max(1, stage.total)}
+              value={stage.done}
+            />
+          </section>
+        ) : null}
+
+        {stage.step === 'done' ? (
+          <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+            <p role="status" className="text-title" data-testid="import-result">
+              {t('import.result', {
+                created: stage.result.created,
+                updated: stage.result.updated,
+                skipped: stage.result.skipped,
+              })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/products" className={buttonPrimary}>
+                {t('import.back_to_products')}
+              </Link>
+              {stage.result.skipped > 0 ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  onClick={() => downloadErrors(stage.preview)}
+                >
+                  {t('import.download_errors')}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() => setStage({ step: 'choose' })}
+              >
+                {t('import.another')}
+              </button>
+            </div>
+          </section>
+        ) : null}
+      </TaskLayout>
     </div>
   );
 }

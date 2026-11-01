@@ -54,7 +54,7 @@ export function SettingsSplit({
         <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
           <div
             ref={navRef}
-            className={index ? 'min-w-0' : 'min-w-0 max-xl:hidden'}
+            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto`}
           >
             <SettingsNav />
           </div>

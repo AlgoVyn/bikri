@@ -74,6 +74,12 @@ function StaffList() {
                 disabled={readOnly}
                 onClick={() => setEditing(row.staff)}
               >
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle font-semibold text-primary-subtle-ink"
+                >
+                  {String(row.staff.name).trim().slice(0, 1).toUpperCase()}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">
                     {String(row.staff.name)}

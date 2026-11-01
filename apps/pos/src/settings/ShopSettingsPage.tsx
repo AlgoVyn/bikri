@@ -543,7 +543,7 @@ function ShopForm() {
         />
         <button
           type="button"
-          className={`${buttonPrimary} self-start`}
+          className={`${buttonQuiet} self-start`}
           disabled={saving || readOnly}
           onClick={() => void saveShop()}
         >
@@ -605,7 +605,7 @@ function ShopForm() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={buttonPrimary}
+              className={buttonQuiet}
               disabled={readOnly}
               onClick={() => void saveBranch()}
             >

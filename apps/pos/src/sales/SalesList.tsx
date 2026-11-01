@@ -9,6 +9,7 @@ import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { scrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
@@ -229,7 +230,7 @@ export function SalesList({
           {t('office.sales.cashier_limited')}
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-1">
+        <div className={`${scrollStrip} items-center`}>
           {PRESETS.map((p) => (
             <button
               key={p.id}

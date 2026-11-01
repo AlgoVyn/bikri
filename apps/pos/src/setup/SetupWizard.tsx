@@ -20,6 +20,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { CheckIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { ShopIllustration } from '../components/ShopIllustration.tsx';
@@ -423,9 +424,12 @@ export function SetupWizard() {
                     key={code}
                     type="button"
                     aria-pressed={language === code}
-                    className={`${buttonQuiet} min-h-16 text-h2 aria-pressed:border-primary aria-pressed:text-primary`}
+                    className={`${buttonQuiet} inline-flex min-h-16 items-center justify-center gap-2 text-h2 aria-pressed:border-primary aria-pressed:text-primary`}
                     onClick={() => void setLanguage(code)}
                   >
+                    {language === code ? (
+                      <CheckIcon className="size-4 shrink-0" />
+                    ) : null}
                     {t(key)}
                   </button>
                 ))}

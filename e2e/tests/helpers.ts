@@ -57,7 +57,7 @@ export async function expectNoHorizontalScroll(page: Page): Promise<void> {
       document.documentElement.scrollWidth -
       document.documentElement.clientWidth,
   );
-  expect(overflow).toBeLessThanOrEqual(0);
+  expect(overflow, page.url()).toBeLessThanOrEqual(0);
 }
 
 /** Row count of a store in the dev shop's database. */

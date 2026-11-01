@@ -30,7 +30,7 @@ export type RenderLineOptions = {
 
 /**
  * Browser seam for logo-independent text rasters.
- * The till implements this with OffscreenCanvas (Inter / Noto Nastaliq Urdu).
+ * The till implements this with OffscreenCanvas (Inter / Noto Naskh Arabic UI).
  * Node tests use {@link createFakeRasterRenderer}. Return gray or RGBA;
  * the encoder thresholds text at 50% luminance. Width should equal `dots`.
  */

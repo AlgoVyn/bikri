@@ -6,7 +6,7 @@ import { ProductThumb } from '../products/ProductThumb.tsx';
 import type { SellRow } from './useSell.ts';
 
 const TILE_MIN = 128;
-/** Nastaliq needs more width than Latin; below this the price and stock pill collide. */
+/** Urdu needs more width than Latin; below this the price and stock pill collide. */
 const TILE_MIN_UR = 160;
 const GAP = 8;
 const TILE_H = 172;

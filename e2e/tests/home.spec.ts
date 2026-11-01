@@ -154,6 +154,9 @@ test.describe('Home and shell (T-013)', () => {
     await commands.getByLabel('Search commands…').fill('day close');
     await commands.getByRole('option', { name: /Day close/ }).click();
     await expect(page).toHaveURL(/\/bikri\/day-close$/);
+    await page.keyboard.press('Control+k');
+    await expect(page.getByText('Recent')).toBeVisible();
+    await page.keyboard.press('Escape');
     await page.keyboard.press('?');
     const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
     await expect(sheet).toBeVisible();
