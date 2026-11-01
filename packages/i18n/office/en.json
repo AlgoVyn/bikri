@@ -256,6 +256,8 @@
       "overpay_confirm": "Save payment",
       "overpay_title": "Customer will be in credit",
       "owes": "Owes you {{amount}}",
+      "owes_label": "Owes you",
+      "in_credit_label": "In credit",
       "payment_backdate_owner": "Only the owner can back-date a payment (up to 7 days).",
       "payment_date": "Date",
       "payment_error_amount": "Enter an amount above zero.",

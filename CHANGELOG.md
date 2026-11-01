@@ -5,6 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased] — 1.0.0 release candidate
 
 ### Design
+- The Udhaar khata header uses a small “Owes you / In credit” label and a responsive balance (24 px on phones, 32 px from 640 px) instead of a 32 px nowrap line (D-160).
 - About no longer repeats the keyboard-shortcut table; the `?` sheet is the single reference. The Settings index keeps its own scroll without a visible scrollbar (D-159).
 - Visual-audit follow-up: a compact Home checklist, task layouts for Import/Prices/Stock/Categories, scrollable mobile date/tab strips, an icon-only Products filter at 390, a sticky Settings index with one primary Save, a compact sticky Day-close action, a labelled status pill, recent commands, Cashier avatars, a primary Sell action on product detail, a setup language check and a single-sale chart hint (D-158).
 - Urdu is now set entirely in **Noto Naskh Arabic UI**; the Nastaliq font files, faces and dependency are removed (D-157).

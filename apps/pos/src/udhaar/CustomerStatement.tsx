@@ -32,7 +32,6 @@ import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
 import {
   ageLabel,
-  balanceLabel,
   balanceTone,
   dateText,
   entryDescription,
@@ -263,12 +262,26 @@ export function CustomerStatement({
             ) : null}
           </div>
         </div>
-        <p
-          className={`whitespace-nowrap text-figure font-semibold ${balanceTone(balance)}`}
+        <div
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
           data-testid="statement-balance"
         >
-          {balanceLabel(t, balance)}
-        </p>
+          <span className="text-small text-text-muted">
+            {balance > 0
+              ? t('office.udhaar.owes_label')
+              : balance < 0
+                ? t('office.udhaar.in_credit_label')
+                : t('office.udhaar.settled')}
+            {balance !== 0 ? ' ' : null}
+          </span>
+          {balance !== 0 ? (
+            <span
+              className={`text-h1 font-semibold sm:text-figure ${balanceTone(balance)}`}
+            >
+              <MoneyText paisa={Math.abs(balance)} />
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

@@ -256,6 +256,8 @@
       "overpay_confirm": "ادائیگی محفوظ کریں",
       "overpay_title": "گاہک کے پاس رقم جمع ہو جائے گی",
       "owes": "آپ کو {{amount}} بقایا ہے",
+      "owes_label": "بقایا",
+      "in_credit_label": "رقم جمع",
       "payment_backdate_owner": "صرف مالک پرانی تاریخ (7 دن تک) ڈال سکتا ہے۔",
       "payment_date": "تاریخ",
       "payment_error_amount": "صفر سے زیادہ رقم لکھیں۔",

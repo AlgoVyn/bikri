@@ -256,6 +256,8 @@
       "overpay_confirm": "Payment mehfooz karein",
       "overpay_title": "Customer ke paas raqam jama ho jayegi",
       "owes": "Aap ko {{amount}} dena hai",
+      "owes_label": "Baqaya",
+      "in_credit_label": "Raqam jama",
       "payment_backdate_owner": "Sirf malik purani tareekh (7 din tak) daal sakta hai.",
       "payment_date": "Tareekh",
       "payment_error_amount": "Sifar se zyada raqam likhein.",
