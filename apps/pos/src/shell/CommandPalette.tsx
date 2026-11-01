@@ -133,14 +133,14 @@ export function CommandPalette() {
       {
         id: 'printer',
         label: t('printer.title'),
-        hint: t('office.settings.nav_printer_hint'),
+        hint: t('shell.commands_printer_hint'),
         icon: <PrinterIcon />,
         run: go('/settings/printer'),
       },
       {
         id: 'cashiers',
-        label: t('office.settings.nav_cashiers'),
-        hint: t('office.settings.nav_cashiers_hint'),
+        label: t('shell.commands_cashiers'),
+        hint: t('shell.commands_cashiers_hint'),
         icon: <UsersIcon />,
         run: go('/settings/cashiers'),
       },
@@ -329,7 +329,7 @@ export function CommandPalette() {
               </div>
               {[
                 {
-                  title: t('office.about.shortcuts_global'),
+                  title: t('shell.shortcuts_global'),
                   rows: [
                     ['Ctrl+K', t('shell.commands')],
                     ['?', t('shell.shortcuts')],
@@ -340,7 +340,7 @@ export function CommandPalette() {
                   ],
                 },
                 {
-                  title: t('office.about.shortcuts_sell'),
+                  title: t('shell.shortcuts_sell'),
                   rows: [
                     ['F2', t('sell.search_label')],
                     ['Ctrl+1/2/3', t('sell.carts')],
@@ -354,12 +354,12 @@ export function CommandPalette() {
                   ],
                 },
                 {
-                  title: t('office.about.shortcuts_details'),
+                  title: t('shell.shortcuts_details'),
                   rows: [
                     ['Ctrl+S', t('form.save')],
                     ['Esc', t('common.close')],
-                    ['P', t('office.bill.print')],
-                    ['R', t('office.bill.refund')],
+                    ['P', t('shell.shortcut_print')],
+                    ['R', t('shell.shortcut_refund')],
                     ['L', t('products.print_label')],
                   ],
                 },

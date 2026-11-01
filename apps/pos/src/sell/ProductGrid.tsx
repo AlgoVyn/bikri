@@ -182,7 +182,7 @@ function Tile({
         </span>
       ) : null}
       <ProductThumb
-        name={name}
+        name={String(p.name_en || name)}
         imageKey={p.image_key}
         color={row.category?.color}
         size="md"

@@ -51,7 +51,7 @@ export function LanguageMenu({ onPicked }: { onPicked?: () => void }) {
         return (
           <label
             key={item.id}
-            className={`flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-control px-2 text-small transition-colors duration-150 focus-within:ring-2 focus-within:ring-primary/40 ${
+            className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-control px-2 text-small transition-colors duration-150 focus-within:ring-2 focus-within:ring-primary/40 ${
               active
                 ? 'bg-primary-subtle font-medium text-primary-subtle-ink'
                 : 'text-text hover:bg-surface-2'

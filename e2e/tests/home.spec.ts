@@ -149,14 +149,15 @@ test.describe('Home and shell (T-013)', () => {
     await page.keyboard.press('Control+k');
     const commands = page.getByRole('dialog', { name: 'Commands' });
     await expect(commands).toBeVisible();
+    await expect(commands.getByText(/office\./u)).toHaveCount(0);
     await expectNoSeriousAxe(page);
     await commands.getByLabel('Search commands…').fill('day close');
     await commands.getByRole('option', { name: /Day close/ }).click();
     await expect(page).toHaveURL(/\/bikri\/day-close$/);
     await page.keyboard.press('?');
-    await expect(
-      page.getByRole('dialog', { name: 'Keyboard shortcuts' }),
-    ).toBeVisible();
+    const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText(/office\./u)).toHaveCount(0);
   });
 
   test('an empty shop can load a starter catalogue', async ({ page }) => {

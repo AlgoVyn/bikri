@@ -165,7 +165,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         data-state={state}
         aria-label={label}
         title={detail}
-        className={`inline-flex h-8 items-center gap-1 rounded-full px-2 text-small ${tone}`}
+        className={`relative inline-flex h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
       >
         <span aria-hidden="true" className="size-2 rounded-full bg-current" />
         <span>{label}</span>

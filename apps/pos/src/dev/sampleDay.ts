@@ -1,5 +1,5 @@
 import { newId } from '@bikri/core';
-import type { BikriDb } from '@bikri/db';
+import type { BikriDb, KvRow } from '@bikri/db';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { writeAction } from '../data/write.ts';
 
@@ -224,6 +224,8 @@ export async function seedSampleDay(
         reverses_id: null,
         created_at: now + 4,
       });
+      // The sample day issues A-A-1/A-A-2 directly; keep the next real sale at A-A-3.
+      await w.table<KvRow>('kv').put({ key: 'invoice_seq', value: 2 });
     },
     { now },
   );

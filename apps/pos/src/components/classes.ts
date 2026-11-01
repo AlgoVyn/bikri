@@ -1,5 +1,5 @@
 export const buttonPrimary =
-  'inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-ink transition-colors duration-150 hover:bg-primary-hover active:bg-primary-hover disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted';
+  'inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-ink transition-colors duration-150 hover:bg-primary-hover active:bg-primary-hover disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted disabled:ring-1 disabled:ring-border disabled:ring-inset';
 
 export const buttonDanger =
   'inline-flex min-h-11 items-center justify-center rounded-control bg-danger px-4 font-medium text-danger-ink transition-colors duration-150 hover:opacity-90 active:opacity-90 disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted';

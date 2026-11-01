@@ -93,6 +93,7 @@
   --color-t6: #7c3aed;
   --color-t7: #be185d;
   --color-t8: #475569;
+  --color-chart-udhaar: #182e55;
 }
 
 /* Motion: shared durations and easing (docs/08 §2). */
@@ -131,6 +132,7 @@
   --dark-info: #7dd3fc;
   --dark-info-subtle: #0c2a44;
   --dark-info-subtle-ink: #e0f2fe;
+  --dark-chart-udhaar: #4bc2bf;
 }
 
 :root,
@@ -167,6 +169,7 @@
   --color-info: var(--dark-info);
   --color-info-subtle: var(--dark-info-subtle);
   --color-info-subtle-ink: var(--dark-info-subtle-ink);
+  --color-chart-udhaar: var(--dark-chart-udhaar);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -199,6 +202,7 @@
     --color-info: var(--dark-info);
     --color-info-subtle: var(--dark-info-subtle);
     --color-info-subtle-ink: var(--dark-info-subtle-ink);
+    --color-chart-udhaar: var(--dark-chart-udhaar);
   }
 }
 
@@ -230,11 +234,12 @@ html:lang(ur) {
   font-size: 18px;
 }
 
-[lang="ur"] * {
+/* Zero specificity: body copy keeps 1.7, while a dense component's leading-* utility wins. */
+:where([lang="ur"]) :where(*) {
   line-height: 1.7;
 }
 
-html:lang(ur) * {
+:where(html:lang(ur)) :where(*) {
   line-height: 1.7;
 }
 

@@ -13,7 +13,7 @@ const COLORS: Record<keyof PaymentMix, string> = {
   cash: 'var(--color-primary)',
   card: 'var(--color-success)',
   bank_wallet: 'var(--color-warning)',
-  udhaar: 'var(--color-brand-navy)',
+  udhaar: 'var(--color-chart-udhaar)',
 };
 
 /** Simple responsive bars + profit line, no chart library (screens/16). */

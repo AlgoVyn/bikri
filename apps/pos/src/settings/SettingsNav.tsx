@@ -222,11 +222,15 @@ function SettingsNavContent() {
               {t('office.settings.health_storage')}
             </dt>
             <dd className="font-medium">
-              {info?.storageBytes
-                ? t('office.settings.health_storage_value', {
+              {info?.storageBytes ? (
+                <bdi dir="ltr">
+                  {t('office.settings.health_storage_value', {
                     mb: Math.max(1, Math.round(info.storageBytes / 1_048_576)),
-                  })
-                : '—'}
+                  })}
+                </bdi>
+              ) : (
+                '—'
+              )}
             </dd>
           </div>
           <div>

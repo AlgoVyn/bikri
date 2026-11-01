@@ -564,9 +564,7 @@ function ProductRow({
             {selected ? '✓' : ''}
           </span>
           <span className="min-w-0">
-            <span
-              className={`ltr-name font-medium leading-tight ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
-            >
+            <span className="ltr-name line-clamp-2 font-medium leading-tight">
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small leading-tight text-text-muted">
@@ -627,9 +625,7 @@ function ProductRow({
             color={row.category?.color}
           />
           <span className="min-w-0">
-            <span
-              className={`ltr-name font-medium leading-tight ${i18n.language === 'ur' ? 'line-clamp-1' : 'line-clamp-2'}`}
-            >
+            <span className="ltr-name line-clamp-2 font-medium leading-tight">
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small leading-tight text-text-muted">

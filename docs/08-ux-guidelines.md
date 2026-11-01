@@ -20,7 +20,7 @@ The Dukaan desktop screenshots under `docs/reference/dukaan/app-*` are a behavio
 - **Pay**: payment methods are descriptive cards (icon + method + hint) with a visible selected check; change and remaining are shown as two summary cards.
 - **Settings**: a master–detail split on ≥ 1280 px — the grouped index (icon, title, hint and chevron) stays in the start column and the selected section fills the end column; below 1280 px the section is a full page with a back arrow.
 - **Lists and detail**: Sales, Products, Udhaar and Suppliers keep the list full width until a row is selected; at ≥1280 px the selected bill/product/customer/supplier then opens beside it, so there is never an empty detail pane to auto-fill. Below 1280 px the detail is a full page with a back arrow.
-- **Lists**: a filter card, a summary card and the rows/table in their own card; page-level titles use the icon header.
+- **Lists**: one list surface — the toolbar, context strip and rows/table sit in one card; page-level titles use the icon header.
 
 Do not copy Dukaan colours, icons, illustrations, wording or pixel layout; the reference only informs structure and hierarchy.
 
@@ -66,7 +66,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
 | `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
 
-`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the brand mark, BIKRI wordmark and the shop name under it, with `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
+`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the brand mark and BIKRI wordmark, with the shop name at its foot, `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
 
 Category tile colours (8, white initials on each): `#006BB3 #182E55 #0F766E #047857 #B45309 #7C3AED #BE185D #475569` (brand blue, logo navy, teal-700 derived from the logo teal — `#4BC2BF` itself is too light for white text — then emerald, amber, violet, pink, slate).
 
@@ -110,9 +110,9 @@ Computed with the WCAG relative-luminance formula on 27–28 Oct 2026. CI repeat
 | Dark | info `#7DD3FC` on surface | 8.77 | 4.5 | pass |
 | Dark | border-strong `#64748B` on surface | 3.07 | 3.0 | pass |
 | Dark | primary-ink `#00385D` on primary-hover `#7DD3FC` | 7.31 | 4.5 | pass |
-| Dark | rail-ink `#F1F5F9` on rail `#0B1729` | 16.40 | 4.5 | pass |
-| Dark | rail-muted `#9FB0C9` on rail `#0B1729` | 8.15 | 4.5 | pass |
-| Dark | rail-active `#4BC2BF` on rail `#0B1729` | 8.36 | 4.5 | pass |
+| Dark | rail-ink `#F1F5F9` on rail `#1D3357` | 11.52 | 4.5 | pass |
+| Dark | rail-muted `#A9B8CE` on rail `#1D3357` | 6.27 | 4.5 | pass |
+| Dark | rail-active `#4BC2BF` on rail `#1D3357` | 5.87 | 4.5 | pass |
 | Dark | primary-subtle-ink `#E0F2FE` on `#00385D` | 10.62 | 4.5 | pass |
 | Dark | banner inks on danger/warning/success/info subtle | 11.16 / 12.03 / 11.81 / 12.80 | 4.5 | pass |
 | Tiles | white on each of the 8 tile colours | 5.02 – 13.45 | 4.5 | pass |
@@ -133,7 +133,7 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 | Card / dialog title (`text-title`) | Inter semibold | 20/28 |
 | Total (`text-total`) | Inter semibold | 28/34; figures 32/40 |
 | Urdu display | **Noto Nastaliq Urdu** (self-hosted) | +20% size, line height 1.8 for headings and receipt |
-| Urdu UI | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for tables, forms, controls and dense settings |
+| Urdu UI | **Noto Naskh Arabic UI** (self-hosted) | +20% size, line height 1.7 for tables, forms, controls and dense settings; a dense row may opt into a tighter `leading-*` utility |
 | Numbers / invoice no / SKU | **JetBrains Mono** or Inter with `font-variant-numeric: tabular-nums` | totals 32/40 bold |
 
 All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google Fonts CDN. Fonts are OFL licensed. Single-line controls (inputs and selects) use line-height 1.5 in Urdu; body text keeps the +20% size and 1.7 leading. Display headings, totals and receipts use Nastaliq; dense UI uses Naskh.
