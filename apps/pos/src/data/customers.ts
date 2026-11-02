@@ -1,5 +1,6 @@
 import { businessDate, newId } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
+import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
 
@@ -227,5 +228,26 @@ export async function deleteCustomer(
   now = Date.now(),
 ): Promise<void> {
   if ((await customerBalance(db, id)) !== 0) throw new CustomerBalanceError();
-  await writeAction(db, (w) => w.remove('customers', id), { now, actor });
+  const device = await deviceInfo(db);
+  await writeAction(
+    db,
+    async (w) => {
+      const before = await w.table<MasterRow, string>('customers').get(id);
+      await w.remove('customers', id);
+      await w.insert('audit_log', {
+        id: newId(now),
+        action: 'party_delete',
+        entity: 'customers',
+        entity_id: id,
+        before_json: before
+          ? JSON.stringify({ name: before.name, phone: before.phone ?? '' })
+          : null,
+        after_json: null,
+        device_id: device?.id ?? '',
+        staff_id: actor ?? '',
+        created_at: now,
+      });
+    },
+    { now, actor },
+  );
 }

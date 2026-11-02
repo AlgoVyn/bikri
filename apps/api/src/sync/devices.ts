@@ -13,17 +13,26 @@ export async function allocateDeviceCode(
 ): Promise<string> {
   const [devices, invoices] = await db.batch([
     db.prepare(
-      'SELECT device_code FROM devices WHERE tenant_id = ?1 AND branch_id = ?2',
+      'SELECT device_code, device_code_history FROM devices WHERE tenant_id = ?1 AND branch_id = ?2',
       branchId,
     ),
     db.prepare(
-      'SELECT MAX(invoice_no) AS invoice_no FROM sales WHERE tenant_id = ?1 AND branch_id = ?2 GROUP BY device_id',
+      'SELECT DISTINCT invoice_no FROM sales WHERE tenant_id = ?1 AND branch_id = ?2',
       branchId,
     ),
   ]);
   const used: string[] = [];
-  for (const r of (devices?.results ?? []) as { device_code: string }[])
+  for (const r of (devices?.results ?? []) as {
+    device_code: string;
+    device_code_history: string;
+  }[]) {
     used.push(r.device_code);
+    used.push(
+      ...String(r.device_code_history ?? '')
+        .split(',')
+        .filter(Boolean),
+    );
+  }
   for (const r of (invoices?.results ?? []) as { invoice_no: string }[]) {
     const code = codeOfInvoice(r.invoice_no);
     if (code) used.push(code);

@@ -12,6 +12,8 @@ export type AuditInput = {
   deviceId?: string;
   /** Staff that acted; default = the shop's first owner, or 'server' before setup (13 §7.2). */
   staffId?: string;
+  /** Only insert when the immediately preceding statement changed a row. */
+  onlyIfChanged?: boolean;
   now: number;
 };
 
@@ -22,9 +24,10 @@ export function auditStatements(
 ): D1PreparedStatement[] {
   const id = newId(input.now);
   const json = (v: unknown) => (v === undefined ? null : JSON.stringify(v));
+  const guard = input.onlyIfChanged ? ' WHERE changes() = 1' : '';
   const insert = input.staffId
     ? db.prepare(
-        'INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)',
+        `INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10${guard}`,
         id,
         input.action,
         input.entity ?? 'shop',
@@ -36,7 +39,7 @@ export function auditStatements(
         input.now,
       )
     : db.prepare(
-        "INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE((SELECT id FROM staff WHERE tenant_id = ?1 AND role = 'owner' AND deleted_at IS NULL ORDER BY created_at LIMIT 1), 'server'), ?9)",
+        `INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE((SELECT id FROM staff WHERE tenant_id = ?1 AND role = 'owner' AND deleted_at IS NULL ORDER BY created_at LIMIT 1), 'server'), ?9${guard}`,
         id,
         input.action,
         input.entity ?? 'shop',

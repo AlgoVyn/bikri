@@ -168,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           ) : null}
           <SyncBadge />
-          <StaffMenu />
+          <StaffMenu shopName={shopName} />
         </div>
       </header>
       <nav
@@ -227,19 +227,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t('pricecheck.title')}
           </span>
         </button>
-        {shopName ? (
-          <div
-            className="mt-auto hidden border-t border-white/10 px-2 pb-3 pt-3 lg:block"
-            title={shopName}
-          >
-            <span
-              className="mx-auto line-clamp-2 max-w-full break-words text-center text-micro font-medium uppercase leading-tight tracking-[0.04em] text-rail-muted"
-              data-testid="rail-shop-name"
-            >
-              {shopName}
-            </span>
-          </div>
-        ) : null}
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">
             <button
@@ -257,11 +244,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 id="more-menu"
                 className="absolute end-1 bottom-full mb-2 w-48 rounded-card border border-border bg-surface py-1 shadow-lg"
               >
-                <li className="border-b border-border px-3 py-2">
-                  <p className="truncate font-medium">
-                    {shopName ?? t('common.app_name')}
-                  </p>
-                </li>
                 {more.map((item) => (
                   <li key={item.to}>
                     <Link

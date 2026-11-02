@@ -78,7 +78,7 @@ Time Travel restores the **entire** database in place, so it rolls back **every 
    Tills see the new epoch on next pull and run **restore recovery** ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)): re-send their own ledger rows created after the restore point, full re-pull, then push the outbox; invoice counters never go backwards.
 6. Unset `MAINTENANCE`.
 
-Note: rows created after the restore point are re-sent by the tills that created them; only master-data edits made after the restore point, and rows from tills that no longer exist or whose browser data was cleared, are lost. Warn every affected shop owner before step 4 (count of `change_log` rows per tenant after the bookmark).
+Note: rows created after the restore point, including master-data edits, are re-sent by the tills that created them; only rows from tills that no longer exist or whose browser data was cleared are lost. Warn every affected shop owner before step 4 (count of `change_log` rows per tenant after the bookmark).
 
 ### 3.2 Restore a nightly backup to a new database
 

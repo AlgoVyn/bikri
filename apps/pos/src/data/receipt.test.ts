@@ -175,6 +175,8 @@ describe('share helpers', () => {
     expect(waNumber('00923001234567')).toBe('923001234567');
     expect(waNumber('3001234567')).toBe('923001234567');
     expect(waNumber('12345')).toBeNull();
+    // Landlines pass the digit check but cannot receive WhatsApp.
+    expect(waNumber('042-35761234')).toBeNull();
     expect(waLink('03001234567', 'Bill A-A-1 · Rs 43,000')).toBe(
       'https://wa.me/923001234567?text=Bill%20A-A-1%20%C2%B7%20Rs%2043%2C000',
     );

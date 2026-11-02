@@ -129,7 +129,10 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 | insert `expenses` | `expense.create`; for a cashier: `method = 'cash'` and `amount ≤ 200000` (Rs 2,000) unless overridden |
 | insert `supplier_returns` (and its lines, payment, ledger rows) | staff has `purchase.create` |
 | insert `ledger_entries` | `opening`/`sale`/`refund`/`void`/`payment`/`purchase`/`supplier_return` must carry the source document in the same transaction; `adjustment` is owner/manager only |
-| insert `stock_movements` | adjustment/count reasons need `stock.adjust`; opening needs `catalog.edit`; purchase/return need `purchase.create`; sale/refund/void movements need the source document and its permission |
+| insert `stock_movements` | adjustment/count reasons need `stock.adjust`; opening needs `catalog.edit`; purchase/return need `purchase.create`; sale/refund/void movements need the source document and its permission; the sign must match the reason and stock-adding reasons need a cost |
+| insert `payments` | a purpose that names a document (`sale`, `refund`, `purchase_paid_now`, `supplier_refund`, `void`) needs that document in the same batch; customer/supplier payments need their ledger row in the same batch |
+| insert `day_closes` | staff has `dayclose.create`; `period_end = created_at` and `period_start ≤ period_end` |
+| insert child lines (`sale_lines`, `refund_lines`, `purchase_lines`, `supplier_return_lines`) | the parent header is in the same batch |
 | upsert/delete `staff`, `branches`, `shop` | `updated_by` is an owner |
 | delete `products`, `customers`, `suppliers` | `updated_by` has `catalog.delete` / `party.delete` |
 | upsert `products.price` / `last_cost` | `updated_by` has `catalog.edit` (purchases set `last_cost` and need `purchase.create`) |

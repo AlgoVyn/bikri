@@ -1,3 +1,4 @@
+import { SYNC_IMPORT_ORDER } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import {
   clearRestoreState,
@@ -5,6 +6,7 @@ import {
   hasStarted,
   importableRow,
   initialRestoreState,
+  missingRestoreTables,
   parseExport,
   type RestoreState,
   readRestoreState,
@@ -250,5 +252,23 @@ describe('export zip manifest', () => {
     await expect(unzip(bad).then(parseExport)).rejects.toBeInstanceOf(
       ExportZipError,
     );
+  });
+
+  it('flags an export that omits tables a restore would purge', () => {
+    const partial = {
+      tables: [
+        { tbl: 'shop', rows: [] },
+        { tbl: 'sales', rows: [] },
+      ],
+    };
+    const missing = missingRestoreTables(partial);
+    expect(missing).toContain('products');
+    expect(missing).toContain('staff');
+    expect(missing).not.toContain('shop');
+    expect(missing).not.toContain('sales');
+    const complete = {
+      tables: SYNC_IMPORT_ORDER.map((tbl) => ({ tbl, rows: [] })),
+    };
+    expect(missingRestoreTables(complete)).toEqual([]);
   });
 });

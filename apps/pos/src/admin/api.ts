@@ -256,6 +256,7 @@ export function resetOwnerPin(
     pin_hash: string;
     pin_salt: string;
     pin_iterations: number;
+    pin_length: number;
   },
 ): Promise<{ ok: boolean }> {
   return apiJson(idPath(id, '/reset-owner-pin'), { method: 'POST', body });

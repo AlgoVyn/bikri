@@ -22,14 +22,37 @@ function rel(path: string): string {
 const allowedRaw = (p: string): boolean =>
   p === 'db/tenantDb.ts' || p.startsWith('platform/');
 
-/** SQL string literals in a source file (template literals with ${} are builders: skipped). */
+/**
+ * Interpolated SQL cannot be parsed for table names, but it must still bind the tenant.
+ * The INSERT form is accepted because `tenantDb` prepends `(tenant_id, …) VALUES (?1, …)`.
+ */
+function interpolatedSqlScoped(sql: string): boolean {
+  return (
+    /\btenant_id\s*=\s*\?1\b/iu.test(sql) ||
+    /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+\S+\s*\(\s*tenant_id\s*,/iu.test(sql)
+  );
+}
+
+/** SQL string literals in a source file (interpolated SQL is checked separately). */
 function sqlLiterals(source: string): string[] {
   const out: string[] = [];
   for (const m of source.matchAll(SQL_LITERAL)) {
     const sql = m[2] ?? '';
-    if (m[1] === '`' && sql.includes('${')) continue;
     if (!/\b(FROM|INTO|UPDATE)\b/i.test(sql)) continue;
+    if (m[1] === '`' && sql.includes('${')) continue;
     out.push(sql);
+  }
+  return out;
+}
+
+/** Interpolated SQL whose literal text does not bind the tenant. */
+function unscopedInterpolated(source: string): string[] {
+  const out: string[] = [];
+  for (const m of source.matchAll(SQL_LITERAL)) {
+    const sql = m[2] ?? '';
+    if (m[1] !== '`' || !sql.includes('${')) continue;
+    if (!/\b(FROM|INTO|UPDATE)\b/i.test(sql)) continue;
+    if (!interpolatedSqlScoped(sql)) out.push(sql);
   }
   return out;
 }
@@ -58,6 +81,10 @@ describe('I19 static check', () => {
           offenders.push(`${file}: ${sql}`);
         }
       }
+      for (const sql of unscopedInterpolated(src))
+        offenders.push(
+          `${file}: interpolated SQL without tenant_id = ?1: ${sql}`,
+        );
     }
     expect(offenders).toEqual([]);
   });
@@ -73,5 +100,16 @@ describe('I19 static check', () => {
       "db.select('SELECT * FROM products WHERE tenant_id = ?1 AND id = ?2', id)";
     expect(RAW_DB.test(good)).toBe(false);
     for (const sql of sqlLiterals(good)) assertTenantScoped(sql);
+    const placeholder = '$' + '{tbl}';
+    expect(
+      unscopedInterpolated(
+        `db.prepare(\`SELECT * FROM ${placeholder} WHERE id = ?2\`)`,
+      ),
+    ).toHaveLength(1);
+    expect(
+      unscopedInterpolated(
+        `db.prepare(\`SELECT * FROM ${placeholder} WHERE tenant_id = ?1 AND id = ?2\`)`,
+      ),
+    ).toHaveLength(0);
   });
 });

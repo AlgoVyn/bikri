@@ -19,7 +19,7 @@
 
 Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`), `+ New customer` (N), `Chase list`, `Export CSV`.
 
-Rows: name, phone, balance (neutral "Owes you Rs 5,890", green "In credit Rs 200", grey "Settled"), oldest unpaid age ("45 days"), limit bar (if limit), next promise date. Click → statement.
+Rows use one table header (`Customer`, `Balance`, `Oldest unpaid`, `Credit limit`, `Promise`) and compact cells: name and phone; the balance amount only (green `In credit` for a negative balance, grey `Settled` for zero; screen readers still hear "Owes you Rs …" for positive balances); oldest unpaid age (`Today`, `1 day`, `45 days`); credit-limit bar with percent and limit (or `No limit`); next promise date as a pill (amber when due). Below 640 px the row stacks into a compact card with the same information. Click → statement.
 
 ## New / edit customer
 
@@ -59,7 +59,7 @@ Fields: amount (`MoneyInput`, prefilled with balance, selects all), method (Cash
 
 Promise: date (required, ≥ today), amount (optional = whole balance), note. Status becomes `kept` automatically when payments since the promise ≥ promised amount (or balance ≤ 0); `broken` the day after the date if not kept (computed locally each morning; written as an upsert by the first device that notices, idempotent).
 
-Chase list groups customers with balance > 0 by oldest-unpaid age: **0–7 days**, **8–30**, **31–60**, **60+**, plus a top group **Promise due today / overdue**. Each row: name, balance, age, last payment date, buttons `Remind` (wa.me), `Call`, `Promise`, `Receive`. Group totals shown. Export CSV.
+Chase list groups customers with balance > 0 by oldest-unpaid age: **0–7 days**, **8–30**, **31–60**, **60+**, plus a top group **Promise due today / overdue**. Each row: name, balance amount, age, last payment date, buttons `Remind` (wa.me), `Call`, `Promise`, `Receive`. Group totals shown. Export CSV.
 
 ## Acceptance criteria
 

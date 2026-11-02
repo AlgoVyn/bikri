@@ -1,5 +1,13 @@
 /** Pull, snapshot and restore recovery (03 §4.2–4.3). */
-import { type LedgerTable, MAX_OPS_PER_TX, newId, opRow } from '@bikri/core';
+import {
+  type LedgerTable,
+  MASTER_TABLES,
+  MAX_OPS_PER_TX,
+  type MasterTable,
+  newId,
+  opRow,
+  SYNC_IMPORT_ORDER,
+} from '@bikri/core';
 import type { BikriDb, SyncedRow } from '@bikri/db';
 import { rebuildCaches } from '../data/caches.ts';
 import { getKv, setKv } from '../data/kv.ts';
@@ -327,11 +335,81 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
   return [...groups.values()];
 }
 
+type RecoveredMaster = { tbl: MasterTable; row: SyncedRow; deleted: boolean };
+type OutboxDraft = {
+  tbl: MasterTable | LedgerTable;
+  kind: 'insert' | 'upsert' | 'delete';
+  row_id: string;
+  row?: Record<string, unknown>;
+  base_rev?: number;
+  changed_fields?: string[];
+  updated_by?: string | null;
+  created_at: number;
+};
+
+const MASTER_SET = new Set<string>(MASTER_TABLES);
+
+function masterDraft(item: RecoveredMaster, now: number): OutboxDraft {
+  const row = opRow(item.tbl, item.row);
+  const baseRev = Number(item.row.rev ?? 0);
+  if (item.deleted) {
+    return {
+      tbl: item.tbl,
+      kind: 'delete',
+      row_id: item.row.id,
+      base_rev: baseRev,
+      updated_by:
+        typeof item.row.updated_by === 'string' ? item.row.updated_by : null,
+      created_at: now,
+    };
+  }
+  return {
+    tbl: item.tbl,
+    kind: 'upsert',
+    row_id: item.row.id,
+    row,
+    base_rev: baseRev,
+    changed_fields: Object.keys(row).filter((key) => key !== 'id'),
+    updated_by:
+      typeof item.row.updated_by === 'string' ? item.row.updated_by : null,
+    created_at: now,
+  };
+}
+
+function ledgerDraft(
+  row: SyncedRow,
+  tbl: LedgerTable,
+  now: number,
+): OutboxDraft {
+  return {
+    tbl,
+    kind: 'insert',
+    row_id: row.id,
+    row: opRow(tbl, row),
+    created_at: now,
+  };
+}
+
+/** Staff rows that must be present in a transaction for its rows to pass the server checks. */
+function staffRefs(row: SyncedRow | undefined): string[] {
+  if (!row) return [];
+  const out: string[] = [];
+  for (const field of ['staff_id', 'updated_by']) {
+    const value = row[field];
+    if (typeof value === 'string') out.push(value);
+  }
+  return out;
+}
+
 /**
  * Restore recovery (03 §4.2): re-send own ledger rows created since the restore point as fresh
  * inserts, clear synced tables and caches (outbox kept), snapshot again. The snapshot state is
  * saved before clearing so a dropped connection resumes the download instead of leaving an
  * empty till. Recovered rows are grouped into document-sized transactions (≤ 200 ops).
+ *
+ * Master rows created/updated after the restore point are recovered too. The restored server
+ * copy only contains rows that existed at the restore point; discarding a new customer,
+ * product or staff member would make the recovered ledger rows fail their FKs or permissions.
  */
 export async function restoreRecovery(
   db: BikriDb,
@@ -391,23 +469,162 @@ export async function restoreRecovery(
           }
         }
       }
-      for (const group of recoveryGroups(recoveredRows)) {
-        for (let offset = 0; offset < group.length; offset += MAX_OPS_PER_TX) {
-          const chunk = group.slice(offset, offset + MAX_OPS_PER_TX);
-          const txId = newId(now);
-          for (const { tbl, row } of chunk) {
-            await db.outbox.add({
-              op_id: newId(now),
-              tx_id: txId,
-              tbl,
-              kind: 'insert',
-              row_id: String(row.id),
-              row: opRow(tbl, row),
-              created_at: now,
-              status: 'pending',
-              attempts: 0,
-            });
+      // Master rows created or updated after the restore point are not in the restored
+      // server copy. Re-send them first so recovered sales/payments/expenses have their
+      // customer, product, category and staff references.
+      const queued = new Set(
+        (await db.outbox.toArray()).map(
+          (entry) => `${entry.tbl}:${entry.row_id}`,
+        ),
+      );
+      const masterRows: RecoveredMaster[] = [];
+      for (const tbl of SYNC_IMPORT_ORDER) {
+        if (!MASTER_SET.has(tbl)) continue;
+        const rows = (await db
+          .table(tbl as MasterTable)
+          .toArray()) as SyncedRow[];
+        for (const row of rows) {
+          const created = Number(row.created_at ?? 0);
+          const updated = Number(row.updated_at ?? 0);
+          const deleted = row.deleted_at ? Number(row.deleted_at) : 0;
+          if (Math.max(created, updated, deleted) < restorePointAt) continue;
+          // Staff rows are included even when an outbox entry exists so a new cashier can
+          // be placed in the same transaction as the rows they created. Other rows already
+          // queued keep their original transaction.
+          if (tbl !== 'staff' && queued.has(`${tbl}:${row.id}`)) continue;
+          masterRows.push({
+            tbl: tbl as MasterTable,
+            row,
+            deleted: row.deleted_at != null,
+          });
+        }
+      }
+
+      const openingRows = recoveredRows.filter(
+        ({ row }) => row.source_type === 'opening',
+      );
+      const openingKeys = new Set<string>();
+      for (const { row } of openingRows) {
+        const partyTable =
+          row.party_type === 'customer' ? 'customers' : 'suppliers';
+        const partyId = String(row.party_id);
+        openingKeys.add(`${partyTable}:${partyId}`);
+        if (
+          masterRows.some(
+            (item) => item.tbl === partyTable && item.row.id === partyId,
+          )
+        )
+          continue;
+        const party = (await db
+          .table(partyTable as 'customers' | 'suppliers')
+          .get(partyId)) as SyncedRow | undefined;
+        if (party)
+          masterRows.push({
+            tbl: partyTable,
+            row: party,
+            deleted: party.deleted_at != null,
+          });
+      }
+
+      const newStaff = new Map(
+        masterRows
+          .filter((item) => item.tbl === 'staff')
+          .map((item) => [item.row.id, item] as const),
+      );
+      // A transaction is built from whole units. A unit is one document (sale + lines +
+      // payment + ledger, an opening balance with its party, …) or one master row, so the
+      // Worker's in-group checks keep seeing the rows together. Units are packed up to the
+      // op limit; a new staff row is copied into every transaction whose rows reference it
+      // because the Worker plans the whole push against the state before the push.
+      const units: { drafts: OutboxDraft[]; staff: Set<string> }[] = [];
+      const referencedStaff = new Set<string>();
+      const addUnit = (
+        drafts: OutboxDraft[],
+        rows: (SyncedRow | undefined)[],
+      ) => {
+        const staff = new Set<string>();
+        for (const row of rows) {
+          for (const id of staffRefs(row)) {
+            if (!newStaff.has(id)) continue;
+            staff.add(id);
+            referencedStaff.add(id);
           }
+        }
+        units.push({ drafts, staff });
+      };
+
+      // An opening balance needs its party row in the same transaction: the Worker's
+      // opening check accepts only a party in the same op group.
+      for (const { row } of openingRows) {
+        const partyTable =
+          row.party_type === 'customer' ? 'customers' : 'suppliers';
+        const party = masterRows.find(
+          (item) =>
+            item.tbl === partyTable && item.row.id === String(row.party_id),
+        );
+        const drafts = party ? [masterDraft(party, now)] : [];
+        drafts.push(ledgerDraft(row, 'ledger_entries', now));
+        addUnit(drafts, [party?.row, row]);
+      }
+
+      for (const item of masterRows) {
+        if (item.tbl === 'staff') continue;
+        if (openingKeys.has(`${item.tbl}:${item.row.id}`)) continue;
+        addUnit([masterDraft(item, now)], [item.row]);
+      }
+
+      const otherLedger = recoveredRows.filter(
+        ({ row }) => row.source_type !== 'opening',
+      );
+      for (const group of recoveryGroups(otherLedger)) {
+        addUnit(
+          group.map(({ tbl, row }) => ledgerDraft(row, tbl, now)),
+          group.map(({ row }) => row),
+        );
+      }
+
+      // A new staff member with no rows of their own still has to be restored.
+      for (const item of newStaff.values()) {
+        if (referencedStaff.has(item.row.id)) continue;
+        addUnit([masterDraft(item, now)], [item.row]);
+      }
+
+      const chunks: OutboxDraft[][] = [];
+      let chunk: OutboxDraft[] = [];
+      let chunkStaff = new Set<string>();
+      const flush = () => {
+        if (chunk.length === 0) return;
+        chunks.push(chunk);
+        chunk = [];
+        chunkStaff = new Set<string>();
+      };
+      for (const unit of units) {
+        const extra = [...unit.staff].filter((id) => !chunkStaff.has(id));
+        if (
+          chunk.length > 0 &&
+          chunk.length + unit.drafts.length + extra.length > MAX_OPS_PER_TX
+        )
+          flush();
+        for (const id of unit.staff) {
+          if (chunkStaff.has(id)) continue;
+          chunkStaff.add(id);
+          const staff = newStaff.get(id);
+          if (staff) chunk.push(masterDraft(staff, now));
+        }
+        chunk.push(...unit.drafts);
+      }
+      flush();
+
+      for (const drafts of chunks) {
+        const txId = newId(now);
+        for (const draft of drafts) {
+          await db.outbox.add({
+            op_id: newId(now),
+            tx_id: txId,
+            ...draft,
+            status: 'pending',
+            attempts: 0,
+          });
         }
       }
       for (const tbl of PULLED_TABLES) await db.table(tbl).clear();

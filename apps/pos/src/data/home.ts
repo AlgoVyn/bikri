@@ -1,5 +1,6 @@
 import type { BikriDb, PartyType, SyncedRow } from '@bikri/db';
 import { heldExpiringCount } from './cart.ts';
+import { unresolvedFailedCount } from './printJobs.ts';
 
 export type AttentionItem =
   | { kind: 'low_stock'; count: number }
@@ -92,7 +93,7 @@ export async function attentionItems(
     0,
   );
   if (over > 0) items.push({ kind: 'over_limit', count: over });
-  const failed = await db.print_jobs.where('status').equals('failed').count();
+  const failed = await unresolvedFailedCount(db);
   if (failed > 0) items.push({ kind: 'failed_prints', count: failed });
   if (opts.isOwner) {
     const conflicts = (await db.sync_conflicts.toArray()).filter(

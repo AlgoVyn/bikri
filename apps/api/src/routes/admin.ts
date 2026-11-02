@@ -259,18 +259,15 @@ async function changeStatus(
     by(c.var.operator),
     now,
   );
-  const update = statements[0];
-  if (!update) throw new ApiError('BAD_STATUS_CHANGE', 409, 'No status update');
-  const res = await c.var.db.batch([update]);
+  const res = await c.var.db.batch(statements);
   if ((res[0]?.meta.changes ?? 0) !== 1)
     throw new ApiError(
       'BAD_STATUS_CHANGE',
       409,
       'The status changed meanwhile',
     );
-  // Audit and device side effects only after the CAS succeeded; never write a status row for a
-  // transition another request won.
-  if (statements.length > 1) await c.var.db.batch(statements.slice(1));
+  // The audit row is guarded by `changes() = 1`, and the device side effects are guarded by
+  // the new tenant status, so a lost CAS never leaves an audit row or side effect behind.
   return fresh(c.env, tenant.id);
 }
 
@@ -514,16 +511,18 @@ admin.post('/tenants/:id/reset-owner-pin', async (c) => {
       pin_hash: z.string().min(16).max(200),
       pin_salt: z.string().min(8).max(200),
       pin_iterations: z.number().int().min(100_000).max(1_000_000),
+      pin_length: z.number().int().min(4).max(6),
     })
     .parse(await c.req.json());
   const now = Date.now();
   const res = await db.batch([
     db.prepare(
-      "UPDATE staff SET pin_hash = ?3, pin_salt = ?4, pin_iterations = ?5, rev = rev + 1, updated_at = ?6, updated_by = 'server' WHERE tenant_id = ?1 AND id = ?2 AND role = 'owner' AND deleted_at IS NULL",
+      "UPDATE staff SET pin_hash = ?3, pin_salt = ?4, pin_iterations = ?5, pin_length = ?6, rev = rev + 1, updated_at = ?7, updated_by = 'server' WHERE tenant_id = ?1 AND id = ?2 AND role = 'owner' AND active = 1 AND deleted_at IS NULL",
       body.staff_id,
       body.pin_hash,
       body.pin_salt,
       body.pin_iterations,
+      body.pin_length,
       now,
     ),
   ]);

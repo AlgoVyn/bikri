@@ -46,14 +46,19 @@ export function ageDays(at: number | null, now = Date.now()): number | null {
   return Math.max(0, Math.floor((now - at) / 86_400_000));
 }
 
+export function ageDaysText(t: TFunction, days: number): string {
+  if (days === 0) return t('office.udhaar.age_today');
+  if (days === 1) return t('office.udhaar.age_one_day');
+  return t('office.udhaar.days_old', { days });
+}
+
 export function ageLabel(
   t: TFunction,
   at: number | null,
   now = Date.now(),
 ): string {
   const days = ageDays(at, now);
-  if (days === null) return '';
-  return t('office.udhaar.days_old', { days });
+  return days === null ? '' : ageDaysText(t, days);
 }
 
 export function limitPercent(

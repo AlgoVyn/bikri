@@ -2,7 +2,7 @@
  * Stock adjust and stock count (screens/09, T-021). Writes `stock_movements` only (append-only,
  * REQ-C03); costed stock-in also moves the provisional avg / last cost (07 §7).
  */
-import { businessDate, newId, nextAvgCost } from '@bikri/core';
+import { businessDate, mulDivRound, newId, nextAvgCost } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
 import type { LedgerContext } from './products.ts';
 import { type Writer, writeAction } from './write.ts';
@@ -332,9 +332,7 @@ export async function finishCount(
             note: '',
           });
           movements += 1;
-          valueDiff += Math.round(
-            (delta * Number(product.avg_cost ?? 0)) / 1000,
-          );
+          valueDiff += mulDivRound(delta, Number(product.avg_cost ?? 0), 1000);
         }
         await w.insert('audit_log', {
           id: newId(w.now),

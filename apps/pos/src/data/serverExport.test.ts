@@ -151,5 +151,11 @@ describe('owner server export (T-053, 13 §7.3)', () => {
     const resumed = await buildServerExport(db, 'st-1');
     expect(starts).toBe(1);
     expect(resumed.manifest.snapshot_seq).toBe(7);
+    // A resumed export must re-read every table; persisting only a “done” flag would drop
+    // products, which had already been fetched before the failed sales page.
+    const entries = await unzip(resumed.bytes);
+    const names = entries.map((entry) => entry.name);
+    expect(names).toContain('json/products.json');
+    expect(names).toContain('json/sales.json');
   });
 });

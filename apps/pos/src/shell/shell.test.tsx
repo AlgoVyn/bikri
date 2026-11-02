@@ -115,9 +115,7 @@ describe('app shell', () => {
     await renderAt(`${BASE_PATH}/`);
     const rail = await screen.findByRole('navigation', { name: 'Main' });
     expect(screen.getByTestId('brand-rail').textContent).toContain('Bikri');
-    expect((await screen.findByTestId('rail-shop-name')).textContent).toBe(
-      'Algovyn Mobiles',
-    );
+    expect(screen.queryByTestId('rail-shop-name')).toBeNull();
     for (const name of [
       'Home',
       'Sell',
@@ -131,6 +129,16 @@ describe('app shell', () => {
     ]) {
       expect(rail.querySelector(`a[title^="${name} ("]`)).not.toBeNull();
     }
+  });
+
+  it('shows the shop name in the staff menu, not the rail', async () => {
+    const user = userEvent.setup();
+    await renderAt(`${BASE_PATH}/`);
+    expect(screen.queryByTestId('rail-shop-name')).toBeNull();
+    await user.click(await screen.findByTestId('staff-menu'));
+    expect((await screen.findByTestId('staff-menu-shop')).textContent).toBe(
+      'Algovyn Mobiles',
+    );
   });
 
   it('hides what a cashier cannot use and refuses it by URL (AC 2)', async () => {

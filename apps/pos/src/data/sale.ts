@@ -141,7 +141,7 @@ export async function completeSale(
 ): Promise<SaleResult> {
   const { cart, money } = input;
   if (cart.lines.length === 0) throw new SaleInvalidError('empty cart');
-  const totals: CartResult = cartTotals(cart, money);
+  let totals: CartResult = cartTotals(cart, money);
   const rows = mergeRows(input.rows);
   const s = settle(totals.total, rows);
   if (!s.valid) throw new SaleInvalidError('payments do not cover the total');
@@ -191,6 +191,23 @@ export async function completeSale(
   const products = new Map<string, MasterRow>();
   for (const p of await db.products.bulkGet(productIds))
     if (p) products.set(p.id, p);
+  // Costs may have changed since the line was added (e.g. a delivery synced from another
+  // till). Re-price the cart now so the below-cost decision matches the cost snapshot the
+  // server will verify.
+  totals = cartTotals(
+    {
+      ...cart,
+      lines: cart.lines.map((line) => {
+        const product = line.product_id
+          ? products.get(line.product_id)
+          : undefined;
+        return product
+          ? { ...line, unit_cost: unitCostOf(product, money.cost_method) }
+          : line;
+      }),
+    },
+    money,
+  );
 
   let created = false;
   const sale = await writeAction(

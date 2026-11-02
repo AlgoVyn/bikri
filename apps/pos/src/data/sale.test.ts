@@ -255,6 +255,26 @@ describe('sale recipe (02 §5)', () => {
     expect((await udhaarCheck(db, 'nobody', 1)).limit).toBeNull();
   });
 
+  it('re-prices cart lines with the current cost before the below-cost check', async () => {
+    const { db, ctx, phone } = await shopWithStock('sale-reprice');
+    const cart = addProduct(emptyCart('c1'), phone, 1000, 'avg');
+    await db.products.update(phone.id, {
+      avg_cost: 5000000,
+      last_cost: 5000000,
+      rev: 2,
+      updated_at: NOW + 1,
+    });
+    const { sale: s } = await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 4200000 }]),
+      ctx,
+      NOW + 1000,
+    );
+    const line = await db.sale_lines.where('sale_id').equals(s.id).first();
+    expect(line?.unit_cost_snapshot).toBe(5000000);
+    expect(line?.below_cost).toBe(1);
+  });
+
   it('refuses a hard-limit udhaar sale until a matching override is present', async () => {
     const { db, ctx, phone, buds } = await shopWithStock('hard-limit');
     const customer = await createCustomer(

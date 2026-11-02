@@ -179,6 +179,27 @@ describe('import spreadsheet (screens/08)', () => {
     expect(audit.map((r) => r.entity_id)).toEqual([a.id]);
   });
 
+  it('rejects names and categories over the D1 schema limits', async () => {
+    const { db } = await shop('imp-limits');
+    const longName = 'a'.repeat(81);
+    const longCategory = 'c'.repeat(41);
+    const g = grid(
+      [
+        HEAD,
+        `${longName},,,,111222333,,450,,,,,`,
+        `Fine,,${longCategory},,444555666,,450,,,,,`,
+      ].join('\n'),
+    );
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.rows[0]?.errors.map((e) => e.code)).toContain(
+      'name_too_long',
+    );
+    expect(preview.rows[1]?.errors.map((e) => e.code)).toContain(
+      'category_too_long',
+    );
+    expect(preview.summary.errors).toBe(2);
+  });
+
   it('row errors are skipped and listed in import-errors.csv', async () => {
     const { db, ctx } = await shop('imp3');
     await saveNewProduct(

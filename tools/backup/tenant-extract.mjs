@@ -16,7 +16,7 @@ import { zipStore } from './zip.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PAGE = 500;
-const APP_VERSION = process.env.APP_VERSION ?? '0.1.0';
+const APP_VERSION = process.env.APP_VERSION ?? '1.0.0';
 const HIDDEN = { devices: ['token_hash'] };
 
 const MONEY_FIELDS = new Set([

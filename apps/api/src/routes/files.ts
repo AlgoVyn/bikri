@@ -13,7 +13,7 @@ const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 const SHA = /^[0-9a-f]{64}$/u;
 /** The only relative keys a till may read (04 §3.6). */
 const READABLE = [
-  /^products\/[0-9A-HJKMNP-TV-Z]{26}\/[0-9a-f]{64}\.webp$/u,
+  /^products\/[0-9A-HJKMNP-TV-Z]{26}\/[0-9a-f]{64}\.(?:webp|jpg|png)$/u,
   /^shop\/logo-[0-9a-f]{64}\.png$/u,
 ];
 
@@ -38,12 +38,24 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
     id: string;
     sha256: string;
   };
+  const type = (c.req.header('content-type') ?? '').split(';')[0]?.trim() ?? '';
+  if (!TYPES.has(type))
+    throw new ApiError(
+      'UNSUPPORTED_MEDIA_TYPE',
+      415,
+      'Upload webp, png or jpeg',
+    );
   let relative: string;
-  if (kind === 'product_image' && ULID.test(id))
-    relative = `products/${id}/${sha256}.webp`;
-  else if (kind === 'logo' && id === 'shop')
+  if (kind === 'product_image' && ULID.test(id)) {
+    const ext =
+      type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : 'webp';
+    relative = `products/${id}/${sha256}.${ext}`;
+  } else if (kind === 'logo' && id === 'shop') {
+    if (type !== 'image/png')
+      throw new ApiError('UNSUPPORTED_MEDIA_TYPE', 415, 'Logo must be a PNG');
     relative = `shop/logo-${sha256}.png`;
-  else throw new ApiError('VALIDATION_FAILED', 400, 'Unknown file kind or id');
+  } else
+    throw new ApiError('VALIDATION_FAILED', 400, 'Unknown file kind or id');
   if (!SHA.test(sha256))
     throw new ApiError(
       'VALIDATION_FAILED',
@@ -64,13 +76,6 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
     kind === 'product_image' ? 'catalog.edit' : 'settings.shop';
   if (!staff || !can(staff.role, staff.permissions_json, permission))
     throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
-  const type = (c.req.header('content-type') ?? '').split(';')[0]?.trim() ?? '';
-  if (!TYPES.has(type))
-    throw new ApiError(
-      'UNSUPPORTED_MEDIA_TYPE',
-      415,
-      'Upload webp, png or jpeg',
-    );
   if (Number(c.req.header('content-length') ?? '0') > MAX_IMAGE_BYTES)
     throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Image is over 2 MB');
   const body = await c.req.arrayBuffer();

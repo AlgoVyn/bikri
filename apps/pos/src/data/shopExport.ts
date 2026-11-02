@@ -1,5 +1,5 @@
-import { APP_VERSION } from '@bikri/core';
-import { type BikriDb, DEXIE_SCHEMA_V1, LOCAL_ONLY_TABLES } from '@bikri/db';
+import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
+import { type BikriDb, LOCAL_ONLY_TABLES } from '@bikri/db';
 import { zipStore } from '../admin/zip.ts';
 import { csvCell } from '../lib/csv.ts';
 import { tenantInfo } from './localTenant.ts';
@@ -76,7 +76,8 @@ const TIME_FIELDS = new Set([
 
 const localOnly = new Set<string>(LOCAL_ONLY_TABLES);
 
-export const SHOP_EXPORT_TABLES = Object.keys(DEXIE_SCHEMA_V1).filter(
+/** Export in dependency order so a restore can import table by table without FK failures. */
+export const SHOP_EXPORT_TABLES = SYNC_EXPORT_ORDER.filter(
   (table) => !localOnly.has(table),
 );
 

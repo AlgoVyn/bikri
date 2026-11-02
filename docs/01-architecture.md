@@ -249,7 +249,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // operator API only
   ],
   "vars": {
-    "APP_VERSION": "0.1.0",
+    "APP_VERSION": "1.0.0",
     "SCHEMA_VERSION": "2",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",

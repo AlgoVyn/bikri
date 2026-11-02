@@ -132,6 +132,8 @@ type Lookups = {
   linkedLedger: Map<string, LinkedLedger[]>;
   /** purchase_line_id → supplier_id of its purchase. */
   purchaseLineSupplier: Map<string, string>;
+  /** sale_line_id → sale_id, for refund lines that are checked against their refund. */
+  saleLineSale: Map<string, string>;
   /** Original expenses referenced by a reversal row in this push. */
   expenses: Map<
     string,
@@ -334,14 +336,41 @@ function bootstrapOwnerId(look: Lookups, group: PushOp[]): string | null {
   return owner ? ownerId : null;
 }
 
+/**
+ * A staff row created in this action may be used by the other rows of the same action, but
+ * only when an owner (already persisted, or the first owner of setup) created it. This lets
+ * restore recovery group a new cashier with the rows they created without weakening the
+ * “only an owner may add staff” rule.
+ */
+function groupStaffAuthorized(
+  look: Lookups,
+  group: PushOp[],
+  id: string,
+): StaffRow | null {
+  const created = staffCreatedInGroup(group, id);
+  if (!created) return null;
+  const op = group.find(
+    (candidate) =>
+      candidate.tbl === 'staff' &&
+      candidate.kind === 'upsert' &&
+      candidate.row?.id === id,
+  );
+  const updater = op?.row?.updated_by;
+  if (typeof updater === 'string') {
+    const owner = look.staff.get(updater);
+    if (
+      owner?.role === 'owner' &&
+      owner.active === 1 &&
+      owner.deleted_at === null
+    )
+      return created;
+  }
+  return bootstrapOwnerId(look, group) === id ? created : null;
+}
+
 function staffOf(look: Lookups, group: PushOp[], id: unknown): StaffRow | null {
   if (typeof id !== 'string') return null;
-  const bootstrap = bootstrapOwnerId(look, group);
-  const s =
-    look.staff.get(id) ??
-    (bootstrap !== null && id === bootstrap
-      ? staffCreatedInGroup(group, id)
-      : null);
+  const s = look.staff.get(id) ?? groupStaffAuthorized(look, group, id);
   return s && s.active === 1 && s.deleted_at === null ? s : null;
 }
 
@@ -430,6 +459,18 @@ function checkRefund(
       Number(row.exact_amount ?? 0)
   )
     throw new Reject('CONSTRAINT_FAILED');
+  for (const line of lines) {
+    const pushedLine = group.find(
+      (candidate) =>
+        candidate.tbl === 'sale_lines' &&
+        candidate.row?.id === line.sale_line_id,
+    )?.row?.sale_id;
+    const lineSale =
+      look.saleLineSale.get(String(line.sale_line_id)) ??
+      (typeof pushedLine === 'string' ? pushedLine : undefined);
+    if (lineSale !== undefined && lineSale !== saleId)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
   if (sale && udhaar > 0) {
     if (!sale.customer_id) throw new Reject('CONSTRAINT_FAILED');
     const earlier =
@@ -636,27 +677,38 @@ function checkLedgerEntry(
       )
         throw new Reject('CONSTRAINT_FAILED');
       break;
-    case 'refund':
+    case 'refund': {
       if (
         !allowed('refund.create') &&
         !overrideFor(group, 'refunds', sourceId, 'refund.create', look.staff)
       )
         throw new Reject('FORBIDDEN');
+      const sale = saleOf(look, group, String(src.sale_id));
       if (
         row.party_type !== 'customer' ||
-        amount !== -Number(src.udhaar_part ?? 0)
+        amount !== -Number(src.udhaar_part ?? 0) ||
+        (sale?.customer_id != null && row.party_id !== sale.customer_id)
       )
         throw new Reject('CONSTRAINT_FAILED');
       break;
-    case 'void':
+    }
+    case 'void': {
       if (
         !allowed('sale.void') &&
         !overrideFor(group, 'sale_voids', sourceId, 'sale.void', look.staff)
       )
         throw new Reject('FORBIDDEN');
-      if (row.party_type !== 'customer' || amount >= 0)
+      const sale = saleOf(look, group, String(src.sale_id));
+      if (
+        row.party_type !== 'customer' ||
+        amount >= 0 ||
+        !sale ||
+        amount !== -Number(sale.udhaar_amount) ||
+        row.party_id !== sale.customer_id
+      )
         throw new Reject('CONSTRAINT_FAILED');
       break;
+    }
     case 'payment': {
       if (!allowed('payment.receive') && !allowed('purchase.create'))
         throw new Reject('FORBIDDEN');
@@ -673,12 +725,20 @@ function checkLedgerEntry(
     }
     case 'purchase':
       if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
-      if (row.party_type !== 'supplier' || amount !== Number(src.total ?? 0))
+      if (
+        row.party_type !== 'supplier' ||
+        row.party_id !== src.supplier_id ||
+        amount !== Number(src.total ?? 0)
+      )
         throw new Reject('CONSTRAINT_FAILED');
       break;
     case 'supplier_return':
       if (!allowed('purchase.create')) throw new Reject('FORBIDDEN');
-      if (row.party_type !== 'supplier' || amount !== -Number(src.total ?? 0))
+      if (
+        row.party_type !== 'supplier' ||
+        row.party_id !== src.supplier_id ||
+        amount !== -Number(src.total ?? 0)
+      )
         throw new Reject('CONSTRAINT_FAILED');
       break;
   }
@@ -694,6 +754,40 @@ function checkStockMovement(
   const reason = String(row.reason_code);
   const qty = Number(row.qty_delta_milli);
   if (!Number.isInteger(qty) || qty === 0)
+    throw new Reject('CONSTRAINT_FAILED');
+  const positive = new Set([
+    'opening',
+    'purchase',
+    'received_godown',
+    'received_local',
+    'received_other',
+    'customer_return',
+    'refund_return',
+    'void_return',
+    'transfer_in',
+  ]);
+  const negative = new Set([
+    'sale',
+    'supplier_return',
+    'damaged',
+    'expired',
+    'lost',
+    'spoiled',
+    'wrong_item',
+    'transfer_out',
+  ]);
+  if ((positive.has(reason) && qty < 0) || (negative.has(reason) && qty > 0))
+    throw new Reject('CONSTRAINT_FAILED');
+  if (
+    [
+      'opening',
+      'purchase',
+      'received_godown',
+      'received_local',
+      'received_other',
+    ].includes(reason) &&
+    (!Number.isSafeInteger(row.unit_cost) || Number(row.unit_cost) < 0)
+  )
     throw new Reject('CONSTRAINT_FAILED');
   if (ADJUST_REASONS.has(reason) && !allowed('stock.adjust'))
     throw new Reject('FORBIDDEN');
@@ -1018,7 +1112,25 @@ function checkOp(
           throw new Reject('FORBIDDEN');
         checkRefund(look, group, row);
         break;
+      case 'refund_lines':
+        if (
+          !sourceInGroup(
+            group,
+            'refunds',
+            typeof row.refund_id === 'string' ? row.refund_id : '',
+          )
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        break;
       case 'supplier_return_lines': {
+        if (
+          !sourceInGroup(
+            group,
+            'supplier_returns',
+            typeof row.return_id === 'string' ? row.return_id : '',
+          )
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         const qty = Number(row.qty_milli);
         const credit = Number(row.unit_credit);
         const lineTotal = Number(row.line_total);
@@ -1052,6 +1164,14 @@ function checkOp(
         break;
       }
       case 'sale_lines': {
+        if (
+          !sourceInGroup(
+            group,
+            'sales',
+            typeof row.sale_id === 'string' ? row.sale_id : '',
+          )
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         if (row.below_cost === 1) {
           const sale = group.find(
             (o) => o.tbl === 'sales' && o.row?.id === row.sale_id,
@@ -1125,6 +1245,14 @@ function checkOp(
         checkPurchase(look, group, row);
         break;
       case 'purchase_lines': {
+        if (
+          !sourceInGroup(
+            group,
+            'purchases',
+            typeof row.purchase_id === 'string' ? row.purchase_id : '',
+          )
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         const qty = Number(row.qty_milli);
         const unit = Number(row.unit_cost);
         const lineTotal = Number(row.line_total);
@@ -1184,6 +1312,50 @@ function checkOp(
                       )
                     : true;
         if (!ok) throw new Reject('FORBIDDEN');
+        const documentFor: Record<string, [string, unknown]> = {
+          sale: ['sales', row.sale_id],
+          refund: ['refunds', row.refund_id],
+          purchase_paid_now: ['purchases', row.purchase_id],
+          supplier_refund: ['supplier_returns', row.supplier_return_id],
+        };
+        const document = documentFor[purpose];
+        if (
+          document &&
+          (typeof document[1] !== 'string' ||
+            !sourceInGroup(group, document[0], document[1]))
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        if (purpose === 'void') {
+          const saleId = typeof row.sale_id === 'string' ? row.sale_id : '';
+          const voidRow = group.find(
+            (candidate) =>
+              candidate.tbl === 'sale_voids' &&
+              candidate.kind === 'insert' &&
+              candidate.row?.sale_id === saleId,
+          );
+          if (row.direction !== 'out' || !voidRow)
+            throw new Reject('CONSTRAINT_FAILED');
+        }
+        if (purpose === 'customer_payment' || purpose === 'supplier_payment') {
+          const paymentId = String(row.id);
+          const ledger = group.find(
+            (candidate) =>
+              candidate.tbl === 'ledger_entries' &&
+              candidate.kind === 'insert' &&
+              candidate.row?.source_type === 'payment' &&
+              candidate.row?.source_id === paymentId,
+          );
+          if (!ledger) throw new Reject('CONSTRAINT_FAILED');
+        }
+        break;
+      }
+      case 'day_closes': {
+        if (!allowed('dayclose.create')) throw new Reject('FORBIDDEN');
+        if (
+          Number(row.period_start) > Number(row.period_end) ||
+          Number(row.period_end) !== Number(row.created_at)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         break;
       }
       case 'audit_log': {
@@ -1656,6 +1828,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const returnIds = new Set<string>();
   const purchaseIds = new Set<string>();
   const purchaseLineIds = new Set<string>();
+  const refundLineIds = new Set<string>();
   const expenseIds = new Set<string>();
   const reversalIds = new Set<string>();
   const pushedSales = new Map<string, SaleInfo>();
@@ -1692,6 +1865,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       saleIds.add(op.row.sale_id);
     if (op.tbl === 'refunds' && typeof op.row?.id === 'string')
       refundIds.add(op.row.id);
+    if (op.tbl === 'refund_lines' && typeof op.row?.sale_line_id === 'string')
+      refundLineIds.add(op.row.sale_line_id);
     if (op.tbl === 'supplier_returns' && typeof op.row?.id === 'string')
       returnIds.add(op.row.id);
     if (
@@ -1748,6 +1923,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { payments: 'refund' | 'sret' | 'purchase' }
     | { ledger: true }
     | { purchaseLines: true }
+    | { saleLineSale: true }
     | { voids: true }
     | { expenses: true }
     | { reversals: true }
@@ -1824,6 +2000,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     { refundUdhaar: true },
   );
   chunked(
+    refundLineIds,
+    (p) =>
+      `SELECT id, sale_id FROM sale_lines WHERE tenant_id = ?1 AND id IN (${p})`,
+    { saleLineSale: true },
+  );
+  chunked(
     refundIds,
     (p) =>
       `SELECT refund_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND refund_id IN (${p})`,
@@ -1882,6 +2064,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     linkedPayments: new Map(),
     linkedLedger: new Map(),
     purchaseLineSupplier: new Map(),
+    saleLineSale: new Map(),
     staff: new Map(),
     branches: new Map(),
     current: new Map(),
@@ -1954,6 +2137,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         ]);
       } else if ('purchaseLines' in k) {
         look.purchaseLineSupplier.set(String(r.id), String(r.supplier_id));
+      } else if ('saleLineSale' in k) {
+        look.saleLineSale.set(String(r.id), String(r.sale_id));
       } else {
         look.onHand.set(String(r.id), {
           on_hand: Number(r.on_hand),

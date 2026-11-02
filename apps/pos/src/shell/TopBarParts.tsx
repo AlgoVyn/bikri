@@ -6,6 +6,7 @@ import {
   InfoIcon,
   LockIcon,
   SearchIcon,
+  StoreIcon,
   UserIcon,
 } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
@@ -294,7 +295,7 @@ export function PrinterDot({
 }
 
 /** Staff avatar with name, role and Lock (T-035; unlocking another profile switches user). */
-export function StaffMenu() {
+export function StaffMenu({ shopName }: { shopName: string | null }) {
   const { t } = useTranslation();
   const { staff, role, support } = useCurrentStaff();
   const lock = useSession((s) => s.lock);
@@ -336,7 +337,24 @@ export function StaffMenu() {
           id={menuId}
           className="absolute end-0 top-12 z-40 max-h-[calc(100dvh-4rem)] w-64 overflow-y-auto rounded-card border border-border bg-surface p-3 shadow-lg"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border-b border-border pb-2">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-text-muted">
+              <StoreIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
+                {t('shell.shop')}
+              </p>
+              <p
+                className="truncate font-medium"
+                data-testid="staff-menu-shop"
+                title={shopName ?? undefined}
+              >
+                {shopName ?? t('common.app_name')}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
             <span
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
               data-testid="staff-menu-user"

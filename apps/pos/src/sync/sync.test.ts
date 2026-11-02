@@ -3,7 +3,7 @@ import type { OutboxEntry } from '@bikri/db';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKv, setKv } from '../data/kv.ts';
 import { dropTestDbs } from '../data/testDb.ts';
-import { readyDb } from '../data/testShop.ts';
+import { NOW, readyDb } from '../data/testShop.ts';
 import { writeAction } from '../data/write.ts';
 import {
   OfflineError,
@@ -537,29 +537,29 @@ describe('pull (03 §4.2)', () => {
         device_id: 'dev-1',
         invoice_seq: 1,
         invoice_no: 'A-A-1',
-        created_at: 100,
+        created_at: NOW - 1000,
       },
       {
         id: 's-new',
         device_id: 'dev-1',
         invoice_seq: 7,
         invoice_no: 'A-A-7',
-        created_at: 900,
+        created_at: NOW + 1000,
       },
       {
         id: 's-other',
         device_id: 'dev-2',
         invoice_seq: 1,
         invoice_no: 'A-B-1',
-        created_at: 900,
+        created_at: NOW + 1000,
       },
     ]);
     await db.sale_lines.bulkAdd([
-      { id: 'l-old', sale_id: 's-old', created_at: 100 },
-      { id: 'l-new', sale_id: 's-new', created_at: 900 },
+      { id: 'l-old', sale_id: 's-old', created_at: NOW - 1000 },
+      { id: 'l-new', sale_id: 's-new', created_at: NOW + 1000 },
     ]);
     server.restoreEpoch = '99';
-    server.restorePointAt = 500;
+    server.restorePointAt = NOW + 1;
     server.tables = {
       sales: [
         {
@@ -832,6 +832,180 @@ describe('pull (03 §4.2)', () => {
     expect(await getKv(db, 'snapshot_state', null)).toBeNull();
     expect(await db.sales.count()).toBe(0);
     expect(await db.sale_voids.count()).toBe(0);
+  });
+
+  it('restore recovery re-sends master rows created or changed after the restore point', async () => {
+    const db = await enrolled('restore-master');
+    const later = NOW + 1000;
+    await db.staff.add({
+      id: 'st-new',
+      name: 'New cashier',
+      role: 'cashier',
+      active: 1,
+      permissions_json: '{}',
+      created_at: later,
+      updated_at: later,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-1',
+    });
+    await db.customers.bulkAdd([
+      {
+        id: 'c-new',
+        name: 'New customer',
+        phone: '',
+        created_at: later,
+        updated_at: later,
+        deleted_at: null,
+        rev: 1,
+        updated_by: 'st-new',
+      },
+      {
+        id: 'c-old',
+        name: 'Old customer',
+        phone: '',
+        created_at: NOW - 1000,
+        updated_at: NOW - 1000,
+        deleted_at: null,
+        rev: 1,
+        updated_by: 'st-1',
+      },
+      {
+        id: 'c-queued',
+        name: 'Queued customer',
+        phone: '',
+        created_at: later,
+        updated_at: later,
+        deleted_at: null,
+        rev: 1,
+        updated_by: 'st-1',
+      },
+    ]);
+    await db.products.add({
+      id: 'p-new',
+      name_en: 'New product',
+      price: 100,
+      created_at: later,
+      updated_at: later,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-new',
+    });
+    await db.suppliers.add({
+      id: 'sup-del',
+      name: 'Deleted supplier',
+      phone: '',
+      created_at: NOW - 1000,
+      updated_at: later,
+      deleted_at: later,
+      rev: 2,
+      updated_by: 'st-1',
+    });
+    await db.outbox.add({
+      op_id: 'op-queued',
+      tx_id: 'tx-queued',
+      tbl: 'customers',
+      kind: 'upsert',
+      row_id: 'c-queued',
+      row: { id: 'c-queued', name: 'Queued customer' },
+      base_rev: 1,
+      changed_fields: ['name'],
+      created_at: later,
+      status: 'pending',
+      attempts: 0,
+    });
+    await db.ledger_entries.bulkAdd([
+      {
+        id: 'l-open-new',
+        party_type: 'customer',
+        party_id: 'c-new',
+        amount: 5000,
+        source_type: 'opening',
+        source_id: null,
+        staff_id: 'st-new',
+        device_id: 'dev-1',
+        created_at: later,
+      },
+      {
+        id: 'l-open-old',
+        party_type: 'customer',
+        party_id: 'c-old',
+        amount: 7000,
+        source_type: 'opening',
+        source_id: null,
+        staff_id: 'st-1',
+        device_id: 'dev-1',
+        created_at: later,
+      },
+      {
+        id: 'l-sale',
+        party_type: 'customer',
+        party_id: 'c-new',
+        amount: 1000,
+        source_type: 'sale',
+        source_id: 's-new',
+        staff_id: 'st-new',
+        device_id: 'dev-1',
+        created_at: later,
+      },
+    ] as never);
+    await db.sales.add({
+      id: 's-new',
+      invoice_no: 'A-A-1',
+      invoice_seq: 1,
+      device_id: 'dev-1',
+      staff_id: 'st-new',
+      created_at: later,
+    });
+    await db.sale_lines.add({
+      id: 'sl-new',
+      sale_id: 's-new',
+      product_id: 'p-new',
+      created_at: later,
+    });
+    await db.payments.add({
+      id: 'pay-new',
+      sale_id: 's-new',
+      purpose: 'sale',
+      amount: 1000,
+      staff_id: 'st-new',
+      device_id: 'dev-1',
+      created_at: later,
+    });
+    server.tables = {};
+    await restoreRecovery(db, NOW + 1, 'epoch-3');
+
+    const outbox = await db.outbox.toArray();
+    const byRow = (id: string) => outbox.filter((entry) => entry.row_id === id);
+    expect(byRow('c-new')).toHaveLength(1);
+    expect(byRow('c-new')[0]).toMatchObject({
+      kind: 'upsert',
+      tbl: 'customers',
+    });
+    expect(byRow('p-new')).toHaveLength(1);
+    expect(byRow('sup-del')[0]).toMatchObject({
+      kind: 'delete',
+      tbl: 'suppliers',
+    });
+    // A row already queued keeps its original op and is not queued twice.
+    expect(byRow('c-queued')).toHaveLength(1);
+    expect(byRow('c-queued')[0]?.op_id).toBe('op-queued');
+    // The opening balance, its party and the new cashier share one transaction.
+    const openingTx = byRow('l-open-new')[0]?.tx_id;
+    expect(byRow('c-new').some((entry) => entry.tx_id === openingTx)).toBe(
+      true,
+    );
+    expect(byRow('st-new').some((entry) => entry.tx_id === openingTx)).toBe(
+      true,
+    );
+    // An older party is pulled into the opening transaction but not re-sent alone.
+    const oldTx = byRow('l-open-old')[0]?.tx_id;
+    expect(byRow('c-old').some((entry) => entry.tx_id === oldTx)).toBe(true);
+    // The sale document keeps its lines and payment together with its cashier.
+    const saleTx = byRow('s-new')[0]?.tx_id;
+    expect(byRow('sl-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
+    expect(byRow('pay-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
+    expect(byRow('st-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
   });
 
   it('runSnapshot from scratch on a new device', async () => {

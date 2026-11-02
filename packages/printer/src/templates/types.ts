@@ -26,6 +26,8 @@ export type ReceiptLine = {
   discount: number;
   /** Line net (gross − line discount). This is the amount column. */
   net: number;
+  /** Final line share after bill discount, tax and rounding; used by text shares. */
+  final?: number;
   /** `YYYY-MM-DD`, snapshotted on the sale line. */
   warrantyUntil: string | null;
 };

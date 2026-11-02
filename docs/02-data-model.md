@@ -790,6 +790,8 @@ CREATE INDEX audit_log_entity ON audit_log (tenant_id, entity, entity_id);
 CREATE INDEX audit_log_time ON audit_log (tenant_id, created_at);
 ```
 
+Product photos keep the uploaded format, so `image_key` ends in `.webp`, `.jpg` or `.png` (the SQL comment above shows the usual WebP resize output).
+
 ### 2.1 Seed data (migration `0002_seed.sql`)
 
 ```sql

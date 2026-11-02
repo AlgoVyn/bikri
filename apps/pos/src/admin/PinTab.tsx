@@ -15,7 +15,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
   const [again, setAgain] = useState('');
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const owners = query.data?.owners;
+  const owners = query.data?.owners.filter((owner) => owner.active === 1);
 
   useEffect(() => {
     if (owners === undefined) return;
@@ -35,7 +35,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
       <p className="sr-only">{t('common.loading')}</p>
     );
   }
-  if (query.data.owners.length === 0) {
+  if ((owners ?? []).length === 0) {
     return <p className="text-text-muted">{t('admin.pin_empty')}</p>;
   }
 
@@ -68,6 +68,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
                 pin_hash: hashed.pin_hash,
                 pin_salt: hashed.pin_salt,
                 pin_iterations: hashed.pin_iterations,
+                pin_length: pin.length,
               }),
             )
             .then(() => {
@@ -98,7 +99,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
               setOwnerId(event.target.value);
             }}
           >
-            {query.data.owners.map((owner) => (
+            {(owners ?? []).map((owner) => (
               <option key={owner.id} value={owner.id}>
                 {owner.name}
               </option>

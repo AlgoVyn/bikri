@@ -55,7 +55,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 - **Auth header (device):** `Authorization: Bearer <device_token>` where the token is 43 base64url chars (32 random bytes).
 - **Auth (shop admin):** device token of an admin device plus `X-Bikri-Staff: <owner staff id>` ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) plus `X-Bikri-Owner-Session: <token>` from the owner email sign-in ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)), except where the table above says otherwise.
 - **Auth (operator):** Cloudflare Access adds `Cf-Access-Jwt-Assertion`; the Worker verifies it ([05 §3.1](05-auth-and-roles.md#31-platform-operator-via-cloudflare-access)).
-- **Version headers:** the till sends `X-Bikri-App: 0.1.0` and `X-Bikri-Schema: 1` on every request.
+- **Version headers:** the till sends `X-Bikri-App: 1.0.0` and `X-Bikri-Schema: 2` on every request.
 - **Times** are epoch ms. **Money** is paisa integers.
 - **Error shape** (all non-2xx):
 
@@ -93,13 +93,13 @@ Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNI
 
 ### 3.1 `GET /api/health`
 ```json
-200 { "ok": true, "app_version": "0.1.0", "schema_version": 1, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
+200 { "ok": true, "app_version": "1.0.0", "schema_version": 2, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
 ```
 
 ### 3.2 `POST /api/devices/enrol`
 Request:
 ```json
-{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "0.1.0", "device_name": "Counter 2" }
+{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "1.0.0", "device_name": "Counter 2" }
 ```
 `device_name` is optional (≤ 40); without it the device gets the name on the code (D-107). The response also carries `tenant_status`, `support` and `poll_after_ms` (D-105).
 
@@ -137,15 +137,15 @@ Specified in [03-sync §4](03-sync.md#4-protocol). Limits: ≤ 200 ops, ≤ 1 MB
 
 ### 3.5 `PUT /api/files/:kind/:id/:sha256`
 - `kind` ∈ `product_image`, `logo`. `id` = product ID (or `shop` for logo). `sha256` = hex digest of the body (client computes).
-- Body: raw bytes, `Content-Type: image/webp | image/png | image/jpeg`, ≤ 2 MB (client resizes first: product images 512×512 max WebP q=0.8; logo PNG ≤ 576 px wide).
-- Server verifies the digest and the staff permission (`catalog.edit` for a product photo, `settings.shop` for the logo; no header → `403 FORBIDDEN`), writes R2 key `t/<tenant_id>/products/<id>/<sha256>.webp` or `t/<tenant_id>/shop/logo-<sha256>.png` (the tenant prefix is added by the server from the token and never shown to the till), returns the **relative** key:
+- Body: raw bytes, `Content-Type: image/webp | image/png | image/jpeg`, ≤ 2 MB (client resizes first: product images 512×512 max WebP q=0.8; logo PNG ≤ 576 px wide). A logo must be `image/png`; other types → `415 UNSUPPORTED_MEDIA_TYPE`.
+- Server verifies the digest and the staff permission (`catalog.edit` for a product photo, `settings.shop` for the logo; no header → `403 FORBIDDEN`), writes R2 key `t/<tenant_id>/products/<id>/<sha256>.webp` (or `.jpg` / `.png` for those upload types) or `t/<tenant_id>/shop/logo-<sha256>.png` (the tenant prefix is added by the server from the token and never shown to the till), returns the **relative** key:
 ```json
 201 { "key": "products/01J9.../9f2c...e1.webp", "size": 24311 }
 ```
 The till then upserts `products.image_key` / `shop.logo_key` through the normal sync path. Uploading the same digest twice is a no-op `200`.
 
 ### 3.6 `GET /api/files/*key`
-`key` is the relative key; the Worker reads `t/<caller's tenant_id>/<key>`, so a till can only ever read its own shop's files, whatever key it asks for. Streams the R2 object from `FILES` with `Cache-Control: private, max-age=31536000, immutable` and `ETag`. **Only keys matching `^products/[0-9A-HJKMNP-TV-Z]{26}/[0-9a-f]{64}\.webp$` or `^shop/logo-[0-9a-f]{64}\.png$` are served**; anything else → `404 NOT_FOUND`. Backups live in the separate `bikri-backups` bucket and are reachable only through the operator's `/api/admin/backups/*`. Keys are content-addressed, so they never change.
+`key` is the relative key; the Worker reads `t/<caller's tenant_id>/<key>`, so a till can only ever read its own shop's files, whatever key it asks for. Streams the R2 object from `FILES` with `Cache-Control: private, max-age=31536000, immutable` and `ETag`. **Only keys matching `^products/[0-9A-HJKMNP-TV-Z]{26}/[0-9a-f]{64}\.(webp|jpg|png)$` or `^shop/logo-[0-9a-f]{64}\.png$` are served**; anything else → `404 NOT_FOUND`. Backups live in the separate `bikri-backups` bucket and are reachable only through the operator's `/api/admin/backups/*`. Keys are content-addressed, so they never change.
 
 ### 3.7 Operator endpoints (Cloudflare Access)
 
@@ -177,7 +177,7 @@ Restore of one tenant ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)):
 
 `POST /api/admin/tenants/:id/import-ops` `{ "device_id": "01JC…", "ops": [ … ] }` (≤ 200 ops per call) → same response shape as push. `404 NOT_FOUND` if the device is not in that tenant, `403 FORBIDDEN` if it is not revoked. For a `read_only` tenant only ops created before the read-only start (`status_changed_at`) are imported; the rest are omitted from `results`.
 
-`POST /api/admin/tenants/:id/reset-owner-pin` `{ "staff_id": "01JB...", "pin_hash": "<base64>", "pin_salt": "<base64>", "pin_iterations": 150000 }` → the **console page in the browser** computes the PBKDF2 hash with WebCrypto (the Worker never hashes PINs, to stay inside the 10 ms CPU limit); the Worker upserts that tenant's staff row with `rev+1`, appends `change_log` and an `audit_log` row (`pin_reset`) → `200 { "ok": true }`.
+`POST /api/admin/tenants/:id/reset-owner-pin` `{ "staff_id": "01JB...", "pin_hash": "<base64>", "pin_salt": "<base64>", "pin_iterations": 150000, "pin_length": 4 }` → the **console page in the browser** computes the PBKDF2 hash with WebCrypto (the Worker never hashes PINs, to stay inside the 10 ms CPU limit); the Worker updates that tenant's active owner row with `rev+1` and the new `pin_length`, appends `change_log` and an `audit_log` row (`pin_reset`) → `200 { "ok": true }`. Inactive or non-owner staff ids → `404 NOT_FOUND`.
 
 `GET /api/admin/backups?prefix=d1/` (bucket `bikri-backups`; downloads are sent with `Cache-Control: no-store` and `Content-Disposition: attachment`) → `200 { "objects": [ { "key": "d1/2026-10-27.sql.gz", "size": 4810233, "uploaded": 1793050000000 } ] }`. Backups are whole-database (all tenants), [09 §2](09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml).
 
@@ -308,6 +308,11 @@ After the op-level parse, the server parses `row` with the table's row schema (e
 | `refunds.amount > 0` has exactly one `payments` row (out, `refund`, same method and amount) and `udhaar_part > 0` exactly one customer `ledger_entries` row (−udhaar_part), in the same batch or already stored | `refunds` | `CONSTRAINT_FAILED` |
 | `supplier_return_lines.line_total = mulDivRound(qty_milli, unit_credit, 1000)`, `Σ line_total = supplier_returns.total`, `line_count` matches; a linked `purchase_line_id` belongs to a purchase of the same `supplier_id` | `supplier_returns`, `supplier_return_lines` | `CONSTRAINT_FAILED` (returned qty above received − already returned is **accepted** and flagged `over_return`) |
 | `supplier_returns.refund_received > 0` has exactly one `payments` row (in, `supplier_refund`, same method and amount, `supplier_return_id`), in the same batch or already stored | `supplier_returns` | `CONSTRAINT_FAILED` |
+| Every `ledger_entries` row is backed by its source row in the same batch (sale, refund, void, payment, purchase or supplier return), with the source's customer/supplier and amount | `ledger_entries` | `CONSTRAINT_FAILED` |
+| `payments.purpose` that names a document (`sale`, `refund`, `purchase_paid_now`, `supplier_refund`, `void`) has that document in the same batch; customer/supplier payments have their `ledger_entries` row in the same batch | `payments` | `CONSTRAINT_FAILED` |
+| Child lines (`sale_lines`, `refund_lines`, `purchase_lines`, `supplier_return_lines`) have their parent header in the same batch | child rows | `CONSTRAINT_FAILED` |
+| `day_closes.period_end = created_at`, `period_start ≤ period_end`, and the staff has `dayclose.create` | `day_closes` | `CONSTRAINT_FAILED` / `FORBIDDEN` |
+| Stock movements have the sign required by their reason (`sale`/`supplier_return` negative, `opening`/`purchase`/receipts positive) and a non-negative integer cost for stock-adding reasons | `stock_movements` | `CONSTRAINT_FAILED` |
 | Ops imported through `POST /api/shop/import-ops` or `/api/admin/tenants/:id/import-ops` | ops of a revoked device of that tenant | `device_id` must be that revoked device instead of the caller |
 
 ## 6. Rate limits

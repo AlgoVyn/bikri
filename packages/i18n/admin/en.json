@@ -143,6 +143,7 @@
     "restore_steps": "Steps",
     "restore_stuck": "Purge did not shrink. The shop stays in maintenance.",
     "restore_wrong_shop": "This export is for a different shop.",
+    "restore_incomplete": "This export is missing tables; it cannot be restored safely.",
     "retry": "Try again",
     "revoke": "Revoke",
     "revoke_body": "The till stops syncing and shows the enrol screen. Other shops are not affected.",

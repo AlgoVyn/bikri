@@ -53,7 +53,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-brand-navy` | `#182E55` | `#182E55` | Logo, receipt preview header | logo |
 | `--color-rail` | `#182E55` | `#1D3357` | Desktop rail background | logo navy / lighter navy so the rail stays distinct from the dark page |
 | `--color-rail-ink` | `#F1F5F9` | `#F1F5F9` | Active rail label and icon | slate-100 (site) |
-| `--color-rail-muted` | `#B8C6DB` | `#A9B8CE` | Inactive rail labels, brand wordmark and shop name | derived |
+| `--color-rail-muted` | `#B8C6DB` | `#A9B8CE` | Inactive rail labels and brand wordmark | derived |
 | `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
 | `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
@@ -66,7 +66,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
 | `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
 
-`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the brand mark and BIKRI wordmark, with the shop name at its foot, `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
+`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the brand mark and BIKRI wordmark, `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
 
 Category tile colours (8, white initials on each): `#006BB3 #182E55 #0F766E #047857 #B45309 #7C3AED #BE185D #475569` (brand blue, logo navy, teal-700 derived from the logo teal — `#4BC2BF` itself is too light for white text — then emerald, amber, violet, pink, slate).
 
@@ -237,7 +237,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 280 KB; route chunks < 100 KB |
+| JS initial bundle (gz) | < 282 KB; route chunks < 100 KB |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised above 100 rows; 60 fps scroll |
 

@@ -55,10 +55,15 @@ export async function sendSigninEmail(
     }
     await env.EMAIL.send({ from: SENDER, to, subject, text });
   } catch (e) {
+    // Provider errors can echo the destination address; log only a bounded code.
+    const code =
+      (e as { code?: unknown }).code ??
+      (e as { name?: unknown }).name ??
+      'EMAIL_SEND_FAILED';
     console.log(
       JSON.stringify({
         event: 'owner_signin_email_failed',
-        error: String((e as Error).message).slice(0, 120),
+        code: String(code).slice(0, 40),
       }),
     );
     throw new ApiError(

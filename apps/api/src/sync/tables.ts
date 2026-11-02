@@ -1,23 +1,15 @@
 /** Synced-table metadata for the Worker (02 §1.1, 03 §4.3), from packages/db/src/tables.ts. */
-import { LEDGER_TABLES, MASTER_TABLES, type SyncedTable } from '@bikri/core';
+import {
+  LEDGER_TABLES,
+  MASTER_TABLES,
+  SYNC_EXPORT_ORDER,
+  SYNC_IMPORT_ORDER,
+  type SyncedTable,
+} from '@bikri/core';
 import { type D1Table, TABLE_COLUMNS } from '@bikri/db/tables';
 
 /** Tables a till receives through pull and snapshot, parents before children (03 §4.3). */
-export const SNAPSHOT_TABLES = [
-  'shop',
-  'branches',
-  'devices',
-  'staff',
-  'categories',
-  'products',
-  'product_barcodes',
-  'customers',
-  'suppliers',
-  'expense_categories',
-  'promises',
-  ...LEDGER_TABLES,
-  'sync_conflicts',
-] as const;
+export const SNAPSHOT_TABLES = SYNC_EXPORT_ORDER;
 
 export type SnapshotTable = (typeof SNAPSHOT_TABLES)[number];
 
@@ -73,34 +65,7 @@ export function selectList(tbl: D1Table): string {
  * Parents before children for applying one push without deferred foreign keys (D-104): every
  * foreign key of a synced table points to a table earlier in this list (or to itself).
  */
-export const APPLY_ORDER = [
-  'shop',
-  'branches',
-  'staff',
-  'categories',
-  'products',
-  'product_barcodes',
-  'customers',
-  'suppliers',
-  'expense_categories',
-  'promises',
-  'sales',
-  'sale_lines',
-  'refunds',
-  'refund_lines',
-  'sale_voids',
-  'purchases',
-  'purchase_lines',
-  'supplier_returns',
-  'supplier_return_lines',
-  'payments',
-  'ledger_entries',
-  'stock_movements',
-  'expenses',
-  'cash_moves',
-  'day_closes',
-  'audit_log',
-] as const;
+export const APPLY_ORDER = SYNC_IMPORT_ORDER;
 
 const RANK = new Map<string, number>(APPLY_ORDER.map((t, i) => [t, i]));
 export function applyRank(tbl: string): number {

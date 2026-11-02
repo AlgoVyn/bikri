@@ -481,6 +481,14 @@ describe('udhaar data', () => {
     );
     await deleteCustomer(db, ali.id, 'st-1', NOW + 4000);
     expect((await db.customers.get(ali.id))?.deleted_at).not.toBeNull();
+    const audit = (await db.audit_log.toArray()).find(
+      (row) =>
+        row.action === 'party_delete' &&
+        row.entity === 'customers' &&
+        row.entity_id === ali.id,
+    );
+    expect(audit).toMatchObject({ staff_id: 'st-1', device_id: 'dev-1' });
+    expect(String(audit?.before_json)).toContain('Ali');
   });
 });
 

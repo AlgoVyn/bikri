@@ -5,6 +5,8 @@ import {
   newId,
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import type { Table } from 'dexie';
+import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
 
@@ -170,10 +172,12 @@ export type SupplierReturnPlan = {
 };
 
 export async function planSupplierReturn(
-  db: BikriDb,
+  src: TableSource,
   input: Omit<SupplierReturnInput, 'returnId'>,
 ): Promise<SupplierReturnPlan> {
-  const supplier = await db.suppliers.get(input.supplierId);
+  const supplier = await (
+    src.table('suppliers') as Table<MasterRow, string>
+  ).get(input.supplierId);
   if (!supplier || supplier.deleted_at)
     throw new SupplierReturnError('supplier');
   const reason = input.reason.trim();
@@ -182,7 +186,9 @@ export async function planSupplierReturn(
   if (input.lines.length === 0 || input.lines.length > MAX_LINES_PER_DOCUMENT)
     throw new SupplierReturnError('lines');
   const purchase = input.purchaseId
-    ? await db.purchases.get(input.purchaseId)
+    ? await (src.table('purchases') as Table<SyncedRow, string>).get(
+        input.purchaseId,
+      )
     : undefined;
   if (input.purchaseId && (!purchase || purchase.supplier_id !== supplier.id))
     throw new SupplierReturnError('purchase');
@@ -190,7 +196,11 @@ export async function planSupplierReturn(
     ...new Set(input.lines.map((line) => String(line.productId))),
   ];
   const products = new Map(
-    (await db.products.bulkGet(productIds))
+    (
+      await (src.table('products') as Table<MasterRow, string>).bulkGet(
+        productIds,
+      )
+    )
       .filter((row): row is MasterRow => row !== undefined)
       .map((row) => [row.id, row]),
   );
@@ -208,7 +218,9 @@ export async function planSupplierReturn(
       throw new SupplierReturnError('qty');
     let linkedCost: number | null = null;
     if (line.purchaseLineId) {
-      const purchaseLine = await db.purchase_lines.get(line.purchaseLineId);
+      const purchaseLine = await (
+        src.table('purchase_lines') as Table<SyncedRow, string>
+      ).get(line.purchaseLineId);
       if (
         !purchaseLine ||
         purchaseLine.product_id !== line.productId ||
@@ -232,7 +244,9 @@ export async function planSupplierReturn(
       unitCredit: line.unitCredit ?? null,
     });
   }
-  const balance = await db.party_balances.get(['supplier', input.supplierId]);
+  const balance = await (
+    src.table('party_balances') as Table<{ balance: number }, [string, string]>
+  ).get(['supplier', input.supplierId]);
   const balanceBefore = balance?.balance ?? 0;
   const refundReceived = Math.max(0, input.refundReceived);
   let priced: ReturnType<typeof computeSupplierReturn>;
@@ -292,7 +306,6 @@ export async function createSupplierReturn(
 ): Promise<SyncedRow> {
   const existing = await db.supplier_returns.get(input.returnId);
   if (existing) return existing;
-  const plan = await planSupplierReturn(db, input);
   const now = options.now ?? Date.now();
   const reason = input.reason.trim();
   const note = (input.note ?? '').trim().slice(0, 200);
@@ -302,6 +315,7 @@ export async function createSupplierReturn(
   return writeAction(
     db,
     async (w) => {
+      const plan = await planSupplierReturn(w, input);
       const row: SyncedRow = {
         id: input.returnId,
         supplier_id: input.supplierId,

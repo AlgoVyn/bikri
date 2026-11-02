@@ -80,6 +80,22 @@ describe('files (T-033, I7)', () => {
       ).toBe(404);
     }
 
+    // A JPEG keeps its extension so the stored object is served with the right type.
+    const jpeg = new Uint8Array([255, 216, 255, 224, 1, 2, 3, 4]);
+    const jpegDigest = await sha(jpeg);
+    const jpegUp = await upload(
+      a.admin.token,
+      `product_image/${IDS.product}/${jpegDigest}`,
+      jpeg,
+      'image/jpeg',
+    );
+    expect(jpegUp.status).toBe(201);
+    const { key: jpegKey } = await json<{ key: string }>(jpegUp);
+    expect(jpegKey).toBe(`products/${IDS.product}/${jpegDigest}.jpg`);
+    expect(
+      (await api(`/files/${jpegKey}`, { token: a.till.token })).status,
+    ).toBe(200);
+
     const bUp = await upload(
       b.admin.token,
       `product_image/${IDS.product}/${digest}`,
@@ -154,6 +170,10 @@ describe('files (T-033, I7)', () => {
         )
       ).status,
     ).toBe(413);
+    expect(
+      (await upload(a.admin.token, `logo/shop/${digest}`, IMG, 'image/webp'))
+        .status,
+    ).toBe(415);
     const logo = await upload(
       a.admin.token,
       `logo/shop/${digest}`,

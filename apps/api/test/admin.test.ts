@@ -2,6 +2,8 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { verifyAccessJwt } from '../src/auth/access.ts';
 import { base64url } from '../src/auth/crypto.ts';
+import { statusChangeStatements } from '../src/platform/tenantAdmin.ts';
+import type { TenantRow } from '../src/types.ts';
 import { api, json, seedShop, setStatus } from './helpers/fixtures.ts';
 import { op, productRow, pushOk, saleOps } from './helpers/ops.ts';
 
@@ -177,7 +179,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       json: {
         code: body.owner_code.code,
         user_agent: 'test',
-        app_version: '0.1.0',
+        app_version: '1.0.0',
       },
     });
     expect(enrol.status).toBe(201);
@@ -314,6 +316,38 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     ).toBe(2);
   });
 
+  it('a lost status CAS writes no audit row or device side effect', async () => {
+    const a = await seedShop('Status CAS');
+    await setStatus(a.tenantId, 'read_only');
+    await env.DB.prepare(
+      'UPDATE devices SET read_only_seen_at = 1 WHERE tenant_id = ?1',
+    )
+      .bind(a.tenantId)
+      .run();
+    const tenant = await env.DB.prepare('SELECT * FROM tenants WHERE id = ?1')
+      .bind(a.tenantId)
+      .first<TenantRow>();
+    if (!tenant) throw new Error('tenant missing');
+    const statements = statusChangeStatements(
+      env,
+      tenant,
+      'active',
+      'Paid',
+      'operator:test',
+      Date.now(),
+    );
+    // Another operator wins the transition before this batch runs.
+    await setStatus(a.tenantId, 'suspended');
+    await env.DB.batch(statements);
+    expect(await auditCount(a.tenantId, 'tenant_status_change')).toBe(0);
+    const seen = await env.DB.prepare(
+      'SELECT read_only_seen_at FROM devices WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(a.tenantId, a.till.id)
+      .first<{ read_only_seen_at: number | null }>();
+    expect(seen?.read_only_seen_at).toBe(1);
+  });
+
   it('maintenance returns to the status it was in (read-only and suspended)', async () => {
     const a = await seedShop('Maint return');
     const setStatus = async (path: string) => {
@@ -383,9 +417,17 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
         pin_hash: 'x'.repeat(44),
         pin_salt: 'y'.repeat(24),
         pin_iterations: 150000,
+        pin_length: 4,
       },
     });
     expect(pin.status).toBe(200);
+    expect(
+      await env.DB.prepare(
+        'SELECT pin_length FROM staff WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(a.tenantId, '01JB0000000000000000000001')
+        .first<{ pin_length: number }>(),
+    ).toEqual({ pin_length: 4 });
     const cashier = await api(`/admin/tenants/${a.tenantId}/reset-owner-pin`, {
       method: 'POST',
       json: {
@@ -393,6 +435,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
         pin_hash: 'x'.repeat(44),
         pin_salt: 'y'.repeat(24),
         pin_iterations: 150000,
+        pin_length: 4,
       },
     });
     expect(cashier.status).toBe(404);

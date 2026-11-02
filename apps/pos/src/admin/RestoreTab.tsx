@@ -14,6 +14,7 @@ import {
   hasStarted,
   importableRow,
   initialRestoreState,
+  missingRestoreTables,
   type ParsedExport,
   parseExport,
   type RestorePhase,
@@ -113,6 +114,12 @@ export function RestoreTab({
                     setZip(null);
                     setError(t('admin.restore_wrong_shop'));
                     toast.push(t('admin.restore_wrong_shop'), 'error');
+                    return;
+                  }
+                  if (missingRestoreTables(parsed).length > 0) {
+                    setZip(null);
+                    setError(t('admin.restore_incomplete'));
+                    toast.push(t('admin.restore_incomplete'), 'error');
                     return;
                   }
                   const stored =

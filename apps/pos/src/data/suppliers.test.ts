@@ -584,6 +584,14 @@ describe('suppliers and deliveries (T-045)', () => {
     ).toMatchObject({ name: 'Edited', phone: '03001234567' });
     await deleteSupplier(db, supplier.id, 'st-1', NOW + 2000);
     expect((await db.suppliers.get(supplier.id))?.deleted_at).not.toBeNull();
+    const audit = (await db.audit_log.toArray()).find(
+      (row) =>
+        row.action === 'party_delete' &&
+        row.entity === 'suppliers' &&
+        row.entity_id === supplier.id,
+    );
+    expect(audit).toMatchObject({ staff_id: 'st-1', device_id: 'dev-1' });
+    expect(String(audit?.before_json)).toContain('Edited');
   });
 });
 

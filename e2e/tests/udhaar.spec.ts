@@ -164,9 +164,15 @@ test.describe('Udhaar (T-043, T-044)', () => {
     await d.getByLabel('Opening balance').fill('500');
     await d.getByRole('button', { name: 'Save' }).click();
     await expect(d).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /Sana/ })).toContainText(
-      'Owes you Rs 500',
-    );
+    const sanaRow = page.getByRole('link', { name: /Sana/ });
+    await expect(sanaRow).toContainText('Rs 500');
+    if ((page.viewportSize()?.width ?? 0) >= 640) {
+      await expect(
+        page
+          .getByTestId('udhaar-list-header')
+          .getByText('Balance', { exact: true }),
+      ).toBeVisible();
+    }
     const customers = await idbAll<{
       name: string;
       credit_limit: number;

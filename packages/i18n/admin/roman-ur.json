@@ -143,6 +143,7 @@
     "restore_steps": "Qadam",
     "restore_stuck": "Safai kam nahi hui. Dukaan maintenance mein rehti hai.",
     "restore_wrong_shop": "Yeh export doosri dukaan ki hai.",
+    "restore_incomplete": "Is export mein kuch tables ghayab hain; mehfooz restore mumkin nahin.",
     "retry": "Dobara",
     "revoke": "Mansookh",
     "revoke_body": "Khata sync hona band karta hai aur enrol dikhata hai. Doosri dukanein nahi badalti.",

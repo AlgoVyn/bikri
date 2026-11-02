@@ -102,6 +102,8 @@ export {
   MAX_OPS_PER_TX,
   opRow,
   SERVER_MANAGED_COLUMNS,
+  SYNC_EXPORT_ORDER,
+  SYNC_IMPORT_ORDER,
 } from './schemas/sync.ts';
 export type { SecurityHeaderName } from './securityHeaders.ts';
 export {

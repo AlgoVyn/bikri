@@ -71,9 +71,7 @@ test.describe('Home and shell (T-013)', () => {
       await nav.getByRole('link', { name: /Home/ }).click();
     } else {
       await expect(page.getByTestId('brand-rail')).toContainText('Bikri');
-      await expect(page.getByTestId('rail-shop-name')).toHaveText(
-        'Algovyn Mobiles',
-      );
+      await expect(page.getByTestId('rail-shop-name')).toHaveCount(0);
       for (const name of [
         'Home',
         'Sell',
@@ -93,6 +91,11 @@ test.describe('Home and shell (T-013)', () => {
       await expect(page).toHaveURL(/\/bikri\/reports$/);
       await page.keyboard.press('Control+Shift+Digit1');
     }
+    await page.getByTestId('staff-menu').click();
+    await expect(page.getByTestId('staff-menu-shop')).toHaveText(
+      'Algovyn Mobiles',
+    );
+    await page.getByTestId('staff-menu').click();
     await expect(
       page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
     ).toBeVisible();

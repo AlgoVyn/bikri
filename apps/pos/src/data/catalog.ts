@@ -252,8 +252,6 @@ export async function productDetail(
     .where('business_date')
     .between(first, last, true, true)
     .toArray();
-  const shop = await db.shop.get('shop');
-  const taxInclusive = shop?.tax_mode === 'inclusive';
   const byId = new Map(
     sales.filter((s) => s.status !== 'void').map((s) => [s.id, s]),
   );
@@ -266,7 +264,9 @@ export async function productDetail(
     const day = days.find((d) => d.date === sale.business_date);
     if (!day) continue;
     day.qty += Number(line.qty_milli);
-    day.revenue += lineRevenue(line, taxInclusive);
+    // Each sale keeps its own tax-inclusive snapshot; using the shop's current mode
+    // would rewrite history after a tax setting change.
+    day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
   }
   const refunds = await db.refunds
     .where('business_date')
@@ -520,23 +520,25 @@ export async function saveProductEdit(
           { last_cost: input.cost },
         );
       }
-      const existing = live(
-        await w
-          .table<MasterRow>('product_barcodes')
-          .where('product_id')
-          .equals(id)
-          .toArray(),
-      );
-      const wanted = new Set(
-        (input.barcodes ?? []).map((b) => b.trim()).filter(Boolean),
-      );
-      for (const row of existing) {
-        if (!wanted.has(String(row.barcode)))
-          await w.remove('product_barcodes', row.id);
-        wanted.delete(String(row.barcode));
+      if (input.barcodes !== undefined) {
+        const existing = live(
+          await w
+            .table<MasterRow>('product_barcodes')
+            .where('product_id')
+            .equals(id)
+            .toArray(),
+        );
+        const wanted = new Set(
+          input.barcodes.map((b) => b.trim()).filter(Boolean),
+        );
+        for (const row of existing) {
+          if (!wanted.has(String(row.barcode)))
+            await w.remove('product_barcodes', row.id);
+          wanted.delete(String(row.barcode));
+        }
+        for (const code of wanted)
+          await w.create('product_barcodes', { product_id: id, barcode: code });
       }
-      for (const code of wanted)
-        await w.create('product_barcodes', { product_id: id, barcode: code });
       return after;
     },
     { actor: ctx.staff_id, ...opts },
@@ -652,8 +654,8 @@ export async function addCategory(
       const next =
         rows.reduce((m, c) => Math.max(m, Number(c.sort_order ?? 0)), 0) + 1;
       return w.create('categories', {
-        name_en: name.trim(),
-        name_ur: nameUr.trim(),
+        name_en: name.trim().slice(0, 40),
+        name_ur: nameUr.trim().slice(0, 40),
         color,
         sort_order: next,
       });
@@ -669,8 +671,10 @@ export async function updateCategory(
   opts: WriteOptions = {},
 ): Promise<void> {
   const clean: OpRow = {};
-  if (patch.name_en !== undefined) clean.name_en = patch.name_en.trim();
-  if (patch.name_ur !== undefined) clean.name_ur = patch.name_ur.trim();
+  if (patch.name_en !== undefined)
+    clean.name_en = patch.name_en.trim().slice(0, 40);
+  if (patch.name_ur !== undefined)
+    clean.name_ur = patch.name_ur.trim().slice(0, 40);
   if (patch.color !== undefined) clean.color = patch.color;
   await writeAction(db, (w) => w.update('categories', id, clean), opts);
 }

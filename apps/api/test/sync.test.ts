@@ -359,7 +359,7 @@ describe('push (03 §4.1, §9)', () => {
       json: {
         device_id: shop.admin.id,
         schema_version: 1,
-        app_version: '0.1.0',
+        app_version: '1.0.0',
         ops: saleOps(shop, shop.till, 10),
       },
     });

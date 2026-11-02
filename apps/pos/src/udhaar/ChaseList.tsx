@@ -25,7 +25,7 @@ import { downloadText } from '../lib/download.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import {
-  balanceLabel,
+  ageDaysText,
   balanceTone,
   dateText,
   groupLabel,
@@ -150,16 +150,16 @@ export function ChaseList() {
                     {String(row.customer.customer.name)}
                   </span>
                   <span className="block text-small text-text-muted">
-                    {t('office.udhaar.days_old', { days: row.ageDays })}
+                    {ageDaysText(t, row.ageDays)}
                     {row.lastPaymentAt
                       ? ` · ${timeText(row.lastPaymentAt, i18n.language, data.tz)}`
                       : ''}
                   </span>
                 </Link>
                 <span
-                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-end text-small font-medium max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
+                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-end text-small font-semibold max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
                 >
-                  {balanceLabel(t, row.customer.balance)}
+                  <MoneyText paisa={row.customer.balance} />
                 </span>
                 <span className="grid w-full grid-cols-2 gap-1 sm:w-auto sm:grid-cols-4">
                   <button

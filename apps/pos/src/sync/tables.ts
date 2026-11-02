@@ -1,22 +1,14 @@
-import { LEDGER_TABLES, MASTER_TABLES, type SyncedTable } from '@bikri/core';
+import {
+  LEDGER_TABLES,
+  MASTER_TABLES,
+  SYNC_EXPORT_ORDER,
+  type SyncedTable,
+} from '@bikri/core';
 import type { DexieTableName } from '@bikri/db';
 
 /** Synced tables a till stores, in snapshot order (03 §4.3). */
-export const PULLED_TABLES = [
-  'shop',
-  'branches',
-  'devices',
-  'staff',
-  'categories',
-  'products',
-  'product_barcodes',
-  'customers',
-  'suppliers',
-  'expense_categories',
-  'promises',
-  ...LEDGER_TABLES,
-  'sync_conflicts',
-] as const satisfies readonly DexieTableName[];
+export const PULLED_TABLES =
+  SYNC_EXPORT_ORDER satisfies readonly DexieTableName[];
 
 export type PulledTable = (typeof PULLED_TABLES)[number];
 

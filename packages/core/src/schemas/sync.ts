@@ -39,6 +39,49 @@ export type LedgerTable = (typeof LEDGER_TABLES)[number];
 export type SyncedTable = MasterTable | LedgerTable;
 export type OpRow = Record<string, unknown>;
 
+/**
+ * Parents before children. Used by the Worker when applying one push, by the export
+ * manifests, and by restore so a table is never written before the rows it references.
+ * `sync_conflicts` has no foreign keys and is not part of this list.
+ */
+export const SYNC_IMPORT_ORDER = [
+  'shop',
+  'branches',
+  'staff',
+  'categories',
+  'products',
+  'product_barcodes',
+  'customers',
+  'suppliers',
+  'expense_categories',
+  'promises',
+  'sales',
+  'sale_lines',
+  'refunds',
+  'refund_lines',
+  'sale_voids',
+  'purchases',
+  'purchase_lines',
+  'supplier_returns',
+  'supplier_return_lines',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
+  'expenses',
+  'cash_moves',
+  'day_closes',
+  'audit_log',
+] as const;
+
+/** Snapshot/export order: devices are server-owned and restore skips them; conflicts are last. */
+export const SYNC_EXPORT_ORDER = [
+  'shop',
+  'branches',
+  'devices',
+  ...SYNC_IMPORT_ORDER.slice(2),
+  'sync_conflicts',
+] as const;
+
 /** Most ops a single Dexie transaction (one user action) may write (03 §3, D-054). */
 export const MAX_OPS_PER_TX = 200;
 /** Lines per bill, refund, delivery or supplier return, so one action stays under the op limit. */

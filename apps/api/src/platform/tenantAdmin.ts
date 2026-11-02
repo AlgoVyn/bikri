@@ -186,20 +186,22 @@ export function statusChangeStatements(
       entity: 'shop',
       before: { status: tenant.status },
       after: { from: tenant.status, to, reason, by },
+      onlyIfChanged: true,
       now,
     }),
   ];
   if (tenant.status === 'read_only' && to !== 'read_only') {
     out.push(
       db.prepare(
-        'UPDATE devices SET read_only_seen_at = NULL WHERE tenant_id = ?1 AND read_only_seen_at IS NOT NULL',
+        'UPDATE devices SET read_only_seen_at = NULL WHERE tenant_id = ?1 AND read_only_seen_at IS NOT NULL AND EXISTS (SELECT 1 FROM tenants WHERE id = ?1 AND status = ?2)',
+        to,
       ),
     );
   }
   if (to === 'deleting') {
     out.push(
       db.prepare(
-        'UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND revoked_at IS NULL',
+        "UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM tenants WHERE id = ?1 AND status = 'deleting')",
         now,
       ),
     );

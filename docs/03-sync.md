@@ -48,8 +48,8 @@ Request:
 ```json
 {
   "device_id": "01JC0Z8K3V7R1M2Q4S6T8V0X2Y",
-  "schema_version": 1,
-  "app_version": "0.1.0",
+  "schema_version": 2,
+  "app_version": "1.0.0",
   "ops": [
     { "op_id": "01JC1A...", "tbl": "sales", "kind": "insert", "row": { "id": "01JC1A...", "invoice_no": "INV-A-1042", "...": "..." } },
     { "op_id": "01JC1B...", "tbl": "products", "kind": "upsert", "base_rev": 3, "changed_fields": ["price"], "row": { "id": "01J9...", "price": 155000, "...": "..." } }
@@ -117,7 +117,7 @@ Response:
 ```
 
 `restore_epoch`, `restore_point_at`, `poll_after_ms`, `tenant_status` and `support` are the caller's tenant's values (`tenants` row); a restore, status change or support grant of one shop never disturbs the tills of another. The till saves `tenant_status` and `support` in `kv` and switches read-only mode and the banners on or off ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080), [§7.5](13-multi-tenancy.md#75-operator-support-access-d-084)). If `restore_epoch` differs from `kv.restore_epoch` (the pull response also carries `restore_point_at`, epoch ms of the data the server was restored to), the client runs **restore recovery** before anything else:
-1. Re-enqueue every ledger row **this device created** (`device_id` = own id) with `created_at ≥ restore_point_at` as fresh `insert` ops (new `op_id`s; the server ignores rows it already has via `ON CONFLICT(id) DO NOTHING`). Master rows are not re-sent (the restored server copy wins).
+1. Re-enqueue every ledger row **this device created** (`device_id` = own id) with `created_at ≥ restore_point_at` as fresh `insert` ops (new `op_id`s; the server ignores rows it already has via `ON CONFLICT(id) DO NOTHING`). Also re-send every master row created, updated or deleted after the restore point (new customers, products, staff, …) as `upsert`/`delete` ops; without them the recovered ledger rows would fail their foreign keys or permissions, and the restore would silently discard work done after the restore point. Master rows already pending in the outbox keep their original op. A new staff row is grouped with the rows that reference it, because the Worker plans one push against the state before the push.
 2. Keep the outbox; clear all synced tables and caches; run a snapshot ([§4.3](#43-snapshot--get-apisyncsnapshot)); then push the outbox.
 3. Never lower the invoice counter: `kv.invoice_seq = max(kv.invoice_seq, max local sales.invoice_seq for this device, devices.last_invoice_seq)`, so no invoice number is ever issued twice.
 4. Save the new `kv.restore_epoch`.

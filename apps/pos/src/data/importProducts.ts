@@ -33,7 +33,9 @@ export const MAX_IMPORT_ROWS = 5000;
 /** Hard ceiling for one import transaction; rows are grouped by their actual op cost. */
 export const IMPORT_CHUNK = 25;
 const MAX_IMPORT_OPS = 170;
-export const MAX_NAME = 120;
+export const MAX_NAME = 80;
+/** Mirrors categories.name_en in the D1 schema. */
+export const MAX_CATEGORY_NAME = 40;
 export const TEMPLATE_FILE = 'bikri-products-template.csv';
 
 /**
@@ -209,6 +211,7 @@ export function templateCsv(): string {
 export type ErrorCode =
   | 'name_required'
   | 'name_too_long'
+  | 'category_too_long'
   | 'price_required'
   | 'price_invalid'
   | 'cost_invalid'
@@ -321,10 +324,13 @@ function parseRow(
   const name = get('name_en');
   if (name.length > MAX_NAME)
     errors.push({ field: 'name_en', code: 'name_too_long' });
+  const category = get('category');
+  if (category.length > MAX_CATEGORY_NAME)
+    errors.push({ field: 'category', code: 'category_too_long' });
   return {
     name_en: name,
     name_ur: get('name_ur'),
-    category: get('category'),
+    category,
     brand: get('brand'),
     barcodes: [...new Set(barcodes)],
     sku: get('sku'),

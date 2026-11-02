@@ -1,3 +1,4 @@
+import { SYNC_EXPORT_ORDER, SYNC_IMPORT_ORDER } from '@bikri/core';
 import type { ExportRow } from './types.ts';
 
 /** Rows per `POST /admin/tenants/:id/import` call (04 §3.7). */
@@ -327,8 +328,20 @@ export function parseExport(
   } else {
     throw new ExportZipError();
   }
-  const tables: ParsedExport['tables'] = [];
+  const known = new Set<string>(SYNC_EXPORT_ORDER);
   for (const tbl of order) {
+    if (!known.has(tbl)) throw new ExportZipError();
+  }
+  const rank = new Map<string, number>(
+    SYNC_EXPORT_ORDER.map((tbl, index) => [tbl, index]),
+  );
+  const ordered = [...order].sort(
+    (left, right) =>
+      (rank.get(left) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(right) ?? Number.MAX_SAFE_INTEGER),
+  );
+  const tables: ParsedExport['tables'] = [];
+  for (const tbl of ordered) {
     const text =
       fileText(files, `${tbl}.json`) ?? fileText(files, `json/${tbl}.json`);
     // A manifest without its table file is a truncated export; restoring it would
@@ -368,6 +381,17 @@ export function parseExport(
     exported_at: exported,
     tables,
   };
+}
+
+/**
+ * A restore purges before it imports, so a manifest that omits a table would silently delete
+ * that table's data. The UI refuses such an archive before starting maintenance.
+ */
+export function missingRestoreTables(
+  parsed: Pick<ParsedExport, 'tables'>,
+): string[] {
+  const present = new Set(parsed.tables.map((table) => table.tbl));
+  return SYNC_IMPORT_ORDER.filter((tbl) => !present.has(tbl));
 }
 
 /** Coerce an export row into the scalars `POST …/import` accepts. */

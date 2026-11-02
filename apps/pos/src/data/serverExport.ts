@@ -1,4 +1,4 @@
-import { APP_VERSION } from '@bikri/core';
+import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { zipStore } from '../admin/zip.ts';
 import { SyncHttpError } from '../sync/client.ts';
@@ -33,8 +33,6 @@ type Session = {
   export_id: string;
   snapshot_seq: number;
   tables: ServerExportTable[];
-  after: Record<string, string>;
-  done: string[];
   /** A server export token is valid for 2 h (04 §3.8). */
   started_at: number;
   exported_at: number;
@@ -125,18 +123,26 @@ async function buildOnce(
       snapshot_seq: start.snapshot_seq,
       exported_at: start.exported_at ?? Date.now(),
       tables: start.tables,
-      after: {},
-      done: [],
       started_at: Date.now(),
       tenant_id: db.tenantId,
     };
     writeSession(session);
   }
+  const rank = new Map<string, number>(
+    SYNC_EXPORT_ORDER.map((tbl, index) => [tbl, index]),
+  );
+  const tables = [...session.tables].sort(
+    (left, right) =>
+      (rank.get(left.tbl) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(right.tbl) ?? Number.MAX_SAFE_INTEGER),
+  );
   const collected: { tbl: string; rows: Record<string, unknown>[] }[] = [];
-  for (const [index, table] of session.tables.entries()) {
-    if (session.done.includes(table.tbl)) continue;
+  // A retry always starts every table from row zero. Persisting only a cursor/“done” flag
+  // would make the resumed zip miss the rows fetched before the failure; re-reading with the
+  // same export token is cheap enough and keeps the archive complete.
+  for (const [index, table] of tables.entries()) {
     const rows: Record<string, unknown>[] = [];
-    let after = session.after[table.tbl] ?? '';
+    let after = '';
     for (let guard = 0; guard < 100_000; guard += 1) {
       const result = await page(
         db,
@@ -149,20 +155,15 @@ async function buildOnce(
       options.onProgress?.({
         table: table.tbl,
         index,
-        total: session.tables.length,
+        total: tables.length,
         rows: table.rows,
         done: rows.length,
       });
-      session.after[table.tbl] = result.next_after;
-      writeSession(session);
       if (
         !result.has_more ||
         result.rows.length === 0 ||
         result.next_after === after
       ) {
-        session.done.push(table.tbl);
-        delete session.after[table.tbl];
-        writeSession(session);
         break;
       }
       after = result.next_after;

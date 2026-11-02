@@ -2,7 +2,7 @@
  * Receipt data for Sale complete (screens/07, T-018): the printer package's input built from
  * local rows, reprint jobs, and the WhatsApp share text/link (REQ-B04).
  */
-import { newId } from '@bikri/core';
+import { newId, parsePkPhone, saleLineFinal } from '@bikri/core';
 import type { BikriDb, MasterRow, PrintJob, SyncedRow } from '@bikri/db';
 import {
   formatReceiptDate,
@@ -130,6 +130,15 @@ export async function loadSaleReceipt(
       unitPrice: Number(l.unit_price),
       discount: Number(l.discount ?? 0),
       net: Number(l.net),
+      final: saleLineFinal(
+        {
+          net: Number(l.net),
+          bill_discount_alloc: Number(l.bill_discount_alloc ?? 0),
+          tax_alloc: Number(l.tax_alloc ?? 0),
+          rounding_alloc: Number(l.rounding_alloc ?? 0),
+        },
+        sale.tax_inclusive === 1,
+      ),
       warrantyUntil: l.warranty_until ? String(l.warranty_until) : null,
     })),
     payments: payments.map(
@@ -229,7 +238,9 @@ export function waNumber(phone: string): string | null {
   else if (digits.startsWith('0')) digits = `92${digits.slice(1)}`;
   else if (digits.length === 10 && digits.startsWith('3'))
     digits = `92${digits}`;
-  return /^92\d{9,10}$/u.test(digits) ? digits : null;
+  if (!/^92\d{9,10}$/u.test(digits)) return null;
+  // WhatsApp only works for mobile numbers; parsePkPhone rejects landlines.
+  return parsePkPhone(`+${digits}`)?.mobile === true ? digits : null;
 }
 
 /** Short plain-text bill for the WhatsApp message (the PNG carries the full layout). */
@@ -244,7 +255,7 @@ export function receiptShareText(input: SaleReceiptInput): string {
         l.qtyMilli % 1000 === 0
           ? String(l.qtyMilli / 1000)
           : (l.qtyMilli / 1000).toFixed(3);
-      return `${l.name} × ${qty}  ${money(l.net)}`;
+      return `${l.name} × ${qty}  ${money(l.final ?? l.net)}`;
     }),
     `Total ${money(sale.total)}`,
   ];

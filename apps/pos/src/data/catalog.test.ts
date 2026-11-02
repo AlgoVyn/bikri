@@ -101,6 +101,62 @@ describe('products (screens/08)', () => {
     expect(detail?.barcodes.map((b) => b.barcode)).toEqual(['8901234567890']);
   });
 
+  it("uses each sale's tax snapshot in the 14-day revenue", async () => {
+    const db = await readyDb('cat-tax');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, opening_milli: 0, barcodes: [] },
+      ctx,
+      { now: NOW },
+    );
+    const date = businessDate(NOW);
+    await db.sales.bulkAdd([
+      {
+        id: 's-inc',
+        business_date: date,
+        status: 'completed',
+        tax_inclusive: 1,
+        device_id: 'dev-1',
+        created_at: NOW,
+      },
+      {
+        id: 's-exc',
+        business_date: date,
+        status: 'completed',
+        tax_inclusive: 0,
+        device_id: 'dev-1',
+        created_at: NOW,
+      },
+    ] as never);
+    await db.sale_lines.bulkAdd([
+      {
+        id: 'l-inc',
+        sale_id: 's-inc',
+        product_id: p.id,
+        qty_milli: 1000,
+        net: 11000,
+        bill_discount_alloc: 0,
+        tax_alloc: 1000,
+        created_at: NOW,
+      },
+      {
+        id: 'l-exc',
+        sale_id: 's-exc',
+        product_id: p.id,
+        qty_milli: 1000,
+        net: 11000,
+        bill_discount_alloc: 0,
+        tax_alloc: 1000,
+        created_at: NOW,
+      },
+    ] as never);
+    const detail = await productDetail(db, p.id, NOW);
+    const today = detail?.last14.find((day) => day.date === date);
+    // Inclusive: 11,000 − 1,000 tax; exclusive: the full 11,000.
+    expect(today).toMatchObject({ qty: 2000, revenue: 21000 });
+  });
+
   it('AC 2: a barcode used by another active product is refused with its name; SKUs are unique', async () => {
     const db = await readyDb();
     const ctx = await ledgerContext(db, 'st-1');
@@ -168,6 +224,23 @@ describe('products (screens/08)', () => {
       .map((b) => b.barcode);
     expect(live).toEqual(['222333444']);
     expect(await db.stock_movements.count()).toBe(1);
+  });
+
+  it('leaves barcodes untouched when an edit omits them', async () => {
+    const db = await readyDb('cat-barcode-keep');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(db, cable, ctx, { now: NOW });
+    await saveProductEdit(
+      db,
+      p.id,
+      { name_en: 'Renamed cable', price: 149900 },
+      ctx,
+      { now: NOW + 1 },
+    );
+    const live = (await db.product_barcodes.toArray())
+      .filter((b) => !b.deleted_at)
+      .map((b) => b.barcode);
+    expect(live).toEqual(['8901234567890']);
   });
 
   it('refuses to delete a product an unsynced sale line points at', async () => {

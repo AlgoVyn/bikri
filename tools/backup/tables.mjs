@@ -38,7 +38,10 @@ export const BACKUP_TABLES = [
   'audit_log',
 ];
 
-/** Tables in a per-tenant `bikri-export` zip (snapshot tables without operational rows). */
+/**
+ * Tables in a per-tenant `bikri-export` zip (snapshot tables without operational rows), in
+ * dependency order so restore never writes a payment before its refund/purchase/return.
+ */
 export const EXPORT_TABLES = [
   'shop',
   'branches',
@@ -53,16 +56,16 @@ export const EXPORT_TABLES = [
   'promises',
   'sales',
   'sale_lines',
-  'payments',
   'refunds',
   'refund_lines',
   'sale_voids',
-  'ledger_entries',
-  'stock_movements',
   'purchases',
   'purchase_lines',
   'supplier_returns',
   'supplier_return_lines',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
   'expenses',
   'cash_moves',
   'day_closes',

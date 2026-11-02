@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getDb, NoActiveTenantError } from './db.ts';
 import { ensureLocalTenant } from './localTenant.ts';
 import { isSetupDone } from './setup.ts';
+import { DEV_TENANT_ID } from './tenant.ts';
 
 export type AppGate = 'loading' | 'enrol' | 'setup' | 'ready';
 
@@ -53,5 +54,10 @@ export function useAppGate(): GateInfo {
   if (noTenant) return { gate: 'enrol', db: null, ...none };
   if (!db || done === undefined || device === undefined)
     return { gate: 'loading', db, ...none };
+  // A database with a completed shop but no device token (e.g. IndexedDB was partially
+  // cleared) must enrol again; otherwise it can write unsyncable local sales. The dev/e2e
+  // shop intentionally has no token.
+  if (done && !device.enrolled && db.tenantId !== DEV_TENANT_ID)
+    return { gate: 'enrol', db, ...device };
   return { gate: done ? 'ready' : 'setup', db, ...device };
 }
