@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { makePng } from './helpers.ts';
+import { idbCount, makePng } from './helpers.ts';
 import {
   API,
   createShop,
@@ -162,6 +162,10 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   // Leave this shop on A removes its database (AC 7).
   await a.page.goto('/bikri/settings');
   await unlock(a.page);
+  // The leave action is intentionally blocked while the outbox has ops. Make the test wait
+  // for the queue instead of racing a background sync under CI load.
+  await syncNow(a.page);
+  await expect.poll(() => idbCount(a.page, 'outbox')).toBe(0);
   await a.page.getByRole('button', { name: 'Leave this shop' }).click();
   await a.page
     .getByRole('dialog', { name: 'Leave that shop' })

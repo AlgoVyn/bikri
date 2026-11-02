@@ -198,9 +198,12 @@ test.describe('Settings (T-050)', () => {
     page,
   }, testInfo) => {
     await openReadyShop(page, '/bikri/settings');
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     await page.waitForTimeout(300);
-    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
 
     await page.getByRole('link', { name: /About/ }).click();
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
