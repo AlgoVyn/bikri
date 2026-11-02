@@ -418,6 +418,7 @@ for (const action of [
   'owner_signin',
   'owner_export',
   'operator_export',
+  'operator_file_gc',
   'operator_import',
   'tenant_restore',
   'tenant_status_change',

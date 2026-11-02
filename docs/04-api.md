@@ -60,12 +60,12 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 - **Error shape** (all non-2xx):
 
 ```json
-{ "error": { "code": "VALIDATION_FAILED", "message": "ops[3].row.price must be >= 0", "details": { "path": ["ops", 3, "row", "price"] } } }
+{ "error": { "code": "VALIDATION_FAILED", "message": "ops must contain at most 200 ops", "details": { "path": ["ops"] } } }
 ```
 
 | HTTP | `code` | When |
 |---|---|---|
-| 400 | `VALIDATION_FAILED` | Body/query fails Zod |
+| 400 | `VALIDATION_FAILED` | Body/query fails request-envelope validation |
 | 400 | `BAD_ENROLMENT_CODE` | Code unknown, used or expired |
 | 400 | `BAD_SIGNIN_CODE` | Owner sign-in code wrong, expired, used or out of tries (`details.tries_left`) |
 | 401 | `UNAUTHENTICATED` | Missing/unknown token or Access JWT |
@@ -167,13 +167,15 @@ Creates the tenant, its default branch (`Main` / `INV`), its expense categories 
 
 `POST /api/admin/tenants/:id/read-only` / `suspend` / `reactivate` `{ "reason": "Unpaid since October" }` (1–200 chars, required) → `200 { "tenant": {...} }`. Each writes `tenants.status`, `status_reason`, `status_changed_at`, `status_changed_by` and a `tenant_status_change` audit row in the tenant in one batch; `reactivate` from `read_only` also clears `devices.read_only_seen_at` for the tenant ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)). Allowed transitions: `active` ↔ `read_only`, `active`/`read_only` → `suspended`, `suspended` → `active`/`read_only` (via `reactivate { to }`, default `active`); others → `409 BAD_STATUS_CHANGE`. `POST /api/admin/tenants/:id/delete` `{ "confirm_slug": "hall-road-mobiles", "reason": "…" }` → `202` (status `deleting`, devices revoked; rows removed by the nightly cron, [03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)).
 
-`POST /api/admin/tenants/:id/support-access` `{ "reason": "Printer not syncing", "hours": 2 }` (`hours` ∈ 1, 2, 4, 8, 24) → `201 { "code", "expires_at", "link", "support_until" }`: sets `support_until` / `support_reason`, creates a single-use `kind = 'support'` enrolment code (15 min) and writes `support_access_start`. `POST /api/admin/tenants/:id/support-access/end` → `200`: `support_until = now`, revokes the tenant's support devices, writes `support_access_end` (`ended_by: 'operator'`). `409 BAD_STATUS_CHANGE` when the tenant is not `active` or `read_only`.
+`POST /api/admin/tenants/:id/support-access` `{ "reason": "Printer not syncing", "hours": 2 }` (`hours` ∈ 1, 2, 4, 8, 24) → `201 { "code", "expires_at", "link", "support_until" }`: sets `support_until` / `support_reason`, extends already-enrolled support devices’ `expires_at`, creates a single-use `kind = 'support'` enrolment code (15 min) and writes `support_access_start`. `POST /api/admin/tenants/:id/support-access/end` → `200`: `support_until = now`, revokes the tenant's support devices, writes `support_access_end` (`ended_by: 'operator'`). `409 BAD_STATUS_CHANGE` when the tenant is not `active` or `read_only`.
 
 `POST /api/admin/tenants/:id/enrolment-codes` `{ "device_name", "branch_id"?, "grants_admin": true }` → `201 { "code", "expires_at", "link" }` (72 h when `grants_admin`, else 15 min).
 
-`GET /api/admin/tenants/:id/export?tbl=&after=&limit=` → same shapes as the snapshot ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)), for that tenant; the first call (no `tbl`) also writes an `audit_log` row `operator_export` in the tenant. `devices.token_hash` is never exported.
+`POST /api/admin/tenants/:id/files/gc` `{ "dry_run"?: true }` → `200 { "examined", "unreferenced", "deleted", "bytes" }`. Lists `t/<tenant>/` and deletes objects not referenced by `products.image_key` or `shop.logo_key` and at least 24 h old; `dry_run` defaults to `true`. Writes `operator_file_gc` in the tenant.
 
-Restore of one tenant ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)): `POST …/maintenance { on: true }` → `POST …/purge` (repeat until `{ "remaining": 0 }`; each call deletes ≤ 5,000 rows child tables first) → `POST …/import { tbl, rows: [...] }` (≤ 500 rows per call, rows validated with the table schemas, written with `INSERT … (tenant_id, …)` and `change_log` rows) → `POST …/restore-epoch { restore_point_at }` → `POST …/maintenance { on: false }`. Purge and import return `409 NOT_IN_MAINTENANCE` otherwise.
+`GET /api/admin/tenants/:id/export?tbl=&after=&limit=` → same shapes as the snapshot ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)), for that tenant; the first call (no `tbl`) captures the server cutoff as `exported_at` and also writes an `audit_log` row `operator_export` in the tenant. Pages use `before=<exported_at>`. `devices.token_hash` and `devices.enrolled_by` are never exported.
+
+Restore of one tenant ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)): `POST …/maintenance { on: true }` → `POST …/purge` (repeat until `{ "remaining": 0 }`; each call deletes ≤ 5,000 rows child tables first) → `POST …/import { tbl, rows: [...] }` (≤ 500 rows per call, rows checked by `checkOp` and the D1 constraints, written with `INSERT … (tenant_id, …)` and `change_log` rows) → `POST …/restore-epoch { restore_point_at }` → `POST …/maintenance { on: false }`. Purge and import return `409 NOT_IN_MAINTENANCE` otherwise.
 
 `POST /api/admin/tenants/:id/import-ops` `{ "device_id": "01JC…", "ops": [ … ] }` (≤ 200 ops per call) → same response shape as push. `404 NOT_FOUND` if the device is not in that tenant, `403 FORBIDDEN` if it is not revoked. For a `read_only` tenant only ops created before the read-only start (`status_changed_at`) are imported; the rest are omitted from `results`.
 
@@ -210,88 +212,52 @@ Code alphabet: `23456789ABCDEFGHJKMNPQRSTVWXYZ` (30 symbols, no `0 O 1 I L U`, m
 
 `POST /api/shop/conflicts/:id/acknowledge` → `200` (sets `resolution = 'acknowledged'`, appends `change_log`; `403 TENANT_READ_ONLY` in a read-only shop).
 
-## 4. Zod schemas (excerpt, `packages/core/schemas`)
+## 4. Request validation
 
-Every table has a schema generated from one table-metadata definition in `packages/db/src/tables.ts` so D1, Dexie and Zod never drift. Example shapes:
+The Worker validates the **HTTP request envelope** with Zod (`apps/api/src/sync/opSchema.ts` and the `z.object` bodies in `routes/`). It does not validate synced rows with per-table Zod schemas.
+
+Row payloads go through:
+
+- an allow-list of columns from `packages/db/src/tables.ts` (`writableColumns` drops `tenant_id`, `rev`, `products.avg_cost`, `sales.status` and unknown keys);
+- `checkOp` in `apps/api/src/sync/applyOps.ts`: row ids, scalar-only values, safe integers, strings capped at 4,000 characters, required parent/source rows, permissions and the table-specific checks in §5;
+- the D1 constraints: `STRICT` tables, `CHECK`s, composite foreign keys and unique indexes.
+
+The client does the cheap equivalent on pull: `assertServerRow` in `apps/pos/src/sync/merge.ts` checks scalar values and bounded strings, and a row-shaped failure is quarantined by `applyPage` rather than aborting the whole page.
+
+This is deliberate ([D-170](decisions.md#decisions-log)). A second per-table schema layer would duplicate D1 and `packages/core` invariants, add Worker CPU and client bundle cost, and create an old-client/new-server compatibility trap for offline tills.
+
+The actual request-envelope schemas (excerpt):
 
 ```ts
-import { z } from 'zod';
-
-export const Ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-// Not every id is a ULID: shop.id is 'shop' (one per tenant), system expense_categories use their code as id,
-// and server-originated rows use device_id / staff_id = 'server' (05 §3).
-export const RowId = z.union([Ulid, z.literal('shop'), z.string().regex(/^[a-z_]{2,30}$/)]); // per-table schemas narrow this
-export const ActorId = z.union([Ulid, z.literal('server')]); // device_id, staff_id, updated_by on rows the server may write
-export const Paisa = z.number().int().safe();
-export const PaisaNonNeg = Paisa.min(0);
-export const QtyMilli = z.number().int().positive();
-export const Bp = z.number().int().min(0).max(10000);
-export const EpochMs = z.number().int().min(0); // 0 only on seed rows; the server rejects created_at more than 24 h in the future
-export const BusinessDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-export const Method = z.enum(['cash', 'card', 'bank_wallet']);
-
-export const SaleRow = z.object({
-  id: Ulid,
-  invoice_no: z.string().regex(/^[A-Z0-9]{1,6}-[A-Z]{1,2}-\d+$/),
-  invoice_seq: z.number().int().positive(),
-  branch_id: Ulid, device_id: Ulid, staff_id: Ulid,
-  customer_id: Ulid.nullable(),
-  business_date: BusinessDate, created_at: EpochMs,
-  line_count: z.number().int().positive(), items_qty_milli: QtyMilli,
-  gross_total: PaisaNonNeg, item_discount_total: PaisaNonNeg, subtotal: PaisaNonNeg,
-  bill_discount_type: z.enum(['rs', 'pct']).nullable(), bill_discount_value: z.number().int().min(0),
-  bill_discount: PaisaNonNeg, tax_rate_bp: Bp, tax: PaisaNonNeg, tax_inclusive: z.union([z.literal(0), z.literal(1)]), rounding: Paisa,
-  total: PaisaNonNeg, paid_total: PaisaNonNeg, udhaar_amount: PaisaNonNeg,
-  cash_tendered: PaisaNonNeg, change_given: PaisaNonNeg,
-  replaces_sale_id: Ulid.nullable(), note: z.string().max(200),
-  status: z.enum(['paid', 'part_refunded', 'refunded', 'void']).optional(), // derived: ignored on push, present on pull
-}).superRefine((s, ctx) => {
-  const taxAdded = s.tax_inclusive === 1 ? 0 : s.tax; // inclusive (MRP) prices already contain the tax, 07 §3
-  if (s.total !== s.subtotal - s.bill_discount + taxAdded + s.rounding) ctx.addIssue({ code: 'custom', message: 'total mismatch' });
-  if (s.paid_total + s.udhaar_amount !== s.total) ctx.addIssue({ code: 'custom', message: 'payment mismatch' });
+export const PushOpSchema = z.object({
+  op_id: Ulid,
+  tx_id: Ulid,
+  tbl: z.string().max(40),
+  kind: z.enum(['insert', 'upsert', 'delete']),
+  row: z.record(z.string(), z.unknown()).optional(),
+  row_id: RowId.optional(),
+  base_rev: z.number().int().min(0).optional(),
+  changed_fields: z.array(z.string().max(40)).max(80).optional(),
+  updated_by: z.string().max(40).nullable().optional(),
+  created_at: z.number().int().optional(),
 });
 
-export const RefundRow = z.object({
-  id: Ulid, sale_id: Ulid, kind: z.enum(['whole', 'partial']), reason: z.string().min(1).max(120),
-  method: Method.nullable(),               // null = whole refund goes to khata (07 §6.1)
-  exact_amount: z.number().int().positive(), udhaar_part: PaisaNonNeg, rounding: Paisa, amount: PaisaNonNeg,
-  branch_id: Ulid, device_id: Ulid, staff_id: Ulid, business_date: BusinessDate, created_at: EpochMs,
-}).superRefine((r, ctx) => {
-  if (r.amount !== r.exact_amount - r.udhaar_part + r.rounding) ctx.addIssue({ code: 'custom', message: 'refund amount mismatch' });
-  if ((r.method === null) !== (r.exact_amount - r.udhaar_part === 0)) ctx.addIssue({ code: 'custom', message: 'method required iff a paid part exists' });
-  if (r.method !== 'cash' && r.rounding !== 0) ctx.addIssue({ code: 'custom', message: 'rounding only for cash' });
-});
-
-export const SupplierReturnRow = z.object({
-  id: Ulid, supplier_id: Ulid, purchase_id: Ulid.nullable(), reason: z.string().min(1).max(120),
-  total: z.number().int().positive(), refund_received: PaisaNonNeg, refund_method: z.enum(['cash', 'bank_wallet']).nullable(),
-  line_count: z.number().int().positive(), note: z.string().max(200),
-  branch_id: Ulid, device_id: Ulid, staff_id: Ulid, business_date: BusinessDate, created_at: EpochMs,
-}).superRefine((r, ctx) => {
-  if (r.refund_received > r.total) ctx.addIssue({ code: 'custom', message: 'refund_received > total' });
-  if ((r.refund_received === 0) !== (r.refund_method === null)) ctx.addIssue({ code: 'custom', message: 'refund_method iff refund_received > 0' });
-});
-export const SupplierReturnLineRow = z.object({
-  id: Ulid, return_id: Ulid, line_no: z.number().int().min(1), product_id: Ulid, purchase_line_id: Ulid.nullable(),
-  qty_milli: QtyMilli, unit_credit: PaisaNonNeg, line_total: PaisaNonNeg, cost_snapshot: PaisaNonNeg, created_at: EpochMs,
-});
-export const SnapshotQuery = z.object({ tbl: z.enum(SNAPSHOT_TABLES).optional(), after: z.string().max(40).default(''), limit: z.coerce.number().int().min(1).max(1000).default(500) });
-
-export const OpInsert = z.object({ op_id: Ulid, tx_id: Ulid, tbl: z.enum(LEDGER_TABLES), kind: z.literal('insert'), row: z.record(z.string(), z.unknown()) });
-export const OpUpsert = z.object({ op_id: Ulid, tx_id: Ulid, tbl: z.enum(MASTER_TABLES), kind: z.literal('upsert'), base_rev: z.number().int().min(0), changed_fields: z.array(z.string()).max(50), row: z.record(z.string(), z.unknown()) });
-export const OpDelete = z.object({ op_id: Ulid, tx_id: Ulid, tbl: z.enum(MASTER_TABLES), kind: z.literal('delete'), row_id: Ulid, base_rev: z.number().int().min(0) });
-// No row schema contains tenant_id: the server strips the key before parsing (03 §2) and sets it from the token.
 export const PushBody = z.object({
-  device_id: Ulid, schema_version: z.number().int(), app_version: z.string().max(20),
-  ops: z.array(z.discriminatedUnion('kind', [OpInsert, OpUpsert, OpDelete])).min(1).max(200),
+  device_id: Ulid,
+  schema_version: z.number().int(),
+  app_version: z.string().max(20),
+  ops: z.array(PushOpSchema).min(1).max(200),
 });
-export const PullQuery = z.object({ since: z.coerce.number().int().min(0), limit: z.coerce.number().int().min(1).max(1000).default(500) });
-export const EnrolBody = z.object({ code: z.string().regex(/^[2-9A-HJKMNP-TV-Z]{4}-?[2-9A-HJKMNP-TV-Z]{4}$/i), user_agent: z.string().max(400), app_version: z.string().max(20) });
+
+export const PullQuery = z.object({
+  since: z.coerce.number().int().min(0),
+  limit: z.coerce.number().int().min(1).max(1000).default(500),
+});
 ```
 
-After the op-level parse, the server parses `row` with the table's row schema (e.g. `SaleRow`) and rejects the op on failure with `CONSTRAINT_FAILED`.
+`Ulid` and `RowId` are defined at the top of `opSchema.ts`. Every route parses its body/query before doing any work; parse failures become `400 VALIDATION_FAILED` with the failing path and no echoed input.
 
-## 5. Server-side checks beyond Zod
+## 5. Server-side checks beyond the request envelope
 
 | Check | Applies to | Error |
 |---|---|---|
@@ -301,7 +267,7 @@ After the op-level parse, the server parses `row` with the table's row schema (e
 | `tbl` is a master or ledger table | all ops | `UNKNOWN_TABLE` |
 | `created_at` ≤ server time + 24 h | all inserts | `CONSTRAINT_FAILED` |
 | Staff role permits the action ([05 §5](05-auth-and-roles.md#5-server-side-enforcement)) | refunds, voids, staff/shop/branch upserts, deletes | `FORBIDDEN` |
-| Invoice prefix and device code match the device's branch/code | `sales` | `CONSTRAINT_FAILED` |
+| The branch exists; the invoice's device code is the device's current or historical code; a sale for another branch is accepted only when it was created before the device's branch move | `sales` | `CONSTRAINT_FAILED` |
 | Ledger table with kind ≠ insert | all | `IMMUTABLE_TABLE` |
 | Refund qty per line ≤ sold qty − already refunded | `refund_lines` | **accepted**, plus a `sync_conflicts` row `over_refund` ([03 §5](03-sync.md#5-conflict-rules)); a refund or void arriving for an already-voided sale → `refund_after_void`. Real money events are never rejected. |
 | Refund split: `udhaar_part` ≤ the sale's remaining udhaar, and `udhaar_part > 0` only if the sale has a customer | `refunds` | `CONSTRAINT_FAILED` (an `amount` above the remaining paid amount is **accepted** and flagged `over_refund`, like any real money event) |
@@ -309,6 +275,8 @@ After the op-level parse, the server parses `row` with the table's row schema (e
 | `supplier_return_lines.line_total = mulDivRound(qty_milli, unit_credit, 1000)`, `Σ line_total = supplier_returns.total`, `line_count` matches; a linked `purchase_line_id` belongs to a purchase of the same `supplier_id` | `supplier_returns`, `supplier_return_lines` | `CONSTRAINT_FAILED` (returned qty above received − already returned is **accepted** and flagged `over_return`) |
 | `supplier_returns.refund_received > 0` has exactly one `payments` row (in, `supplier_refund`, same method and amount, `supplier_return_id`), in the same batch or already stored | `supplier_returns` | `CONSTRAINT_FAILED` |
 | Every `ledger_entries` row is backed by its source row in the same batch (sale, refund, void, payment, purchase or supplier return), with the source's customer/supplier and amount | `ledger_entries` | `CONSTRAINT_FAILED` |
+| A `customer`/`supplier` party exists in the tenant (in D1 or earlier in the same push); payment directions match their purpose (`sale`/`customer_payment`/`supplier_refund` are `in`, `refund`/`void`/`supplier_payment`/`purchase_paid_now` are `out`) | `payments`, `ledger_entries` | `CONSTRAINT_FAILED` |
+| At least one active owner remains after the action | `staff` | `CONSTRAINT_FAILED` |
 | `payments.purpose` that names a document (`sale`, `refund`, `purchase_paid_now`, `supplier_refund`, `void`) has that document in the same batch; customer/supplier payments have their `ledger_entries` row in the same batch | `payments` | `CONSTRAINT_FAILED` |
 | Child lines (`sale_lines`, `refund_lines`, `purchase_lines`, `supplier_return_lines`) have their parent header in the same batch | child rows | `CONSTRAINT_FAILED` |
 | `day_closes.period_end = created_at`, `period_start ≤ period_end`, and the staff has `dayclose.create` | `day_closes` | `CONSTRAINT_FAILED` / `FORBIDDEN` |

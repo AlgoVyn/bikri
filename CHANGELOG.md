@@ -61,6 +61,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - The server accepts a void after a refund but logs a `refund_after_void` conflict; a rejected refund/void discards with the correct status. Device codes survive a branch move (migration 0005) and purchases/stock movements are reconciled. File uploads check the staff permission, and failed uploads appear in Settings → Sync with Retry.
 - The Vite dev origin is allowed by the dev script; `docs/07` documents the negative-rounding guard (D-162).
 
+### Third review remediation (2026-11-03)
+- A successful push now updates the local master `rev` from `server_rev`; discarded edits restore the pre-edit row from `pull_shadow`, so a rejected costed delivery or stock-in cannot leave a stale average/last cost.
+- Costed stock-ins and deliveries are accepted with `stock.adjust` / `purchase.create` without requiring `catalog.edit`; server checks now cover real business dates, the sale tax-rate range, payment direction/type/party existence, ledger party existence, sales branch moves and the last active owner.
+- The operator export is a v2 `bikri-export` zip with JSON and CSV, uses the server cutoff, and the operator console can garbage-collect unreferenced R2 files under `t/<tenant>/` after 24 h.
+- Support access extension updates already-enrolled support device expiry; `devices.enrolled_by` is no longer sent to tills.
+- The missing `office.products.title` use is replaced with the base products title; `i18n:check` now also verifies that literal `t()` keys used by the app exist. The docs no longer require per-table Zod row schemas (D-170).
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

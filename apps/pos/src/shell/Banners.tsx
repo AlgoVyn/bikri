@@ -49,8 +49,8 @@ export function Banners() {
         await setKv(db, 'support', null);
         toast.push(t('tenant.support.ended'));
       }
-    } catch (e) {
-      toast.push(e instanceof Error ? e.message : String(e), 'error');
+    } catch {
+      toast.push(t('errors.generic'), 'error');
     }
   };
   const readOnly = state?.status?.status === 'read_only';

@@ -1,5 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
+import { gcTenantFiles } from '../../src/platform/filesGc.ts';
+import { tenantById } from '../../src/platform/tenantAdmin.ts';
 import {
   addSupportDevice,
   api,
@@ -205,5 +207,36 @@ describe('files (T-033, I7)', () => {
       (await api(`/files/shop/logo-${digest}.png`, { token: a.till.token }))
         .status,
     ).toBe(200);
+  });
+
+  it('GC removes only unreferenced A objects and never touches B', async () => {
+    const a = await seedShop('Files GC A');
+    const b = await seedShop('Files GC B');
+    const digest = await sha(IMG);
+    const up = await upload(
+      a.admin.token,
+      `product_image/${IDS.product}/${digest}`,
+      IMG,
+    );
+    const { key } = await json<{ key: string }>(up);
+    await env.DB.prepare(
+      'UPDATE products SET image_key = ?3 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(a.tenantId, IDS.product, key)
+      .run();
+    const orphanA = `products/${IDS.product}/${'a'.repeat(64)}.webp`;
+    const orphanB = `shop/logo-${'b'.repeat(64)}.png`;
+    await env.FILES.put(`t/${a.tenantId}/${orphanA}`, IMG);
+    await env.FILES.put(`t/${b.tenantId}/${orphanB}`, IMG);
+    const tenant = await tenantById(env, a.tenantId);
+    if (!tenant) throw new Error('tenant missing');
+    const result = await gcTenantFiles(env, tenant, {
+      now: Date.now() + 2 * 24 * 60 * 60 * 1000,
+      dryRun: false,
+    });
+    expect(result).toMatchObject({ unreferenced: 1, deleted: 1 });
+    expect(await env.FILES.head(`t/${a.tenantId}/${key}`)).not.toBeNull();
+    expect(await env.FILES.head(`t/${a.tenantId}/${orphanA}`)).toBeNull();
+    expect(await env.FILES.head(`t/${b.tenantId}/${orphanB}`)).not.toBeNull();
   });
 });

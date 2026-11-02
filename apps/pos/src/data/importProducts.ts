@@ -30,8 +30,7 @@ export type ImportField = (typeof TEMPLATE_COLUMNS)[number];
 export type Mapping = Partial<Record<ImportField, number>>;
 
 export const MAX_IMPORT_ROWS = 5000;
-/** Hard ceiling for one import transaction; rows are grouped by their actual op cost. */
-export const IMPORT_CHUNK = 25;
+/** Rows are grouped by their actual op cost; this is the hard ceiling per transaction. */
 const MAX_IMPORT_OPS = 170;
 export const MAX_NAME = 80;
 /** Mirrors categories.name_en in the D1 schema. */

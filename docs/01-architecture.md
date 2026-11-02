@@ -108,9 +108,8 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 | i18next / react-i18next | 26.5 / 17.1 | pos | |
 | react-hotkeys-hook | 5.3 | pos | |
 | ulidx | 2.4 | core | `monotonicFactory()` |
-| zod | 4.6 | core, api, pos | |
+| zod | 4.6 | api | HTTP request envelopes only; no per-table row schemas ([D-170](decisions.md#decisions-log)) |
 | hono | 4.13 | api | |
-| @hono/zod-validator | 0.9 | api | |
 | drizzle-orm / drizzle-kit | 0.45 / 0.31 | db, api | typed D1 queries; drafts later migrations. `0001_init.sql` is hand-written from [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) and is the source of truth (CHECKs, partial unique indexes); the Drizzle schema must mirror it, checked by `drizzle-kit generate` producing no diff in CI |
 | wrangler | 4.152 | api | |
 | @cloudflare/workers-types | 2026-10 | api | |
@@ -178,7 +177,7 @@ bikri/
 │           ├─ sync/      applyOps, pull, snapshot, avgCost recompute
 │           └─ cron/      prune.ts (scheduled(): per-tenant change_log floors, applied_ops retention, tenant deletion, 03 §4.4)
 ├─ packages/
-│   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/
+│   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/ (op/table metadata)
 │   ├─ db/                drizzle schema (D1), migrations/*.sql, dexie.ts (Dexie schema), tables.ts (shared table metadata)
 │   ├─ printer/           layout.ts, escpos.ts, raster.ts, templates/, transports/webusb.ts, transports/webserial.ts, labels/ (code128.ts, label layouts, screens/20)
 │   └─ i18n/              en.json, ur.json, roman-ur.json, check-keys.ts
@@ -216,7 +215,7 @@ The Hono app is created with `new Hono().basePath('/bikri/api')`, so route files
 
 `sameOrigin`: for **every** `/bikri/api/admin/*` request, reject with `403 FORBIDDEN` when `Sec-Fetch-Site` is present and not `same-origin`; for all non-GET `/bikri/api/*` requests also reject unless the `Origin` header is `https://algovyn.com` (or the dev/preview origin from `ALLOWED_ORIGINS`). Device calls use a bearer token so CSRF is not possible there, but the operator API is authenticated by the Access cookie, so this check is required for it.
 
-Errors: a single `onError` handler maps thrown `ApiError(code, status, message, details)` to the JSON error shape in [04-api §2](04-api.md#2-conventions). Zod failures become `VALIDATION_FAILED` (400).
+Errors: a single `onError` handler maps thrown `ApiError(code, status, message, details)` to the JSON error shape in [04-api §2](04-api.md#2-conventions). Zod request-envelope failures become `VALIDATION_FAILED` (400).
 
 CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scrypt on the server; SHA-256 only via `crypto.subtle`; push handler processes at most 200 ops in one `db.batch()`; no image processing in the Worker (resize on the device).
 

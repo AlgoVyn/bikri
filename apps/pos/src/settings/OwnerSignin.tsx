@@ -37,9 +37,9 @@ export function shopErrorMessage(
       });
     if (e.code === 'TENANT_READ_ONLY') return t('tenant.readOnly.blocked');
     if (e.code === 'LAST_ADMIN_DEVICE') return t('devices.last_admin');
-    return e.message || e.code;
+    return t('errors.generic');
   }
-  return e instanceof Error ? e.message : String(e);
+  return t('errors.generic');
 }
 
 function mmss(ms: number): string {

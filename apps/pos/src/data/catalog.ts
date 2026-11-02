@@ -399,7 +399,9 @@ export async function ledgerContext(
   staffId: string,
 ): Promise<LedgerContext> {
   const device = await deviceInfo(db);
-  const branch = await defaultBranch(db);
+  const branch =
+    (device?.branch_id ? await db.branches.get(device.branch_id) : undefined) ??
+    (await defaultBranch(db));
   if (!device || !branch)
     throw new Error('This till has no device or branch yet');
   return { branch_id: branch.id, device_id: device.id, staff_id: staffId };

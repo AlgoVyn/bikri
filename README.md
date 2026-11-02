@@ -51,7 +51,7 @@ pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
 |---|---|
 | `apps/pos` | React + Vite PWA: till and back office |
 | `apps/api` | Cloudflare Worker: Hono API + static assets |
-| `packages/core` | Pure business and money rules, Zod schemas |
+| `packages/core` | Pure business and money rules, shared table/op metadata |
 | `packages/db` | D1 SQL migrations, Dexie schema, table metadata |
 | `packages/printer` | Receipt layout, ESC/POS encoder, raster renderer, transports |
 | `packages/i18n` | `en`, `ur` and `roman-ur` translation catalogs |

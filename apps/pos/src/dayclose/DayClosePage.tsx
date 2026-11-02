@@ -146,11 +146,8 @@ export function DayClosePage() {
       void import('../sync/engine.ts')
         .then((m) => m.syncNow())
         .catch(() => undefined);
-    } catch (err) {
-      toast.push(
-        err instanceof Error ? err.message : t('errors.generic'),
-        'error',
-      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
     } finally {
       setPending(false);
       setConfirmAgain(false);

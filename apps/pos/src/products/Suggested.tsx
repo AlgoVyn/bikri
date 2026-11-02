@@ -90,13 +90,8 @@ export function SuggestedPage() {
               await saveNewProduct(db, { name_en: name, price }, ctx);
             toast.push(t('suggested.added', { count: chosen.length }));
             void navigate({ to: '/products' });
-          } catch (err) {
-            toast.push(
-              err instanceof Error && err.message
-                ? err.message
-                : t('errors.generic'),
-              'error',
-            );
+          } catch {
+            toast.push(t('errors.generic'), 'error');
           } finally {
             setPending(false);
           }

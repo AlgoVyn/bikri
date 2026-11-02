@@ -53,7 +53,17 @@ export type ApplyOutcome = {
 };
 
 const COLUMN = /^[a-z_][a-z0-9_]*$/u;
+const BUSINESS_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const NEVER_FROM_CLIENT = new Set(['tenant_id', 'rev']);
+
+function isBusinessDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !BUSINESS_DATE.test(value)) return false;
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return (
+    Number.isFinite(parsed) &&
+    new Date(parsed).toISOString().slice(0, 10) === value
+  );
+}
 
 /** Audit actions a till may write; operator/tenant lifecycle rows are server-only. */
 const CLIENT_AUDIT_ACTIONS = new Set([
@@ -134,6 +144,9 @@ type Lookups = {
   purchaseLineSupplier: Map<string, string>;
   /** sale_line_id → sale_id, for refund lines that are checked against their refund. */
   saleLineSale: Map<string, string>;
+  /** Parties referenced by payments/ledger rows, for polymorphic party checks. */
+  customers: Set<string>;
+  suppliers: Set<string>;
   /** Original expenses referenced by a reversal row in this push. */
   expenses: Map<
     string,
@@ -372,6 +385,86 @@ function staffOf(look: Lookups, group: PushOp[], id: unknown): StaffRow | null {
   if (typeof id !== 'string') return null;
   const s = look.staff.get(id) ?? groupStaffAuthorized(look, group, id);
   return s && s.active === 1 && s.deleted_at === null ? s : null;
+}
+
+/** Active owners left after every staff op in this transaction has been applied. */
+function ownersAfterPush(look: Lookups, group: PushOp[]): Set<string> {
+  const owners = new Set(
+    [...look.staff.values()]
+      .filter(
+        (s) => s.role === 'owner' && s.active === 1 && s.deleted_at === null,
+      )
+      .map((s) => s.id),
+  );
+  for (const op of group) {
+    if (op.tbl !== 'staff') continue;
+    const id =
+      op.kind === 'delete'
+        ? op.row_id
+        : typeof op.row?.id === 'string'
+          ? op.row.id
+          : undefined;
+    if (!id) continue;
+    if (op.kind === 'delete') {
+      owners.delete(id);
+      continue;
+    }
+    const current = look.staff.get(id);
+    const role = op.row?.role ?? current?.role;
+    const active = op.row?.active ?? current?.active;
+    const deleted = op.row?.deleted_at ?? current?.deleted_at ?? null;
+    if (role === 'owner' && Number(active) === 1 && deleted == null)
+      owners.add(id);
+    else owners.delete(id);
+  }
+  return owners;
+}
+
+function assertOwnerRemains(look: Lookups, group: PushOp[]): void {
+  if (ownersAfterPush(look, group).size === 0)
+    throw new Reject('CONSTRAINT_FAILED');
+}
+
+/** Only demoting/deactivating/deleting a stored owner can remove the last owner. */
+function removesOwner(look: Lookups, op: PushOp): boolean {
+  const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+  const current = typeof id === 'string' ? look.staff.get(id) : undefined;
+  if (current === undefined) return false;
+  if (
+    current.role !== 'owner' ||
+    current.active !== 1 ||
+    current.deleted_at !== null
+  )
+    return false;
+  if (op.kind === 'delete') return true;
+  const role = op.row?.role ?? current.role;
+  const active = op.row?.active ?? current.active;
+  const deleted = op.row?.deleted_at ?? current.deleted_at;
+  return role !== 'owner' || Number(active) !== 1 || deleted != null;
+}
+
+function partyExists(
+  look: Lookups,
+  group: PushOp[],
+  type: unknown,
+  id: unknown,
+): boolean {
+  if (typeof id !== 'string' || id.length === 0) return false;
+  if (type === 'customer')
+    return (
+      look.customers.has(id) ||
+      group.some(
+        (o) => o.tbl === 'customers' && o.row?.id === id && o.kind !== 'delete',
+      )
+    );
+  if (type === 'supplier')
+    return (
+      look.suppliers.has(id) ||
+      group.some(
+        (o) => o.tbl === 'suppliers' && o.row?.id === id && o.kind !== 'delete',
+      )
+    );
+  return false;
 }
 
 function saleOf(
@@ -651,6 +744,8 @@ function checkLedgerEntry(
   };
   if (source === 'adjustment') {
     if (staff.role === 'cashier') throw new Reject('FORBIDDEN');
+    if (!partyExists(look, group, row.party_type, row.party_id))
+      throw new Reject('CONSTRAINT_FAILED');
     return;
   }
   if (source === 'opening') {
@@ -659,10 +754,15 @@ function checkLedgerEntry(
     if (amount < 0) throw new Reject('CONSTRAINT_FAILED');
     const partyTable =
       row.party_type === 'customer' ? 'customers' : 'suppliers';
-    if (!partyInGroup(group, partyTable, String(row.party_id)))
+    if (
+      !partyInGroup(group, partyTable, String(row.party_id)) ||
+      !partyExists(look, group, row.party_type, row.party_id)
+    )
       throw new Reject('CONSTRAINT_FAILED');
     return;
   }
+  if (!partyExists(look, group, row.party_type, row.party_id))
+    throw new Reject('CONSTRAINT_FAILED');
   const table = sourceTable[source];
   if (!table || sourceId === null) throw new Reject('CONSTRAINT_FAILED');
   const src = sourceInGroup(group, table, sourceId);
@@ -1022,6 +1122,8 @@ function checkOp(
     throw new Reject('IMMUTABLE_TABLE');
   if (isMasterTable(op.tbl) && op.kind === 'insert')
     throw new Reject('CONSTRAINT_FAILED');
+  if (op.tbl === 'staff' && removesOwner(look, op))
+    assertOwnerRemains(look, group);
   if (op.kind === 'delete') {
     if (!op.row_id) throw new Reject('CONSTRAINT_FAILED');
     if (['staff', 'branches', 'shop'].includes(op.tbl)) {
@@ -1049,6 +1151,10 @@ function checkOp(
   if (!row || typeof row.id !== 'string' || row.id.length === 0)
     throw new Reject('CONSTRAINT_FAILED');
   if (typeof row.created_at === 'number' && row.created_at > ctx.now + DAY_MS)
+    throw new Reject('CONSTRAINT_FAILED');
+  if ('business_date' in row && !isBusinessDate(row.business_date))
+    throw new Reject('CONSTRAINT_FAILED');
+  if (op.tbl === 'promises' && !isBusinessDate(row.promised_on))
     throw new Reject('CONSTRAINT_FAILED');
   for (const [column, value] of Object.entries(row)) {
     if (typeof value === 'string' && value.length > 4_000)
@@ -1089,10 +1195,28 @@ function checkOp(
             .split(',')
             .filter(Boolean),
         ]);
+        const branch = look.branches.get(String(row.branch_id));
+        if (
+          !branch ||
+          // A sale created before a device's branch move may still arrive from
+          // the old branch; a new sale must use the device's current branch.
+          (row.branch_id !== ctx.device.branch_id &&
+            Number(row.created_at) >= ctx.device.updated_at)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         if (
           !invoice ||
           !codes.has(invoice[1] ?? '') ||
+          !Number.isSafeInteger(Number(row.invoice_seq)) ||
+          Number(row.invoice_seq) <= 0 ||
           Number(invoice[2]) !== Number(row.invoice_seq)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        if (
+          row.tax_rate_bp !== undefined &&
+          (!Number.isSafeInteger(Number(row.tax_rate_bp)) ||
+            Number(row.tax_rate_bp) < 0 ||
+            Number(row.tax_rate_bp) > 5_000)
         )
           throw new Reject('CONSTRAINT_FAILED');
         checkSaleInsert(group, row);
@@ -1283,6 +1407,32 @@ function checkOp(
         if (!['cash', 'card', 'bank_wallet'].includes(String(row.method)))
           throw new Reject('CONSTRAINT_FAILED');
         const purpose = String(row.purpose);
+        const expectedDirection: Record<string, 'in' | 'out'> = {
+          sale: 'in',
+          refund: 'out',
+          void: 'out',
+          customer_payment: 'in',
+          supplier_payment: 'out',
+          purchase_paid_now: 'out',
+          supplier_refund: 'in',
+        };
+        if (
+          expectedDirection[purpose] !== undefined &&
+          row.direction !== expectedDirection[purpose]
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        if (
+          (purpose === 'customer_payment' && row.party_type !== 'customer') ||
+          ((purpose === 'supplier_payment' || purpose === 'supplier_refund') &&
+            row.party_type !== 'supplier')
+        )
+          throw new Reject('CONSTRAINT_FAILED');
+        if (
+          row.party_type !== null &&
+          row.party_type !== undefined &&
+          !partyExists(look, group, row.party_type, row.party_id)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         const ok =
           purpose === 'supplier_payment' ||
           purpose === 'purchase_paid_now' ||
@@ -1406,23 +1556,32 @@ function checkOp(
     const catalogueEdit = Boolean(
       updater && can(updater.role, updater.permissions_json, 'catalog.edit'),
     );
-    // A delivery always refreshes the product's last cost (07 §7); that single
-    // server-side consequence belongs to purchase.create, not catalog.edit.
-    const deliveryCost =
+    const changes = (op.changed_fields ?? []).filter(
+      (field) => field !== 'avg_cost',
+    );
+    // `avg_cost` is server-managed, so it must not make a costed delivery or stock-in
+    // look like a catalogue edit. The companion costed movement/purchase line is the
+    // authority for this consequence.
+    const costSource =
       op.tbl === 'products' &&
-      Boolean(
-        updater &&
-          can(updater.role, updater.permissions_json, 'purchase.create'),
-      ) &&
-      (op.changed_fields ?? []).length > 0 &&
-      (op.changed_fields ?? []).every((field) => field === 'last_cost') &&
+      changes.length > 0 &&
+      changes.every((field) => field === 'last_cost') &&
       group.some(
         (candidate) =>
-          candidate.tbl === 'purchase_lines' &&
           candidate.kind === 'insert' &&
-          candidate.row?.product_id === row.id,
+          candidate.row?.product_id === row.id &&
+          ((candidate.tbl === 'purchase_lines' &&
+            typeof candidate.row?.purchase_id === 'string') ||
+            (candidate.tbl === 'stock_movements' &&
+              [
+                'opening',
+                'purchase',
+                'received_godown',
+                'received_local',
+                'received_other',
+              ].includes(String(candidate.row?.reason_code)))),
       );
-    if (!catalogueEdit && !deliveryCost) throw new Reject('FORBIDDEN');
+    if (!catalogueEdit && !costSource) throw new Reject('FORBIDDEN');
     if (
       op.tbl === 'products' &&
       row.deleted_at != null &&
@@ -1831,6 +1990,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const refundLineIds = new Set<string>();
   const expenseIds = new Set<string>();
   const reversalIds = new Set<string>();
+  const partyIds = {
+    customer: new Set<string>(),
+    supplier: new Set<string>(),
+  };
   const pushedSales = new Map<string, SaleInfo>();
   const pushedRefundBefore = new Map<string, number>();
   const refundRunning = new Map<string, number>();
@@ -1908,6 +2071,15 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       reversalIds.add(op.row.reverses_id);
       expenseIds.add(op.row.reverses_id);
     }
+    if (
+      (op.tbl === 'payments' || op.tbl === 'ledger_entries') &&
+      typeof op.row?.party_id === 'string'
+    ) {
+      if (op.row.party_type === 'customer')
+        partyIds.customer.add(op.row.party_id);
+      if (op.row.party_type === 'supplier')
+        partyIds.supplier.add(op.row.party_id);
+    }
   }
   const stmts: D1PreparedStatement[] = [
     db.prepare(
@@ -1927,6 +2099,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { voids: true }
     | { expenses: true }
     | { reversals: true }
+    | { customers: true }
+    | { suppliers: true }
     | { ledgerExists: string }
   > = [];
   for (const [tbl, ids] of byTable) {
@@ -2053,6 +2227,16 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       `SELECT reverses_id AS id FROM expenses WHERE tenant_id = ?1 AND reverses_id IN (${p})`,
     { reversals: true },
   );
+  chunked(
+    partyIds.customer,
+    (p) => `SELECT id FROM customers WHERE tenant_id = ?1 AND id IN (${p})`,
+    { customers: true },
+  );
+  chunked(
+    partyIds.supplier,
+    (p) => `SELECT id FROM suppliers WHERE tenant_id = ?1 AND id IN (${p})`,
+    { suppliers: true },
+  );
   ctx.budget.take();
   const res = await db.batch(stmts);
   const look: Lookups = {
@@ -2065,6 +2249,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     linkedLedger: new Map(),
     purchaseLineSupplier: new Map(),
     saleLineSale: new Map(),
+    customers: new Set(),
+    suppliers: new Set(),
     staff: new Map(),
     branches: new Map(),
     current: new Map(),
@@ -2139,6 +2325,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         look.purchaseLineSupplier.set(String(r.id), String(r.supplier_id));
       } else if ('saleLineSale' in k) {
         look.saleLineSale.set(String(r.id), String(r.sale_id));
+      } else if ('customers' in k) {
+        look.customers.add(String(r.id));
+      } else if ('suppliers' in k) {
+        look.suppliers.add(String(r.id));
       } else {
         look.onHand.set(String(r.id), {
           on_hand: Number(r.on_hand),
@@ -2147,6 +2337,18 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       }
     }
   });
+  // A customer/supplier or branch created earlier in this push is not in D1 yet. Treat it
+  // as existing so an offline "new parent, then sale/payment" batch is not rejected before
+  // the parent row is applied (the batch orders parents first).
+  for (const op of ops) {
+    if (op.kind === 'delete' || typeof op.row?.id !== 'string') continue;
+    if (op.tbl === 'customers') look.customers.add(op.row.id);
+    if (op.tbl === 'suppliers') look.suppliers.add(op.row.id);
+    if (op.tbl === 'branches' && !look.branches.has(op.row.id))
+      look.branches.set(op.row.id, {
+        bill_prefix: String(op.row.bill_prefix ?? ''),
+      });
+  }
   return look;
 }
 

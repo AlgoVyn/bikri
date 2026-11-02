@@ -128,11 +128,7 @@ export function CustomerDialog({
     } catch (err) {
       if (err instanceof DuplicatePhoneError)
         setDuplicate({ id: err.ownerId, name: err.ownerName });
-      else
-        toast.push(
-          err instanceof Error ? err.message : t('errors.generic'),
-          'error',
-        );
+      else toast.push(t('errors.generic'), 'error');
     } finally {
       setPending(false);
     }

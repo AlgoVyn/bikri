@@ -375,4 +375,37 @@ describe('caches (02 §3.1, §3.2)', () => {
     expect(await db.products.get(product.id)).toBeUndefined();
     expect(await db.outbox.count()).toBe(0);
   });
+
+  it('discarding a rejected edit restores the pre-edit master row', async () => {
+    const db = freshDb();
+    await db.products.put({
+      id: 'p1',
+      name_en: 'X',
+      price: 100,
+      last_cost: 40,
+      avg_cost: 40,
+      created_at: 1,
+      updated_at: 1,
+      rev: 7,
+    });
+    await writeAction(
+      db,
+      (w) => w.update('products', 'p1', { price: 200, last_cost: 80 }),
+      { now: NOW },
+    );
+    expect(await db.products.get('p1')).toMatchObject({
+      price: 200,
+      last_cost: 80,
+    });
+    const [op] = await db.outbox.toArray();
+    if (op?.seq === undefined) throw new Error('no outbox op');
+    await db.outbox.update(op.seq, { status: 'failed' });
+    await discardFailed(db, [op.seq]);
+    expect(await db.products.get('p1')).toMatchObject({
+      price: 100,
+      last_cost: 40,
+      rev: 7,
+    });
+    expect(await db.outbox.count()).toBe(0);
+  });
 });

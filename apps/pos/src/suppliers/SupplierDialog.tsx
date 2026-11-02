@@ -69,11 +69,8 @@ export function SupplierDialog({
           : t('office.suppliers.supplier_added'),
       );
       onOpenChange(false);
-    } catch (err) {
-      toast.push(
-        err instanceof Error ? err.message : t('errors.generic'),
-        'error',
-      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
     } finally {
       setPending(false);
     }

@@ -856,6 +856,7 @@
       "action_credit_limit_change": "Udhaar limit",
       "action_day_close_difference": "Din ke hisab ka farq",
       "action_operator_export": "Algovyn export",
+      "action_operator_file_gc": "Algovyn file cleanup",
       "action_operator_import": "Algovyn import",
       "action_override": "Manager approval",
       "action_owner_email_change": "Malik email change",

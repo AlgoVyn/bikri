@@ -265,6 +265,8 @@ export function resetOwnerPin(
 export type ExportStart = {
   tenant: { id: string; slug: string; display_name: string };
   snapshot_seq: number;
+  /** Server clock at the export cutoff; all pages must use it as `before`. */
+  exported_at?: number;
   tables: { tbl: string; rows: number }[];
 };
 
@@ -275,9 +277,9 @@ export type ExportPage = {
   has_more: boolean;
 };
 
-export function exportStart(id: string, before?: number): Promise<ExportStart> {
-  const q = before === undefined ? '' : `?before=${before}`;
-  return apiJson(idPath(id, `/export${q}`));
+export function exportStart(id: string): Promise<ExportStart> {
+  // The server captures the cutoff; a client clock must not choose it.
+  return apiJson(idPath(id, '/export'));
 }
 
 export function exportPage(

@@ -68,7 +68,7 @@ export function ImportPage() {
       <div className="mx-auto flex max-w-lg flex-col items-center gap-3 p-8 text-center">
         <p className="text-text-muted">{t('tenant.readOnly.blocked')}</p>
         <Link to="/products" className={buttonQuiet}>
-          {t('office.products.title')}
+          {t('products.title')}
         </Link>
       </div>
     );

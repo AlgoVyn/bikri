@@ -148,6 +148,21 @@ export async function writeAction<T>(
 
     const master = (tbl: MasterTable) =>
       tx.table(tbl) as Table<MasterRow, string>;
+    const shadows = tx.table('pull_shadow') as Table<
+      { tbl: string; id: string; row: SyncedRow },
+      [string, string]
+    >;
+    // Keep the pre-edit copy until the server answers. A rejected action is discarded by
+    // restoring this row, so local-only changes such as a delivery's avg/last cost never
+    // survive a server refusal.
+    const rememberBeforeEdit = async (
+      tbl: MasterTable,
+      row: MasterRow,
+    ): Promise<void> => {
+      if (row.rev === 0) return;
+      if (await shadows.get([tbl, row.id])) return;
+      await shadows.put({ tbl, id: row.id, row });
+    };
 
     const writer: Writer = {
       db,
@@ -199,6 +214,8 @@ export async function writeAction<T>(
           (k) => !SYSTEM_FIELDS.has(k) && !sameValue(existing[k], patch[k]),
         );
         if (changed.length === 0) return existing;
+        const pending = await pendingUpsert(tbl, id);
+        if (!pending) await rememberBeforeEdit(tbl, existing);
         const row: MasterRow = {
           ...existing,
           ...patch,
@@ -209,7 +226,6 @@ export async function writeAction<T>(
         for (const k of SYSTEM_FIELDS)
           if (k !== 'updated_at' && k !== 'updated_by') row[k] = existing[k];
         await master(tbl).put(row);
-        const pending = await pendingUpsert(tbl, id);
         if (pending?.seq !== undefined) {
           const creating = pending.base_rev === 0;
           const fields = creating
@@ -235,6 +251,7 @@ export async function writeAction<T>(
         const existing = await master(tbl).get(id);
         if (!existing) throw new RowNotFoundError(tbl, id);
         if (existing.deleted_at) return;
+        await rememberBeforeEdit(tbl, existing);
         await master(tbl).put({
           ...existing,
           deleted_at: now,

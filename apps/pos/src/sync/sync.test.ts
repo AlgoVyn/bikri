@@ -206,6 +206,30 @@ describe('push (03 §3, §4.1)', () => {
     expect((await db.categories.get('c-bad'))?.name_en).toBe('Server');
   });
 
+  it('adopts the server revision after an applied master write', async () => {
+    const db = await enrolled('rev');
+    await writeAction(db, (w) => w.create('categories', { name_en: 'New' }), {
+      now: 42,
+    });
+    const created = (await db.categories.toArray())[0];
+    if (!created) throw new Error('no category');
+    expect(created.rev).toBe(0);
+    await pushAll(db);
+    expect((await db.categories.get(created.id))?.rev).toBe(1);
+
+    await db.products.put(product('p1', { rev: 4, price: 100 }));
+    server.results = (op) =>
+      op.row?.id === 'p1'
+        ? { result: 'applied', server_rev: 5 }
+        : { result: 'applied', server_rev: 1 };
+    await writeAction(db, (w) => w.update('products', 'p1', { price: 200 }), {
+      now: 43,
+    });
+    await pushAll(db);
+    expect(await db.products.get('p1')).toMatchObject({ price: 200, rev: 5 });
+    expect(await db.outbox.count()).toBe(0);
+  });
+
   it('does not steal a live sending claim, but reclaims a stale one', async () => {
     const db = await enrolled('claim');
     await writeAction(

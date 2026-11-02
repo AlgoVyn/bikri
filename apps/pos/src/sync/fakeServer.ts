@@ -32,7 +32,8 @@ export class FakeServer {
   results: (op: { op_id: string; tbl: string; row?: { id?: string } }) => {
     result: string;
     error_code?: string;
-  } = () => ({ result: 'applied' });
+    server_rev?: number;
+  } = () => ({ result: 'applied', server_rev: 1 });
   override: Handler | null = null;
   online = true;
   device = {

@@ -351,13 +351,7 @@ export function ProductFormPage({
         });
       else if (error instanceof DuplicateSkuError)
         setErrors({ sku: t('form.sku_taken') });
-      else
-        toast.push(
-          error instanceof Error && error.message
-            ? error.message
-            : t('errors.generic'),
-          'error',
-        );
+      else toast.push(t('errors.generic'), 'error');
     } finally {
       pendingSave.current = false;
       setSaving(false);

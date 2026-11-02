@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
@@ -196,6 +197,239 @@ describe('derived-ledger permissions (05 §5, 07 §5)', () => {
       'FORBIDDEN',
       'CONSTRAINT_FAILED',
     ]);
+  });
+
+  it('accepts a costed stock-in with stock.adjust but without catalog.edit', async () => {
+    const shop = await seedShop('Costed stock-in');
+    await env.DB.prepare(
+      'UPDATE staff SET permissions_json = ?2 WHERE tenant_id = ?1 AND id = ?3',
+    )
+      .bind(
+        shop.tenantId,
+        JSON.stringify({ 'stock.adjust': true }),
+        IDS.cashier,
+      )
+      .run();
+    const now = Date.now();
+    const tx = newId(now);
+    const res = await pushOk(shop.admin, [
+      op(
+        'products',
+        'upsert',
+        productRow(IDS.product, {
+          avg_cost: 5000,
+          last_cost: 5000,
+          updated_by: IDS.cashier,
+        }),
+        { tx_id: tx, base_rev: 3, changed_fields: ['avg_cost', 'last_cost'] },
+      ),
+      op(
+        'stock_movements',
+        'insert',
+        {
+          id: newId(now),
+          product_id: IDS.product,
+          qty_delta_milli: 1000,
+          reason_code: 'received_local',
+          ref_type: 'adjustment',
+          ref_id: null,
+          unit_cost: 5000,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.admin.id,
+          staff_id: IDS.cashier,
+          business_date: '2026-10-29',
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    ]);
+    expect(res.results.map((row) => row.result)).toEqual([
+      'applied',
+      'applied',
+    ]);
+  });
+
+  it('accepts a payment to a party created earlier in the same push', async () => {
+    const shop = await seedShop('New party payment');
+    const now = Date.now();
+    const customerId = newId(now);
+    const paymentId = newId(now);
+    const base = {
+      branch_id: shop.branchId,
+      device_id: shop.admin.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-29',
+      created_at: now,
+    };
+    const createTx = newId(now);
+    const payTx = newId(now);
+    const res = await pushOk(shop.admin, [
+      op(
+        'customers',
+        'upsert',
+        {
+          id: customerId,
+          name: 'New customer',
+          phone: '',
+          address: '',
+          note: '',
+          credit_limit: null,
+          hard_limit: 0,
+          created_at: now,
+          updated_at: now,
+          updated_by: IDS.owner,
+        },
+        { tx_id: createTx, base_rev: 0, changed_fields: [] },
+      ),
+      op(
+        'payments',
+        'insert',
+        {
+          ...base,
+          id: paymentId,
+          direction: 'in',
+          method: 'cash',
+          purpose: 'customer_payment',
+          amount: 5000,
+          cash_tendered: null,
+          change_given: null,
+          reference: '',
+          sale_id: null,
+          refund_id: null,
+          purchase_id: null,
+          supplier_return_id: null,
+          party_type: 'customer',
+          party_id: customerId,
+          note: '',
+        },
+        { tx_id: payTx },
+      ),
+      op(
+        'ledger_entries',
+        'insert',
+        {
+          ...base,
+          id: newId(now),
+          party_type: 'customer',
+          party_id: customerId,
+          amount: -5000,
+          source_type: 'payment',
+          source_id: paymentId,
+          note: '',
+        },
+        { tx_id: payTx },
+      ),
+    ]);
+    expect(res.results.map((row) => row.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+  });
+
+  it('refuses to remove the last active owner', async () => {
+    const shop = await seedShop('Last owner');
+    const now = Date.now();
+    const res = await pushOk(shop.admin, [
+      op(
+        'staff',
+        'upsert',
+        {
+          id: IDS.owner,
+          name: 'Owner',
+          role: 'owner',
+          pin_hash: 'h',
+          pin_salt: 's',
+          pin_iterations: 150000,
+          pin_length: 4,
+          permissions_json: '{}',
+          active: 0,
+          max_discount_bp: 10000,
+          created_at: now,
+          updated_at: now,
+          updated_by: IDS.owner,
+        },
+        { base_rev: 1, changed_fields: ['active'] },
+      ),
+    ]);
+    expect(res.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+  });
+
+  it('rejects a customer payment with the wrong direction or party type', async () => {
+    const shop = await seedShop('Payment direction');
+    const base = {
+      branch_id: shop.branchId,
+      device_id: shop.admin.id,
+      staff_id: IDS.owner,
+      business_date: '2026-10-29',
+      created_at: Date.now(),
+    };
+    const res = await pushOk(shop.admin, [
+      op('payments', 'insert', {
+        ...base,
+        id: newId(),
+        direction: 'out',
+        method: 'cash',
+        purpose: 'customer_payment',
+        amount: 1000,
+        cash_tendered: null,
+        change_given: null,
+        reference: '',
+        sale_id: null,
+        refund_id: null,
+        purchase_id: null,
+        supplier_return_id: null,
+        party_type: 'customer',
+        party_id: IDS.customer,
+        note: '',
+      }),
+      op('payments', 'insert', {
+        ...base,
+        id: newId(),
+        direction: 'out',
+        method: 'cash',
+        purpose: 'supplier_payment',
+        amount: 1000,
+        cash_tendered: null,
+        change_given: null,
+        reference: '',
+        sale_id: null,
+        refund_id: null,
+        purchase_id: null,
+        supplier_return_id: null,
+        party_type: 'customer',
+        party_id: IDS.customer,
+        note: '',
+      }),
+    ]);
+    expect(res.results.map((row) => row.error_code)).toEqual([
+      'CONSTRAINT_FAILED',
+      'CONSTRAINT_FAILED',
+    ]);
+  });
+
+  it('rejects malformed business dates and an out-of-range sale tax rate', async () => {
+    const shop = await seedShop('Row values');
+    const badDate = saleOps(shop, shop.till, 1);
+    badDate[0]!.row = {
+      ...badDate[0]!.row,
+      business_date: '2026-13-99',
+    };
+    const dateResult = await pushOk(shop.till, badDate);
+    expect(
+      dateResult.results.every((row) => row.error_code === 'CONSTRAINT_FAILED'),
+    ).toBe(true);
+
+    const badTax = saleOps(shop, shop.till, 2);
+    badTax[0]!.row = { ...badTax[0]!.row, tax_rate_bp: 6000 };
+    const taxResult = await pushOk(shop.till, badTax);
+    expect(
+      taxResult.results.every((row) => row.error_code === 'CONSTRAINT_FAILED'),
+    ).toBe(true);
   });
 
   it('rejects a sale with no lines and accepts an older bill prefix', async () => {

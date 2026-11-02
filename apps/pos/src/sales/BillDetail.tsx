@@ -241,9 +241,7 @@ export function BillDetail({
       toast.push(
         err instanceof ReadOnlyError
           ? t('tenant.readOnly.blocked')
-          : err instanceof Error && err.message
-            ? err.message
-            : t('errors.generic'),
+          : t('errors.generic'),
         'error',
       );
     }
@@ -277,9 +275,7 @@ export function BillDetail({
       toast.push(
         err instanceof ReadOnlyError
           ? t('tenant.readOnly.blocked')
-          : err instanceof Error && err.message
-            ? err.message
-            : t('errors.generic'),
+          : t('errors.generic'),
         'error',
       );
     }

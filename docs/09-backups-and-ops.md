@@ -132,6 +132,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 | Task | How |
 |---|---|
 | Deploy | merge to `main` → CI runs tests (including the isolation suite) → website check ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)) → `wrangler d1 migrations apply bikri --remote` (and each shard) → `wrangler deploy` |
+| Clean orphan shop files | console/API `POST /api/admin/tenants/:id/files/gc` (`dry_run` first); removes unreferenced R2 objects under `t/<tenant>/` older than 24 h |
 | Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) |
 | Make a shop read-only (e.g. unpaid) / suspend / reactivate | console → tenant → `Make read-only` / `Suspend` / `Reactivate`, with a reason; recorded in the shop's Activity ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 | Help a shop (support access) | console → tenant → `Support access` (reason, 1–24 h) → open the code in a separate browser profile; the shop sees a banner until it ends ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |

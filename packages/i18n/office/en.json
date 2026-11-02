@@ -856,6 +856,7 @@
       "action_credit_limit_change": "Credit limit",
       "action_day_close_difference": "Day-close difference",
       "action_operator_export": "Algovyn export",
+      "action_operator_file_gc": "Algovyn file cleanup",
       "action_operator_import": "Algovyn import",
       "action_override": "Manager override",
       "action_owner_email_change": "Owner email change",

@@ -97,6 +97,7 @@ type PushResponse = {
     op_id: string;
     result: 'applied' | 'conflict_merged' | 'rejected';
     error_code?: string;
+    server_rev?: number;
   }[];
   server_time: number;
   latest_seq: number;
@@ -167,38 +168,59 @@ export async function pushAll(
     out.sent += batch.length;
     out.serverTime = res.server_time;
     const bySeq = new Map(batch.map((e) => [e.op_id, e]));
-    await db.transaction('rw', [db.outbox, db.pull_shadow, db.kv], async () => {
-      const answered = new Set(res.results.map((r) => r.op_id));
-      for (const r of res.results) {
-        const entry = bySeq.get(r.op_id);
-        if (entry?.seq === undefined) continue;
-        const current = await db.outbox.get(entry.seq);
-        // Another tab may have reclaimed this row (or it changed) while the request
-        // was in flight; only the claim owner may settle it.
-        if (current === undefined || current.op_id !== r.op_id) continue;
-        if (r.result === 'rejected') {
-          out.rejected += 1;
-          await db.outbox.update(entry.seq, {
-            status: 'failed',
-            last_error: r.error_code ?? 'REJECTED',
-            sending_at: undefined,
-            attempts: entry.attempts + 1,
-          });
-        } else {
-          out.applied += 1;
-          await db.outbox.delete(entry.seq);
-          await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+    const masterTables = [
+      ...new Set(
+        batch
+          .filter((entry) => !isLedgerTable(entry.tbl))
+          .map((entry) => db.table(entry.tbl)),
+      ),
+    ];
+    await db.transaction(
+      'rw',
+      [db.outbox, db.pull_shadow, db.kv, ...masterTables],
+      async () => {
+        const answered = new Set(res.results.map((r) => r.op_id));
+        for (const r of res.results) {
+          const entry = bySeq.get(r.op_id);
+          if (entry?.seq === undefined) continue;
+          const current = await db.outbox.get(entry.seq);
+          // Another tab may have reclaimed this row (or it changed) while the request
+          // was in flight; only the claim owner may settle it.
+          if (current === undefined || current.op_id !== r.op_id) continue;
+          if (r.result === 'rejected') {
+            out.rejected += 1;
+            await db.outbox.update(entry.seq, {
+              status: 'failed',
+              last_error: r.error_code ?? 'REJECTED',
+              sending_at: undefined,
+              attempts: entry.attempts + 1,
+            });
+          } else {
+            out.applied += 1;
+            await db.outbox.delete(entry.seq);
+            await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+            // Keep the local optimistic revision current; otherwise the next edit of
+            // this row would use a stale base_rev and be needlessly field-merged.
+            if (
+              !isLedgerTable(entry.tbl) &&
+              typeof r.server_rev === 'number' &&
+              Number.isSafeInteger(r.server_rev)
+            )
+              await db
+                .table(entry.tbl)
+                .update(entry.row_id, { rev: r.server_rev });
+          }
         }
-      }
-      for (const entry of batch) {
-        if (entry.seq === undefined || answered.has(entry.op_id)) continue;
-        await db.outbox.update(entry.seq, {
-          status: 'pending',
-          sending_at: undefined,
-        });
-      }
-      await setKv(db, 'last_push_at', Date.now());
-    });
+        for (const entry of batch) {
+          if (entry.seq === undefined || answered.has(entry.op_id)) continue;
+          await db.outbox.update(entry.seq, {
+            status: 'pending',
+            sending_at: undefined,
+          });
+        }
+        await setKv(db, 'last_push_at', Date.now());
+      },
+    );
     await applyStatus(db, res);
     // Nothing processed (call budget on the server): stop, retry on the next tick.
     if (res.results.length === 0) break;

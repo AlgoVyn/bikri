@@ -14,7 +14,7 @@ An offline-first, **multi-tenant** POS PWA: many independent shops (tenants), ea
 | 1 | [01-architecture](docs/01-architecture.md) | Stack, versions, repo layout, Cloudflare config, deployment |
 | 2 | [02-data-model](docs/02-data-model.md) | Exact D1 SQL and Dexie schema. **Source of truth for every column name.** |
 | 3 | [03-sync](docs/03-sync.md) | Outbox, push/pull, conflict rules, idempotency |
-| 4 | [04-api](docs/04-api.md) | Every endpoint, JSON shapes, error codes, Zod schemas |
+| 4 | [04-api](docs/04-api.md) | Every endpoint, JSON shapes, error codes, request validation |
 | 5 | [05-auth-and-roles](docs/05-auth-and-roles.md) | Device tokens, PINs, roles and the permission matrix |
 | 6 | [06-printing](docs/06-printing.md) | ESC/POS bytes, receipt templates, WebUSB/Web Serial, fallback |
 | 7 | [07-money-rules](docs/07-money-rules.md) | Totals, discounts, tax, rounding, refunds, cost, day close + **test vectors** |
@@ -43,7 +43,7 @@ Follow [docs/11-roadmap.md](docs/11-roadmap.md) task by task (T-001, T-002, …)
 ## 4. Conventions (mandatory)
 
 **Language and tooling**
-- TypeScript **7.0.2** (exact pin; see [01 §3.1](docs/01-architecture.md#31-typescript-7-notes-decision-d-024) for the TS 6 side-by-side alias if a tool needs the compiler API) everywhere, `strict: true`, no `any` (use `unknown` + Zod parsing at boundaries).
+- TypeScript **7.0.2** (exact pin; see [01 §3.1](docs/01-architecture.md#31-typescript-7-notes-decision-d-024) for the TS 6 side-by-side alias if a tool needs the compiler API) everywhere, `strict: true`, no `any` (use `unknown` + explicit runtime validation at boundaries).
 - pnpm workspaces + Turborepo. Biome for lint and format (no ESLint/Prettier).
 - ES modules only. Node 24 LTS for tooling.
 
@@ -83,7 +83,7 @@ Follow [docs/11-roadmap.md](docs/11-roadmap.md) task by task (T-001, T-002, …)
 
 **Code organisation**
 - Business rules live in `packages/core` as pure functions with unit tests. React components never compute totals, tax, cost or balances themselves.
-- Shared Zod schemas live in `packages/core/schemas`. The Worker validates every request with them; the client validates every pulled row with them.
+- Request **envelopes** are validated with Zod in `apps/api` (`opSchema.ts` and route bodies). Synced row payloads are checked structurally by the Worker (`writableColumns`/`checkOp`: known columns, scalar/safe-integer values, bounded strings) and by the D1 `STRICT`/`CHECK`/foreign-key constraints; the client checks pulled rows with `assertServerRow`. Do not add per-table Zod row schemas ([D-170](docs/decisions.md#decisions-log), [04 §4](docs/04-api.md#4-request-validation)).
 - UI strings never hard-coded: every visible string is an i18n key present in `en.json`, `ur.json` and `roman-ur.json` (CI fails otherwise).
 - Use CSS logical properties (`ms-*`, `pe-*`, `start`, `end`) so RTL works without special cases.
 

@@ -459,9 +459,7 @@ export function ProductDetailPage({
               toast.push(
                 error instanceof ReadOnlyError
                   ? t('tenant.readOnly.blocked')
-                  : error instanceof Error && error.message
-                    ? error.message
-                    : t('errors.generic'),
+                  : t('errors.generic'),
                 'error',
               );
           }

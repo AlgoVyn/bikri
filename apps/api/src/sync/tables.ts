@@ -15,7 +15,8 @@ export type SnapshotTable = (typeof SNAPSHOT_TABLES)[number];
 
 /** Columns never sent to a till (besides tenant_id). */
 const HIDDEN: Partial<Record<D1Table, readonly string[]>> = {
-  devices: ['token_hash'],
+  // `enrolled_by` can contain `operator:<email>`; tills only need the device fields.
+  devices: ['token_hash', 'enrolled_by'],
 };
 
 /** The columns of a row as a till sees it: every column except tenant_id and hidden ones. */

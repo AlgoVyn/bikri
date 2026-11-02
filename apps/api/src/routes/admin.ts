@@ -12,6 +12,7 @@ import {
   SlugTakenError,
   TILL_CODE_TTL_MS,
 } from '../platform/createTenant.ts';
+import { gcTenantFiles } from '../platform/filesGc.ts';
 import {
   accountOverview,
   listTenants,
@@ -348,6 +349,11 @@ admin.post('/tenants/:id/support-access', async (c) => {
   });
   await db.batch([
     supportStatement(c.env, tenant.id, until, body.reason, now),
+    // Extending support also extends devices that are already enrolled.
+    db.prepare(
+      "UPDATE devices SET expires_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
+      until,
+    ),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
@@ -555,8 +561,9 @@ admin.get('/tenants/:id/owners', async (c) => {
 // Export (I17) and restore (I18), 09 §3.4.
 admin.get('/tenants/:id/export', async (c) => {
   const { tenant, db } = c.var;
+  const exportedAt = Date.now();
   const payload = await snapshotPayload(
-    (k) => c.req.query(k),
+    (k) => c.req.query(k) ?? (k === 'before' ? String(exportedAt) : undefined),
     db,
     tenant,
     1000,
@@ -566,7 +573,7 @@ admin.get('/tenants/:id/export', async (c) => {
       auditStatements(db, {
         action: 'operator_export',
         after: { by: by(c.var.operator) },
-        now: Date.now(),
+        now: exportedAt,
       }),
     );
     return c.json({
@@ -575,10 +582,35 @@ admin.get('/tenants/:id/export', async (c) => {
         slug: tenant.slug,
         display_name: tenant.display_name,
       },
+      exported_at: exportedAt,
       ...payload,
     });
   }
   return c.json(payload);
+});
+
+admin.post('/tenants/:id/files/gc', async (c) => {
+  const { tenant, db } = c.var;
+  const body = z
+    .object({ dry_run: z.boolean().default(true) })
+    .parse((await c.req.json().catch(() => ({}))) as unknown);
+  const now = Date.now();
+  const result = await gcTenantFiles(c.env, tenant, {
+    now,
+    dryRun: body.dry_run,
+  });
+  await db.batch(
+    auditStatements(db, {
+      action: 'operator_file_gc',
+      after: {
+        ...result,
+        dry_run: body.dry_run,
+        by: by(c.var.operator),
+      },
+      now,
+    }),
+  );
+  return c.json(result);
 });
 
 admin.post('/tenants/:id/maintenance', async (c) => {
