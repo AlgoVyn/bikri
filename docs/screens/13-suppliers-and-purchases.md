@@ -15,7 +15,7 @@ On ≥ 1280 px the supplier list and the selected ledger share one master–deta
 
 ## Suppliers list
 
-Cards: total you owe suppliers. Rows: name, phone, balance ("You owe Rs 85,000" / "Advance Rs 5,000"), last delivery date. `+ New supplier`, `Export CSV`.
+Summary: total you owe suppliers. Rows use one table header (`Supplier`, `Balance`, `Last delivery`): name and phone; balance amount only (green `Advance` for a negative balance, grey `Settled` for zero; screen readers still hear "You owe Rs …" for positive balances); formatted last-delivery date, or `—` when there has been no delivery. Below 640 px the row stacks into a compact card. `+ New supplier`, `Export CSV`.
 
 New supplier: name (1–60), phone (optional), address, note, opening balance ("You already owe them", creates `ledger_entries` source opening).
 

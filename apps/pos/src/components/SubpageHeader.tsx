@@ -21,6 +21,7 @@ export function SubpageHeader({
   title,
   subtitle,
   actions,
+  stackActions = false,
 }: {
   backTo: SubpageParent;
   /** Accessible name of the back link (the destination, not just "Back"). */
@@ -29,6 +30,8 @@ export function SubpageHeader({
   title: string;
   subtitle?: ReactNode;
   actions?: ReactNode;
+  /** Keep actions on their own row below the title, even on wide viewports. */
+  stackActions?: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-start gap-3">
@@ -64,7 +67,11 @@ export function SubpageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex w-full flex-wrap items-center gap-2 sm:ms-auto sm:w-auto">
+        <div
+          className={`flex w-full flex-wrap items-center gap-2 ${
+            stackActions ? '' : 'sm:ms-auto sm:w-auto'
+          }`}
+        >
           {actions}
         </div>
       ) : null}

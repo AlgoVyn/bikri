@@ -25,6 +25,9 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByTestId('report-bills')).toContainText('2');
     await expect(page.getByTestId('report-profit')).toContainText('Rs 400');
     await expect(page.getByTestId('report-expenses-total')).toHaveCount(0);
+    await expect(page.getByTestId('report-chart')).toContainText(
+      'One active hour so far',
+    );
     await expectNoHorizontalScroll(page);
 
     await page.getByRole('button', { name: 'Export' }).click();

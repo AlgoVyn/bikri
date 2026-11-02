@@ -27,6 +27,9 @@ import {
 } from './format.ts';
 import { SupplierDialog } from './SupplierDialog.tsx';
 
+const SUPPLIER_GRID =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:gap-3';
+
 /** Suppliers list (screens/13). */
 export function SupplierList({
   embedded = false,
@@ -152,6 +155,15 @@ export function SupplierList({
 
         {data && data.rows.length > 0 ? (
           <ul className="flex flex-col divide-y divide-border">
+            <li
+              className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
+              aria-hidden="true"
+              data-testid="suppliers-list-header"
+            >
+              <span>{t('office.suppliers.col_supplier')}</span>
+              <span>{t('office.suppliers.balance')}</span>
+              <span>{t('office.suppliers.col_last_delivery')}</span>
+            </li>
             {data.rows.map((row) => (
               <li key={row.supplier.id}>
                 <Link
@@ -162,9 +174,9 @@ export function SupplierList({
                   aria-current={
                     row.supplier.id === selectedId ? 'page' : undefined
                   }
-                  className={`flex min-h-16 border-s-2 focus-visible:outline-offset-[-2px] flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
+                  className={`${SUPPLIER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
                 >
-                  <span className="min-w-0 flex-[2_1_10rem]">
+                  <span className="col-span-2 min-w-0 sm:col-span-1">
                     <span className="block truncate font-medium">
                       {String(row.supplier.name)}
                     </span>
@@ -175,23 +187,33 @@ export function SupplierList({
                       {String(row.supplier.phone ?? '')}
                     </span>
                   </span>
-                  <span className="min-w-0 flex-[1_1_9rem] text-small">
+                  <span className="min-w-0">
                     <span
-                      className={`block whitespace-nowrap font-medium ${supplierBalanceTone(row.balance)}`}
+                      className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
                     >
-                      {supplierBalanceLabel(t, row.balance)}
+                      {row.balance > 0 ? (
+                        <span className="sr-only">
+                          {supplierBalanceLabel(t, row.balance)}
+                        </span>
+                      ) : null}
+                      <span aria-hidden={row.balance > 0 ? true : undefined}>
+                        <MoneyText paisa={row.balance} />
+                      </span>
                     </span>
+                    {row.balance < 0 ? (
+                      <span className="block text-small text-success-subtle-ink">
+                        {t('office.suppliers.advance_label')}
+                      </span>
+                    ) : row.balance === 0 ? (
+                      <span className="block text-small text-text-muted">
+                        {t('office.suppliers.settled')}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="min-w-0 flex-[1_1_9rem] text-small text-text-muted">
+                  <span className="min-w-0 text-end text-small text-text-muted sm:text-start">
                     {row.lastDeliveryDate
-                      ? t('office.suppliers.last_delivery', {
-                          date: dateText(
-                            row.lastDeliveryDate,
-                            i18n.language,
-                            data.tz,
-                          ),
-                        })
-                      : t('office.suppliers.never')}
+                      ? dateText(row.lastDeliveryDate, i18n.language, data.tz)
+                      : '—'}
                   </span>
                 </Link>
               </li>

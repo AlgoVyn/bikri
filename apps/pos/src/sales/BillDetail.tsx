@@ -351,6 +351,15 @@ export function BillDetail({
         >
           {statusLabel(t, status)}
         </span>
+        {role === 'owner' ? (
+          <button
+            type="button"
+            className="min-h-11 px-2 text-small text-text-muted underline underline-offset-2 hover:text-text"
+            onClick={() => setAuditOpen(true)}
+          >
+            {t('office.bill.audit')}
+          </button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
@@ -406,15 +415,6 @@ export function BillDetail({
               {t('office.bill.void_reissue')}
             </button>
           </>
-        ) : null}
-        {role === 'owner' ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => setAuditOpen(true)}
-          >
-            {t('office.bill.audit')}
-          </button>
         ) : null}
       </div>
 

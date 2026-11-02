@@ -20,7 +20,7 @@ Bikri difference: **no "Edit bill"**. Instead `Void` and `Void & reissue` (REQ-B
 
 Page header: Sales icon, title and a one-line subtitle, with Export at the end. The date presets and the search/filter toolbar each sit in a card; each day's bills are in a card.
 
-Toolbar: date range (Today, Yesterday, 7 days, 30 days, This month, Custom); the selected range is remembered on this device. The list has a column header (Time, Invoice, Customer, Items, Total, Method, Status) and fixed column tracks so values line up across rows., search (invoice no, customer name/phone, product name), filters: method (Cash / Card / Bank-wallet / Udhaar / Split), status (Paid / Part refunded / Refunded / Void), cashier, device. `Export CSV` (REQ-B02).
+Toolbar: date range (Today, Yesterday, 7 days, 30 days, This month, Custom); the selected range is remembered on this device. The full-width list has a column header (Time, Invoice, Customer, Items, Total, Method, Status) and fixed column tracks so values line up across rows. In the master–detail pane it switches to a compact header (Time, Invoice, Total, Status) with the customer under the invoice; search (invoice no, customer name/phone, product name), filters: method (Cash / Card / Bank-wallet / Udhaar / Split), status (Paid / Part refunded / Refunded / Void), cashier, device. `Export CSV` (REQ-B02).
 
 Summary strip above the list (for the filter): bills, sold (net of refunds), refunds, avg bill.
 
@@ -28,7 +28,7 @@ Rows: time, invoice no (mono font), customer, items count, total, method chips, 
 
 ## Bill detail
 
-Header: invoice no, status pill, date/time, cashier, device, branch, customer (link to statement). Buttons: `Print` (P), `Share` (WhatsApp/PDF), `Refund` (R, `refund.create`, hidden when status refunded/void) → [11](11-refund.md), `Void` (`sale.void`; managers same business date only), `Void & reissue`, `Audit` (owner: shows audit rows for this bill).
+Header: invoice no, status pill, date/time, cashier, device, branch, customer (link to statement). Buttons: `Print` (P), `Share` (WhatsApp/PDF), `Refund` (R, `refund.create`, hidden when status refunded/void) → [11](11-refund.md), `Void` (`sale.void`; managers same business date only), `Void & reissue`. `Audit` (owner: shows audit rows for this bill) is a quiet link beside the status pill, not a primary button.
 
 Body: lines table (name, qty, unit price, line discount, line total, refunded qty, on-bill qty), totals block identical to the receipt, payments list (method, amount, reference, tendered/change), refunds list (each with the money paid back and method, and the part taken off the khata) (each with time, staff, reason, method, amount, rounding, `Print refund receipt`), void info.
 

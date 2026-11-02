@@ -50,8 +50,11 @@ const SALES_PRESETS: SalesPreset[] = [
   'month',
   'custom',
 ];
-const SALE_GRID =
+const SALE_GRID_FULL =
   'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1.4fr)_3.5rem_6rem_minmax(0,1.4fr)_7.5rem]';
+/** The master–detail pane is ~500 px: keep the four columns that matter, not seven. */
+const SALE_GRID_EMBEDDED =
+  'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[3.5rem_minmax(0,1.5fr)_5.5rem_6.5rem]';
 
 const PRESETS: { id: SalesPreset; key: string }[] = [
   { id: 'today', key: 'office.sales.range_today' },
@@ -449,15 +452,21 @@ export function SalesList({
             </div>
             <ul className="flex flex-col">
               <li
-                className={`${SALE_GRID} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
+                className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
                 aria-hidden="true"
               >
                 <span>{t('office.sales.col_time')}</span>
                 <span>{t('office.sales.col_invoice')}</span>
-                <span>{t('office.sales.col_customer')}</span>
-                <span className="text-end">{t('office.sales.col_items')}</span>
+                {embedded ? null : (
+                  <>
+                    <span>{t('office.sales.col_customer')}</span>
+                    <span className="text-end">
+                      {t('office.sales.col_items')}
+                    </span>
+                  </>
+                )}
                 <span className="text-end">{t('office.sales.col_total')}</span>
-                <span>{t('office.sales.col_method')}</span>
+                {embedded ? null : <span>{t('office.sales.col_method')}</span>}
                 <span className="text-end">{t('office.sales.col_status')}</span>
               </li>
               {day.rows.map((row) => (
@@ -465,6 +474,7 @@ export function SalesList({
                   key={row.sale.id}
                   row={row}
                   current={row.sale.id === selectedId}
+                  embedded={embedded}
                   timeZone={data?.timeZone ?? 'Asia/Karachi'}
                   onReprint={async () => {
                     await queueSalePrint(getDb(), String(row.sale.id), {
@@ -505,11 +515,13 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
 function SaleRow({
   row,
   current,
+  embedded,
   timeZone,
   onReprint,
 }: {
   row: SaleListRow;
   current: boolean;
+  embedded: boolean;
   timeZone: string;
   onReprint: () => Promise<void>;
 }) {
@@ -524,7 +536,7 @@ function SaleRow({
         resetScroll={false}
         onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
-        className={`${SALE_GRID} min-h-11 focus-visible:outline-offset-[-2px] px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
+        className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} min-h-11 focus-visible:outline-offset-[-2px] px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
       >
         <span className="tabular-nums text-small text-text-muted">
           {timeText(Number(sale.created_at), i18n.language, timeZone)}
@@ -533,29 +545,39 @@ function SaleRow({
           <span className="block truncate font-mono font-medium">
             {String(sale.invoice_no)}
           </span>
-          <span className="block truncate text-small text-text-muted sm:hidden">
+          <span
+            className={`block truncate text-small text-text-muted ${
+              embedded ? '' : 'sm:hidden'
+            }`}
+          >
             {row.customerName ?? t('office.sales.walk_in')}
           </span>
         </span>
-        <span className="hidden min-w-0 truncate text-text-muted sm:block">
-          {row.customerName ?? t('office.sales.walk_in')}
-        </span>
-        <span className="hidden text-end text-small text-text-muted sm:block">
-          {qtyText(Number(sale.items_qty_milli))}
-        </span>
+        {embedded ? null : (
+          <>
+            <span className="hidden min-w-0 truncate text-text-muted sm:block">
+              {row.customerName ?? t('office.sales.walk_in')}
+            </span>
+            <span className="hidden text-end text-small text-text-muted sm:block">
+              {qtyText(Number(sale.items_qty_milli))}
+            </span>
+          </>
+        )}
         <span className="text-end">
           <MoneyText paisa={Number(sale.total)} />
         </span>
-        <span className="col-span-2 flex flex-wrap gap-1 sm:col-span-1">
-          {row.methods.map((m) => (
-            <span
-              key={m}
-              className="rounded-full border border-border px-2 text-small text-text-muted"
-            >
-              {methodLabel(t, m)}
-            </span>
-          ))}
-        </span>
+        {embedded ? null : (
+          <span className="col-span-2 flex flex-wrap gap-1 sm:col-span-1">
+            {row.methods.map((m) => (
+              <span
+                key={m}
+                className="rounded-full border border-border px-2 text-small text-text-muted"
+              >
+                {methodLabel(t, m)}
+              </span>
+            ))}
+          </span>
+        )}
         <span
           className={`justify-self-start whitespace-nowrap rounded-full px-2 text-small font-medium sm:justify-self-end ${statusTone(status)}`}
         >

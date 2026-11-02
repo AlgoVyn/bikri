@@ -59,7 +59,7 @@ Fields: amount (`MoneyInput`, prefilled with balance, selects all), method (Cash
 
 Promise: date (required, ≥ today), amount (optional = whole balance), note. Status becomes `kept` automatically when payments since the promise ≥ promised amount (or balance ≤ 0); `broken` the day after the date if not kept (computed locally each morning; written as an upsert by the first device that notices, idempotent).
 
-Chase list groups customers with balance > 0 by oldest-unpaid age: **0–7 days**, **8–30**, **31–60**, **60+**, plus a top group **Promise due today / overdue**. Each row: name, balance amount, age, last payment date, buttons `Remind` (wa.me), `Call`, `Promise`, `Receive`. Group totals shown. Export CSV.
+Chase list groups customers with balance > 0 by oldest-unpaid age: **0–7 days**, **8–30**, **31–60**, **60+**, plus a top group **Promise due today / overdue**. Each row: name, balance amount, age, last payment date, buttons `Remind` (wa.me), `Call`, `Promise`, `Receive`. The first (most urgent) row's `Receive` is the one filled primary; the rest are quiet. Group totals shown. Export CSV.
 
 ## Acceptance criteria
 

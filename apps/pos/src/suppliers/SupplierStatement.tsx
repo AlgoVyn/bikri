@@ -160,6 +160,7 @@ export function SupplierStatement({
         backLabel={t('office.suppliers.back')}
         icon={<SuppliersIcon />}
         title={name}
+        stackActions={embedded}
         subtitle={
           supplier.phone ? (
             <a

@@ -175,6 +175,22 @@ test.describe('Home and shell (T-013)', () => {
     ).toBeVisible();
   });
 
+  test('the setup card compacts once the catalogue and first sale exist', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.seedProducts([
+        { name: 'Phone', price: 100000, stock: 1 },
+      ]);
+      await window.__bikriTest?.seedTodaySales();
+    });
+    await page.reload();
+    const card = page.getByTestId('getting-started');
+    await expect(card).toBeVisible();
+    expect((await card.boundingBox())?.height ?? 999).toBeLessThan(160);
+  });
+
   test('the staff menu switches language', async ({ page }) => {
     await openReadyShop(page, '/bikri/');
     await page.getByTestId('staff-menu').click();

@@ -626,6 +626,8 @@ function SummaryTab({
 }) {
   const { t } = useTranslation();
   const summary = bundle.summary;
+  const activeHours = summary.hourly.filter((point) => point.sold !== 0);
+  const singleHour = activeHours.length === 1 ? activeHours[0] : undefined;
   const comparison =
     previous &&
     (previous.bills > 0 || previous.sold !== 0 || previous.expenses !== 0)
@@ -757,8 +759,7 @@ function SummaryTab({
         />
       ) : (
         <>
-          {bundle.range.from === bundle.range.to &&
-          summary.hourly.some((point) => point.sold !== 0) ? (
+          {bundle.range.from === bundle.range.to && activeHours.length > 0 ? (
             <section
               data-testid="report-chart"
               className="rounded-card border border-border bg-surface p-3"
@@ -766,13 +767,23 @@ function SummaryTab({
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.hourly_chart')}
               </h2>
-              <HourlyChart points={summary.hourly} t={t} />
-              {summary.hourly.filter((point) => point.sold !== 0).length ===
-              1 ? (
-                <p className="mt-2 text-small text-text-muted">
-                  {t('office.reports.hourly_single')}
-                </p>
-              ) : null}
+              {singleHour ? (
+                <>
+                  <div className="flex items-center justify-between gap-3 rounded-control bg-surface-2 px-3 py-2 text-small">
+                    <span className="tabular-nums text-text-muted">
+                      {`${String(singleHour.hour).padStart(2, '0')}:00`}
+                    </span>
+                    <span className="font-semibold">
+                      <MoneyText paisa={singleHour.sold} />
+                    </span>
+                  </div>
+                  <p className="mt-2 text-small text-text-muted">
+                    {t('office.reports.hourly_single')}
+                  </p>
+                </>
+              ) : (
+                <HourlyChart points={summary.hourly} t={t} />
+              )}
             </section>
           ) : summary.daily.filter(
               (point) => point.sold !== 0 || point.grossProfit !== 0,

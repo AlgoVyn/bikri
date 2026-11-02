@@ -35,6 +35,9 @@ test.describe('remembered date filters', () => {
     await page.getByRole('button', { name: 'Custom', exact: true }).click();
     await page.getByLabel('From', { exact: true }).fill('2026-10-01');
     await page.getByLabel('To', { exact: true }).fill('2026-10-15');
+    await expect(
+      page.getByText('1 Oct 2026', { exact: true }).first(),
+    ).toBeVisible();
     await page.goto('/bikri/');
     await page.goto('/bikri/expenses');
     await expect(page.getByLabel('From', { exact: true })).toHaveValue(

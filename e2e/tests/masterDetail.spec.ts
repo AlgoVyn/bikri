@@ -3,6 +3,13 @@ import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
 
 // The reference app keeps the list beside the selected row on desktop (screens 08/10/12/13).
 
+type Box = { x: number; y: number; width: number; height: number };
+const overlaps = (a: Box, b: Box): boolean =>
+  a.x < b.x + b.width &&
+  b.x < a.x + a.width &&
+  a.y < b.y + b.height &&
+  b.y < a.y + a.height;
+
 async function seedManyProducts(page: Page): Promise<void> {
   await openReadyShop(page, '/bikri/products');
   await page.evaluate(
@@ -30,6 +37,9 @@ test.describe('desktop master–detail', () => {
     await expect(page.getByTestId('sales-detail')).toBeVisible();
     await expect(page.getByTestId('sales-master')).toBeVisible();
     await expect(page.getByText('Select a bill')).toHaveCount(0);
+    await expect(
+      page.getByTestId('sales-master').getByText('Walk-in customer'),
+    ).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 
@@ -89,8 +99,17 @@ test.describe('desktop master–detail', () => {
     });
     await expect(page.getByText('Select a supplier')).toHaveCount(0);
     await page.getByRole('link', { name: /Karachi Traders/ }).click();
-    await expect(page.getByTestId('suppliers-detail')).toBeVisible();
+    const detail = page.getByTestId('suppliers-detail');
+    await expect(detail).toBeVisible();
     await expect(page.getByTestId('suppliers-master')).toBeVisible();
+    const title = await detail
+      .getByRole('heading', { name: 'Karachi Traders' })
+      .boundingBox();
+    const action = await detail
+      .getByRole('link', { name: 'Record delivery' })
+      .boundingBox();
+    expect(title && action).toBeTruthy();
+    if (title && action) expect(overlaps(title, action)).toBe(false);
     await expectNoHorizontalScroll(page);
   });
 });

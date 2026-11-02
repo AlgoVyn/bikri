@@ -234,6 +234,7 @@ export function CustomerStatement({
         backLabel={t('office.udhaar.back_customers')}
         icon={<UsersIcon />}
         title={name}
+        stackActions={embedded}
         subtitle={
           phone ? (
             <a href={`tel:${phone}`} dir="ltr" className="underline">

@@ -85,6 +85,15 @@ export function SettingsIcon() {
   );
 }
 
+export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3.5v4M16 3.5v4" />
+    </Svg>
+  );
+}
+
 export function ClockIcon() {
   return (
     <Svg>

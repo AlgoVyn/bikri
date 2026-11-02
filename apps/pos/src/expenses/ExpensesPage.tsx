@@ -239,23 +239,32 @@ export function ExpensesPage() {
         summary={
           data && data.byCategory.length > 0 ? (
             <div className="flex flex-col gap-1 py-1">
-              {data.byCategory.map((row) => (
-                <div
-                  key={row.category?.id ?? 'none'}
-                  className="flex items-center gap-2 text-small"
-                >
-                  <span className="min-w-32 truncate">
-                    {categoryName(row.category, i18n.language)}
-                  </span>
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                    <span
-                      className="block h-full bg-primary"
-                      style={{ width: `${Math.round((row.net / max) * 100)}%` }}
-                    />
-                  </span>
-                  <MoneyText paisa={row.net} />
-                </div>
-              ))}
+              <p className="text-small font-medium text-text-muted">
+                {t('office.expenses.by_category')}
+              </p>
+              {data.byCategory.map((row) => {
+                const percent = Math.round((row.net / max) * 100);
+                return (
+                  <div
+                    key={row.category?.id ?? 'none'}
+                    className="flex items-center gap-2 text-small"
+                  >
+                    <span className="min-w-32 truncate">
+                      {categoryName(row.category, i18n.language)}
+                    </span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+                      <span
+                        className="block h-full bg-primary"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </span>
+                    <span className="w-9 text-end tabular-nums text-text-muted">
+                      {percent}%
+                    </span>
+                    <MoneyText paisa={row.net} />
+                  </div>
+                );
+              })}
             </div>
           ) : undefined
         }

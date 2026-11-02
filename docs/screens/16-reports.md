@@ -19,7 +19,7 @@ Bikri difference: every report exports to CSV and PDF (Dukaan has no export).
 Toolbar: range chips Today / Yesterday / 7 days / 30 days / This month / Last month / Custom (date range picker, max 366 days); the range is remembered on this device; branch (v2) and device filters; `Export ▾` (CSV of the current tab, PDF of the summary).
 
 Tabs:
-1. **Summary**: cards Sold, Bills, Average bill, Gross profit, Expenses, Net profit, Margin; daily bar chart (sold, profit line); payment mix donut (cash/card/bank-wallet/udhaar); udhaar given vs received; a "Tax collected" card when tax is enabled ([07 §9](../07-money-rules.md#9-reports-formulas)).
+1. **Summary**: cards Sold, Bills, Average bill, Gross profit, Expenses, Net profit, Margin; daily bar chart (sold, profit line); payment mix donut (cash/card/bank-wallet/udhaar); udhaar given vs received; a "Tax collected" card when tax is enabled ([07 §9](../07-money-rules.md#9-reports-formulas)). When a single-day range has only one active hour, the hourly chart collapses to a compact hour/amount row with the "one active hour" note.
 2. **Products**: best sellers by qty and revenue, slow movers (no sale in 30 days with stock > 0), profit by product (`cost.view`), by category, by brand.
 3. **Stock**: stock value (avg cost), low stock, out of stock, negative stock exceptions, stock movement summary by reason, supplier returns (count, credit, return difference — informational, not in profit).
 4. **Udhaar**: total owed, aging buckets (same as chase list), top debtors.

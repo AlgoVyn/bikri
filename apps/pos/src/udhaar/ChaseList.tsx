@@ -125,7 +125,7 @@ export function ChaseList() {
         </p>
       ) : null}
 
-      {data?.groups.map((group) => (
+      {data?.groups.map((group, groupIndex) => (
         <section key={group.key} className="flex flex-col gap-1">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
             <h2 className="text-title font-semibold">
@@ -136,7 +136,7 @@ export function ChaseList() {
             </p>
           </div>
           <ul className="flex flex-col rounded-card border border-border bg-surface">
-            {group.rows.map((row) => (
+            {group.rows.map((row, rowIndex) => (
               <li
                 key={row.customer.customer.id}
                 className="flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0"
@@ -193,7 +193,11 @@ export function ChaseList() {
                   {can('payment.receive') && !readOnly ? (
                     <button
                       type="button"
-                      className={buttonPrimary}
+                      className={
+                        groupIndex === 0 && rowIndex === 0
+                          ? buttonPrimary
+                          : buttonQuiet
+                      }
                       onClick={() => {
                         setSelected(row);
                         setDialog('receive');

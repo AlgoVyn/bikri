@@ -179,7 +179,7 @@ Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference vie
 - Urdu sets `<html lang="ur" dir="rtl">`. Use logical CSS only (`ms-`, `me-`, `ps-`, `start`, `end`); icons with direction (arrows, chevrons) flip via `rtl:` variant.
 - **Numbers stay Western digits and LTR** in all languages (`<bdi dir="ltr">` around amounts, invoice numbers, phones). Input fields accept Urdu/Arabic-Indic digits (`۰-۹`, `٠-٩`) and normalise.
 - Money format: `Rs 43,000` (no decimals when paisa = 0, else `Rs 3,459.77`); negative `−Rs 500` with a true minus; lakh grouping optional (`shop.number_grouping`).
-- Dates: `26 Oct 2026, 4:05 PM` (en/roman-ur), Urdu month names in `ur`; always Asia/Karachi.
+- Dates: `26 Oct 2026, 4:05 PM` (en/roman-ur), Urdu month names in `ur`; always Asia/Karachi. Date fields use the shared `DateField`: a 44 px bordered control with the formatted business date and a calendar icon; the native platform picker sits underneath so mobile/keyboard input keeps working, but its `dd/mm/yyyy` chrome is never shown.
 - Roman Urdu glossary (use consistently): Udhaar, Khata, Baqaya (balance), Wapsi (refund), Rozana hisaab (day close), Kharcha (expense), Supplier, Bill.
 
 ## 5. Interaction patterns

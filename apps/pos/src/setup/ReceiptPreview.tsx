@@ -145,7 +145,7 @@ export function ReceiptPreview({
       ) : null}
       <pre
         data-testid="receipt-preview"
-        className="overflow-x-auto font-mono text-receipt leading-tight"
+        className="overflow-x-auto font-mono text-receipt leading-tight [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {text}
       </pre>

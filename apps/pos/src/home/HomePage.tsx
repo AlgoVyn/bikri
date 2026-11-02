@@ -441,6 +441,7 @@ function GettingStarted({
   const steps = [
     {
       done: products > 0,
+      to: '/products/new' as const,
       title: t('home.step_products'),
       hint: t('home.step_products_hint'),
       action:
@@ -468,6 +469,7 @@ function GettingStarted({
     },
     {
       done: printer,
+      to: '/settings/printer' as const,
       title: t('home.step_printer'),
       hint: t('home.step_printer_hint'),
       action: printer ? null : (
@@ -478,6 +480,7 @@ function GettingStarted({
     },
     {
       done: hasSale,
+      to: '/sell' as const,
       title: t('home.step_sale'),
       hint: t('home.step_sale_hint'),
       action: hasSale ? null : (
@@ -494,9 +497,82 @@ function GettingStarted({
 
   if (pending.length === 0) return null;
 
+  const progress = (done / steps.length) * 100;
+
+  // Once the catalogue exists, the remaining setup is one optional step. A full checklist
+  // card would outweigh the New sale hero; keep it as a compact strip.
+  if (pending.length === 1 && products > 0) {
+    const step = pending[0];
+    if (!step) return null;
+    return (
+      <section
+        aria-labelledby="getting-started"
+        data-testid="getting-started"
+        className="rounded-card border border-border bg-surface p-3 shadow-card"
+      >
+        <div className="flex items-center gap-2">
+          <h2 id="getting-started" className="me-auto text-title font-semibold">
+            {t('home.get_started')}
+          </h2>
+          <span className="text-small text-text-muted tabular-nums">
+            {t('home.steps_progress', { done, total: steps.length })}
+          </span>
+          <button
+            type="button"
+            className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2"
+            aria-label={t('common.dismiss')}
+            onClick={onDismiss}
+          >
+            <span aria-hidden="true" className="text-title leading-none">
+              ×
+            </span>
+          </button>
+        </div>
+        <Link
+          to={step.to}
+          className="mt-2 flex min-h-11 items-center gap-3 rounded-control px-1 hover:bg-surface-2"
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-small font-semibold text-text-muted"
+          >
+            {step.number}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{step.title}</p>
+            <p className="text-small text-text-muted">{step.hint}</p>
+          </div>
+          <span
+            aria-hidden="true"
+            className="text-title leading-none text-text-muted"
+          >
+            ›
+          </span>
+        </Link>
+        <div
+          role="progressbar"
+          aria-label={t('home.steps_progress', {
+            done,
+            total: steps.length,
+          })}
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuenow={done}
+          className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2"
+        >
+          <div
+            className="h-full rounded-full bg-success transition-[width] duration-200"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-labelledby="getting-started"
+      data-testid="getting-started"
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
     >
       <div className="flex items-center gap-2 px-4 py-3">
@@ -531,7 +607,7 @@ function GettingStarted({
         >
           <div
             className="h-full rounded-full bg-success transition-[width] duration-200"
-            style={{ width: `${(done / steps.length) * 100}%` }}
+            style={{ width: `${progress}%` }}
           />
         </div>
       </div>

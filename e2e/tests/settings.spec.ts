@@ -53,8 +53,9 @@ test.describe('Settings (T-050)', () => {
     await page.goto('/bikri/settings/about');
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Terms and privacy' }),
+      page.getByRole('heading', { name: 'Terms of use' }),
     ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
     await expect(
       page.getByText('No analytics, ads or tracking scripts.'),
     ).toBeVisible();
@@ -271,8 +272,9 @@ test.describe('Settings (T-050)', () => {
     await expect(page.getByText(/^Version:/u)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Source code' })).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Terms and privacy' }),
+      page.getByRole('heading', { name: 'Terms of use' }),
     ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Keyboard shortcuts' }),
     ).toHaveCount(0);
