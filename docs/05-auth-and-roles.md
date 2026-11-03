@@ -103,6 +103,10 @@ Owner's choice: **email sign-in** is the stronger sign-in for shop owners. It is
 
 **Testing.** Worker tests use a fake `EMAIL` binding that records messages; E2E journey 24 reads the code from it ([10 §5](10-testing.md#5-e2e-journeys-each-in-en-and-ur-desktop-1280800-and-phone-390844)). Isolation case I23.
 
+## 3.3 Public shop requests
+
+`POST /api/public/shop-requests` and `POST /api/public/shop-requests/status` are the only unauthenticated write endpoints besides enrolment. They are same-origin, rate-limited and honeypot-checked; they only touch the platform `shop_requests` table. They never create a tenant, device or owner code. Approval happens only in the Access-protected operator console after Cloudflare verifies the email (D-175).
+
 ## 4. Staff PINs and session
 
 - PIN: 4 digits by default (owner can allow 4–6 per person). Stored as PBKDF2-SHA256, 150,000 iterations, 16-byte random salt, 32-byte output, base64 (`staff.pin_hash`, `pin_salt`, `pin_iterations`). Hashing happens in the browser with WebCrypto.

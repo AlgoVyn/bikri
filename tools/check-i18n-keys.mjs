@@ -10,6 +10,7 @@ const CATALOGS = [
   'packages/i18n/en.json',
   'packages/i18n/office/en.json',
   'packages/i18n/admin/en.json',
+  'packages/i18n/public/en.json',
 ];
 const PLURAL = ['_zero', '_one', '_two', '_few', '_many', '_other'];
 

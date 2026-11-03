@@ -5,6 +5,8 @@ interface __BaseEnv_Env {
   OWNER_EMAILS: string;
   OWNER_CODE_KEY: string;
   OWNER_SESSION_KEY: string;
+  /** Cloudflare Email Routing API token (Email Routing: Edit). Optional; manual fallback if absent. */
+  EMAIL_ROUTING_TOKEN?: string;
   /** Only honoured when ENV = 'test'. */
   ACCESS_TEST_EMAIL?: string;
 }

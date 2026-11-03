@@ -27,6 +27,13 @@ Every task in [11-roadmap](11-roadmap.md) is done only when its tests exist and 
 
 Add a property-based test (fast-check) for: Σ allocations = amount; Σ line finals = total (both tax modes); inclusive mode `Σ revenue + tax = total − rounding`; refunds of all units in any split = line final; over any sequence of refunds of one bill Σ `udhaar_part` ≤ `udhaar_amount` and Σ cash `amount` ≤ `paid_total`; `|rounding| ≤ round_total_to / 2`.
 
+## 2.1 Shop-request tests (D-175)
+
+- Public: validation, duplicate active email (one row), honeypot stores nothing, status token masks the email, rate limit.
+- Operator: list/detail, approval blocked before email verification (`EMAIL_NOT_VERIFIED`), add/check through a mocked Cloudflare Email Routing API, manual fallback only when the token is unset, approve creates one tenant + owner code + invite email + audits, double approve is idempotent, reject creates no tenant, reopen works.
+- E2E: public form in English and Urdu at 1280×800 and 390×844; operator reviews, verifies (manual fallback in e2e), approves, sees the one-time pairing panel and tenant link.
+- Isolation: `shop_requests`/`operator_audit` are platform tables; the public endpoints never read tenant tables and the operator routes are Access-only.
+
 ## 3. Sync tests
 
 The 20 cases in [03 §9](03-sync.md#9-test-cases-must-exist-in-appsapi-and-appspos-tests) plus:

@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index.tsx';
 import { Route as SplatRouteImport } from './routes/$.tsx';
 import { Route as AdminRouteImport } from './routes/admin.tsx';
 import { Route as LabelsRouteImport } from './routes/labels.tsx';
+import { Route as RequestRouteImport } from './routes/request.tsx';
+import { Route as RequestStatusRouteImport } from './routes/request-status.tsx';
 import { Route as SellRouteImport } from './routes/sell.tsx';
 import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
@@ -46,6 +48,8 @@ import { Route as SuppliersSupplierIdRouteImport } from './routes/suppliers/$sup
 import { Route as UdhaarIndexRouteImport } from './routes/udhaar/index.tsx';
 import { Route as UdhaarCustomerIdRouteImport } from './routes/udhaar/$customerId.tsx';
 import { Route as UdhaarChaseRouteImport } from './routes/udhaar/chase.tsx';
+import { Route as AdminRequestsIndexRouteImport } from './routes/admin/requests/index.tsx';
+import { Route as AdminRequestsIdRouteImport } from './routes/admin/requests/$id.tsx';
 import { Route as AdminTenantsIndexRouteImport } from './routes/admin/tenants/index.tsx';
 import { Route as AdminTenantsIdRouteImport } from './routes/admin/tenants/$id.tsx';
 import { Route as AdminTenantsNewRouteImport } from './routes/admin/tenants/new.tsx';
@@ -77,6 +81,18 @@ const LabelsRoute = LabelsRouteImport.update({
   path: '/labels',
   getParentRoute: () => rootRouteImport,
 } as any);
+const RequestRoute = RequestRouteImport.update({
+  id: '/request',
+  path: '/request',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/request.lazy.tsx').then((d) => d.Route));
+const RequestStatusRoute = RequestStatusRouteImport.update({
+  id: '/request-status',
+  path: '/request-status',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/request-status.lazy.tsx').then((d) => d.Route),
+);
 const SellRoute = SellRouteImport.update({
   id: '/sell',
   path: '/sell',
@@ -264,6 +280,20 @@ const UdhaarChaseRoute = UdhaarChaseRouteImport.update({
 } as any).lazy(() =>
   import('./routes/udhaar/chase.lazy.tsx').then((d) => d.Route),
 );
+const AdminRequestsIndexRoute = AdminRequestsIndexRouteImport.update({
+  id: '/requests/',
+  path: '/requests/',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/requests/index.lazy.tsx').then((d) => d.Route),
+);
+const AdminRequestsIdRoute = AdminRequestsIdRouteImport.update({
+  id: '/requests/$id',
+  path: '/requests/$id',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/requests/$id.lazy.tsx').then((d) => d.Route),
+);
 const AdminTenantsIndexRoute = AdminTenantsIndexRouteImport.update({
   id: '/tenants/',
   path: '/tenants/',
@@ -343,6 +373,8 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
   '/labels': typeof LabelsRoute;
+  '/request': typeof RequestRoute;
+  '/request-status': typeof RequestStatusRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -376,11 +408,13 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute;
   '/suppliers/': typeof SuppliersIndexRoute;
   '/udhaar/': typeof UdhaarIndexRoute;
+  '/admin/requests/$id': typeof AdminRequestsIdRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/sales/$id/refund': typeof SalesIdRefundRoute;
+  '/admin/requests/': typeof AdminRequestsIndexRoute;
   '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
@@ -391,6 +425,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/$': typeof SplatRoute;
   '/labels': typeof LabelsRoute;
+  '/request': typeof RequestRoute;
+  '/request-status': typeof RequestStatusRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -423,11 +459,13 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute;
   '/suppliers': typeof SuppliersIndexRoute;
   '/udhaar': typeof UdhaarIndexRoute;
+  '/admin/requests/$id': typeof AdminRequestsIdRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/sales/$id/refund': typeof SalesIdRefundRoute;
+  '/admin/requests': typeof AdminRequestsIndexRoute;
   '/admin/tenants': typeof AdminTenantsIndexRoute;
   '/products/$id': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId': typeof SuppliersSupplierIdIndexRoute;
@@ -440,6 +478,8 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute;
   '/admin': typeof AdminRouteWithChildren;
   '/labels': typeof LabelsRoute;
+  '/request': typeof RequestRoute;
+  '/request-status': typeof RequestStatusRoute;
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
@@ -473,11 +513,13 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute;
   '/suppliers/': typeof SuppliersIndexRoute;
   '/udhaar/': typeof UdhaarIndexRoute;
+  '/admin/requests/$id': typeof AdminRequestsIdRoute;
   '/admin/tenants/$id': typeof AdminTenantsIdRoute;
   '/admin/tenants/new': typeof AdminTenantsNewRoute;
   '/products/$id/adjust': typeof ProductsIdAdjustRoute;
   '/products/$id/edit': typeof ProductsIdEditRoute;
   '/sales/$id/refund': typeof SalesIdRefundRoute;
+  '/admin/requests/': typeof AdminRequestsIndexRoute;
   '/admin/tenants/': typeof AdminTenantsIndexRoute;
   '/products/$id/': typeof ProductsIdIndexRoute;
   '/suppliers/$supplierId/': typeof SuppliersSupplierIdIndexRoute;
@@ -491,6 +533,8 @@ export interface FileRouteTypes {
     | '/$'
     | '/admin'
     | '/labels'
+    | '/request'
+    | '/request-status'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -524,11 +568,13 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/suppliers/'
     | '/udhaar/'
+    | '/admin/requests/$id'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/sales/$id/refund'
+    | '/admin/requests/'
     | '/admin/tenants/'
     | '/products/$id/'
     | '/suppliers/$supplierId/'
@@ -539,6 +585,8 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/labels'
+    | '/request'
+    | '/request-status'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -571,11 +619,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/udhaar'
+    | '/admin/requests/$id'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/sales/$id/refund'
+    | '/admin/requests'
     | '/admin/tenants'
     | '/products/$id'
     | '/suppliers/$supplierId'
@@ -587,6 +637,8 @@ export interface FileRouteTypes {
     | '/$'
     | '/admin'
     | '/labels'
+    | '/request'
+    | '/request-status'
     | '/sell'
     | '/setup'
     | '/admin/backups'
@@ -620,11 +672,13 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/suppliers/'
     | '/udhaar/'
+    | '/admin/requests/$id'
     | '/admin/tenants/$id'
     | '/admin/tenants/new'
     | '/products/$id/adjust'
     | '/products/$id/edit'
     | '/sales/$id/refund'
+    | '/admin/requests/'
     | '/admin/tenants/'
     | '/products/$id/'
     | '/suppliers/$supplierId/'
@@ -637,6 +691,8 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute;
   AdminRoute: typeof AdminRouteWithChildren;
   LabelsRoute: typeof LabelsRoute;
+  RequestRoute: typeof RequestRoute;
+  RequestStatusRoute: typeof RequestStatusRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
   DevUiRoute: typeof DevUiRoute;
@@ -701,6 +757,20 @@ declare module '@tanstack/react-router' {
       path: '/labels';
       fullPath: '/labels';
       preLoaderRoute: typeof LabelsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/request': {
+      id: '/request';
+      path: '/request';
+      fullPath: '/request';
+      preLoaderRoute: typeof RequestRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/request-status': {
+      id: '/request-status';
+      path: '/request-status';
+      fullPath: '/request-status';
+      preLoaderRoute: typeof RequestStatusRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/sell': {
@@ -934,6 +1004,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UdhaarChaseRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/admin/requests/': {
+      id: '/admin/requests/';
+      path: '/requests';
+      fullPath: '/admin/requests/';
+      preLoaderRoute: typeof AdminRequestsIndexRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
+    '/admin/requests/$id': {
+      id: '/admin/requests/$id';
+      path: '/requests/$id';
+      fullPath: '/admin/requests/$id';
+      preLoaderRoute: typeof AdminRequestsIdRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
     '/admin/tenants/': {
       id: '/admin/tenants/';
       path: '/tenants';
@@ -1010,16 +1094,20 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminBackupsRoute: typeof AdminBackupsRoute;
   AdminIndexRoute: typeof AdminIndexRoute;
+  AdminRequestsIdRoute: typeof AdminRequestsIdRoute;
   AdminTenantsIdRoute: typeof AdminTenantsIdRoute;
   AdminTenantsNewRoute: typeof AdminTenantsNewRoute;
+  AdminRequestsIndexRoute: typeof AdminRequestsIndexRoute;
   AdminTenantsIndexRoute: typeof AdminTenantsIndexRoute;
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminBackupsRoute: AdminBackupsRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminRequestsIdRoute: AdminRequestsIdRoute,
   AdminTenantsIdRoute: AdminTenantsIdRoute,
   AdminTenantsNewRoute: AdminTenantsNewRoute,
+  AdminRequestsIndexRoute: AdminRequestsIndexRoute,
   AdminTenantsIndexRoute: AdminTenantsIndexRoute,
 };
 
@@ -1056,6 +1144,8 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AdminRoute: AdminRouteWithChildren,
   LabelsRoute: LabelsRoute,
+  RequestRoute: RequestRoute,
+  RequestStatusRoute: RequestStatusRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
   DevUiRoute: DevUiRoute,

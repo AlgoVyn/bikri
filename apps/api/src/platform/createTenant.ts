@@ -9,6 +9,8 @@ export const OWNER_CODE_TTL_MS = 72 * 3600_000;
 export const TILL_CODE_TTL_MS = 15 * 60_000;
 
 export type NewTenant = {
+  /** Pre-generated id for idempotent approvals (D-175); omitted by the normal New shop flow. */
+  id?: string;
   slug: string;
   display_name: string;
   owner_email: string | null;
@@ -81,7 +83,7 @@ export async function createTenant(
     .bind(input.slug)
     .first();
   if (taken) throw new SlugTakenError(input.slug);
-  const id = newId(now);
+  const id = input.id ?? newId(now);
   const branchId = newId(now);
   const db = tenantDb(env, { id, db_shard: 'DB' });
   const templates = await env.DB.prepare(

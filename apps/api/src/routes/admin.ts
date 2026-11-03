@@ -14,6 +14,17 @@ import {
 } from '../platform/createTenant.ts';
 import { gcTenantFiles } from '../platform/filesGc.ts';
 import {
+  addRequestEmail,
+  approveShopRequest,
+  checkRequestEmail,
+  getShopRequest,
+  listShopRequests,
+  manualVerifyRequestEmail,
+  rejectShopRequest,
+  reopenShopRequest,
+  type ShopRequestStatus,
+} from '../platform/shopRequests.ts';
+import {
   accountOverview,
   listTenants,
   maskEmail,
@@ -132,6 +143,98 @@ admin.post('/tenants', async (c) => {
       throw new ApiError('SLUG_TAKEN', 409, 'That slug is taken');
     throw e;
   }
+});
+
+// ---- public shop requests (D-175) -----------------------------------------------------------
+const RequestStatus = z.enum([
+  'pending',
+  'awaiting_email',
+  'email_verified',
+  'approving',
+  'approved',
+  'rejected',
+  'failed',
+]);
+
+admin.get('/shop-requests', async (c) => {
+  const status = c.req.query('status');
+  const parsed = status ? RequestStatus.parse(status) : null;
+  const q = (c.req.query('q') ?? '').slice(0, 100);
+  return c.json({
+    requests: await listShopRequests(c.env, {
+      status: parsed as ShopRequestStatus | null,
+      q,
+    }),
+  });
+});
+
+admin.get('/shop-requests/:id', async (c) => {
+  const detail = await getShopRequest(c.env, c.req.param('id'));
+  if (!detail) throw new ApiError('NOT_FOUND', 404, 'No such shop request');
+  return c.json(detail);
+});
+
+admin.post('/shop-requests/:id/email', async (c) =>
+  c.json(await addRequestEmail(c.env, c.req.param('id'), c.var.operator)),
+);
+
+admin.get('/shop-requests/:id/email-status', async (c) =>
+  c.json(await checkRequestEmail(c.env, c.req.param('id'), c.var.operator)),
+);
+
+admin.post('/shop-requests/:id/email/manual', async (c) => {
+  const body = z
+    .object({ note: z.string().trim().min(1).max(200) })
+    .parse(await c.req.json());
+  await manualVerifyRequestEmail(
+    c.env,
+    c.req.param('id'),
+    c.var.operator,
+    body.note,
+  );
+  const detail = await getShopRequest(c.env, c.req.param('id'));
+  return c.json(detail);
+});
+
+admin.post('/shop-requests/:id/approve', async (c) => {
+  const body = z
+    .object({
+      slug: Slug.optional(),
+      daily_write_budget: BUDGET.optional(),
+      note: z.string().trim().max(500).optional(),
+    })
+    .parse(await c.req.json().catch(() => ({})));
+  return c.json(
+    await approveShopRequest(c.env, c.req.param('id'), c.var.operator, {
+      ...body,
+      origin: origin(c),
+      base_path: String(c.env.BASE_PATH),
+    }),
+  );
+});
+
+admin.post('/shop-requests/:id/reject', async (c) => {
+  const body = z.object({ reason: Reason }).parse(await c.req.json());
+  return c.json(
+    await rejectShopRequest(
+      c.env,
+      c.req.param('id'),
+      c.var.operator,
+      body.reason,
+    ),
+  );
+});
+
+admin.post('/shop-requests/:id/reopen', async (c) => {
+  const body = z.object({ reason: Reason }).parse(await c.req.json());
+  return c.json(
+    await reopenShopRequest(
+      c.env,
+      c.req.param('id'),
+      c.var.operator,
+      body.reason,
+    ),
+  );
 });
 
 admin.get('/slug-available', async (c) => {

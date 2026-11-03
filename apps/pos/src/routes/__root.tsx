@@ -87,5 +87,12 @@ function RootLayout() {
   const { pathname } = useLocation();
   // The operator console never opens a shop database or the PIN lock (screens/19).
   const admin = pathname === '/admin' || pathname.startsWith('/admin/');
-  return <ToastProvider>{admin ? <Outlet /> : <Gate />}</ToastProvider>;
+  // Public shop-request pages work before any shop/device exists (D-175).
+  const publicPage =
+    pathname === '/request' ||
+    pathname === '/request-status' ||
+    pathname.startsWith('/request/');
+  return (
+    <ToastProvider>{admin || publicPage ? <Outlet /> : <Gate />}</ToastProvider>
+  );
 }

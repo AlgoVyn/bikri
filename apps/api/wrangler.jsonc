@@ -39,6 +39,7 @@
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
     "SHOP_TIMEZONE": "Asia/Karachi",
+    "CLOUDFLARE_ACCOUNT_ID": "e71e6ef868a1404888d1751c815913b5",
     // "test" only in Worker tests and E2E (`--var ENV:test`); enables ACCESS_TEST_EMAIL and the fake email outbox.
     // The Worker refuses requests if ENV=test while ALLOWED_ORIGINS contains https://algovyn.com (10 §5).
     "ENV": "production"
@@ -55,6 +56,11 @@
     {
       "name": "OWNER_SIGNIN_LIMIT",
       "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "REGISTER_LIMIT",
+      "namespace_id": "1002",
       "simple": { "limit": 10, "period": 60 }
     }
   ],

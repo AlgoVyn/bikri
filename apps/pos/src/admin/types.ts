@@ -145,3 +145,65 @@ export type UnsyncedOp = {
   changed_fields?: string[];
   updated_by?: string | null;
 };
+
+export type ShopRequestStatus =
+  | 'pending'
+  | 'awaiting_email'
+  | 'email_verified'
+  | 'approving'
+  | 'approved'
+  | 'rejected'
+  | 'failed';
+
+export type ShopRequest = {
+  id: string;
+  shop_name: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  city: string;
+  business_type: string;
+  note: string;
+  status: ShopRequestStatus;
+  email_verification_sent_at: number | null;
+  email_verified_at: number | null;
+  email_checked_at: number | null;
+  cloudflare_address_id: string | null;
+  tenant_id: string | null;
+  reject_reason: string;
+  last_error: string;
+  reviewed_by: string | null;
+  reviewed_at: number | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ShopRequestTenant = {
+  id: string;
+  slug: string;
+  display_name: string;
+  status: string;
+  devices: number;
+  setup_completed: boolean;
+};
+
+export type ShopRequestDetail = {
+  request: ShopRequest;
+  tenant: ShopRequestTenant | null;
+};
+
+export type ShopRequestEmailState = {
+  email: string;
+  verified: boolean;
+  status: ShopRequestStatus;
+  email_verified_at?: number | null;
+  already_added?: boolean;
+};
+
+export type ApproveShopRequestResult = {
+  request: ShopRequest;
+  tenant: Tenant | null;
+  owner_code: IssuedCode | null;
+  invite_email_sent: boolean;
+  already_approved: boolean;
+};

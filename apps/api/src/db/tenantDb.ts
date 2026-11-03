@@ -11,6 +11,8 @@ export const PLATFORM_TABLES = [
   'tenants',
   'tenant_usage',
   'expense_category_templates',
+  'shop_requests',
+  'operator_audit',
 ] as const;
 
 /** Every tenant-scoped D1 table (02 §1.1: server-owned, master, ledger). */

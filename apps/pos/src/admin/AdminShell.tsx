@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import {
+  ClockIcon,
   CloudIcon,
   ReportsIcon,
   StoreIcon,
@@ -15,6 +16,7 @@ import { getSession } from './api.ts';
 
 const NAV = [
   { to: '/admin', label: 'admin.nav_overview', Icon: ReportsIcon },
+  { to: '/admin/requests', label: 'admin.nav_requests', Icon: ClockIcon },
   { to: '/admin/tenants', label: 'admin.nav_tenants', Icon: StoreIcon },
   { to: '/admin/backups', label: 'admin.nav_backups', Icon: CloudIcon },
 ] as const;

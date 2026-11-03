@@ -1,10 +1,14 @@
 import { API_BASE } from '@bikri/core';
 import type {
+  ApproveShopRequestResult,
   BackupManifest,
   BackupObject,
   DeviceInfo,
   IssuedCode,
   OwnerProfile,
+  ShopRequest,
+  ShopRequestDetail,
+  ShopRequestEmailState,
   Tenant,
   TenantDetail,
   TenantListItem,
@@ -356,4 +360,73 @@ export async function readBackupManifest(
   } catch {
     return null;
   }
+}
+
+export function listShopRequests(params: {
+  status?: string;
+  q?: string;
+}): Promise<{ requests: ShopRequest[] }> {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.q) query.set('q', params.q);
+  const suffix = query.toString();
+  return apiJson(`/admin/shop-requests${suffix ? `?${suffix}` : ''}`);
+}
+
+export function getShopRequest(id: string): Promise<ShopRequestDetail> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}`);
+}
+
+export function addShopRequestEmail(
+  id: string,
+): Promise<ShopRequestEmailState> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}/email`, {
+    method: 'POST',
+  });
+}
+
+export function checkShopRequestEmail(
+  id: string,
+): Promise<ShopRequestEmailState> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}/email-status`);
+}
+
+export function manualVerifyShopRequestEmail(
+  id: string,
+  note: string,
+): Promise<ShopRequestDetail> {
+  return apiJson(
+    `/admin/shop-requests/${encodeURIComponent(id)}/email/manual`,
+    { method: 'POST', body: { note } },
+  );
+}
+
+export function approveShopRequest(
+  id: string,
+  body: { slug?: string; daily_write_budget?: number; note?: string } = {},
+): Promise<ApproveShopRequestResult> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}/approve`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export function rejectShopRequest(
+  id: string,
+  reason: string,
+): Promise<ShopRequest> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}/reject`, {
+    method: 'POST',
+    body: { reason },
+  });
+}
+
+export function reopenShopRequest(
+  id: string,
+  reason: string,
+): Promise<ShopRequest> {
+  return apiJson(`/admin/shop-requests/${encodeURIComponent(id)}/reopen`, {
+    method: 'POST',
+    body: { reason },
+  });
 }

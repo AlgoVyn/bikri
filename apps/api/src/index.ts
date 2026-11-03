@@ -17,6 +17,7 @@ import { enrol } from './routes/enrol.ts';
 import { getFile, putFile } from './routes/files.ts';
 import { health } from './routes/health.ts';
 import { me } from './routes/me.ts';
+import { publicShopRequests } from './routes/publicShopRequests.ts';
 import { shop } from './routes/shop.ts';
 import { pull, push, snapshot } from './routes/sync.ts';
 import type { AppEnv } from './types.ts';
@@ -26,6 +27,7 @@ const app = new Hono<AppEnv>().basePath(API_BASE);
 app.use('*', requestLog, securityHeaders, sameOrigin);
 app.get('/health', health);
 app.post('/devices/enrol', enrol);
+app.route('/public', publicShopRequests);
 
 // Device-authenticated routes: the tenant comes only from the token (13 §5).
 for (const path of ['/me', '/sync/*', '/files/*', '/shop/*']) {

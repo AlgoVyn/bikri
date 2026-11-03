@@ -38,7 +38,13 @@ describe('nightly D1 export', () => {
   it('keeps the table list in sync with the generated schema', () => {
     const expected = Object.keys(TABLE_COLUMNS).filter(
       (table) =>
-        !['meta', 'tenants', 'expense_category_templates'].includes(table),
+        ![
+          'meta',
+          'tenants',
+          'expense_category_templates',
+          'shop_requests',
+          'operator_audit',
+        ].includes(table),
     );
     expect([...BACKUP_TABLES].sort()).toEqual(expected.sort());
   });

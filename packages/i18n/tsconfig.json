@@ -16,6 +16,7 @@
     "ur.json",
     "roman-ur.json",
     "admin/*.json",
-    "office/*.json"
+    "office/*.json",
+    "public/*.json"
   ]
 }

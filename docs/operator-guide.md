@@ -37,9 +37,11 @@ pnpm exec wrangler r2 bucket create bikri-backups
    pnpm exec wrangler secret put OWNER_EMAILS       # operator@example.com
    pnpm exec wrangler secret put OWNER_CODE_KEY     # openssl rand -base64 32
    pnpm exec wrangler secret put OWNER_SESSION_KEY  # openssl rand -base64 32
+   pnpm exec wrangler secret put EMAIL_ROUTING_TOKEN # Cloudflare API token: Email Routing:Edit
    ```
+   `EMAIL_ROUTING_TOKEN` lets the Requests page add a requester's email to Cloudflare Email Routing and check its verification. If it is not set, the console falls back to a manual "verified in Cloudflare" note. The Worker also uses the `CLOUDFLARE_ACCOUNT_ID` var from `wrangler.jsonc`.
 6. GitHub → Settings → Secrets and variables → Actions:
-   - secrets `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit; also needs R2 object list/delete for retention), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the `age1…` public key);
+   - secrets `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit; also needs R2 object list/delete for retention), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the `age1…` public key), optional `EMAIL_ROUTING_TOKEN` (Email Routing:Edit; deploy sets the Worker secret when present);
    - variable `DEPLOY_ENABLED=true`;
    - branch protection: require the `ci` check on `main`.
 7. Apply migrations and deploy once:
@@ -61,6 +63,16 @@ pnpm exec wrangler r2 bucket create bikri-backups
 6. To add tills or staff: owner on an admin device → **Settings → Devices** (issue code) and **Settings → Cashiers** (staff + PIN). The operator can also issue an owner pairing code from the console.
 
 Target for a second shop: under 15 minutes from the console's New tenant button.
+
+## 3.1 Shop requests
+
+1. Open **Requests**. Pending applications show the shop, owner, email, phone and note.
+2. For a credible request, press **Add email to Cloudflare**. Cloudflare sends its verification email to the requester. If the address is already on the list, the console reuses it.
+3. When the requester clicks the link, press **Check verification**. The request becomes **Email verified**.
+4. Press **Approve and create shop**. The console shows the one-time owner pairing code/link and sends the invite email (or lets you copy it if the email failed).
+5. Reject with a reason if it is not a real shop. Reopen a rejected request if it was a mistake.
+
+If `EMAIL_ROUTING_TOKEN` is not set, add the address in the Cloudflare dashboard, verify it, and use **Mark verified in Cloudflare** (the note is audited). The public status page never shows the owner code.
 
 ## 4. Every-day console actions
 

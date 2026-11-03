@@ -30,7 +30,7 @@ export async function loadAllCatalogs(): Promise<Record<LocaleCode, Catalog>> {
 }
 
 /** Feature areas whose strings load with their lazy routes, not at start (D-112). */
-export const CATALOG_AREAS = ['admin', 'office'] as const;
+export const CATALOG_AREAS = ['admin', 'office', 'public'] as const;
 export type CatalogArea = (typeof CATALOG_AREAS)[number];
 
 /**
@@ -41,7 +41,12 @@ export async function loadAreaCatalog(
   area: CatalogArea,
   locale: LocaleCode,
 ): Promise<Record<string, unknown>> {
-  const files = area === 'admin' ? adminFiles : officeFiles;
+  const files =
+    area === 'admin'
+      ? adminFiles
+      : area === 'office'
+        ? officeFiles
+        : publicFiles;
   return (await files[locale]()).default as Record<string, unknown>;
 }
 
@@ -55,4 +60,9 @@ const officeFiles: Record<LocaleCode, () => JsonModule> = {
   en: () => import('../office/en.json'),
   ur: () => import('../office/ur.json'),
   'roman-ur': () => import('../office/roman-ur.json'),
+};
+const publicFiles: Record<LocaleCode, () => JsonModule> = {
+  en: () => import('../public/en.json'),
+  ur: () => import('../public/ur.json'),
+  'roman-ur': () => import('../public/roman-ur.json'),
 };

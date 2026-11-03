@@ -96,6 +96,12 @@ jobs:
       - name: Deploy Worker
         working-directory: apps/api
         run: pnpm exec wrangler deploy
+      - name: Set Email Routing token (optional)
+        working-directory: apps/api
+        env:
+          EMAIL_ROUTING_TOKEN: ${{ secrets.EMAIL_ROUTING_TOKEN }}
+        if: env.EMAIL_ROUTING_TOKEN != ''
+        run: echo "$EMAIL_ROUTING_TOKEN" | pnpm exec wrangler secret put EMAIL_ROUTING_TOKEN
       - name: Smoke test
         run: |
           curl -fsS https://algovyn.com/bikri/api/health | tee /dev/stderr | grep -q '"ok":true'

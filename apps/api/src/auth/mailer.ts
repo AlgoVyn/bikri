@@ -37,6 +37,75 @@ export function signinEmailText(input: {
   ].join('\n');
 }
 
+export function shopInviteEmailText(input: {
+  shopName: string;
+  code: string;
+  link: string;
+  expiresAt: number;
+}): string {
+  const expires = new Date(input.expiresAt)
+    .toISOString()
+    .slice(0, 16)
+    .replace('T', ' ');
+  return [
+    `Your shop ${input.shopName} is approved for Bikri.`,
+    '',
+    `Registration code: ${input.code}`,
+    `Open this link on the first till: ${input.link}`,
+    `The code expires in 72 hours (${expires} UTC).`,
+    'The first device becomes the admin device. Complete the setup wizard to start selling.',
+    'If you did not request this, ignore this email.',
+    '',
+    '—',
+    '',
+    `آپ کی دکان ${input.shopName} بکری کے لیے منظور ہو گئی ہے۔`,
+    '',
+    `رجسٹریشن کوڈ: ${input.code}`,
+    `پہلی ڈیوائس پر یہ لنک کھولیں: ${input.link}`,
+    'یہ کوڈ 72 گھنٹوں میں ختم ہو جائے گا۔',
+    'پہلی ڈیوائس ایڈمن ڈیوائس بن جائے گی۔ فروخت شروع کرنے کے لیے سیٹ اپ مکمل کریں۔',
+    'اگر آپ نے یہ نہیں مانگا تو اس ای میل کو نظر انداز کریں۔',
+  ].join('\n');
+}
+
+export async function sendShopInviteEmail(
+  env: Env,
+  to: string,
+  input: {
+    shopName: string;
+    code: string;
+    link: string;
+    expiresAt: number;
+  },
+): Promise<boolean> {
+  const subject = 'Your Bikri shop is approved';
+  const text = shopInviteEmailText(input);
+  try {
+    if (String(env.ENV) === 'test') {
+      if (testMail.fail)
+        throw new Error('destination address not verified (test)');
+      testOutbox.push({ to, subject, text, at: Date.now() });
+      if (testOutbox.length > 200)
+        testOutbox.splice(0, testOutbox.length - 200);
+      return true;
+    }
+    await env.EMAIL.send({ from: SENDER, to, subject, text });
+    return true;
+  } catch (e) {
+    const code =
+      (e as { code?: unknown }).code ??
+      (e as { name?: unknown }).name ??
+      'EMAIL_SEND_FAILED';
+    console.log(
+      JSON.stringify({
+        event: 'shop_invite_email_failed',
+        code: String(code).slice(0, 40),
+      }),
+    );
+    return false;
+  }
+}
+
 export async function sendSigninEmail(
   env: Env,
   to: string,

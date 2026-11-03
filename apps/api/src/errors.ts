@@ -9,6 +9,7 @@ export type ErrorStatus =
   | 415
   | 429
   | 500
+  | 502
   | 503
   | 507;
 

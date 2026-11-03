@@ -113,7 +113,7 @@ A task is done only when **all** of these hold:
 - Do not accept a tenant id from a client, query a tenant table without `tenant_id`, or add a deployment-wide unique on shop data (SKU, barcode, invoice number, bill prefix, codes).
 - Do not use a Workers Custom Domain for `algovyn.com` (it would replace the website); use the two Worker routes in [01 §5.1](docs/01-architecture.md#51-wranglerjsonc).
 - Do not store secrets in the repo. Use `wrangler secret put` and GitHub Actions secrets.
-- Do not build FBR integration, batches/expiry, multi-currency, public shop sign-up, billing or several shops in one browser in v1.
+- Do not build FBR integration, batches/expiry, multi-currency, public **self-service tenant creation**, billing or several shops in one browser in v1. Request-only onboarding with operator approval (D-175) is allowed.
 
 ## 7. When the spec is unclear
 

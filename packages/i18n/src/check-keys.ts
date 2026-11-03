@@ -84,6 +84,7 @@ export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
     [rootDir, ''],
     [resolve(rootDir, 'admin'), 'admin/'],
     [resolve(rootDir, 'office'), 'office/'],
+    [resolve(rootDir, 'public'), 'public/'],
   ] as const) {
     const catalogs: Record<string, unknown> = {};
     for (const locale of LOCALE_FILES) {

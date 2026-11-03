@@ -10,6 +10,8 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 |---|---|---|---|
 | GET | `/health` | none | Liveness and versions |
 | POST | `/devices/enrol` | none (rate-limited) | Exchange an enrolment code for a device token (the code decides the tenant) |
+| POST | `/public/shop-requests` | none (rate-limited, same-origin) | Create a public shop request; no tenant is created (D-175) |
+| POST | `/public/shop-requests/status` | none (rate-limited) | Status by the random request token; masked email only |
 | GET | `/me` | device | Tenant, device, branch and setup status |
 | POST | `/sync/push` | device | Push outbox ops ([03 §4.1](03-sync.md#41-push--post-apisyncpush)) |
 | GET | `/sync/pull` | device | Pull changes since a cursor ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) |
@@ -26,6 +28,14 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | GET | `/shop/export` | admin device + owner | Owner's server export of this shop, paged like the snapshot ([13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)) |
 | POST | `/shop/support-access/end` | admin device + owner PIN (no session needed) | End the operator's support access now ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |
 | GET | `/admin/session` | Access | Who is signed in to the operator console |
+| GET | `/admin/shop-requests` | Access | List public shop requests (status/search) |
+| GET | `/admin/shop-requests/:id` | Access | Request detail + created tenant summary |
+| POST | `/admin/shop-requests/:id/email` | Access | Add the request email to Cloudflare Email Routing and send verification |
+| GET | `/admin/shop-requests/:id/email-status` | Access | Re-check Cloudflare verification |
+| POST | `/admin/shop-requests/:id/email/manual` | Access | Fallback only when `EMAIL_ROUTING_TOKEN` is unset; audited |
+| POST | `/admin/shop-requests/:id/approve` | Access | Require a verified email, create the tenant + owner code, send the invite |
+| POST | `/admin/shop-requests/:id/reject` | Access | Reject with a reason; no tenant |
+| POST | `/admin/shop-requests/:id/reopen` | Access | Reopen a rejected request (audited) |
 | GET | `/admin/usage` | Access | Account-wide usage today: Σ `tenant_usage`, per tenant, vs free-tier limits |
 | GET/POST | `/admin/tenants` | Access | List tenants; create a tenant (+ default branch, expense categories, owner pairing code) |
 | GET/PATCH | `/admin/tenants/:id` | Access | Tenant detail; edit display name, budget, poll interval, note |
@@ -76,7 +86,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 403 | `TENANT_READ_ONLY` | The caller's tenant is `read_only` and the request would create or change business data (push ops created after the device learned it, file upload, ops import, conflict acknowledge); `details.since` = read-only start. The till keeps the ops pending and shows the read-only banner ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 | 404 | `NOT_FOUND` | File, device or tenant not found **in the caller's tenant** (the same answer whether or not the id exists in another tenant) |
 | 409 | `SCHEMA_OUTDATED` | Client schema version < `MIN_CLIENT_SCHEMA` |
-| 409 | `SLUG_TAKEN` / `NOT_IN_MAINTENANCE` / `LAST_ADMIN_DEVICE` / `BAD_STATUS_CHANGE` | Operator and shop-admin endpoints (§3.7, §3.8) |
+| 409 | `SLUG_TAKEN` / `NOT_IN_MAINTENANCE` / `LAST_ADMIN_DEVICE` / `BAD_STATUS_CHANGE` / `EMAIL_NOT_VERIFIED` | Operator and shop-admin endpoints (§3.7, §3.8); a shop request cannot be approved before its email is verified |
 | 410 | `SNAPSHOT_REQUIRED` | Pull `since` is below the tenant's `change_log_floor` (changes pruned after 30 days); `details.change_log_floor` |
 | 413 | `PAYLOAD_TOO_LARGE` | Push body > 1 MB, image > 2 MB |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload not webp/png/jpeg |
@@ -86,6 +96,8 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 503 | `TENANT_QUOTA` | The caller's tenant reached its `daily_write_budget` for the UTC day ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)); `Retry-After` = seconds to 00:00 UTC; client keeps ops |
 | 503 | `D1_LIMIT` | D1 daily free limit of the account reached (all tenants); client keeps ops and retries after `Retry-After` |
 | 503 | `EMAIL_UNAVAILABLE` | The owner sign-in email could not be sent (owner email missing or not a verified destination address, or Cloudflare error) |
+| 503 | `EMAIL_ROUTING_NOT_CONFIGURED` | The shop-request email action has no `EMAIL_ROUTING_TOKEN`; use the audited manual fallback |
+| 502 | `EMAIL_ROUTING_FAILED` | Cloudflare Email Routing API refused or failed the add/check |
 | 507 | `TENANT_STORAGE_FULL` | The caller's tenant reached its 1 GB R2 file cap; the till marks the upload failed instead of retrying forever (it never blocks other files) |
 
 Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNIQUE_VIOLATION`, `FOREIGN_KEY`, `FORBIDDEN`, `IMMUTABLE_TABLE` (update/delete attempted on a ledger table), `UNKNOWN_TABLE`, `SETUP_ALREADY_DONE` (a `shop` insert when `setup_completed_at` is already set).
