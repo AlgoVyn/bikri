@@ -866,6 +866,7 @@
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
     "update_ready": "Update tayyar hai",
+    "updating": "Update ho raha hai…",
     "sync_ago": "{{minutes}} minute pehle",
     "sync_never": "kabhi nahin",
     "sync_detail_synced": "Aakhri sync {{ago}} · {{count}} baqi",

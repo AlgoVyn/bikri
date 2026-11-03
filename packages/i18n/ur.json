@@ -866,6 +866,7 @@
     "theme_rtl": "اردو",
     "ui_kit": "اجزاء",
     "update_ready": "اپ ڈیٹ تیار ہے",
+    "updating": "اپ ڈیٹ ہو رہا ہے…",
     "sync_ago": "{{minutes}} منٹ پہلے",
     "sync_never": "کبھی نہیں",
     "sync_detail_synced": "آخری سنک {{ago}} · {{count}} باقی",

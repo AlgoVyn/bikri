@@ -866,6 +866,7 @@
     "theme_rtl": "Urdu",
     "ui_kit": "UI kit",
     "update_ready": "Update ready",
+    "updating": "Updating…",
     "sync_ago": "{{minutes}} min ago",
     "sync_never": "never",
     "sync_detail_synced": "Last sync {{ago}} · {{count}} waiting",

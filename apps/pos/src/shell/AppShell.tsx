@@ -40,10 +40,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useCurrentStaff();
   const shopName = useShopName();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
 
   const allowed = (item: NavItem) => item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
+  const startUpdate = () => {
+    setUpdating(true);
+    applyUpdate();
+    // If the browser never fires the controller change, let the button retry
+    // instead of leaving it disabled forever.
+    window.setTimeout(() => setUpdating(false), 10_000);
+  };
   const current = navItemFor(pathname);
   const extraTitle = EXTRA_TITLES[pathname.replace(/\/+$/u, '')];
   const screenTitle = current
@@ -162,9 +170,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               className={buttonPrimary}
-              onClick={() => applyUpdate()}
+              disabled={updating}
+              aria-busy={updating}
+              onClick={startUpdate}
             >
-              {t('shell.update_ready')}
+              {updating ? t('shell.updating') : t('shell.update_ready')}
             </button>
           ) : null}
           <SyncBadge />

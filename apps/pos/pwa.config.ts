@@ -51,6 +51,11 @@ export const pwaOptions = {
   },
   workbox: {
     cacheId: 'bikri',
+    // A prompt-mode update activates the new worker, but without `clients.claim`
+    // the open page keeps the old controller and `controllerchange` never fires,
+    // so the Update Ready button appears to do nothing. Claiming the clients makes
+    // the reload happen immediately after activation.
+    clientsClaim: true,
     navigateFallback: `${scope}index.html`,
     navigateFallbackDenylist: [/^\/bikri\/api\//, /^\/bikri\/admin/],
     /* Glob URLs are relative to dist/bikri. Prefix them so they match the scope
