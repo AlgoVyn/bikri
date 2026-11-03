@@ -1,3 +1,4 @@
+import { businessDate } from '@bikri/core';
 import type { PrintJob } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
@@ -13,6 +14,8 @@ import {
   receiptShareText,
   waLink,
 } from '../data/receipt.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import {
   closeShareWindow,
@@ -128,11 +131,15 @@ export function SaleComplete({
   onScan: (code: string) => void;
   onOpenBill: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const { sale } = done;
   const saleId = String(sale.id);
   const invoice = String(sale.invoice_no);
+  const timeZone = useShopTimeZone();
+  const late =
+    businessDate(Number(sale.created_at), timeZone) !==
+    String(sale.business_date);
   const newSale = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState<'share' | 'pdf' | null>(null);
   useEffect(() => newSale.current?.focus(), []);
@@ -254,6 +261,16 @@ export function SaleComplete({
       <p className="text-title" data-testid="sale-saved">
         {t('pay.saved', { invoice })}
       </p>
+      {late ? (
+        <p
+          data-testid="sale-backdated"
+          className="rounded-control border border-warning bg-warning-subtle px-2 py-1 text-small text-warning-subtle-ink"
+        >
+          {t('done.recorded_late', {
+            date: formatBusinessDate(String(sale.business_date), i18n.language),
+          })}
+        </p>
+      ) : null}
       {change > 0 ? (
         <p className="text-figure font-semibold" data-testid="done-change">
           {t('pay.change', { amount: formatShopMoney(change) })}

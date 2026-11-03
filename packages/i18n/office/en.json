@@ -48,7 +48,9 @@
       "col_method": "Method",
       "col_status": "Status",
       "select_bill": "Select a bill",
-      "select_bill_hint": "Its items, payments and actions appear here."
+      "select_bill_hint": "Its items, payments and actions appear here.",
+      "record_past": "Record past sale",
+      "late": "Late"
     },
     "bill": {
       "audit": "Audit",
@@ -119,7 +121,8 @@
       "voided_body": "Voided — {{reason}}",
       "voided_title": "VOID",
       "tendered": "Tendered {{amount}}",
-      "change": "Change {{amount}}"
+      "change": "Change {{amount}}",
+      "recorded_late": "Recorded late · sale date {{date}} · made by {{staff}}. Reason: {{reason}}"
     },
     "void": {
       "body": "The bill stays in the list with a VOID stamp. Cash goes back, stock returns, and udhaar is removed from the khata.",
@@ -896,7 +899,8 @@
       "action_drawer_open": "Drawer opened",
       "action_ops_import": "Pending changes imported",
       "action_pin_reset": "Owner PIN reset",
-      "action_supplier_return": "Return to supplier"
+      "action_supplier_return": "Return to supplier",
+      "action_sale_backdated": "Past sale recorded"
     },
     "about": {
       "built_note": "The app updates itself when online.",
@@ -975,6 +979,27 @@
       "theme_light": "Light",
       "theme_system": "System",
       "title": "Language & display"
+    },
+    "backdate": {
+      "title": "Record a past sale",
+      "subtitle": "Enter a sale that was missed. It is recorded on this device with the date it happened.",
+      "date": "Sale date",
+      "date_hint": "Up to {{days}} days back. The time is the entry time.",
+      "staff": "Made by",
+      "staff_placeholder": "Choose a cashier",
+      "role_owner": "Owner",
+      "role_manager": "Manager",
+      "role_cashier": "Cashier",
+      "reason": "Why was it missed?",
+      "reason_placeholder": "e.g. Cashier forgot to enter the sale",
+      "warning": "The sale will be attributed to {{staff}}. The cash must be with you, not in the till.",
+      "start": "Start past sale",
+      "error_date": "Enter a valid date.",
+      "error_range": "Choose a date within the last 30 days.",
+      "error_reason": "Write a reason (1–120 characters).",
+      "error_forbidden": "Only the owner can record a past sale.",
+      "error_staff": "Choose an active cashier.",
+      "error_generic": "Could not start the past sale."
     }
   }
 }

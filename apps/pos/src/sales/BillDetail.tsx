@@ -27,7 +27,7 @@ import {
 } from '../data/salesHistory.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatTimestamp } from '../lib/date';
+import { formatBusinessDate, formatTimestamp } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
 import {
   closeShareWindow,
@@ -194,6 +194,7 @@ export function BillDetail({
 
   const { detail, timeZone } = data;
   const sale = detail.sale;
+  const backdate = backdateInfo(detail.audit);
   const status = String(sale.status);
   const inclusive = sale.tax_inclusive === 1;
   const voidReason =
@@ -359,6 +360,19 @@ export function BillDetail({
           </button>
         ) : null}
       </div>
+
+      {backdate ? (
+        <p
+          data-testid="bill-backdated"
+          className="rounded-control border border-warning bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+        >
+          {t('office.bill.recorded_late', {
+            date: formatBusinessDate(String(sale.business_date), i18n.language),
+            staff: detail.staffName,
+            reason: backdate.reason,
+          })}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <button
@@ -958,6 +972,19 @@ function VoidDialog({
       </div>
     </Modal>
   );
+}
+
+function backdateInfo(audit: Bill['audit']): { reason: string } | null {
+  const row = audit.find((entry) => entry.action === 'sale_backdated');
+  if (!row) return null;
+  try {
+    const after = JSON.parse(String(row.after_json ?? '{}')) as {
+      reason?: unknown;
+    };
+    return { reason: typeof after.reason === 'string' ? after.reason : '' };
+  } catch {
+    return { reason: '' };
+  }
 }
 
 function AuditDialog({

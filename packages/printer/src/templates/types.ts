@@ -47,6 +47,8 @@ export type ReceiptSale = {
   createdAt: number;
   /** `YYYY-MM-DD`. Warranty day counts start here. */
   businessDate: string;
+  /** The sale was recorded on a later day than its business date (D-173). */
+  late?: boolean;
   itemsQtyMilli: number;
   itemDiscountTotal: number;
   /** Sum of line nets (`sales.subtotal`). */
@@ -99,6 +101,7 @@ export type ReceiptLabels = {
   originalDate: string;
   replacementBill: string;
   reprint: string;
+  recordedLate: string;
   telPrefix: string;
   ntn: string;
   strn: string;

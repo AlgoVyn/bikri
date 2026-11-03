@@ -48,7 +48,9 @@
       "col_method": "Tareeqa",
       "col_status": "Halat",
       "select_bill": "Bill muntakhib karein",
-      "select_bill_hint": "Us ki items, payments aur actions yahan nazar aayenge."
+      "select_bill_hint": "Us ki items, payments aur actions yahan nazar aayenge.",
+      "record_past": "Purani sale darj karein",
+      "late": "Der se"
     },
     "bill": {
       "audit": "Audit",
@@ -119,7 +121,8 @@
       "voided_body": "Mansookh — {{reason}}",
       "voided_title": "Mansookh",
       "tendered": "Wasool {{amount}}",
-      "change": "Baqaya {{amount}}"
+      "change": "Baqaya {{amount}}",
+      "recorded_late": "Der se darj · sale date {{date}} · {{staff}} ki taraf se. Wajah: {{reason}}"
     },
     "void": {
       "body": "Bill list mein mansookh ke nishan ke sath rahega. Cash wapas, stock wapas aur udhaar khatay se kam ho jayega.",
@@ -896,7 +899,8 @@
       "action_drawer_open": "Daraz khuli",
       "action_ops_import": "Pending changes import",
       "action_pin_reset": "Malik ka PIN reset",
-      "action_supplier_return": "Supplier ko wapsi"
+      "action_supplier_return": "Supplier ko wapsi",
+      "action_sale_backdated": "Purani sale darj"
     },
     "about": {
       "built_note": "App online hone par khud update hoti hai.",
@@ -975,6 +979,27 @@
       "theme_light": "Light",
       "theme_system": "System",
       "title": "Language aur display"
+    },
+    "backdate": {
+      "title": "Purani sale darj karein",
+      "subtitle": "Chhoot gayi sale darj karein. Ye isi device par asal date ke sath save hogi.",
+      "date": "Sale ki date",
+      "date_hint": "{{days}} din peeche tak. Waqt darj karne ka waqt hoga.",
+      "staff": "Kis ne ki",
+      "staff_placeholder": "Cashier chunein",
+      "role_owner": "Malik",
+      "role_manager": "Manager",
+      "role_cashier": "Cashier",
+      "reason": "Kyun chhoot gayi?",
+      "reason_placeholder": "Maslan cashier sale darj karna bhool gaya",
+      "warning": "Sale {{staff}} ke naam hogi. Cash aap ke paas hona chahiye, drawer mein nahi.",
+      "start": "Purani sale shuru karein",
+      "error_date": "Sahi date darj karein.",
+      "error_range": "Pichhle 30 din ke andar date chunein.",
+      "error_reason": "Wajah likhein (1–120 characters).",
+      "error_forbidden": "Sirf malik purani sale darj kar sakta hai.",
+      "error_staff": "Active cashier chunein.",
+      "error_generic": "Purani sale shuru nahi ho saki."
     }
   }
 }

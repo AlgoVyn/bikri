@@ -206,7 +206,7 @@ Supplier returns (`supplier_return`, §10) are outflows **without** a unit cost:
 
 ## 8. Day close
 
-Scope: **one device (cash drawer)**, period = from the previous `day_closes.period_end` of this device (or device enrolment time) to now. All sums are `cash` only and filtered by `device_id` and `created_at` in `(period_start, period_end]`. The drawer uses **`created_at`** (when cash physically moved), while reports use **`business_date`**: a back-dated expense or delivery takes cash out of today's drawer but counts in the earlier day's profit. Each enrolled device is one drawer: never enrol two browsers that share one physical cash drawer.
+Scope: **one device (cash drawer)**, period = from the previous `day_closes.period_end` of this device (or device enrolment time) to now. All sums are `cash` only and filtered by `device_id` and `created_at` in `(period_start, period_end]`. The drawer uses **`created_at`** (when cash physically moved), while reports use **`business_date`**: a back-dated expense or delivery takes cash out of today's drawer but counts in the earlier day's profit. A sale recorded on a past business date (D-173) follows the same split: its `business_date` is the chosen day, but its `created_at` is the entry time, so it counts in the recording device's current drawer period if that device closes; the original till's stored close is never changed. Each enrolled device is one drawer: never enrol two browsers that share one physical cash drawer.
 
 ```
 opening_cash      = previous close's counted_cash (0 for the first close, editable "Opening float" only on the first close)

@@ -5,6 +5,7 @@ export const PERMISSIONS = [
   'sale.udhaar',
   'sale.below_cost',
   'sale.void',
+  'sale.backdate',
   'refund.create',
   'drawer.open',
   'cash.move',
@@ -36,6 +37,8 @@ const MANAGER_DENIED: ReadonlySet<Permission> = new Set([
   'settings.shop',
   'settings.staff',
   'devices.manage',
+  // Recording a sale on a past business date is owner-only by default (D-173).
+  'sale.backdate',
 ]);
 
 /**

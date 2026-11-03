@@ -267,11 +267,25 @@ export function SellPage() {
     const current = (await getDb().carts.get(active)) ?? cart;
     if (current.lines.length === 0) return;
     const now = cartTotals(current, money);
+    // A backdated cart is attributed to the cashier who made the sale; their limits and
+    // permissions decide whether an owner/manager override is needed (D-173).
+    const seller = current.backdate
+      ? await getDb().staff.get(current.backdate.staff_id)
+      : staff;
+    const sellerCan = (permission: Permission) =>
+      Boolean(
+        seller &&
+          canDo(
+            seller.role as Role,
+            String(seller.permissions_json ?? '{}'),
+            permission,
+          ),
+      );
     const checks = paymentChecks(current, now, {
       maxDiscountBp:
-        staff?.role === 'owner' ? 10000 : Number(staff?.max_discount_bp ?? 0),
-      canBelowCost: can('sale.below_cost'),
-      canDiscount: can('sale.discount'),
+        seller?.role === 'owner' ? 10000 : Number(seller?.max_discount_bp ?? 0),
+      canBelowCost: sellerCan('sale.below_cost'),
+      canDiscount: sellerCan('sale.discount'),
     });
     const voidNeeded =
       current.reissue != null &&
@@ -354,6 +368,16 @@ export function SellPage() {
         : '',
     [cart.reissue?.sale_id],
   );
+  const backdateStaffName =
+    useLiveQuery(
+      async () =>
+        cart.backdate
+          ? String(
+              (await getDb().staff.get(cart.backdate.staff_id))?.name ?? '',
+            )
+          : '',
+      [cart.backdate?.staff_id],
+    ) ?? '';
   const holdLabel =
     customerName ||
     t('sell.held_default', {
@@ -755,6 +779,9 @@ export function SellPage() {
             onAddItem={focusSearch}
             onHeld={() => setDialog('held')}
             heldCount={heldCount}
+            backdate={cart.backdate ?? null}
+            backdateStaffName={backdateStaffName}
+            onCancelBackdate={askClear}
           />
         ) : null}
       </aside>

@@ -2,9 +2,10 @@
  * Receipt data for Sale complete (screens/07, T-018): the printer package's input built from
  * local rows, reprint jobs, and the WhatsApp share text/link (REQ-B04).
  */
-import { newId, parsePkPhone, saleLineFinal } from '@bikri/core';
+import { businessDate, newId, parsePkPhone, saleLineFinal } from '@bikri/core';
 import type { BikriDb, MasterRow, PrintJob, SyncedRow } from '@bikri/db';
 import {
+  formatIsoDate,
   formatReceiptDate,
   formatReceiptMoney,
   type ItemLayout,
@@ -107,6 +108,9 @@ export async function loadSaleReceipt(
       invoiceNo: String(sale.invoice_no),
       createdAt: Number(sale.created_at),
       businessDate: String(sale.business_date),
+      late:
+        businessDate(Number(sale.created_at), shop.timeZone) !==
+        String(sale.business_date),
       itemsQtyMilli: Number(sale.items_qty_milli ?? 0),
       itemDiscountTotal: Number(sale.item_discount_total ?? 0),
       subtotal: Number(sale.subtotal ?? 0),
@@ -249,7 +253,11 @@ export function receiptShareText(input: SaleReceiptInput): string {
   const money = (p: number) => formatReceiptMoney(p, shop.numberGrouping);
   const rows = [
     shop.name,
-    `Bill ${sale.invoiceNo} · ${formatReceiptDate(sale.createdAt, shop.timeZone)}`,
+    `Bill ${sale.invoiceNo} · ${
+      sale.late
+        ? formatIsoDate(sale.businessDate)
+        : formatReceiptDate(sale.createdAt, shop.timeZone)
+    }`,
     ...input.lines.map((l) => {
       const qty =
         l.qtyMilli % 1000 === 0

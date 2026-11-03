@@ -4,6 +4,7 @@ export const packageName = '@bikri/db';
 export {
   BikriDb,
   type Cart,
+  type CartBackdate,
   type CartLine,
   type CartOverride,
   DEXIE_SCHEMA_V1,

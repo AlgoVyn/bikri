@@ -418,6 +418,7 @@ for (const action of [
   'void',
   'reissue',
   'refund',
+  'sale_backdated',
   'discount_over_limit',
   'product_delete',
   'party_delete',

@@ -67,6 +67,7 @@ export function emptyCart(id: CartId, now = Date.now()): Cart {
     note: '',
     updated_at: now,
     reissue: null,
+    backdate: null,
   };
 }
 
@@ -197,6 +198,7 @@ export function cartSignature(cart: Cart): string {
   return JSON.stringify({
     customer: cart.customer_id ?? null,
     reissue: cart.reissue?.sale_id ?? null,
+    backdate: cart.backdate ?? null,
     discount: cart.bill_discount ?? null,
     lines: cart.lines.map((line) => [
       line.key,

@@ -8,6 +8,12 @@ import {
 } from '@bikri/core';
 import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
 import {
+  addDays,
+  BACKDATE_DAYS,
+  BACKDATE_REASON_MAX,
+  isBusinessDate,
+} from './backdate.ts';
+import {
   type CartId,
   CartNotEmptyError,
   cartTotals,
@@ -129,12 +135,6 @@ export type SaleInput = {
   maxDiscountBp: number;
 };
 
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 export type SaleResult = { sale: SyncedRow; created: boolean };
 
 /** Sale recipe (02 §5): one Dexie transaction with its outbox ops; then the cart tab is empty. */
@@ -167,15 +167,46 @@ export async function completeSale(
   const shop = await db.shop.get('shop');
   const timeZone =
     ctx.timeZone ?? (String(shop?.timezone ?? '').trim() || 'Asia/Karachi');
-  const date = businessDate(now, timeZone);
   const reissue = cart.reissue ?? null;
+  const backdate = cart.backdate ?? null;
+  if (backdate && reissue) throw new SaleInvalidError('backdate reissue');
+  const today = businessDate(now, timeZone);
+  let date = today;
+  let sellerId = ctx.staff_id;
+  if (backdate) {
+    const actor = await db.staff.get(ctx.staff_id);
+    if (
+      actor?.active !== 1 ||
+      actor.deleted_at ||
+      !can(
+        String(actor.role) as 'owner' | 'manager' | 'cashier',
+        String(actor.permissions_json ?? '{}'),
+        'sale.backdate',
+      )
+    )
+      throw new SaleInvalidError('backdate permission');
+    if (!isBusinessDate(backdate.business_date))
+      throw new SaleInvalidError('backdate date');
+    if (backdate.business_date > today)
+      throw new SaleInvalidError('backdate range');
+    if (backdate.business_date < addDays(today, -BACKDATE_DAYS))
+      throw new SaleInvalidError('backdate range');
+    const reason = backdate.reason.trim();
+    if (reason.length === 0 || reason.length > BACKDATE_REASON_MAX)
+      throw new SaleInvalidError('backdate reason');
+    const attributed = await db.staff.get(backdate.staff_id);
+    if (attributed?.active !== 1 || attributed.deleted_at)
+      throw new SaleInvalidError('backdate staff');
+    date = backdate.business_date;
+    sellerId = backdate.staff_id;
+  }
   const voidOverride = overrideMatches(cart, 'sale.void')
     ? cart.overrides?.find((o) => o.permission === 'sale.void')
     : undefined;
   const base = {
     branch_id: ctx.branch_id,
     device_id: ctx.device_id,
-    staff_id: ctx.staff_id,
+    staff_id: sellerId,
     business_date: date,
     created_at: now,
   };
@@ -207,7 +238,7 @@ export async function completeSale(
     money,
   );
 
-  const seller = await db.staff.get(ctx.staff_id);
+  const seller = await db.staff.get(sellerId);
   const sellerPerm = (permission: Parameters<typeof can>[2]) =>
     Boolean(
       seller &&
@@ -217,6 +248,11 @@ export async function completeSale(
           permission,
         ),
     );
+  const sellerLimit = backdate
+    ? seller?.role === 'owner'
+      ? 10_000
+      : Number(seller?.max_discount_bp ?? input.maxDiscountBp)
+    : input.maxDiscountBp;
   if (
     totals.lines.some((line) => line.below_cost === 1) &&
     !sellerPerm('sale.below_cost') &&
@@ -230,8 +266,7 @@ export async function completeSale(
   )
     throw new SaleInvalidError('discount permission');
   if (
-    totals.discount_share_bp >
-      Number(seller?.max_discount_bp ?? input.maxDiscountBp) &&
+    totals.discount_share_bp > sellerLimit &&
     !overrideMatches(cart, 'sale.discount')
   )
     throw new SaleInvalidError('discount override');
@@ -262,6 +297,7 @@ export async function completeSale(
           ]),
           bill_discount: value.bill_discount ?? null,
           reissue: value.reissue ?? null,
+          backdate: value.backdate ?? null,
         });
       if (
         live &&
@@ -451,14 +487,21 @@ export async function completeSale(
           boundLine === undefined ? o : { ...o, bound_line: boundLine },
         );
       }
-      if (totals.discount_share_bp > input.maxDiscountBp)
+      if (totals.discount_share_bp > sellerLimit)
         await audit('discount_over_limit', {
           discount_share_bp: totals.discount_share_bp,
-          limit_bp: input.maxDiscountBp,
+          limit_bp: sellerLimit,
           approved_by: overrideMatches(cart, 'sale.discount')
             ? (cart.overrides?.find((o) => o.permission === 'sale.discount')
                 ?.approved_by ?? null)
             : null,
+        });
+      if (backdate)
+        await audit('sale_backdated', {
+          attributed_staff_id: sellerId,
+          business_date: date,
+          reason: backdate.reason.trim(),
+          recorded_at: now,
         });
       if (reissue && reissuePlan) {
         await writeVoidRows(w, reissuePlan, ctx, {

@@ -1,3 +1,4 @@
+import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,8 +31,11 @@ import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { formatShopMoney } from '../lib/money';
+import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { cashierTodayOnly } from '../state/reportScope.ts';
+import { BackdateDialog } from './BackdateDialog.tsx';
 import {
   dayHeading,
   methodLabel,
@@ -114,6 +118,9 @@ export function SalesList({
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
   const toast = useToast();
+  const readOnly = useReadOnly();
+  const setActive = useSellStore((s) => s.setActive);
+  const [backdateOpen, setBackdateOpen] = useState(false);
   const activeFilters = [method, status, staffId, deviceId].filter(
     Boolean,
   ).length;
@@ -212,22 +219,34 @@ export function SalesList({
         subtitle={t('office.sales.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
         actions={
-          can('export.data') ? (
-            <button
-              type="button"
-              className={buttonQuiet}
-              disabled={!data || data.rows.length === 0}
-              onClick={() =>
-                data &&
-                downloadText(
-                  'bikri-sales.csv',
-                  salesCsv(data.rows, data.timeZone),
-                )
-              }
-            >
-              {t('office.sales.export_csv')}
-            </button>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            {!readOnly && can('sale.backdate') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                data-testid="record-past-sale"
+                onClick={() => setBackdateOpen(true)}
+              >
+                {t('office.sales.record_past')}
+              </button>
+            ) : null}
+            {can('export.data') ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!data || data.rows.length === 0}
+                onClick={() =>
+                  data &&
+                  downloadText(
+                    'bikri-sales.csv',
+                    salesCsv(data.rows, data.timeZone),
+                  )
+                }
+              >
+                {t('office.sales.export_csv')}
+              </button>
+            ) : null}
+          </div>
         }
       />
 
@@ -499,6 +518,14 @@ export function SalesList({
           </div>
         ) : null}
       </ListSurface>
+      <BackdateDialog
+        open={backdateOpen}
+        onOpenChange={setBackdateOpen}
+        onStarted={(cartId) => {
+          setActive(cartId);
+          void navigate({ to: '/sell' });
+        }}
+      />
     </div>
   );
 }
@@ -528,6 +555,9 @@ function SaleRow({
   const { t, i18n } = useTranslation();
   const sale = row.sale;
   const status = String(sale.status);
+  const late =
+    businessDate(Number(sale.created_at), timeZone) !==
+    String(sale.business_date);
   return (
     <li className="relative border-b border-border">
       <Link
@@ -542,8 +572,15 @@ function SaleRow({
           {timeText(Number(sale.created_at), i18n.language, timeZone)}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-mono font-medium">
-            {String(sale.invoice_no)}
+          <span className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono font-medium">
+              {String(sale.invoice_no)}
+            </span>
+            {late ? (
+              <span className="shrink-0 rounded-full bg-warning-subtle px-1.5 text-small text-warning-subtle-ink">
+                {t('office.sales.late')}
+              </span>
+            ) : null}
           </span>
           <span
             className={`block truncate text-small text-text-muted ${

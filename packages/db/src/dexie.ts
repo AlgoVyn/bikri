@@ -166,6 +166,16 @@ export type CartOverride = {
 /** A cart opened by "Void & reissue": on payment the old bill is voided in the same action. */
 export type CartReissue = { sale_id: string; void_id: string; reason: string };
 
+/**
+ * A cart opened by "Record a past sale" (owner-only): the sale is written on this device,
+ * with the chosen business date and the attributed cashier (D-173).
+ */
+export type CartBackdate = {
+  business_date: string;
+  staff_id: string;
+  reason: string;
+};
+
 export type Cart = {
   id: 'c1' | 'c2' | 'c3';
   customer_id?: string | null;
@@ -175,6 +185,7 @@ export type Cart = {
   updated_at: number;
   overrides?: CartOverride[];
   reissue?: CartReissue | null;
+  backdate?: CartBackdate | null;
 };
 
 export type HeldBill = Omit<Cart, 'id'> & {

@@ -60,6 +60,10 @@ Cost and margin are never shown here, except a small "Cost Rs 1,120 · margin 12
 
 Hold (Ctrl+H) moves the active cart into `held_bills` with an optional label (default: customer name or "Held 10:42") and clears the tab. Held bills panel lists label, time, item count, total, staff; `Resume` (into the active tab if empty, else asks which tab), `Delete` (confirm). Held bills are local to the device and expire after 7 days (warning on Home).
 
+## Recording a past sale
+
+A cart opened from **Sales → Record past sale** shows a warning banner above the cart tabs: "Recording a past sale · <date> · <staff>", the reason, and `Cancel past sale`. Everything else is the normal Sell flow; on payment the sale uses the chosen business date and attributes the sale to the chosen cashier, while the owner is recorded as the recorder in `audit_log sale_backdated` ([10](10-sales-and-bill-detail.md#record-a-past-sale), [D-173](../decisions.md#decisions-log)). The owner is never asked for a time of day: `created_at` is the entry time, `business_date` is the chosen date.
+
 ## States
 
 - No products: empty state "No products yet" + `Add product` and `Quick sale`.

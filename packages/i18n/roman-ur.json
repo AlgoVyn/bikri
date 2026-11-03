@@ -106,7 +106,8 @@
     "share_whatsapp": "WhatsApp par bhejein",
     "paid": "Ada",
     "customer": "Gahak",
-    "share_blocked": "WhatsApp kholne ke liye is site ki pop-up ki ijazat dein, ya download shuda tasveer attach karein."
+    "share_blocked": "WhatsApp kholne ke liye is site ki pop-up ki ijazat dein, ya download shuda tasveer attach karein.",
+    "recorded_late": "Der se darj · sale date {{date}}"
   },
   "enrol": {
     "needed": "Ye till abhi kisi dukaan se munsalik nahin. Pairing code se jorein.",
@@ -425,7 +426,9 @@
     "method_udhaar_hint": "Gahak ke khatay mein shamil karein",
     "change_label": "Wapas karne hain",
     "due_label": "Abhi baqi",
-    "cart_changed": "Yeh bill kisi doosre tab mein ada ho chuka hai. Dobara payment se pehle page reload karein."
+    "cart_changed": "Yeh bill kisi doosre tab mein ada ho chuka hai. Dobara payment se pehle page reload karein.",
+    "backdate_summary": "{{date}} ki purani sale, {{staff}} ki taraf se",
+    "backdate_failed": "Purani sale save nahi hui. Date aur cashier check karein."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",
@@ -737,7 +740,9 @@
     "view_cart_one": "Cart dekhein · 1 cheez",
     "walk_in": "Aam gahak",
     "empty_tab": "Nayi bill",
-    "add_first_item": "Payment ke liye product shamil karein"
+    "add_first_item": "Payment ke liye product shamil karein",
+    "backdate_banner": "Purani sale darj ho rahi hai · {{date}} · {{staff}}",
+    "backdate_cancel": "Purani sale cancel karein"
   },
   "setup": {
     "add_one": "Aik product shamil karein",

@@ -106,7 +106,8 @@
     "share_whatsapp": "Send on WhatsApp",
     "paid": "Paid",
     "customer": "Customer",
-    "share_blocked": "Allow pop-ups for this site to open WhatsApp, or attach the downloaded picture."
+    "share_blocked": "Allow pop-ups for this site to open WhatsApp, or attach the downloaded picture.",
+    "recorded_late": "Recorded late · sale date {{date}}"
   },
   "enrol": {
     "needed": "This till is not part of a shop yet. Enrol it with a pairing code.",
@@ -425,7 +426,9 @@
     "method_udhaar_hint": "Add to customer khata",
     "change_label": "Change to give",
     "due_label": "Still due",
-    "cart_changed": "This bill was already paid in another tab. Reload before taking payment again."
+    "cart_changed": "This bill was already paid in another tab. Reload before taking payment again.",
+    "backdate_summary": "Past sale for {{date}}, made by {{staff}}",
+    "backdate_failed": "The past sale was not saved. Check the date and the cashier."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",
@@ -737,7 +740,9 @@
     "view_cart_one": "View cart · 1 item",
     "walk_in": "Walk-in customer",
     "empty_tab": "New bill",
-    "add_first_item": "Add a product to take payment"
+    "add_first_item": "Add a product to take payment",
+    "backdate_banner": "Recording a past sale · {{date}} · {{staff}}",
+    "backdate_cancel": "Cancel past sale"
   },
   "setup": {
     "add_one": "Add one product",

@@ -1,4 +1,4 @@
-import { type CartResult, cashChips, newId } from '@bikri/core';
+import { type CartResult, can as canDo, cashChips, newId } from '@bikri/core';
 import type { Cart, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -47,6 +47,7 @@ import {
   WALLET_PROVIDERS,
 } from '../data/sale.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -169,9 +170,24 @@ function PayStep({
   ) => void;
   onSaved: (done: Done) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
+  const backdateStaff = useLiveQuery(
+    async () =>
+      cart.backdate ? await getDb().staff.get(cart.backdate.staff_id) : null,
+    [cart.backdate?.staff_id],
+  );
+  const seller = backdateStaff ?? staff;
+  const sellerCan = (permission: 'sale.udhaar' | 'sale.discount') =>
+    Boolean(
+      seller &&
+        canDo(
+          seller.role as 'owner' | 'manager' | 'cashier',
+          String(seller.permissions_json ?? '{}'),
+          permission,
+        ),
+    );
   const saleId = useMemo(() => newId(), []);
   const total = totals.total;
   const [rows, setRows] = useState<PayRow[]>([
@@ -206,7 +222,7 @@ function PayStep({
     Boolean(credit?.hard_blocked) &&
     !overrideMatches(cart, 'udhaar.hard_limit', { udhaar: s.udhaar });
   const needsCustomer = s.udhaar > 0 && !cart.customer_id;
-  const udhaarDenied = s.udhaar > 0 && !can('sale.udhaar');
+  const udhaarDenied = s.udhaar > 0 && !sellerCan('sale.udhaar');
   const valid = s.valid && !needsCustomer && !hardBlocked && !udhaarDenied;
   const row = rows[activeRow] ?? rows[0];
   const othersApplied = (index: number) =>
@@ -256,9 +272,9 @@ function PayStep({
           note,
           print: printOn,
           maxDiscountBp:
-            staff?.role === 'owner'
+            seller?.role === 'owner'
               ? 10000
-              : Number(staff?.max_discount_bp ?? 0),
+              : Number(seller?.max_discount_bp ?? 0),
         },
         ctx,
       );
@@ -315,6 +331,20 @@ function PayStep({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
+      {cart.backdate ? (
+        <p
+          data-testid="pay-backdate"
+          className="rounded-control border border-warning bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+        >
+          {t('pay.backdate_summary', {
+            date: formatBusinessDate(
+              cart.backdate.business_date,
+              i18n.language,
+            ),
+            staff: String(seller?.name ?? '—'),
+          })}
+        </p>
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <div className="flex flex-col gap-4">
           <div

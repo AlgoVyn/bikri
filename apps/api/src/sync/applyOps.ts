@@ -5,6 +5,7 @@
 import {
   allocate,
   allocateRounding,
+  businessDate,
   can,
   isBelowCost,
   isLedgerTable,
@@ -69,6 +70,12 @@ function isBusinessDate(value: unknown): value is string {
   );
 }
 
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Audit actions a till may write; operator/tenant lifecycle rows are server-only. */
 const CLIENT_AUDIT_ACTIONS = new Set([
   'branch_change',
@@ -86,6 +93,7 @@ const CLIENT_AUDIT_ACTIONS = new Set([
   'product_delete',
   'refund',
   'reissue',
+  'sale_backdated',
   'shop_change',
   'staff_change',
   'stock_count',
@@ -116,6 +124,7 @@ type ShopRules = {
   tax_mode: 'exclusive' | 'inclusive';
   round_total_to: number;
   default_credit_limit: number | null;
+  timezone: string;
   updated_at: number;
 };
 type Current = {
@@ -1668,6 +1677,64 @@ function checkSalePolicy(
     throw new Reject('FORBIDDEN');
 }
 
+/**
+ * A sale recorded on a past business date (D-173): the till must send a `sale_backdated`
+ * audit row in the same transaction, written by a staff member with `sale.backdate` (owner
+ * by default). A genuine offline sale carries an op `created_at` on its own business date,
+ * so it never enters this path. The 30-day cap is measured from when it was recorded.
+ */
+function checkBackdatedSale(
+  look: Lookups,
+  group: PushOp[],
+  row: Record<string, unknown>,
+  opCreatedAt: number,
+): void {
+  const tz = look.shop?.timezone || 'Asia/Karachi';
+  const opDate = businessDate(opCreatedAt, tz);
+  const business = String(row.business_date ?? '');
+  if (business === opDate) return;
+  if (business > opDate) throw new Reject('CONSTRAINT_FAILED');
+  if (business < addDays(opDate, -30)) throw new Reject('CONSTRAINT_FAILED');
+  const audit = group.find(
+    (candidate) =>
+      candidate.tbl === 'audit_log' &&
+      candidate.kind === 'insert' &&
+      candidate.row?.action === 'sale_backdated' &&
+      candidate.row?.entity === 'sales' &&
+      candidate.row?.entity_id === row.id,
+  )?.row;
+  if (!audit) throw new Reject('FORBIDDEN');
+  const recorder = staffForHistory(
+    look,
+    group,
+    audit.staff_id,
+    Number(audit.created_at),
+  );
+  if (
+    !recorder ||
+    !can(recorder.role, recorder.permissions_json, 'sale.backdate')
+  )
+    throw new Reject('FORBIDDEN');
+  let after: {
+    attributed_staff_id?: unknown;
+    business_date?: unknown;
+    reason?: unknown;
+  };
+  try {
+    after = JSON.parse(String(audit.after_json ?? '{}')) as typeof after;
+  } catch {
+    throw new Reject('CONSTRAINT_FAILED');
+  }
+  const reason = typeof after.reason === 'string' ? after.reason.trim() : '';
+  if (
+    after.attributed_staff_id !== row.staff_id ||
+    after.business_date !== business ||
+    reason.length === 0 ||
+    reason.length > 120
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+}
+
 function checkOp(
   ctx: ApplyContext,
   look: Lookups,
@@ -1803,6 +1870,8 @@ function checkOp(
         checkSaleInsert(group, row);
         try {
           checkSalePolicy(look, group, row, staff, allowed);
+          if (typeof op.created_at === 'number')
+            checkBackdatedSale(look, group, row, op.created_at);
         } catch (error) {
           // Money helpers throw RangeError on malformed arithmetic; that is a bad row,
           // not an internal failure, so the op is rejected instead of retried forever.
@@ -2210,6 +2279,11 @@ function checkOp(
       case 'audit_log': {
         if (!CLIENT_AUDIT_ACTIONS.has(String(row.action)))
           throw new Reject('FORBIDDEN');
+        if (
+          row.action === 'sale_backdated' &&
+          (row.entity !== 'sales' || typeof row.entity_id !== 'string')
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         for (const field of ['before_json', 'after_json']) {
           const value = row[field];
           if (value === null || value === undefined) continue;
@@ -3546,7 +3620,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const res = await db.batch(stmts);
   ctx.budget.take();
   const shop = await db.first<ShopRules>(
-    'SELECT tax_rate_bp, tax_mode, round_total_to, default_credit_limit, updated_at FROM shop WHERE tenant_id = ?1',
+    'SELECT tax_rate_bp, tax_mode, round_total_to, default_credit_limit, timezone, updated_at FROM shop WHERE tenant_id = ?1',
   );
   const look: Lookups = {
     sales: new Map(),

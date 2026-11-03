@@ -1,5 +1,5 @@
 import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
-import type { Cart, CartLine } from '@bikri/db';
+import type { Cart, CartBackdate, CartLine } from '@bikri/db';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -14,6 +14,7 @@ import {
   isEmptyCart,
   type ShopMoney,
 } from '../data/cart.ts';
+import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { LineEditor } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
@@ -42,6 +43,9 @@ export type CartPanelProps = {
   onAddItem: () => void;
   onHeld: () => void;
   heldCount: number;
+  backdate?: CartBackdate | null;
+  backdateStaffName?: string;
+  onCancelBackdate: () => void;
 };
 
 function itemCount(lines: readonly CartLine[]): number {
@@ -52,11 +56,41 @@ function itemCount(lines: readonly CartLine[]): number {
 }
 
 export function CartPanel(p: CartPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const customer = useCustomer(p.cart.customer_id);
   const { totals, cart, money } = p;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {p.backdate ? (
+        <div
+          data-testid="backdate-banner"
+          className="rounded-control border border-warning bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+        >
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {t('sell.backdate_banner', {
+                  date: formatBusinessDate(
+                    p.backdate.business_date,
+                    i18n.language,
+                  ),
+                  staff: p.backdateStaffName || '—',
+                })}
+              </p>
+              <p className="truncate" title={p.backdate.reason}>
+                {p.backdate.reason}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 px-2 underline underline-offset-2"
+              onClick={p.onCancelBackdate}
+            >
+              {t('sell.backdate_cancel')}
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div role="tablist" aria-label={t('sell.carts')} className="flex gap-1">
         {CART_IDS.map((id, i) => {
           const filled = !isEmptyCart(p.carts[id]);

@@ -166,8 +166,13 @@ export function buildSaleReceipt(
   pushPair(
     blocks,
     labels.date,
-    formatReceiptDate(sale.createdAt, shop.timeZone),
+    sale.late === true
+      ? formatIsoDate(sale.businessDate)
+      : formatReceiptDate(sale.createdAt, shop.timeZone),
   );
+  if (sale.late === true) {
+    pushCenter(blocks, labels.recordedLate);
+  }
   const staff = input.staffName?.trim() ?? '';
   if (shop.showCashierOnReceipt && staff.length > 0) {
     pushPair(blocks, labels.cashier, staff);

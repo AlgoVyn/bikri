@@ -5,7 +5,7 @@ describe('permission matrix (05 §6)', () => {
   it('owner has everything', () => {
     for (const p of PERMISSIONS) expect(roleAllows('owner', p)).toBe(true);
   });
-  it('manager lacks deletes, shop/staff settings and devices', () => {
+  it('manager lacks deletes, shop/staff settings, devices and backdated sales', () => {
     expect(roleAllows('manager', 'refund.create')).toBe(true);
     expect(roleAllows('manager', 'cost.view')).toBe(true);
     for (const p of [
@@ -14,6 +14,7 @@ describe('permission matrix (05 §6)', () => {
       'settings.shop',
       'settings.staff',
       'devices.manage',
+      'sale.backdate',
     ] as const) {
       expect(roleAllows('manager', p)).toBe(false);
     }
@@ -28,6 +29,7 @@ describe('permission matrix (05 §6)', () => {
       'purchase.create',
       'stock.adjust',
       'export.data',
+      'sale.backdate',
     ] as const) {
       expect(roleAllows('cashier', p)).toBe(false);
     }

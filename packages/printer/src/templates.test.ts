@@ -33,6 +33,19 @@ function variant(change: (input: SaleReceiptInput) => void): SaleReceiptInput {
 }
 
 describe('sale receipt conditional rows (06 §4.1)', () => {
+  it('prints the business date and RECORDED LATE for a backdated sale', () => {
+    const t = text80(
+      buildSaleReceipt(
+        variant((i) => {
+          i.sale.late = true;
+          i.sale.businessDate = '2026-10-20';
+        }),
+      ),
+    );
+    expect(t).toContain('20-10-2026');
+    expect(t).toContain('RECORDED LATE');
+  });
+
   it('adds the tax row for tax-exclusive sales', () => {
     const t = text80(
       buildSaleReceipt(

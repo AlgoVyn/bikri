@@ -220,7 +220,7 @@ The Worker validates the **HTTP request envelope** with Zod (`apps/api/src/sync/
 Row payloads go through:
 
 - an allow-list of columns from `packages/db/src/tables.ts` (`writableColumns` drops `tenant_id`, `rev`, `products.avg_cost`, `sales.status` and unknown keys);
-- `checkOp` in `apps/api/src/sync/applyOps.ts`: row ids, scalar-only values, safe integers, strings capped at 4,000 characters, required parent/source rows, permissions and the table-specific checks in §5;
+- `checkOp` in `apps/api/src/sync/applyOps.ts`: row ids, scalar-only values, safe integers, strings capped at 4,000 characters, required parent/source rows, permissions and the table-specific checks in §5; a sale whose `business_date` is earlier than the op's business date needs a `sale_backdated` audit row in the same batch (owner default, 30-day cap, no future date);
 - the D1 constraints: `STRICT` tables, `CHECK`s, composite foreign keys and unique indexes.
 
 The client does the cheap equivalent on pull: `assertServerRow` in `apps/pos/src/sync/merge.ts` checks scalar values and bounded strings, and a row-shaped failure is quarantined by `applyPage` rather than aborting the whole page.
