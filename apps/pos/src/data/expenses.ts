@@ -289,8 +289,15 @@ export async function reverseExpense(
   const now = options.now ?? Date.now();
   return writeAction(
     db,
-    (w) =>
-      w.insert('expenses', {
+    async (w) => {
+      // Repeat under the write transaction: two rapid confirms can both pass the
+      // optimistic check above.
+      const duplicate = await w
+        .table<SyncedRow, string>('expenses')
+        .filter((row) => row.reverses_id === input.expenseId)
+        .first();
+      if (duplicate) throw new ExpenseError('already');
+      return w.insert('expenses', {
         id: input.reversalId,
         category_id: String(original.category_id),
         amount: n(original.amount),
@@ -303,7 +310,8 @@ export async function reverseExpense(
         staff_id: ctx.staff_id,
         business_date: String(original.business_date),
         created_at: now,
-      }),
+      });
+    },
     { now, actor: ctx.staff_id },
   );
 }

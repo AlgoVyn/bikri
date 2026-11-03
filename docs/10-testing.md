@@ -11,7 +11,7 @@ Every task in [11-roadmap](11-roadmap.md) is done only when its tests exist and 
 | Integration (till) | `apps/pos/src/**/*.test.ts` with fake-indexeddb | repositories write row + outbox atomically, rebuild caches, pull merge | 90% for `db/`, `sync/` |
 | Integration (Worker) | `apps/api/test/*.test.ts` with the vitest plugin, real migrations applied | every endpoint, auth, push idempotency, conflicts, avg cost recompute, limits | 90% |
 | **Isolation (Worker + till)** | `apps/api/test/isolation/*.test.ts`, `e2e/isolation.spec.ts` | cross-tenant leakage, §8 | **every endpoint and every table; required** |
-| E2E | `e2e/*.spec.ts` (Playwright, Chromium; WebKit for the phone profile) | user journeys below against `wrangler dev` + local D1 | all journeys |
+| E2E | `e2e/tests/*.spec.ts` (Playwright, Desktop Chrome at 1280×800 and 390×844) | user journeys below against `wrangler dev` + local D1 | all journeys |
 | Manual | checklist §6 | real printers, drawer, scanners, phones | before each release |
 
 ## 2. Money vectors (mandatory)
@@ -82,7 +82,7 @@ Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-el
 24. Owner email sign-in: on an admin device unlocked as owner, `Add a till` asks for the email code → the code read from the fake `EMAIL` binding signs in → the code is created; a wrong code 5 times kills it; Lock drops the session and the next action asks again; `Download from server` builds a zip whose row counts equal the server's.
 25. Support access: the operator starts support access for shop A (2 h, reason) → every till of A shows the support banner with the reason, B shows none; the support browser profile enrols, sees A's reports, cannot save a sale; the owner presses `End now` → the support device gets `DEVICE_REVOKED` and the banner disappears; Activity shows start and end.
 
-Visual snapshots: Playwright screenshots of every screen (light, dark, Urdu) stored in `e2e/__screenshots__`; diffs reviewed in PRs (threshold 0.2%).
+Visual snapshots: the deterministic English screenshots in `e2e/tests/visual.spec.ts-snapshots` (desktop and phone, light) use a fixed pixel budget; other language/theme captures are attached with `VISUAL=1` for review.
 
 ## 6. Manual hardware checklist (before each release)
 
@@ -107,7 +107,7 @@ Record results in `docs/releases/<version>-hardware.md`.
 
 ## 7. CI
 
-`.github/workflows/ci.yml` on every PR: `pnpm biome ci`, `pnpm typecheck`, `pnpm test` (unit + integration + the isolation suite, §8), `pnpm build`, `pnpm e2e` (Chromium desktop + WebKit phone, sharded 2), bundle size check (08 §7), i18n key parity check, link check of `docs/` (all relative links and images resolve). Required to merge.
+`.github/workflows/ci.yml` on every PR: `pnpm biome ci`, `pnpm typecheck`, `pnpm test` (unit + integration + the isolation suite, §8), `pnpm build`, `pnpm e2e` (Desktop Chrome, 1280×800 and 390×844, one worker), bundle size check (08 §7), i18n key parity check, link check of `docs/` (all relative links and images resolve). Required to merge.
 
 `deploy.yml` and the nightly `website-guard.yml` run `node tools/check-website.mjs` ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)); `tools/check-website.test.mjs` covers it with saved HTML samples (a page with `cdn.tailwindcss.com` → fail; a page with `navigator.serviceWorker.register('/sw.js')` → fail; Google Fonts stylesheet only → warn; clean page → pass).
 

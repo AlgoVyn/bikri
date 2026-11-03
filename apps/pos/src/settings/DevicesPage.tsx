@@ -20,6 +20,7 @@ import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { chunkOpsByTx, MAX_BATCH_OPS } from '../sync/chunk.ts';
 import { OwnerSigninRequired, shopRequest } from '../sync/shopApi.ts';
 import { SettingsPageLayout } from './Layout.tsx';
 import { shopErrorMessage, useShopAdmin } from './OwnerSignin.tsx';
@@ -54,6 +55,8 @@ export type UnsyncedFile = {
   tenant_id: string;
   device_id: string;
   ops: {
+    op_id?: string;
+    tx_id: string;
     tbl: string;
     kind: string;
     created_at: number;
@@ -97,7 +100,7 @@ export function previewUnsynced(text: string, tenantId: string) {
   };
 }
 
-export const IMPORT_CHUNK = 200;
+export const IMPORT_CHUNK = MAX_BATCH_OPS;
 
 export async function importUnsynced(
   db: BikriDb,
@@ -107,8 +110,10 @@ export async function importUnsynced(
 ) {
   let applied = 0;
   let rejected = 0;
-  for (let i = 0; i < file.ops.length; i += IMPORT_CHUNK) {
-    const ops = file.ops.slice(i, i + IMPORT_CHUNK);
+  let done = 0;
+  // Never split a transaction: the server applies one tx as a unit, and half a sale or
+  // half a refund would be rejected (and the file is the only copy of a revoked till).
+  for (const ops of chunkOpsByTx(file.ops)) {
     const res = await shopRequest<{ results: { result: string }[] }>(
       db,
       staffId,
@@ -122,7 +127,8 @@ export async function importUnsynced(
       if (r.result === 'rejected') rejected += 1;
       else applied += 1;
     }
-    onProgress?.(Math.min(file.ops.length, i + IMPORT_CHUNK));
+    done += ops.length;
+    onProgress?.(done);
   }
   return { applied, rejected };
 }

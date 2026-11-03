@@ -109,6 +109,8 @@ export type OutboxEntry = {
   status: OutboxStatus;
   /** When this tab claimed the row for a push; a live claim is never stolen by another tab. */
   sending_at?: number;
+  /** Token of the tab/claim that owns this sending row; a late response must match it. */
+  claim_token?: string;
   attempts: number;
   last_error?: string;
 };
@@ -189,7 +191,14 @@ export type PrintJob = {
   refund_id?: string;
   day_close_id?: string;
   supplier_return_id?: string;
-  kind: 'sale' | 'refund' | 'test' | 'day_close' | 'statement' | 'supplier';
+  kind:
+    | 'sale'
+    | 'refund'
+    | 'void'
+    | 'test'
+    | 'day_close'
+    | 'statement'
+    | 'supplier';
   status: 'queued' | 'printing' | 'done' | 'failed';
   /** Set when a print starts; used to recover a tab that closed mid-print. */
   started_at?: number;

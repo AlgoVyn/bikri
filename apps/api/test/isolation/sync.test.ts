@@ -324,16 +324,16 @@ describe('sync isolation', () => {
         period_start: 0,
         period_end: now,
         opening_cash: 0,
-        cash_sales: 0,
+        cash_sales: 150000,
         udhaar_cash_in: 0,
         pay_ins: 0,
         supplier_cash_in: 0,
-        cash_refunds: 0,
+        cash_refunds: 1000,
         cash_expenses: 0,
         supplier_cash_out: 0,
         pay_outs: 0,
-        expected_cash: 0,
-        counted_cash: 0,
+        expected_cash: 149000,
+        counted_cash: 149000,
         difference: 0,
         denominations_json: null,
         note: mark,
@@ -421,12 +421,50 @@ describe('sync isolation', () => {
         op('payments', 'insert', refundPayment, { tx_id: ids.refund }),
         op('purchases', 'insert', purchase, { tx_id: ids.purchase }),
         op('purchase_lines', 'insert', line, { tx_id: ids.purchase }),
+        op(
+          'ledger_entries',
+          'insert',
+          {
+            id: newId(now),
+            party_type: 'supplier',
+            party_id: IDS.supplier,
+            amount: 500,
+            source_type: 'purchase',
+            source_id: ids.purchase,
+            note: mark,
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: now,
+          },
+          { tx_id: ids.purchase },
+        ),
         op('supplier_returns', 'insert', supplierReturn, {
           tx_id: ids.supplierReturn,
         }),
         op('supplier_return_lines', 'insert', returnLine, {
           tx_id: ids.supplierReturn,
         }),
+        op(
+          'ledger_entries',
+          'insert',
+          {
+            id: newId(now),
+            party_type: 'supplier',
+            party_id: IDS.supplier,
+            amount: -500,
+            source_type: 'supplier_return',
+            source_id: ids.supplierReturn,
+            note: mark,
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: now,
+          },
+          { tx_id: ids.supplierReturn },
+        ),
         op('day_closes', 'insert', dayClose),
         op(
           'refund_lines',
@@ -473,20 +511,8 @@ describe('sync isolation', () => {
     };
     const firstA = rows(a, 'A');
     const firstB = rows(b, 'B');
-    await pushOk(a.till, [
-      ...firstA.slice(0, 6),
-      firstA[8]!,
-      firstA[9]!,
-      firstA[10]!,
-    ]);
-    await pushOk(b.till, [
-      ...firstB.slice(0, 6),
-      firstB[8]!,
-      firstB[9]!,
-      firstB[10]!,
-    ]);
-    await pushOk(a.till, firstA.slice(6, 8));
-    await pushOk(b.till, firstB.slice(6, 8));
+    await pushOk(a.till, firstA);
+    await pushOk(b.till, firstB);
 
     const pa = await pullAll(a.till);
     const pb = await pullAll(b.till);

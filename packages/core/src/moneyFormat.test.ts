@@ -51,6 +51,12 @@ describe('formatMoney', () => {
     expect(formatMoney(-1)).toBe('\u2212Rs 0.01');
   });
 
+  it('rejects unsafe integers', () => {
+    expect(() => formatMoney(Number.MAX_SAFE_INTEGER + 1)).toThrow(
+      /safe integer/,
+    );
+  });
+
   it('groups lakh style after the first three digits', () => {
     expect(groupLakh(1000)).toBe('1,000');
     expect(groupLakh(100000)).toBe('1,00,000');

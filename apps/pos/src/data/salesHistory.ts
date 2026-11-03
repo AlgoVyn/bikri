@@ -354,16 +354,16 @@ export async function salesHistory(
       String(b.sale.id).localeCompare(String(a.sale.id)),
   );
 
-  const days: SalesDay[] = [];
+  const byDate = new Map<string, SalesDay>();
   for (const row of rows) {
     const date = String(row.sale.business_date);
-    const last = days.at(-1);
-    if (!last || last.date !== date) {
-      days.push({ date, bills: 0, total: 0, rows: [row] });
-      continue;
-    }
-    last.rows.push(row);
+    const day = byDate.get(date);
+    if (day) day.rows.push(row);
+    else byDate.set(date, { date, bills: 0, total: 0, rows: [row] });
   }
+  const days = [...byDate.values()].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  );
   for (const day of days) {
     for (const row of day.rows) {
       if (row.sale.status === 'void') continue;

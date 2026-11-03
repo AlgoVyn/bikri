@@ -39,5 +39,6 @@ export const accessAuth: MiddlewareHandler<{
   if (!operatorEmails(c.env).includes(email))
     throw new ApiError('FORBIDDEN', 403, 'Not an operator');
   c.set('operator', email);
+  c.header('Cache-Control', 'private, no-store');
   await next();
 };

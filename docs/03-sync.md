@@ -92,6 +92,8 @@ Response:
 
 ### 4.2 Pull — `GET /api/sync/pull?since=<seq>&limit=500`
 
+The till sends `X-Bikri-Schema: <CLIENT_SCHEMA_VERSION>`; a value below `MIN_CLIENT_SCHEMA` (or a missing header) answers `409 SCHEMA_OUTDATED`, so an old cached till cannot write data it does not understand into IndexedDB (it must update before pulling).
+
 ```sql
 SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE tenant_id = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3;  -- index change_log_tenant_seq
 ```
@@ -135,7 +137,7 @@ Initial sync (new device, restore, or a till whose cursor is older than the prun
 
 ### 4.3 Snapshot — `GET /api/sync/snapshot`
 
-A consistent-enough copy of every synced table, paged per table, followed by a normal pull from the snapshot's cursor.
+Requires the same `X-Bikri-Schema` header as pull. A consistent-enough copy of every synced table, paged per table, followed by a normal pull from the snapshot's cursor.
 
 1. `GET /api/sync/snapshot` (no query) → `200 { "snapshot_seq": 48213, "tables": [ { "tbl": "shop", "rows": 1 }, { "tbl": "products", "rows": 812 }, … ] }`. `snapshot_seq` = `MAX(seq) FROM change_log WHERE tenant_id = ?1` (or the tenant's `change_log_floor` if it has no log rows) read **before** any rows; `rows` are `COUNT(*) … WHERE tenant_id = ?1` per table for the progress bar (all counts in one `db.batch()`). Tables, in this order (parents before children): `shop`, `branches`, `devices`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, then every ledger table of [02 §1.1](02-data-model.md#11-table-kinds), then `sync_conflicts`. Soft-deleted master rows are included (history refers to them). `devices` rows exclude `token_hash` and `enrolled_by`. No row carries `tenant_id`.
 2. For each table: `GET /api/sync/snapshot?tbl=<tbl>&after=<id>&limit=500` → `200 { "tbl": "products", "rows": [ {…}, … ], "next_after": "01J9…", "has_more": true }` from `SELECT <columns except tenant_id> FROM <tbl> WHERE tenant_id = ?1 AND id > ?2 ORDER BY id LIMIT ?3` (primary key `(tenant_id, id)`) (`limit` 1–1000). Rows have exactly the shape of `change_log.row_json`.

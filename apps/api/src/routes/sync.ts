@@ -147,8 +147,25 @@ type ChangeRow = {
   row_json: string;
 };
 
+/** Pull/snapshot speak the schema the till was built for; an outdated till must update first. */
+function assertClientSchema(c: Context<AppEnv>): void {
+  const raw = c.req.header('x-bikri-schema');
+  const version = raw === undefined ? Number.NaN : Number(raw);
+  const min = Number(c.env.MIN_CLIENT_SCHEMA);
+  if (!Number.isSafeInteger(version) || version < min)
+    throw new ApiError(
+      'SCHEMA_OUTDATED',
+      409,
+      'Update the app to keep syncing',
+      {
+        min_client_schema: min,
+      },
+    );
+}
+
 /** `GET /api/sync/pull?since=&limit=` (03 §4.2). */
 export async function pull(c: Context<AppEnv>): Promise<Response> {
+  assertClientSchema(c);
   const { tenant, device, db } = c.var;
   const now = Date.now();
   const q = PullQuery.parse({
@@ -254,6 +271,7 @@ export async function snapshotPayload(
 
 /** `GET /api/sync/snapshot` (03 §4.3). */
 export async function snapshot(c: Context<AppEnv>): Promise<Response> {
+  assertClientSchema(c);
   const { tenant, db } = c.var;
   return c.json(await snapshotPayload((k) => c.req.query(k), db, tenant));
 }

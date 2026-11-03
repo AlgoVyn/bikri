@@ -70,6 +70,7 @@ export type ReceiptSale = {
 export type ReceiptLabels = {
   saleTitle: string;
   refundTitle: string;
+  voidTitle: string;
   testTitle: string;
   bill: string;
   date: string;
@@ -96,6 +97,7 @@ export type ReceiptLabels = {
   paidBack: string;
   originalBill: string;
   originalDate: string;
+  replacementBill: string;
   reprint: string;
   telPrefix: string;
   ntn: string;
@@ -138,6 +140,16 @@ export type RefundReceipt = {
   udhaarPart: number;
   khataBalancePaisa: number | null;
   reason: string;
+};
+
+export type VoidReceipt = {
+  shop: ReceiptShop;
+  staffName: string | null;
+  originalInvoiceNo: string;
+  originalCreatedAt: number;
+  voidCreatedAt: number;
+  reason: string;
+  replacementInvoiceNo: string | null;
 };
 
 /** Day close / Z-report (screens/15); an internal slip, so no "Powered by AlgoVyn". */

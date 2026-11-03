@@ -2,7 +2,12 @@
 import { API_BASE } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { putFile } from '../data/fileCache.ts';
-import { deviceToken, OfflineError, SyncHttpError } from './client.ts';
+import {
+  deviceToken,
+  OfflineError,
+  REQUEST_TIMEOUT_MS,
+  SyncHttpError,
+} from './client.ts';
 
 /** Uploads pending photos/logos; a 4xx marks the entry failed, network errors leave it pending. */
 export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
@@ -28,6 +33,7 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
           },
           body: e.blob,
           credentials: 'omit',
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         },
       );
     } catch (error) {
@@ -43,7 +49,7 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
     } | null;
     const code = body?.error?.code ?? 'HTTP_ERROR';
     if (
-      res.status >= 500 ||
+      (res.status >= 500 && code !== 'TENANT_STORAGE_FULL') ||
       code === 'TENANT_READ_ONLY' ||
       code === 'TENANT_QUOTA'
     ) {
@@ -73,6 +79,7 @@ export async function fetchRemoteFile(
       {
         headers: { authorization: `Bearer ${token}` },
         credentials: 'omit',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );
     if (!res.ok) return null;

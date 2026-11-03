@@ -63,7 +63,7 @@ export type {
   DiscountType,
   TaxMode,
 } from './money/totals.ts';
-export { computeCart, isBelowCost } from './money/totals.ts';
+export { allocateRounding, computeCart, isBelowCost } from './money/totals.ts';
 export type { NumberGrouping } from './moneyFormat.ts';
 export { formatMoney, groupLakh, parseMoneyToPaisa } from './moneyFormat.ts';
 export { API_BASE, BASE_PATH } from './paths.ts';

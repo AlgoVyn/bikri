@@ -1,5 +1,5 @@
 /** Till HTTP client (03 §4, 04 §2): bearer token from kv, pending report header, typed errors. */
-import { API_BASE } from '@bikri/core';
+import { API_BASE, CLIENT_SCHEMA_VERSION } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { getKv } from '../data/kv.ts';
 
@@ -23,6 +23,9 @@ export class SyncHttpError extends Error {
     this.retryAfter = retryAfter;
   }
 }
+
+/** A stalled connection must not own the sync engine forever. */
+export const REQUEST_TIMEOUT_MS = 45_000;
 
 export class OfflineError extends Error {
   constructor(cause?: unknown) {
@@ -67,17 +70,27 @@ export async function request<T>(
     body = JSON.stringify(options.json);
   }
   let res: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const forwardAbort = () => controller.abort();
+  if (options.signal) {
+    if (options.signal.aborted) controller.abort();
+    else options.signal.addEventListener('abort', forwardAbort, { once: true });
+  }
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: options.method ?? (body ? 'POST' : 'GET'),
       headers,
       body,
-      signal: options.signal,
+      signal: controller.signal,
       credentials: 'omit',
       cache: 'no-store',
     });
   } catch (error) {
     throw new OfflineError(error);
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', forwardAbort);
   }
   const text = await res.text();
   let data: unknown = null;
@@ -122,6 +135,7 @@ export async function tillRequest<T>(
     token,
     headers: {
       'x-bikri-pending': await pendingHeader(db),
+      'x-bikri-schema': String(CLIENT_SCHEMA_VERSION),
       ...(options.headers ?? {}),
     },
   });

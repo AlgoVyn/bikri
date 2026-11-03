@@ -242,6 +242,8 @@ describe('shop admin (T-038, 04 §3.8)', () => {
         })
       ).status,
     ).toBe(404);
+    // Both issuing and cancelling a code are audited in the shop.
+    expect(await auditCount(a.tenantId, 'device_enrol_code')).toBe(2);
 
     const renamed = await shopApi(a, s, `/shop/devices/${a.till.id}`, {
       method: 'PATCH',

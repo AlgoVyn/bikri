@@ -1,4 +1,4 @@
-import { type Code128, encodeCode128 } from './code128.ts';
+import { BarcodeError, type Code128, encodeCode128 } from './code128.ts';
 
 export type LabelSizeId = '50x25' | '38x25' | '40x30' | 'a4';
 
@@ -49,7 +49,7 @@ export const LABEL_SIZES: Record<LabelSizeId, LabelSize> = {
 export type RenderDpi = 203 | 300;
 
 export class LabelError extends Error {
-  readonly code: 'too_long' | 'charset';
+  readonly code: 'too_long' | 'empty' | 'charset';
   constructor(code: LabelError['code']) {
     super(code);
     this.name = 'LabelError';
@@ -88,7 +88,9 @@ export function barcodeLabelSvg(
   let code: Code128;
   try {
     code = encodeCode128(value);
-  } catch {
+  } catch (error) {
+    if (error instanceof BarcodeError && error.code === 'empty')
+      throw new LabelError('empty');
     throw new LabelError('charset');
   }
   const mm = moduleMm(size, code.modules, dpi);

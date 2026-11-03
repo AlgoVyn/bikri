@@ -464,22 +464,59 @@ describe('void rules (05 §5, D-044)', () => {
       .run();
     const sales = [1, 2].map((seq) => saleOps(shop, shop.till, seq));
     await pushOk(shop.till, sales.flat());
-    const voidOf = (seq: number, staff: string, date: string) =>
-      op('sale_voids', 'insert', {
-        id: newId(),
-        sale_id: sales[seq - 1]?.[0]?.row?.id,
-        reason: 'Wrong item',
-        replacement_sale_id: null,
-        device_id: shop.till.id,
-        staff_id: staff,
-        business_date: date,
-        created_at: Date.now(),
-      });
-    const late = await pushOk(shop.till, [voidOf(1, manager, '2026-10-28')]);
+    const voidOf = (seq: number, staff: string, date: string) => {
+      const saleId = String(sales[seq - 1]?.[0]?.row?.id ?? '');
+      const tx = newId();
+      return [
+        op(
+          'sale_voids',
+          'insert',
+          {
+            id: newId(),
+            sale_id: saleId,
+            reason: 'Wrong item',
+            replacement_sale_id: null,
+            device_id: shop.till.id,
+            staff_id: staff,
+            business_date: date,
+            created_at: Date.now(),
+          },
+          { tx_id: tx },
+        ),
+        op(
+          'payments',
+          'insert',
+          {
+            id: newId(),
+            direction: 'out',
+            method: 'cash',
+            purpose: 'void',
+            amount: 150000,
+            cash_tendered: null,
+            change_given: null,
+            reference: '',
+            sale_id: saleId,
+            refund_id: null,
+            purchase_id: null,
+            supplier_return_id: null,
+            party_type: null,
+            party_id: null,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: staff,
+            business_date: date,
+            created_at: Date.now(),
+          },
+          { tx_id: tx },
+        ),
+      ];
+    };
+    const late = await pushOk(shop.till, voidOf(1, manager, '2026-10-28'));
     expect(late.results[0]?.error_code).toBe('FORBIDDEN');
-    const same = await pushOk(shop.till, [voidOf(1, manager, '2026-10-27')]);
+    const same = await pushOk(shop.till, voidOf(1, manager, '2026-10-27'));
     expect(same.results[0]?.error_code ?? null).toBeNull();
-    const owner = await pushOk(shop.till, [voidOf(2, IDS.owner, '2026-10-29')]);
+    const owner = await pushOk(shop.till, voidOf(2, IDS.owner, '2026-10-29'));
     expect(owner.results[0]?.error_code ?? null).toBeNull();
   });
 
@@ -590,17 +627,50 @@ describe('void rules (05 §5, D-044)', () => {
       }),
     ]);
     const voidId = newId();
+    const voidTx = newId();
     const res = await pushOk(shop.till, [
-      op('sale_voids', 'insert', {
-        id: voidId,
-        sale_id: sale[0]?.row?.id,
-        reason: 'Wrong item',
-        replacement_sale_id: null,
-        device_id: shop.till.id,
-        staff_id: IDS.owner,
-        business_date: '2026-10-27',
-        created_at: Date.now(),
-      }),
+      op(
+        'sale_voids',
+        'insert',
+        {
+          id: voidId,
+          sale_id: sale[0]?.row?.id,
+          reason: 'Wrong item',
+          replacement_sale_id: null,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: '2026-10-27',
+          created_at: Date.now(),
+        },
+        { tx_id: voidTx },
+      ),
+      op(
+        'payments',
+        'insert',
+        {
+          id: newId(),
+          direction: 'out',
+          method: 'cash',
+          purpose: 'void',
+          amount: 150000,
+          cash_tendered: null,
+          change_given: null,
+          reference: '',
+          sale_id: sale[0]?.row?.id,
+          refund_id: null,
+          purchase_id: null,
+          supplier_return_id: null,
+          party_type: null,
+          party_id: null,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: '2026-10-27',
+          created_at: Date.now(),
+        },
+        { tx_id: voidTx },
+      ),
     ]);
     expect(res.results[0]?.error_code ?? null).toBeNull();
     expect(
@@ -926,7 +996,47 @@ describe('supplier return rows (04 §5)', () => {
         ...lines.map((l) =>
           op('supplier_return_lines', 'insert', l, { tx_id: t }),
         ),
-        ...pays.map((p) => op('payments', 'insert', p, { tx_id: t })),
+        op(
+          'ledger_entries',
+          'insert',
+          {
+            id: newId(),
+            party_type: 'supplier',
+            party_id: head.supplier_id,
+            amount: -Number(head.total),
+            source_type: 'supplier_return',
+            source_id: head.id,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: Date.now(),
+          },
+          { tx_id: t },
+        ),
+        ...pays.flatMap((p) => [
+          op('payments', 'insert', p, { tx_id: t }),
+          op(
+            'ledger_entries',
+            'insert',
+            {
+              id: newId(),
+              party_type: 'supplier',
+              party_id: head.supplier_id,
+              amount: Number(p.amount),
+              source_type: 'payment',
+              source_id: p.id,
+              note: '',
+              branch_id: shop.branchId,
+              device_id: shop.till.id,
+              staff_id: IDS.owner,
+              business_date: '2026-10-27',
+              created_at: Date.now(),
+            },
+            { tx_id: t },
+          ),
+        ]),
       ]);
       return res.results[0]?.error_code ?? null;
     };
@@ -1075,6 +1185,25 @@ describe('supplier return rows (04 §5)', () => {
           },
           { tx_id: t },
         ),
+        op(
+          'ledger_entries',
+          'insert',
+          {
+            id: newId(),
+            party_type: 'supplier',
+            party_id: supplier,
+            amount: -3000,
+            source_type: 'supplier_return',
+            source_id: id,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: device,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: Date.now(),
+          },
+          { tx_id: t },
+        ),
       ];
     };
     const wrong = await pushOk(shop.till, ret(other));
@@ -1083,7 +1212,7 @@ describe('supplier return rows (04 §5)', () => {
     const b = await pushOk(shop.admin, ret(IDS.supplier, shop.admin.id));
     expect(
       [...a.results, ...b.results].map((r) => r.error_code ?? null),
-    ).toEqual([null, null, null, null]);
+    ).toEqual([null, null, null, null, null, null]);
     expect(
       await count(
         "SELECT COUNT(*) AS n FROM sync_conflicts WHERE tenant_id = ?1 AND kind = 'over_return'",

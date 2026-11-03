@@ -51,6 +51,23 @@ export default defineConfig({
   build: {
     outDir: `dist${BASE_PATH}`,
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Keep operator-console code in its own folder so the service worker can
+        // exclude it from the till precache. Route chunks in `_id.lazy-*` share a
+        // generic name with shop routes; module ids are the only reliable marker.
+        chunkFileNames: (chunk) => {
+          const ids = chunk.moduleIds ?? [];
+          const admin = ids.some(
+            (id) =>
+              id.includes('/src/admin/') || id.includes('/src/routes/admin/'),
+          );
+          return admin
+            ? 'assets/admin/[name]-[hash].js'
+            : 'assets/[name]-[hash].js';
+        },
+      },
+    },
   },
   server: {
     port: 5173,

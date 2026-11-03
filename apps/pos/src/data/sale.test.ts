@@ -275,6 +275,39 @@ describe('sale recipe (02 §5)', () => {
     expect(line?.below_cost).toBe(1);
   });
 
+  it('links a price approval to the sale line id, not the cart key', async () => {
+    const { db, ctx, phone } = await shopWithStock('sale-price-audit');
+    const cartId = 'c-price' as Cart['id'];
+    let cart = addProduct(emptyCart(cartId), phone, 1000, 'avg');
+    const cartKey = String(cart.lines[0]?.key);
+    cart = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      bound_line: cartKey,
+      bound_price: 4_000_000,
+      bound_cart: cartSignature(cart),
+    });
+    const { sale: stored } = await completeSale(
+      db,
+      sale(
+        {
+          ...cart,
+          lines: cart.lines.map((l) => ({ ...l, unit_price: 4_000_000 })),
+        },
+        [{ method: 'cash', amount: 4_000_000 }],
+        { cartId },
+      ),
+      ctx,
+      NOW,
+    );
+    const line = await db.sale_lines.where('sale_id').equals(stored.id).first();
+    expect(line?.id).not.toBe(cartKey);
+    const audit = (await db.audit_log.toArray()).find(
+      (row) => row.action === 'override',
+    );
+    expect(JSON.parse(String(audit?.after_json)).bound_line).toBe(line?.id);
+  });
+
   it('refuses a hard-limit udhaar sale until a matching override is present', async () => {
     const { db, ctx, phone, buds } = await shopWithStock('hard-limit');
     const customer = await createCustomer(

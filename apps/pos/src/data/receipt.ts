@@ -184,16 +184,16 @@ export async function receiptShop(
       phone: text(row?.phone),
       receiptHeader: text(row?.receipt_header),
       receiptFooter: text(row?.receipt_footer),
-      showPaymentDetails: row?.show_payment_details !== 0,
-      showCashierOnReceipt: row?.show_cashier_on_receipt !== 0,
+      showPaymentDetails: Number(row?.show_payment_details ?? 1) !== 0,
+      showCashierOnReceipt: Number(row?.show_cashier_on_receipt ?? 1) !== 0,
       taxLabel:
         text(row?.tax_label) ||
         (receiptLanguage === 'ur' ? 'سیلز ٹیکس' : 'Sales tax'),
       numberGrouping: row?.number_grouping === 'lakh' ? 'lakh' : 'intl',
       ntn: text(row?.ntn),
       strn: text(row?.strn),
-      printWarranty: row?.print_warranty !== 0,
-      showYouSaved: row?.show_you_saved === 1,
+      printWarranty: Number(row?.print_warranty ?? 1) !== 0,
+      showYouSaved: Number(row?.show_you_saved ?? 0) === 1,
       timeZone: text(row?.timezone) || 'Asia/Karachi',
     },
   };

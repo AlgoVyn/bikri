@@ -86,6 +86,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 503 | `TENANT_QUOTA` | The caller's tenant reached its `daily_write_budget` for the UTC day ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)); `Retry-After` = seconds to 00:00 UTC; client keeps ops |
 | 503 | `D1_LIMIT` | D1 daily free limit of the account reached (all tenants); client keeps ops and retries after `Retry-After` |
 | 503 | `EMAIL_UNAVAILABLE` | The owner sign-in email could not be sent (owner email missing or not a verified destination address, or Cloudflare error) |
+| 507 | `TENANT_STORAGE_FULL` | The caller's tenant reached its 1 GB R2 file cap; the till marks the upload failed instead of retrying forever (it never blocks other files) |
 
 Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNIQUE_VIOLATION`, `FOREIGN_KEY`, `FORBIDDEN`, `IMMUTABLE_TABLE` (update/delete attempted on a ledger table), `UNKNOWN_TABLE`, `SETUP_ALREADY_DONE` (a `shop` insert when `setup_completed_at` is already set).
 
@@ -171,7 +172,7 @@ Creates the tenant, its default branch (`Main` / `INV`), its expense categories 
 
 `POST /api/admin/tenants/:id/enrolment-codes` `{ "device_name", "branch_id"?, "grants_admin": true }` → `201 { "code", "expires_at", "link" }` (72 h when `grants_admin`, else 15 min).
 
-`POST /api/admin/tenants/:id/files/gc` `{ "dry_run"?: true }` → `200 { "examined", "unreferenced", "deleted", "bytes" }`. Lists `t/<tenant>/` and deletes objects not referenced by `products.image_key` or `shop.logo_key` and at least 24 h old; `dry_run` defaults to `true`. Writes `operator_file_gc` in the tenant.
+`POST /api/admin/tenants/:id/files/gc` `{ "dry_run"?: true }` → `200 { "examined", "unreferenced", "deleted", "bytes" }`. Lists `t/<tenant>/` and deletes objects not referenced by a live (`deleted_at IS NULL`) `products.image_key` or `shop.logo_key` and at least 24 h old; a soft-deleted product releases its image. `dry_run` defaults to `true`. Writes `operator_file_gc` in the tenant.
 
 `GET /api/admin/tenants/:id/export?tbl=&after=&limit=` → same shapes as the snapshot ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)), for that tenant; the first call (no `tbl`) captures the server cutoff as `exported_at` and also writes an `audit_log` row `operator_export` in the tenant. Pages use `before=<exported_at>`. `devices.token_hash` and `devices.enrolled_by` are never exported.
 
@@ -267,20 +268,22 @@ export const PullQuery = z.object({
 | `tbl` is a master or ledger table | all ops | `UNKNOWN_TABLE` |
 | `created_at` ≤ server time + 24 h | all inserts | `CONSTRAINT_FAILED` |
 | Staff role permits the action ([05 §5](05-auth-and-roles.md#5-server-side-enforcement)) | refunds, voids, staff/shop/branch upserts, deletes | `FORBIDDEN` |
-| The branch exists; the invoice's device code is the device's current or historical code; a sale for another branch is accepted only when it was created before the device's branch move | `sales` | `CONSTRAINT_FAILED` |
+| The branch exists; the invoice's device code is the device's current or historical code. A sale may carry a different branch than the device's current one (a till that was offline during a branch move keeps selling on the branch it knew); the invoice code proves the device wrote it | `sales` | `CONSTRAINT_FAILED` |
 | Ledger table with kind ≠ insert | all | `IMMUTABLE_TABLE` |
 | Refund qty per line ≤ sold qty − already refunded | `refund_lines` | **accepted**, plus a `sync_conflicts` row `over_refund` ([03 §5](03-sync.md#5-conflict-rules)); a refund or void arriving for an already-voided sale → `refund_after_void`. Real money events are never rejected. |
-| Refund split: `udhaar_part` ≤ the sale's remaining udhaar, and `udhaar_part > 0` only if the sale has a customer | `refunds` | `CONSTRAINT_FAILED` (an `amount` above the remaining paid amount is **accepted** and flagged `over_refund`, like any real money event) |
+| Refund split: `udhaar_part` ≤ the sale's remaining udhaar, and `udhaar_part > 0` only if the sale has a customer. Within the remaining paid amount, `amount`/`rounding` must match the documented cash nearest/down/none results or the card/bank exact/capped result; an `amount` above the remaining paid amount is **accepted** and flagged `over_refund`, like any real money event | `refunds` | `CONSTRAINT_FAILED` |
 | `refunds.amount > 0` has exactly one `payments` row (out, `refund`, same method and amount) and `udhaar_part > 0` exactly one customer `ledger_entries` row (−udhaar_part), in the same batch or already stored | `refunds` | `CONSTRAINT_FAILED` |
 | `supplier_return_lines.line_total = mulDivRound(qty_milli, unit_credit, 1000)`, `Σ line_total = supplier_returns.total`, `line_count` matches; a linked `purchase_line_id` belongs to a purchase of the same `supplier_id` | `supplier_returns`, `supplier_return_lines` | `CONSTRAINT_FAILED` (returned qty above received − already returned is **accepted** and flagged `over_return`) |
 | `supplier_returns.refund_received > 0` has exactly one `payments` row (in, `supplier_refund`, same method and amount, `supplier_return_id`), in the same batch or already stored | `supplier_returns` | `CONSTRAINT_FAILED` |
-| Every `ledger_entries` row is backed by its source row in the same batch (sale, refund, void, payment, purchase or supplier return), with the source's customer/supplier and amount | `ledger_entries` | `CONSTRAINT_FAILED` |
+| Every `ledger_entries` row is backed by its source row in the same batch (sale, refund, void, payment, purchase or supplier return), with the source's customer/supplier and amount; an `opening` balance only arrives with its new party in the same batch | `ledger_entries` | `CONSTRAINT_FAILED` |
 | A `customer`/`supplier` party exists in the tenant (in D1 or earlier in the same push); payment directions match their purpose (`sale`/`customer_payment`/`supplier_refund` are `in`, `refund`/`void`/`supplier_payment`/`purchase_paid_now` are `out`) | `payments`, `ledger_entries` | `CONSTRAINT_FAILED` |
 | At least one active owner remains after the action | `staff` | `CONSTRAINT_FAILED` |
 | `payments.purpose` that names a document (`sale`, `refund`, `purchase_paid_now`, `supplier_refund`, `void`) has that document in the same batch; customer/supplier payments have their `ledger_entries` row in the same batch | `payments` | `CONSTRAINT_FAILED` |
 | Child lines (`sale_lines`, `refund_lines`, `purchase_lines`, `supplier_return_lines`) have their parent header in the same batch | child rows | `CONSTRAINT_FAILED` |
-| `day_closes.period_end = created_at`, `period_start ≤ period_end`, and the staff has `dayclose.create` | `day_closes` | `CONSTRAINT_FAILED` / `FORBIDDEN` |
-| Stock movements have the sign required by their reason (`sale`/`supplier_return` negative, `opening`/`purchase`/receipts positive) and a non-negative integer cost for stock-adding reasons | `stock_movements` | `CONSTRAINT_FAILED` |
+| `day_closes.period_end = created_at`, `period_start ≤ period_end`, the period starts at the device's previous close (`period_start` = its `period_end`, `opening_cash` = its `counted_cash`) and one close per device/period, and the staff has `dayclose.create`. The cash components and expected/difference are recomputed from the period's cash payments, cash moves and cash expenses (D1 plus rows in the same push) | `day_closes` | `CONSTRAINT_FAILED` / `FORBIDDEN` |
+| Sale money is recomputed, not trusted: line gross/discount/net, bill discount from its type/value, tax from the snapshot rate, per-line allocations (cart order), rounding (shop step for sales rung after the last settings change, whose rate/mode must also match the shop), and cash tender/change (`cash_tendered ≥ cash applied`, `change = tendered − applied`; only cash may exceed the amount due) | `sales`, `sale_lines`, `payments` | `CONSTRAINT_FAILED` |
+| Stock movements have the sign required by their reason (`sale`/`supplier_return` negative, `opening`/`purchase`/receipts positive) and a non-negative integer cost for stock-adding reasons. A sale, purchase, supplier return, refund restock or void of a tracked product must carry its movement; if the till omitted it, the Worker writes the missing row in the same batch (money rows are never rejected for this) | `stock_movements` | `CONSTRAINT_FAILED`; a missing row is repaired server-side |
+| A refund, void/reissue, supplier return and a day-close difference carry their audit row; the Worker compares its amounts/ids with the event and writes the canonical row itself when it is missing | `audit_log` | `CONSTRAINT_FAILED` |
 | Ops imported through `POST /api/shop/import-ops` or `/api/admin/tenants/:id/import-ops` | ops of a revoked device of that tenant | `device_id` must be that revoked device instead of the caller |
 
 ## 6. Rate limits

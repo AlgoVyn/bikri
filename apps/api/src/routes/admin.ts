@@ -562,6 +562,12 @@ admin.get('/tenants/:id/owners', async (c) => {
 admin.get('/tenants/:id/export', async (c) => {
   const { tenant, db } = c.var;
   const exportedAt = Date.now();
+  if (c.req.query('tbl') && !c.req.query('before'))
+    throw new ApiError(
+      'VALIDATION_FAILED',
+      400,
+      'Export pages need the exported_at cutoff',
+    );
   const payload = await snapshotPayload(
     (k) => c.req.query(k) ?? (k === 'before' ? String(exportedAt) : undefined),
     db,
@@ -659,13 +665,19 @@ function assertMaintenance(tenant: TenantRow): void {
     throw new ApiError('NOT_IN_MAINTENANCE', 409, 'Turn maintenance on first');
 }
 
-/** Tables purged by a restore, children first. Devices, codes and branches stay (D-105). */
+/**
+ * Tables purged by a restore, children first. Devices, codes and branches stay (D-105), and
+ * `audit_log` stays: it is append-only (AGENTS.md) and `maintenance off` reads the last
+ * `tenant_status_change` from it to restore the shop's previous status.
+ */
 export const PURGE_ORDER = [
   'change_log',
   'applied_ops',
   'sync_conflicts',
   'owner_email_codes',
-  ...[...APPLY_ORDER].reverse().filter((t) => t !== 'branches'),
+  ...[...APPLY_ORDER]
+    .reverse()
+    .filter((t) => t !== 'branches' && t !== 'audit_log'),
 ] as const;
 
 admin.post('/tenants/:id/purge', async (c) => {
@@ -748,11 +760,11 @@ admin.post('/tenants/:id/import', async (c) => {
   }
   try {
     await db.batch(stmts);
-  } catch (e) {
+  } catch {
     throw new ApiError(
       'CONSTRAINT_FAILED',
       400,
-      String((e as Error).message).slice(0, 200),
+      'The export rows do not satisfy the shop schema',
     );
   }
   await db.batch(

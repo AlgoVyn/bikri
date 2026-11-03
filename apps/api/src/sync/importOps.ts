@@ -3,10 +3,12 @@ import type { TenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import { takeRowsRead } from '../platform/readCounter.ts';
 import { usageStatement } from '../platform/tenants.ts';
+import { assertQuota } from '../routes/sync.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
 import { applyOps, CallBudget } from './applyOps.ts';
 import { latestSeq } from './changeLog.ts';
 import type { PushOp } from './opSchema.ts';
+import { supportPayload, tenantStatusPayload } from './status.ts';
 
 /** Whole transactions created before `limit` (read-only shops import only those, 13 §7.2). */
 export function opsBefore(ops: PushOp[], limit: number): PushOp[] {
@@ -39,6 +41,7 @@ export async function importOps(
       403,
       'Only a revoked device’s ops can be imported',
     );
+  await assertQuota(env, tenant, now);
   const eligible =
     tenant.status === 'read_only' && tenant.status_changed_at !== null
       ? opsBefore(ops, tenant.status_changed_at)
@@ -61,5 +64,7 @@ export async function importOps(
     results: outcome.results,
     server_time: now,
     latest_seq: await latestSeq(db, tenant.change_log_floor),
+    tenant_status: tenantStatusPayload(tenant),
+    support: supportPayload(tenant, now),
   };
 }

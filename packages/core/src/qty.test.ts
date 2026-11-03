@@ -32,5 +32,11 @@ describe('formatQtyFromMilli', () => {
     expect(formatQtyFromMilli(1500, 'm')).toBe('1.5');
     expect(formatQtyFromMilli(1234, 'm')).toBe('1.234');
     expect(formatQtyFromMilli(1000, 'kg')).toBe('1');
+    expect(formatQtyFromMilli(-1000, 'pc')).toBe('-1');
+    expect(formatQtyFromMilli(-500, 'm')).toBe('-0.5');
+    expect(() => formatQtyFromMilli(1500, 'pc')).toThrow(/fractional/);
+    expect(() => formatQtyFromMilli(Number.MAX_SAFE_INTEGER + 1, 'm')).toThrow(
+      /safe integer/,
+    );
   });
 });

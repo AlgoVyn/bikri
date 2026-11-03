@@ -257,12 +257,16 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
     const purchase = text(row.purchase_id);
     const sret = text(row.supplier_return_id);
     let key = `pay:${String(row.id)}`;
+    // A refund payment carries BOTH sale_id and refund_id; the refund document owns it.
+    // Grouping it under the sale would split it from the refund it pays for and make both
+    // transactions fail server-side after a restore (the sale group cannot see the refund
+    // header, and the refund group has no payment).
     if (sale && row.purpose === 'void')
       key = `void:${voidBySale.get(sale) ?? sale}`;
-    else if (sale) key = `sale:${sale}`;
     else if (refund) key = `refund:${refund}`;
-    else if (purchase) key = `purchase:${purchase}`;
     else if (sret) key = `sret:${sret}`;
+    else if (purchase) key = `purchase:${purchase}`;
+    else if (sale) key = `sale:${sale}`;
     paymentGroup.set(String(row.id), key);
   }
 

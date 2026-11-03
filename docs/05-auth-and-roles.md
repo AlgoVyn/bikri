@@ -126,6 +126,7 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 | insert `refunds` | staff has `refund.create`, or an `audit_log` row `action = 'override'`, `entity = 'refunds'`, `entity_id = <refund id>`, `after_json.permission = 'refund.create'`, whose `approved_by` staff has the permission, is applied in the **same batch** (the refund op is applied only together with it) |
 | insert `sale_voids` | `sale.void` (or override, same linking rule); a manager only when the sale's `business_date` equals the void's `business_date` |
 | insert `sale_lines` with `below_cost = 1` | the sale's staff has `sale.below_cost`, or an override audit row for the sale (same linking rule) |
+| insert `sales` | `sale.create`; a line priced below the product's current price needs `catalog.edit` or a line-bound override; any discount needs `sale.discount`, and a discount above the staff's `max_discount_bp` needs an override; udhaar needs `sale.udhaar` |
 | insert `expenses` | `expense.create`; for a cashier: `method = 'cash'` and `amount ≤ 200000` (Rs 2,000) unless overridden |
 | insert `supplier_returns` (and its lines, payment, ledger rows) | staff has `purchase.create` |
 | insert `ledger_entries` | `opening`/`sale`/`refund`/`void`/`payment`/`purchase`/`supplier_return` must carry the source document in the same transaction; `adjustment` is owner/manager only |
@@ -174,4 +175,4 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 
 `override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `drawer_open`, `price_change`, `cost_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_file_gc`, `operator_import`, `tenant_restore`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
 
-Each row stores `before_json`/`after_json` with only the changed fields and belongs to one tenant. The shop owner sees that shop's log in Settings → Activity (filter by action, staff, date; CSV export).
+Each row stores `before_json`/`after_json` with only the changed fields and belongs to one tenant. The shop owner sees that shop's log in Settings → Activity (filter by action, staff, date; CSV export). For a refund, void/reissue, supplier return and a day-close difference the Worker checks the row's ids/amounts against the event and writes the canonical row itself if the till did not send one.

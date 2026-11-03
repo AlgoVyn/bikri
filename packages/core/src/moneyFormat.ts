@@ -78,8 +78,8 @@ export function formatMoney(
   paisa: number,
   grouping: NumberGrouping = 'intl',
 ): string {
-  if (!Number.isInteger(paisa)) {
-    throw new Error('formatMoney expects integer paisa');
+  if (!Number.isSafeInteger(paisa)) {
+    throw new Error('formatMoney expects safe integer paisa');
   }
   const negative = paisa < 0;
   const absolute = Math.abs(paisa);

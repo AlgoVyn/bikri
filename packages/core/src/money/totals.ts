@@ -218,14 +218,8 @@ export function allocateRounding(
     }
     remaining -= used;
   }
-  if (remaining > 0) {
-    const parts = allocate(
-      remaining,
-      bases.map((base) => Math.max(0, base)),
-    );
-    for (let index = 0; index < parts.length; index += 1)
-      out[index] = (out[index] as number) - (parts[index] as number);
-  }
+  if (remaining > 0)
+    throw new RangeError('rounding exceeds the value of the lines');
   return out;
 }
 
@@ -237,8 +231,11 @@ export function computeCart(input: CartInput): CartResult {
   const taxRate = input.tax_rate_bp ?? 0;
   assertSafeInteger(step, 'round_total_to');
   assertSafeInteger(taxRate, 'tax_rate_bp');
-  if (taxRate < 0) {
-    throw new RangeError('tax_rate_bp must be non-negative');
+  if (![1, 100, 500, 1000].includes(step)) {
+    throw new RangeError('round_total_to must be 1, 100, 500 or 1000');
+  }
+  if (taxRate < 0 || taxRate > 5000) {
+    throw new RangeError('tax_rate_bp must be between 0 and 5000');
   }
 
   const priced = input.lines.map((line) => priceLine(line, costMethod));

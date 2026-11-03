@@ -114,6 +114,9 @@ export function buildRefundReceipt(
     blocks.push({ t: 'rule', char: '-' });
     pushFooter(blocks, footer);
   }
+  if (settings.qr === true && input.originalInvoiceNo.trim().length > 0) {
+    blocks.push({ t: 'qr', data: input.originalInvoiceNo.trim() });
+  }
   const cashBack = input.method === 'cash' && input.amount > 0;
   pushPoweredBy(blocks);
   pushJobEnd(blocks, settings.drawer !== false && cashBack);

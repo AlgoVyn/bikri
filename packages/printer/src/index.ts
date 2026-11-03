@@ -94,7 +94,9 @@ export type {
   RefundReceipt,
   SupplierReturnLabels,
   SupplierReturnReceipt,
+  VoidReceipt,
 } from './templates/types.ts';
+export { buildVoidNotice } from './templates/void.ts';
 export type {
   Align,
   Block,

@@ -9,7 +9,8 @@ export type ErrorStatus =
   | 415
   | 429
   | 500
-  | 503;
+  | 503
+  | 507;
 
 export class ApiError extends Error {
   readonly code: string;

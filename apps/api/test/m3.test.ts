@@ -89,6 +89,20 @@ function purchase(
       landed_unit_cost: unitCost,
       created_at: now,
     },
+    ledger: {
+      id: newId(now),
+      party_type: 'supplier',
+      party_id: IDS.supplier,
+      amount: lineTotal,
+      source_type: 'purchase',
+      source_id: purchaseId,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: staffId,
+      business_date: '2026-10-27',
+      created_at: now,
+    },
   };
 }
 
@@ -168,6 +182,7 @@ describe('M3 server rules', () => {
         tx_id: buyTx,
       }),
       op('purchase_lines', 'insert', buy.line, { tx_id: buyTx }),
+      op('ledger_entries', 'insert', buy.ledger, { tx_id: buyTx }),
       op(
         'stock_movements',
         'insert',
@@ -175,7 +190,7 @@ describe('M3 server rules', () => {
         { tx_id: buyTx },
       ),
     ]);
-    expect(codes(received)).toEqual([null, null, null]);
+    expect(codes(received)).toEqual([null, null, null, null]);
     expect(await product(shop, id)).toEqual({
       avg_cost: 13333,
       last_cost: 20000,
@@ -242,10 +257,16 @@ describe('M3 server rules', () => {
       ...sale[0]!.row,
       paid_total: 70000,
       udhaar_amount: 80000,
+      cash_tendered: 70000,
     };
     const saleId = String(sale[0]!.row?.id);
     const tx = sale[0]!.tx_id;
-    sale[2]!.row = { ...sale[2]!.row, amount: 70000 };
+    sale[2]!.row = {
+      ...sale[2]!.row,
+      amount: 70000,
+      cash_tendered: 70000,
+      change_given: 0,
+    };
     sale.push(
       op(
         'ledger_entries',
@@ -334,10 +355,16 @@ describe('M3 server rules', () => {
       ...sale[0]!.row,
       paid_total: 100000,
       udhaar_amount: 50000,
+      cash_tendered: 100000,
     };
     const saleId = String(sale[0]!.row?.id);
     const tx = sale[0]!.tx_id;
-    sale[2]!.row = { ...sale[2]!.row, amount: 100000 };
+    sale[2]!.row = {
+      ...sale[2]!.row,
+      amount: 100000,
+      cash_tendered: 100000,
+      change_given: 0,
+    };
     sale.push(
       op(
         'ledger_entries',
@@ -369,36 +396,75 @@ describe('M3 server rules', () => {
     expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
   });
 
-  it('treats a second void of the same sale as an idempotent no-op', async () => {
+  it('rejects a second void of the same sale instead of half-applying it', async () => {
     const shop = await seedShop('Void');
     const sale = saleOps(shop, shop.till, 1);
     const pushedSale = await pushOk(shop.till, sale);
     expect(codes(pushedSale)).toEqual([null, null, null]);
     const saleId = String(sale[0]!.row?.id);
-    const voidRow = (id: string) => ({
-      id,
-      sale_id: saleId,
-      reason: 'Changed mind',
-      replacement_sale_id: null,
-      device_id: shop.till.id,
-      staff_id: IDS.owner,
-      business_date: '2026-10-27',
-      created_at: now,
-    });
-    const first = await pushOk(shop.till, [
-      op('sale_voids', 'insert', voidRow(newId(now))),
-    ]);
-    expect(codes(first)).toEqual([null]);
-    const second = await pushOk(shop.till, [
-      op('sale_voids', 'insert', voidRow(newId(now))),
-    ]);
-    expect(codes(second)).toEqual([null]);
+    const voidOps = (id: string) => {
+      const tx = newId(now);
+      return [
+        op(
+          'sale_voids',
+          'insert',
+          {
+            id,
+            sale_id: saleId,
+            reason: 'Changed mind',
+            replacement_sale_id: null,
+            device_id: shop.till.id,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: now,
+          },
+          { tx_id: tx },
+        ),
+        op(
+          'payments',
+          'insert',
+          {
+            id: newId(now),
+            direction: 'out',
+            method: 'cash',
+            purpose: 'void',
+            amount: 150000,
+            cash_tendered: null,
+            change_given: null,
+            reference: '',
+            sale_id: saleId,
+            refund_id: null,
+            purchase_id: null,
+            supplier_return_id: null,
+            party_type: null,
+            party_id: null,
+            note: '',
+            branch_id: shop.branchId,
+            device_id: shop.till.id,
+            staff_id: IDS.owner,
+            business_date: '2026-10-27',
+            created_at: now,
+          },
+          { tx_id: tx },
+        ),
+      ];
+    };
+    const first = await pushOk(shop.till, voidOps(newId(now)));
+    expect(codes(first)).toEqual([null, null]);
+    const second = await pushOk(shop.till, voidOps(newId(now)));
+    expect(codes(second)).toEqual(['CONSTRAINT_FAILED', 'CONSTRAINT_FAILED']);
     const count = await env.DB.prepare(
       'SELECT COUNT(*) AS n FROM sale_voids WHERE tenant_id = ?1 AND sale_id = ?2',
     )
       .bind(shop.tenantId, saleId)
       .first<{ n: number }>();
     expect(count).toEqual({ n: 1 });
+    const voidPayments = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM payments WHERE tenant_id = ?1 AND sale_id = ?2 AND purpose = 'void'",
+    )
+      .bind(shop.tenantId, saleId)
+      .first<{ n: number }>();
+    expect(voidPayments).toEqual({ n: 1 });
   });
 
   it('validates expense reversals and allows a cashier to reverse a manager expense', async () => {

@@ -1,4 +1,10 @@
-import { businessDate, generateSku, newId, type OpRow } from '@bikri/core';
+import {
+  businessDate,
+  generateSku,
+  newId,
+  type OpRow,
+  refundedRevenue,
+} from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { type Photo, photoKey } from '../products/photo.ts';
@@ -255,12 +261,14 @@ export async function productDetail(
   const byId = new Map(
     sales.filter((s) => s.status !== 'void').map((s) => [s.id, s]),
   );
+  const productLines: { line: SyncedRow; sale: SyncedRow }[] = [];
   for (const line of await db.sale_lines
     .where('product_id')
     .equals(id)
     .toArray()) {
     const sale = byId.get(String(line.sale_id));
     if (!sale) continue;
+    productLines.push({ line, sale });
     const day = days.find((d) => d.date === sale.business_date);
     if (!day) continue;
     day.qty += Number(line.qty_milli);
@@ -268,33 +276,51 @@ export async function productDetail(
     // would rewrite history after a tax setting change.
     day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
   }
-  const refunds = await db.refunds
-    .where('business_date')
-    .between(first, last, true, true)
-    .toArray();
-  if (refunds.length > 0) {
-    const refundLines = await db.refund_lines
-      .where('refund_id')
-      .anyOf(refunds.map((refund) => String(refund.id)))
-      .toArray();
-    const saleLines = new Map(
+  // Refund revenue is the cumulative ex-tax share of the line final (07 §6); using
+  // refund_lines.amount would subtract tax/rounding that was never in revenue.
+  const allRefundLines =
+    productLines.length === 0
+      ? []
+      : await db.refund_lines
+          .where('sale_line_id')
+          .anyOf(productLines.map(({ line }) => String(line.id)))
+          .toArray();
+  if (allRefundLines.length > 0) {
+    const allRefunds = new Map(
       (
-        await db.sale_lines.bulkGet(
-          refundLines.map((line) => String(line.sale_line_id)),
-        )
+        await db.refunds.bulkGet([
+          ...new Set(allRefundLines.map((line) => String(line.refund_id))),
+        ])
       )
-        .filter((line): line is SyncedRow => line !== undefined)
-        .map((line) => [String(line.id), line]),
+        .filter((refund): refund is SyncedRow => refund !== undefined)
+        .map((refund) => [String(refund.id), refund]),
     );
-    for (const line of refundLines) {
-      const saleLine = saleLines.get(String(line.sale_line_id));
-      if (!saleLine || saleLine.product_id !== id) continue;
-      const refund = refunds.find((row) => row.id === line.refund_id);
-      if (!refund) continue;
-      const day = days.find((d) => d.date === String(refund.business_date));
-      if (!day) continue;
-      day.qty = Math.max(0, day.qty - Number(line.qty_milli));
-      day.revenue -= Number(line.amount);
+    for (const { line, sale } of productLines) {
+      const forLine = allRefundLines
+        .filter((refundLine) => String(refundLine.sale_line_id) === line.id)
+        .sort(
+          (a, b) =>
+            Number(a.created_at) - Number(b.created_at) ||
+            String(a.id).localeCompare(String(b.id)),
+        );
+      let previous = 0;
+      for (const refundLine of forLine) {
+        const refund = allRefunds.get(String(refundLine.refund_id));
+        if (refund) {
+          const day = days.find((d) => d.date === String(refund.business_date));
+          const qty = Number(refundLine.qty_milli);
+          if (day) {
+            day.qty = Math.max(0, day.qty - qty);
+            day.revenue -= refundedRevenue(
+              lineRevenue(line, sale.tax_inclusive === 1),
+              Number(line.qty_milli),
+              previous,
+              qty,
+            );
+          }
+        }
+        previous += Number(refundLine.qty_milli);
+      }
     }
   }
   return {
@@ -694,16 +720,15 @@ export async function moveCategory(
       const rows = live(
         await w.table<MasterRow>('categories').orderBy('sort_order').toArray(),
       );
-      const ids = rows.map((r) => r.id);
-      const i = ids.indexOf(id);
+      const i = rows.findIndex((row) => row.id === id);
       const j = i + direction;
-      if (i < 0 || j < 0 || j >= ids.length) return;
-      [ids[i], ids[j]] = [ids[j] as string, ids[i] as string];
-      for (const [k, rowId] of ids.entries()) {
-        const row = rows.find((r) => r.id === rowId);
-        if (row && Number(row.sort_order) !== k + 1)
-          await w.update('categories', rowId, { sort_order: k + 1 });
-      }
+      const a = rows[i];
+      const b = rows[j];
+      if (!a || !b) return;
+      // Swap only the two positions; normalising the whole list would exceed the
+      // 200-op action limit on a large catalogue.
+      await w.update('categories', a.id, { sort_order: Number(b.sort_order) });
+      await w.update('categories', b.id, { sort_order: Number(a.sort_order) });
     },
     opts,
   );

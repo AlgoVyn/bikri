@@ -12,6 +12,12 @@ import { writeAction } from './write.ts';
 
 const n = (value: unknown): number => Number(value ?? 0);
 
+function refundValue(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0)
+    throw new SupplierReturnError('refund');
+  return value;
+}
+
 export class SupplierReturnError extends Error {
   readonly code:
     | 'supplier'
@@ -227,8 +233,9 @@ export async function planSupplierReturn(
         (purchase && purchaseLine.purchase_id !== purchase.id)
       )
         throw new SupplierReturnError('purchase');
-      const landed = n(purchaseLine.landed_unit_cost);
-      linkedCost = landed > 0 ? landed : null;
+      // Zero is a valid landed cost (free goods). Only a missing purchase line means
+      // "fall back to avg/last cost".
+      linkedCost = n(purchaseLine.landed_unit_cost);
     }
     if (
       line.unitCredit !== null &&
@@ -248,7 +255,7 @@ export async function planSupplierReturn(
     src.table('party_balances') as Table<{ balance: number }, [string, string]>
   ).get(['supplier', input.supplierId]);
   const balanceBefore = balance?.balance ?? 0;
-  const refundReceived = Math.max(0, input.refundReceived);
+  const refundReceived = refundValue(input.refundReceived);
   let priced: ReturnType<typeof computeSupplierReturn>;
   try {
     // 07 §10 lives in core; price the lines with the tested function.
@@ -309,7 +316,7 @@ export async function createSupplierReturn(
   const now = options.now ?? Date.now();
   const reason = input.reason.trim();
   const note = (input.note ?? '').trim().slice(0, 200);
-  const refundReceived = Math.max(0, input.refundReceived);
+  const refundReceived = refundValue(input.refundReceived);
   const refundMethod = refundReceived > 0 ? input.refundMethod : null;
   const today = options.today ?? businessDate(now, ctx.timeZone);
   return writeAction(

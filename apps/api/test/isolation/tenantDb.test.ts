@@ -16,6 +16,8 @@ const B = { id: 'tenant-b', db_shard: 'DB' };
 describe('assertTenantScoped', () => {
   it.each([
     'SELECT * FROM products WHERE tenant_id = ?1 AND id = ?2',
+    'SELECT * FROM "products" WHERE tenant_id = ?1 AND id = ?2',
+    'SELECT * FROM main.products WHERE tenant_id = ?1 AND id = ?2',
     'SELECT p.id FROM products p JOIN product_barcodes b ON b.tenant_id = ?1 AND b.product_id = p.id WHERE p.tenant_id = ?1',
     'UPDATE products SET price = ?2 WHERE tenant_id = ?1 AND id = ?3',
     'DELETE FROM change_log WHERE tenant_id = ?1 AND seq < ?2',
@@ -29,6 +31,8 @@ describe('assertTenantScoped', () => {
 
   it.each([
     'SELECT * FROM products WHERE id = ?1',
+    'SELECT * FROM "products" WHERE id = ?1',
+    'SELECT * FROM main.products WHERE id = ?1',
     'SELECT * FROM products WHERE tenant_id = ?2',
     'SELECT * FROM products p JOIN product_barcodes b ON b.product_id = p.id WHERE p.tenant_id = ?1',
     'UPDATE sales SET status = ?2 WHERE id = ?3',

@@ -1,6 +1,7 @@
 import {
   businessDate,
   type CartResult,
+  can,
   creditLimitCheck,
   isBelowCost,
   newId,
@@ -80,6 +81,10 @@ export function mergeRows(rows: readonly PayRow[]): PayRow[] {
 
 /** Applies the rows to `total` per 07 §4: only cash can exceed what is due (change). */
 export function settle(total: number, rows: readonly PayRow[]): Settlement {
+  for (const row of rows) {
+    if (!Number.isSafeInteger(row.amount) || row.amount < 0)
+      throw new SaleInvalidError('payment amount');
+  }
   const sum = (m: PayMethod) =>
     rows.filter((r) => r.method === m).reduce((s, r) => s + r.amount, 0);
   const card = sum('card');
@@ -148,13 +153,6 @@ export async function completeSale(
   const customerId = cart.customer_id ?? null;
   if (s.udhaar > 0 && !customerId)
     throw new SaleInvalidError('udhaar needs a customer');
-  // The manager approval is bound to the cart/amount it was given for; a changed
-  // cart or udhaar part must ask again (05 §4.1, D-160).
-  if (
-    totals.discount_share_bp > input.maxDiscountBp &&
-    !overrideMatches(cart, 'sale.discount')
-  )
-    throw new SaleInvalidError('discount override');
   if (s.udhaar > 0) {
     const credit = await udhaarCheck(db, customerId as string, s.udhaar);
     if (
@@ -209,6 +207,37 @@ export async function completeSale(
     money,
   );
 
+  const seller = await db.staff.get(ctx.staff_id);
+  const sellerPerm = (permission: Parameters<typeof can>[2]) =>
+    Boolean(
+      seller &&
+        can(
+          seller.role as 'owner' | 'manager' | 'cashier',
+          String(seller.permissions_json ?? '{}'),
+          permission,
+        ),
+    );
+  if (
+    totals.lines.some((line) => line.below_cost === 1) &&
+    !sellerPerm('sale.below_cost') &&
+    !overrideMatches(cart, 'sale.below_cost')
+  )
+    throw new SaleInvalidError('below-cost approval');
+  if (
+    totals.discount_share_bp > 0 &&
+    !sellerPerm('sale.discount') &&
+    !overrideMatches(cart, 'sale.discount')
+  )
+    throw new SaleInvalidError('discount permission');
+  if (
+    totals.discount_share_bp >
+      Number(seller?.max_discount_bp ?? input.maxDiscountBp) &&
+    !overrideMatches(cart, 'sale.discount')
+  )
+    throw new SaleInvalidError('discount override');
+  if (s.udhaar > 0 && !sellerPerm('sale.udhaar'))
+    throw new SaleInvalidError('udhaar permission');
+
   let created = false;
   const sale = await writeAction(
     db,
@@ -217,6 +246,29 @@ export async function completeSale(
         .table<SyncedRow, string>('sales')
         .get(input.saleId);
       if (existing) return existing;
+      // Another tab may have added/removed a line after this pay screen opened.
+      // Writing the caller's stale cart would silently drop that work.
+      const live = await w.table<Cart, string>('carts').get(input.cartId);
+      const signature = (value: Cart) =>
+        JSON.stringify({
+          customer_id: value.customer_id ?? null,
+          lines: value.lines.map((line) => [
+            line.key,
+            line.product_id,
+            line.qty_milli,
+            line.unit_price,
+            line.discount_type,
+            line.discount_value,
+          ]),
+          bill_discount: value.bill_discount ?? null,
+          reissue: value.reissue ?? null,
+        });
+      if (
+        live &&
+        live.updated_at >= cart.updated_at &&
+        signature(live) !== signature(cart)
+      )
+        throw new SaleInvalidError('cart changed');
       const kv = w.table<{ key: string; value: unknown }>('kv');
       const last = (await kv.get('cart_last_sale'))?.value as
         | { cart_id?: string; at?: number }
@@ -278,6 +330,7 @@ export async function completeSale(
         .map((line, i) => ({ line, r: totals.lines[i] }))
         .reverse();
       let lineNo = 0;
+      const saleLineIds = new Map<string, string>();
       for (const { line, r } of ordered) {
         if (!r) continue;
         lineNo += 1;
@@ -292,8 +345,10 @@ export async function completeSale(
           : line.unit_cost;
         const warranty = Number(product?.warranty_days ?? 0);
         const discounted = line.discount_type && line.discount_value > 0;
+        const saleLineId = newId(now);
+        saleLineIds.set(line.key, saleLineId);
         await w.insert('sale_lines', {
-          id: newId(now),
+          id: saleLineId,
           sale_id: input.saleId,
           line_no: lineNo,
           product_id: line.product_id,
@@ -383,8 +438,19 @@ export async function completeSale(
           staff_id: ctx.staff_id,
           created_at: now,
         });
-      for (const o of cart.overrides ?? [])
-        if (o.permission !== 'sale.void') await audit('override', o);
+      for (const o of cart.overrides ?? []) {
+        if (o.permission === 'sale.void') continue;
+        // A price approval is bound to the cart key it was given for; store the bill's
+        // line id so the Worker can link the audit row to the exact sale line.
+        const boundLine =
+          typeof o.bound_line === 'string'
+            ? saleLineIds.get(o.bound_line)
+            : undefined;
+        await audit(
+          'override',
+          boundLine === undefined ? o : { ...o, bound_line: boundLine },
+        );
+      }
       if (totals.discount_share_bp > input.maxDiscountBp)
         await audit('discount_over_limit', {
           discount_share_bp: totals.discount_share_bp,

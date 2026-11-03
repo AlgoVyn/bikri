@@ -128,7 +128,7 @@ function referenceSaleOps(
     invoice_seq: seq,
     branch_id: shop.branchId,
     device_id: shop.till.id,
-    staff_id: IDS.cashier,
+    staff_id: IDS.owner,
     customer_id: IDS.customer,
     business_date: '2026-10-27',
     created_at: now,

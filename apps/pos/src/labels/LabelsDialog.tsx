@@ -188,7 +188,9 @@ function LabelsDialogContent({
       previewError =
         err instanceof LabelError && err.code === 'too_long'
           ? t('office.labels.too_long')
-          : t('office.labels.charset');
+          : err instanceof LabelError && err.code === 'empty'
+            ? t('office.labels.value_empty')
+            : t('office.labels.charset');
     }
   }
 
@@ -232,7 +234,9 @@ function LabelsDialogContent({
         setError(
           err instanceof LabelError && err.code === 'too_long'
             ? t('office.labels.too_long')
-            : t('office.labels.charset'),
+            : err instanceof LabelError && err.code === 'empty'
+              ? t('office.labels.value_empty')
+              : t('office.labels.charset'),
         );
         return;
       }

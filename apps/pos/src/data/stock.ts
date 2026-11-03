@@ -334,22 +334,6 @@ export async function finishCount(
           movements += 1;
           valueDiff += mulDivRound(delta, Number(product.avg_cost ?? 0), 1000);
         }
-        await w.insert('audit_log', {
-          id: newId(w.now),
-          action: 'stock_count',
-          entity: 'stock',
-          entity_id: ctx.device_id,
-          before_json: null,
-          after_json: JSON.stringify({
-            scope: source.scope,
-            items_counted: counted,
-            movements,
-            value_diff: valueDiff,
-          }),
-          device_id: ctx.device_id,
-          staff_id: ctx.staff_id,
-          created_at: now,
-        });
         return { movements, counted, valueDiff };
       },
       { now },
@@ -360,6 +344,27 @@ export async function finishCount(
     for (const id of slice) applied.add(id);
     await saveCountDraft(db, { ...source, applied: [...applied] });
   }
+  await writeAction(
+    db,
+    (w) =>
+      w.insert('audit_log', {
+        id: newId(now),
+        action: 'stock_count',
+        entity: 'stock',
+        entity_id: ctx.device_id,
+        before_json: null,
+        after_json: JSON.stringify({
+          scope: source.scope,
+          items_counted: result.counted,
+          movements: result.movements,
+          value_diff: result.valueDiff,
+        }),
+        device_id: ctx.device_id,
+        staff_id: ctx.staff_id,
+        created_at: now,
+      }),
+    { now, actor: ctx.staff_id },
+  );
   await discardCount(db);
   return result;
 }

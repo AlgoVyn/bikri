@@ -85,6 +85,7 @@ export async function applyPrices(
         for (const r of chunk) {
           const before = await w.table<MasterRow>('products').get(r.product.id);
           if (!before || before.deleted_at) continue;
+          if (Number(before.price) === r.next) continue;
           await w.update('products', r.product.id, { price: r.next });
           await productAudit(
             w,

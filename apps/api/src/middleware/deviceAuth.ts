@@ -43,6 +43,7 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('tenant', tenant);
   c.set('device', device);
   c.set('db', db);
+  c.header('Cache-Control', 'private, no-store');
 
   const pending = parsePending(c.req.header('x-bikri-pending'));
   if (now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {

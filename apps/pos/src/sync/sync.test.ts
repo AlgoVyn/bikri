@@ -647,6 +647,8 @@ describe('pull (03 §4.2)', () => {
       { id: 'pay-sale', sale_id: saleId, purpose: 'sale', created_at: 1000 },
       {
         id: 'pay-refund',
+        // The real refund writer sets both ids; the refund document must own the payment.
+        sale_id: saleId,
         refund_id: refundId,
         purpose: 'refund',
         created_at: 1000,
@@ -848,6 +850,13 @@ describe('pull (03 §4.2)', () => {
     await restoreRecovery(db, 500, 'epoch-2');
     const queued = await db.outbox.toArray();
     expect(new Set(queued.map((op) => op.tbl)).size).toBeGreaterThan(8);
+    // A refund payment must travel with its refund, not with the original sale.
+    const refundTx = queued.find(
+      (op) => op.tbl === 'refunds' && op.row_id === refundId,
+    )?.tx_id;
+    expect(refundTx).toBeDefined();
+    for (const rowId of ['pay-refund', 'rl1', 'l-refund', 'm-refund'])
+      expect(queued.find((op) => op.row_id === rowId)?.tx_id).toBe(refundTx);
     const perTx = new Map<string, number>();
     for (const op of queued)
       perTx.set(op.tx_id, (perTx.get(op.tx_id) ?? 0) + 1);

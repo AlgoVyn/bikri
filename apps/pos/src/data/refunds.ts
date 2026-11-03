@@ -91,7 +91,13 @@ export async function computeRefund(
 ): Promise<RefundPlan> {
   const sale = await (src.table('sales') as Table<SyncedRow>).get(saleId);
   if (!sale) throw new RefundNotAllowedError('missing');
-  if (sale.status === 'void') throw new RefundNotAllowedError('void');
+  // `sales.status` is only a cache; a pending/pulled void row is authoritative.
+  const voidRow = await (src.table('sale_voids') as Table<SyncedRow>)
+    .where('sale_id')
+    .equals(saleId)
+    .first();
+  if (sale.status === 'void' || voidRow)
+    throw new RefundNotAllowedError('void');
   const lines = (
     await (src.table('sale_lines') as Table<SyncedRow>)
       .where('sale_id')

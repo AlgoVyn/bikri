@@ -61,7 +61,8 @@ export type SqlValue = string | number | null;
 export type Row = Record<string, SqlValue>;
 
 const TENANT_SET: ReadonlySet<string> = new Set(TENANT_TABLES);
-const TABLE_REF = /\b(?:FROM|JOIN|INTO|UPDATE)\s+([a-z_][a-z0-9_]*)/gi;
+const TABLE_REF =
+  /\b(?:FROM|JOIN|INTO|UPDATE)\s+(?:(?:"?[a-z_][a-z0-9_]*"?)\.)?"?([a-z_][a-z0-9_]*)"?/gi;
 const TENANT_PREDICATE = /\b(?:[a-z_][a-z0-9_]*\.)?tenant_id\s*=\s*\?1\b/gi;
 const TENANT_INSERT =
   /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+[a-z_][a-z0-9_]*\s*\(\s*tenant_id\s*,[^)]*\)\s*(?:VALUES\s*\(\s*\?1\s*,|SELECT\s+\?1\s*,)/i;

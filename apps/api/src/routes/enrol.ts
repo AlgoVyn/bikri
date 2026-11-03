@@ -35,6 +35,15 @@ const badCode = () =>
 
 /** `POST /api/devices/enrol` (04 §3.2): the code decides the tenant and branch. */
 export async function enrol(c: Context<AppEnv>): Promise<Response> {
+  if (String(c.env.MAINTENANCE) === '1') {
+    throw new ApiError(
+      'MAINTENANCE',
+      503,
+      'Bikri is being updated',
+      undefined,
+      { 'Retry-After': '300' },
+    );
+  }
   const now = Date.now();
   const ip = c.req.header('cf-connecting-ip') ?? 'local';
   if (enrolBlocked(ip, now)) {

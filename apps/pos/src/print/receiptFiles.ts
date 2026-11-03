@@ -1,4 +1,5 @@
 /** Receipt blocks, pictures, PNG and PDF for sale/refund screens and print jobs (screens/07, 11). */
+import { newId } from '@bikri/core';
 import type { BikriDb, PrintJob } from '@bikri/db';
 import {
   type Block,
@@ -6,12 +7,14 @@ import {
   buildRefundReceipt,
   buildSaleReceipt,
   buildSupplierReturn,
+  buildVoidNotice,
   type DayCloseReceipt,
   type RasterSource,
   type ReceiptLabels,
   type RefundReceipt,
   type SaleReceiptInput,
   type SupplierReturnReceipt,
+  type VoidReceipt,
 } from '@bikri/printer';
 import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import {
@@ -19,6 +22,7 @@ import {
   type PrinterKv,
   type ReceiptPaper,
   receiptPaper,
+  receiptShop,
 } from '../data/receipt.ts';
 import { loadRefundReceipt } from '../data/refundReceipt.ts';
 import { loadSupplierReturnReceipt } from '../data/supplierReturnReceipt.ts';
@@ -38,6 +42,8 @@ export type SaleReceipt = ReceiptLayout & { input: SaleReceiptInput };
 export type RefundPrint = ReceiptLayout & {
   input: RefundReceipt & { labels?: Partial<ReceiptLabels> };
 };
+
+export type VoidPrint = ReceiptLayout & { input: VoidReceipt };
 
 export type DayClosePrint = ReceiptLayout & { input: DayCloseReceipt };
 
@@ -92,6 +98,56 @@ export async function refundReceipt(
   return { input, blocks, paper, logo, printer };
 }
 
+export async function voidReceipt(
+  db: BikriDb,
+  saleId: string,
+): Promise<VoidPrint | null> {
+  const voidRow = await db.sale_voids.where('sale_id').equals(saleId).first();
+  const sale = await db.sales.get(saleId);
+  if (!voidRow || !sale) return null;
+  const replacement = voidRow.replacement_sale_id
+    ? await db.sales.get(String(voidRow.replacement_sale_id))
+    : undefined;
+  const staff = voidRow.staff_id
+    ? await db.staff.get(String(voidRow.staff_id))
+    : undefined;
+  const { shop } = await receiptShop(db);
+  const input: VoidReceipt = {
+    shop,
+    staffName: staff ? String(staff.name) : null,
+    originalInvoiceNo: String(sale.invoice_no),
+    originalCreatedAt: Number(sale.created_at),
+    voidCreatedAt: Number(voidRow.created_at),
+    reason: String(voidRow.reason),
+    replacementInvoiceNo: replacement ? String(replacement.invoice_no) : null,
+  };
+  const { printer, paper, logo } = await layoutOf(db);
+  const blocks = buildVoidNotice(input, {
+    paperMm: paper.paperMm,
+    charsPerLine: paper.charsPerLine,
+    dots: paper.dots,
+    printLogo: printer?.print_logo !== false,
+  });
+  return { input, blocks, paper, logo, printer };
+}
+
+/** Queue the cancellation notice after a successful void. */
+export async function queueVoidPrint(
+  db: BikriDb,
+  saleId: string,
+  now = Date.now(),
+): Promise<string> {
+  const id = newId(now);
+  await db.print_jobs.put({
+    id,
+    sale_id: saleId,
+    kind: 'void',
+    status: 'queued',
+    created_at: now,
+  });
+  return id;
+}
+
 export async function dayCloseReceipt(
   db: BikriDb,
   dayCloseId: string,
@@ -129,8 +185,14 @@ export function jobReceipt(
   db: BikriDb,
   job: PrintJob,
 ): Promise<
-  SaleReceipt | RefundPrint | DayClosePrint | SupplierReturnPrint | null
+  | SaleReceipt
+  | RefundPrint
+  | VoidPrint
+  | DayClosePrint
+  | SupplierReturnPrint
+  | null
 > {
+  if (job.kind === 'void' && job.sale_id) return voidReceipt(db, job.sale_id);
   if (job.sale_id)
     return saleReceipt(db, job.sale_id, { reprint: job.reprint === true });
   if (job.refund_id) return refundReceipt(db, job.refund_id);

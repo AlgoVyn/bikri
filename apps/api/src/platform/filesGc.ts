@@ -25,7 +25,7 @@ export async function gcTenantFiles(
   const db = tenantDb(env, tenant);
   const [products, shop] = await db.batch([
     db.prepare(
-      'SELECT image_key FROM products WHERE tenant_id = ?1 AND image_key IS NOT NULL',
+      'SELECT image_key FROM products WHERE tenant_id = ?1 AND image_key IS NOT NULL AND deleted_at IS NULL',
     ),
     db.prepare(
       'SELECT logo_key FROM shop WHERE tenant_id = ?1 AND logo_key IS NOT NULL',

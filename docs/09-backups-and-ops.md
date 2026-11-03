@@ -97,7 +97,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 
 1. **Get the shop's data** as a `bikri-export` zip, from one of: the operator console export (current server state), the shop owner's on-device export, or a nightly backup: `wrangler d1 create bikri-restore` (counts against the 10-database Free limit; delete it afterwards), load the backup into it (§3.2 step 1), then `node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --backup-date YYYY-MM-DD --out export.zip` (pages each table with `wrangler d1 execute --json … WHERE tenant_id = ?`).
 2. Console → tenant → `Restore` → `maintenance on` (only this shop's tills get `503 MAINTENANCE` and keep selling offline).
-3. `purge` until nothing is left (≤ 5,000 rows per call; deletes count as rows written, so a large shop may take several calls and should be restored outside the shop's busy hours).
+3. `purge` until nothing is left (≤ 5,000 rows per call; deletes count as rows written, so a large shop may take several calls and should be restored outside the shop's busy hours). `audit_log` is never purged: it is append-only, and `maintenance off` uses its last `tenant_status_change` to return the shop to `read_only`/`suspended`.
 4. `import` the zip (≤ 500 rows per call, parents first; rows validated like a push; `change_log` written).
 5. `restore-epoch` with the restore point (the export's `exported_at` or the backup's date at 02:30 PKT) → the shop's tills run restore recovery ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) and re-send their own newer ledger rows.
 6. `maintenance off`. Audit `tenant_restore` in the tenant. Other shops are never touched.

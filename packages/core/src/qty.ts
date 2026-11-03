@@ -63,8 +63,8 @@ export function parseQtyToMilli(raw: string, unit: string): number | null {
 
 /** Display milli-units in the unit's scale, trimming trailing decimal zeros. */
 export function formatQtyFromMilli(milli: number, unit: string): string {
-  if (!Number.isInteger(milli)) {
-    throw new Error('formatQtyFromMilli expects integer milli-units');
+  if (!Number.isSafeInteger(milli)) {
+    throw new Error('formatQtyFromMilli expects safe integer milli-units');
   }
   const negative = milli < 0;
   const absolute = Math.abs(milli);
@@ -72,6 +72,10 @@ export function formatQtyFromMilli(milli: number, unit: string): string {
   const fraction = absolute % 1000;
   const sign = negative ? '-' : '';
   if (!qtyAllowsDecimals(unit) || fraction === 0) {
+    if (!qtyAllowsDecimals(unit) && fraction !== 0)
+      throw new Error(
+        `formatQtyFromMilli cannot show fractional ${unit} quantities`,
+      );
     return `${sign}${whole}`;
   }
   const fractionText = String(fraction).padStart(3, '0').replace(/0+$/u, '');

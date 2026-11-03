@@ -216,7 +216,6 @@ export function buildSaleReceipt(
     bold: true,
     size: 'double-height',
   });
-  blocks.push({ t: 'rule', char: '=' });
   if (sale.taxInclusive && sale.tax > 0) {
     pushPair(
       blocks,
@@ -227,6 +226,7 @@ export function buildSaleReceipt(
       money(sale.tax),
     );
   }
+  blocks.push({ t: 'rule', char: '=' });
   // Payment-method rows may be hidden; a udhaar/khata row is part of the bill's trust and must
   // still print when there is a khata part (06 §5).
   pushPayments(

@@ -222,4 +222,4 @@ Answered on 27 Oct 2026 and recorded as D-080–D-085: read-only shops (§7.2), 
 7. **Writes by support access:** support devices are view-only (§7.5). Should the operator ever be allowed to make changes in a shop's data from a support device (for example with the owner's explicit approval per session)?
 
 
-**File storage per shop.** The till file API rejects an upload that would take a shop over 1 GB or that targets a product not in that shop; the shared R2 bucket cannot be filled by one tenant.
+**File storage per shop.** The till file API rejects an upload that would take a shop over 1 GB (`507 TENANT_STORAGE_FULL`) or that targets a product not in that shop; the shared R2 bucket cannot be filled by one tenant. The till marks that file failed instead of retrying it forever, so it never blocks other uploads.

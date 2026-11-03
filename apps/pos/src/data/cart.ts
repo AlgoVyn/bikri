@@ -203,6 +203,7 @@ export function cartSignature(cart: Cart): string {
       line.product_id,
       line.qty_milli,
       line.unit_price,
+      line.unit_cost,
       line.discount_type ?? null,
       line.discount_value ?? 0,
     ]),

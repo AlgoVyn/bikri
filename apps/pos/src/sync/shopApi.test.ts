@@ -89,6 +89,8 @@ describe('import unsynced ops (03 §8)', () => {
     tenant_id: tenant,
     device_id: 'd-old',
     ops: Array.from({ length: n }, (_, i) => ({
+      op_id: `op-${i}`,
+      tx_id: `tx-${i}`,
       tbl: i % 2 ? 'payments' : 'sales',
       kind: 'insert',
       created_at: 1000 + i,

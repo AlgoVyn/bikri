@@ -232,6 +232,8 @@ export function BillDetail({
         },
         ctx,
       );
+      const { queueVoidPrint } = await import('../print/receiptFiles.ts');
+      await queueVoidPrint(db, saleId).catch(() => undefined);
       toast.push(t('office.bill.void_done'));
     } catch (err) {
       if (err instanceof VoidNotAllowedError) {

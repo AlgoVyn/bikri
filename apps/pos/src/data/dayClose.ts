@@ -285,7 +285,7 @@ export async function closeDay(
     },
     { now, actor: ctx.staff_id },
   );
-  if (options.print !== false)
+  if (options.print !== false && String(row.id) === input.dayCloseId)
     await queueDayClosePrint(db, String(row.id), { now });
   return row;
 }

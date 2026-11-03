@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
+import { chunkOpsByTx } from '../sync/chunk.ts';
 import {
   adminErrorMessage,
   importOps,
@@ -8,7 +9,7 @@ import {
   listDevices,
   revokeDevice,
 } from './api.ts';
-import { formatCount, formatWhen, OPS_CHUNK } from './format.ts';
+import { formatCount, formatWhen } from './format.ts';
 import type { DeviceInfo, IssuedCode, UnsyncedOp } from './types.ts';
 import {
   AdminConfirm,
@@ -337,8 +338,7 @@ export function DevicesTab({
               setPending(true);
               void (async () => {
                 let done = 0;
-                for (let i = 0; i < job.ops.length; i += OPS_CHUNK) {
-                  const slice = job.ops.slice(i, i + OPS_CHUNK);
+                for (const slice of chunkOpsByTx(job.ops)) {
                   await importOps(tenantId, job.deviceId, slice);
                   done += slice.length;
                   setProgress(

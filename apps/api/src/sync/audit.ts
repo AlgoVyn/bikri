@@ -39,7 +39,7 @@ export function auditStatements(
         input.now,
       )
     : db.prepare(
-        `INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE((SELECT id FROM staff WHERE tenant_id = ?1 AND role = 'owner' AND deleted_at IS NULL ORDER BY created_at LIMIT 1), 'server'), ?9${guard}`,
+        `INSERT INTO audit_log (tenant_id, id, action, entity, entity_id, before_json, after_json, device_id, staff_id, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE((SELECT id FROM staff WHERE tenant_id = ?1 AND role = 'owner' AND active = 1 AND deleted_at IS NULL ORDER BY created_at LIMIT 1), 'server'), ?9${guard}`,
         id,
         input.action,
         input.entity ?? 'shop',

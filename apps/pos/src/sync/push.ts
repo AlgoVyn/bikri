@@ -10,11 +10,11 @@ import type { Table, Transaction } from 'dexie';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { jsonBytes, nextTxBatch } from './chunk.ts';
 import { tillRequest } from './client.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 
-export const MAX_BATCH_OPS = 200;
-export const MAX_BATCH_BYTES = 512 * 1024;
+export { MAX_BATCH_BYTES, MAX_BATCH_OPS } from './chunk.ts';
 
 export type WireOp = {
   op_id: string;
@@ -66,30 +66,7 @@ export function toWire(e: OutboxEntry): WireOp {
 
 /** The next batch: whole transactions only (a single oversized transaction is still sent alone). */
 export function nextBatch(pending: OutboxEntry[]): OutboxEntry[] {
-  const batch: OutboxEntry[] = [];
-  let bytes = 0;
-  let i = 0;
-  while (i < pending.length) {
-    const tx = pending[i]?.tx_id;
-    let j = i;
-    let txBytes = 0;
-    while (j < pending.length && pending[j]?.tx_id === tx) {
-      txBytes += JSON.stringify(toWire(pending[j] as OutboxEntry)).length;
-      j += 1;
-    }
-    const count = j - i;
-    if (
-      batch.length > 0 &&
-      (batch.length + count > MAX_BATCH_OPS ||
-        bytes + txBytes > MAX_BATCH_BYTES)
-    )
-      break;
-    batch.push(...pending.slice(i, j));
-    bytes += txBytes;
-    i = j;
-    if (batch.length >= MAX_BATCH_OPS) break;
-  }
-  return batch;
+  return nextTxBatch(pending, (entry) => jsonBytes(toWire(entry)));
 }
 
 type PushResponse = {
@@ -130,7 +107,11 @@ export async function pushAll(
     .where('status')
     .equals('sending')
     .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
-    .modify({ status: 'pending', sending_at: undefined });
+    .modify({
+      status: 'pending',
+      sending_at: undefined,
+      claim_token: undefined,
+    });
   for (let round = 0; round < maxRounds; round += 1) {
     const pending = await db.outbox
       .where('status')
@@ -141,10 +122,12 @@ export async function pushAll(
     const seqs = batch
       .map((entry) => entry.seq)
       .filter((seq): seq is number => seq !== undefined);
-    await db.outbox
-      .where('seq')
-      .anyOf(seqs)
-      .modify({ status: 'sending', sending_at: Date.now() });
+    const claimToken = newId();
+    await db.outbox.where('seq').anyOf(seqs).modify({
+      status: 'sending',
+      sending_at: Date.now(),
+      claim_token: claimToken,
+    });
     let res: PushResponse;
     try {
       res = await tillRequest<PushResponse>(db, '/sync/push', {
@@ -159,10 +142,11 @@ export async function pushAll(
     } catch (error) {
       // A transport error leaves the ops pending for the next tick; a mutation made while this
       // request was in flight must not coalesce into them.
-      await db.outbox
-        .where('seq')
-        .anyOf(seqs)
-        .modify({ status: 'pending', sending_at: undefined });
+      await db.outbox.where('seq').anyOf(seqs).modify({
+        status: 'pending',
+        sending_at: undefined,
+        claim_token: undefined,
+      });
       throw error;
     }
     out.sent += batch.length;
@@ -186,13 +170,19 @@ export async function pushAll(
           const current = await db.outbox.get(entry.seq);
           // Another tab may have reclaimed this row (or it changed) while the request
           // was in flight; only the claim owner may settle it.
-          if (current === undefined || current.op_id !== r.op_id) continue;
+          if (
+            current === undefined ||
+            current.op_id !== r.op_id ||
+            current.claim_token !== claimToken
+          )
+            continue;
           if (r.result === 'rejected') {
             out.rejected += 1;
             await db.outbox.update(entry.seq, {
               status: 'failed',
               last_error: r.error_code ?? 'REJECTED',
               sending_at: undefined,
+              claim_token: undefined,
               attempts: entry.attempts + 1,
             });
           } else {
@@ -201,7 +191,12 @@ export async function pushAll(
             await db.pull_shadow.delete([entry.tbl, entry.row_id]);
             // Keep the local optimistic revision current; otherwise the next edit of
             // this row would use a stale base_rev and be needlessly field-merged.
+            // Only a plain applied result proves the local row equals the server row.
+            // A field merge keeps fields from the other device; adopting its revision
+            // here would let the next edit overwrite that device's field with our stale
+            // copy. Keep the old base revision until the merged row is pulled.
             if (
+              r.result === 'applied' &&
               !isLedgerTable(entry.tbl) &&
               typeof r.server_rev === 'number' &&
               Number.isSafeInteger(r.server_rev)
@@ -216,6 +211,7 @@ export async function pushAll(
           await db.outbox.update(entry.seq, {
             status: 'pending',
             sending_at: undefined,
+            claim_token: undefined,
           });
         }
         await setKv(db, 'last_push_at', Date.now());

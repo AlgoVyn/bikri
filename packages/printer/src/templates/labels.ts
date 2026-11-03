@@ -3,6 +3,7 @@ import type { ReceiptLabels } from './types.ts';
 export const englishReceiptLabels: ReceiptLabels = {
   saleTitle: 'SALE RECEIPT',
   refundTitle: 'REFUND RECEIPT',
+  voidTitle: 'BILL CANCELLED',
   testTitle: 'BIKRI TEST PRINT',
   bill: 'Bill',
   date: 'Date',
@@ -29,6 +30,7 @@ export const englishReceiptLabels: ReceiptLabels = {
   paidBack: 'Paid back',
   originalBill: 'Original bill',
   originalDate: 'Original date',
+  replacementBill: 'Replacement bill',
   reprint: 'REPRINT',
   telPrefix: 'Tel:',
   ntn: 'NTN',
@@ -52,6 +54,7 @@ export const englishReceiptLabels: ReceiptLabels = {
 export const urduReceiptLabels: ReceiptLabels = {
   saleTitle: 'رسید',
   refundTitle: 'واپسی کی رسید',
+  voidTitle: 'بل منسوخ',
   testTitle: 'بکری ٹیسٹ پرنٹ',
   bill: 'بل',
   date: 'تاریخ',
@@ -78,6 +81,7 @@ export const urduReceiptLabels: ReceiptLabels = {
   paidBack: 'واپس دیے',
   originalBill: 'اصل بل',
   originalDate: 'اصل تاریخ',
+  replacementBill: 'نیا بل',
   reprint: 'دوبارہ پرنٹ',
   telPrefix: 'فون:',
   ntn: 'NTN',

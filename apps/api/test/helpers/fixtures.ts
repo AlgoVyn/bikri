@@ -5,7 +5,7 @@
  */
 import { SELF } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { CLIENT_SCHEMA_VERSION, newId } from '@bikri/core';
 import { newDeviceToken, sha256Hex } from '../../src/auth/crypto.ts';
 import { codeFromIndex } from '../../src/auth/deviceCodes.ts';
 import { createTenant } from '../../src/platform/createTenant.ts';
@@ -205,6 +205,9 @@ export function api(
   const headers = new Headers(init.headers);
   if (init.token) headers.set('authorization', `Bearer ${init.token}`);
   if (!headers.has('origin')) headers.set('origin', TEST_ORIGIN);
+  // Pull/snapshot reject a client below MIN_CLIENT_SCHEMA; tests act as a current till.
+  if (!headers.has('x-bikri-schema'))
+    headers.set('x-bikri-schema', String(CLIENT_SCHEMA_VERSION));
   let body = init.body;
   if (init.json !== undefined) {
     headers.set('content-type', 'application/json');

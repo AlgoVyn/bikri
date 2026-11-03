@@ -92,9 +92,9 @@ export function previewBlocks(shop: PreviewShop, uiLanguage = 'en'): Block[] {
     },
   );
   if (shop.tax_rate_bp > 0 && shop.inclusive) {
-    const inside = Math.round(
-      (SAMPLE_PRICE * shop.tax_rate_bp) / (10_000 + shop.tax_rate_bp),
-    );
+    const inside =
+      SAMPLE_PRICE -
+      mulDivRound(SAMPLE_PRICE, 10_000, 10_000 + shop.tax_rate_bp);
     blocks.push({
       t: 'pair',
       left: labels.includesTax

@@ -67,6 +67,13 @@ export type ShopSettings = {
 
 export type ShopSettingsPatch = Partial<ShopSettings>;
 
+const BOOLEAN_SHOP_FIELDS: ReadonlySet<string> = new Set([
+  'show_payment_details',
+  'show_cashier_on_receipt',
+  'show_you_saved',
+  'print_warranty',
+]);
+
 const SHOP_FIELDS: (keyof ShopSettings)[] = [
   'name',
   'business_type',
@@ -132,10 +139,10 @@ function shopValues(row: SyncedRow | undefined): ShopSettings {
         ? row.receipt_language
         : 'app',
     number_grouping: row?.number_grouping === 'lakh' ? 'lakh' : 'intl',
-    show_payment_details: row?.show_payment_details !== 0,
-    show_cashier_on_receipt: row?.show_cashier_on_receipt !== 0,
-    show_you_saved: row?.show_you_saved === 1,
-    print_warranty: row?.print_warranty === 1,
+    show_payment_details: Number(row?.show_payment_details ?? 1) !== 0,
+    show_cashier_on_receipt: Number(row?.show_cashier_on_receipt ?? 1) !== 0,
+    show_you_saved: Number(row?.show_you_saved ?? 0) === 1,
+    print_warranty: Number(row?.print_warranty ?? 1) === 1,
   };
 }
 
@@ -155,7 +162,13 @@ export async function updateShopSettings(
   for (const field of SHOP_FIELDS) {
     const value = patch[field];
     if (value === undefined) continue;
-    clean[field] = typeof value === 'string' ? value.trim() : value;
+    clean[field] = BOOLEAN_SHOP_FIELDS.has(field)
+      ? value
+        ? 1
+        : 0
+      : typeof value === 'string'
+        ? value.trim()
+        : value;
   }
   if (patch.tax_rate_bp === 0) clean.tax_mode = 'exclusive';
   if (clean.tax_rate_bp !== undefined && clean.tax_rate_bp === 0)
@@ -403,9 +416,14 @@ for (const action of [
   'credit_limit_change',
   'override',
   'void',
+  'reissue',
   'refund',
+  'discount_over_limit',
+  'product_delete',
+  'party_delete',
   'stock_count',
   'supplier_return',
+  'backup_restore',
   'drawer_open',
   'device_change',
   'device_enrol_code',

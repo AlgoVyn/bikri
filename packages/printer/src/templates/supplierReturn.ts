@@ -1,4 +1,4 @@
-import { formatReceiptMoney } from '../format.ts';
+import { formatIsoDate, formatReceiptMoney } from '../format.ts';
 import { resolvePaper } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
@@ -57,7 +57,7 @@ export function buildSupplierReturn(
   pushPair(blocks, labels.supplier, input.supplierName);
   if (input.purchaseInvoice)
     pushPair(blocks, labels.delivery, input.purchaseInvoice);
-  pushPair(blocks, labels.date, input.businessDate);
+  pushPair(blocks, labels.date, formatIsoDate(input.businessDate));
   blocks.push({ t: 'rule', char: '-' });
   for (const line of input.lines) {
     pushPair(blocks, `${line.qty} x ${line.name}`, money(line.lineTotal));

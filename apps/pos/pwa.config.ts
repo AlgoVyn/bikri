@@ -59,6 +59,7 @@ export const pwaOptions = {
     globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
     // The operator console is always online and must not be precached (01 §6).
     globIgnores: [
+      '**/admin/**',
       '**/admin.lazy-*.js',
       '**/backups.lazy-*.js',
       '**/useAdminQuery-*.js',

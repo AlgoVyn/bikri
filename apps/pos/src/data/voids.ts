@@ -253,7 +253,7 @@ export async function writeVoidRows(
   }
   await w.insert('audit_log', {
     id: newId(w.now),
-    action: 'void',
+    action: options.replacementSaleId ? 'reissue' : 'void',
     entity: 'sale_voids',
     entity_id: options.voidId,
     before_json: null,

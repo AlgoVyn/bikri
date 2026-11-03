@@ -346,18 +346,34 @@ shop.delete('/enrolment-codes/:code', async (c) => {
   const { db } = c.var;
   const raw = c.req.param('code');
   const plain = normaliseCode(raw);
-  const res = plain
-    ? await db.run(
-        "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND code_hash = ?2 AND used_at IS NULL AND kind = 'till'",
-        await codeHash(plain),
-      )
+  const match = plain
+    ? {
+        sql: 'code_hash = ?2',
+        value: await codeHash(plain),
+      }
     : /^[0-9a-f]{16}$/.test(raw)
-      ? await db.run(
-          "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND substr(code_hash, 1, 16) = ?2 AND used_at IS NULL AND kind = 'till'",
-          raw,
-        )
+      ? { sql: 'substr(code_hash, 1, 16) = ?2', value: raw }
       : null;
-  if (!res || (res.meta.changes ?? 0) === 0)
+  if (!match) throw new ApiError('NOT_FOUND', 404, 'No such code');
+  const code = await db.first<{ device_name: string; grants_admin: number }>(
+    `SELECT device_name, grants_admin FROM enrolment_codes WHERE tenant_id = ?1 AND ${match.sql} AND used_at IS NULL AND kind = 'till'`,
+    match.value,
+  );
+  if (!code) throw new ApiError('NOT_FOUND', 404, 'No such code');
+  const [deleted] = await db.batch([
+    db.prepare(
+      `DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND ${match.sql} AND used_at IS NULL AND kind = 'till'`,
+      match.value,
+    ),
+    ...audit(c, 'device_enrol_code', {
+      after: {
+        device_name: code.device_name,
+        is_admin: code.grants_admin === 1,
+        cancelled: true,
+      },
+    }),
+  ]);
+  if ((deleted?.meta.changes ?? 0) === 0)
     throw new ApiError('NOT_FOUND', 404, 'No such code');
   return c.body(null, 204);
 });

@@ -138,10 +138,25 @@ describe('computeCart edges', () => {
     expect(cart.lines.reduce((sum, line) => sum + line.final, 0)).toBe(
       cart.total,
     );
-    // The fallback still allocates when the line values cannot absorb it all.
-    expect(allocateRounding(-2, [1, 0])).toEqual([-2, 0]);
+    // Rounding beyond the available line value is malformed, not a negative line.
+    expect(() => allocateRounding(-2, [1, 0])).toThrow(/rounding exceeds/);
     expect(allocateRounding(0, [1])).toEqual([0]);
     expect(allocateRounding(1, [1, 1])).toEqual([1, 0]);
+  });
+
+  it('rejects a tax rate or rounding step outside the shop schema', () => {
+    expect(() =>
+      computeCart({
+        lines: [{ qty_milli: 1000, unit_price: 10_000 }],
+        tax_rate_bp: 5001,
+      }),
+    ).toThrow(/tax_rate_bp/);
+    expect(() =>
+      computeCart({
+        lines: [{ qty_milli: 1000, unit_price: 10_000 }],
+        round_total_to: 2,
+      }),
+    ).toThrow(/round_total_to/);
   });
 
   it('flags below-cost lines and leaves unknown cost alone', () => {

@@ -376,6 +376,34 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     expect(await setMaintenance(false)).toBe('suspended');
   });
 
+  it('a restore purge keeps the audit log, so a read-only shop returns to read-only', async () => {
+    const a = await seedShop('Restore status');
+    const setMaintenance = async (on: boolean) => {
+      const res = await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+        method: 'POST',
+        json: { on },
+      });
+      expect(res.status).toBe(200);
+      return (await json<{ tenant: { status: string } }>(res)).tenant.status;
+    };
+    await api(`/admin/tenants/${a.tenantId}/read-only`, {
+      method: 'POST',
+      json: { reason: 'unpaid' },
+    });
+    await setMaintenance(true);
+    let remaining = 1;
+    while (remaining > 0) {
+      const p = await json<{ remaining: number }>(
+        await api(`/admin/tenants/${a.tenantId}/purge`, { method: 'POST' }),
+      );
+      remaining = p.remaining;
+    }
+    expect(
+      await auditCount(a.tenantId, 'tenant_status_change'),
+    ).toBeGreaterThan(0);
+    expect(await setMaintenance(false)).toBe('read_only');
+  });
+
   it('codes, device revoke and owner PIN reset write audit rows in that tenant only', async () => {
     const a = await seedShop('Dev A');
     const b = await seedShop('Dev B');
@@ -491,17 +519,23 @@ describe('operator export and restore (I17, I18)', () => {
     const b = await seedShop('Exp B');
     const start = await json<{
       tenant: { id: string };
+      exported_at: number;
       tables: { tbl: string; rows: number }[];
     }>(await api(`/admin/tenants/${a.tenantId}/export`));
     expect(start.tenant.id).toBe(a.tenantId);
+    const before = start.exported_at;
     const page = await json<{ rows: Record<string, unknown>[] }>(
-      await api(`/admin/tenants/${a.tenantId}/export?tbl=products`),
+      await api(
+        `/admin/tenants/${a.tenantId}/export?tbl=products&before=${before}`,
+      ),
     );
     expect(page.rows).toHaveLength(1);
     expect(page.rows[0]).not.toHaveProperty('tenant_id');
     expect(String(page.rows[0]?.name_en)).toBe('Exp A phone');
     const devs = await json<{ rows: Record<string, unknown>[] }>(
-      await api(`/admin/tenants/${a.tenantId}/export?tbl=devices`),
+      await api(
+        `/admin/tenants/${a.tenantId}/export?tbl=devices&before=${before}`,
+      ),
     );
     expect(devs.rows.every((r) => !('token_hash' in r))).toBe(true);
     expect(await auditCount(a.tenantId, 'operator_export')).toBe(1);
@@ -513,6 +547,7 @@ describe('operator export and restore (I17, I18)', () => {
     const b = await seedShop('Res B');
     await pushOk(a.till, saleOps(a, a.till, 1));
     // Export A's products and sales.
+    const exportCutoff = Date.now();
     const tables: Record<string, Record<string, unknown>[]> = {};
     for (const tbl of [
       'shop',
@@ -527,7 +562,7 @@ describe('operator export and restore (I17, I18)', () => {
       tables[tbl] = (
         await json<{ rows: Record<string, unknown>[] }>(
           await api(
-            `/admin/tenants/${a.tenantId}/export?tbl=${tbl}&limit=1000`,
+            `/admin/tenants/${a.tenantId}/export?tbl=${tbl}&limit=1000&before=${exportCutoff}`,
           ),
         )
       ).rows;

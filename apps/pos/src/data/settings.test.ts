@@ -171,7 +171,7 @@ describe('settings helpers', () => {
       show_payment_details: true,
       show_cashier_on_receipt: true,
       show_you_saved: false,
-      print_warranty: false,
+      print_warranty: true,
     });
     expect(
       shopSettings({

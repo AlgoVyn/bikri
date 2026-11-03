@@ -110,8 +110,8 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
   } while (cursor);
   if (used + body.byteLength > MAX_TENANT_FILE_BYTES)
     throw new ApiError(
-      'TENANT_QUOTA',
-      429,
+      'TENANT_STORAGE_FULL',
+      507,
       'This shop has reached its file storage limit',
     );
   await c.env.FILES.put(key, body, { httpMetadata: { contentType: type } });

@@ -117,6 +117,18 @@ describe('client/server sync contract regressions', () => {
     const res = await pushOk(shop.till, [
       op('supplier_returns', 'insert', head, { tx_id: tx }),
       op('supplier_return_lines', 'insert', line, { tx_id: tx }),
+      op(
+        'ledger_entries',
+        'insert',
+        {
+          ...ledger,
+          id: newId(now),
+          amount: -Number(head.total),
+          source_type: 'supplier_return',
+          source_id: returnId,
+        },
+        { tx_id: tx },
+      ),
       op('payments', 'insert', payment, { tx_id: tx }),
       op('ledger_entries', 'insert', ledger, { tx_id: tx }),
     ]);

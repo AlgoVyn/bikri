@@ -13,6 +13,7 @@ import {
   buildRefundReceipt,
   buildSaleReceipt,
   buildTestPrint,
+  buildVoidNotice,
   POWERED_BY,
   type RefundReceipt,
   renderReceiptText,
@@ -285,6 +286,30 @@ describe('test print (06 §4.3, §8)', () => {
         printLogo: false,
       }).some((b) => b.t === 'drawer' || b.t === 'logo'),
     ).toBe(false);
+  });
+});
+
+describe('void notice (06 §4.3)', () => {
+  it('prints the cancellation, original bill, reason and replacement', () => {
+    const shop = saleBasicInput().shop;
+    const blocks = buildVoidNotice(
+      {
+        shop,
+        staffName: 'Owner',
+        originalInvoiceNo: 'INV-A-7',
+        originalCreatedAt: Date.parse('2026-10-27T10:00:00Z'),
+        voidCreatedAt: Date.parse('2026-10-27T11:00:00Z'),
+        reason: 'Wrong item',
+        replacementInvoiceNo: 'INV-A-8',
+      },
+      { paperMm: 80 },
+    );
+    const text = renderReceiptText(blocks, resolvePaper({ paperMm: 80 }));
+    expect(text).toContain('BILL CANCELLED');
+    expect(text).toContain('INV-A-7');
+    expect(text).toContain('Wrong item');
+    expect(text).toContain('INV-A-8');
+    expect(text).toContain(POWERED_BY);
   });
 });
 
