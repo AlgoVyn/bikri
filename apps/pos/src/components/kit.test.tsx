@@ -10,6 +10,7 @@ import { KeyBadge } from './KeyBadge.tsx';
 import { filterMoneyDraft, MoneyInput } from './MoneyInput.tsx';
 import { MoneyText } from './MoneyText.tsx';
 import { OverrideDialog } from './OverrideDialog.tsx';
+import { PastDatePicker } from './PastDatePicker.tsx';
 import { PhoneInput } from './PhoneInput.tsx';
 import { QtyInput } from './QtyInput.tsx';
 import { isRapidBarcode, SearchBox } from './SearchBox.tsx';
@@ -31,6 +32,18 @@ function PhoneHarness() {
       onChange={(next) => {
         setValue(next ?? '');
       }}
+    />
+  );
+}
+
+function PastDateHarness() {
+  const [value, setValue] = useState('2026-10-27');
+  return (
+    <PastDatePicker
+      label="Sale date"
+      value={value}
+      today="2026-10-27"
+      onChange={setValue}
     />
   );
 }
@@ -137,6 +150,26 @@ describe('money and quantity fields', () => {
     );
     expect(node.tagName).toBe('BDI');
     expect(node.getAttribute('dir')).toBe('ltr');
+  });
+});
+
+describe('past date picker', () => {
+  it('selects a past day, goes back months, and only disables future days', async () => {
+    const user = userEvent.setup();
+    render(<PastDateHarness />);
+    expect(
+      screen.getByTestId('backdate-selected-date').getAttribute('data-date'),
+    ).toBe('2026-10-27');
+    await user.click(screen.getByTestId('backdate-prev-month'));
+    await user.click(screen.getByTestId('backdate-day-2026-09-15'));
+    expect(
+      screen.getByTestId('backdate-selected-date').getAttribute('data-date'),
+    ).toBe('2026-09-15');
+    await user.click(screen.getByTestId('backdate-next-month'));
+    expect(
+      (screen.getByTestId('backdate-day-2026-10-28') as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });
 

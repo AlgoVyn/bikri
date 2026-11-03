@@ -41,7 +41,7 @@ The three cart tabs keep separate sales; **Hold** parks a bill and **Resume** br
 
 ### Recording a missed sale
 
-If a sale was not entered, open **Sales → Record past sale**. Pick the sale date (today or up to 30 days back), the cashier who made it, and why it was missed. The sale is recorded on the current device with the chosen date and the cashier's name; you are recorded as the person who entered it in Activity. **The cash must be with you, not in the till.** The original till's day close is never changed: if that till is still open and the cash is there, record the cash handover as a pay-out or take the cash before closing. Cancel writes nothing. The sale shows a **Late** badge and prints `RECORDED LATE`; reports put it on the chosen day.
+If a sale was not entered, open **Sales → Record past sale**. Pick the sale date (any past date; the calendar goes back as far as you need), the cashier who made it, and why it was missed. The sale is recorded on the current device with the chosen date and the cashier's name; you are recorded as the person who entered it in Activity. **The cash must be with you, not in the till.** The original till's day close is never changed: if that till is still open and the cash is there, record the cash handover as a pay-out or take the cash before closing. Cancel writes nothing. The sale shows a **Late** badge and prints `RECORDED LATE`; reports put it on the chosen day.
 
 ## 5. Udhaar (khata)
 

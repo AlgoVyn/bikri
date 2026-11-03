@@ -48,7 +48,7 @@ describe('record a past sale (D-173)', () => {
     expect(await db.outbox.count()).toBe(0);
   });
 
-  it('rejects a non-owner, an out-of-range date, a future date, an empty reason and an inactive cashier', async () => {
+  it('rejects a non-owner, a future date, an empty reason and an inactive cashier', async () => {
     const { db } = await withCashier();
     await expect(
       startBackdate(db, {
@@ -59,15 +59,6 @@ describe('record a past sale (D-173)', () => {
         now: NOW,
       }),
     ).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(
-      startBackdate(db, {
-        actorId: 'st-1',
-        date: addDays(TODAY, -31),
-        staffId: 'st-2',
-        reason: 'x',
-        now: NOW,
-      }),
-    ).rejects.toMatchObject({ code: 'range' });
     await expect(
       startBackdate(db, {
         actorId: 'st-1',
@@ -104,6 +95,23 @@ describe('record a past sale (D-173)', () => {
         now: NOW,
       }),
     ).rejects.toBeInstanceOf(BackdateError);
+  });
+
+  it('accepts a date older than 30 days (no cap)', async () => {
+    const { db } = await withCashier();
+    const old = addDays(TODAY, -400);
+    const { cartId } = await startBackdate(db, {
+      actorId: 'st-1',
+      date: old,
+      staffId: 'st-2',
+      reason: 'Old missed sale',
+      now: NOW,
+    });
+    expect((await db.carts.get(cartId))?.backdate).toEqual({
+      business_date: old,
+      staff_id: 'st-2',
+      reason: 'Old missed sale',
+    });
   });
 
   it('writes the sale on the chosen date, attributes it to the cashier and audits the owner recorder', async () => {

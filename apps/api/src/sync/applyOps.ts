@@ -70,12 +70,6 @@ function isBusinessDate(value: unknown): value is string {
   );
 }
 
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 /** Audit actions a till may write; operator/tenant lifecycle rows are server-only. */
 const CLIENT_AUDIT_ACTIONS = new Set([
   'branch_change',
@@ -1694,7 +1688,6 @@ function checkBackdatedSale(
   const business = String(row.business_date ?? '');
   if (business === opDate) return;
   if (business > opDate) throw new Reject('CONSTRAINT_FAILED');
-  if (business < addDays(opDate, -30)) throw new Reject('CONSTRAINT_FAILED');
   const audit = group.find(
     (candidate) =>
       candidate.tbl === 'audit_log' &&

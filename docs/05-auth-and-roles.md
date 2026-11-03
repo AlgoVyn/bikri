@@ -126,7 +126,7 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 | insert `refunds` | staff has `refund.create`, or an `audit_log` row `action = 'override'`, `entity = 'refunds'`, `entity_id = <refund id>`, `after_json.permission = 'refund.create'`, whose `approved_by` staff has the permission, is applied in the **same batch** (the refund op is applied only together with it) |
 | insert `sale_voids` | `sale.void` (or override, same linking rule); a manager only when the sale's `business_date` equals the void's `business_date` |
 | insert `sale_lines` with `below_cost = 1` | the sale's staff has `sale.below_cost`, or an override audit row for the sale (same linking rule) |
-| insert `sales` | `sale.create`; a line priced below the product's current price needs `catalog.edit` or a line-bound override; any discount needs `sale.discount`, and a discount above the staff's `max_discount_bp` needs an override; udhaar needs `sale.udhaar`; a sale whose `business_date` is earlier than the op's business date needs a `sale_backdated` audit row in the same batch, written by staff with `sale.backdate`, naming the attributed staff, date and reason (30-day cap; no future date) |
+| insert `sales` | `sale.create`; a line priced below the product's current price needs `catalog.edit` or a line-bound override; any discount needs `sale.discount`, and a discount above the staff's `max_discount_bp` needs an override; udhaar needs `sale.udhaar`; a sale whose `business_date` is earlier than the op's business date needs a `sale_backdated` audit row in the same batch, written by staff with `sale.backdate`, naming the attributed staff, date and reason (any past date; no future date) |
 | insert `expenses` | `expense.create`; for a cashier: `method = 'cash'` and `amount ≤ 200000` (Rs 2,000) unless overridden |
 | insert `supplier_returns` (and its lines, payment, ledger rows) | staff has `purchase.create` |
 | insert `ledger_entries` | `opening`/`sale`/`refund`/`void`/`payment`/`purchase`/`supplier_return` must carry the source document in the same transaction; `adjustment` is owner/manager only |
@@ -149,7 +149,7 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 | `sale.udhaar` | Put a bill on udhaar | ✔ | ✔ | ✔ |
 | `sale.below_cost` | Complete a sale with a below-cost line without override | ✔ | ✔ | ✘ |
 | `sale.void` | Void / reissue a bill | ✔ | ✔ (same day only) | ✘ |
-| `sale.backdate` | Record a past sale on its real business date (owner device, date only, 30-day cap) | ✔ | ✘ (grant per person if needed) | ✘ |
+| `sale.backdate` | Record a past sale on its real business date (owner device, date only, any past date) | ✔ | ✘ (grant per person if needed) | ✘ |
 | `refund.create` | Refund whole/partial | ✔ | ✔ | ✘ |
 | `drawer.open` | Open drawer without a sale (F9) | ✔ | ✔ | ✘ |
 | `cash.move` | Pay-in / pay-out | ✔ | ✔ | ✘ |

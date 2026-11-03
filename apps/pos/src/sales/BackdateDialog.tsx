@@ -7,13 +7,12 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { DateField } from '../components/DateField.tsx';
+import { PastDatePicker } from '../components/PastDatePicker.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
-  addDays,
-  BACKDATE_DAYS,
   BACKDATE_REASON_MAX,
   BackdateError,
+  isBusinessDate,
   startBackdate,
 } from '../data/backdate.ts';
 import { type CartId, CartNotEmptyError } from '../data/cart.ts';
@@ -55,7 +54,6 @@ export function BackdateDialog({
         String(a.name).localeCompare(String(b.name)),
     );
   }, []);
-  const min = addDays(today, -BACKDATE_DAYS);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +64,7 @@ export function BackdateDialog({
   }, [open, today, staff?.id]);
 
   const valid =
-    date >= min &&
+    isBusinessDate(date) &&
     date <= today &&
     staffId !== '' &&
     reason.trim().length > 0 &&
@@ -113,13 +111,12 @@ export function BackdateDialog({
       sheet
     >
       <div className="flex flex-col gap-3">
-        <DateField
+        <PastDatePicker
           label={t('office.backdate.date')}
+          hint={t('office.backdate.date_hint')}
           value={date}
-          min={min}
-          max={today}
+          today={today}
           onChange={setDate}
-          hint={t('office.backdate.date_hint', { days: BACKDATE_DAYS })}
         />
         <label className="flex flex-col gap-1 text-small">
           <span>{t('office.backdate.staff')}</span>

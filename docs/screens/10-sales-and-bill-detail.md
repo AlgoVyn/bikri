@@ -34,7 +34,7 @@ Body: lines table (name, qty, unit price, line discount, line total, refunded qt
 
 ### Record a past sale
 
-Owner-only dialog from the Sales page (`sale.backdate`). Fields: **Sale date** (date only, today or up to 30 days back; the time of day is the entry time and is not asked), **Made by** (an active owner/manager/cashier; this person is the sale's `staff_id` in reports), **Why was it missed?** (required, 1–120). A warning says the cash must be with the owner, not in the till.
+Owner-only dialog from the Sales page (`sale.backdate`). Fields: **Sale date** (calendar with Today/Yesterday/7-day/30-day presets and month arrows that go back indefinitely; any past date, only future dates disabled; the time of day is the entry time and is not asked), **Made by** (an active owner/manager/cashier; this person is the sale's `staff_id` in reports), **Why was it missed?** (required, 1–120). A warning says the cash must be with the owner, not in the till.
 
 On start, the owner's current device opens an empty cart with the date/staff/reason. The cart shows a banner "Recording a past sale · <date> · <staff>" with the reason and `Cancel past sale`. Payment writes a normal sale on this device with `business_date` = the chosen date, `created_at` = the entry time, and the attributed cashier; it also writes `audit_log sale_backdated` with the owner as recorder, the attributed staff, date and reason. The original till's day close is never changed; the sale counts in the chosen day's reports and in this device's current drawer period if it closes. Cancel = nothing written.
 
@@ -54,5 +54,5 @@ Opens the Sell screen in a new cart tab prefilled with the original lines, custo
 4. Export CSV of 7 days has one row per bill with columns `invoice_no,date,time,customer,items,subtotal,discounts,tax,total,cash,card,bank_wallet,udhaar,refunded,status,cashier,device`.
 5. A bill with a failed print shows the red icon until a reprint succeeds.
 6. Owner records a missed cash sale for yesterday: it appears under yesterday with a **Late** badge, the cashier filter finds it, the bill detail shows the reason, and the day close of the original till is unchanged.
-7. A cashier/manager cannot see `Record past sale`; a sale dated more than 30 days back or in the future is refused; cancelling the dialog or the cart writes nothing.
+7. A cashier/manager cannot see `Record past sale`; a future date is refused and an old date is accepted; cancelling the dialog or the cart writes nothing.
 8. The receipt of a backdated bill prints the sale date and `RECORDED LATE`, not the entry date.

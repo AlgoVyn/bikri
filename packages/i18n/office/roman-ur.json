@@ -984,7 +984,7 @@
       "title": "Purani sale darj karein",
       "subtitle": "Chhoot gayi sale darj karein. Ye isi device par asal date ke sath save hogi.",
       "date": "Sale ki date",
-      "date_hint": "{{days}} din peeche tak. Waqt darj karne ka waqt hoga.",
+      "date_hint": "Woh din chunein jis din sale hui. Aage ki date nahi chalegi.",
       "staff": "Kis ne ki",
       "staff_placeholder": "Cashier chunein",
       "role_owner": "Malik",
@@ -995,11 +995,17 @@
       "warning": "Sale {{staff}} ke naam hogi. Cash aap ke paas hona chahiye, drawer mein nahi.",
       "start": "Purani sale shuru karein",
       "error_date": "Sahi date darj karein.",
-      "error_range": "Pichhle 30 din ke andar date chunein.",
+      "error_range": "Pichhli date chunein (aage ki nahi).",
       "error_reason": "Wajah likhein (1–120 characters).",
       "error_forbidden": "Sirf malik purani sale darj kar sakta hai.",
       "error_staff": "Active cashier chunein.",
-      "error_generic": "Purani sale shuru nahi ho saki."
+      "error_generic": "Purani sale shuru nahi ho saki.",
+      "preset_today": "Aaj",
+      "preset_yesterday": "Kal",
+      "preset_7d": "7 din pehle",
+      "preset_30d": "30 din pehle",
+      "prev_month": "Pichhla mahina",
+      "next_month": "Agla mahina"
     }
   }
 }

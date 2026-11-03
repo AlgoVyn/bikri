@@ -119,13 +119,18 @@ describe('backdated sales (D-173)', () => {
     expect(res.results[0]?.error_code).toBe('FORBIDDEN');
   });
 
-  it('rejects a date older than 30 days and a future date', async () => {
+  it('accepts a date older than 30 days and rejects a future date', async () => {
     const shop = await seedShop('BackdateRange');
     const old = await pushOk(
       shop.till,
-      backdatedSale(shop, { date: addDays(today, -31), seq: 1 }).ops,
+      backdatedSale(shop, { date: addDays(today, -400), seq: 1 }).ops,
     );
-    expect(old.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(old.results.map((r) => r.error_code ?? null)).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
     const future = await pushOk(
       shop.till,
       backdatedSale(shop, { date: addDays(today, 1), seq: 2 }).ops,

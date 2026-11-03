@@ -35,12 +35,15 @@ async function recordPastSale(page: Page, lang: 'en' | 'ur') {
   // A raw IndexedDB write is not seen by Dexie's liveQuery; reload so the dialog lists it.
   await page.reload();
   await expect(page.getByTestId('record-past-sale')).toBeVisible();
-  const date = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
 
   await page.getByTestId('record-past-sale').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await dialog.locator('input[type="date"]').fill(date);
+  await dialog.getByTestId('backdate-preset-yesterday').click();
+  const date = await dialog
+    .getByTestId('backdate-selected-date')
+    .getAttribute('data-date');
+  expect(date).toBeTruthy();
   await expect(
     dialog.getByTestId('backdate-staff').locator('option'),
   ).toHaveCount(3);

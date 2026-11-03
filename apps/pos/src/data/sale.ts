@@ -7,12 +7,7 @@ import {
   newId,
 } from '@bikri/core';
 import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
-import {
-  addDays,
-  BACKDATE_DAYS,
-  BACKDATE_REASON_MAX,
-  isBusinessDate,
-} from './backdate.ts';
+import { addDays, BACKDATE_REASON_MAX, isBusinessDate } from './backdate.ts';
 import {
   type CartId,
   CartNotEmptyError,
@@ -188,8 +183,6 @@ export async function completeSale(
     if (!isBusinessDate(backdate.business_date))
       throw new SaleInvalidError('backdate date');
     if (backdate.business_date > today)
-      throw new SaleInvalidError('backdate range');
-    if (backdate.business_date < addDays(today, -BACKDATE_DAYS))
       throw new SaleInvalidError('backdate range');
     const reason = backdate.reason.trim();
     if (reason.length === 0 || reason.length > BACKDATE_REASON_MAX)

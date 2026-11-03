@@ -12,8 +12,7 @@ import {
 } from './cart.ts';
 import { ReadOnlyError } from './write.ts';
 
-/** How far back an owner may record a sale (screens/10 "Record past sale"). */
-export const BACKDATE_DAYS = 30;
+/** How far back an owner may record a sale: any past business date (D-174). */
 export const BACKDATE_REASON_MAX = 120;
 
 export class BackdateError extends Error {
@@ -70,8 +69,6 @@ export async function startBackdate(
   const today = businessDate(now, timeZone);
   if (!isBusinessDate(input.date)) throw new BackdateError('date');
   if (input.date > today) throw new BackdateError('range');
-  if (input.date < addDays(today, -BACKDATE_DAYS))
-    throw new BackdateError('range');
   const reason = input.reason.trim();
   if (reason.length === 0 || reason.length > BACKDATE_REASON_MAX)
     throw new BackdateError('reason');

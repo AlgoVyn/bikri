@@ -984,7 +984,7 @@
       "title": "Record a past sale",
       "subtitle": "Enter a sale that was missed. It is recorded on this device with the date it happened.",
       "date": "Sale date",
-      "date_hint": "Up to {{days}} days back. The time is the entry time.",
+      "date_hint": "Choose the day the sale happened. Future dates are not allowed.",
       "staff": "Made by",
       "staff_placeholder": "Choose a cashier",
       "role_owner": "Owner",
@@ -995,11 +995,17 @@
       "warning": "The sale will be attributed to {{staff}}. The cash must be with you, not in the till.",
       "start": "Start past sale",
       "error_date": "Enter a valid date.",
-      "error_range": "Choose a date within the last 30 days.",
+      "error_range": "Choose a past date (not in the future).",
       "error_reason": "Write a reason (1–120 characters).",
       "error_forbidden": "Only the owner can record a past sale.",
       "error_staff": "Choose an active cashier.",
-      "error_generic": "Could not start the past sale."
+      "error_generic": "Could not start the past sale.",
+      "preset_today": "Today",
+      "preset_yesterday": "Yesterday",
+      "preset_7d": "7 days ago",
+      "preset_30d": "30 days ago",
+      "prev_month": "Previous month",
+      "next_month": "Next month"
     }
   }
 }
