@@ -34,6 +34,8 @@
     "status_error_body": "Try again in a moment.",
     "status_reason": "Reason: {{reason}}",
     "status_created": "Requested {{date}}",
-    "status_back": "Back to the request form"
+    "status_back": "Back to the request form",
+    "already_have_code": "Already have a pairing code?",
+    "connect_device": "Connect this device"
   }
 }

@@ -140,7 +140,9 @@
     "leave_confirm": "{{shop}} ko is browser se hatayein? Is device par us ka saara data mit jayega; dukaan ka sync shuda data mehfooz rahega.",
     "leave_blocked": "{{count}} tabdeeliyan abhi sync nahin huin. Pehle unhein export karein, phir niklein.",
     "revoked": "Maalik ne is device ko munqata kar diya hai. Jo sales sync nahin huin woh isi device par mehfooz hain.",
-    "export_unsynced": "Ghair sync data export karein"
+    "export_unsynced": "Ghair sync data export karein",
+    "request_shop_hint": "Pairing code nahi hai?",
+    "request_shop_link": "Dukan ki darkhwast karein"
   },
   "errors": {
     "generic": "Kuch ghalat ho gaya. Dobara koshish karein.",

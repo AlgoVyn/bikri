@@ -34,6 +34,8 @@
     "status_error_body": "Thori der baad dobara koshish karein.",
     "status_reason": "Wajah: {{reason}}",
     "status_created": "Darkhwast {{date}}",
-    "status_back": "Darkhwast ke form par wapas"
+    "status_back": "Darkhwast ke form par wapas",
+    "already_have_code": "Pehle se pairing code hai?",
+    "connect_device": "Ye device jorein"
   }
 }

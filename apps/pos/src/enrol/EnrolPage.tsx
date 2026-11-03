@@ -1,4 +1,5 @@
 /** Enrol this device (screens/02, T-034). Rendered by the gate without the app shell. */
+import { BASE_PATH } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -403,6 +404,15 @@ export function EnrolPage({
           {busy ? t('enrol.connecting') : t('enrol.connect')}
         </button>
       </form>
+      <p className="border-t border-border pt-3 text-center text-small text-text-muted">
+        {t('enrol.request_shop_hint')}{' '}
+        <a
+          className="text-primary underline underline-offset-2"
+          href={`${BASE_PATH}/request`}
+        >
+          {t('enrol.request_shop_link')}
+        </a>
+      </p>
       {tab === 'new' ? (
         <details className="text-small">
           <summary className="cursor-pointer text-primary">

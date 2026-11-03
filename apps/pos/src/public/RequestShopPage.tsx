@@ -220,6 +220,15 @@ function RequestShop() {
           {busy ? t('register.submitting') : t('register.submit')}
         </button>
       </form>
+      <p className="text-center text-small text-text-muted">
+        {t('register.already_have_code')}{' '}
+        <a
+          className="text-primary underline underline-offset-2"
+          href={`${BASE_PATH}/enrol`}
+        >
+          {t('register.connect_device')}
+        </a>
+      </p>
     </main>
   );
 }

@@ -36,6 +36,19 @@ for (const lang of ['en', 'ur'] as const) {
   });
 }
 
+test('enrol page links new visitors to the request form', async ({ page }) => {
+  await page.goto('/bikri/enrol');
+  const link = page.getByRole('link', { name: 'Request a shop' });
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(
+    page.getByRole('heading', { name: 'Request a Bikri shop' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Connect this device' }),
+  ).toBeVisible();
+});
+
 test.describe('operator request approval', () => {
   test.beforeEach(({ browserName: _b }, testInfo) => {
     test.skip(

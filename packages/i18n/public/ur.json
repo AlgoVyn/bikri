@@ -34,6 +34,8 @@
     "status_error_body": "تھوڑی دیر بعد دوبارہ کوشش کریں۔",
     "status_reason": "وجہ: {{reason}}",
     "status_created": "درخواست {{date}}",
-    "status_back": "درخواست کے فارم پر واپس"
+    "status_back": "درخواست کے فارم پر واپس",
+    "already_have_code": "پہلے سے پیرنگ کوڈ ہے؟",
+    "connect_device": "یہ ڈیوائس جوڑیں"
   }
 }

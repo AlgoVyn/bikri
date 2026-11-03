@@ -140,7 +140,9 @@
     "leave_confirm": "Remove {{shop}} from this browser? All its data on this device is deleted; the shop keeps its synced data.",
     "leave_blocked": "{{count}} changes are not synced yet. Export them first, then leave.",
     "revoked": "This device was disconnected by the owner. Unsynced sales were kept on this device.",
-    "export_unsynced": "Export unsynced data"
+    "export_unsynced": "Export unsynced data",
+    "request_shop_hint": "Do not have a pairing code?",
+    "request_shop_link": "Request a shop"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
