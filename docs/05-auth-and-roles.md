@@ -93,10 +93,10 @@ Owner's choice: **email sign-in** is the stronger sign-in for shop owners. It is
 
 **Limits and abuse protection.**
 - Code: 6 digits, expires after **10 minutes**, single use, at most **5 wrong tries** (then dead).
-- Sending: one code per device per **60 seconds** (resend cooldown), at most **5 codes per shop per hour** and **20 per day** (counted from `owner_email_codes` by `(tenant_id, created_at)`); over the limit → `429 RATE_LIMITED` with `Retry-After`. Starting a new code kills the previous unused one.
+- Sending: one code per device per **60 seconds** (resend cooldown), at most **5 codes per shop per hour** and **20 per day** (counted from `owner_email_codes` by `(tenant_id, created_at)`); over the limit → `429 RATE_LIMITED` with `Retry-After`. The insert is conditional on those counts, so concurrent starts cannot exceed them. Starting a new code kills the previous unused one.
 - Per-IP: Workers Rate Limiting binding `OWNER_SIGNIN_LIMIT` (`simple: { limit: 10, period: 60 }`, key `ip:<CF-Connecting-IP>`) on both endpoints; approximate, a second line of defence.
 - Only the shop's own owner can ask, only from the shop's own admin device, and the address is never in the request: nobody can make Bikri email an arbitrary address, and other shops' owners cannot be reached.
-- After 3 dead codes in an hour the shop's sign-in pauses for 1 hour and the console flags the shop.
+- After 3 dead codes in an hour the shop's sign-in pauses for 1 hour from the newest dead code and the console flags the shop. A wrong try is claimed with a conditional update before the HMAC comparison, so parallel guesses share the five-try budget.
 - Every successful sign-in writes `audit_log` `owner_signin` (staff, device) in the shop; failures are counted in Workers Logs (no codes, no addresses).
 - Rows in `owner_email_codes` are deleted by the nightly cron 1 day after they expire.
 - Secrets `OWNER_CODE_KEY` and `OWNER_SESSION_KEY` (32 random bytes each, `wrangler secret put`); rotating `OWNER_SESSION_KEY` signs every owner out.

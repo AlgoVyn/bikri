@@ -61,8 +61,9 @@ function RequestShop() {
         status_token?: unknown;
       } | null;
       if (response.status === 202) {
+        // A duplicate email gets no new status token; the original applicant keeps it.
         setToken(
-          typeof body?.status_token === 'string' ? body.status_token : null,
+          typeof body?.status_token === 'string' ? body.status_token : '',
         );
         return;
       }
@@ -91,13 +92,15 @@ function RequestShop() {
             {t('register.success_title')}
           </h1>
           <p className="mt-2 text-text-muted">{t('register.success_body')}</p>
-          <a
-            data-testid="register-status-link"
-            className={`${buttonPrimary} mt-5 inline-flex`}
-            href={`${BASE_PATH}/request-status#${encodeURIComponent(token)}`}
-          >
-            {t('register.check_status')}
-          </a>
+          {token ? (
+            <a
+              data-testid="register-status-link"
+              className={`${buttonPrimary} mt-5 inline-flex`}
+              href={`${BASE_PATH}/request-status#${encodeURIComponent(token)}`}
+            >
+              {t('register.check_status')}
+            </a>
+          ) : null}
         </section>
       </main>
     );

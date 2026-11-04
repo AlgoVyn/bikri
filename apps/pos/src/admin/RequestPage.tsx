@@ -238,7 +238,13 @@ export function RequestPage({ id }: { id: string }) {
             <Field label={t('admin.request_city')} value={request.city} />
             <Field
               label={t('admin.request_business_type')}
-              value={request.business_type}
+              value={
+                request.business_type
+                  ? t(`admin.request_business_${request.business_type}`, {
+                      defaultValue: request.business_type,
+                    })
+                  : '—'
+              }
             />
             <Field
               className="sm:col-span-2"

@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
 import { op, pushOk } from './helpers/ops.ts';
@@ -130,7 +130,7 @@ function referenceSaleOps(
     device_id: shop.till.id,
     staff_id: IDS.owner,
     customer_id: IDS.customer,
-    business_date: '2026-10-27',
+    business_date: businessDate(now),
     created_at: now,
     line_count: REFERENCE_LINES,
     items_qty_milli: 3000,
@@ -207,7 +207,7 @@ function referenceSaleOps(
         branch_id: shop.branchId,
         device_id: shop.till.id,
         staff_id: IDS.cashier,
-        business_date: '2026-10-27',
+        business_date: businessDate(now),
         created_at: now,
       },
       { tx_id: tx },
@@ -226,7 +226,7 @@ function referenceSaleOps(
         branch_id: shop.branchId,
         device_id: shop.till.id,
         staff_id: IDS.cashier,
-        business_date: '2026-10-27',
+        business_date: businessDate(now),
         created_at: now,
       },
       { tx_id: tx },
@@ -249,7 +249,7 @@ function referenceSaleOps(
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.cashier,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
         },
         { tx_id: tx },

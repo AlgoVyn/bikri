@@ -183,8 +183,13 @@ export function removeLine(cart: Cart, key: string): Cart {
 }
 
 export function addOverride(cart: Cart, override: CartOverride): Cart {
+  // A catalog price approval is per line; keep the other line approvals. Every other
+  // permission is a single approval for the whole action.
   const rest = (cart.overrides ?? []).filter(
-    (o) => o.permission !== override.permission,
+    (o) =>
+      o.permission !== override.permission ||
+      (override.permission === 'catalog.edit' &&
+        o.bound_line !== override.bound_line),
   );
   return { ...cart, overrides: [...rest, override] };
 }
@@ -218,15 +223,17 @@ export function overrideMatches(
   permission: string,
   options: { udhaar?: number; line?: string; price?: number } = {},
 ): boolean {
-  const override = (cart.overrides ?? []).find(
+  const overrides = (cart.overrides ?? []).filter(
     (candidate) => candidate.permission === permission,
   );
-  if (!override) return false;
   if (permission === 'catalog.edit')
-    return (
-      override.bound_line === options.line &&
-      override.bound_price === options.price
+    return overrides.some(
+      (override) =>
+        override.bound_line === options.line &&
+        override.bound_price === options.price,
     );
+  const override = overrides[0];
+  if (!override) return false;
   if (override.bound_cart !== cartSignature(cart)) return false;
   if (permission === 'udhaar.hard_limit')
     return (

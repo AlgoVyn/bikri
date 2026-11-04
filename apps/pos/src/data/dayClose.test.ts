@@ -368,6 +368,41 @@ describe('day close (T-047)', () => {
     ).toMatchObject([{ action: 'day_close_difference' }]);
   });
 
+  it('returns a concurrent close when the form was prepared for the old period', async () => {
+    const { db, ctx } = await setup('concurrent');
+    const first = await closeDay(
+      db,
+      { dayCloseId: 'first', countedCash: 0, note: 'First' },
+      ctx,
+      { now: NOW + 1000, print: false },
+    );
+    const duplicate = await closeDay(
+      db,
+      {
+        dayCloseId: 'second',
+        countedCash: 5000,
+        note: 'Stale form',
+        expectedPeriodStart: Number(first.period_start),
+      },
+      ctx,
+      { now: NOW + 2000, print: false },
+    );
+    expect(duplicate.id).toBe(first.id);
+    expect(await db.day_closes.count()).toBe(1);
+    const next = await closeDay(
+      db,
+      {
+        dayCloseId: 'third',
+        countedCash: 0,
+        note: 'Fresh period',
+        expectedPeriodStart: Number(first.period_end),
+      },
+      ctx,
+      { now: NOW + 3000, print: false },
+    );
+    expect(next.id).not.toBe(first.id);
+  });
+
   it('keeps devices apart and is idempotent', async () => {
     const { db, ctx } = await setup('devices');
     await db.payments.add(

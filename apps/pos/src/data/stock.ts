@@ -334,6 +334,13 @@ export async function finishCount(
           movements += 1;
           valueDiff += mulDivRound(delta, Number(product.avg_cost ?? 0), 1000);
         }
+        // Persist the applied ids in the same transaction as the movements. If the tab
+        // dies after this commit, the retry skips the chunk instead of re-applying the
+        // count over sales that happened in between.
+        const nextApplied = [...new Set([...applied, ...slice])];
+        await w
+          .table<{ key: string; value: CountDraft }>('kv')
+          .put({ key: DRAFT_KEY, value: { ...source, applied: nextApplied } });
         return { movements, counted, valueDiff };
       },
       { now },

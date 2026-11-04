@@ -220,9 +220,6 @@ function BackupContent() {
         <p className="mt-1 text-small text-text-muted">
           {t('office.backup.restore_hint')}
         </p>
-        <button type="button" className={buttonQuiet} disabled>
-          {t('office.backup.restore')}
-        </button>
       </section>
     </SettingsPageLayout>
   );

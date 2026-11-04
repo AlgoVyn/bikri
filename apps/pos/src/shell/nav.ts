@@ -18,6 +18,8 @@ export type NavItem = {
   Icon: () => React.JSX.Element;
   /** Hidden (and its route refused) without this permission (screens/04). */
   perm: Permission | null;
+  /** Shown when the user has any of these permissions instead of a single `perm`. */
+  permAny?: readonly Permission[];
   /** Shown in the phone bottom bar; the rest live under More. */
   bar: boolean;
 };
@@ -68,7 +70,8 @@ export const NAV: readonly NavItem[] = [
     label: 'nav.suppliers',
     keys: 'Ctrl+Shift+6',
     Icon: SuppliersIcon,
-    perm: 'purchase.create',
+    perm: null,
+    permAny: ['party.edit', 'purchase.create'],
     bar: false,
   },
   {

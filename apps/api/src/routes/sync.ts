@@ -231,15 +231,21 @@ export async function snapshotPayload(
     limit: query('limit') ?? undefined,
     before: query('before') ?? undefined,
   });
+  // `sync_conflicts` records its time in `at`; the other export tables use `created_at`.
+  const cutoffColumn = (tbl: string): string | null =>
+    tbl === 'sync_conflicts'
+      ? 'at'
+      : columnsOf(tbl as Parameters<typeof columnsOf>[0]).includes('created_at')
+        ? 'created_at'
+        : null;
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
     const res = await db.batch(
       SNAPSHOT_TABLES.map((tbl) => {
-        const cut =
-          q.before !== undefined && columnsOf(tbl).includes('created_at');
+        const column = q.before === undefined ? null : cutoffColumn(tbl);
         return db.prepare(
-          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${cut ? ' AND created_at <= ?2' : ''}`,
-          ...(cut ? [q.before as number] : []),
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${column ? ` AND ${column} <= ?2` : ''}`,
+          ...(column ? [q.before as number] : []),
         );
       }),
     );
@@ -254,10 +260,12 @@ export async function snapshotPayload(
     };
   }
   const limit = Math.min(q.limit, maxLimit);
-  const cut = q.before !== undefined && columnsOf(q.tbl).includes('created_at');
+  const column = q.before === undefined ? null : cutoffColumn(q.tbl);
   const rows = await db.select(
-    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${cut ? ' AND created_at <= ?3' : ''} ORDER BY id LIMIT ?${cut ? 4 : 3}`,
-    ...(cut ? [q.after, q.before as number, limit + 1] : [q.after, limit + 1]),
+    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
+    ...(column
+      ? [q.after, q.before as number, limit + 1]
+      : [q.after, limit + 1]),
   );
   const page = rows.slice(0, limit);
   addRowsRead(tenant.id, page.length);

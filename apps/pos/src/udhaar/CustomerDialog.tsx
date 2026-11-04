@@ -59,6 +59,7 @@ export function CustomerDialog({
     [editing?.id],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens or another customer is selected; a live row update must not wipe typed input.
   useEffect(() => {
     if (!open) return;
     setName(editing ? String(editing.name) : '');
@@ -76,7 +77,7 @@ export function CustomerDialog({
     setOpening(null);
     setDuplicate(null);
     setPending(false);
-  }, [open, editing]);
+  }, [open, editing?.id]);
 
   const save = async () => {
     if (name.trim() === '' || pending) return;

@@ -189,6 +189,8 @@ export type CloseDayInput = {
   note?: string;
   /** First close only: opening float. */
   openingCash?: number;
+  /** The period start the form was showing; a newer close means another tab finished first. */
+  expectedPeriodStart?: number;
 };
 
 export type CloseDayOptions = {
@@ -212,20 +214,15 @@ export async function closeDay(
     db,
     async (w) => {
       const data = await dayCloseData(w, ctx.device_id, now, input.openingCash);
-      // Two tabs can prepare the same period; the second must return the first close,
-      // not open a second drawer period with the same opening float.
-      const duplicate = (
-        await (w.table('day_closes') as Table<SyncedRow>)
-          .where('[device_id+period_end]')
-          .between(
-            [ctx.device_id, data.periodStart],
-            [ctx.device_id, now],
-            true,
-            true,
-          )
-          .toArray()
-      ).find((row) => n(row.period_start) === data.periodStart);
-      if (duplicate) return duplicate;
+      // Two tabs can prepare the same period. If a close finished after this form
+      // captured its period, return that close instead of appending an empty period
+      // with a second counted amount.
+      if (
+        input.expectedPeriodStart !== undefined &&
+        data.recentClose &&
+        n(data.recentClose.period_end) > input.expectedPeriodStart
+      )
+        return data.recentClose;
       const result = computeDayClose({
         ...data.components,
         counted_cash: input.countedCash,

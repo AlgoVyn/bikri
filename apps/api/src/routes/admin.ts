@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import type { OperatorVars } from '../middleware/accessAuth.ts';
+import { readJsonBody } from '../middleware/body.ts';
 import {
   createTenant,
   enrolLink,
@@ -439,7 +440,11 @@ admin.post('/tenants/:id/support-access', async (c) => {
     );
   }
   const now = Date.now();
-  const until = now + body.hours * 3_600_000;
+  // Starting again extends an existing grant; it must never shorten it.
+  const until = Math.max(
+    tenant.support_until ?? 0,
+    now + body.hours * 3_600_000,
+  );
   const branch = await defaultBranch(db);
   const code = await enrolmentCodeStatement(c.env, tenant.id, {
     device_name: 'Algovyn support',
@@ -454,7 +459,7 @@ admin.post('/tenants/:id/support-access', async (c) => {
     supportStatement(c.env, tenant.id, until, body.reason, now),
     // Extending support also extends devices that are already enrolled.
     db.prepare(
-      "UPDATE devices SET expires_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
+      "UPDATE devices SET expires_at = MAX(COALESCE(expires_at, 0), ?2), updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
       until,
     ),
     db.prepare(
@@ -518,6 +523,13 @@ admin.post('/tenants/:id/enrolment-codes', async (c) => {
     .parse(await c.req.json());
   const now = Date.now();
   const branch = body.branch_id ?? (await defaultBranch(db));
+  if (body.branch_id) {
+    const exists = await db.first(
+      'SELECT id FROM branches WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+      body.branch_id,
+    );
+    if (!exists) throw new ApiError('NOT_FOUND', 404, 'No such branch');
+  }
   const code = await enrolmentCodeStatement(c.env, tenant.id, {
     device_name: body.device_name,
     branch_id: branch,
@@ -825,7 +837,7 @@ admin.post('/tenants/:id/import', async (c) => {
       rows: z.array(z.record(z.string(), Scalar)).min(1).max(500),
       reason: z.string().trim().max(200).optional(),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 4_000_000));
   const tbl = body.tbl as (typeof IMPORT_TABLES)[number];
   const allowed = new Set(clientColumns(tbl));
   const now = Date.now();

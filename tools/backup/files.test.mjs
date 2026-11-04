@@ -211,6 +211,27 @@ describe('weekly file backup', () => {
     await expect(access(join(out, 'files'))).rejects.toThrow();
   });
 
+  it('refuses an empty listing unless explicitly allowed', async () => {
+    const out = await tempDir();
+    vi.stubGlobal('fetch', async (url) =>
+      String(url).includes('/objects?') ? page([]) : new Response('unused'),
+    );
+    await expect(
+      main(['--out-dir', out, '--date', '2026-11-01', '--retry-base-ms', '0']),
+    ).rejects.toThrow('No files found');
+    await expect(
+      main([
+        '--out-dir',
+        out,
+        '--date',
+        '2026-11-01',
+        '--allow-empty',
+        '--retry-base-ms',
+        '0',
+      ]),
+    ).resolves.toMatchObject({ objects: 0 });
+  });
+
   it('refuses an unexpected key instead of silently skipping it', async () => {
     const out = await tempDir();
     vi.stubGlobal('fetch', async (url) =>

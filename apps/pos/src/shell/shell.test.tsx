@@ -143,13 +143,12 @@ describe('app shell', () => {
 
   it('hides what a cashier cannot use and refuses it by URL (AC 2)', async () => {
     await unlockAs('cashier');
-    await renderAt(`${BASE_PATH}/suppliers`);
+    await renderAt(`${BASE_PATH}/settings/cashiers`);
     expect(await screen.findByText("You don't have access")).toBeTruthy();
-    expect(
-      await screen.findByRole('heading', { name: 'Assalam-o-Alaikum, Sana' }),
-    ).toBeTruthy();
     const rail = screen.getByRole('navigation', { name: 'Main' });
-    expect(rail.querySelector('a[title^="Suppliers ("]')).toBeNull();
+    // Suppliers is a party-edit surface, so a cashier may open the list but the
+    // owner-only staff settings stay hidden.
+    expect(rail.querySelector('a[title^="Suppliers ("]')).not.toBeNull();
     expect(rail.querySelector('a[title^="Sell ("]')).not.toBeNull();
   });
 

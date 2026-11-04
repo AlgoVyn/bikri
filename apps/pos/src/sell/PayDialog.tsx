@@ -194,6 +194,13 @@ function PayStep({
     { method: 'cash', amount: total },
   ]);
   const [activeRow, setActiveRow] = useState(0);
+  // A product added from Price Check (or another tab) changes the bill under an open
+  // pay screen. Rebuild the payment rows from the new total instead of submitting a
+  // stale amount.
+  useEffect(() => {
+    setRows([{ method: 'cash', amount: total }]);
+    setActiveRow(0);
+  }, [total]);
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
   const [picker, setPicker] = useState(false);
@@ -271,10 +278,7 @@ function PayStep({
           rows: merged,
           note,
           print: printOn,
-          maxDiscountBp:
-            seller?.role === 'owner'
-              ? 10000
-              : Number(seller?.max_discount_bp ?? 0),
+          maxDiscountBp: Number(seller?.max_discount_bp ?? 0),
         },
         ctx,
       );

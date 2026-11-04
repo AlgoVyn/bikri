@@ -76,15 +76,17 @@ test.describe('Day close (T-047)', () => {
   });
 
   test('a short drawer needs a note and is audited', async ({ page }) => {
-    await openReadyShop(page, '/bikri/day-close');
-    await counted(page, '2000');
+    await openReadyShop(page, '/bikri/');
+    await page.evaluate(() => window.__bikriTest?.seedTodaySales());
+    await page.goto('/bikri/day-close');
+    await counted(page, '500');
     await expect(page.getByTestId('day-close-difference')).toContainText(
-      'Extra cash',
+      'Less cash',
     );
     await expect(
       page.getByText('Write a note for a difference of Rs 100 or more.'),
     ).toBeVisible();
-    await page.getByLabel('Note').fill('Opening float difference');
+    await page.getByLabel('Note').fill('Short by Rs 250');
     await page.getByRole('button', { name: 'Close day' }).click();
     await expect(page.getByTestId('day-closed')).toBeVisible();
     const audit = await idbAll<{ action: string }>(page, 'audit_log');

@@ -139,6 +139,8 @@
     "leave": "Leave that shop",
     "leave_confirm": "Remove {{shop}} from this browser? All its data on this device is deleted; the shop keeps its synced data.",
     "leave_blocked": "{{count}} changes are not synced yet. Export them first, then leave.",
+    "leave_pin_body": "Enter an owner PIN to remove this shop from the browser. Its local data will be deleted; synced data stays on the server.",
+    "leave_pin_title": "Owner PIN needed",
     "revoked": "This device was disconnected by the owner. Unsynced sales were kept on this device.",
     "export_unsynced": "Export unsynced data",
     "request_shop_hint": "Do not have a pairing code?",

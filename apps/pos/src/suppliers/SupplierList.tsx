@@ -52,7 +52,7 @@ export function SupplierList({
   }, [query]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
-    enabled: can('purchase.create') && !readOnly,
+    enabled: can('party.edit') && !readOnly,
   });
 
   return (
@@ -81,7 +81,7 @@ export function SupplierList({
                 {t('office.suppliers.export_csv')}
               </button>
             ) : null}
-            {can('purchase.create') ? (
+            {can('party.edit') ? (
               <button
                 type="button"
                 className={`${buttonPrimary} gap-2`}
@@ -139,14 +139,14 @@ export function SupplierList({
             actionLabel={
               query
                 ? t('common.clear_filters')
-                : can('purchase.create') && !readOnly
+                : can('party.edit') && !readOnly
                   ? t('office.suppliers.new_supplier')
                   : undefined
             }
             onAction={
               query
                 ? () => setQuery('')
-                : can('purchase.create') && !readOnly
+                : can('party.edit') && !readOnly
                   ? () => setNewOpen(true)
                   : undefined
             }

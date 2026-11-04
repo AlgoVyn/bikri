@@ -7,7 +7,7 @@ import {
 } from '../src/platform/shopRequests.ts';
 import { api, json } from './helpers/fixtures.ts';
 
-type Created = { request_id: string; status_token: string };
+type Created = { request_id: string; status_token?: string };
 type Err = { error: { code: string } };
 
 let ip = 0;
@@ -52,7 +52,7 @@ describe('public shop requests (D-175)', () => {
     const email = `new-${Date.now()}@example.com`;
     const created = await publicRequest(email);
     expect(created.request_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/u);
-    expect(created.status_token.length).toBeGreaterThan(20);
+    expect((created.status_token ?? '').length).toBeGreaterThan(20);
     expect(
       await count(
         'SELECT COUNT(*) AS n FROM shop_requests WHERE email = ?1',
@@ -79,8 +79,11 @@ describe('public shop requests (D-175)', () => {
 
   it('does not create a second active row for the same email, and the honeypot stores nothing', async () => {
     const email = `dup-${Date.now()}@example.com`;
-    await publicRequest(email);
-    await publicRequest(email);
+    const first = await publicRequest(email);
+    const second = await publicRequest(email);
+    // The duplicate gets no new status token and cannot rewrite the first request.
+    expect(second.request_id).toBe(first.request_id);
+    expect(second.status_token).toBeUndefined();
     expect(
       await count(
         "SELECT COUNT(*) AS n FROM shop_requests WHERE email = ?1 AND status IN ('pending','awaiting_email','email_verified','approving')",
@@ -100,6 +103,16 @@ describe('public shop requests (D-175)', () => {
     });
     expect(honeypot.status).toBe(202);
     expect(await count('SELECT COUNT(*) AS n FROM shop_requests')).toBe(before);
+  });
+
+  it('rejects an oversized public body before parsing it', async () => {
+    const res = await api('/public/shop-requests', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': nextIp() },
+      body: 'x'.repeat(20 * 1024),
+      json: undefined,
+    });
+    expect(res.status).toBe(413);
   });
 
   it('rejects a bad email and rate-limits repeated requests', async () => {

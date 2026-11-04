@@ -166,14 +166,23 @@ export function BillDetail({
       data.detail.sale.status === 'part_refunded') &&
     data.detail.refunds.length === 0;
 
-  useHotkey(plainKey('p'), () => void print(), { enabled: Boolean(data) });
+  const canViewBill =
+    data !== null &&
+    data !== undefined &&
+    can('report.view') &&
+    !(
+      cashierTodayOnly(role, support) &&
+      (String(data.detail.sale.business_date) !== data.today ||
+        (branchId !== null && String(data.detail.sale.branch_id) !== branchId))
+    );
+  useHotkey(plainKey('p'), () => void print(), { enabled: canViewBill });
   useHotkey(
     plainKey('r'),
     () => {
-      if (canRefund)
+      if (canRefund && canViewBill)
         void navigate({ to: '/sales/$id/refund', params: { id: saleId } });
     },
-    { enabled: canRefund },
+    { enabled: canRefund && canViewBill },
   );
 
   if (data === null)
@@ -183,12 +192,7 @@ export function BillDetail({
       </p>
     );
   if (!data) return <PageLoading compact />;
-  if (
-    !can('report.view') ||
-    (cashierTodayOnly(role, support) &&
-      (String(data.detail.sale.business_date) !== data.today ||
-        (branchId !== null && String(data.detail.sale.branch_id) !== branchId)))
-  ) {
+  if (!canViewBill) {
     return <p className="p-4 text-text-muted">{t('shell.no_access')}</p>;
   }
 

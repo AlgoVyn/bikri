@@ -1,4 +1,4 @@
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import type { PushOp } from '../../src/sync/opSchema.ts';
 import { api, IDS, json, type Shop } from './fixtures.ts';
 
@@ -73,7 +73,7 @@ export function saleOps(
     device_id: dev.id,
     staff_id: IDS.cashier,
     customer_id: opts.customerId ?? null,
-    business_date: '2026-10-27',
+    business_date: businessDate(now),
     created_at: now,
     line_count: 1,
     items_qty_milli: 1000,
@@ -137,7 +137,7 @@ export function saleOps(
     branch_id: shop.branchId,
     device_id: dev.id,
     staff_id: IDS.cashier,
-    business_date: '2026-10-27',
+    business_date: businessDate(now),
     created_at: now,
   };
   return [

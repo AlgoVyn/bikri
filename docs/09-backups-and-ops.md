@@ -24,7 +24,7 @@ Schedule `cron: "30 21 * * *"` (UTC) = **02:30 Asia/Karachi** daily; also `workf
 Steps:
 1. Checkout, setup Node 24, `pnpm i --filter tools`.
 2. `wrangler d1 export bikri --remote --output=bikri-YYYY-MM-DD.sql` (date in Asia/Karachi).
-3. Sanity check: file > 1 KB and contains `CREATE TABLE sales`; row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`).
+3. Sanity check: the dump contains `CREATE TABLE` for **every** table in `tools/backup/tables.mjs` plus `meta`/`tenants`, and at least one `INSERT INTO tenants`; a partial dump is refused. Row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. are written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`).
 4. `gzip -9` → upload to R2 bucket `bikri-backups`: `d1/YYYY-MM-DD.sql.gz` + `d1/YYYY-MM-DD.manifest.json` (`wrangler r2 object put bikri-backups/d1/… --remote`).
 5. Encrypt `age -r $BACKUP_AGE_RECIPIENT` → upload as workflow artifact `backup-YYYY-MM-DD` (retention 90 days).
 6. Retention in R2: keep 30 daily and one backup per month for the last 12 months (the 1st when present, otherwise the earliest available date); delete older (script lists and deletes).
@@ -87,9 +87,9 @@ Note: rows created after the restore point, including master-data edits, are re-
 3. Point the `DB` binding to the new database ID in `wrangler.jsonc`, deploy, then set `restore_epoch` / `restore_point_at` for every tenant exactly as in §3.1 step 5 (restore point = the backup's `manifest.json` `date` at 02:30 PKT).
 4. **Restore drill:** before v1.0.0 and then every 3 months, restore last night's backup into `bikri-restore` and compare `manifest.json` counts (checklist item in [10 §6](10-testing.md#6-manual-hardware-checklist-before-each-release)); delete the drill DB afterwards.
 
-### 3.3 Restore from the owner's JSON export (new deploy / leaving Cloudflare)
+### 3.3 Restore from the owner's JSON export (operator action in v1)
 
-Settings → Backup → `Restore from export` is only enabled when the server reports an empty shop (`shop_setup_completed = false`, 0 sales) — e.g. a new tenant created for a shop moving from another Bikri deployment. The till uploads in batches via normal sync push (ops with original IDs), so the same validation applies. Format: `bikri-export-<slug>-YYYYMMDD-HHmm.zip` containing `manifest.json` (`{ format: "bikri-export", version: 2, exported_at, app_version, tenant: { id, display_name }, tables: {name: count} }`), `json/<table>.json` (array of rows exactly as in 02 without `tenant_id`, money in paisa) and `csv/<table>.csv` (human-friendly: amounts in rupees with 2 decimals, dates ISO in Asia/Karachi). The JSON is the restore source; CSV is for Excel.
+`Restore from export` is **not an owner action in v1**. A shop owner downloads the zip, keeps it, and contacts Algovyn support; the operator restores it through the console into a new empty shop (or the same shop after the §3.4 maintenance/purge flow). This avoids accepting a cross-device export through the till's normal push path, where historical `device_id` values would fail the server's device check. Format: `bikri-export-<slug>-YYYYMMDD-HHmm.zip` containing `manifest.json` (`{ format: "bikri-export", version: 2, exported_at, app_version, tenant: { id, display_name }, tables: {name: count} }`), `json/<table>.json` (array of rows exactly as in 02 without `tenant_id`, money in paisa) and `csv/<table>.csv` (human-friendly: amounts in rupees with 2 decimals, dates ISO in Asia/Karachi). The JSON is the restore source; CSV is for Excel.
 
 ### 3.4 Restore one tenant
 

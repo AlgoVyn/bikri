@@ -1,7 +1,7 @@
 import { businessDate } from '@bikri/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { addDays, BackdateError, startBackdate } from './backdate.ts';
-import { addProduct, emptyCart } from './cart.ts';
+import { addProduct, addQuickSale, emptyCart } from './cart.ts';
 import { ledgerContext } from './catalog.ts';
 import { completeSale, SaleInvalidError } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
@@ -172,6 +172,118 @@ describe('record a past sale (D-173)', () => {
     expect((await db.outbox.toArray()).some((o) => o.tbl === 'audit_log')).toBe(
       true,
     );
+  });
+
+  it('authorizes yesterday’s lower price with a recorder-owned catalog override', async () => {
+    const { db, ctx, buds } = await withCashier();
+    const line = addProduct(emptyCart('c1'), buds, 1000, 'avg');
+    const cart = {
+      ...line,
+      lines: line.lines.map((row) => ({ ...row, unit_price: 300000 })),
+      backdate: {
+        business_date: YESTERDAY,
+        staff_id: 'st-2',
+        reason: 'Price was lower yesterday',
+      },
+    };
+    await db.carts.put(cart);
+    const { sale: written } = await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 300000 }]),
+      ctx,
+      NOW,
+    );
+    const override = (
+      await db.audit_log
+        .where('[entity+entity_id]')
+        .equals(['sales', String(written.id)])
+        .toArray()
+    ).find((row) => row.action === 'override');
+    expect(JSON.parse(String(override?.after_json))).toMatchObject({
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      bound_price: 300000,
+    });
+  });
+
+  it('asks for an override when the recorder cannot edit the catalogue', async () => {
+    const { db, buds } = await withCashier();
+    await db.staff.add({
+      id: 'st-manager',
+      name: 'Manager',
+      role: 'manager',
+      active: 1,
+      permissions_json: '{"sale.backdate":true,"catalog.edit":false}',
+      max_discount_bp: 2000,
+      ...row,
+    });
+    const line = addProduct(emptyCart('c1'), buds, 1000, 'avg');
+    const cart = {
+      ...line,
+      lines: line.lines.map((row) => ({ ...row, unit_price: 300000 })),
+      backdate: {
+        business_date: YESTERDAY,
+        staff_id: 'st-2',
+        reason: 'Price was lower yesterday',
+      },
+    };
+    await db.carts.put(cart);
+    await expect(
+      completeSale(
+        db,
+        sale(cart, [{ method: 'cash', amount: 300000 }]),
+        await ledgerContext(db, 'st-manager'),
+        NOW,
+      ),
+    ).rejects.toThrow('price approval');
+  });
+
+  it('refuses to attribute a sale to a cashier who cannot create sales', async () => {
+    const { db, buds } = await withCashier();
+    await db.staff.update('st-2', {
+      permissions_json: '{"sale.create":false}',
+    });
+    const cart = {
+      ...addProduct(emptyCart('c1'), buds, 1000, 'avg'),
+      backdate: {
+        business_date: YESTERDAY,
+        staff_id: 'st-2',
+        reason: 'Missed',
+      },
+    };
+    await db.carts.put(cart);
+    await expect(
+      completeSale(
+        db,
+        sale(cart, [{ method: 'cash', amount: 350000 }]),
+        await ledgerContext(db, 'st-1'),
+        NOW,
+      ),
+    ).rejects.toThrow('seller cannot create sales');
+  });
+
+  it('does not price-check a quick-sale line with no product', async () => {
+    const { db } = await withCashier();
+    const cart = {
+      ...addQuickSale(emptyCart('c1'), {
+        name: 'Loose item',
+        price: 90000,
+        qtyMilli: 1000,
+      }),
+      backdate: {
+        business_date: YESTERDAY,
+        staff_id: 'st-2',
+        reason: 'Missed quick sale',
+      },
+    };
+    await db.carts.put(cart);
+    const { sale: written } = await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 90000 }]),
+      await ledgerContext(db, 'st-1'),
+      NOW,
+    );
+    expect(written.staff_id).toBe('st-2');
   });
 
   it('rejects a non-owner recorder, a missing cashier and a reissue cart', async () => {

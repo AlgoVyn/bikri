@@ -4,6 +4,7 @@ import {
   expectNoSeriousAxe,
   setLanguage,
 } from './helpers.ts';
+import { ORIGIN } from './syncHelpers.ts';
 
 // Public shop requests and the operator approval queue (D-175). The public form is tested on
 // both viewports; the operator console is desktop-only, like the rest of /admin.
@@ -65,7 +66,7 @@ test.describe('operator request approval', () => {
     const shop = `Requested shop ${stamp}`;
     const email = `operator-${stamp}@e2e.test`;
     const created = await page.request.post('/bikri/api/public/shop-requests', {
-      headers: { origin: 'http://localhost:8787' },
+      headers: { origin: ORIGIN },
       data: {
         shop_name: shop,
         owner_name: 'Requested Owner',

@@ -86,7 +86,15 @@ export async function startBackdate(
     throw new BackdateError('forbidden');
 
   const attributed = await db.staff.get(input.staffId);
-  if (attributed?.active !== 1 || attributed.deleted_at)
+  if (
+    attributed?.active !== 1 ||
+    attributed.deleted_at ||
+    !can(
+      String(attributed.role) as Role,
+      String(attributed.permissions_json ?? '{}'),
+      'sale.create',
+    )
+  )
     throw new BackdateError('staff');
 
   const carts = await loadCarts(db);

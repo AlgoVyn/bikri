@@ -129,6 +129,26 @@ describe('checkSite', () => {
     expect(formatReport(findings)).toContain('FAIL');
   });
 
+  it('fails when the home page cannot be fetched', async () => {
+    const findings = await checkSite('https://algovyn.com', async () => {
+      throw new Error('ENOTFOUND');
+    });
+    expect(levels(findings)).toContain('fail:fetch-error');
+    expect(formatReport(findings)).toContain('FAIL');
+  });
+
+  it('fails when the home page is not a 200 HTML response', async () => {
+    const findings = await checkSite(
+      'https://algovyn.com',
+      async () =>
+        new Response('maintenance', {
+          status: 503,
+          headers: { 'content-type': 'text/html' },
+        }),
+    );
+    expect(levels(findings)).toContain('fail:home-unreachable');
+  });
+
   it('fails when /sw.js at the site root is JavaScript', async () => {
     const fetchImpl = site({
       '/': { type: 'text/html', body: sample('clean.html') },

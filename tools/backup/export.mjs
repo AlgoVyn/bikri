@@ -44,8 +44,19 @@ export function parseWranglerJson(stdout) {
 export function assertSqlDump(sql) {
   if (Buffer.byteLength(sql, 'utf8') < 1024)
     throw new Error('D1 export is smaller than 1 KB');
-  if (!/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`[]?sales\b/iu.test(sql))
-    throw new Error('D1 export does not contain CREATE TABLE sales');
+  const created = new Set(
+    [
+      ...sql.matchAll(
+        /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`[]?([a-z_][a-z0-9_]*)["`\]]?/giu,
+      ),
+    ].map((match) => String(match[1]).toLowerCase()),
+  );
+  const required = ['meta', 'tenants', ...BACKUP_TABLES];
+  const missing = required.filter((table) => !created.has(table.toLowerCase()));
+  if (missing.length > 0)
+    throw new Error(
+      `D1 export is missing table(s): ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '…' : ''}`,
+    );
   // A schema-only dump is not a backup. Every real shop database has at least one tenant.
   if (!/INSERT INTO\s+["`[]?tenants\b/iu.test(sql))
     throw new Error('D1 export does not contain tenant data');

@@ -109,6 +109,25 @@ describe('backdated sales (D-173)', () => {
     expect(res.results[0]?.error_code).toBe('FORBIDDEN');
   });
 
+  it('checks the sale entry time when an old client omits the op timestamp', async () => {
+    const shop = await seedShop('BackdateNoEnvelope');
+    const { ops } = backdatedSale(shop, {
+      date: addDays(today, -1),
+      withAudit: false,
+    });
+    for (const entry of ops) delete entry.created_at;
+    const res = await pushOk(shop.till, ops);
+    expect(res.results[0]?.error_code).toBe('FORBIDDEN');
+
+    const acceptedShop = await seedShop('BackdateWithAuditNoEnvelope');
+    const accepted = backdatedSale(acceptedShop, {
+      date: addDays(today, -1),
+    });
+    for (const entry of accepted.ops) delete entry.created_at;
+    const ok = await pushOk(acceptedShop.till, accepted.ops);
+    expect(ok.results.every((row) => row.error_code === undefined)).toBe(true);
+  });
+
   it('rejects an audit written by a cashier without sale.backdate', async () => {
     const shop = await seedShop('BackdateCashier');
     const { ops } = backdatedSale(shop, {

@@ -85,7 +85,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | REQ-B10 | **Product photos** on sell tiles and product detail; camera capture or upload; offline cached. | [screens/08](screens/08-products.md) |
 | REQ-B11 | **Weighted-average cost** for profit, with last cost kept and shown. | [07 §7](07-money-rules.md#7-cost-weighted-average) |
 | REQ-B12 | **Honest history.** Saved bills cannot be edited; "Edit" means void + reissue linked to the original, with an audit entry. | [screens/10](screens/10-sales-and-bill-detail.md) |
-| REQ-B13 | **Open source, own data.** Full JSON/CSV export of the shop and restore; nightly SQL export to R2 and off-Cloudflare. | [09-backups-and-ops](09-backups-and-ops.md) |
+| REQ-B13 | **Open source, own data.** Full JSON/CSV export of the shop; a restore is performed by the operator from that export (owner restores are not a v1 action); nightly SQL export to R2 and off-Cloudflare. | [09-backups-and-ops](09-backups-and-ops.md) |
 | REQ-B14 | **Below-cost warning.** Selling a line below its cost shows "Below cost" to everyone; cost and margin are shown only to roles with `cost.view`. | [screens/05](screens/05-sell.md) |
 | REQ-B15 | **Failed print never loses a bill.** The sale is saved before printing; failed prints are retried or reprinted from Sales. | [06 §9](06-printing.md#9-print-job-lifecycle-and-errors) |
 

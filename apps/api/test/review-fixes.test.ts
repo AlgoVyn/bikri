@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { api, IDS, json, seedShop } from './helpers/fixtures.ts';
 import { op, productRow, pushOk, saleOps } from './helpers/ops.ts';
@@ -291,7 +291,7 @@ describe('review fixes', () => {
           device_id: shop.till.id,
           staff_id: IDS.owner,
           customer_id: null,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
           line_count: 2,
           items_qty_milli: 2000,
@@ -349,7 +349,7 @@ describe('review fixes', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
         },
         { tx_id: tx },

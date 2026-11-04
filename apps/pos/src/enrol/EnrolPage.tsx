@@ -1,6 +1,7 @@
 /** Enrol this device (screens/02, T-034). Rendered by the gate without the app shell. */
 import { BASE_PATH } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../components/classes.ts';
 import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
+import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import {
   CODE_RE,
   defaultDeviceName,
@@ -23,6 +25,7 @@ import {
   unexportedOps,
   unsyncedExport,
 } from '../data/enrol.ts';
+import { verifyPinWithLockout } from '../data/pinLock.ts';
 import { OfflineError, SyncHttpError } from '../sync/client.ts';
 import { pullAll } from '../sync/pull.ts';
 
@@ -125,6 +128,15 @@ export function EnrolPage({
   } | null>(db && shopName && !revoked ? { db, shop: shopName } : null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leavePinOpen, setLeavePinOpen] = useState(false);
+  const ownerProfiles = useLiveQuery(async () => {
+    if (!connected) return [];
+    return (await connected.db.staff.toArray())
+      .filter(
+        (row) => row.role === 'owner' && row.active === 1 && !row.deleted_at,
+      )
+      .map((row) => ({ id: String(row.id), label: String(row.name) }));
+  }, [connected?.db.tenantId]);
 
   const download = async (target: BikriDb, shop: string) => {
     setStage({ kind: 'downloading', shop, db: target, done: 0, total: 0 });
@@ -181,6 +193,7 @@ export function EnrolPage({
       await leaveShop(target);
       setConnected(null);
       setConfirmLeave(false);
+      setLeavePinOpen(false);
       if (after) setStage(after);
       else setStage({ kind: 'form' });
     } catch (e) {
@@ -188,6 +201,14 @@ export function EnrolPage({
         setLeaveError(t('enrol.leave_blocked', { count: e.count }));
       else setLeaveError(String(e));
     }
+  };
+
+  const verifyLeavePin = async (pin: string, profileId: string) => {
+    if (!connected || !profileId) return false;
+    const result = await verifyPinWithLockout(connected.db, profileId, pin);
+    if (result.kind !== 'ok') return false;
+    setTimeout(() => void leave(connected.db, null), 0);
+    return true;
   };
 
   const card = (body: React.ReactNode) => (
@@ -270,58 +291,76 @@ export function EnrolPage({
   }
 
   if (connected) {
-    return card(
+    return (
       <>
-        <h1 className="font-semibold text-h2">
-          {t('enrol.already', { shop: connected.shop })}
-        </h1>
-        <button type="button" className={buttonPrimary} onClick={onDone}>
-          {t('enrol.open', { shop: connected.shop })}
-        </button>
-        {confirmLeave ? (
-          <div className="flex flex-col gap-2 rounded-control border border-border p-3">
-            <p>{t('enrol.leave_confirm', { shop: connected.shop })}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={buttonDanger}
-                onClick={() => void leave(connected.db, null)}
-              >
-                {t('enrol.leave')}
-              </button>
+        {card(
+          <>
+            <h1 className="font-semibold text-h2">
+              {t('enrol.already', { shop: connected.shop })}
+            </h1>
+            <button type="button" className={buttonPrimary} onClick={onDone}>
+              {t('enrol.open', { shop: connected.shop })}
+            </button>
+            {confirmLeave ? (
+              <div className="flex flex-col gap-2 rounded-control border border-border p-3">
+                <p>{t('enrol.leave_confirm', { shop: connected.shop })}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={buttonDanger}
+                    disabled={ownerProfiles === undefined}
+                    onClick={() => {
+                      if ((ownerProfiles?.length ?? 0) > 0)
+                        setLeavePinOpen(true);
+                      else void leave(connected.db, null);
+                    }}
+                  >
+                    {t('enrol.leave')}
+                  </button>
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => setConfirmLeave(false)}
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
                 type="button"
                 className={buttonQuiet}
-                onClick={() => setConfirmLeave(false)}
+                disabled={ownerProfiles === undefined}
+                onClick={() => setConfirmLeave(true)}
               >
-                {t('common.cancel')}
+                {t('enrol.leave')}
               </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => setConfirmLeave(true)}
-          >
-            {t('enrol.leave')}
-          </button>
+            )}
+            {leaveError ? (
+              <div className="flex flex-col gap-2">
+                <p role="alert" className="text-danger text-small">
+                  {leaveError}
+                </p>
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  onClick={() => void exportUnsynced(connected.db)}
+                >
+                  {t('enrol.export_unsynced')}
+                </button>
+              </div>
+            ) : null}
+          </>,
         )}
-        {leaveError ? (
-          <div className="flex flex-col gap-2">
-            <p role="alert" className="text-danger text-small">
-              {leaveError}
-            </p>
-            <button
-              type="button"
-              className={buttonQuiet}
-              onClick={() => void exportUnsynced(connected.db)}
-            >
-              {t('enrol.export_unsynced')}
-            </button>
-          </div>
-        ) : null}
-      </>,
+        <OverrideDialog
+          open={leavePinOpen}
+          onOpenChange={setLeavePinOpen}
+          title={t('enrol.leave_pin_title')}
+          body={t('enrol.leave_pin_body')}
+          profiles={ownerProfiles ?? []}
+          verify={verifyLeavePin}
+        />
+      </>
     );
   }
 

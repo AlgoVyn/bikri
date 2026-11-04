@@ -281,12 +281,61 @@ export function SellPage() {
             permission,
           ),
       );
+    // A backdated price below today's catalogue price needs a line-bound catalog.edit
+    // approval for the attributed seller. The recorder may not have catalog.edit either;
+    // ask for another approver before opening Pay.
+    let priceApproval: CartLine | null = null;
+    if (
+      current.backdate &&
+      !can('catalog.edit') &&
+      !sellerCan('catalog.edit')
+    ) {
+      const productIds = [
+        ...new Set(
+          current.lines
+            .map((line) => line.product_id)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      const products = await getDb().products.bulkGet(productIds);
+      for (const line of current.lines) {
+        if (!line.product_id) continue;
+        const product = products.find((row) => row?.id === line.product_id);
+        if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
+        if (
+          overrideMatches(current, 'catalog.edit', {
+            line: line.key,
+            price: line.unit_price,
+          })
+        )
+          continue;
+        priceApproval = line;
+        break;
+      }
+    }
     const checks = paymentChecks(current, now, {
-      maxDiscountBp:
-        seller?.role === 'owner' ? 10000 : Number(seller?.max_discount_bp ?? 0),
+      maxDiscountBp: Number(seller?.max_discount_bp ?? 0),
       canBelowCost: sellerCan('sale.below_cost'),
       canDiscount: sellerCan('sale.discount'),
     });
+    if (priceApproval) {
+      const approved = priceApproval;
+      setOverride({
+        permission: 'catalog.edit',
+        onApproved: (by) => {
+          void mutate((c) =>
+            addOverride(c, {
+              permission: 'catalog.edit',
+              approved_by: by,
+              approved_at: Date.now(),
+              bound_line: approved.key,
+              bound_price: approved.unit_price,
+            }),
+          ).then(() => takePayment());
+        },
+      });
+      return;
+    }
     const voidNeeded =
       current.reissue != null &&
       !can('sale.void') &&

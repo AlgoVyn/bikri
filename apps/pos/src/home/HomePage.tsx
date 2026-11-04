@@ -56,6 +56,8 @@ type QuickTile = {
   keys: string;
   Icon: () => React.JSX.Element;
   perm: Permission | null;
+  /** Any of these permissions is enough, matching the rail (`permAny`). */
+  permAny?: readonly Permission[];
 };
 
 const QUICK_DESC: Record<string, string> = {
@@ -161,6 +163,7 @@ export function HomePage() {
       keys: item.keys,
       Icon: item.Icon,
       perm: item.perm,
+      ...(item.permAny ? { permAny: item.permAny } : {}),
     })),
     {
       to: '/stock/count',
@@ -177,8 +180,13 @@ export function HomePage() {
       keys: item.keys,
       Icon: item.Icon,
       perm: item.perm,
+      ...(item.permAny ? { permAny: item.permAny } : {}),
     })),
-  ].filter((tile) => tile.perm === null || can(tile.perm));
+  ].filter((tile) =>
+    tile.permAny !== undefined
+      ? tile.permAny.some((permission) => can(permission))
+      : tile.perm === null || can(tile.perm),
+  );
 
   const runTiles = tiles.filter((tile) => RUN_ROUTES.has(tile.to));
   const manageTiles = tiles.filter((tile) => !RUN_ROUTES.has(tile.to));

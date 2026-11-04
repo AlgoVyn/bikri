@@ -242,9 +242,7 @@ export async function completeSale(
         ),
     );
   const sellerLimit = backdate
-    ? seller?.role === 'owner'
-      ? 10_000
-      : Number(seller?.max_discount_bp ?? input.maxDiscountBp)
+    ? Number(seller?.max_discount_bp ?? input.maxDiscountBp)
     : input.maxDiscountBp;
   if (
     totals.lines.some((line) => line.below_cost === 1) &&
@@ -265,6 +263,40 @@ export async function completeSale(
     throw new SaleInvalidError('discount override');
   if (s.udhaar > 0 && !sellerPerm('sale.udhaar'))
     throw new SaleInvalidError('udhaar permission');
+
+  // A past sale is attributed to another staff member, so every check the Worker makes
+  // against that seller has to run locally too. In particular, a recorder with
+  // `catalog.edit` may authorize yesterday's price; the Worker requires a line-bound
+  // `catalog.edit` override for that, not a silent old price.
+  const backdatePriceAudits: { lineKey: string; price: number }[] = [];
+  if (backdate) {
+    if (!sellerPerm('sale.create'))
+      throw new SaleInvalidError('seller cannot create sales');
+    const recorder = await db.staff.get(ctx.staff_id);
+    const recorderCanEdit = Boolean(
+      recorder &&
+        can(
+          recorder.role as 'owner' | 'manager' | 'cashier',
+          String(recorder.permissions_json ?? '{}'),
+          'catalog.edit',
+        ),
+    );
+    for (const line of cart.lines) {
+      if (!line.product_id) continue;
+      const product = products.get(line.product_id);
+      if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
+      if (sellerPerm('catalog.edit')) continue;
+      if (
+        overrideMatches(cart, 'catalog.edit', {
+          line: line.key,
+          price: line.unit_price,
+        })
+      )
+        continue;
+      if (!recorderCanEdit) throw new SaleInvalidError('price approval');
+      backdatePriceAudits.push({ lineKey: line.key, price: line.unit_price });
+    }
+  }
 
   let created = false;
   const sale = await writeAction(
@@ -479,6 +511,19 @@ export async function completeSale(
           'override',
           boundLine === undefined ? o : { ...o, bound_line: boundLine },
         );
+      }
+      // The recorder authorized a past price for the attributed seller. Write the same
+      // line-bound audit the normal price-override path writes.
+      for (const price of backdatePriceAudits) {
+        const boundLine = saleLineIds.get(price.lineKey);
+        if (!boundLine) continue;
+        await audit('override', {
+          permission: 'catalog.edit',
+          approved_by: ctx.staff_id,
+          approved_at: now,
+          bound_line: boundLine,
+          bound_price: price.price,
+        });
       }
       if (totals.discount_share_bp > sellerLimit)
         await audit('discount_over_limit', {

@@ -157,7 +157,7 @@ export async function createShopRequest(
   env: Env,
   input: NewShopRequest,
   now = Date.now(),
-): Promise<{ id: string; token: string; duplicate: boolean }> {
+): Promise<{ id: string; token: string | null; duplicate: boolean }> {
   const email = normaliseEmail(input.email);
   if (!emailOk(email))
     throw new ApiError('VALIDATION_FAILED', 400, 'Enter a valid email address');
@@ -193,25 +193,9 @@ export async function createShopRequest(
       .bind(email)
       .first<{ id: string }>();
     if (!existing) throw error;
-    await env.DB.prepare(
-      `UPDATE shop_requests
-          SET shop_name = ?2, owner_name = ?3, phone = ?4, city = ?5,
-              business_type = ?6, note = ?7, status_token_hash = ?8, updated_at = ?9
-        WHERE id = ?1`,
-    )
-      .bind(
-        existing.id,
-        input.shop_name.trim().slice(0, 60),
-        input.owner_name.trim().slice(0, 60),
-        input.phone.trim().slice(0, 30),
-        input.city.trim().slice(0, 60),
-        input.business_type.trim().slice(0, 40) || 'other',
-        input.note.trim().slice(0, 500),
-        hash,
-        now,
-      )
-      .run();
-    return { id: existing.id, token, duplicate: true };
+    // Never let anyone who merely knows the email rewrite the request or replace its
+    // status token. The original applicant keeps the only status link.
+    return { id: existing.id, token: null, duplicate: true };
   }
   return { id, token, duplicate: false };
 }
@@ -423,7 +407,7 @@ export async function addRequestEmail(
   const status: ShopRequestStatus = verified
     ? 'email_verified'
     : 'awaiting_email';
-  await env.DB.prepare(
+  const res = await env.DB.prepare(
     `UPDATE shop_requests
         SET cloudflare_address_id = ?2,
             email_verification_sent_at = COALESCE(email_verification_sent_at, ?3),
@@ -431,10 +415,19 @@ export async function addRequestEmail(
             email_verified_at = CASE WHEN ?4 = 1 THEN COALESCE(email_verified_at, ?3) ELSE email_verified_at END,
             status = ?5,
             updated_at = ?3
-      WHERE id = ?1`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
   )
     .bind(id, addressId, now, verified ? 1 : 0, status)
     .run();
+  if ((res.meta.changes ?? 0) === 0) {
+    const current = await requireRequest(env, id);
+    return {
+      email: current.email,
+      verified: current.email_verified_at !== null,
+      status: current.status,
+      already_added: false,
+    };
+  }
   await audit(env, {
     action: 'shop_request_email_added',
     requestId: id,
@@ -476,16 +469,25 @@ export async function checkRequestEmail(
       : verified
         ? 'email_verified'
         : 'awaiting_email';
-  await env.DB.prepare(
+  const res = await env.DB.prepare(
     `UPDATE shop_requests
         SET email_checked_at = ?2,
             email_verified_at = CASE WHEN ?3 = 1 THEN COALESCE(email_verified_at, ?2) ELSE email_verified_at END,
             status = ?4,
             updated_at = ?2
-      WHERE id = ?1`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
   )
     .bind(id, now, verified ? 1 : 0, status)
     .run();
+  if ((res.meta.changes ?? 0) === 0) {
+    const current = await requireRequest(env, id);
+    return {
+      email: current.email,
+      verified: current.email_verified_at !== null,
+      status: current.status,
+      email_verified_at: current.email_verified_at,
+    };
+  }
   if (verified && row.email_verified_at === null)
     await audit(env, {
       action: 'shop_request_email_verified',
@@ -522,13 +524,19 @@ export async function manualVerifyRequestEmail(
   const row = await requireRequest(env, id);
   if (row.status === 'approved' || row.status === 'rejected')
     throw new ApiError('CONFLICT', 409, 'This request is already closed');
-  await env.DB.prepare(
+  const res = await env.DB.prepare(
     `UPDATE shop_requests
         SET email_verified_at = ?2, email_checked_at = ?2, status = 'email_verified', updated_at = ?2
-      WHERE id = ?1`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
   )
     .bind(id, now)
     .run();
+  if ((res.meta.changes ?? 0) === 0)
+    throw new ApiError(
+      'CONFLICT',
+      409,
+      'This request is already being processed',
+    );
   await audit(env, {
     action: 'shop_request_email_manual',
     requestId: id,

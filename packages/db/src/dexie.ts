@@ -107,8 +107,12 @@ export type OutboxEntry = {
   updated_by?: string | null;
   created_at: number;
   status: OutboxStatus;
-  /** When this tab claimed the row for a push; a live claim is never stolen by another tab. */
+  /** When a push claimed this row. A later push reclaims it: an unfinished claim may be
+   * left by a reload, a closed tab or a stopped engine, and later ops must not overtake it. */
   sending_at?: number;
+  /** When this op was first sent to the server. Such an op is never coalesced: its old op id
+   * may already be in `applied_ops`, so only a fresh op id can safely carry a newer edit. */
+  sent_at?: number;
   /** Token of the tab/claim that owns this sending row; a late response must match it. */
   claim_token?: string;
   attempts: number;

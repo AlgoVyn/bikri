@@ -1,7 +1,7 @@
 import { businessDate, computeDayClose, newId } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
@@ -53,6 +53,7 @@ export function DayClosePage() {
   > | null>(null);
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [pending, setPending] = useState(false);
+  const periodStartRef = useRef<number | null>(null);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -70,6 +71,10 @@ export function DayClosePage() {
   useEffect(() => {
     if (data?.firstClose) setOpening(data.openingCash);
   }, [data?.firstClose, data?.openingCash]);
+  useEffect(() => {
+    if (data && periodStartRef.current === null)
+      periodStartRef.current = data.periodStart;
+  }, [data]);
 
   if (!can('dayclose.create'))
     return (
@@ -104,6 +109,7 @@ export function DayClosePage() {
     setMode('notes');
     setCountTouched(false);
     setOpening(data?.firstClose ? data.openingCash : 0);
+    periodStartRef.current = null;
   };
   const noteNeeded =
     Math.abs(result.difference) >= 10_000 && note.trim() === '';
@@ -138,6 +144,7 @@ export function DayClosePage() {
           denominations: mode === 'notes' ? notes : null,
           note,
           openingCash: data.firstClose ? opening : undefined,
+          expectedPeriodStart: periodStartRef.current ?? undefined,
         },
         ctx,
       );
@@ -337,15 +344,16 @@ export function DayClosePage() {
                             inputMode="numeric"
                             className="h-11 w-20 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-end"
                             value={notes[value] ?? ''}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              setCountTouched(true);
                               setNotes((current) => ({
                                 ...current,
                                 [value]: Math.max(
                                   0,
                                   Number(e.target.value) || 0,
                                 ),
-                              }))
-                            }
+                              }));
+                            }}
                           />
                           <span className="text-end text-text-muted">
                             <MoneyText

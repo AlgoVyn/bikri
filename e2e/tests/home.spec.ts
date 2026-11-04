@@ -217,7 +217,7 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page).toHaveURL(/\/bikri\/settings\/sync$/);
   });
 
-  test('a cashier sees no Suppliers, profit or drawer cash, and is turned away by URL', async ({
+  test('a cashier sees no profit or drawer cash, can view suppliers, and is turned away from owner pages', async ({
     page,
   }) => {
     await openWithSales(page);
@@ -229,10 +229,23 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByTestId('today-cash')).toHaveCount(0);
     await expect(page.getByTestId('today-sold')).toContainText('1,000');
     const nav = page.getByRole('navigation', { name: 'Main' });
-    await expect(nav.getByRole('link', { name: /^Suppliers/ })).toHaveCount(0);
+    // `party.edit` lets a cashier view the supplier list; deliveries remain purchase.create.
+    if (isPhone(page)) {
+      await nav.getByRole('button', { name: 'More' }).click();
+      await expect(
+        page.locator('#more-menu').getByRole('link', { name: 'Suppliers' }),
+      ).toBeVisible();
+    } else {
+      await expect(nav.getByRole('link', { name: /^Suppliers/ })).toBeVisible();
+    }
     await page.evaluate(() => window.__bikriTest?.navigate('/suppliers'));
+    await expect(
+      page.getByRole('heading', { name: 'Suppliers', exact: true, level: 1 }),
+    ).toBeVisible();
+    await page.evaluate(() =>
+      window.__bikriTest?.navigate('/settings/cashiers'),
+    );
     await expect(page.getByText("You don't have access")).toBeVisible();
-    await expect(page).toHaveURL(/\/bikri\/$/);
     await page.evaluate(() => window.__bikriTest?.navigate('/labels'));
     await expect(page.getByTestId('permission-no-access')).toBeVisible();
   });

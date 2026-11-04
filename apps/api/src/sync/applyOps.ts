@@ -1672,10 +1672,11 @@ function checkSalePolicy(
 }
 
 /**
- * A sale recorded on a past business date (D-173): the till must send a `sale_backdated`
- * audit row in the same transaction, written by a staff member with `sale.backdate` (owner
- * by default). A genuine offline sale carries an op `created_at` on its own business date,
- * so it never enters this path. The 30-day cap is measured from when it was recorded.
+ * A sale recorded on a past business date (D-173/D-174): the till must send a
+ * `sale_backdated` audit row in the same transaction, written by a staff member with
+ * `sale.backdate` (owner by default). A genuine offline sale carries an op `created_at`
+ * on its own business date, so it never enters this path. Any past date is accepted
+ * (D-174); only a future business date is rejected.
  */
 function checkBackdatedSale(
   look: Lookups,
@@ -1863,8 +1864,16 @@ function checkOp(
         checkSaleInsert(group, row);
         try {
           checkSalePolicy(look, group, row, staff, allowed);
-          if (typeof op.created_at === 'number')
-            checkBackdatedSale(look, group, row, op.created_at);
+          // Older clients and imported files may omit the envelope timestamp. The sale's
+          // own created_at is the entry time; never let a missing op.created_at skip the
+          // backdate audit check.
+          const entryAt =
+            typeof op.created_at === 'number'
+              ? op.created_at
+              : Number(row.created_at);
+          if (!Number.isSafeInteger(entryAt))
+            throw new Reject('CONSTRAINT_FAILED');
+          checkBackdatedSale(look, group, row, entryAt);
         } catch (error) {
           // Money helpers throw RangeError on malformed arithmetic; that is a bad row,
           // not an internal failure, so the op is rejected instead of retried forever.

@@ -129,6 +129,17 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
 
   await b.page.goto('/bikri/enrol');
   await expect(b.page.getByText(/This browser is connected to/)).toBeVisible();
+  // Leaving from /enrol is not a free action: it needs an owner PIN.
+  await b.page.getByRole('button', { name: 'Leave that shop' }).click();
+  // The connected-shop confirmation is an inline card, not a dialog.
+  await b.page.getByRole('button', { name: 'Leave that shop' }).last().click();
+  const leavePin = b.page.getByRole('dialog', {
+    name: 'Owner PIN needed',
+  });
+  await expect(leavePin).toBeVisible();
+  await leavePin.getByRole('button', { name: 'Cancel' }).click();
+  await b.page.goto('/bikri/');
+  await expect(b.page.getByTestId('lock-screen')).toBeVisible();
 
   // Revoke B → B's next sync shows the enrol screen with the revoked notice (AC 4).
   const row = a.page

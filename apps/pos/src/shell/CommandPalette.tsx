@@ -185,7 +185,8 @@ export function CommandPalette() {
     return items.filter((item) => {
       if (item.id === 'sell') return can('sale.create');
       if (item.id === 'udhaar') return can('payment.receive');
-      if (item.id === 'suppliers') return can('purchase.create');
+      if (item.id === 'suppliers')
+        return can('purchase.create') || can('party.edit');
       if (item.id === 'expenses') return can('expense.create');
       if (item.id === 'reports') return can('report.view');
       if (item.id === 'day-close') return can('dayclose.create');

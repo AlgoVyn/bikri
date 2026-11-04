@@ -169,6 +169,7 @@ export function DevicesPage() {
   const [codes, setCodes] = useState<CodeRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fresh, setFresh] = useState<NewCode | null>(null);
+  const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [form, setForm] = useState({ name: '', branch: '', admin: false });
   const [confirmRevoke, setConfirmRevoke] = useState<ShopDevice | null>(null);
@@ -280,7 +281,8 @@ export function DevicesPage() {
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!staffId || !form.name.trim()) return;
+            if (!staffId || !form.name.trim() || creating) return;
+            setCreating(true);
             void guard(async () => {
               const res = await shopRequest<NewCode>(
                 db,
@@ -298,7 +300,7 @@ export function DevicesPage() {
               setFresh(res);
               setForm({ name: '', branch: '', admin: false });
               await load();
-            });
+            }).finally(() => setCreating(false));
           }}
         >
           <label className="flex min-w-48 flex-1 flex-col gap-1">
@@ -333,7 +335,12 @@ export function DevicesPage() {
             />
             <span>{t('devices.can_manage')}</span>
           </label>
-          <button type="submit" className={buttonPrimary}>
+          <button
+            type="submit"
+            className={buttonPrimary}
+            disabled={creating}
+            aria-busy={creating}
+          >
             {t('devices.make_code')}
           </button>
         </form>
@@ -630,22 +637,32 @@ export function DevicesPage() {
               type="button"
               className={buttonPrimary}
               onClick={() => {
-                const file = importState.p.file;
+                const preview = importState.p;
+                const file = preview.file;
                 void guard(async () => {
                   if (!staffId) return;
-                  setImportState({
-                    kind: 'running',
-                    done: 0,
-                    total: file.ops.length,
-                  });
-                  const out = await importUnsynced(db, staffId, file, (done) =>
+                  try {
                     setImportState({
                       kind: 'running',
-                      done,
+                      done: 0,
                       total: file.ops.length,
-                    }),
-                  );
-                  setImportState({ kind: 'done', ...out });
+                    });
+                    const out = await importUnsynced(
+                      db,
+                      staffId,
+                      file,
+                      (done) =>
+                        setImportState({
+                          kind: 'running',
+                          done,
+                          total: file.ops.length,
+                        }),
+                    );
+                    setImportState({ kind: 'done', ...out });
+                  } catch (error) {
+                    setImportState({ kind: 'preview', p: preview });
+                    throw error;
+                  }
                 });
               }}
             >

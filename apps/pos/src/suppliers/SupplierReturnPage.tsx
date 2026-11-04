@@ -33,6 +33,7 @@ type Unlinked = {
   key: string;
   productId: string;
   name: string;
+  unit: string;
   qtyMilli: number;
   unitCredit: number;
   trackStock: boolean;
@@ -157,7 +158,7 @@ export function SupplierReturnPage({
       unitCredit: line.unitCredit,
       lineTotal: mulDivRound(line.qtyMilli, line.unitCredit, 1000),
       name: line.name,
-      unit: 'pc',
+      unit: line.unit,
     })),
   ];
   const total = allLines.reduce((sum, line) => sum + line.lineTotal, 0);
@@ -186,6 +187,7 @@ export function SupplierReturnPage({
         key: newId(),
         productId,
         name: String(product.name_en),
+        unit: String(product.unit ?? 'pc'),
         qtyMilli: 1000,
         unitCredit: Number(product.avg_cost || product.last_cost || 0),
         trackStock: product.track_stock === 1,
@@ -407,7 +409,7 @@ export function SupplierReturnPage({
                   <div className="w-32">
                     <QtyInput
                       label={`${t('office.suppliers.return_qty')} ${line.name}`}
-                      unit="pc"
+                      unit={line.unit as never}
                       value={line.qtyMilli}
                       onChange={(value) =>
                         setUnlinked((current) =>

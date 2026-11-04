@@ -1,3 +1,4 @@
+import { can as canDo, type Role } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
@@ -46,7 +47,14 @@ export function BackdateDialog({
   const [busy, setBusy] = useState(false);
   const people = useLiveQuery(async () => {
     const rows = (await getDb().staff.toArray()).filter(
-      (row) => row.active === 1 && !row.deleted_at,
+      (row) =>
+        row.active === 1 &&
+        !row.deleted_at &&
+        canDo(
+          row.role as Role,
+          String(row.permissions_json ?? '{}'),
+          'sale.create',
+        ),
     );
     return rows.sort(
       (a, b) =>

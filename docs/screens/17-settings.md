@@ -100,7 +100,7 @@ Last push/pull time, pending ops count, failed ops with error and `Retry` / (own
 - Server backups: "Your data is backed up every night by Algovyn." (the nightly backup covers all shops and is run by the platform operator; shops don't see or download it, [09 §2](../09-backups-and-ops.md#2-nightly-backup-workflow-githubworkflowsbackupyml)). To restore, contact the operator, who restores **this shop only** ([09 §3.4](../09-backups-and-ops.md#34-restore-one-tenant)).
 - `Download full export` (all of **this shop's** tables as JSON + CSV zip, generated from local data, REQ-B13).
 - `Download from server` (owner, admin device, email sign-in; once per 24 hours): the same zip built from the server copy, including every till's data ([13 §7.3](../13-multi-tenancy.md#73-per-tenant-export-and-restore)); progress per table, resumable for 2 hours. Works in a read-only shop.
-- `Restore from export` (owner; only into an empty shop, and only an export of the same shop or one without a tenant; the operator does restores of a live shop), see [09](../09-backups-and-ops.md).
+- `Restore from export` is **not a v1 owner action**: a shop restore is performed by Algovyn support (operator console) into an empty shop; the owner keeps the export zip and contacts support, see [09](../09-backups-and-ops.md).
 - Unsynced ops of a removed (revoked) till are imported in **Devices** above, not here ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
 
 ## Activity (owner)

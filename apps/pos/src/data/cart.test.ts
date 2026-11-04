@@ -20,6 +20,7 @@ import {
   listHeld,
   loadCarts,
   MAX_CART_LINES,
+  overrideMatches,
   parseQtyPrefix,
   paymentChecks,
   removeLine,
@@ -270,6 +271,41 @@ describe('totals and payment checks (07 §3)', () => {
     expect(paymentChecks(cart, cartTotals(cart, money), cashier).discount).toBe(
       false,
     );
+  });
+
+  it('keeps one catalog.price approval per line', () => {
+    let cart = emptyCart('c1');
+    cart = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      bound_line: 'line-a',
+      bound_price: 100,
+    });
+    cart = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      bound_line: 'line-b',
+      bound_price: 200,
+    });
+    expect(cart.overrides).toHaveLength(2);
+    expect(
+      overrideMatches(cart, 'catalog.edit', {
+        line: 'line-a',
+        price: 100,
+      }),
+    ).toBe(true);
+    expect(
+      overrideMatches(cart, 'catalog.edit', {
+        line: 'line-b',
+        price: 200,
+      }),
+    ).toBe(true);
+    expect(
+      overrideMatches(cart, 'catalog.edit', {
+        line: 'line-a',
+        price: 999,
+      }),
+    ).toBe(false);
   });
 
   it('approvers are active staff with a PIN who hold the permission', () => {

@@ -238,6 +238,20 @@ export function ownerExportStatement(env: Env, tenantId: string, now: number) {
   ).bind(tenantId, now);
 }
 
+/** Claim the once-per-24-hours owner export; zero changes means another request won. */
+export function claimOwnerExportStatement(
+  env: Env,
+  tenantId: string,
+  now: number,
+  every: number,
+) {
+  return env.DB.prepare(
+    `UPDATE tenants SET last_owner_export_at = ?2
+      WHERE id = ?1
+        AND (last_owner_export_at IS NULL OR last_owner_export_at <= ?3)`,
+  ).bind(tenantId, now, now - every);
+}
+
 export async function tenantBySlug(
   env: Env,
   slug: string,

@@ -24,14 +24,23 @@ describe('nightly D1 export', () => {
     expect(() => assertSqlDump('CREATE TABLE sales (id TEXT);')).toThrow(
       'smaller than 1 KB',
     );
+    const complete = [
+      'x'.repeat(1100),
+      ...['meta', 'tenants', ...BACKUP_TABLES].map(
+        (table) => `CREATE TABLE "${table}" (id TEXT);`,
+      ),
+      "INSERT INTO tenants VALUES ('t1');",
+    ].join('\n');
+    expect(() => assertSqlDump(complete)).not.toThrow();
+    expect(() => assertSqlDump('x'.repeat(1100))).toThrow('missing table');
+    // A dump that stops after a few tables must not be accepted as complete.
     expect(() =>
       assertSqlDump(
         `${'x'.repeat(1100)}\nCREATE TABLE "sales" (id TEXT);\nINSERT INTO tenants VALUES ('t1');`,
       ),
-    ).not.toThrow();
-    expect(() => assertSqlDump('x'.repeat(1100))).toThrow('CREATE TABLE sales');
+    ).toThrow('missing table');
     expect(() =>
-      assertSqlDump(`${'x'.repeat(1100)}\nCREATE TABLE sales (id TEXT);`),
+      assertSqlDump(complete.replace("INSERT INTO tenants VALUES ('t1');", '')),
     ).toThrow('tenant data');
   });
 

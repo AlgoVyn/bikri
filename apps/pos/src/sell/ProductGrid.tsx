@@ -170,6 +170,7 @@ function Tile({
   return (
     <button
       type="button"
+      id={`sell-result-${index}`}
       data-index={index}
       data-testid="sell-tile"
       aria-current={active || undefined}

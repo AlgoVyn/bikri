@@ -925,6 +925,14 @@ CREATE INDEX operator_audit_request ON operator_audit (request_id, created_at);
 CREATE INDEX operator_audit_time ON operator_audit (created_at);
 ```
 
+### 2.6 Public request status index (migration `0007_shop_requests_token.sql`)
+
+```sql
+-- The public request-status lookup is by random token; without this index every poll
+-- scans the platform table.
+CREATE INDEX shop_requests_token ON shop_requests (status_token_hash);
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

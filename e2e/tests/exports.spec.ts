@@ -19,8 +19,8 @@ test.describe('Exports (T-049)', () => {
       page.getByRole('button', { name: 'Download from server' }),
     ).toBeDisabled();
     await expect(
-      page.getByRole('button', { name: 'Restore from export' }),
-    ).toBeDisabled();
+      page.getByText(/restore is handled by Algovyn support/i),
+    ).toBeVisible();
 
     await context.setOffline(true);
     const [download] = await Promise.all([
@@ -32,8 +32,28 @@ test.describe('Exports (T-049)', () => {
     expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
     const text = bytes.toString('latin1');
     expect(text).toContain('manifest.json');
-    expect(text).toContain('json/sales.json');
-    expect(text).toContain('csv/sales.csv');
+    const tables = [
+      'shop',
+      'branches',
+      'devices',
+      'staff',
+      'products',
+      'customers',
+      'sales',
+      'sale_lines',
+      'payments',
+      'refunds',
+      'refund_lines',
+      'ledger_entries',
+      'stock_movements',
+      'expenses',
+      'day_closes',
+      'sync_conflicts',
+    ];
+    for (const table of tables) {
+      expect(text).toContain(`json/${table}.json`);
+      expect(text).toContain(`csv/${table}.csv`);
+    }
     expect(text).toContain('"format": "bikri-export"');
     expect(text).toContain('"version": 2');
     expect(text).toContain('"tables"');

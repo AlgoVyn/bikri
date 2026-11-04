@@ -69,7 +69,10 @@ async function recordPastSale(page: Page, lang: 'en' | 'ur') {
     business_date: date,
     staff_id: 'st-cashier',
   });
-  expect(sale?.created_at).not.toBe(date);
+  // created_at is the entry time, not the chosen business date.
+  expect(typeof sale?.created_at).toBe('number');
+  expect(Number(sale?.created_at)).toBeGreaterThan(Date.now() - 10 * 60_000);
+  expect(sale?.business_date).toBe(date);
   const audit = (await idbAll<Row>(page, 'audit_log')).find(
     (row) => row.action === 'sale_backdated',
   );

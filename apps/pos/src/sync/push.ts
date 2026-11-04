@@ -100,18 +100,16 @@ export async function pushAll(
     serverTime: null,
   };
   if (!device) return out;
-  // A tab closed mid-request leaves rows in `sending`; reclaim only stale claims so a
-  // second tab cannot steal a live batch and drop a coalesced edit.
-  const staleBefore = Date.now() - 5 * 60_000;
-  await db.outbox
-    .where('status')
-    .equals('sending')
-    .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
-    .modify({
-      status: 'pending',
-      sending_at: undefined,
-      claim_token: undefined,
-    });
+  // A reload, a closed tab or a stopped engine can leave rows in `sending` forever. That is
+  // not just a delay: pending ops behind them would be sent without their prerequisites
+  // (a product before its owner staff row is a real example), so the server would reject
+  // them. Reclaim every unfinished claim now. A second push of the same op is safe: the
+  // server answers from `applied_ops`, and this tab then settles the row itself.
+  await db.outbox.where('status').equals('sending').modify({
+    status: 'pending',
+    sending_at: undefined,
+    claim_token: undefined,
+  });
   for (let round = 0; round < maxRounds; round += 1) {
     const pending = await db.outbox
       .where('status')
@@ -126,6 +124,7 @@ export async function pushAll(
     await db.outbox.where('seq').anyOf(seqs).modify({
       status: 'sending',
       sending_at: Date.now(),
+      sent_at: Date.now(),
       claim_token: claimToken,
     });
     let res: PushResponse;
@@ -188,7 +187,37 @@ export async function pushAll(
           } else {
             out.applied += 1;
             await db.outbox.delete(entry.seq);
-            await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+            // A newer op for the same row may still be pending (for example one queued
+            // while this request was in flight). Its restore point is the row the server
+            // just accepted, not the older shadow; delete the shadow if we cannot replace it.
+            const newer = await db.outbox
+              .where('[tbl+row_id]')
+              .equals([entry.tbl, entry.row_id])
+              .count();
+            if (newer > 0) {
+              // Keep a restore point for the newer op. For an applied upsert, replace it
+              // with the row the server now has; for a delete or a field merge, keep the
+              // shadow the newer op recorded when it was queued.
+              if (r.result === 'applied' && entry.row) {
+                // Keep the server-managed columns (avg_cost, sales.status, …) from the
+                // current local row; the op payload intentionally omits them.
+                const local = (await db.table(entry.tbl).get(entry.row_id)) as
+                  | Record<string, unknown>
+                  | undefined;
+                await db.pull_shadow.put({
+                  tbl: entry.tbl,
+                  id: entry.row_id,
+                  row: {
+                    ...(local ?? {}),
+                    ...entry.row,
+                    id: entry.row_id,
+                    rev: r.server_rev ?? local?.rev ?? 0,
+                  },
+                });
+              }
+            } else {
+              await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+            }
             // Keep the local optimistic revision current; otherwise the next edit of
             // this row would use a stale base_rev and be needlessly field-merged.
             // Only a plain applied result proves the local row equals the server row.
@@ -310,18 +339,28 @@ export async function discardFailed(
     const entries = (await db.outbox.toArray()).filter((e) =>
       txIds.includes(e.tx_id),
     );
+    // A newer action may still be waiting for the same row. Restoring an older shadow
+    // would then overwrite that newer local edit, so leave the row for its own op.
+    const otherKeys = new Set(
+      (await db.outbox.toArray())
+        .filter((e) => !txIds.includes(e.tx_id))
+        .map((e) => `${e.tbl}:${e.row_id}`),
+    );
     const saleIds = new Set<string>();
     for (const e of entries) {
       if (e.seq === undefined) continue;
+      const rowKey = `${e.tbl}:${e.row_id}`;
       if (isLedgerTable(e.tbl)) {
         if (e.tbl === 'refunds' || e.tbl === 'sale_voids') {
           const row = await db.table(e.tbl).get(e.row_id);
           if (row && typeof row.sale_id === 'string') saleIds.add(row.sale_id);
         }
-        await db.table(e.tbl).delete(e.row_id);
-        await db.pull_shadow.delete([e.tbl, e.row_id]);
-        ledgerChanged = true;
-      } else {
+        if (!otherKeys.has(rowKey)) {
+          await db.table(e.tbl).delete(e.row_id);
+          await db.pull_shadow.delete([e.tbl, e.row_id]);
+          ledgerChanged = true;
+        }
+      } else if (!otherKeys.has(rowKey)) {
         const shadow = await db.pull_shadow.get([e.tbl, e.row_id]);
         if (shadow) {
           await db.table(e.tbl).put(shadow.row);

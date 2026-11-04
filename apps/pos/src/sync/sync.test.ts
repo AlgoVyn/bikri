@@ -206,6 +206,98 @@ describe('push (03 §3, §4.1)', () => {
     expect((await db.categories.get('c-bad'))?.name_en).toBe('Server');
   });
 
+  it('keeps the applied row as the shadow for a newer pending edit', async () => {
+    const db = await enrolled('shadow-newer');
+    const category = await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'First' }),
+      { now: NOW },
+    );
+    const first = await db.outbox.orderBy('seq').first();
+    if (!first?.seq) throw new Error('no op');
+    // Simulate an edit queued while the first request is in flight.
+    await db.outbox.update(first.seq, { status: 'sending' });
+    await writeAction(
+      db,
+      (w) => w.update('categories', category.id, { name_en: 'Second' }),
+      { now: NOW + 1 },
+    );
+    await db.outbox.update(first.seq, { status: 'pending' });
+    expect(await db.outbox.count()).toBe(2);
+    await pushAll(db);
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.pull_shadow.count()).toBe(0);
+  });
+
+  it('keeps the newer restore point when a delete is applied and its follower is rejected', async () => {
+    const db = await enrolled('shadow-delete');
+    const category = await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'First' }),
+      { now: NOW },
+    );
+    server.results = () => ({ result: 'applied', server_rev: 1 });
+    await pushAll(db);
+    const stored = await db.categories.get(category.id);
+    expect(stored?.rev).toBe(1);
+
+    await writeAction(db, (w) => w.remove('categories', category.id), {
+      now: NOW + 1,
+    });
+    const remove = await db.outbox.orderBy('seq').last();
+    if (!remove?.seq) throw new Error('no op');
+    await db.outbox.update(remove.seq, { status: 'sending' });
+    await writeAction(
+      db,
+      (w) => w.update('categories', category.id, { name_en: 'Second' }),
+      { now: NOW + 2 },
+    );
+    expect(await db.pull_shadow.count()).toBe(1);
+    // The delete is applied; the follow-up edit is rejected. Its pre-delete restore
+    // point must survive so discarding the failed edit does not keep the optimistic row.
+    server.results = (op) =>
+      op.op_id === remove.op_id
+        ? { result: 'applied' }
+        : { result: 'rejected', error_code: 'UNIQUE_VIOLATION' };
+    await pushAll(db);
+    expect(await db.outbox.count()).toBe(1);
+    expect(await db.pull_shadow.count()).toBe(1);
+    expect(
+      (await db.pull_shadow.get(['categories', category.id]))?.row,
+    ).toMatchObject({
+      id: category.id,
+      deleted_at: null,
+    });
+  });
+
+  it('recomputes a part-refunded status after a rejected refund is discarded', async () => {
+    const db = await enrolled('discard-refund');
+    await db.sales.add({
+      id: 's-ref',
+      total: 1000,
+      status: 'refunded',
+      created_at: 1,
+    } as never);
+    await db.refunds.bulkAdd([
+      { id: 'r-keep', sale_id: 's-ref', exact_amount: 600, created_at: 1 },
+      { id: 'r-bad', sale_id: 's-ref', exact_amount: 400, created_at: 1 },
+    ] as never);
+    await db.outbox.add({
+      op_id: 'op-refund',
+      tx_id: 'tx-refund',
+      tbl: 'refunds',
+      kind: 'insert',
+      row_id: 'r-bad',
+      row: { id: 'r-bad', sale_id: 's-ref' },
+      created_at: 1,
+      status: 'failed',
+      attempts: 1,
+    });
+    const failed = await db.outbox.orderBy('seq').last();
+    await discardFailed(db, [failed?.seq ?? 0]);
+    expect((await db.sales.get('s-ref'))?.status).toBe('part_refunded');
+  });
+
   it('adopts the server revision after an applied master write', async () => {
     const db = await enrolled('rev');
     await writeAction(db, (w) => w.create('categories', { name_en: 'New' }), {
@@ -230,25 +322,34 @@ describe('push (03 §3, §4.1)', () => {
     expect(await db.outbox.count()).toBe(0);
   });
 
-  it('does not steal a live sending claim, but reclaims a stale one', async () => {
+  it('reclaims an unfinished sending claim and sends it before later ops', async () => {
     const db = await enrolled('claim');
     await writeAction(
       db,
       (w) => w.create('categories', { id: 'c-claim', name_en: 'Claim' }),
       { now: 42 },
     );
+    // A reload or a stopped engine can leave a claim with no response. The next push
+    // must resend it, in order, instead of skipping it and sending newer ops first.
     await db.outbox
       .toCollection()
       .modify({ status: 'sending', sending_at: Date.now() });
+    await writeAction(
+      db,
+      (w) =>
+        w.create('products', {
+          name_en: 'Product',
+          sku: 'SKU-CLAIM',
+          price: 100,
+        }),
+      { now: 43 },
+    );
     server.log = [];
     await pushAll(db);
-    expect(server.log.filter((l) => l.path === '/sync/push')).toHaveLength(0);
-
-    await db.outbox
-      .toCollection()
-      .modify({ sending_at: Date.now() - 10 * 60_000 });
-    await pushAll(db);
-    expect(server.log.filter((l) => l.path === '/sync/push')).toHaveLength(1);
+    const pushes = server.log.filter((l) => l.path === '/sync/push');
+    expect(pushes).toHaveLength(1);
+    const body = pushes[0]?.body as { ops: { tbl: string }[] };
+    expect(body.ops.map((op) => op.tbl)).toEqual(['categories', 'products']);
     expect(await db.outbox.count()).toBe(0);
   });
 

@@ -703,7 +703,7 @@
       "no_permission": "Only the owner can download a full shop copy.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} rows)",
       "restore": "Restore from export",
-      "restore_hint": "Restoring is only enabled for an empty shop; it arrives with the remaining Settings sections.",
+      "restore_hint": "In v1, a shop restore is handled by Algovyn support. Keep the export zip; contact support to restore it into a new empty shop.",
       "server": "Download from server",
       "server_building": "Building from server…",
       "server_done": "Server export downloaded.",

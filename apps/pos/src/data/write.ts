@@ -141,7 +141,13 @@ export async function writeAction<T>(
         .equals([tbl, id])
         .toArray();
       const last = entries.at(-1);
-      return last && last.kind === 'upsert' && last.status === 'pending'
+      // Never coalesce into an op that has already been sent. The server may have applied it
+      // and lost the response; its op id is then in `applied_ops`, so a replay is answered
+      // without applying the newer values. A fresh op id is the only safe carrier.
+      return last &&
+        last.kind === 'upsert' &&
+        last.status === 'pending' &&
+        last.sent_at === undefined
         ? last
         : undefined;
     };

@@ -136,6 +136,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') out.dryRun = true;
+    else if (arg === '--allow-empty') out.allowEmpty = true;
     else if (arg.startsWith('--')) {
       const key = arg.slice(2);
       const value = argv[i + 1];
@@ -192,6 +193,10 @@ export async function main(argv = process.argv.slice(2)) {
     0,
   );
   const tenants = new Set(objects.map((object) => object.key.split('/')[1]));
+  if (objects.length === 0 && args.allowEmpty !== true)
+    throw new Error(
+      'No files found under the bucket/prefix; refusing to upload an empty backup (use --allow-empty only for a genuinely empty shop).',
+    );
   if (args.dryRun) {
     console.log(
       JSON.stringify({

@@ -33,6 +33,7 @@ export function SupplierDialog({
   const [opening, setOpening] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens or another supplier is selected; a live row update must not wipe typed input.
   useEffect(() => {
     if (!open) return;
     setName(editing ? String(editing.name) : '');
@@ -41,7 +42,7 @@ export function SupplierDialog({
     setNote(editing ? String(editing.note ?? '') : '');
     setOpening(null);
     setPending(false);
-  }, [open, editing]);
+  }, [open, editing?.id]);
 
   const save = async () => {
     if (name.trim() === '' || pending) return;

@@ -43,7 +43,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [updating, setUpdating] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
 
-  const allowed = (item: NavItem) => item.perm === null || can(item.perm);
+  const allowed = (item: NavItem) =>
+    item.permAny !== undefined
+      ? item.permAny.some((permission) => can(permission))
+      : item.perm === null || can(item.perm);
   const visible = NAV.filter(allowed);
   const startUpdate = () => {
     setUpdating(true);
@@ -107,6 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       // Ctrl+Shift+P works everywhere, even while typing (screens/18).
       if (
         !event.defaultPrevented &&
+        !dialogOpen() &&
         event.ctrlKey &&
         event.shiftKey &&
         !event.altKey &&

@@ -169,6 +169,39 @@ describe('writeAction (03 §3)', () => {
     });
   });
 
+  it('does not coalesce into an op that was sent and then put back to pending', async () => {
+    const db = freshDb();
+    const product = await writeAction(
+      db,
+      (w) =>
+        w.create('products', {
+          name_en: 'Phone X',
+          sku: 'PHO-3',
+          price: 100,
+        }),
+      { now: NOW },
+    );
+    const [first] = await db.outbox.toArray();
+    if (first?.seq === undefined) throw new Error('no outbox op');
+    // This is what a transport error/timeout leaves behind: pending, same op id,
+    // but the server may already have applied it.
+    await db.outbox.update(first.seq, {
+      status: 'pending',
+      sent_at: NOW + 10,
+      sending_at: undefined,
+      claim_token: undefined,
+    });
+    await writeAction(
+      db,
+      (w) => w.update('products', product.id, { price: 200 }),
+      { now: NOW + 20 },
+    );
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops.find((op) => op.seq === first.seq)?.op_id).toBe(first.op_id);
+    expect(ops.find((op) => op.seq !== first.seq)?.op_id).not.toBe(first.op_id);
+  });
+
   it('coalesces edits of a pending new row into its create op', async () => {
     const db = freshDb();
     await writeAction(

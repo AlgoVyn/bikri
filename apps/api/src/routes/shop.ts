@@ -15,6 +15,7 @@ import { sendSigninEmail } from '../auth/mailer.ts';
 import { ownerCodeKey, ownerSessionKey } from '../auth/ownerKeys.ts';
 import type { TenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
+import { readJsonBody } from '../middleware/body.ts';
 import {
   OWNER_SESSION_MS,
   type OwnerSession,
@@ -25,8 +26,8 @@ import {
   TILL_CODE_TTL_MS,
 } from '../platform/createTenant.ts';
 import {
+  claimOwnerExportStatement,
   maskEmail,
-  ownerExportStatement,
   supportStatement,
 } from '../platform/tenantAdmin.ts';
 import { auditStatements } from '../sync/audit.ts';
@@ -132,7 +133,9 @@ shop.post('/owner-signin/start', async (c) => {
     (r) => r.attempts >= SIGNIN.tries && r.used_at === null,
   );
   if (dead.length >= SIGNIN.deadPerHour) {
-    const third = dead[SIGNIN.deadPerHour - 1]?.created_at ?? now;
+    // `rows` is newest-first; the pause starts at the newest dead code, not the oldest
+    // one in the window (which can already be almost an hour old).
+    const third = dead[0]?.created_at ?? now;
     throw rateLimited(
       'Sign-in is paused for an hour',
       (third + SIGNIN.pause - now) / 1000,
@@ -153,22 +156,42 @@ shop.post('/owner-signin/start', async (c) => {
   const code = newSixDigitCode();
   const hash = await hmacHex(ownerCodeKey(c.env), `${tenant.id}${id}${code}`);
   const expires = now + SIGNIN.ttl;
-  await db.batch([
-    // A new code ends the previous unused one (expired, not dead: it does not count toward the pause).
-    db.prepare(
-      'UPDATE owner_email_codes SET expires_at = ?2 WHERE tenant_id = ?1 AND used_at IS NULL AND expires_at > ?2',
-      now,
-    ),
-    db.prepare(
-      'INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
-      id,
-      device.id,
-      ownerId,
-      hash,
-      now,
-      expires,
-    ),
-  ]);
+  // The checks above give precise errors, but they are read-then-insert. This conditional
+  // insert is the atomic guard: concurrent starts cannot exceed the cooldown/hour/day caps
+  // or the dead-code pause.
+  const inserted = await db.run(
+    `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+     WHERE NOT EXISTS (SELECT 1 FROM owner_email_codes WHERE tenant_id = ?1 AND device_id = ?3 AND created_at > ?8)
+       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?9) < ?10
+       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?11) < ?12
+       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND attempts >= ?13 AND used_at IS NULL AND created_at > ?9) < ?14`,
+    id,
+    device.id,
+    ownerId,
+    hash,
+    now,
+    expires,
+    now - SIGNIN.cooldown,
+    now - HOUR,
+    SIGNIN.perHour,
+    now - 24 * HOUR,
+    SIGNIN.perDay,
+    SIGNIN.tries,
+    SIGNIN.deadPerHour,
+  );
+  if ((inserted.meta.changes ?? 0) !== 1)
+    throw rateLimited(
+      'Too many codes. Try again shortly.',
+      SIGNIN.cooldown / 1000,
+    );
+  // A new code ends the previous unused one (expired, not dead: it does not count toward
+  // the pause). Exclude the row just inserted.
+  await db.run(
+    'UPDATE owner_email_codes SET expires_at = ?2 WHERE tenant_id = ?1 AND used_at IS NULL AND expires_at > ?2 AND id <> ?3',
+    now,
+    id,
+  );
   const shopName = String(
     (shopRow?.results?.[0] as { name?: string } | undefined)?.name ??
       tenant.display_name,
@@ -216,23 +239,29 @@ shop.post('/owner-signin/verify', async (c) => {
   ) {
     throw bad(0);
   }
+  // Claim one try before comparing the HMAC. Concurrent guesses now consume the same
+  // five-try budget instead of all reading attempts = 0.
+  const claimed = await db.run(
+    'UPDATE owner_email_codes SET attempts = attempts + 1 WHERE tenant_id = ?1 AND id = ?2 AND device_id = ?3 AND used_at IS NULL AND expires_at > ?4 AND attempts < 5',
+    body.code_id,
+    device.id,
+    now,
+  );
+  if ((claimed.meta.changes ?? 0) !== 1) throw bad(0);
   const hash = await hmacHex(
     ownerCodeKey(c.env),
     `${tenant.id}${body.code_id}${body.code}`,
   );
   if (!safeEqual(hash, row.code_hash)) {
-    await db.run(
-      'UPDATE owner_email_codes SET attempts = attempts + 1 WHERE tenant_id = ?1 AND id = ?2 AND attempts < 5',
-      body.code_id,
-    );
     console.log(JSON.stringify({ event: 'owner_signin_wrong_code' }));
-    throw bad(SIGNIN.tries - row.attempts - 1);
+    throw bad(SIGNIN.tries - (row.attempts + 1));
   }
   const res = await db.batch([
     db.prepare(
-      'UPDATE owner_email_codes SET used_at = ?3 WHERE tenant_id = ?1 AND id = ?2 AND used_at IS NULL AND attempts < 5',
+      'UPDATE owner_email_codes SET used_at = ?3 WHERE tenant_id = ?1 AND id = ?2 AND device_id = ?4 AND used_at IS NULL',
       body.code_id,
       now,
+      device.id,
     ),
   ]);
   if ((res[0]?.meta.changes ?? 0) !== 1) throw bad(0);
@@ -548,7 +577,7 @@ shop.post('/devices/:id/revoke', async (c) => {
 shop.post('/import-ops', async (c) => {
   const { tenant, db } = c.var;
   // importOps applies only transactions created before a read-only cutoff (13 §7.2).
-  const body = ImportOpsBody.parse(await c.req.json());
+  const body = ImportOpsBody.parse(await readJsonBody(c, 1_000_000));
   const now = Date.now();
   const out = await importOps(c.env, db, tenant, body.device_id, body.ops, now);
   await db.batch(
@@ -608,6 +637,13 @@ shop.get('/export', async (c) => {
         (tenant.last_owner_export_at + EXPORT_EVERY - now) / 1000,
       );
     }
+    // Claim the slot atomically before building the export; two concurrent starts must
+    // not both receive an export token.
+    const [claimed] = await db.batch([
+      claimOwnerExportStatement(c.env, tenant.id, now, EXPORT_EVERY),
+    ]);
+    if ((claimed?.meta.changes ?? 0) !== 1)
+      throw rateLimited('One server export per day', EXPORT_EVERY / 1000);
     const start = await snapshotPayload(
       (k) => (k === 'before' ? String(now) : undefined),
       db,
@@ -621,10 +657,7 @@ shop.get('/export', async (c) => {
       exp: now + EXPORT_TTL,
       before: now,
     } satisfies ExportToken);
-    await db.batch([
-      ownerExportStatement(c.env, tenant.id, now),
-      ...audit(c, 'owner_export'),
-    ]);
+    await db.batch(audit(c, 'owner_export'));
     return c.json({ export_id: token, exported_at: now, ...start });
   }
   const t = await verifyToken<ExportToken>(ownerSessionKey(c.env), exportId);

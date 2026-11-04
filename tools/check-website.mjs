@@ -272,24 +272,36 @@ export async function checkSite(site, fetchImpl = fetch) {
   const seen = new Set();
   /** @type {Set<string>} */
   const seenJs = new Set();
+  let homeAnalysed = false;
   while (queue.length > 0 && seen.size < MAX_PAGES) {
     const url = /** @type {string} */ (queue.shift());
     const u = new URL(url);
     if (isBikriPath(u.pathname) || seen.has(u.href)) continue;
     seen.add(u.href);
+    const isHome = u.href === home;
     let page;
     try {
       page = await get(u.href);
     } catch (err) {
       findings.push({
-        level: 'warn',
+        level: isHome ? 'fail' : 'warn',
         page: u.href,
         rule: 'fetch-error',
         detail: String(err),
       });
       continue;
     }
-    if (page.status !== 200 || !/html/i.test(page.type ?? '')) continue;
+    if (page.status !== 200 || !/html/i.test(page.type ?? '')) {
+      if (isHome)
+        findings.push({
+          level: 'fail',
+          page: u.href,
+          rule: 'home-unreachable',
+          detail: `status ${page.status}, type ${page.type ?? 'unknown'}`,
+        });
+      continue;
+    }
+    if (isHome) homeAnalysed = true;
     const result = analyzeHtml(page.text, u.href, host);
     findings.push(...result.findings);
     // Follow every page, not just Home: a third-party script can live on a page
@@ -308,6 +320,16 @@ export async function checkSite(site, fetchImpl = fetch) {
     }
   }
 
+  if (
+    !homeAnalysed &&
+    !findings.some((f) => f.level === 'fail' && f.page === home)
+  )
+    findings.push({
+      level: 'fail',
+      page: home,
+      rule: 'home-unreachable',
+      detail: 'home page was not analysed',
+    });
   for (const path of ROOT_SW_PATHS) {
     try {
       const res = await fetchImpl(new URL(path, origin).href, {

@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { api, IDS, json, seedShop } from './helpers/fixtures.ts';
 import {
@@ -512,11 +512,12 @@ describe('void rules (05 §5, D-044)', () => {
         ),
       ];
     };
-    const late = await pushOk(shop.till, voidOf(1, manager, '2026-10-28'));
+    const today = businessDate(Date.now());
+    const late = await pushOk(shop.till, voidOf(1, manager, '2099-01-01'));
     expect(late.results[0]?.error_code).toBe('FORBIDDEN');
-    const same = await pushOk(shop.till, voidOf(1, manager, '2026-10-27'));
+    const same = await pushOk(shop.till, voidOf(1, manager, today));
     expect(same.results[0]?.error_code ?? null).toBeNull();
-    const owner = await pushOk(shop.till, voidOf(2, IDS.owner, '2026-10-29'));
+    const owner = await pushOk(shop.till, voidOf(2, IDS.owner, today));
     expect(owner.results[0]?.error_code ?? null).toBeNull();
   });
 

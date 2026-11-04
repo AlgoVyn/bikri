@@ -68,6 +68,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Support access extension updates already-enrolled support device expiry; `devices.enrolled_by` is no longer sent to tills.
 - The missing `office.products.title` use is replaced with the base products title; `i18n:check` now also verifies that literal `t()` keys used by the app exist. The docs no longer require per-table Zod row schemas (D-170).
 
+### Fifth review remediation (2026-11-04)
+- Outbox replies lost after a timeout can no longer coalesce a newer edit into an already-applied op id; the restore shadow is kept/replaced correctly for a newer pending op.
+- An interrupted push (reload, closed tab, stopped engine) no longer leaves claims that block later ops: each push reclaims and resends unfinished rows in sequence, so a product can never overtake its setup staff/shop rows.
+- `/enrol` requires an owner PIN before leaving a connected shop; the cashier blind-count screen can be completed from denomination inputs.
+- Backdated sales mirror the attributed seller's `sale.create`/`catalog.edit` checks, including a line-bound price override, and the Worker cannot skip the backdate audit when an old client omits `op.created_at`.
+- Owner discount limits, supplier visibility, device admin double submits, failed imports, Customer/Supplier dialog edits and Price Check/Pay interactions are fixed.
+- Shop requests cannot be rewritten by a duplicate email and an `approving` request cannot regress; owner sign-in limits and support/export claims are atomic.
+- Public/import bodies are capped, migration `0007` indexes `shop_requests.status_token_hash`, and `Restore from export` is documented as an operator action in v1.
+- Release gates: the website check fails closed, the backup verifies every table, `gen-tables` reads every migration, the bundle gate counts the theme/nested chunks (288 KB budget), and the e2e assertions/checks cover the repaired paths.
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

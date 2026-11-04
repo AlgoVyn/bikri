@@ -703,7 +703,7 @@
       "no_permission": "Mukammal dukan ki copy sirf malik download kar sakta hai.",
       "progress": "{{table}} ({{index}}/{{total}}, {{rows}} satrein)",
       "restore": "Export se restore karein",
-      "restore_hint": "Restore sirf khali dukan ke liye hai; yeh baqi Settings ke saath aayegi.",
+      "restore_hint": "v1 mein dukaan ki restore Algovyn support karta hai. Export zip sambhal kar rakhein; nayi khali dukaan mein restore ke liye support se rabta karein.",
       "server": "Server se download karein",
       "server_building": "Server se ban rahi hai…",
       "server_done": "Server export download ho gayi.",

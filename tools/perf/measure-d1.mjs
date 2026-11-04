@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 /**
@@ -259,11 +259,9 @@ export function measure({ bills = 20_000, days = 120 } = {}) {
   const file = join(dir, 'perf.sqlite');
   const db = new DatabaseSync(file);
   try {
-    for (const name of [
-      '0001_init.sql',
-      '0002_seed.sql',
-      '0003_perf_indexes.sql',
-    ])
+    for (const name of readdirSync(join(ROOT, 'packages/db/migrations'))
+      .filter((file) => /^\d{4}_.+\.sql$/u.test(file))
+      .sort())
       db.exec(readFileSync(join(ROOT, 'packages/db/migrations', name), 'utf8'));
     // Sizing only: no need to materialise every parent row.
     db.exec('PRAGMA foreign_keys = OFF');

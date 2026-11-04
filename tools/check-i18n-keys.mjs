@@ -24,10 +24,46 @@ function flatten(value, prefix = '', out = new Set()) {
   return out;
 }
 
-const keys = new Set();
-for (const file of CATALOGS) {
-  const parsed = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
-  for (const key of flatten(parsed)) keys.add(key);
+const catalogKeys = Object.fromEntries(
+  CATALOGS.map((file) => {
+    const parsed = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
+    return [file, flatten(parsed)];
+  }),
+);
+const base = catalogKeys['packages/i18n/en.json'];
+const office = catalogKeys['packages/i18n/office/en.json'];
+const admin = catalogKeys['packages/i18n/admin/en.json'];
+const publicKeys = catalogKeys['packages/i18n/public/en.json'];
+
+const OFFICE_DIRS = new Set([
+  'dayclose',
+  'sales',
+  'udhaar',
+  'suppliers',
+  'reports',
+  'expenses',
+  'labels',
+  'settings',
+]);
+
+/** Which catalogs a source file may use: base + its feature area. */
+function allowedKeys(file) {
+  const rel = relative(SOURCE, file).replaceAll('\\', '/');
+  if (rel.startsWith('admin/') || rel.startsWith('routes/admin/'))
+    return new Set([...base, ...admin]);
+  if (rel.startsWith('public/') || rel.startsWith('routes/request'))
+    return new Set([...base, ...publicKeys]);
+  const area = rel.split('/')[0];
+  // A few shared components are only mounted from office screens.
+  const officeComponent = rel === 'components/PastDatePicker.tsx';
+  if (
+    officeComponent ||
+    OFFICE_DIRS.has(area) ||
+    (rel.startsWith('routes/') &&
+      OFFICE_DIRS.has(rel.split('/')[1]?.replace(/\.tsx?$/u, '') ?? ''))
+  )
+    return new Set([...base, ...office]);
+  return base;
 }
 
 const files = [];
@@ -49,6 +85,7 @@ const missing = [];
 const literal = /\bt\(\s*(['"])((?:\\.|(?!\1).)+)\1/g;
 for (const file of files) {
   const source = readFileSync(file, 'utf8');
+  const keys = allowedKeys(file);
   for (const match of source.matchAll(literal)) {
     const key = match[2];
     if (key.includes('${')) continue;

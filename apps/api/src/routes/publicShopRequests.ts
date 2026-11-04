@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../errors.ts';
+import { readJsonBody } from '../middleware/body.ts';
 import { createShopRequest, statusByToken } from '../platform/shopRequests.ts';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
@@ -49,7 +50,7 @@ async function limit(
 
 publicShopRequests.post('/shop-requests', async (c) => {
   await limit(c, 'shop-request');
-  const body = RequestBody.parse(await c.req.json());
+  const body = RequestBody.parse(await readJsonBody(c, 16 * 1024));
   // A filled honeypot gets the same answer as a real request; nothing is stored.
   if (body.website) return c.json({ ok: true }, 202);
   const created = await createShopRequest(c.env, body);
@@ -57,7 +58,7 @@ publicShopRequests.post('/shop-requests', async (c) => {
     {
       ok: true,
       request_id: created.id,
-      status_token: created.token,
+      ...(created.token ? { status_token: created.token } : {}),
     },
     202,
   );
@@ -65,7 +66,7 @@ publicShopRequests.post('/shop-requests', async (c) => {
 
 publicShopRequests.post('/shop-requests/status', async (c) => {
   await limit(c, 'shop-request-status');
-  const body = StatusBody.parse(await c.req.json());
+  const body = StatusBody.parse(await readJsonBody(c, 8 * 1024));
   const status = await statusByToken(c.env, body.token);
   if (!status) throw new ApiError('NOT_FOUND', 404, 'Request not found');
   return c.json(status);

@@ -88,7 +88,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 409 | `SCHEMA_OUTDATED` | Client schema version < `MIN_CLIENT_SCHEMA` |
 | 409 | `SLUG_TAKEN` / `NOT_IN_MAINTENANCE` / `LAST_ADMIN_DEVICE` / `BAD_STATUS_CHANGE` / `EMAIL_NOT_VERIFIED` | Operator and shop-admin endpoints (§3.7, §3.8); a shop request cannot be approved before its email is verified |
 | 410 | `SNAPSHOT_REQUIRED` | Pull `since` is below the tenant's `change_log_floor` (changes pruned after 30 days); `details.change_log_floor` |
-| 413 | `PAYLOAD_TOO_LARGE` | Push body > 1 MB, image > 2 MB |
+| 413 | `PAYLOAD_TOO_LARGE` | Push body > 1 MB, image > 2 MB, public request body > 16 KB, shop import > 1 MB, operator import > 4 MB |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload not webp/png/jpeg |
 | 429 | `RATE_LIMITED` | Too many requests (see §6); owner sign-in codes and server exports also use it, with `Retry-After` |
 | 500 | `INTERNAL` | Unexpected; includes `details.request_id` |
