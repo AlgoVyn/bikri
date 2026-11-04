@@ -716,6 +716,7 @@
     },
     "settings": {
       "health_title": "ڈیٹا کی حفاظت",
+      "health_last_sync": "آخری سنک",
       "health_sync": "سنک",
       "health_pending": "{{count}} تبدیلیاں باقی",
       "health_up_to_date": "اپ ٹو ڈیٹ",
@@ -825,6 +826,7 @@
       "perm_purchase_create": "سپلائر اور ڈیلیوری",
       "perm_refund_create": "واپسی",
       "perm_report_view": "رپورٹس",
+      "perm_sale_backdate": "پرانے فروخت درج کرنا",
       "perm_sale_below_cost": "لاگت سے کم بیچنا",
       "perm_sale_create": "فروخت بنانا",
       "perm_sale_discount": "رعایت دینا",

@@ -57,7 +57,11 @@ test.describe('Products (T-014)', () => {
     await expectNoHorizontalScroll(page);
 
     // AC 7: Duplicate keeps details, clears SKU, barcodes and opening stock.
-    await page.getByRole('link', { name: 'Duplicate' }).click();
+    await page
+      .getByTestId('product-actions')
+      .getByRole('button', { name: 'More actions' })
+      .click();
+    await page.getByRole('button', { name: 'Duplicate' }).click();
     const name = page.getByLabel('Name (English)');
     await expect(name).toHaveValue('Type-C cable 1 m white');
     await expect(name).toBeFocused();

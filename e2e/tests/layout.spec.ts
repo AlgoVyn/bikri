@@ -90,6 +90,48 @@ test.describe('design layout invariants', () => {
     }
   });
 
+  test('every till control is at least 44 px on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedVisualShop(page);
+    await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+    await page.waitForTimeout(300);
+    await page.getByTestId('sell-tile').first().click();
+    await page.getByTestId('cart-bar').click();
+    await page.waitForTimeout(300);
+    const small = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      if (!main) return [];
+      const nodes = Array.from(
+        main.querySelectorAll<HTMLElement>(
+          'button, a[href], input:not([type="hidden"]), select, textarea',
+        ),
+      );
+      return nodes
+        .filter((el) => {
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            !el.closest('.sr-only') &&
+            !el.classList.contains('sr-only') &&
+            (rect.width < 44 || rect.height < 44)
+          );
+        })
+        .map((el) => ({
+          tag: el.tagName,
+          label:
+            el.getAttribute('aria-label') ??
+            (el.textContent ?? '').trim().slice(0, 30),
+          width: Math.round(el.getBoundingClientRect().width),
+          height: Math.round(el.getBoundingClientRect().height),
+        }));
+    });
+    expect(small).toEqual([]);
+  });
+
   test('list density holds at 1280', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await seedVisualShop(page);

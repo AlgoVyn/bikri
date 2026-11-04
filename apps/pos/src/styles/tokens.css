@@ -261,6 +261,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Native checkboxes, radios and progress use the brand colour, not the browser blue. */
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--color-primary);
+}
+
 /* Pressed toggles must not animate through a low-contrast intermediate colour. */
 [aria-pressed="true"],
 [aria-selected="true"] {

@@ -29,6 +29,7 @@ import { shopTimeZone } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { tileBg } from '../products/tiles.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -247,21 +248,27 @@ export function ExpensesPage() {
                 return (
                   <div
                     key={row.category?.id ?? 'none'}
-                    className="flex items-center gap-2 text-small"
+                    className="flex items-center gap-3 text-small"
                   >
                     <span className="min-w-32 truncate">
                       {categoryName(row.category, i18n.language)}
                     </span>
-                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+                    <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
                       <span
-                        className="block h-full bg-primary"
+                        className={`block h-full ${
+                          row.category?.color
+                            ? tileBg(row.category.color)
+                            : 'bg-primary'
+                        }`}
                         style={{ width: `${percent}%` }}
                       />
                     </span>
-                    <span className="w-9 text-end tabular-nums text-text-muted">
+                    <span className="w-10 text-end tabular-nums text-text-muted">
                       {percent}%
                     </span>
-                    <MoneyText paisa={row.net} />
+                    <span className="w-20 text-end">
+                      <MoneyText paisa={row.net} />
+                    </span>
                   </div>
                 );
               })}

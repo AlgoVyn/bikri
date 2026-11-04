@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
+import { InfoIcon, LockIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
@@ -70,8 +71,11 @@ export function Banners() {
         <p
           role="alert"
           data-testid="banner-read-only"
-          className="bg-warning-subtle px-4 py-2 text-warning-subtle-ink"
+          className="flex min-h-11 items-center gap-2 bg-warning-subtle px-4 py-2 text-small text-warning-subtle-ink"
         >
+          <span aria-hidden="true" className="shrink-0">
+            <LockIcon />
+          </span>
           {t('tenant.readOnly.banner')}
         </p>
       ) : null}
@@ -79,8 +83,11 @@ export function Banners() {
         <p
           role="status"
           data-testid="banner-support"
-          className="bg-info-subtle px-4 py-2 text-info-subtle-ink"
+          className="flex min-h-11 items-center gap-2 bg-info-subtle px-4 py-2 text-small text-info-subtle-ink"
         >
+          <span aria-hidden="true" className="shrink-0">
+            <InfoIcon />
+          </span>
           {t('tenant.support.banner', { time, reason: support.reason })}
           {state?.canEnd ? (
             <button
@@ -97,8 +104,11 @@ export function Banners() {
         <p
           role="status"
           data-testid="banner-offline"
-          className="bg-warning-subtle px-4 py-1 text-small text-warning-subtle-ink"
+          className="flex min-h-11 items-center gap-2 bg-warning-subtle px-4 py-2 text-small text-warning-subtle-ink"
         >
+          <span aria-hidden="true" className="shrink-0">
+            <InfoIcon />
+          </span>
           {t('shell.offline')}
         </p>
       )}

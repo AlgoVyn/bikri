@@ -17,6 +17,7 @@ import {
 import { adminHref, formatWhen } from './format.ts';
 import type { ApproveShopRequestResult } from './types.ts';
 import {
+  AdminErrorState,
   dangerBtn,
   inputClass,
   Modal,
@@ -85,12 +86,7 @@ export function RequestPage({ id }: { id: string }) {
 
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={quietBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

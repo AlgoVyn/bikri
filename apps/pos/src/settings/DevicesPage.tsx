@@ -12,6 +12,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { DeviceIcon, UploadIcon } from '../components/icons.tsx';
 import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
@@ -278,7 +279,7 @@ export function DevicesPage() {
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <h2 className="text-h2 font-semibold">{t('devices.add_title')}</h2>
         <form
-          className="flex flex-wrap items-end gap-3"
+          className="grid gap-3 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (!staffId || !form.name.trim() || creating) return;
@@ -303,7 +304,7 @@ export function DevicesPage() {
             }).finally(() => setCreating(false));
           }}
         >
-          <label className="flex min-w-48 flex-1 flex-col gap-1">
+          <label className="flex flex-col gap-1">
             <span>{t('devices.name')}</span>
             <input
               className={fieldClass}
@@ -327,7 +328,7 @@ export function DevicesPage() {
               ))}
             </select>
           </label>
-          <label className="flex min-h-11 items-center gap-2">
+          <label className="flex min-h-11 items-center gap-2 sm:col-span-2">
             <input
               type="checkbox"
               checked={form.admin}
@@ -337,7 +338,7 @@ export function DevicesPage() {
           </label>
           <button
             type="submit"
-            className={buttonPrimary}
+            className={`${buttonPrimary} justify-self-start sm:col-span-2`}
             disabled={creating}
             aria-busy={creating}
           >
@@ -414,13 +415,18 @@ export function DevicesPage() {
           </button>
         </div>
         {devices === null ? (
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => void guard(load)}
-          >
-            {t('devices.load')}
-          </button>
+          <div
+            role="status"
+            className="h-24 animate-pulse rounded-card border border-border bg-surface-2"
+            aria-label={t('common.loading')}
+          />
+        ) : devices.length === 0 ? (
+          <EmptyState
+            icon={<DeviceIcon />}
+            message={t('devices.empty')}
+            actionLabel={t('devices.load')}
+            onAction={() => void guard(load)}
+          />
         ) : (
           <ul
             className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface"

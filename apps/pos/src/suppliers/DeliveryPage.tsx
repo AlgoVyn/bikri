@@ -9,6 +9,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -20,7 +21,6 @@ import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatBusinessDate } from '../lib/date';
 import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -38,7 +38,7 @@ const field =
 
 /** Record a delivery / purchase (screens/13). */
 export function DeliveryPage({ supplierId }: { supplierId: string }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -244,20 +244,13 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             onChange={(e) => setInvoiceNo(e.target.value)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.suppliers.delivery_date')}
-          <input
-            type="date"
-            className={field}
-            min={minDate}
-            max={today}
-            value={chosenDate}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <span className="text-text-muted">
-            {formatBusinessDate(chosenDate, i18n.language)}
-          </span>
-        </label>
+        <DateField
+          label={t('office.suppliers.delivery_date')}
+          value={chosenDate}
+          min={minDate}
+          max={today}
+          onChange={setDate}
+        />
       </section>
 
       <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">

@@ -22,7 +22,14 @@ import {
   SHOP_SHARE,
 } from './format.ts';
 import type { TenantListItem, UsageOverview } from './types.ts';
-import { Meter, Panel, quietBtn, StatCard, StatusBadge } from './ui.tsx';
+import {
+  AdminErrorState,
+  Meter,
+  Panel,
+  quietBtn,
+  StatCard,
+  StatusBadge,
+} from './ui.tsx';
 
 export function OverviewPage() {
   const { t, i18n } = useTranslation();
@@ -47,7 +54,9 @@ export function OverviewPage() {
         const message =
           err instanceof AdminApiError && err.status === 403
             ? t('admin.err_not_operator')
-            : adminErrorMessage(err, t('admin.err_generic'));
+            : err instanceof AdminApiError && err.status >= 500
+              ? t('admin.err_server')
+              : adminErrorMessage(err, t('admin.err_generic'));
         setError(message);
         toast.push(message, 'error');
       });
@@ -57,7 +66,12 @@ export function OverviewPage() {
   }, [t, toast, tick]);
 
   if (error !== null && usage === null) {
-    return <p className="text-text-muted">{error}</p>;
+    return (
+      <AdminErrorState
+        message={error}
+        onRetry={() => setTick((value) => value + 1)}
+      />
+    );
   }
   if (usage === null) {
     return <p className="sr-only">{t('common.loading')}</p>;

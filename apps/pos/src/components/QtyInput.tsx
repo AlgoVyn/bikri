@@ -33,7 +33,7 @@ export function QtyInput({
   value: number | null;
   onChange: (milli: number | null) => void;
   name?: string;
-  /** 36 px controls for dense rows (cart lines, stock count, labels). */
+  /** 44 px controls for dense rows (cart lines, stock count, labels). */
   dense?: boolean;
   /** Keep the label for assistive tech only; the row already gives the context. */
   hideLabel?: boolean;
@@ -68,7 +68,6 @@ export function QtyInput({
         {label}
       </label>
       <div
-        dir="ltr"
         className={
           dense ? 'flex items-center gap-1' : 'flex items-center gap-2'
         }
@@ -85,11 +84,12 @@ export function QtyInput({
         </button>
         <input
           id={inputId}
+          dir="ltr"
           name={name}
           aria-label={ariaLabel}
           inputMode={qtyAllowsDecimals(unit) ? 'decimal' : 'numeric'}
           autoComplete="off"
-          className={`${dense ? 'h-9 px-1.5 text-small' : 'h-11 px-3 text-body'} min-w-0 flex-1 rounded-control border border-border-strong bg-surface text-center font-mono text-text outline-none`}
+          className={`${dense ? 'h-11 px-2 text-small' : 'h-11 px-3 text-body'} min-w-0 flex-1 rounded-control border border-border-strong bg-surface text-center font-mono text-text outline-none`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}

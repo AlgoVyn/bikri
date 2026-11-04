@@ -159,7 +159,7 @@ export function LockScreen() {
     },
   );
   const key =
-    'flex h-16 items-center justify-center rounded-card border border-border bg-surface text-h2 font-semibold';
+    'flex h-16 items-center justify-center rounded-card border border-border bg-surface text-h2 font-semibold transition-[background-color,transform] duration-150 hover:bg-surface-2 active:scale-[0.99] active:bg-surface-2';
 
   return (
     <main

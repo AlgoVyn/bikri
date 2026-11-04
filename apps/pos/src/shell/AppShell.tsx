@@ -10,6 +10,7 @@ import { ReadOnlyError } from '../data/write.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { Banners } from './Banners.tsx';
 import { Breadcrumbs } from './Breadcrumbs.tsx';
 import { CommandPalette } from './CommandPalette.tsx';
@@ -38,15 +39,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { updateReady, applyUpdate } = useUpdateReady();
   usePrintService();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const shopName = useShopName();
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
 
   const allowed = (item: NavItem) =>
-    item.permAny !== undefined
-      ? item.permAny.some((permission) => can(permission))
-      : item.perm === null || can(item.perm);
+    item.to !== '/sell' || !readOnly
+      ? item.permAny !== undefined
+        ? item.permAny.some((permission) => can(permission))
+        : item.perm === null || can(item.perm)
+      : false;
   const visible = NAV.filter(allowed);
   const startUpdate = () => {
     setUpdating(true);
@@ -134,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         !event.shiftKey &&
         (event.key === 'n' || event.key === 'N')
       ) {
-        if (!can('sale.create')) return;
+        if (readOnly || !can('sale.create')) return;
         event.preventDefault();
         void navigate({ to: '/sell' });
         return;

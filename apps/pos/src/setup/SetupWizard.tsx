@@ -757,7 +757,9 @@ export function SetupWizard() {
                       <option key={v} value={v}>
                         {v === 1
                           ? t('setup.round_none')
-                          : t('setup.round_rs', { n: v / 100 })}
+                          : v === 100
+                            ? t('setup.round_rupee')
+                            : t('setup.round_rs', { n: v / 100 })}
                       </option>
                     ))}
                   </select>

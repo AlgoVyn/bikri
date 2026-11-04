@@ -65,7 +65,9 @@ async function readError(response: Response): Promise<AdminApiError> {
   const message =
     typeof body?.error?.message === 'string'
       ? body.error.message
-      : `HTTP ${response.status}`;
+      : response.status >= 500
+        ? 'The server is unavailable. Check your connection and try again.'
+        : `Request failed (${response.status})`;
   return new AdminApiError(
     code,
     response.status,

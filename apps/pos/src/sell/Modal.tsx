@@ -10,6 +10,8 @@ const SIZES = {
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,
   // Full screen below 768 px (pay modal, screens/06).
   full: `${base} w-[min(56rem,calc(100%-2rem))] max-md:m-0 max-md:h-full max-md:max-h-full max-md:w-full max-md:rounded-none`,
+  // Sale complete: centered like screens/07, but full-screen on phones.
+  done: `${base} w-[min(36rem,calc(100%-2rem))] max-md:m-0 max-md:h-full max-md:max-h-full max-md:w-full max-md:rounded-none`,
   // A form sheet: rises from the bottom on phones, a compact dialog on larger screens.
   sheet: `${base} w-[min(32rem,calc(100%-2rem))] max-md:mt-auto max-md:mb-0 max-md:max-h-[92dvh] max-md:w-full max-md:rounded-b-none max-md:pt-6 max-md:pb-0`,
 } as const;
@@ -23,6 +25,7 @@ export function Modal({
   children,
   wide = false,
   full = false,
+  done = false,
   sheet = false,
   header,
 }: {
@@ -33,6 +36,8 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
   full?: boolean;
+  /** Sale complete: compact centered dialog on desktop, full screen on phones. */
+  done?: boolean;
   /** Phone: a bottom sheet; from 768 px: a compact dialog. */
   sheet?: boolean;
   /** Extra content next to the title (e.g. the total to pay). */
@@ -45,7 +50,17 @@ export function Modal({
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content
           className={
-            SIZES[full ? 'full' : sheet ? 'sheet' : wide ? 'wide' : 'normal']
+            SIZES[
+              done
+                ? 'done'
+                : full
+                  ? 'full'
+                  : sheet
+                    ? 'sheet'
+                    : wide
+                      ? 'wide'
+                      : 'normal'
+            ]
           }
           {...(description ? {} : { 'aria-describedby': undefined })}
         >

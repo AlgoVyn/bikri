@@ -65,6 +65,19 @@ describe('admin api client', () => {
     expect(settled).toBe(false);
   });
 
+  it('turns a bodyless 5xx into a friendly server message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('bad gateway', { status: 502 })),
+    );
+    await expect(getUsage()).rejects.toMatchObject({
+      name: 'AdminApiError',
+      status: 502,
+      message:
+        'The server is unavailable. Check your connection and try again.',
+    });
+  });
+
   it('sends JSON with same-origin credentials and surfaces the error message', async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {

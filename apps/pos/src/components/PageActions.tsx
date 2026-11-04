@@ -13,6 +13,8 @@ import { MoreIcon } from './icons.tsx';
 export type PageActionItem = {
   label: string;
   disabled?: boolean;
+  /** Destructive items stay in the overflow but carry the danger colour. */
+  tone?: 'danger';
 } & (
   | { onSelect: () => void; to?: undefined }
   | { to: string; onSelect?: undefined }
@@ -20,6 +22,7 @@ export type PageActionItem = {
 
 const itemClass =
   'flex min-h-11 w-full items-center gap-2 rounded-control px-2 text-start text-small text-text transition-colors duration-150 hover:bg-surface-2 disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted';
+const dangerItemClass = `${itemClass} text-danger`;
 
 /**
  * Page action hierarchy (docs/08 §2): one filled primary, quiet secondaries, everything
@@ -142,7 +145,9 @@ export function PageActions({
                       itemRefs.current[index] = element;
                     }}
                     to={item.to as never}
-                    className={itemClass}
+                    className={
+                      item.tone === 'danger' ? dangerItemClass : itemClass
+                    }
                     aria-disabled={item.disabled || undefined}
                     tabIndex={item.disabled ? -1 : undefined}
                     onClick={(event) => {
@@ -163,7 +168,9 @@ export function PageActions({
                     }}
                     type="button"
                     disabled={item.disabled}
-                    className={itemClass}
+                    className={
+                      item.tone === 'danger' ? dangerItemClass : itemClass
+                    }
                     onClick={() => {
                       item.onSelect?.();
                       setOpen(false);

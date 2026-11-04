@@ -220,7 +220,7 @@ export function CartPanel(p: CartPanelProps) {
             <dt>
               <button
                 type="button"
-                className="inline-flex min-h-9 items-center gap-2 text-primary"
+                className="inline-flex min-h-11 items-center gap-2 text-primary"
                 disabled={cart.lines.length === 0}
                 onClick={p.onBillDiscount}
               >
@@ -358,7 +358,7 @@ function LineRow({
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          className="flex min-h-9 min-w-0 flex-1 flex-col justify-center text-start"
+          className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-start"
           aria-expanded={expanded}
           onClick={() => {
             p.onSelect(line.key);
@@ -382,7 +382,7 @@ function LineRow({
         </span>
         <button
           type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
+          className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
           aria-label={`${t('sell.remove_line')} ${line.name}`}
           title={`${t('sell.remove_line')} ${line.name}`}
           onClick={() => p.onRemoveLine(line.key)}
@@ -393,7 +393,7 @@ function LineRow({
         </button>
       </div>
 
-      <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+      <div className="mt-1.5 grid grid-cols-[minmax(140px,auto)_minmax(70px,1fr)_minmax(90px,1.2fr)] gap-1.5 sm:grid-cols-3">
         <QtyInput
           dense
           hideLabel
@@ -495,37 +495,31 @@ function InlinePrice({
 /** Compact Rs/% selector that lives inside the discount field. */
 function DiscountTypeToggle({
   type,
-  compact,
   onChange,
 }: {
   type: 'amount' | 'percent';
-  compact?: boolean;
   onChange: (type: 'amount' | 'percent') => void;
 }) {
   const { t } = useTranslation();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a two-button toggle inside the field, not a form fieldset
-    <div
-      role="group"
-      aria-label={t('sell.discount_type')}
-      className="flex shrink-0 items-stretch border-e border-border-strong"
+    <button
+      type="button"
+      aria-label={`${t('sell.discount_type')}: ${type === 'amount' ? 'Rs' : '%'}`}
+      aria-pressed={type === 'percent'}
+      title={t('sell.discount_type')}
+      className="flex w-11 shrink-0 items-stretch justify-center border-e border-border-strong text-small font-medium"
+      onClick={() => onChange(type === 'amount' ? 'percent' : 'amount')}
     >
-      {(['amount', 'percent'] as const).map((key) => (
-        <button
-          key={key}
-          type="button"
-          aria-pressed={type === key}
-          className={`${compact ? 'w-6' : 'w-7'} text-small font-medium first:rounded-s-control ${
-            type === key
-              ? 'bg-primary-subtle text-primary-subtle-ink'
-              : 'text-text-muted hover:bg-surface-2'
-          }`}
-          onClick={() => onChange(key)}
-        >
-          {key === 'amount' ? 'Rs' : '%'}
-        </button>
-      ))}
-    </div>
+      <span
+        className={`flex w-full items-center justify-center rounded-s-control ${
+          type === 'amount'
+            ? 'bg-primary-subtle text-primary-subtle-ink'
+            : 'text-text-muted hover:bg-surface-2'
+        }`}
+      >
+        {type === 'amount' ? 'Rs' : '%'}
+      </span>
+    </button>
   );
 }
 
@@ -554,9 +548,7 @@ function InlineDiscount({
         label={t('sell.discount')}
         value={line.discount_value || null}
         placeholder="0"
-        leading={
-          <DiscountTypeToggle compact type={type} onChange={switchType} />
-        }
+        leading={<DiscountTypeToggle type={type} onChange={switchType} />}
         onChange={(value) =>
           onChange({ discount_type: type, discount_value: value ?? 0 })
         }

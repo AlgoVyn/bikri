@@ -199,7 +199,7 @@ function Tile({
         </span>
         {pill ? (
           <span
-            className={`shrink-0 whitespace-nowrap rounded-full px-1.5 text-caption ${pill.cls}`}
+            className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-small ${pill.cls}`}
           >
             {pill.text}
           </span>

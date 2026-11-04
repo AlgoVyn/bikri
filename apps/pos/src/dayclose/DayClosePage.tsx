@@ -27,6 +27,7 @@ import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { downloadText } from '../lib/download.ts';
+import { formatShopMoney } from '../lib/money';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -218,7 +219,7 @@ export function DayClosePage() {
                 >
                   {Number(closed.difference) === 0
                     ? t('office.dayclose.correct')
-                    : `${Number(closed.difference) < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${Number(closed.difference) / 100}`}
+                    : `${Number(closed.difference) < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(Number(closed.difference)))}`}
                 </span>
               }
             />
@@ -474,7 +475,7 @@ export function DayClosePage() {
             >
               {result.difference === 0
                 ? t('office.dayclose.correct')
-                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${Math.abs(result.difference) / 100}`}
+                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(result.difference))}`}
             </span>
           </div>
         </section>
@@ -539,7 +540,7 @@ export function DayClosePage() {
             >
               {result.difference === 0
                 ? t('office.dayclose.correct')
-                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${Math.abs(result.difference) / 100}`}
+                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(result.difference))}`}
             </span>
           </p>
           <button

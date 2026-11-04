@@ -58,6 +58,8 @@
     "empty_tenants": "Abhi koi dukaan nahi.",
     "end_maintenance": "Maintenance band karein",
     "err_budget": "0 se 100000 tak poora adad likhein.",
+    "err_title": "Kuch ghalat ho gaya",
+    "err_server": "Server dastiyab nahi. Apna connection check karein aur dobara koshish karein.",
     "err_generic": "Kuch ghalat hua. Dobara koshish karein.",
     "err_not_operator": "Yeh account console nahi khol sakta.",
     "export_done": "Export download ho gaya.",

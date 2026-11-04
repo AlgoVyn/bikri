@@ -75,7 +75,7 @@ export function MoneyInput({
   /** Full-height control at the start of the field (e.g. the Rs/% switch); replaces the Rs prefix. */
   leading?: ReactNode;
   placeholder?: string;
-  /** 36 px field whose label is for assistive tech only (dense cart rows). */
+  /** 48 px field whose label is for assistive tech only (dense cart rows). */
   compact?: boolean;
 }) {
   const { t } = useTranslation();
@@ -102,8 +102,7 @@ export function MoneyInput({
         {trailing}
       </div>
       <div
-        dir="ltr"
-        className={`flex items-stretch rounded-control border border-border-strong bg-surface ${compact ? 'h-9' : large ? 'h-14' : 'h-11'}`}
+        className={`flex items-stretch rounded-control border border-border-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${compact ? 'h-12' : large ? 'h-14' : 'h-12'}`}
       >
         {leading ?? (
           <bdi
@@ -114,11 +113,12 @@ export function MoneyInput({
         )}
         <input
           id={inputId}
+          dir="ltr"
           name={name}
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
-          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
+          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}

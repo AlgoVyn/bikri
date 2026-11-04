@@ -717,6 +717,7 @@
     "settings": {
       "health_title": "Data safety",
       "health_sync": "Sync",
+      "health_last_sync": "Last sync",
       "health_pending": "{{count}} changes waiting",
       "health_up_to_date": "Up to date",
       "health_storage": "Storage",
@@ -825,6 +826,7 @@
       "perm_purchase_create": "Suppliers and deliveries",
       "perm_refund_create": "Refunds",
       "perm_report_view": "Reports",
+      "perm_sale_backdate": "Record past sales",
       "perm_sale_below_cost": "Sell below cost",
       "perm_sale_create": "Create sales",
       "perm_sale_discount": "Give discounts",

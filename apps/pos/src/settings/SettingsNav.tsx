@@ -202,6 +202,7 @@ function SettingsNavContent() {
                   })
                 : t('office.settings.health_up_to_date')}
               <span className="block text-caption font-normal text-text-muted">
+                {t('office.settings.health_last_sync')}:{' '}
                 {info?.lastSync
                   ? t('shell.sync_ago', {
                       minutes: Math.max(

@@ -10,8 +10,10 @@ import {
   fieldClass,
   pageClass,
 } from '../components/classes.ts';
+import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   addCategory,
@@ -377,9 +379,12 @@ export function ProductFormPage({
         void submit(false);
       }}
     >
-      <h1 className="text-h1 font-semibold">
-        {isEdit ? t('form.edit_title') : t('form.new_title')}
-      </h1>
+      <SubpageHeader
+        backTo="/products"
+        backLabel={t('products.back')}
+        icon={<ProductsIcon />}
+        title={isEdit ? t('form.edit_title') : t('form.new_title')}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <div className="flex min-w-0 flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-card">

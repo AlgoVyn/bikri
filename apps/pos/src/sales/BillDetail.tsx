@@ -491,7 +491,9 @@ export function BillDetail({
         </p>
       ) : null}
 
-      <dl className="grid grid-cols-2 gap-2 rounded-card border border-border bg-surface p-3 text-small sm:grid-cols-4">
+      <dl
+        className={`grid grid-cols-2 gap-2 rounded-card border border-border bg-surface p-3 text-small ${embedded ? '' : 'sm:grid-cols-4'}`}
+      >
         <Meta label={t('office.bill.date')} value={fullDate} />
         <Meta label={t('office.bill.cashier')} value={detail.staffName} />
         <Meta label={t('office.bill.device')} value={detail.deviceName} />
@@ -520,17 +522,33 @@ export function BillDetail({
             <tr className="border-b border-border text-start text-text-muted">
               <th className="p-2 text-start">{t('office.bill.col_name')}</th>
               <th className="p-2 text-end">{t('office.bill.col_qty')}</th>
-              <th className="hidden p-2 text-end sm:table-cell">
+              <th
+                className={
+                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                }
+              >
                 {t('office.bill.col_price')}
               </th>
-              <th className="hidden p-2 text-end sm:table-cell">
+              <th
+                className={
+                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                }
+              >
                 {t('office.bill.col_discount')}
               </th>
               <th className="p-2 text-end">{t('office.bill.col_total')}</th>
-              <th className="hidden p-2 text-end sm:table-cell">
+              <th
+                className={
+                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                }
+              >
                 {t('office.bill.col_refunded')}
               </th>
-              <th className="hidden p-2 text-end sm:table-cell">
+              <th
+                className={
+                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                }
+              >
                 {t('office.bill.col_kept')}
               </th>
             </tr>
@@ -547,13 +565,25 @@ export function BillDetail({
                     <span className="ltr-name block">
                       {String(line.name_snapshot)}
                     </span>
-                    <span className="block text-text-muted sm:hidden">
+                    <span
+                      className={
+                        embedded
+                          ? 'block text-text-muted'
+                          : 'block text-text-muted sm:hidden'
+                      }
+                    >
                       {t('office.bill.qty_price', {
                         qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
                         price: formatShopMoney(Number(line.unit_price)),
                       })}
                     </span>
-                    <span className="block text-small text-text-muted sm:hidden">
+                    <span
+                      className={
+                        embedded
+                          ? 'block text-small text-text-muted'
+                          : 'block text-small text-text-muted sm:hidden'
+                      }
+                    >
                       {refundedMilli > 0
                         ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
                         : ''}
@@ -563,10 +593,18 @@ export function BillDetail({
                   <td className="p-2 text-end tabular-nums">
                     {qty / 1000} {t(`unit.${unit}`)}
                   </td>
-                  <td className="hidden p-2 text-end sm:table-cell">
+                  <td
+                    className={
+                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                    }
+                  >
                     <MoneyText paisa={Number(line.unit_price)} />
                   </td>
-                  <td className="hidden p-2 text-end sm:table-cell">
+                  <td
+                    className={
+                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                    }
+                  >
                     <MoneyText paisa={Number(line.discount ?? 0)} />
                   </td>
                   <td className="p-2 text-end">
@@ -582,10 +620,18 @@ export function BillDetail({
                       )}
                     />
                   </td>
-                  <td className="hidden p-2 text-end sm:table-cell">
+                  <td
+                    className={
+                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                    }
+                  >
                     {refundedMilli > 0 ? refundedMilli / 1000 : '—'}
                   </td>
-                  <td className="hidden p-2 text-end sm:table-cell">
+                  <td
+                    className={
+                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                    }
+                  >
                     {keptMilli / 1000}
                   </td>
                 </tr>

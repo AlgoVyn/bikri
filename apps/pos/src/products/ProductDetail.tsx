@@ -5,13 +5,13 @@ import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
-  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { addProduct, CartFullError } from '../data/cart.ts';
 import {
@@ -192,110 +192,152 @@ export function ProductDetailPage({
           </dl>
         </div>
       </header>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {can('sale.create') && !readOnly ? (
-          <button
-            type="button"
-            className={buttonPrimary}
-            onClick={() => void addToSale()}
-          >
-            {t('products.sell')}
-          </button>
-        ) : null}
-        {canEdit ? (
-          <Link
-            to="/products/$id/edit"
-            params={{ id }}
-            className={`${buttonQuiet} gap-2`}
-          >
-            {t('products.edit')}
-          </Link>
-        ) : null}
-        {can('catalog.edit') || can('purchase.create') ? (
-          <button
-            type="button"
-            className={`${buttonQuiet} gap-2`}
-            onClick={() => setLabelsOpen(true)}
-          >
-            {t('products.print_label')}
-          </button>
-        ) : null}
-        {canEdit ? (
-          <Link
-            to="/products/new"
-            search={{ duplicate: id }}
-            className={buttonQuiet}
-          >
-            {t('products.duplicate')}
-          </Link>
-        ) : null}
-        {p.track_stock === 1 && can('stock.adjust') && !readOnly ? (
-          <Link
-            to="/products/$id/adjust"
-            params={{ id }}
-            className={buttonQuiet}
-          >
-            {t('adjust.button')}
-          </Link>
-        ) : null}
-        {can('catalog.delete') && !readOnly ? (
-          <button
-            type="button"
-            className={buttonDangerQuiet}
-            onClick={() => setConfirmDelete(true)}
-          >
-            {t('products.delete')}
-          </button>
-        ) : null}
+      <div data-testid="product-actions">
+        <PageActions
+          moreLabel={t('products.more_actions')}
+          primary={
+            can('sale.create') && !readOnly ? (
+              <button
+                type="button"
+                className={buttonPrimary}
+                onClick={() => void addToSale()}
+              >
+                {t('products.sell')}
+              </button>
+            ) : undefined
+          }
+          secondary={
+            <>
+              {canEdit ? (
+                <Link
+                  to="/products/$id/edit"
+                  params={{ id }}
+                  className={`${buttonQuiet} gap-2`}
+                >
+                  {t('products.edit')}
+                </Link>
+              ) : null}
+              {can('catalog.edit') || can('purchase.create') ? (
+                <button
+                  type="button"
+                  className={`${buttonQuiet} gap-2`}
+                  onClick={() => setLabelsOpen(true)}
+                >
+                  {t('products.print_label')}
+                </button>
+              ) : null}
+              {p.track_stock === 1 && can('stock.adjust') && !readOnly ? (
+                <Link
+                  to="/products/$id/adjust"
+                  params={{ id }}
+                  className={buttonQuiet}
+                >
+                  {t('adjust.button')}
+                </Link>
+              ) : null}
+            </>
+          }
+          more={[
+            ...(canEdit
+              ? [
+                  {
+                    label: t('products.duplicate'),
+                    onSelect: () =>
+                      void navigate({
+                        to: '/products/new',
+                        search: { duplicate: id },
+                      }),
+                  },
+                ]
+              : []),
+            ...(can('catalog.delete') && !readOnly
+              ? [
+                  {
+                    label: t('products.delete'),
+                    tone: 'danger' as const,
+                    onSelect: () => setConfirmDelete(true),
+                  },
+                ]
+              : []),
+          ]}
+        />
       </div>
 
-      <section
-        aria-label={t('products.price')}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
-      >
-        <Figure label={t('products.price')} testId="detail-price">
-          <MoneyText paisa={price} />
-        </Figure>
-        {showCost ? (
-          <>
-            <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
-              <MoneyText paisa={avg} />
-            </Figure>
-            <Figure label={t('products.last_cost')} testId="detail-last-cost">
-              <MoneyText paisa={Number(p.last_cost ?? 0)} />
-            </Figure>
+      <section aria-label={t('products.price')} className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Figure label={t('products.price')} testId="detail-price" emphasize>
+            <MoneyText paisa={price} />
+          </Figure>
+          {showCost ? (
             <Figure
-              label={t('products.profit_per_item')}
-              testId="detail-profit"
+              label={t('products.margin')}
+              testId="detail-margin"
+              emphasize
             >
-              {avg > 0 ? <MoneyText paisa={price - avg} /> : '—'}
-            </Figure>
-            <Figure label={t('products.margin')} testId="detail-margin">
               <bdi dir="ltr">{margin ?? '—'}</bdi>
             </Figure>
-          </>
-        ) : null}
-        {p.track_stock === 1 ? (
-          <>
-            <Figure label={t('products.on_hand')} testId="detail-on-hand">
+          ) : null}
+          {p.track_stock === 1 ? (
+            <Figure
+              label={t('products.on_hand')}
+              testId="detail-on-hand"
+              emphasize
+            >
               {qtyWithUnit(t, detail.onHand, unit)}
             </Figure>
-            <Figure label={t('products.min_stock')} testId="detail-min">
-              {Number(p.min_stock_milli ?? 0) > 0
-                ? qtyWithUnit(t, Number(p.min_stock_milli), unit)
-                : t('products.min_stock_off')}
-            </Figure>
+          ) : null}
+        </div>
+        {showCost || p.track_stock === 1 ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
             {showCost ? (
-              <Figure
-                label={t('products.stock_value')}
-                testId="detail-stock-value"
-              >
-                <MoneyText
-                  paisa={mulDivRound(Math.max(detail.onHand, 0), avg, 1000)}
-                />
-              </Figure>
+              <>
+                <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
+                  <MoneyText paisa={avg} />
+                </Figure>
+                <Figure
+                  label={t('products.last_cost')}
+                  testId="detail-last-cost"
+                >
+                  <MoneyText paisa={Number(p.last_cost ?? 0)} />
+                </Figure>
+                <Figure
+                  label={t('products.profit_per_item')}
+                  testId="detail-profit"
+                >
+                  {avg > 0 ? <MoneyText paisa={price - avg} /> : '—'}
+                </Figure>
+              </>
             ) : null}
-          </>
+            {p.track_stock === 1 ? (
+              <>
+                <Figure label={t('products.min_stock')} testId="detail-min">
+                  {Number(p.min_stock_milli ?? 0) > 0 ? (
+                    qtyWithUnit(t, Number(p.min_stock_milli), unit)
+                  ) : canEdit ? (
+                    <Link
+                      to="/products/$id/edit"
+                      params={{ id }}
+                      className="underline underline-offset-2"
+                    >
+                      {t('products.min_stock_off')}
+                    </Link>
+                  ) : (
+                    t('products.min_stock_off')
+                  )}
+                </Figure>
+                {showCost ? (
+                  <Figure
+                    label={t('products.stock_value')}
+                    testId="detail-stock-value"
+                  >
+                    <MoneyText
+                      paisa={mulDivRound(Math.max(detail.onHand, 0), avg, 1000)}
+                    />
+                  </Figure>
+                ) : null}
+              </>
+            ) : null}
+          </div>
         ) : null}
       </section>
 
@@ -306,12 +348,14 @@ export function ProductDetailPage({
         <h2 id="last14-heading" className="text-h2 font-semibold">
           {t('products.last14')}
         </h2>
-        <p className="text-small text-text-muted">
-          {t('products.last14_total', {
-            qty: qtyWithUnit(t, totalQty, unit),
-            amount: formatShopMoney(totalRevenue),
-          })}
-        </p>
+        {totalQty > 0 ? (
+          <p className="text-small text-text-muted">
+            {t('products.last14_total', {
+              qty: qtyWithUnit(t, totalQty, unit),
+              amount: formatShopMoney(totalRevenue),
+            })}
+          </p>
+        ) : null}
         {totalQty === 0 ? (
           <p className="mt-3 text-small text-text-muted">
             {t('products.last14_empty')}
@@ -490,18 +534,32 @@ function Figure({
   label,
   testId,
   children,
+  emphasize = false,
 }: {
   label: string;
   testId: string;
   children: React.ReactNode;
+  emphasize?: boolean;
 }) {
   return (
     <div
-      className="rounded-card border border-border bg-surface p-3"
+      className={
+        emphasize
+          ? 'rounded-card border border-primary/20 bg-primary-subtle p-3 text-primary-subtle-ink'
+          : 'rounded-card border border-border bg-surface p-3'
+      }
       data-testid={testId}
     >
       <p className="text-small text-text-muted">{label}</p>
-      <p className="mt-1 text-h2 font-semibold">{children}</p>
+      <p
+        className={
+          emphasize
+            ? 'mt-1 text-total font-semibold'
+            : 'mt-1 text-body font-semibold'
+        }
+      >
+        {children}
+      </p>
     </div>
   );
 }

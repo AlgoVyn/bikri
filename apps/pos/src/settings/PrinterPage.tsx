@@ -297,58 +297,62 @@ export function PrinterPage() {
           ) : null}
         </div>
         {jobs && jobs.length === 0 ? (
-          <p className="text-text-muted">{t('printer.recent_empty')}</p>
+          <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
+            {t('printer.recent_empty')}
+          </p>
         ) : null}
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-          {jobs?.map(({ job, invoice }) => (
-            <li
-              key={job.id}
-              data-testid="print-job"
-              className="flex flex-wrap items-center gap-2 p-3"
-            >
-              <span className="flex-1">
-                {invoice
-                  ? t('printer.job_bill', { invoice })
-                  : t(`printer.kind_${job.kind}`)}
-                {job.reprint ? ` · ${t('printer.reprint')}` : ''}
-                <span className="block text-small text-text-muted">
-                  {timeOf(job.created_at, i18n.language, timeZone)}
-                </span>
-              </span>
-              <span
-                className={
-                  job.status === 'failed' ? 'text-danger' : 'text-text-muted'
-                }
+        {jobs && jobs.length > 0 ? (
+          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+            {jobs.map(({ job, invoice }) => (
+              <li
+                key={job.id}
+                data-testid="print-job"
+                className="flex flex-wrap items-center gap-2 p-3"
               >
-                {job.status === 'failed'
-                  ? t(`print.err_${job.error ?? 'FAILED'}`)
-                  : t(`printer.status_${job.status}`)}
-              </span>
-              {job.status === 'failed' ? (
-                <button
-                  type="button"
-                  className={buttonQuiet}
-                  onClick={() => void retryPrintJob(getDb(), job.id)}
+                <span className="flex-1">
+                  {invoice
+                    ? t('printer.job_bill', { invoice })
+                    : t(`printer.kind_${job.kind}`)}
+                  {job.reprint ? ` · ${t('printer.reprint')}` : ''}
+                  <span className="block text-small text-text-muted">
+                    {timeOf(job.created_at, i18n.language, timeZone)}
+                  </span>
+                </span>
+                <span
+                  className={
+                    job.status === 'failed' ? 'text-danger' : 'text-text-muted'
+                  }
                 >
-                  {t('done.retry')}
-                </button>
-              ) : null}
-              {job.status === 'queued' ? (
-                <button
-                  type="button"
-                  className={buttonQuiet}
-                  onClick={() => {
-                    void cancelPrintJob(getDb(), job.id).then(() =>
-                      toast.push(t('printer.cancelled'), 'info'),
-                    );
-                  }}
-                >
-                  {t('printer.cancel')}
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                  {job.status === 'failed'
+                    ? t(`print.err_${job.error ?? 'FAILED'}`)
+                    : t(`printer.status_${job.status}`)}
+                </span>
+                {job.status === 'failed' ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => void retryPrintJob(getDb(), job.id)}
+                  >
+                    {t('done.retry')}
+                  </button>
+                ) : null}
+                {job.status === 'queued' ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => {
+                      void cancelPrintJob(getDb(), job.id).then(() =>
+                        toast.push(t('printer.cancelled'), 'info'),
+                      );
+                    }}
+                  >
+                    {t('printer.cancel')}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
     </SettingsPageLayout>
   );

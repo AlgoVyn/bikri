@@ -3,7 +3,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import { adminErrorMessage, listOwners, resetOwnerPin } from './api.ts';
-import { Field, inputClass, Panel, primaryBtn } from './ui.tsx';
+import {
+  AdminErrorState,
+  Field,
+  inputClass,
+  Panel,
+  primaryBtn,
+} from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 export function PinTab({ tenantId }: { tenantId: string }) {
@@ -25,12 +31,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
 
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

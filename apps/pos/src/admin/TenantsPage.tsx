@@ -11,7 +11,13 @@ import {
   statusLabelKey,
 } from './format.ts';
 import type { TenantListItem } from './types.ts';
-import { Panel, primaryBtn, quietBtn, StatusBadge } from './ui.tsx';
+import {
+  AdminErrorState,
+  Panel,
+  primaryBtn,
+  quietBtn,
+  StatusBadge,
+} from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 const PAGE_SIZE = 20;
@@ -25,12 +31,7 @@ export function TenantsPage() {
   const lang = i18n.language;
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

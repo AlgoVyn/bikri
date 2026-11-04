@@ -64,7 +64,7 @@ export function SearchBox({
           type="search"
           autoComplete="off"
           placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+          className="h-full min-w-0 flex-1 bg-transparent text-body text-text outline-none"
           value={value}
           onChange={(event) => {
             const next = event.target.value;

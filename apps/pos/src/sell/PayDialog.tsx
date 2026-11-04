@@ -126,7 +126,8 @@ export function PayDialog({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      full
+      done={done !== null}
+      full={done === null}
       title={done ? t('pay.done_title') : t('sell.take_payment')}
     >
       {done ? (

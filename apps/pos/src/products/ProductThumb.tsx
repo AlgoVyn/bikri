@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getDb } from '../data/db.ts';
 import { getFile } from '../data/fileCache.ts';
 import { fetchRemoteFile } from '../sync/files.ts';
-import { tileBg } from './tiles.ts';
+import { TILE_BG, tileBg } from './tiles.ts';
 
 /** Object URL of a cached photo for the active shop, or null (works offline, 01 §PWA). */
 export function useFileUrl(key: string | null | undefined): string | null {
@@ -65,10 +65,15 @@ export function ProductThumb({
       />
     );
   }
+  const palette = typeof color === 'string' && color in TILE_BG ? color : null;
   return (
     <span
       aria-hidden="true"
-      className={`flex shrink-0 items-center justify-center font-semibold text-tile-ink ${box} ${tileBg(color)}`}
+      className={`flex shrink-0 items-center justify-center font-semibold ${box} ${
+        palette
+          ? `text-tile-ink ${tileBg(palette)}`
+          : 'bg-surface-2 text-text-muted'
+      }`}
     >
       {monogram.toUpperCase()}
     </span>

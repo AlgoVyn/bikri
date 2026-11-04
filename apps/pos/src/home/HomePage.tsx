@@ -11,6 +11,7 @@ import {
 import {
   ClockIcon,
   CountIcon,
+  LockIcon,
   ProductsIcon,
   SalesIcon,
   SearchIcon,
@@ -183,9 +184,11 @@ export function HomePage() {
       ...(item.permAny ? { permAny: item.permAny } : {}),
     })),
   ].filter((tile) =>
-    tile.permAny !== undefined
-      ? tile.permAny.some((permission) => can(permission))
-      : tile.perm === null || can(tile.perm),
+    !readOnly || tile.to !== '/day-close'
+      ? tile.permAny !== undefined
+        ? tile.permAny.some((permission) => can(permission))
+        : tile.perm === null || can(tile.perm)
+      : false,
   );
 
   const runTiles = tiles.filter((tile) => RUN_ROUTES.has(tile.to));
@@ -287,7 +290,7 @@ export function HomePage() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {can('catalog.edit') ? (
+              {can('catalog.edit') && !readOnly ? (
                 <>
                   <Link to="/products/new" className={buttonPrimary}>
                     {t('home.add_product')}
@@ -300,7 +303,7 @@ export function HomePage() {
                   </Link>
                   <button
                     type="button"
-                    className={buttonQuiet}
+                    className="min-h-11 self-center text-small font-medium text-primary underline"
                     disabled={samplePending || readOnly}
                     onClick={() => void loadSamples()}
                   >
@@ -324,36 +327,73 @@ export function HomePage() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
           <div className="contents lg:col-start-1 lg:flex lg:flex-col lg:gap-6">
-            <Link
-              to="/sell"
-              className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border border-rail-active/30 bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-rail-active/60"
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
-              />
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -bottom-16 end-16 size-32 rounded-full bg-accent/10"
-              />
-              <span className="relative flex size-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink">
-                <SellIcon />
-              </span>
-              <span className="relative min-w-0 flex-1">
-                <span className="block text-title font-semibold text-rail-ink">
-                  {t('home.new_sale')}
-                </span>
-                <span className="block text-small text-rail-muted">
-                  {t('home.new_sale_hint')}
-                </span>
-              </span>
-              <span
-                aria-hidden="true"
-                className="relative text-title text-rail-active rtl:rotate-180"
+            {readOnly ? (
+              <section
+                aria-labelledby="read-only-heading"
+                className="order-1 flex flex-col gap-3 rounded-card border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-ink shadow-card"
               >
-                ›
-              </span>
-            </Link>
+                <div className="flex items-start gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-12 shrink-0 items-center justify-center rounded-control bg-warning/15"
+                  >
+                    <LockIcon />
+                  </span>
+                  <div className="min-w-0">
+                    <h2
+                      id="read-only-heading"
+                      className="text-title font-semibold"
+                    >
+                      {t('home.read_only_title')}
+                    </h2>
+                    <p className="mt-1 text-small">
+                      {t('home.read_only_hint')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link to="/reports" className={buttonPrimary}>
+                    {t('nav.reports')}
+                  </Link>
+                  {can('export.data') ? (
+                    <Link to="/settings/backup" className={buttonQuiet}>
+                      {t('home.export_data')}
+                    </Link>
+                  ) : null}
+                </div>
+              </section>
+            ) : (
+              <Link
+                to="/sell"
+                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border border-rail-active/30 bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-rail-active/60"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-16 end-16 size-32 rounded-full bg-accent/10"
+                />
+                <span className="relative flex size-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink">
+                  <SellIcon />
+                </span>
+                <span className="relative min-w-0 flex-1">
+                  <span className="block text-title font-semibold text-rail-ink">
+                    {t('home.new_sale')}
+                  </span>
+                  <span className="block text-small text-rail-muted">
+                    {t('home.new_sale_hint')}
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="relative text-title text-rail-active rtl:rotate-180"
+                >
+                  ›
+                </span>
+              </Link>
+            )}
 
             <div className="order-3 flex flex-col gap-6">
               <QuickActions
@@ -409,7 +449,7 @@ export function HomePage() {
                   data={data}
                   showCash={can('dayclose.view_expected')}
                   showProfit={can('cost.view')}
-                  canClose={can('dayclose.create')}
+                  canClose={can('dayclose.create') && !readOnly}
                   timeText={timeText}
                 />
               ) : null}
@@ -509,7 +549,7 @@ function GettingStarted({
 
   // Once the catalogue exists, the remaining setup is one optional step. A full checklist
   // card would outweigh the New sale hero; keep it as a compact strip.
-  if (pending.length === 1 && products > 0) {
+  if (products > 0) {
     const step = pending[0];
     if (!step) return null;
     return (
@@ -766,6 +806,11 @@ function RegisterCard({
         <p className="text-small text-text-muted">
           {t('home.bills_count', { count: data.today.bills })}
         </p>
+        {data.today.bills === 0 ? (
+          <p className="text-small text-text-muted">
+            {t('home.no_sales_today')}
+          </p>
+        ) : null}
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
         {showCash ? (
@@ -807,9 +852,17 @@ function RegisterCard({
         </div>
       </dl>
       {canClose ? (
-        <Link to="/day-close" className={`${buttonQuiet} mt-3 w-full`}>
-          {t('home.day_close')}
-        </Link>
+        <div className="mt-3 flex justify-end border-t border-border pt-1">
+          <Link
+            to="/day-close"
+            className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary"
+          >
+            {t('home.day_close')}
+            <span aria-hidden="true" className="rtl:rotate-180">
+              ›
+            </span>
+          </Link>
+        </div>
       ) : null}
     </section>
   );

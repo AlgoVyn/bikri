@@ -151,6 +151,29 @@ export function Panel({
   );
 }
 
+/** A failed operator query: one calm surface, the reason and one retry. */
+export function AdminErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Panel
+      title={t('admin.err_title')}
+      actions={
+        <button type="button" className={buttonPrimary} onClick={onRetry}>
+          {t('admin.retry')}
+        </button>
+      }
+    >
+      <p className="text-small text-text-muted">{message}</p>
+    </Panel>
+  );
+}
+
 /** Headline number on the overview. */
 export function StatCard({
   label,

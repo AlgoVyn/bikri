@@ -13,6 +13,7 @@ import { formatCount, formatWhen } from './format.ts';
 import type { DeviceInfo, IssuedCode, UnsyncedOp } from './types.ts';
 import {
   AdminConfirm,
+  AdminErrorState,
   Field,
   inputClass,
   PairingPanel,
@@ -129,12 +130,7 @@ export function DevicesTab({
 
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

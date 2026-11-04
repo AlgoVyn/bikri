@@ -15,7 +15,7 @@ import {
   readRestoreState,
 } from './restore.ts';
 import { SummaryTab } from './SummaryTab.tsx';
-import { AdminConfirm, primaryBtn, quietBtn, StatusBadge } from './ui.tsx';
+import { AdminConfirm, AdminErrorState, quietBtn, StatusBadge } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 type Tab = 'summary' | 'devices' | 'pin' | 'export' | 'restore' | 'delete';
@@ -56,12 +56,7 @@ export function TenantPage({ id }: { id: string }) {
 
   if (detail === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={primaryBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

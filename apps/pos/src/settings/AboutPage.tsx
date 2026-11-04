@@ -67,14 +67,18 @@ function AboutContent() {
           </button>
         </div>
       </section>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-title font-semibold">{t('office.about.terms')}</h2>
-        <ol className="flex list-decimal flex-col gap-2 ps-5 text-small">
+      <details className="rounded-card border border-border bg-surface p-4">
+        <summary className="cursor-pointer">
+          <h2 className="inline text-title font-semibold">
+            {t('office.about.terms')}
+          </h2>
+        </summary>
+        <ol className="mt-2 flex list-decimal flex-col gap-2 ps-5 text-small">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((number) => (
             <li key={number}>{t(`office.about.terms_${number}`)}</li>
           ))}
         </ol>
-      </section>
+      </details>
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4 text-small">
         <h2 className="text-title font-semibold">
           {t('office.about.privacy')}

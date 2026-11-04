@@ -24,6 +24,7 @@ import {
 } from '../print/shareWindow.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { ignoresHotkey } from '../shell/hotkeys.ts';
+import { useShopName } from '../shell/TopBarParts.tsx';
 import { saleChime } from './beep.ts';
 import type { Done } from './PayDialog.tsx';
 
@@ -137,6 +138,7 @@ export function SaleComplete({
   const saleId = String(sale.id);
   const invoice = String(sale.invoice_no);
   const timeZone = useShopTimeZone();
+  const shopName = useShopName();
   const late =
     businessDate(Number(sale.created_at), timeZone) !==
     String(sale.business_date);
@@ -285,31 +287,54 @@ export function SaleComplete({
           })}
         </p>
       ) : null}
-      <dl
+      <div
         data-testid="sale-receipt"
         className="receipt-paper bikri-receipt-in w-full p-3 text-start text-small"
       >
-        <div className="flex items-center justify-between gap-2">
-          <dt className="text-text-muted">
-            {t('sell.items', { count: Number(sale.line_count ?? 0) })}
-          </dt>
-          <dd>
-            <MoneyText paisa={Number(sale.total ?? 0)} />
-          </dd>
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <dt className="text-text-muted">{t('done.paid')}</dt>
-          <dd>
-            <MoneyText paisa={Number(sale.paid_total ?? 0)} />
-          </dd>
-        </div>
-        {done.customerName ? (
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <dt className="text-text-muted">{t('done.customer')}</dt>
-            <dd className="truncate">{done.customerName}</dd>
-          </div>
+        {shopName ? (
+          <p className="mb-2 text-center font-semibold">{shopName}</p>
         ) : null}
-      </dl>
+        <dl>
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-text-muted">{t('done.invoice')}</dt>
+            <dd className="font-mono">{invoice}</dd>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <dt className="text-text-muted">{t('done.date')}</dt>
+            <dd>
+              {formatBusinessDate(String(sale.business_date), i18n.language)}
+            </dd>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <dt className="text-text-muted">
+              {t('sell.items', { count: Number(sale.line_count ?? 0) })}
+            </dt>
+            <dd>
+              <MoneyText paisa={Number(sale.total ?? 0)} />
+            </dd>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <dt className="text-text-muted">{t('done.paid')}</dt>
+            <dd>
+              <MoneyText paisa={Number(sale.paid_total ?? 0)} />
+            </dd>
+          </div>
+          {change > 0 ? (
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <dt className="text-text-muted">{t('pay.change_label')}</dt>
+              <dd>
+                <MoneyText paisa={change} />
+              </dd>
+            </div>
+          ) : null}
+          {done.customerName ? (
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <dt className="text-text-muted">{t('done.customer')}</dt>
+              <dd className="truncate">{done.customerName}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
       <PrintStatus job={job} hasPrinter={settings?.printer ?? false} />
       <button
         ref={newSale}

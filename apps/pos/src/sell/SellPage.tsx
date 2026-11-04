@@ -617,7 +617,7 @@ export function SellPage() {
               }
               autoComplete="off"
               placeholder={t('sell.search_placeholder')}
-              className="bikri-focus-wrapper min-w-0 flex-1 bg-transparent text-body outline-none"
+              className="bikri-focus-wrapper h-full min-w-0 flex-1 bg-transparent text-body outline-none"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -744,20 +744,22 @@ export function SellPage() {
             {t('sell.held_bills', { count: heldCount })}
           </button>
         </div>
-        <button
-          type="button"
-          className={`${buttonPrimary} min-h-14 justify-between gap-2 lg:hidden`}
-          data-testid="cart-bar"
-          aria-expanded={sheet}
-          onClick={() => setSheet(true)}
-        >
-          <span className="min-w-0 truncate">
-            {t('sell.view_cart', { count: cart.lines.length })}
-          </span>
-          <span className="shrink-0">
-            <MoneyText paisa={totals.total} />
-          </span>
-        </button>
+        {cart.lines.length > 0 ? (
+          <button
+            type="button"
+            className={`${buttonPrimary} min-h-14 justify-between gap-2 lg:hidden`}
+            data-testid="cart-bar"
+            aria-expanded={sheet}
+            onClick={() => setSheet(true)}
+          >
+            <span className="min-w-0 truncate">
+              {t('sell.view_cart', { count: cart.lines.length })}
+            </span>
+            <span className="shrink-0">
+              <MoneyText paisa={totals.total} />
+            </span>
+          </button>
+        ) : null}
       </section>
       <aside
         aria-label={t('sell.cart')}

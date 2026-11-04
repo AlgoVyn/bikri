@@ -29,7 +29,9 @@ export function useAdminQuery<T>(key: string, query: () => Promise<T>) {
         const message =
           err instanceof AdminApiError && err.status === 403
             ? t('admin.err_not_operator')
-            : adminErrorMessage(err, t('admin.err_generic'));
+            : err instanceof AdminApiError && err.status >= 500
+              ? t('admin.err_server')
+              : adminErrorMessage(err, t('admin.err_generic'));
         setError(message);
         toast.push(message, 'error');
       });

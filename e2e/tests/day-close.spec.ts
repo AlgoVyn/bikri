@@ -81,7 +81,7 @@ test.describe('Day close (T-047)', () => {
     await page.goto('/bikri/day-close');
     await counted(page, '500');
     await expect(page.getByTestId('day-close-difference')).toContainText(
-      'Less cash',
+      'Less cash Rs 250',
     );
     await expect(
       page.getByText('Write a note for a difference of Rs 100 or more.'),

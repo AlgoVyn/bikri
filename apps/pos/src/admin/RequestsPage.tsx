@@ -5,7 +5,7 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { listShopRequests } from './api.ts';
 import { adminHref, formatWhen } from './format.ts';
 import type { ShopRequest, ShopRequestStatus } from './types.ts';
-import { Panel, quietBtn } from './ui.tsx';
+import { AdminErrorState, Panel } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 const STATUSES: ShopRequestStatus[] = [
@@ -54,12 +54,7 @@ export function RequestsPage() {
   );
   if (query.data === null) {
     return query.error !== null ? (
-      <p className="text-text-muted">
-        {query.error}{' '}
-        <button type="button" className={quietBtn} onClick={query.reload}>
-          {t('admin.retry')}
-        </button>
-      </p>
+      <AdminErrorState message={query.error} onRetry={query.reload} />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

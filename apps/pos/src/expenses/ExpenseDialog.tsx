@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -174,18 +175,14 @@ export function ExpenseDialog({
             value={amount}
             onChange={setAmount}
           />
-          <label className="flex flex-col gap-1 text-small">
-            {t('office.expenses.date')}
-            <input
-              type="date"
-              className={field}
-              min={minDate}
-              max={today}
-              value={date}
-              disabled={role !== 'owner'}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
+          <DateField
+            label={t('office.expenses.date')}
+            value={date}
+            min={minDate}
+            max={today}
+            disabled={role !== 'owner'}
+            onChange={setDate}
+          />
           <fieldset className="sm:col-span-2">
             <legend className="mb-1 text-small">
               {t('office.expenses.method')}

@@ -117,7 +117,7 @@ export function GlobalSearch() {
           aria-autocomplete="list"
           autoComplete="off"
           placeholder={t('shell.search_label')}
-          className="bikri-focus-wrapper min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+          className="bikri-focus-wrapper h-full min-w-0 flex-1 bg-transparent text-body text-text outline-none"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);

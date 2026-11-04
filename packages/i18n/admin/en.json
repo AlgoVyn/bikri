@@ -58,6 +58,8 @@
     "empty_tenants": "No shops yet.",
     "end_maintenance": "Turn maintenance off",
     "err_budget": "Enter a whole number from 0 to 100,000.",
+    "err_title": "Something went wrong",
+    "err_server": "The server is unavailable. Check your connection and try again.",
     "err_generic": "Something went wrong. Try again.",
     "err_not_operator": "This account cannot open the operator console.",
     "export_done": "Export downloaded.",

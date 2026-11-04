@@ -716,6 +716,7 @@
     },
     "settings": {
       "health_title": "Data ki hifazat",
+      "health_last_sync": "Aakhri sync",
       "health_sync": "Sync",
       "health_pending": "{{count}} changes baqi",
       "health_up_to_date": "Up to date",
@@ -825,6 +826,7 @@
       "perm_purchase_create": "Suppliers aur deliveries",
       "perm_refund_create": "Wapsi",
       "perm_report_view": "Reports",
+      "perm_sale_backdate": "Purani sale darj karna",
       "perm_sale_below_cost": "Lagat se kam bechna",
       "perm_sale_create": "Sale banana",
       "perm_sale_discount": "Discount dena",

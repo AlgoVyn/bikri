@@ -1,6 +1,6 @@
 # Bikri POS
 
-Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale PWA for small shops in Pakistan. It runs many independent shops on one Cloudflare deployment; every shop's data is isolated and can be exported at any time.
+Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale PWA. It runs many independent shops on one Cloudflare deployment; every shop's data is isolated and can be exported at any time.
 
 **Live:** <https://algovyn.com/bikri/>
 
