@@ -11,7 +11,7 @@ import {
 } from '../components/classes.ts';
 import { ClockIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
@@ -27,7 +27,6 @@ import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { downloadText } from '../lib/download.ts';
-import { formatShopMoney } from '../lib/money';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -37,6 +36,7 @@ const COMMEMORATIVE = 75;
 
 export function DayClosePage() {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const toast = useToast();
   const navigate = useNavigate();
   const { staff, can } = useCurrentStaff();
@@ -219,7 +219,7 @@ export function DayClosePage() {
                 >
                   {Number(closed.difference) === 0
                     ? t('office.dayclose.correct')
-                    : `${Number(closed.difference) < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(Number(closed.difference)))}`}
+                    : `${Number(closed.difference) < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${money(Math.abs(Number(closed.difference)))}`}
                 </span>
               }
             />
@@ -475,7 +475,7 @@ export function DayClosePage() {
             >
               {result.difference === 0
                 ? t('office.dayclose.correct')
-                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(result.difference))}`}
+                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${money(Math.abs(result.difference))}`}
             </span>
           </div>
         </section>
@@ -540,7 +540,7 @@ export function DayClosePage() {
             >
               {result.difference === 0
                 ? t('office.dayclose.correct')
-                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${formatShopMoney(Math.abs(result.difference))}`}
+                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${money(Math.abs(result.difference))}`}
             </span>
           </p>
           <button

@@ -4,12 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { paySupplier, SupplierPaymentError } from '../data/purchases.ts';
-import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -32,6 +31,7 @@ export function PaySupplierDialog({
   balance: number;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const toast = useToast();
   const { staff } = useCurrentStaff();
   const [amount, setAmount] = useState<number | null>(null);
@@ -68,7 +68,7 @@ export function PaySupplierDialog({
       );
       toast.push(
         t('office.suppliers.payment_saved', {
-          amount: formatShopMoney(amount),
+          amount: money(amount),
         }),
       );
       onOpenChange(false);
@@ -151,7 +151,7 @@ export function PaySupplierDialog({
       </div>
       <p className="text-end text-small tabular-nums text-text-muted">
         {t('office.suppliers.balance_after', {
-          amount: formatShopMoney(balance - (amount ?? 0)),
+          amount: money(balance - (amount ?? 0)),
         })}
       </p>
       <DialogFooter>

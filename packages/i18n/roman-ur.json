@@ -580,6 +580,19 @@
     "cancel_waiting": "Waiting cancel karein ({{count}})",
     "cancelled_many": "{{count}} waiting prints cancel ho gaye."
   },
+  "privacy": {
+    "title": "Raqam chhupayein",
+    "hide": "Raqam chhupayein",
+    "show": "Raqam dikhayein",
+    "hidden": "Raqam chhupi hui hai",
+    "hint": "Is device par farokht, munafa, cash aur baqaya chhupata hai. Bechte waqt qeemtein nazar aati rahengi.",
+    "command_hint": "Farokht, munafa aur baqaya chhupayein",
+    "hidden_toast": "Is device par raqmein chhup gayi hain.",
+    "hidden_toast_selling": "Raqmein chhup gayi hain. Bechte waqt qeemtein nazar aati rahengi.",
+    "visible_toast": "Raqmein dikhayi ja rahi hain.",
+    "chart_hidden": "Raqmein chhupi hui hain",
+    "chart_hint": "Dikhanay ke liye upar wali aankh dabayein."
+  },
   "products": {
     "add": "Product shamil karein",
     "all_categories": "Tamam categories",

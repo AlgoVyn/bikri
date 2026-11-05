@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { expectNoHorizontalScroll, openReadyShop } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // Design layout invariants (docs/design-review-checklist.md). The screenshot matrix is
 // attached on demand with VISUAL=1; CI always checks the geometry.
@@ -130,6 +134,42 @@ test.describe('design layout invariants', () => {
         }));
     });
     expect(small).toEqual([]);
+  });
+
+  test('desktop rail keeps labels on one line and hides its scrollbar', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 700 });
+    await seedVisualShop(page);
+    const nav = page.getByTestId('brand-rail').locator('..');
+    const metrics = await nav.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        width: element.getBoundingClientRect().width,
+        scrollbarWidth: style.scrollbarWidth,
+        overflowY: style.overflowY,
+        labels: Array.from(
+          element.querySelectorAll<HTMLElement>('a > span:last-child'),
+        ).map((label) => getComputedStyle(label).whiteSpace),
+      };
+    });
+    expect(metrics.width).toBeGreaterThanOrEqual(88);
+    expect(metrics.scrollbarWidth).toBe('none');
+    expect(metrics.overflowY).toBe('auto');
+    expect(metrics.labels.length).toBeGreaterThanOrEqual(9);
+    expect(metrics.labels.every((whiteSpace) => whiteSpace === 'nowrap')).toBe(
+      true,
+    );
+
+    // Urdu labels are shorter in Latin width terms but use the larger Naskh metrics.
+    await setLanguage(page, 'ur');
+    const overflowed = await nav.evaluate((element) =>
+      Array.from(element.querySelectorAll<HTMLElement>('a > span:last-child'))
+        .filter((label) => label.scrollWidth > label.clientWidth + 1)
+        .map((label) => label.textContent),
+    );
+    expect(overflowed).toEqual([]);
+    await setLanguage(page, 'en');
   });
 
   test('list density holds at 1280', async ({ page }) => {

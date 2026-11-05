@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate } from '@tanstack/react-router';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   type ReactNode,
   useEffect,
@@ -12,6 +13,8 @@ import { useTranslation } from 'react-i18next';
 import {
   ClockIcon,
   ExpensesIcon,
+  EyeIcon,
+  EyeOffIcon,
   PrinterIcon,
   ProductsIcon,
   ReportsIcon,
@@ -24,8 +27,10 @@ import {
   UsersIcon,
 } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
+import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useSession } from '../state/session.ts';
+import { loadDevicePrefs, togglePrivacyMode } from './devicePrefs.ts';
 import { ignoresHotkey } from './hotkeys.ts';
 import { usePriceCheck } from './priceCheckStore.ts';
 
@@ -67,6 +72,12 @@ export function CommandPalette() {
   const [recentIds, setRecentIds] = useState<string[]>(readRecent);
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const privacyEnabled =
+    useLiveQuery(
+      async () => (await loadDevicePrefs(getDb())).privacyMode,
+      [],
+      false,
+    ) ?? false;
 
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => {
@@ -172,6 +183,17 @@ export function CommandPalette() {
         },
       },
       {
+        id: 'privacy',
+        label: privacyEnabled ? t('privacy.show') : t('privacy.hide'),
+        hint: t('privacy.command_hint'),
+        keys: 'Ctrl+Shift+H',
+        icon: privacyEnabled ? <EyeOffIcon /> : <EyeIcon />,
+        run: () => {
+          setOpen(false);
+          void togglePrivacyMode(getDb());
+        },
+      },
+      {
         id: 'lock',
         label: t('shell.lock'),
         hint: t('shell.staff_menu'),
@@ -193,7 +215,7 @@ export function CommandPalette() {
       if (item.id === 'cashiers') return can('settings.staff');
       return true;
     });
-  }, [can, lock, navigate, openPriceCheck, t]);
+  }, [can, lock, navigate, openPriceCheck, privacyEnabled, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -404,6 +426,7 @@ export function CommandPalette() {
                     ['?', t('shell.shortcuts')],
                     ['/', t('shell.search_label')],
                     ['N', t('home.new_sale')],
+                    ['Ctrl+Shift+H', t('privacy.title')],
                     ['Ctrl+Shift+P', t('home.price_check')],
                     ['Ctrl+L', t('shell.lock')],
                   ],

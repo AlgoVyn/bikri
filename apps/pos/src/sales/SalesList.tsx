@@ -8,7 +8,7 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -30,7 +30,6 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
-import { formatShopMoney } from '../lib/money';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -95,6 +94,7 @@ export function SalesList({
   selectedId?: string;
 }) {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const navigate = useNavigate();
   const { can, role, support, branchId } = useCurrentStaff();
   const limited = !can('report.view') || cashierTodayOnly(role, support);
@@ -467,7 +467,7 @@ export function SalesList({
               <p className="text-small text-text-muted">
                 {t('office.sales.day_total', {
                   bills: day.bills,
-                  amount: formatShopMoney(day.total),
+                  amount: money(day.total),
                 })}
               </p>
             </div>

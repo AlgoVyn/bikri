@@ -1,9 +1,11 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary } from '../components/classes.ts';
 import { MoreIcon, SearchIcon } from '../components/icons.tsx';
+import { PrivacyProvider } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
@@ -14,12 +16,28 @@ import { useReadOnly } from '../state/readOnly.ts';
 import { Banners } from './Banners.tsx';
 import { Breadcrumbs } from './Breadcrumbs.tsx';
 import { CommandPalette } from './CommandPalette.tsx';
+import {
+  applyDevicePrefs,
+  loadDevicePrefs,
+  togglePrivacyMode,
+} from './devicePrefs.ts';
 import { GlobalSearch } from './GlobalSearch.tsx';
 import { dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
-import { StaffMenu, SyncBadge, useShopName } from './TopBarParts.tsx';
+import {
+  PrivacyToggle,
+  StaffMenu,
+  SyncBadge,
+  useShopName,
+} from './TopBarParts.tsx';
+
+/** `/sell` and its completion/dialog state: the cashier needs every price, always. */
+function isSellingRoute(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/u, '');
+  return path === '/sell' || path.startsWith('/sell/');
+}
 
 const navLink =
   'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted transition-colors duration-150 lg:flex-none lg:py-1.5';
@@ -44,6 +62,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
+  const privacyEnabled = useLiveQuery(
+    async () => (await loadDevicePrefs(getDb())).privacyMode,
+    [],
+  );
+  // Mask until the stored preference is known, so a reload can never flash a real amount.
+  const privacyActive = (privacyEnabled ?? true) && !isSellingRoute(pathname);
+  const togglePrivacy = () => {
+    void togglePrivacyMode(getDb())
+      .then((next) => {
+        const selling = isSellingRoute(pathname);
+        toast.push(
+          t(
+            next
+              ? selling
+                ? 'privacy.hidden_toast_selling'
+                : 'privacy.hidden_toast'
+              : 'privacy.visible_toast',
+          ),
+        );
+      })
+      .catch(() => toast.push(t('errors.generic'), 'error'));
+  };
 
   const allowed = (item: NavItem) =>
     item.to !== '/sell' || !readOnly
@@ -75,10 +115,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Device-level display preferences (screens/17).
   useEffect(() => {
     let alive = true;
-    void import('./devicePrefs.ts').then(async (module) => {
-      const prefs = await module.loadDevicePrefs(getDb());
-      if (alive) module.applyDevicePrefs(prefs, i18n.language);
-    });
+    void loadDevicePrefs(getDb())
+      .then((prefs) => {
+        if (alive) applyDevicePrefs(prefs, i18n.language);
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -111,6 +152,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Re-bound every render so the handler sees the current permissions.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Hide amounts is a display action: it must also work in a field or an open dialog.
+      if (
+        !event.defaultPrevented &&
+        event.ctrlKey &&
+        event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        event.code === 'KeyH'
+      ) {
+        event.preventDefault();
+        togglePrivacy();
+        return;
+      }
       // Ctrl+Shift+P works everywhere, even while typing (screens/18).
       if (
         !event.defaultPrevented &&
@@ -185,13 +239,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               {updating ? t('shell.updating') : t('shell.update_ready')}
             </button>
           ) : null}
+          <PrivacyToggle
+            enabled={privacyEnabled ?? false}
+            onToggle={togglePrivacy}
+          />
           <SyncBadge />
           <StaffMenu shopName={shopName} />
         </div>
       </header>
       <nav
         aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail"
+        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
       >
         <div
           className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
@@ -228,7 +286,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 />
               ) : null}
               <item.Icon />
-              <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
+              <span className="max-w-full truncate leading-tight">
                 {t(item.label)}
               </span>
             </Link>
@@ -241,7 +299,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => openPriceCheck(true)}
         >
           <SearchIcon />
-          <span className="max-w-full truncate leading-tight lg:whitespace-normal lg:break-words">
+          <span className="max-w-full truncate leading-tight">
             {t('pricecheck.title')}
           </span>
         </button>
@@ -296,10 +354,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         id="main-content"
         className="pt-topbar pb-tabbar lg:ps-rail lg:pb-0"
       >
-        <Banners />
-        {blocked ? null : children}
+        <PrivacyProvider active={privacyActive}>
+          <Banners />
+          {blocked ? null : children}
+        </PrivacyProvider>
       </main>
-      <PriceCheck />
+      <PrivacyProvider active={false}>
+        <PriceCheck />
+      </PrivacyProvider>
       <CommandPalette />
     </div>
   );

@@ -9,7 +9,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -26,7 +26,6 @@ import {
 } from '../data/supplierReturns.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Unlinked = {
@@ -52,6 +51,7 @@ export function SupplierReturnPage({
   initialPurchaseId?: string;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -228,8 +228,8 @@ export function SupplierReturnPage({
       toast.push(
         t('office.suppliers.return_saved', {
           count: allLines.length,
-          total: formatShopMoney(total),
-          balance: formatShopMoney(after),
+          total: money(total),
+          balance: money(after),
         }),
       );
       void navigate({
@@ -486,7 +486,7 @@ export function SupplierReturnPage({
         <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
           <p className="text-small">
             {t('office.suppliers.return_suggested', {
-              amount: formatShopMoney(suggested),
+              amount: money(suggested),
             })}
           </p>
           <MoneyInput

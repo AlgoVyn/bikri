@@ -10,7 +10,7 @@ import {
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -41,6 +41,7 @@ export function SupplierList({
   selectedId?: string;
 } = {}) {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [query, setQuery] = useState('');
@@ -195,7 +196,7 @@ export function SupplierList({
                     >
                       {row.balance > 0 ? (
                         <span className="sr-only">
-                          {supplierBalanceLabel(t, row.balance)}
+                          {supplierBalanceLabel(t, row.balance, money)}
                         </span>
                       ) : null}
                       <span aria-hidden={row.balance > 0 ? true : undefined}>

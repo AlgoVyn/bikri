@@ -11,7 +11,7 @@ import {
   fieldClass,
   pageClass,
 } from '../components/classes.ts';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, type CartId, isEmptyCart, loadCarts } from '../data/cart.ts';
@@ -28,7 +28,6 @@ import {
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date';
-import { formatShopMoney } from '../lib/money';
 import {
   closeShareWindow,
   navigateShareWindow,
@@ -58,6 +57,7 @@ export function BillDetail({
   embedded?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
   const readOnly = useReadOnly();
@@ -296,14 +296,14 @@ export function BillDetail({
     .reduce((sum, line) => sum + Number(line.line.qty_milli), 0);
   const voidSummary = [
     paidBack > 0
-      ? t('office.void.summary_paid', { amount: formatShopMoney(paidBack) })
+      ? t('office.void.summary_paid', { amount: money(paidBack) })
       : null,
     returnQty > 0
       ? t('office.void.summary_stock', { qty: returnQty / 1000 })
       : null,
     Number(sale.udhaar_amount) > 0
       ? t('office.void.summary_khata', {
-          amount: formatShopMoney(Number(sale.udhaar_amount)),
+          amount: money(Number(sale.udhaar_amount)),
           name: detail.customer ? String(detail.customer.name) : '',
         })
       : null,
@@ -574,7 +574,7 @@ export function BillDetail({
                     >
                       {t('office.bill.qty_price', {
                         qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
-                        price: formatShopMoney(Number(line.unit_price)),
+                        price: money(Number(line.unit_price)),
                       })}
                     </span>
                     <span
@@ -730,13 +730,11 @@ export function BillDetail({
                       {Number(p.cash_tendered ?? 0) > 0 ? (
                         <span className="block text-small text-text-muted">
                           {t('office.bill.tendered', {
-                            amount: formatShopMoney(Number(p.cash_tendered)),
+                            amount: money(Number(p.cash_tendered)),
                           })}{' '}
                           ·{' '}
                           {t('office.bill.change', {
-                            amount: formatShopMoney(
-                              Number(p.change_given ?? 0),
-                            ),
+                            amount: money(Number(p.change_given ?? 0)),
                           })}
                         </span>
                       ) : null}
@@ -814,7 +812,7 @@ export function BillDetail({
                 {Number(refund.udhaar_part) > 0 ? (
                   <p>
                     {t('office.bill.refund_khata', {
-                      amount: formatShopMoney(Number(refund.udhaar_part)),
+                      amount: money(Number(refund.udhaar_part)),
                     })}
                   </p>
                 ) : null}
@@ -827,7 +825,7 @@ export function BillDetail({
                     )}
                     {Number(refund.rounding) !== 0
                       ? ` · ${t('office.bill.refund_rounding', {
-                          amount: formatShopMoney(Number(refund.rounding)),
+                          amount: money(Number(refund.rounding)),
                         })}`
                       : ''}
                   </p>

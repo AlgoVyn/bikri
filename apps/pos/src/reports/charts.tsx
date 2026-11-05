@@ -1,12 +1,12 @@
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PrivacyCurtain, usePrivacyActive } from '../components/privacy.tsx';
 import type {
   DailyPoint,
   HourlyPoint,
   PaymentMix,
 } from '../data/reportBundle.ts';
-import { formatShopMoney } from '../lib/money';
 import { shortDate } from './format.ts';
 
 const COLORS: Record<keyof PaymentMix, string> = {
@@ -28,6 +28,8 @@ export function DailyChart({
   lang: string;
   t: TFunction;
 }) {
+  const money = useDisplayMoney();
+  const privacy = usePrivacyActive();
   const width = 720;
   const height = 220;
   const pad = 56;
@@ -66,6 +68,7 @@ export function DailyChart({
   const svgRef = useRef<SVGSVGElement>(null);
   const [renderedWidth, setRenderedWidth] = useState(width);
   useEffect(() => {
+    if (privacy) return;
     const element = svgRef.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
     const update = () => setRenderedWidth(element.clientWidth || width);
@@ -73,7 +76,8 @@ export function DailyChart({
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [privacy]);
+  if (privacy) return <PrivacyCurtain className="h-52" />;
   // SVG font sizes are in viewBox units, so compensate for the rendered width: labels stay
   // around 11–12 CSS px on a phone instead of shrinking to 4 px.
   const labelFont = Math.min(
@@ -81,10 +85,7 @@ export function DailyChart({
     Math.max(8, Math.round((12 * width) / Math.max(1, renderedWidth))),
   );
   const summary = points
-    .map(
-      (point) =>
-        `${shortDate(point.date, lang)} ${formatShopMoney(point.sold)}`,
-    )
+    .map((point) => `${shortDate(point.date, lang)} ${money(point.sold)}`)
     .join('; ');
 
   return (
@@ -138,7 +139,7 @@ export function DailyChart({
                   fontSize={labelFont}
                   fill="var(--color-text-muted)"
                 >
-                  {formatShopMoney(value)}
+                  {money(value)}
                 </text>
               </g>
             ),
@@ -158,7 +159,7 @@ export function DailyChart({
                 opacity={point.date === points.at(-1)?.date ? 1 : 0.82}
               >
                 <title>
-                  {`${shortDate(point.date, lang)} · ${formatShopMoney(point.sold)}`}
+                  {`${shortDate(point.date, lang)} · ${money(point.sold)}`}
                 </title>
               </rect>
             );
@@ -264,6 +265,9 @@ export function HourlyChart({
   points: readonly HourlyPoint[];
   t: TFunction;
 }) {
+  const money = useDisplayMoney();
+  const privacy = usePrivacyActive();
+  if (privacy) return <PrivacyCurtain className="h-40" />;
   const width = 720;
   const height = 180;
   const padX = 40;
@@ -305,7 +309,7 @@ export function HourlyChart({
               fontSize={10}
               fill="var(--color-text-muted)"
             >
-              {formatShopMoney(value)}
+              {money(value)}
             </text>
           </g>
         ))}
@@ -324,7 +328,7 @@ export function HourlyChart({
               opacity={point.sold === 0 ? 0.25 : 1}
             >
               <title>
-                {`${String(point.hour).padStart(2, '0')}:00 · ${formatShopMoney(point.sold)}`}
+                {`${String(point.hour).padStart(2, '0')}:00 · ${money(point.sold)}`}
               </title>
             </rect>
           );

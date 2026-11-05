@@ -9,7 +9,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, emptyCart, isEmptyCart, loadCarts } from '../data/cart.ts';
@@ -22,7 +22,6 @@ import {
   refundSale,
 } from '../data/refunds.ts';
 import { billDetail, shopTimeZone } from '../data/salesHistory.ts';
-import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -49,6 +48,7 @@ export function RefundDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can, role, support, branchId } = useCurrentStaff();
@@ -436,9 +436,9 @@ export function RefundDialog({
           <p className="font-medium">{t('office.refund.split_title')}</p>
           <p>
             {t('office.refund.split_body', {
-              exact: formatShopMoney(plan?.exact ?? 0),
-              paid: formatShopMoney(plan?.amount ?? 0),
-              udhaar: formatShopMoney(plan?.udhaarPart ?? 0),
+              exact: money(plan?.exact ?? 0),
+              paid: money(plan?.amount ?? 0),
+              udhaar: money(plan?.udhaarPart ?? 0),
               name: detail.customer ? String(detail.customer.name) : '',
             })}
           </p>
@@ -467,7 +467,7 @@ export function RefundDialog({
       ) : plan && plan.udhaarPart > 0 ? (
         <p className="rounded-control bg-warning-subtle p-2 text-warning-subtle-ink">
           {t('office.refund.khata_only', {
-            amount: formatShopMoney(plan.udhaarPart),
+            amount: money(plan.udhaarPart),
             name: detail?.customer ? String(detail.customer.name) : '',
           })}
         </p>
@@ -552,11 +552,11 @@ export function RefundDialog({
         >
           {plan && plan.amount > 0
             ? t('office.refund.button', {
-                amount: formatShopMoney(plan.amount),
+                amount: money(plan.amount),
               })
             : plan && plan.udhaarPart > 0
               ? t('office.refund.button_khata', {
-                  amount: formatShopMoney(plan.udhaarPart),
+                  amount: money(plan.udhaarPart),
                 })
               : t('office.refund.button_empty')}
         </button>

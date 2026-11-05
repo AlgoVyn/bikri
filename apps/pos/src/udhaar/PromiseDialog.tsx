@@ -5,12 +5,12 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
+import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -32,6 +32,7 @@ export function PromiseDialog({
   balance: number;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const toast = useToast();
   const { staff } = useCurrentStaff();
   const [date, setDate] = useState(businessDate(Date.now()));
@@ -106,7 +107,7 @@ export function PromiseDialog({
         />
       </div>
       <p className="text-small text-text-muted">
-        {t('office.udhaar.promise_whole', { amount: formatShopMoney(balance) })}
+        {t('office.udhaar.promise_whole', { amount: money(balance) })}
       </p>
       <label className="flex flex-col gap-1 text-small">
         {t('office.udhaar.note')}

@@ -580,6 +580,19 @@
     "cancel_waiting": "Cancel waiting ({{count}})",
     "cancelled_many": "{{count}} waiting prints cancelled."
   },
+  "privacy": {
+    "title": "Hide amounts",
+    "hide": "Hide amounts",
+    "show": "Show amounts",
+    "hidden": "Amount hidden",
+    "hint": "Hides sales, profit, cash and balances on this device. Prices stay visible while selling.",
+    "command_hint": "Hide sales, profit and balances",
+    "hidden_toast": "Amounts hidden on this device.",
+    "hidden_toast_selling": "Amounts hidden. Prices stay visible while selling.",
+    "visible_toast": "Amounts visible.",
+    "chart_hidden": "Amounts hidden",
+    "chart_hint": "Use the eye button in the top bar to show them."
+  },
   "products": {
     "add": "Add product",
     "all_categories": "All categories",

@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  EyeIcon,
+  EyeOffIcon,
   InfoIcon,
   LockIcon,
   SearchIcon,
@@ -42,6 +44,31 @@ export function useOnline(): boolean {
     };
   }, []);
   return online;
+}
+
+/** Eye toggle for privacy mode (screens/04). One tap hides every amount on browsing screens. */
+export function PrivacyToggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = enabled ? t('privacy.show') : t('privacy.hide');
+  return (
+    <button
+      type="button"
+      data-testid="privacy-toggle"
+      aria-label={t('privacy.hide')}
+      aria-pressed={enabled}
+      title={`${label} (Ctrl+Shift+H)`}
+      onClick={onToggle}
+      className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-text aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink"
+    >
+      {enabled ? <EyeOffIcon /> : <EyeIcon />}
+    </button>
+  );
 }
 
 /** Rail badge (03 §7): one status trigger; printer details live in its popover. */

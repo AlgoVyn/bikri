@@ -18,3 +18,11 @@ export function shopGrouping(): NumberGrouping {
 export function formatShopMoney(paisa: number): string {
   return formatMoney(paisa, currentGrouping);
 }
+
+/** Fixed-width mask: its length must not reveal the amount's magnitude. */
+export const MONEY_MASK = '••••';
+
+/** A display-only amount mask for privacy mode; printed/exported money never uses it. */
+export function maskMoney(paisa: number): string {
+  return `${paisa < 0 ? '−' : ''}Rs ${MONEY_MASK}`;
+}

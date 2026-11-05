@@ -1,6 +1,5 @@
 import type { TFunction } from 'i18next';
 import type { StatementEntry } from '../data/udhaar.ts';
-import { formatShopMoney } from '../lib/money';
 
 export function localeOf(lang: string): string {
   return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
@@ -31,12 +30,15 @@ export function balanceTone(balance: number): string {
   return 'text-text-muted';
 }
 
-export function balanceLabel(t: TFunction, balance: number): string {
-  if (balance > 0)
-    return t('office.udhaar.owes', { amount: formatShopMoney(balance) });
+export function balanceLabel(
+  t: TFunction,
+  balance: number,
+  money: (paisa: number) => string,
+): string {
+  if (balance > 0) return t('office.udhaar.owes', { amount: money(balance) });
   if (balance < 0)
     return t('office.udhaar.in_credit', {
-      amount: formatShopMoney(-balance),
+      amount: money(-balance),
     });
   return t('office.udhaar.settled');
 }

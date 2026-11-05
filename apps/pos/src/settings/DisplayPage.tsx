@@ -13,6 +13,7 @@ import {
   type DevicePrefs,
   loadDevicePrefs,
   saveDevicePrefs,
+  setPrivacyMode,
 } from '../shell/devicePrefs.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
@@ -40,7 +41,14 @@ function DisplayContent() {
   const [gap, setGap] = useState<number | null>(null);
   const last = useRef<number | null>(null);
   useEffect(() => {
-    if (stored && !touched.current) setForm(stored);
+    if (!stored) return;
+    setForm((current) =>
+      touched.current
+        ? current.privacyMode === stored.privacyMode
+          ? current
+          : { ...current, privacyMode: stored.privacyMode }
+        : stored,
+    );
   }, [stored]);
   useEffect(() => {
     applyDevicePrefs(form, i18n.language);
@@ -106,6 +114,25 @@ function DisplayContent() {
             <option value="115">115%</option>
             <option value="130">130%</option>
           </select>
+        </label>
+        <label className="flex items-start gap-2 text-small">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={form.privacyMode}
+            data-testid="privacy-setting"
+            onChange={(event) => {
+              const value = event.target.checked;
+              change({ privacyMode: value });
+              void setPrivacyMode(getDb(), value).catch(() =>
+                toast.push(t('errors.generic'), 'error'),
+              );
+            }}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="font-medium">{t('privacy.title')}</span>
+            <span className="text-text-muted">{t('privacy.hint')}</span>
+          </span>
         </label>
         <label className="flex flex-col gap-1 text-small">
           {t('office.display.auto_lock')}

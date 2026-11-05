@@ -7,9 +7,10 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { PrivacyValue } from '../components/privacy.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -25,7 +26,6 @@ import type { ReportRange } from '../data/reports.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
-import { formatShopMoney } from '../lib/money';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { DailyChart, HourlyChart, PaymentMixBar } from './charts.tsx';
@@ -534,12 +534,18 @@ function Delta({
     ? `${Math.abs(change).toFixed(1)} ${t('office.reports.pp')}`
     : `${Math.abs(Math.round(change))}%`;
   return (
-    <span className={`text-small ${positive ? 'text-success' : 'text-danger'}`}>
-      <bdi dir="ltr">
-        {up ? '↑' : '↓'} {value}
-      </bdi>{' '}
-      <span className="text-text-muted">{t('office.reports.vs_previous')}</span>
-    </span>
+    <PrivacyValue mask="••%">
+      <span
+        className={`text-small ${positive ? 'text-success' : 'text-danger'}`}
+      >
+        <bdi dir="ltr">
+          {up ? '↑' : '↓'} {value}
+        </bdi>{' '}
+        <span className="text-text-muted">
+          {t('office.reports.vs_previous')}
+        </span>
+      </span>
+    </PrivacyValue>
   );
 }
 
@@ -625,6 +631,7 @@ function SummaryTab({
   lang: string;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const summary = bundle.summary;
   const activeHours = summary.hourly.filter((point) => point.sold !== 0);
   const singleHour = activeHours.length === 1 ? activeHours[0] : undefined;
@@ -715,7 +722,11 @@ function SummaryTab({
             <li className="min-w-0">
               <Card
                 label={t('office.reports.margin')}
-                value={percentText(summary.marginBp)}
+                value={
+                  <PrivacyValue mask="••%">
+                    {percentText(summary.marginBp)}
+                  </PrivacyValue>
+                }
                 hint={
                   <Delta
                     current={summary.marginBp / 100}
@@ -840,7 +851,7 @@ function SummaryTab({
               <p className="mt-2 text-small text-text-muted">
                 {t('office.reports.refunds_note', {
                   count: summary.refundCount,
-                  amount: formatShopMoney(summary.refunded),
+                  amount: money(summary.refunded),
                 })}
               </p>
             </section>
@@ -910,9 +921,13 @@ function ProductsTab({
             <MoneyText key="revenue" paisa={row.revenue} />,
             <MoneyText key="cost" paisa={row.cost} />,
             <MoneyText key="profit" paisa={row.profit} />,
-            row.revenue > 0
-              ? percentText(mulDivRound(row.profit, 10000, row.revenue))
-              : '—',
+            row.revenue > 0 ? (
+              <PrivacyValue key="margin" mask="••%">
+                {percentText(mulDivRound(row.profit, 10000, row.revenue))}
+              </PrivacyValue>
+            ) : (
+              '—'
+            ),
           ])}
           empty={t('office.reports.no_products')}
         />

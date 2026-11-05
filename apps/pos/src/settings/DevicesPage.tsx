@@ -1,4 +1,3 @@
-import { formatShopMoney } from '../lib/money';
 /** Settings → Devices on an admin device (screens/17, T-038): codes, devices, import unsynced ops. */
 
 import type { BikriDb } from '@bikri/db';
@@ -14,6 +13,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { DeviceIcon, UploadIcon } from '../components/icons.tsx';
+import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { QrCode } from '../components/QrCode.tsx';
 import { getDb } from '../data/db.ts';
 import { formatCode } from '../data/enrol.ts';
@@ -149,6 +149,7 @@ function timeText(
 
 export function DevicesPage() {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const timeZone = useShopTimeZone();
   const db = getDb();
   const online = useOnline();
@@ -635,8 +636,8 @@ export function DevicesPage() {
                 count: importState.p.count,
                 from: timeText(i18n.language, importState.p.from, timeZone),
                 to: timeText(i18n.language, importState.p.to, timeZone),
-                sales: formatShopMoney(importState.p.sales),
-                payments: formatShopMoney(importState.p.payments),
+                sales: money(importState.p.sales),
+                payments: money(importState.p.payments),
               })}
             </p>
             <button

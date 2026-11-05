@@ -7,14 +7,13 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatShopMoney } from '../lib/money';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -46,6 +45,7 @@ export function ReceivePaymentDialog({
   balance: number;
 }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
   const [amount, setAmount] = useState<number | null>(null);
@@ -111,9 +111,7 @@ export function ReceivePaymentDialog({
         ctx,
         { role, today },
       );
-      toast.push(
-        t('office.udhaar.payment_saved', { amount: formatShopMoney(amount) }),
-      );
+      toast.push(t('office.udhaar.payment_saved', { amount: money(amount) }));
       onOpenChange(false);
     } catch (err) {
       if (err instanceof ReadOnlyError)
@@ -237,10 +235,10 @@ export function ReceivePaymentDialog({
         >
           {after >= 0
             ? t('office.udhaar.balance_after', {
-                amount: formatShopMoney(after),
+                amount: money(after),
               })
             : t('office.udhaar.credit_after', {
-                amount: formatShopMoney(-after),
+                amount: money(-after),
               })}
         </p>
         {role !== 'owner' ? (
@@ -281,7 +279,7 @@ export function ReceivePaymentDialog({
         onOpenChange={setOverpay}
         title={t('office.udhaar.overpay_title')}
         body={t('office.udhaar.overpay_body', {
-          amount: formatShopMoney((amount ?? 0) - Math.max(0, balance)),
+          amount: money((amount ?? 0) - Math.max(0, balance)),
         })}
         confirmLabel={t('office.udhaar.overpay_confirm')}
         onConfirm={() => void save()}

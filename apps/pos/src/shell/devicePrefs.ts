@@ -12,6 +12,8 @@ export type DevicePrefs = {
   camera: boolean;
   suffixEnter: boolean;
   saleSound: boolean;
+  /** Hide amounts on this device (shoulder-surfing privacy, docs/screens/04). */
+  privacyMode: boolean;
 };
 
 export const THEME_STORAGE_KEY = 'bikri.theme';
@@ -23,6 +25,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   camera: false,
   suffixEnter: true,
   saleSound: true,
+  privacyMode: false,
 };
 
 export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
@@ -38,6 +41,7 @@ export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
     autoLockMinutes: Number(
       stored.autoLockMinutes ?? autoLock ?? DEFAULT_PREFS.autoLockMinutes,
     ),
+    privacyMode: stored.privacyMode === true,
   };
 }
 
@@ -52,8 +56,26 @@ export async function saveDevicePrefs(
     camera: prefs.camera,
     suffixEnter: prefs.suffixEnter,
     saleSound: prefs.saleSound,
+    privacyMode: prefs.privacyMode,
   });
   await setKv(db, 'auto_lock_minutes', prefs.autoLockMinutes);
+}
+
+/** Persist the privacy toggle without disturbing the other display settings. */
+export async function setPrivacyMode(
+  db: BikriDb,
+  enabled: boolean,
+): Promise<void> {
+  const prefs = await loadDevicePrefs(db);
+  await saveDevicePrefs(db, { ...prefs, privacyMode: enabled });
+}
+
+/** Flip privacy mode and return the new value. */
+export async function togglePrivacyMode(db: BikriDb): Promise<boolean> {
+  const prefs = await loadDevicePrefs(db);
+  const next = !prefs.privacyMode;
+  await saveDevicePrefs(db, { ...prefs, privacyMode: next });
+  return next;
 }
 
 /** Reads the device theme selected in Settings (same origin, no shop DB needed). */

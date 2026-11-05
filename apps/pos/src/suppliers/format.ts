@@ -1,12 +1,15 @@
 import type { TFunction } from 'i18next';
 import type { SupplierStatementEntry } from '../data/suppliers.ts';
-import { formatShopMoney } from '../lib/money';
 
-export function supplierBalanceLabel(t: TFunction, balance: number): string {
+export function supplierBalanceLabel(
+  t: TFunction,
+  balance: number,
+  money: (paisa: number) => string,
+): string {
   if (balance > 0)
-    return t('office.suppliers.you_owe', { amount: formatShopMoney(balance) });
+    return t('office.suppliers.you_owe', { amount: money(balance) });
   if (balance < 0)
-    return t('office.suppliers.advance', { amount: formatShopMoney(-balance) });
+    return t('office.suppliers.advance', { amount: money(-balance) });
   return t('office.suppliers.settled');
 }
 

@@ -11,7 +11,7 @@ import {
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -21,7 +21,6 @@ import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { formatShopMoney } from '../lib/money';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Line = {
@@ -39,6 +38,7 @@ const field =
 /** Record a delivery / purchase (screens/13). */
 export function DeliveryPage({ supplierId }: { supplierId: string }) {
   const { t } = useTranslation();
+  const money = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -174,8 +174,8 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
       toast.push(
         t('office.suppliers.delivery_saved', {
           count: valid.length,
-          total: formatShopMoney(total),
-          balance: formatShopMoney(after),
+          total: money(total),
+          balance: money(after),
         }),
         'info',
         [
@@ -230,7 +230,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
           {t('office.suppliers.delivery_title')}
         </h1>
         <p className="text-small text-text-muted">
-          {String(data.supplier.name)} · {formatShopMoney(data.balance)}
+          {String(data.supplier.name)} · {money(data.balance)}
         </p>
       </div>
 

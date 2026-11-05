@@ -120,6 +120,26 @@ export function SearchIcon() {
   );
 }
 
+export function EyeIcon() {
+  return (
+    <Svg>
+      <path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon() {
+  return (
+    <Svg>
+      <path d="M4.2 7.3C3.1 8.8 2.5 10.2 2.5 12c0 0 3.5 6 9.5 6 1.7 0 3.2-.4 4.5-1" />
+      <path d="M9.8 6.3A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a12.8 12.8 0 0 1-2.2 2.9" />
+      <path d="M9.9 9.9A3 3 0 0 0 14.1 14" />
+      <path d="m4 4 16 16" />
+    </Svg>
+  );
+}
+
 export function SuppliersIcon() {
   return (
     <Svg>

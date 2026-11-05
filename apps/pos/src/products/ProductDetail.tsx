@@ -10,7 +10,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { addProduct, CartFullError } from '../data/cart.ts';
@@ -27,7 +27,6 @@ import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
-import { formatShopMoney } from '../lib/money';
 import { shortDate } from '../reports/format.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { mutateCart, useShopMoney } from '../sell/useSell.ts';
@@ -55,6 +54,7 @@ export function ProductDetailPage({
   embedded?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const displayMoney = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
@@ -352,7 +352,7 @@ export function ProductDetailPage({
           <p className="text-small text-text-muted">
             {t('products.last14_total', {
               qty: qtyWithUnit(t, totalQty, unit),
-              amount: formatShopMoney(totalRevenue),
+              amount: displayMoney(totalRevenue),
             })}
           </p>
         ) : null}

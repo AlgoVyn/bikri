@@ -14,8 +14,8 @@
 
 ## App shell (all screens after unlock)
 
-- **Rail** (desktop ≥ 1024 px: brand-navy vertical rail at the start edge, 72 px, with the Bikri mark and the BIKRI wordmark; tablet/mobile: surface bottom bar with 5 items + "More"): Home, Sell, Products, Sales, Udhaar, Suppliers, Expenses, Reports, Settings. The active desktop item has a white/10 panel and a teal indicator. Items the user can't access are hidden. Each item has a tooltip with its hotkey (Ctrl+Shift+1…Ctrl+Shift+9).
-- **Top bar** (56 px): screen title; elevated surface with a soft shadow; global search on a tinted field (`/` focuses, with a `/` key hint on desktop; searches products, customers, bills by invoice no); **sync badge** and **printer pill** on desktop only; staff avatar menu (shop name, user icon + name, role, `Lock` with a padlock icon, Ctrl+L). On phones the title keeps the space: sync and printer move into the staff menu, and the language select stays compact.
+- **Rail** (desktop ≥ 1024 px: brand-navy vertical rail at the start edge, 88 px, with the Bikri mark and the BIKRI wordmark; tablet/mobile: surface bottom bar with 5 items + "More"): Home, Sell, Products, Sales, Udhaar, Suppliers, Expenses, Reports, Settings. Labels stay on one line; the rail scrolls with the wheel/trackpad but its scrollbar is hidden. The active desktop item has a white/10 panel and a teal indicator. Items the user can't access are hidden. Each item has a tooltip with its hotkey (Ctrl+Shift+1…Ctrl+Shift+9).
+- **Top bar** (56 px): screen title; elevated surface with a soft shadow; global search on a tinted field (`/` focuses, with a `/` key hint on desktop; searches products, customers, bills by invoice no); **hide-amounts eye**; **sync badge** and **printer pill** on desktop only; staff avatar menu (shop name, user icon + name, role, `Lock` with a padlock icon, Ctrl+L). On phones the title keeps the space: the eye stays next to the avatar, sync and printer move into the staff menu, and the language select stays compact.
 - **Sync badge** states ([03 §7](../03-sync.md#7-status-shown-to-the-user)): `Synced` (green check), `Syncing…` (spinner), `n waiting` (muted, offline or pending), `Sync problem` (red; click opens Settings → Sync). Tooltip shows last successful sync time. The printer pill is neutral “No printer” (accessible label “Printer not set up”), green “Printer ready” or red “Print failed”, never colour-only.
 - **Offline banner**: thin amber bar "Offline — sales are saved on this device" when `navigator.onLine` is false or 3 consecutive pushes fail.
 - **Update prompt**: toast "New version ready — Reload" (never auto-reload during a sale).
@@ -32,6 +32,15 @@
 6. **Attention list** (main column, max 5): products at or below `min_stock_milli` ("12 items low on stock"), batches expiring in 30 days (v2), udhaar promises due today, customers over limit, failed print jobs, sync conflicts (owner), day not closed yesterday on this device. Card with a leading status dot and a chevron.
 7. **Recent bills** (right column on ≥ 1024 px; below the register/market on phones): the shop’s last 5 bills, newest first (invoice, time, total, method chips), in a card with a `View all` link to Sales; click a row for bill detail. Empty state inside the card. Bills from every till in the shop appear; the invoice prefix shows the device.
 
+## Privacy mode
+
+The eye in the top bar (and `Ctrl+Shift+H`) hides amounts on this device and remembers the choice in `kv.ui.prefs.privacyMode`. It is device-local, never synced, and works offline; Settings → Scanner & display has the same switch.
+
+- **Masked** on Home, Reports, Sales history/detail, bill detail, Udhaar, Suppliers, Expenses, Day close, product cost/margin/stock value: every money value becomes a fixed `Rs ••••` / `−Rs ••••` (never proportional to the amount), and margin/delta percentages become `••%`. Charts are replaced by an “Amounts hidden” panel because bar heights and trend lines leak performance. The real value is not rendered, so screenshots and DOM inspection do not reveal it.
+- **Never masked** in the selling flow (Sell, Pay, Sale complete), Price check or any printed receipt/label, PDF/CSV/exported or WhatsApp-reminder output: those amounts are needed to serve the customer and are already customer-facing.
+- Counts, quantities, stock levels, dates and invoice numbers stay visible. This is shoulder-surfing privacy, not access control: the PIN lock and permissions (`cost.view`, `report.view`) still enforce who may see what.
+- The eye shows an eye-off state while enabled; toggling off restores every amount. A toast confirms the change.
+
 ## States
 
 - First run (0 products): replace the hero/register with a card "Add your first products" with buttons `Add product`, `Import spreadsheet`, `Add from suggested list` (electronics starter list: charger, cable, earbuds, power bank, screen protector, back cover — names only, user sets prices), followed by quick actions and the empty Recent bills card.
@@ -45,3 +54,5 @@
 3. `N` from Home opens Sell with focus in search.
 4. Low-stock attention item counts only products with `track_stock = 1`.
 5. Layout works at 390×844, 768×1024, 1280×800 and 1920×1080 without horizontal scroll.
+6. The eye (or `Ctrl+Shift+H`) hides every amount on Home/Reports/Sales/Udhaar/Suppliers/Expenses/Day close and persists across reload; Sell, Pay, Sale complete and Price check keep their prices, and print/export output is never masked.
+7. The desktop rail is 88 px wide, labels never wrap, and the rail remains scrollable with no visible scrollbar.

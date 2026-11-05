@@ -17,7 +17,7 @@ import {
   SearchIcon,
   SellIcon,
 } from '../components/icons.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -31,7 +31,6 @@ import { expectedCash, summary } from '../data/reports.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { formatTimestamp } from '../lib/date';
-import { formatShopMoney } from '../lib/money';
 import { NAV } from '../shell/nav.ts';
 import { usePriceCheck } from '../shell/priceCheckStore.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
@@ -780,6 +779,7 @@ function RegisterCard({
   timeText: (at: number) => string;
 }) {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const last = data.recent[0]?.sale.created_at;
   return (
     <section
@@ -840,12 +840,12 @@ function RegisterCard({
           <dd className="mt-0.5 flex flex-col gap-0.5 text-body font-medium">
             <span>
               {t('home.udhaar_given', {
-                amount: formatShopMoney(data.today.udhaarGiven),
+                amount: money(data.today.udhaarGiven),
               })}
             </span>
             <span>
               {t('home.udhaar_received', {
-                amount: formatShopMoney(data.today.udhaarReceived),
+                amount: money(data.today.udhaarReceived),
               })}
             </span>
           </dd>

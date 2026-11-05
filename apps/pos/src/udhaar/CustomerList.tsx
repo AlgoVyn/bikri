@@ -11,7 +11,7 @@ import {
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
-import { MoneyText } from '../components/MoneyText.tsx';
+import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -55,6 +55,7 @@ export function UdhaarList({
   selectedId?: string;
 }) {
   const { t, i18n } = useTranslation();
+  const money = useDisplayMoney();
   const { can, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
   const canEditPromises = can('party.edit');
@@ -324,7 +325,7 @@ export function UdhaarList({
                       >
                         {row.balance > 0 ? (
                           <span className="sr-only">
-                            {balanceLabel(t, row.balance)}
+                            {balanceLabel(t, row.balance, money)}
                           </span>
                         ) : null}
                         <span aria-hidden={row.balance > 0 ? true : undefined}>
