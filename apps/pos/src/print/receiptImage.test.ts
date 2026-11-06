@@ -25,6 +25,19 @@ describe('receipt picture (screens/07 AC 2)', () => {
     expect(rows.every((r) => r.height > 0)).toBe(true);
   });
 
+  it('draws a QR as a scannable row, not as its payload text', () => {
+    const rows = receiptRows(
+      [{ t: 'qr', data: '01J0000000000000000000000A' }],
+      { dots: 576, charsPerLine: 48, itemLayout: 'columns', logo: null },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: 'qr',
+      data: '01J0000000000000000000000A',
+    });
+    expect(rows[0]?.height).toBeGreaterThan(100);
+  });
+
   it('wraps a JPEG in a one-page PDF at paper width', () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
     const pdf = new TextDecoder('latin1').decode(

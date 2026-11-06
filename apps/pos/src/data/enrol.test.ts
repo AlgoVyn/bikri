@@ -11,6 +11,8 @@ import {
   leaveShop,
   markUnsyncedExported,
   normaliseCodeInput,
+  PendingFilesError,
+  pendingFileCount,
   UnsyncedOpsError,
   unexportedOps,
   unsyncedExport,
@@ -176,7 +178,7 @@ describe('leave this shop', () => {
     expect(file.data.ops).toHaveLength(1);
     expect(file.data.ops[0]).not.toHaveProperty('seq');
     expect(file.filename).toMatch(/^bikri-unsynced-.+\.json$/);
-    await markUnsyncedExported(db);
+    await markUnsyncedExported(db, file.snapshot);
     expect(await unexportedOps(db)).toBe(0);
     // A coalesced edit changes the exported row without changing its sequence.
     await writeAction(db, (w) =>
@@ -192,11 +194,45 @@ describe('leave this shop', () => {
       seq: Number((await db.outbox.orderBy('seq').last())?.seq ?? 0),
     });
     expect(await unexportedOps(db)).toBe(0);
-    await markUnsyncedExported(db);
+    const finalFile = await unsyncedExport(db);
+    await markUnsyncedExported(db, finalFile.snapshot);
     await leaveShop(db);
     expect(localStorage.getItem('bikri.active_tenant')).toBeNull();
     const names = await indexedDB.databases();
     expect(names.map((d) => d.name)).not.toContain(`bikri-${db.tenantId}`);
+  });
+
+  it('is blocked by photos or logos that have not uploaded yet', async () => {
+    const db = await readyDb('leave-files');
+    setActiveTenantId(db.tenantId);
+    await db.file_queue.add({
+      kind: 'logo',
+      target_id: 'shop',
+      blob: new Blob(['x'], { type: 'image/png' }),
+      sha256: 'd'.repeat(64),
+      status: 'pending',
+    });
+    await db.file_queue.add({
+      kind: 'product_image',
+      target_id: 'p1',
+      blob: new Blob(['y'], { type: 'image/png' }),
+      sha256: 'e'.repeat(64),
+      status: 'failed',
+    });
+    await expect(leaveShop(db)).rejects.toBeInstanceOf(PendingFilesError);
+    expect(await pendingFileCount(db)).toBe(2);
+    await db.file_queue.clear();
+    await expect(leaveShop(db)).resolves.toBeUndefined();
+  });
+
+  it('does not mark an export when the outbox moved while downloading', async () => {
+    const db = await readyDb('leave-stale');
+    setActiveTenantId(db.tenantId);
+    await writeAction(db, (w) => w.create('categories', { name_en: 'A' }));
+    const file = await unsyncedExport(db, Date.UTC(2026, 0, 2, 3, 4));
+    await writeAction(db, (w) => w.create('categories', { name_en: 'B' }));
+    expect(await markUnsyncedExported(db, file.snapshot)).toBe(false);
+    expect(await unexportedOps(db)).toBe(2);
   });
 });
 

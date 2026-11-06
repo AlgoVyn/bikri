@@ -8,8 +8,10 @@ import {
   sha256Hex,
 } from '../auth/crypto.ts';
 import { enrolBlocked, recordEnrolFailure } from '../auth/enrolLimit.ts';
+import { ownerCodeKey } from '../auth/ownerKeys.ts';
 import { tenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
+import { readJsonBody } from '../middleware/body.ts';
 import { enrolmentCodeByHash, getTenant } from '../platform/tenants.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { allocateDeviceCode, publicDevice } from '../sync/devices.ts';
@@ -57,7 +59,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
       },
     );
   }
-  const raw: unknown = await c.req.json().catch(() => null);
+  const raw: unknown = await readJsonBody(c, 16 * 1024).catch(() => null);
   const parsed = EnrolBody.safeParse(raw);
   const normal = parsed.success ? normaliseCode(parsed.data.code) : null;
   if (!parsed.success || !normal) {
@@ -66,12 +68,19 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
       throw parsed.error;
     throw badCode();
   }
-  const hash = await codeHash(normal);
-  const code = await enrolmentCodeByHash(c.env, hash);
+  const hash = await codeHash(ownerCodeKey(c.env), normal);
+  let code = await enrolmentCodeByHash(c.env, hash);
+  if (!code) {
+    // Codes issued before the keyed hash still work until they expire.
+    code = await enrolmentCodeByHash(c.env, await sha256Hex(`enrol:${normal}`));
+  }
   if (!code || code.used_at !== null || code.expires_at <= now) {
     recordEnrolFailure(ip, now);
     throw badCode();
   }
+  // The fallback above may have matched the pre-HMAC hash. Every claim statement must
+  // use the hash actually stored on the row, not the newly computed one.
+  const matchedHash = code.code_hash;
   const tenant = await getTenant(c.env, code.tenant_id);
   if (!tenant) throw badCode();
   if (tenant.status === 'maintenance') {
@@ -136,7 +145,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
     const insert = db.prepare(
       `INSERT INTO devices (tenant_id, ${cols.join(', ')}) SELECT ?1, ${cols.map((_, i) => `?${i + 2}`).join(', ')} WHERE EXISTS (SELECT 1 FROM enrolment_codes WHERE tenant_id = ?1 AND code_hash = ?${cols.length + 2} AND device_id = ?2)`,
       ...cols.map((k) => device[k as keyof DeviceRow]),
-      hash,
+      matchedHash,
     );
     try {
       const results = await db.batch([
@@ -144,7 +153,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
           'UPDATE enrolment_codes SET used_at = ?2, device_id = ?3 WHERE tenant_id = ?1 AND code_hash = ?4 AND used_at IS NULL AND expires_at > ?2',
           now,
           device.id,
-          hash,
+          matchedHash,
         ),
         insert,
         changeLogStatement(db, 'devices', device.id, 'upsert', null, now),

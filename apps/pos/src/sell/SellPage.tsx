@@ -539,7 +539,12 @@ export function SellPage() {
   useHotkey(
     (e) => e.key === 'Escape',
     () => {
-      if (expanded) setExpanded(null);
+      // screens/05: clear the search first, then collapse the expanded line, then
+      // ask before clearing a non-empty cart.
+      if (query !== '') {
+        setQuery('');
+        focusSearch();
+      } else if (expanded) setExpanded(null);
       else askClear();
     },
     { enabled: ready },

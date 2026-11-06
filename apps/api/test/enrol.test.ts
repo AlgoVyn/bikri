@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { sha256Hex } from '../src/auth/crypto.ts';
 import {
   codeFromIndex,
   indexOfCode,
@@ -48,6 +49,32 @@ describe('device codes', () => {
 });
 
 describe('POST /api/devices/enrol', () => {
+  it('still accepts a code issued with the pre-HMAC hash', async () => {
+    const shop = await seedShop('Legacy Enrol');
+    const now = Date.now();
+    const code = 'ABCD2345';
+    await env.DB.prepare(
+      `INSERT INTO enrolment_codes
+       (tenant_id, code_hash, device_name, branch_id, grants_admin, kind, created_by, created_at, expires_at)
+       VALUES (?1, ?2, 'Legacy till', ?3, 1, 'till', 'test', ?4, ?5)`,
+    )
+      .bind(
+        shop.tenantId,
+        await sha256Hex(`enrol:${code}`),
+        shop.branchId,
+        now,
+        now + 3_600_000,
+      )
+      .run();
+    const res = await api('/devices/enrol', {
+      method: 'POST',
+      json: enrolBody(code),
+    });
+    expect(res.status).toBe(201);
+    const body = await json<EnrolResponse>(res);
+    expect(body.tenant.id).toBe(shop.tenantId);
+  });
+
   it('enrols with the owner pairing code into its tenant (I9), once', async () => {
     const shop = await seedShop('Enrol One');
     const res = await api('/devices/enrol', {

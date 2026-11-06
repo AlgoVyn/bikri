@@ -111,6 +111,7 @@ export function SupplierStatement({
       balance: row.balance,
     })),
     openingBalance: statement.openingBalance,
+    lang: i18n.language,
     labels: {
       title: t('office.suppliers.statement'),
       date: t('office.suppliers.date'),

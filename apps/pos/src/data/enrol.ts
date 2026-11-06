@@ -73,8 +73,11 @@ export async function enrolDevice(
   const previousTenant = activeTenantId();
   if (previousTenant) {
     // getDb() opens the active shop; never delete it while changes are waiting.
-    const count = await unexportedOps(getDb());
+    const current = getDb();
+    const count = await unexportedOps(current);
     if (count > 0) throw new UnsyncedOpsError(count);
+    const files = await pendingFileCount(current);
+    if (files > 0) throw new PendingFilesError(files);
   }
   const res = await request<EnrolResponse>('/devices/enrol', {
     method: 'POST',
@@ -142,6 +145,24 @@ export class UnsyncedOpsError extends Error {
   }
 }
 
+/** Photos/logos still waiting for upload; deleting the shop DB would lose them. */
+export class PendingFilesError extends Error {
+  readonly count: number;
+  constructor(count: number) {
+    super(`${count} files are not uploaded`);
+    this.name = 'PendingFilesError';
+    this.count = count;
+  }
+}
+
+export async function pendingFileCount(db: BikriDb): Promise<number> {
+  const pending = await db.file_queue.where('status').equals('pending').count();
+  const failed = await db.file_queue.where('status').equals('failed').count();
+  return pending + failed;
+}
+
+export type UnsyncedSnapshot = { seq: number; fingerprint: string };
+
 /** Unsynced ops file (03 §8). */
 export async function unsyncedExport(db: BikriDb, now = Date.now()) {
   const device = (await db.kv.get('device'))?.value as DeviceInfo | undefined;
@@ -151,6 +172,10 @@ export async function unsyncedExport(db: BikriDb, now = Date.now()) {
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   return {
     filename: `bikri-unsynced-${device?.code ?? 'X'}-${stamp}.json`,
+    snapshot: {
+      seq: ops.at(-1)?.seq ?? 0,
+      fingerprint: await outboxFingerprint(ops),
+    } satisfies UnsyncedSnapshot,
     data: {
       format: 'bikri-unsynced',
       version: 2,
@@ -164,8 +189,9 @@ export async function unsyncedExport(db: BikriDb, now = Date.now()) {
   };
 }
 
-async function outboxFingerprint(db: BikriDb): Promise<string> {
-  const ops = await db.outbox.orderBy('seq').toArray();
+async function outboxFingerprint(
+  ops: readonly { seq?: number; op_id: string; row?: unknown }[],
+): Promise<string> {
   const text = ops
     .map(
       ({ seq, op_id, row }) => `${seq ?? ''}:${op_id}:${JSON.stringify(row)}`,
@@ -178,19 +204,27 @@ async function outboxFingerprint(db: BikriDb): Promise<string> {
     .join('');
 }
 
+/** Marks the exact snapshot the user downloaded; returns false if the outbox moved. */
 export async function markUnsyncedExported(
   db: BikriDb,
+  snapshot: UnsyncedSnapshot,
   now = Date.now(),
-): Promise<void> {
-  const last = await db.outbox.orderBy('seq').last();
+): Promise<boolean> {
+  const ops = await db.outbox.orderBy('seq').toArray();
+  const current = {
+    seq: ops.at(-1)?.seq ?? 0,
+    fingerprint: await outboxFingerprint(ops),
+  };
+  if (
+    current.seq !== snapshot.seq ||
+    current.fingerprint !== snapshot.fingerprint
+  )
+    return false;
   await db.kv.put({
     key: 'unsynced_exported',
-    value: {
-      at: now,
-      seq: last?.seq ?? 0,
-      fingerprint: await outboxFingerprint(db),
-    },
+    value: { at: now, seq: current.seq, fingerprint: current.fingerprint },
   });
+  return true;
 }
 
 /** Leave this shop: blocked while ops are unsynced unless they were exported (screens/17 This device). */
@@ -205,13 +239,19 @@ export async function unexportedOps(db: BikriDb): Promise<number> {
   if ((last?.seq ?? 0) > exported.seq) return count;
   // A coalesced edit changes the last row without changing its sequence.
   if (exported.fingerprint !== undefined)
-    return (await outboxFingerprint(db)) === exported.fingerprint ? 0 : count;
+    return (await outboxFingerprint(
+      await db.outbox.orderBy('seq').toArray(),
+    )) === exported.fingerprint
+      ? 0
+      : count;
   return 0;
 }
 
 export async function leaveShop(db: BikriDb): Promise<void> {
   const count = await unexportedOps(db);
   if (count > 0) throw new UnsyncedOpsError(count);
+  const files = await pendingFileCount(db);
+  if (files > 0) throw new PendingFilesError(files);
   const id = db.tenantId;
   db.close();
   closeDb();

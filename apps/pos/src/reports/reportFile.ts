@@ -1,4 +1,5 @@
 import type { ReportBundle } from '../data/reportBundle.ts';
+import { canvasFont, prepareCanvasFonts } from '../lib/canvasFont.ts';
 import { formatShopMoney } from '../lib/money';
 import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
@@ -38,7 +39,8 @@ export type ReportFileMeta = {
 const WIDTH = 1240;
 const MARGIN = 60;
 
-function draw(meta: ReportFileMeta): HTMLCanvasElement {
+async function draw(meta: ReportFileMeta): Promise<HTMLCanvasElement> {
+  await prepareCanvasFonts(meta.lang);
   const { bundle, labels } = meta;
   const summary = bundle.summary;
   const days = summary.daily.length;
@@ -52,11 +54,11 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   ctx.fillStyle = CANVAS.paper;
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.fillStyle = CANVAS.ink;
-  ctx.font = 'bold 40px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 40);
   ctx.fillText(meta.shopName, MARGIN, 70);
-  ctx.font = 'bold 28px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 28);
   ctx.fillText(labels.title, MARGIN, 132);
-  ctx.font = '20px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 400, 20);
   ctx.fillStyle = CANVAS.muted;
   ctx.fillText(
     `${labels.range}: ${shortDate(meta.from, meta.lang)} – ${shortDate(meta.to, meta.lang)}`,
@@ -98,16 +100,16 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     ctx.fillStyle = CANVAS.surface2;
     ctx.fillRect(x, y, cardWidth, 72);
     ctx.fillStyle = CANVAS.muted;
-    ctx.font = '16px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 400, 16);
     ctx.fillText(label, x + 14, y + 26);
     ctx.fillStyle = CANVAS.ink;
-    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 700, 22);
     ctx.fillText(value, x + 14, y + 56);
   });
 
   const chartTop = 240 + Math.ceil(cards.length / 4) * 86 + 30;
   ctx.fillStyle = CANVAS.ink;
-  ctx.font = 'bold 22px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 22);
   ctx.fillText(
     meta.showProfit
       ? `${labels.chartSold} / ${labels.chartProfit}`
@@ -158,7 +160,7 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
   }
   if (summary.daily.length > 0) {
     ctx.fillStyle = CANVAS.muted;
-    ctx.font = '14px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 400, 14);
     const first = summary.daily[0];
     const last = summary.daily.at(-1);
     if (first)
@@ -179,9 +181,9 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
 
   const mixTop = chartY + chartHeight + 56;
   ctx.fillStyle = CANVAS.ink;
-  ctx.font = 'bold 22px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 22);
   ctx.fillText(labels.paymentMix, MARGIN, mixTop);
-  ctx.font = '18px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 400, 18);
   const methods = [
     [labels.methods.cash, summary.paymentMix.cash],
     [labels.methods.card, summary.paymentMix.card],
@@ -194,9 +196,9 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
     ctx.fillStyle = CANVAS.muted;
     ctx.fillText(label, x, y);
     ctx.fillStyle = CANVAS.ink;
-    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 700, 18);
     ctx.fillText(formatShopMoney(value), x, y + 26);
-    ctx.font = '18px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 400, 18);
   });
   ctx.fillStyle = CANVAS.muted;
   ctx.fillText(
@@ -208,11 +210,11 @@ function draw(meta: ReportFileMeta): HTMLCanvasElement {
 }
 
 export async function reportPng(meta: ReportFileMeta): Promise<Blob> {
-  return canvasBlob(draw(meta), 'image/png');
+  return canvasBlob(await draw(meta), 'image/png');
 }
 
 export async function reportPdf(meta: ReportFileMeta): Promise<Blob> {
-  const canvas = draw(meta);
+  const canvas = await draw(meta);
   const jpeg = new Uint8Array(
     await (await canvasBlob(canvas, 'image/jpeg', 0.92)).arrayBuffer(),
   );

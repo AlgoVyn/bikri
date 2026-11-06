@@ -100,6 +100,18 @@ const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {
   sales: new Set(['status']),
 };
 const DAY_MS = 86_400_000;
+/** The row and its outbox envelope are written in the same action; a large skew means a forged or broken clock. */
+export const MAX_ROW_OP_SKEW_MS = 10 * 60_000;
+
+type CostState = {
+  on_hand: number;
+  avg_cost: number;
+  last_cost: number;
+  /** When a costed movement last changed the cost (client action time). */
+  cost_changed_at: number;
+  /** The state includes a costed movement planned in this push. */
+  pushed: boolean;
+};
 
 type StaffRow = {
   id: string;
@@ -116,6 +128,7 @@ type StaffRow = {
 type ShopRules = {
   tax_rate_bp: number;
   tax_mode: 'exclusive' | 'inclusive';
+  cost_method: 'avg' | 'last';
   round_total_to: number;
   default_credit_limit: number | null;
   timezone: string;
@@ -147,7 +160,7 @@ type Lookups = {
   current: Map<string, Current>;
   /** Ledger rows already stored (append-only tables have no rev column). */
   existingLedger: Set<string>;
-  onHand: Map<string, { on_hand: number; avg_cost: number }>;
+  onHand: Map<string, CostState>;
   /** Sales that pushed voids and refunds refer to (D-044 same-day voids, 04 §5 refund split). */
   sales: Map<string, SaleInfo>;
   /** Sales created by this push, not in D1 yet. */
@@ -184,10 +197,17 @@ type Lookups = {
   /** Parties referenced by payments/ledger rows, for polymorphic party checks. */
   customers: Set<string>;
   suppliers: Set<string>;
+  /** Party id → deleted_at (null = live), for "new business needs a live party" checks. */
+  partyDeleted: Map<string, number | null>;
   /** Original expenses referenced by a reversal row in this push. */
   expenses: Map<
     string,
-    { amount: number; method: string; reverses_id: string | null }
+    {
+      amount: number;
+      method: string;
+      reverses_id: string | null;
+      business_date: string;
+    }
   >;
   /** Expense ids that already have a stored reversal. */
   existingReversals: Set<string>;
@@ -197,10 +217,16 @@ type Lookups = {
   shop: ShopRules | null;
   /** Stored ledger balance for a party being checked or deleted. */
   partyBalances: Map<string, number>;
-  /** Current product price/tracking, for sale price-override policy. */
+  /** Current product price/cost/tracking, for sale price and cost checks. */
   products: Map<
     string,
-    { price: number; track_stock: number; updated_at: number }
+    {
+      price: number;
+      avg_cost: number;
+      last_cost: number;
+      track_stock: number;
+      updated_at: number;
+    }
   >;
   /** The latest stored close of each device, for period chaining. */
   lastClose: Map<
@@ -586,6 +612,15 @@ function effectiveStaff(
           : Number(op.row.deleted_at),
     };
   }
+  // A soft-deleted row cannot be resurrected by an upsert (D-104 / 03 §5). This is
+  // also what planOp writes, so the owner-count check must model it too.
+  if (current.deleted_at !== null) {
+    return {
+      role: current.role,
+      active: current.active,
+      deleted_at: current.deleted_at,
+    };
+  }
   const changed = op.changed_fields ?? [];
   const merge = current.rev !== (op.base_rev ?? 0);
   const pick = (field: 'role' | 'active' | 'deleted_at') => {
@@ -676,6 +711,38 @@ function partyExists(
       )
     );
   return false;
+}
+
+/** A party may be used by a new row only if it was not already deleted at that time. */
+function partyUsableAt(
+  look: Lookups,
+  group: PushOp[],
+  type: 'customer' | 'supplier',
+  id: unknown,
+  at: unknown,
+): boolean {
+  // Unknown and another tenant's ids are indistinguishable (no existence oracle) and
+  // keep the FOREIGN_KEY answer the foreign key used to give them. A soft-deleted
+  // party is a constraint failure, not a missing row.
+  if (!partyExists(look, group, type, id)) throw new Reject('FOREIGN_KEY');
+  if (typeof id !== 'string') return false;
+  const deleted = look.partyDeleted.get(key(type, id));
+  if (deleted !== undefined)
+    return deleted === null || (typeof at === 'number' && at <= deleted);
+  const table = type === 'customer' ? 'customers' : 'suppliers';
+  const op = group.find(
+    (candidate) =>
+      candidate.tbl === table &&
+      candidate.kind !== 'delete' &&
+      candidate.row?.id === id,
+  );
+  if (!op) return false;
+  const rowDeleted = op.row?.deleted_at;
+  return (
+    rowDeleted === null ||
+    rowDeleted === undefined ||
+    (typeof at === 'number' && at <= Number(rowDeleted))
+  );
 }
 
 function saleOf(
@@ -906,6 +973,8 @@ function checkSupplierReturn(
   row: Record<string, unknown>,
 ): void {
   const id = String(row.id);
+  if (!partyUsableAt(look, group, 'supplier', row.supplier_id, row.created_at))
+    throw new Reject('CONSTRAINT_FAILED');
   const lines = linkedInGroup(group, 'supplier_return_lines', 'return_id', id);
   if (lines.length !== Number(row.line_count))
     throw new Reject('CONSTRAINT_FAILED');
@@ -1071,7 +1140,15 @@ function checkLedgerEntry(
   };
   if (source === 'adjustment') {
     if (staff.role === 'cashier') throw new Reject('FORBIDDEN');
-    if (!partyExists(look, group, row.party_type, row.party_id))
+    if (
+      !partyUsableAt(
+        look,
+        group,
+        row.party_type as 'customer' | 'supplier',
+        row.party_id,
+        row.created_at,
+      )
+    )
       throw new Reject('CONSTRAINT_FAILED');
     return;
   }
@@ -1083,7 +1160,13 @@ function checkLedgerEntry(
       row.party_type === 'customer' ? 'customers' : 'suppliers';
     if (
       !partyInGroup(group, partyTable, String(row.party_id)) ||
-      !partyExists(look, group, row.party_type, row.party_id) ||
+      !partyUsableAt(
+        look,
+        group,
+        row.party_type,
+        row.party_id,
+        row.created_at,
+      ) ||
       // An opening balance belongs to a new party, not an existing one.
       look.current.has(key(partyTable, String(row.party_id)))
     )
@@ -1292,14 +1375,31 @@ function checkStockMovement(
   if (reason === 'purchase' && typeof row.ref_id === 'string') {
     const ref = row.ref_id;
     const productId = String(row.product_id);
-    const received = linkedInGroup(group, 'purchase_lines', 'purchase_id', ref)
-      .filter((line) => line.product_id === productId)
-      .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
+    const purchaseLines = linkedInGroup(
+      group,
+      'purchase_lines',
+      'purchase_id',
+      ref,
+    ).filter((line) => line.product_id === productId);
+    const received = purchaseLines.reduce(
+      (sum, line) => sum + Number(line.qty_milli ?? 0),
+      0,
+    );
     const moved = movementsFor(ref, productId).reduce(
       (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
       0,
     );
-    if (qty <= 0 || received <= 0 || moved > received)
+    // The server recomputes avg cost from this unit_cost; it must be one of the
+    // delivery line landed costs, not an arbitrary cheaper number.
+    const landedCosts = new Set(
+      purchaseLines.map((line) => Number(line.landed_unit_cost)),
+    );
+    if (
+      qty <= 0 ||
+      received <= 0 ||
+      moved > received ||
+      !landedCosts.has(Number(row.unit_cost))
+    )
       throw new Reject('CONSTRAINT_FAILED');
   }
   if (reason === 'supplier_return' && typeof row.ref_id === 'string') {
@@ -1320,6 +1420,50 @@ function checkStockMovement(
     if (qty >= 0 || returned <= 0 || moved > returned)
       throw new Reject('CONSTRAINT_FAILED');
   }
+  if (reason === 'refund_return' && typeof row.ref_id === 'string') {
+    const ref = row.ref_id;
+    const productId = String(row.product_id);
+    const refundLines = linkedInGroup(group, 'refund_lines', 'refund_id', ref);
+    let restocked = 0;
+    for (const line of refundLines) {
+      if (Number(line.restock ?? 1) !== 1) continue;
+      const saleLineId = String(line.sale_line_id ?? '');
+      const pushed = group.find(
+        (candidate) =>
+          candidate.tbl === 'sale_lines' &&
+          candidate.kind === 'insert' &&
+          candidate.row?.id === saleLineId,
+      )?.row;
+      const stored = look.saleLineById.get(saleLineId);
+      if ((pushed?.product_id ?? stored?.product_id) !== productId) continue;
+      restocked += Number(line.qty_milli ?? 0);
+    }
+    const moved = movementsFor(ref, productId).reduce(
+      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      0,
+    );
+    if (qty <= 0 || restocked <= 0 || moved > restocked)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (reason === 'void_return' && typeof row.ref_id === 'string') {
+    const ref = row.ref_id;
+    const productId = String(row.product_id);
+    const voidRow = sourceInGroup(group, 'sale_voids', ref);
+    const saleId = typeof voidRow?.sale_id === 'string' ? voidRow.sale_id : '';
+    const saleLines = [
+      ...(look.saleLinesBySale.get(saleId) ?? []),
+      ...linkedInGroup(group, 'sale_lines', 'sale_id', saleId),
+    ];
+    const sold = saleLines
+      .filter((line) => line.product_id === productId)
+      .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
+    const moved = movementsFor(ref, productId).reduce(
+      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      0,
+    );
+    if (qty <= 0 || sold <= 0 || moved > sold)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
 }
 
 /** Deliveries are reconciled with their lines, charges and paid-now payment (07 §7). */
@@ -1329,6 +1473,8 @@ function checkPurchase(
   row: Record<string, unknown>,
 ): void {
   const id = String(row.id);
+  if (!partyUsableAt(look, group, 'supplier', row.supplier_id, row.created_at))
+    throw new Reject('CONSTRAINT_FAILED');
   const lines = linkedInGroup(group, 'purchase_lines', 'purchase_id', id);
   if (lines.length === 0 || lines.length !== Number(row.line_count))
     throw new Reject('CONSTRAINT_FAILED');
@@ -1388,7 +1534,11 @@ function checkPurchase(
     throw new Reject('CONSTRAINT_FAILED');
 }
 /** Sales are reconciled with their lines, payments and udhaar ledger row (07 §2). */
-function checkSaleInsert(group: PushOp[], row: Record<string, unknown>): void {
+function checkSaleInsert(
+  look: Lookups,
+  group: PushOp[],
+  row: Record<string, unknown>,
+): void {
   const n = (value: unknown) => Number(value ?? 0);
   const lines = linkedInGroup(group, 'sale_lines', 'sale_id', String(row.id));
   if (lines.length === 0) throw new Reject('CONSTRAINT_FAILED');
@@ -1422,6 +1572,12 @@ function checkSaleInsert(group: PushOp[], row: Record<string, unknown>): void {
     if (n(row[field]) < 0) throw new Reject('CONSTRAINT_FAILED');
   }
   if (n(row.tax_rate_bp) < 0) throw new Reject('CONSTRAINT_FAILED');
+  if (
+    row.customer_id !== null &&
+    row.customer_id !== undefined &&
+    !partyUsableAt(look, group, 'customer', row.customer_id, row.created_at)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
 
   const payments = group.filter(
     (candidate) =>
@@ -1493,6 +1649,9 @@ function checkSalePolicy(
   row: Record<string, unknown>,
   staff: StaffRow | null,
   allowed: (permission: Permission) => boolean,
+  entryAt: number,
+  costs: Map<string, CostState>,
+  deviceSeenAt: number,
 ): void {
   const n = (value: unknown) => Number(value ?? 0);
   if (!allowed('sale.create')) throw new Reject('FORBIDDEN');
@@ -1504,12 +1663,12 @@ function checkSalePolicy(
       Number(b.line_no) - Number(a.line_no) ||
       String(b.id).localeCompare(String(a.id)),
   );
-  const createdAt = n(row.created_at);
   const taxRate = n(row.tax_rate_bp);
   const inclusive = Number(row.tax_inclusive) === 1;
   // A shop setting only governs sales made after it changed; an offline sale keeps the
-  // snapshot it was rung with.
-  const fresh = look.shop !== null && createdAt >= look.shop.updated_at;
+  // snapshot it was rung with. The envelope time, not the client-authored row time, is
+  // the authority for "when it was rung".
+  const fresh = look.shop !== null && entryAt >= look.shop.updated_at;
   if (fresh && look.shop && taxRate !== look.shop.tax_rate_bp)
     throw new Reject('CONSTRAINT_FAILED');
   if (fresh && look.shop && inclusive !== (look.shop.tax_mode === 'inclusive'))
@@ -1617,18 +1776,50 @@ function checkSalePolicy(
     const unitCost = n(line.unit_cost_snapshot);
     if (!Number.isSafeInteger(unitCost) || unitCost < 0)
       throw new Reject('CONSTRAINT_FAILED');
+    const lineCreatedAt = n(line.created_at);
+    if (Math.abs(lineCreatedAt - entryAt) > MAX_ROW_OP_SKEW_MS)
+      throw new Reject('CONSTRAINT_FAILED');
     const product =
       typeof line.product_id === 'string'
         ? look.products.get(line.product_id)
         : undefined;
-    if (
-      product &&
-      n(line.created_at) >= product.updated_at &&
-      unitPrice < product.price &&
-      !allowed('catalog.edit') &&
-      !overrideForLine(look, group, 'sales', saleId, String(line.id), unitPrice)
-    )
-      throw new Reject('FORBIDDEN');
+    const costState =
+      typeof line.product_id === 'string'
+        ? costs.get(line.product_id)
+        : undefined;
+    const costChangedAt = costState?.cost_changed_at ?? 0;
+    // A cost change after this sale, or one this device could not have pulled yet, makes
+    // the snapshot the authoritative historical value. Same-push costed movements are
+    // deterministic from the pushed rows, so they are always checked.
+    const costKnown =
+      costState?.pushed === true ||
+      costChangedAt === 0 ||
+      (entryAt >= costChangedAt && costChangedAt <= deviceSeenAt);
+    const shopKnown =
+      !look.shop ||
+      (entryAt >= look.shop.updated_at && look.shop.updated_at <= deviceSeenAt);
+    if ((product || costState) && costKnown && shopKnown) {
+      const expectedCost =
+        (look.shop?.cost_method ?? 'avg') === 'last'
+          ? (costState?.last_cost ?? product?.last_cost ?? 0)
+          : (costState?.avg_cost ?? product?.avg_cost ?? 0);
+      if (unitCost !== expectedCost) throw new Reject('CONSTRAINT_FAILED');
+    }
+    if (product && entryAt >= product.updated_at) {
+      if (
+        unitPrice < product.price &&
+        !allowed('catalog.edit') &&
+        !overrideForLine(
+          look,
+          group,
+          'sales',
+          saleId,
+          String(line.id),
+          unitPrice,
+        )
+      )
+        throw new Reject('FORBIDDEN');
+    }
     const revenue = n(line.net) - lineBill - (inclusive ? lineTax : 0);
     const below = isBelowCost(revenue, qty, unitCost);
     if (n(line.below_cost) !== (below ? 1 : 0))
@@ -1659,7 +1850,7 @@ function checkSalePolicy(
         : mulDivRound(discount, 10_000, n(row.gross_total));
     const maxBp = staff?.max_discount_bp ?? 0;
     // The limit governs the sale when it was rung, not a later staff edit.
-    const limitFresh = !staff || createdAt >= staff.updated_at;
+    const limitFresh = !staff || entryAt >= staff.updated_at;
     if (
       limitFresh &&
       share > maxBp &&
@@ -1683,10 +1874,13 @@ function checkBackdatedSale(
   group: PushOp[],
   row: Record<string, unknown>,
   opCreatedAt: number,
+  now: number,
 ): void {
   const tz = look.shop?.timezone || 'Asia/Karachi';
   const opDate = businessDate(opCreatedAt, tz);
   const business = String(row.business_date ?? '');
+  // The server's current business date is the only trustworthy upper bound.
+  if (business > businessDate(now, tz)) throw new Reject('CONSTRAINT_FAILED');
   if (business === opDate) return;
   if (business > opDate) throw new Reject('CONSTRAINT_FAILED');
   const audit = group.find(
@@ -1734,6 +1928,7 @@ function checkOp(
   look: Lookups,
   group: PushOp[],
   op: PushOp,
+  costs: Map<string, CostState>,
 ): void {
   if (!isMasterTable(op.tbl) && !isLedgerTable(op.tbl))
     throw new Reject('UNKNOWN_TABLE');
@@ -1814,8 +2009,15 @@ function checkOp(
       op.created_at < ctx.tenant.created_at - DAY_MS)
   )
     throw new Reject('CONSTRAINT_FAILED');
-
   if (op.kind === 'insert') {
+    const rowCreatedAt =
+      typeof row.created_at === 'number' ? row.created_at : null;
+    if (
+      typeof op.created_at === 'number' &&
+      rowCreatedAt !== null &&
+      Math.abs(rowCreatedAt - op.created_at) > MAX_ROW_OP_SKEW_MS
+    )
+      throw new Reject('CONSTRAINT_FAILED');
     const cols = new Set(columnsOf(op.tbl as D1Table));
     if (cols.has('device_id') && row.device_id !== ctx.device.id)
       throw new Reject('FORBIDDEN');
@@ -1861,19 +2063,28 @@ function checkOp(
             Number(row.tax_rate_bp) > 5_000)
         )
           throw new Reject('CONSTRAINT_FAILED');
-        checkSaleInsert(group, row);
+        checkSaleInsert(look, group, row);
+        // Older clients and imported files may omit the envelope timestamp. The sale's
+        // own created_at is the entry time; never let a missing op.created_at skip the
+        // backdate audit check.
+        const entryAt =
+          typeof op.created_at === 'number'
+            ? op.created_at
+            : Number(row.created_at);
+        if (!Number.isSafeInteger(entryAt))
+          throw new Reject('CONSTRAINT_FAILED');
         try {
-          checkSalePolicy(look, group, row, staff, allowed);
-          // Older clients and imported files may omit the envelope timestamp. The sale's
-          // own created_at is the entry time; never let a missing op.created_at skip the
-          // backdate audit check.
-          const entryAt =
-            typeof op.created_at === 'number'
-              ? op.created_at
-              : Number(row.created_at);
-          if (!Number.isSafeInteger(entryAt))
-            throw new Reject('CONSTRAINT_FAILED');
-          checkBackdatedSale(look, group, row, entryAt);
+          checkSalePolicy(
+            look,
+            group,
+            row,
+            staff,
+            allowed,
+            entryAt,
+            costs,
+            Number(ctx.device.last_seen_at ?? 0),
+          );
+          checkBackdatedSale(look, group, row, entryAt, ctx.now);
         } catch (error) {
           // Money helpers throw RangeError on malformed arithmetic; that is a bad row,
           // not an internal failure, so the op is rejected instead of retried forever.
@@ -2006,9 +2217,23 @@ function checkOp(
             throw new Reject('CONSTRAINT_FAILED');
           if (
             Number(row.amount) !== Number(original.amount) ||
-            row.method !== original.method
+            row.method !== original.method ||
+            row.business_date !==
+              String(
+                (original as { business_date?: unknown }).business_date ?? '',
+              )
           )
             throw new Reject('CONSTRAINT_FAILED');
+          // A cashier may reverse only a same-day expense (D-117); the client enforces
+          // this, but the server must not trust that.
+          if (
+            staff?.role === 'cashier' &&
+            !over &&
+            String(
+              (original as { business_date?: unknown }).business_date ?? '',
+            ) !== businessDate(ctx.now, look.shop?.timezone || 'Asia/Karachi')
+          )
+            throw new Reject('FORBIDDEN');
           const duplicate =
             look.existingReversals.has(originalId) ||
             group.some(
@@ -2097,7 +2322,13 @@ function checkOp(
         if (
           row.party_type !== null &&
           row.party_type !== undefined &&
-          !partyExists(look, group, row.party_type, row.party_id)
+          !partyUsableAt(
+            look,
+            group,
+            row.party_type as 'customer' | 'supplier',
+            row.party_id,
+            row.created_at,
+          )
         )
           throw new Reject('CONSTRAINT_FAILED');
         const ok =
@@ -2322,6 +2553,14 @@ function checkOp(
     const cur = look.current.get(key('shop', 'shop'));
     if ((op.base_rev ?? 0) === 0 && cur?.setup_completed_at)
       throw new Reject('SETUP_ALREADY_DONE');
+    // Completion is a one-way flag. Replaying or editing the shop row must not reopen
+    // the setup wizard or reset the timestamp.
+    if (
+      cur?.setup_completed_at &&
+      row.setup_completed_at !== undefined &&
+      Number(row.setup_completed_at) !== Number(cur.setup_completed_at)
+    )
+      throw new Reject('CONSTRAINT_FAILED');
   }
   if (
     op.tbl === 'products' ||
@@ -2339,7 +2578,7 @@ function checkOp(
     // authority for this consequence.
     const costSource =
       op.tbl === 'products' &&
-      changes.length > 0 &&
+      look.current.has(key('products', row.id)) &&
       changes.every((field) => field === 'last_cost') &&
       group.some(
         (candidate) =>
@@ -2425,11 +2664,11 @@ function planOp(
   look: Lookups,
   group: PushOp[],
   op: PushOp,
-  avg: Map<string, { on_hand: number; avg_cost: number }>,
+  avg: Map<string, CostState>,
 ): Planned {
   const { db, now } = ctx;
   const deviceId = ctx.device.id;
-  checkOp(ctx, look, group, op);
+  checkOp(ctx, look, group, op, avg);
   const tbl = op.tbl as D1Table;
 
   if (op.kind === 'delete') {
@@ -2569,14 +2808,13 @@ function planOp(
     };
   }
   const merge = cur.rev !== (op.base_rev ?? 0);
-  let set = merge
-    ? cols.filter(
-        (c) =>
-          (op.changed_fields ?? []).includes(c) ||
-          c === 'updated_at' ||
-          c === 'updated_by',
-      )
-    : cols;
+  const changed = new Set(op.changed_fields ?? []);
+  // The op's changed_fields is the authorisation and write list. The row payload is a
+  // full local row, so writing every supplied column here would let a permitted
+  // last_cost update smuggle in a price/track_stock change (see costSource).
+  let set = cols.filter(
+    (c) => changed.has(c) || c === 'updated_at' || c === 'updated_by',
+  );
   // A delete always wins over a concurrent edit (03 §5).
   if (cur.deleted_at !== null) set = set.filter((c) => c !== 'deleted_at');
   const assignments = [
@@ -2646,7 +2884,7 @@ function sideEffects(
   ctx: ApplyContext,
   tbl: D1Table,
   row: Record<string, unknown>,
-  avg: Map<string, { on_hand: number; avg_cost: number }>,
+  avg: Map<string, CostState>,
 ): D1PreparedStatement[] {
   const { db, now } = ctx;
   const out: D1PreparedStatement[] = [];
@@ -2779,6 +3017,9 @@ function sideEffects(
         } catch {
           throw new Reject('CONSTRAINT_FAILED');
         }
+        state.last_cost = Number(row.unit_cost);
+        state.cost_changed_at = Number(row.created_at ?? now);
+        state.pushed = true;
         out.push(
           db.prepare(
             'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
@@ -2965,7 +3206,7 @@ function stockRepairStatements(
   group: PushOp[],
   tbl: string,
   row: Record<string, unknown>,
-  avg: Map<string, { on_hand: number; avg_cost: number }>,
+  avg: Map<string, CostState>,
 ): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];
   const number = (value: unknown): number => Number(value ?? 0);
@@ -3123,12 +3364,20 @@ function stockRepairStatements(
     const lines = linkedInGroup(group, 'refund_lines', 'refund_id', id);
     const byProduct = new Map<string, number>();
     for (const line of lines) {
-      if (line.restock !== 1) continue;
-      const saleLine = look.saleLineById.get(String(line.sale_line_id));
-      if (!saleLine?.product_id) continue;
+      if (Number(line.restock ?? 1) !== 1) continue;
+      const saleLineId = String(line.sale_line_id);
+      const pushed = group.find(
+        (candidate) =>
+          candidate.tbl === 'sale_lines' &&
+          candidate.kind === 'insert' &&
+          candidate.row?.id === saleLineId,
+      )?.row;
+      const productId =
+        pushed?.product_id ?? look.saleLineById.get(saleLineId)?.product_id;
+      if (typeof productId !== 'string') continue;
       byProduct.set(
-        saleLine.product_id,
-        (byProduct.get(saleLine.product_id) ?? 0) + number(line.qty_milli),
+        productId,
+        (byProduct.get(productId) ?? 0) + number(line.qty_milli),
       );
     }
     for (const [productId, qty] of byProduct) {
@@ -3143,7 +3392,9 @@ function stockRepairStatements(
         (sum, movement) => sum + number(movement.row?.qty_delta_milli),
         0,
       );
-      const missing = qty - moved;
+      // An over-refund is accepted as a conflict, but it must never restock more
+      // units than the sale actually removed.
+      const missing = Math.min(qty - moved, sold - moved);
       if (missing > 0)
         addMovement(productId, missing, 'refund_return', 'refund', id, null);
     }
@@ -3151,7 +3402,20 @@ function stockRepairStatements(
 
   if (tbl === 'sale_voids') {
     const saleId = String(row.sale_id);
-    for (const line of look.saleLinesBySale.get(saleId) ?? []) {
+    const seen = new Set<string>();
+    const lines: { id: string; product_id: string | null }[] = [
+      ...(look.saleLinesBySale.get(saleId) ?? []),
+      ...(linkedInGroup(group, 'sale_lines', 'sale_id', saleId) as {
+        id: string;
+        product_id: string | null;
+      }[]),
+    ].filter((line) => {
+      const id = String(line.id);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    for (const line of lines) {
       if (!line.product_id) continue;
       const sold =
         (look.saleMoved.get(saleId)?.get(line.product_id) ?? 0) +
@@ -3248,12 +3512,23 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       typeof op.row?.sale_id === 'string'
     )
       saleIds.add(op.row.sale_id);
+    if (op.tbl === 'sales' && typeof op.row?.customer_id === 'string')
+      partyIds.customer.add(op.row.customer_id);
+    if (op.tbl === 'purchases' && typeof op.row?.supplier_id === 'string')
+      partyIds.supplier.add(op.row.supplier_id);
+    if (
+      op.tbl === 'supplier_returns' &&
+      typeof op.row?.supplier_id === 'string'
+    )
+      partyIds.supplier.add(op.row.supplier_id);
     if (op.tbl === 'refunds' && typeof op.row?.id === 'string')
       refundIds.add(op.row.id);
     if (op.tbl === 'refund_lines' && typeof op.row?.sale_line_id === 'string')
       refundLineIds.add(op.row.sale_line_id);
-    if (op.tbl === 'sale_lines' && typeof op.row?.product_id === 'string')
+    if (op.tbl === 'sale_lines' && typeof op.row?.product_id === 'string') {
       saleProductIds.add(op.row.product_id);
+      products.add(op.row.product_id);
+    }
     if (
       (op.tbl === 'purchase_lines' || op.tbl === 'supplier_return_lines') &&
       typeof op.row?.product_id === 'string'
@@ -3446,7 +3721,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     const params = chunk.map((_, j) => `?${j + 2}`).join(', ');
     stmts.push(
       db.prepare(
-        `SELECT p.id AS id, p.avg_cost AS avg_cost, COALESCE((SELECT SUM(m.qty_delta_milli) FROM stock_movements m WHERE m.tenant_id = ?1 AND m.product_id = p.id), 0) AS on_hand FROM products p WHERE p.tenant_id = ?1 AND p.id IN (${params})`,
+        `SELECT p.id AS id, p.avg_cost AS avg_cost, p.last_cost AS last_cost,
+          COALESCE((SELECT SUM(m.qty_delta_milli) FROM stock_movements m WHERE m.tenant_id = ?1 AND m.product_id = p.id), 0) AS on_hand,
+          COALESCE((SELECT MAX(m.created_at) FROM stock_movements m WHERE m.tenant_id = ?1 AND m.product_id = p.id AND m.qty_delta_milli > 0 AND m.unit_cost IS NOT NULL), 0) AS cost_changed_at
+         FROM products p WHERE p.tenant_id = ?1 AND p.id IN (${params})`,
         ...chunk,
       ),
     );
@@ -3541,7 +3819,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   chunked(
     expenseIds,
     (p) =>
-      `SELECT id, amount, method, reverses_id FROM expenses WHERE tenant_id = ?1 AND id IN (${p})`,
+      `SELECT id, amount, method, reverses_id, business_date FROM expenses WHERE tenant_id = ?1 AND id IN (${p})`,
     { expenses: true },
   );
   chunked(
@@ -3552,12 +3830,14 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   );
   chunked(
     partyIds.customer,
-    (p) => `SELECT id FROM customers WHERE tenant_id = ?1 AND id IN (${p})`,
+    (p) =>
+      `SELECT id, deleted_at FROM customers WHERE tenant_id = ?1 AND id IN (${p})`,
     { customers: true },
   );
   chunked(
     partyIds.supplier,
-    (p) => `SELECT id FROM suppliers WHERE tenant_id = ?1 AND id IN (${p})`,
+    (p) =>
+      `SELECT id, deleted_at FROM suppliers WHERE tenant_id = ?1 AND id IN (${p})`,
     { suppliers: true },
   );
   for (const type of ['customer', 'supplier'] as const) {
@@ -3571,7 +3851,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   chunked(
     saleProductIds,
     (p) =>
-      `SELECT id, price, track_stock, updated_at FROM products WHERE tenant_id = ?1 AND id IN (${p})`,
+      `SELECT id, price, avg_cost, last_cost, track_stock, updated_at FROM products WHERE tenant_id = ?1 AND id IN (${p})`,
     { saleProducts: true },
   );
   chunked(
@@ -3641,6 +3921,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     saleMoved: new Map(),
     customers: new Set(),
     suppliers: new Set(),
+    partyDeleted: new Map(),
     staff: new Map(),
     branches: new Map(),
     current: new Map(),
@@ -3681,6 +3962,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           amount: Number(r.amount),
           method: String(r.method),
           reverses_id: typeof r.reverses_id === 'string' ? r.reverses_id : null,
+          business_date: String(r.business_date ?? ''),
         });
         continue;
       }
@@ -3749,8 +4031,20 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         look.saleMoved.set(saleId, moved);
       } else if ('customers' in k) {
         look.customers.add(String(r.id));
+        look.partyDeleted.set(
+          key('customer', String(r.id)),
+          r.deleted_at === null || r.deleted_at === undefined
+            ? null
+            : Number(r.deleted_at),
+        );
       } else if ('suppliers' in k) {
         look.suppliers.add(String(r.id));
+        look.partyDeleted.set(
+          key('supplier', String(r.id)),
+          r.deleted_at === null || r.deleted_at === undefined
+            ? null
+            : Number(r.deleted_at),
+        );
       } else if ('partyBalance' in k) {
         look.partyBalances.set(
           key(k.partyBalance, String(r.id)),
@@ -3759,6 +4053,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       } else if ('saleProducts' in k) {
         look.products.set(String(r.id), {
           price: Number(r.price ?? 0),
+          avg_cost: Number(r.avg_cost ?? 0),
+          last_cost: Number(r.last_cost ?? 0),
           track_stock: Number(r.track_stock ?? 0),
           updated_at: Number(r.updated_at ?? 0),
         });
@@ -3799,6 +4095,9 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
         look.onHand.set(String(r.id), {
           on_hand: Number(r.on_hand),
           avg_cost: Number(r.avg_cost),
+          last_cost: Number(r.last_cost ?? 0),
+          cost_changed_at: Number(r.cost_changed_at ?? 0),
+          pushed: false,
         });
       }
     }
@@ -3810,8 +4109,28 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     if (op.kind === 'delete' || typeof op.row?.id !== 'string') continue;
     if (op.kind === 'upsert' && (op.base_rev ?? 0) === 0)
       look.pushedCreates.add(key(op.tbl, op.row.id));
-    if (op.tbl === 'customers') look.customers.add(op.row.id);
-    if (op.tbl === 'suppliers') look.suppliers.add(op.row.id);
+    if (op.tbl === 'customers') {
+      look.customers.add(op.row.id);
+      const partyKey = key('customer', op.row.id);
+      if (!look.partyDeleted.has(partyKey))
+        look.partyDeleted.set(
+          partyKey,
+          op.row.deleted_at === null || op.row.deleted_at === undefined
+            ? null
+            : Number(op.row.deleted_at),
+        );
+    }
+    if (op.tbl === 'suppliers') {
+      look.suppliers.add(op.row.id);
+      const partyKey = key('supplier', op.row.id);
+      if (!look.partyDeleted.has(partyKey))
+        look.partyDeleted.set(
+          partyKey,
+          op.row.deleted_at === null || op.row.deleted_at === undefined
+            ? null
+            : Number(op.row.deleted_at),
+        );
+    }
     if (op.tbl === 'branches' && !look.branches.has(op.row.id))
       look.branches.set(op.row.id, {
         bill_prefix: String(op.row.bill_prefix ?? ''),
@@ -3868,6 +4187,30 @@ function groupByTx(ops: PushOp[]): PushOp[][] {
   return groups;
 }
 
+/** Apply the product rows of a successfully planned transaction to the next group in order. */
+function applyProductChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (
+      op.tbl !== 'products' ||
+      op.kind === 'delete' ||
+      typeof op.row?.id !== 'string'
+    )
+      continue;
+    const previous = look.products.get(op.row.id);
+    look.products.set(op.row.id, {
+      price: Number(op.row.price ?? previous?.price ?? 0),
+      avg_cost: previous?.avg_cost ?? 0,
+      last_cost: Number(op.row.last_cost ?? previous?.last_cost ?? 0),
+      // Keep the persisted tracking mode for an existing row: a tracking change in a
+      // later transaction must not make an earlier sale look tracked.
+      track_stock: previous?.track_stock ?? Number(op.row.track_stock ?? 0),
+      updated_at: Number(
+        op.row.updated_at ?? previous?.updated_at ?? op.row.created_at ?? 0,
+      ),
+    });
+  }
+}
+
 /**
  * Applies a list of ops for one device (03 §4.1 steps 3–7). Returns results in op order for the
  * processed ops; ops not processed (call budget, lost guard twice) are omitted.
@@ -3903,7 +4246,7 @@ export async function applyOps(
   for (let round = 0; round < 2 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     const look = await loadLookups(ctx, pending.flat());
-    const avg = new Map<string, { on_hand: number; avg_cost: number }>();
+    const avg = new Map<string, CostState>();
     for (const [id, v] of look.onHand) avg.set(id, { ...v });
     // Products created by this push are not in D1 yet, but their opening/purchase movements
     // are planned after them; seed a zero state so the server can compute avg_cost (07 §7).
@@ -3919,6 +4262,21 @@ export async function applyOps(
         on_hand: 0,
         // avg_cost is server-managed; never trust a client value.
         avg_cost: 0,
+        last_cost: Number(op.row.last_cost ?? 0),
+        cost_changed_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
+        pushed: true,
+      });
+    }
+
+    // A product with no stock movement yet still has a catalogue cost snapshot.
+    for (const [id, product] of look.products) {
+      if (avg.has(id)) continue;
+      avg.set(id, {
+        on_hand: 0,
+        avg_cost: product.avg_cost,
+        last_cost: product.last_cost,
+        cost_changed_at: 0,
+        pushed: false,
       });
     }
 
@@ -3946,6 +4304,7 @@ export async function applyOps(
         if (existing > 0 && existing < planned.length)
           throw new Reject('CONSTRAINT_FAILED');
         groups.push({ txId: ops[0]?.tx_id ?? '', planned });
+        applyProductChanges(look, ops);
         for (const [id, value] of groupAvg) avg.set(id, value);
       } catch (error) {
         if (!(error instanceof Reject)) throw error;

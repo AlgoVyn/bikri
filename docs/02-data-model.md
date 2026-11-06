@@ -933,6 +933,50 @@ CREATE INDEX operator_audit_time ON operator_audit (created_at);
 CREATE INDEX shop_requests_token ON shop_requests (status_token_hash);
 ```
 
+
+### 2.7 Expense reversal uniqueness (migration `0008_review_hardening.sql`)
+
+```sql
+-- One reversal row per expense. The client checks this optimistically, but two tills
+-- (or two transactions in one push) must not be able to reverse the same expense twice.
+-- A trigger (not a UNIQUE index) keeps the fix deployable when an older database already
+-- contains duplicate reversals, which append-only rules forbid deleting.
+CREATE TRIGGER expenses_one_reversal
+BEFORE INSERT ON expenses
+WHEN NEW.reverses_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM expenses e
+    WHERE e.tenant_id = NEW.tenant_id AND e.reverses_id = NEW.reverses_id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'expense already reversed');
+END;
+```
+
+### 2.8 Refund udhaar guard (migration `0009_refund_udhaar_guard.sql`)
+
+```sql
+-- A refund's udhaar part can never exceed the sale's udhaar, even when two tills push
+-- two refunds at the same moment. The Worker checks the same rule, but only SQLite can
+-- make the check and the insert one atomic step. AFTER (not BEFORE) keeps the table's
+-- own CHECK/UNIQUE errors as the first answer for malformed rows.
+CREATE TRIGGER refunds_udhaar_guard
+AFTER INSERT ON refunds
+WHEN NEW.udhaar_part > 0
+  AND COALESCE(
+    (SELECT SUM(r.udhaar_part) FROM refunds r
+      WHERE r.tenant_id = NEW.tenant_id AND r.sale_id = NEW.sale_id),
+    0
+  ) > COALESCE(
+    (SELECT s.udhaar_amount FROM sales s
+      WHERE s.tenant_id = NEW.tenant_id AND s.id = NEW.sale_id),
+    0
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'refund udhaar exceeds sale udhaar');
+END;
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

@@ -1,5 +1,5 @@
 import type { BikriDb } from '@bikri/db';
-import type { DayCloseReceipt } from '@bikri/printer';
+import { type DayCloseReceipt, urduDayCloseLabels } from '@bikri/printer';
 import { dayCloseInfo } from './dayClose.ts';
 import { receiptShop } from './receipt.ts';
 
@@ -10,7 +10,7 @@ export async function loadDayCloseReceipt(
 ): Promise<DayCloseReceipt | null> {
   const row = await db.day_closes.get(dayCloseId);
   if (!row) return null;
-  const { shop } = await receiptShop(db);
+  const { shop, receiptLanguage } = await receiptShop(db);
   const staff = row.staff_id
     ? await db.staff.get(String(row.staff_id))
     : undefined;
@@ -35,6 +35,7 @@ export async function loadDayCloseReceipt(
   }
   return {
     shop,
+    ...(receiptLanguage === 'ur' ? { labels: urduDayCloseLabels } : {}),
     staffName: staff ? String(staff.name) : null,
     deviceName: device ? String(device.name ?? device.code ?? '') : '',
     periodStart: Number(row.period_start),

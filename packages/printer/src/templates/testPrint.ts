@@ -46,11 +46,13 @@ export function buildTestPrint(input: TestPrintInput): Block[] {
     align: 'center',
   });
   blocks.push({ t: 'qr', data: 'bikri-test-print' });
-  blocks.push({
-    t: 'text',
-    text: labels.drawerWorks,
-    align: 'center',
-  });
+  if (input.drawer !== false) {
+    blocks.push({
+      t: 'text',
+      text: labels.drawerWorks,
+      align: 'center',
+    });
+  }
   pushJobEnd(blocks, input.drawer !== false);
   return blocks;
 }

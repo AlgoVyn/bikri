@@ -1,6 +1,7 @@
 /** Tenant creation in one batch (02 §2.1, 13 §7.1). */
 import { newId } from '@bikri/core';
 import { codeHash, newEnrolmentCode, normaliseCode } from '../auth/crypto.ts';
+import { ownerCodeKey } from '../auth/ownerKeys.ts';
 import { tenantDb } from '../db/tenantDb.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import type { TenantRow } from '../types.ts';
@@ -48,7 +49,7 @@ export async function enrolmentCodeStatement(
   expires_at: number;
 }> {
   const code = newEnrolmentCode();
-  const hash = await codeHash(normaliseCode(code) ?? '');
+  const hash = await codeHash(ownerCodeKey(env), normaliseCode(code) ?? '');
   const expires = input.now + input.ttl_ms;
   const db = tenantDb(env, { id: tenantId, db_shard: 'DB' });
   return {

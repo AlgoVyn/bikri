@@ -9,7 +9,12 @@ export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
   try {
     await next();
   } finally {
-    const route = new URL(c.req.url).pathname;
+    const route = new URL(c.req.url).pathname
+      // The plain enrolment code is a credential; never put it in Workers Logs.
+      .replace(
+        /\/shop\/enrolment-codes\/[^/]+/u,
+        '/shop/enrolment-codes/:code',
+      );
     const vars = c.var as {
       tenant?: { id?: string };
       device?: { id?: string };

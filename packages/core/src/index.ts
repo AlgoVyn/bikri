@@ -40,6 +40,7 @@ export {
   saleLineFinal,
   splitRefund,
 } from './money/refunds.ts';
+export { lineRevenue } from './money/reports.ts';
 export type { StockValueInput } from './money/stock.ts';
 export {
   movementChangesAvgCost,

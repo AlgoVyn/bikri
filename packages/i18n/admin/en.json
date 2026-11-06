@@ -74,6 +74,7 @@
     "import_bad": "This file is not a bikri-unsynced export.",
     "import_choose": "Choose file",
     "import_done": "Import finished.",
+    "import_partial": "Import stopped: {{rejected}} ops were rejected and {{missing}} were not processed. The file is safe; fix the shop data and retry.",
     "import_hint": "Revoked devices only. Choose the bikri-unsynced JSON file.",
     "import_not_revoked": "Import only for a revoked device of this shop.",
     "import_ops": "Import unsynced ops",

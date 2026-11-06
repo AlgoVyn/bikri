@@ -834,9 +834,9 @@ export function BillDetail({
                   type="button"
                   className="mt-1 underline"
                   onClick={() => {
-                    void queueRefundPrint(getDb(), String(refund.id)).then(() =>
-                      toast.push(t('office.bill.print_queued')),
-                    );
+                    void queueRefundPrint(getDb(), String(refund.id), {
+                      reprint: true,
+                    }).then(() => toast.push(t('office.bill.print_queued')));
                   }}
                 >
                   {t('office.bill.print_refund')}

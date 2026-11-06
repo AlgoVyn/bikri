@@ -540,11 +540,15 @@ export async function reportBundle(
     const day = dayMap.get(String(payment.business_date));
     if (!day) continue;
     const amount = n(payment.amount);
-    if (payment.direction === 'in' && payment.purpose === 'sale')
-      addMix(day.mix, String(payment.method), amount);
-    else if (payment.direction === 'out' && payment.purpose === 'void')
-      addMix(day.mix, String(payment.method), -amount);
-    if (payment.direction === 'in' && payment.purpose === 'customer_payment')
+    if (payment.direction === 'in' && payment.purpose === 'sale') {
+      // A voided sale is excluded from Sold and Bills; its original payment and the
+      // reversing void payout must not reappear in the method mix either.
+      if (payment.sale_id && saleById.has(String(payment.sale_id)))
+        addMix(day.mix, String(payment.method), amount);
+    } else if (
+      payment.direction === 'in' &&
+      payment.purpose === 'customer_payment'
+    )
       day.udhaarReceived += amount;
   }
 

@@ -124,10 +124,14 @@ export async function importUnsynced(
         json: { device_id: file.device_id, ops },
       },
     );
-    for (const r of res.results ?? []) {
+    const results = res.results ?? [];
+    for (const r of results) {
       if (r.result === 'rejected') rejected += 1;
       else applied += 1;
     }
+    // The server omits ops it could not process (call budget/reserved calls). They are
+    // not applied, so never report the file as fully imported.
+    if (results.length < ops.length) rejected += ops.length - results.length;
     done += ops.length;
     onProgress?.(done);
   }

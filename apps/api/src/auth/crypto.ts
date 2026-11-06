@@ -60,8 +60,9 @@ export function normaliseCode(code: string): string | null {
   return /^[2-9A-HJKMNP-TV-Z]{8}$/u.test(c) ? c : null;
 }
 
-export function codeHash(normalised: string): Promise<string> {
-  return sha256Hex(`enrol:${normalised}`);
+/** Keyed hash so a leaked DB cannot brute-force the 40-bit enrolment code offline. */
+export function codeHash(secret: string, normalised: string): Promise<string> {
+  return hmacHex(secret, `enrol:${normalised}`);
 }
 
 /** Six digits with rejection sampling (owner email sign-in, 05 §3.2). */

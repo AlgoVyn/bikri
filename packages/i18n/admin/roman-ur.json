@@ -74,6 +74,7 @@
     "import_bad": "Yeh file bikri-unsynced export nahi.",
     "import_choose": "File chunein",
     "import_done": "Import mukammal.",
+    "import_partial": "Import ruk gaya: {{rejected}} tabdeeliyan mustarad aur {{missing}} par karwai nahin hui. File mehfooz hai; dukaan ka data durust kar ke dobara koshish karein.",
     "import_hint": "Sirf mansookh device. bikri-unsynced JSON file chunein.",
     "import_not_revoked": "Sirf is dukaan ke mansookh device ke liye.",
     "import_ops": "Unsynced ops import",

@@ -358,5 +358,15 @@ describe('expenses and cash moves (T-046)', () => {
     await expect(
       createExpenseCategory(db, { name: 'Cleaning' }, 'st-1', NOW + 1000),
     ).rejects.toThrow();
+    // A deleted category keeps its code; recreating the same name gets a fresh code
+    // instead of being permanently blocked by the old soft-deleted row.
+    await db.expense_categories.update(category.id, { deleted_at: NOW + 2000 });
+    const again = await createExpenseCategory(
+      db,
+      { name: 'Cleaning' },
+      'st-1',
+      NOW + 3000,
+    );
+    expect(again.code).toBe('cleaning_2');
   });
 });

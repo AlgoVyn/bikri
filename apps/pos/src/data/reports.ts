@@ -1,5 +1,6 @@
 import {
   computeDayClose,
+  lineRevenue as coreLineRevenue,
   mulDivRound,
   refundedCost,
   refundedRevenue,
@@ -21,10 +22,11 @@ const n = (v: unknown) => Number(v ?? 0);
 
 /** 07 §1: profit uses revenue ex-tax and ex-rounding. */
 export function lineRevenue(line: SyncedRow, taxInclusive: boolean): number {
-  return (
-    n(line.net) -
-    n(line.bill_discount_alloc) -
-    (taxInclusive ? n(line.tax_alloc) : 0)
+  return coreLineRevenue(
+    n(line.net),
+    n(line.bill_discount_alloc),
+    n(line.tax_alloc),
+    taxInclusive,
   );
 }
 

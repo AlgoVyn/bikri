@@ -305,7 +305,10 @@ function PayStep({
           : err instanceof SaleInvalidError &&
               err.message.includes('cart already paid')
             ? t('pay.cart_changed')
-            : t('pay.save_failed'),
+            : err instanceof SaleInvalidError &&
+                err.message.includes('too many ops')
+              ? t('pay.too_many_ops')
+              : t('pay.save_failed'),
         'error',
       );
     } finally {

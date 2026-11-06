@@ -1,10 +1,11 @@
 import { env } from 'cloudflare:workers';
+import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { verifyAccessJwt } from '../src/auth/access.ts';
 import { base64url } from '../src/auth/crypto.ts';
 import { statusChangeStatements } from '../src/platform/tenantAdmin.ts';
 import type { TenantRow } from '../src/types.ts';
-import { api, json, seedShop, setStatus } from './helpers/fixtures.ts';
+import { api, IDS, json, seedShop, setStatus } from './helpers/fixtures.ts';
 import { op, productRow, pushOk, saleOps } from './helpers/ops.ts';
 
 const n = async (sql: string, ...p: unknown[]) =>
@@ -402,6 +403,95 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       await auditCount(a.tenantId, 'tenant_status_change'),
     ).toBeGreaterThan(0);
     expect(await setMaintenance(false)).toBe('read_only');
+  });
+
+  it('purges self-referencing sales and expenses without rewriting their links first', async () => {
+    const shop = await seedShop('Purge refs');
+    await pushOk(shop.till, saleOps(shop, shop.till, 1));
+    await pushOk(shop.till, saleOps(shop, shop.till, 2));
+    const sales = await env.DB.prepare(
+      'SELECT id, invoice_seq FROM sales WHERE tenant_id = ?1 ORDER BY invoice_seq',
+    )
+      .bind(shop.tenantId)
+      .all<{ id: string }>();
+    const first = sales.results[0]?.id;
+    const second = sales.results[1]?.id;
+    expect(first && second).toBeTruthy();
+    await env.DB.prepare(
+      'UPDATE sales SET replaces_sale_id = ?3 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, second, first)
+      .run();
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare(
+      "INSERT INTO expense_categories (tenant_id, id, code, name_en, created_at, updated_at) VALUES (?1, 'purge-cat', 'purge-cat', 'Purge', ?2, ?2)",
+    )
+      .bind(shop.tenantId, Date.now())
+      .run();
+    const expenseId = newId();
+    const baseExpense = {
+      category_id: 'purge-cat',
+      amount: 1000,
+      method: 'cash',
+      payee: '',
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: day,
+      created_at: Date.now(),
+    };
+    await env.DB.prepare(
+      `INSERT INTO expenses (tenant_id, id, category_id, amount, method, payee, note, reverses_id, branch_id, device_id, staff_id, business_date, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8, ?9, ?10, ?11, ?12)`,
+    )
+      .bind(
+        shop.tenantId,
+        expenseId,
+        baseExpense.category_id,
+        baseExpense.amount,
+        baseExpense.method,
+        baseExpense.payee,
+        baseExpense.note,
+        baseExpense.branch_id,
+        baseExpense.device_id,
+        baseExpense.staff_id,
+        baseExpense.business_date,
+        baseExpense.created_at,
+      )
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO expenses (tenant_id, id, category_id, amount, method, payee, note, reverses_id, branch_id, device_id, staff_id, business_date, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+    )
+      .bind(
+        shop.tenantId,
+        newId(),
+        baseExpense.category_id,
+        baseExpense.amount,
+        baseExpense.method,
+        baseExpense.payee,
+        baseExpense.note,
+        expenseId,
+        baseExpense.branch_id,
+        baseExpense.device_id,
+        baseExpense.staff_id,
+        baseExpense.business_date,
+        baseExpense.created_at + 1,
+      )
+      .run();
+    await api(`/admin/tenants/${shop.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true },
+    });
+    let remaining = 1;
+    while (remaining > 0) {
+      const res = await api(`/admin/tenants/${shop.tenantId}/purge`, {
+        method: 'POST',
+      });
+      expect(res.status).toBe(200);
+      remaining = (await json<{ remaining: number }>(res)).remaining;
+    }
   });
 
   it('codes, device revoke and owner PIN reset write audit rows in that tenant only', async () => {

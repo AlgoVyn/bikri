@@ -693,7 +693,154 @@ describe('void rules (05 §5, D-044)', () => {
   });
 });
 
+describe('sale policy (07 §6)', () => {
+  it('accepts an offline sale whose cost changed after it was rung', async () => {
+    const shop = await seedShop('Cost after sale');
+    const now = Date.now();
+    const ops = saleOps(shop, shop.till, 1);
+    await env.DB.prepare(
+      'UPDATE products SET avg_cost = 500, last_cost = 500 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.product)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO stock_movements
+       (tenant_id, id, product_id, qty_delta_milli, reason_code, ref_type, ref_id, unit_cost, note, branch_id, device_id, staff_id, business_date, created_at)
+       VALUES (?1, ?2, ?3, 1000, 'purchase', 'adjustment', NULL, 500, '', ?4, ?5, ?6, ?7, ?8)`,
+    )
+      .bind(
+        shop.tenantId,
+        newId(now + 60_000),
+        IDS.product,
+        shop.branchId,
+        shop.till.id,
+        IDS.owner,
+        businessDate(now + 60_000),
+        now + 60_000,
+      )
+      .run();
+    const res = await pushOk(shop.till, ops);
+    expect(res.results.map((row) => row.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+  });
+
+  it('accepts a sale whose cost changed before it while the till was offline', async () => {
+    const shop = await seedShop('Cost while offline');
+    const now = Date.now();
+    const changedAt = now - 120_000;
+    const seenAt = now - 240_000;
+    await env.DB.prepare(
+      'UPDATE products SET avg_cost = 500, last_cost = 500 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.product)
+      .run();
+    await env.DB.prepare(
+      'UPDATE devices SET last_seen_at = ?3 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, shop.till.id, seenAt)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO stock_movements
+       (tenant_id, id, product_id, qty_delta_milli, reason_code, ref_type, ref_id, unit_cost, note, branch_id, device_id, staff_id, business_date, created_at)
+       VALUES (?1, ?2, ?3, 1000, 'purchase', 'adjustment', NULL, 500, '', ?4, ?5, ?6, ?7, ?8)`,
+    )
+      .bind(
+        shop.tenantId,
+        newId(changedAt),
+        IDS.product,
+        shop.branchId,
+        shop.till.id,
+        IDS.owner,
+        businessDate(changedAt),
+        changedAt,
+      )
+      .run();
+    const res = await pushOk(shop.till, saleOps(shop, shop.till, 1));
+    expect(res.results.map((row) => row.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+  });
+
+  it('does not use a rejected pending price edit for a later sale', async () => {
+    const shop = await seedShop('Rejected price edit');
+    const now = Date.now();
+    const edit = productRow(IDS.product, {
+      price: 200_000,
+      updated_at: now,
+      updated_by: IDS.cashier,
+    });
+    const res = await pushOk(shop.till, [
+      op('products', 'upsert', edit, {
+        base_rev: 3,
+        changed_fields: ['price'],
+      }),
+      ...saleOps(shop, shop.till, 1),
+    ]);
+    expect(res.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'FORBIDDEN',
+    });
+    expect(res.results.slice(1).map((row) => row.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+  });
+
+  it('checks a below-list price for a product created in the same push', async () => {
+    const shop = await seedShop('New product policy');
+    const now = Date.now();
+    const productId = newId(now);
+    const product = productRow(productId, {
+      price: 200_000,
+      last_cost: 0,
+      created_at: now,
+      updated_at: now,
+    });
+    const ops = saleOps(shop, shop.till, 1);
+    for (const entry of ops) {
+      if (entry.tbl === 'sale_lines' && entry.row)
+        entry.row.product_id = productId;
+    }
+    const res = await pushOk(shop.till, [
+      op('products', 'upsert', product, {
+        base_rev: 0,
+        changed_fields: [],
+      }),
+      ...ops,
+    ]);
+    expect(res.results[0]?.result).toBe('applied');
+    expect(res.results.slice(1).map((row) => row.result)).toEqual([
+      'rejected',
+      'rejected',
+      'rejected',
+    ]);
+    expect(res.results[1]?.error_code).toBe('FORBIDDEN');
+  });
+});
+
 describe('pull and snapshot', () => {
+  it('caps the D1 rows one shop may read in a UTC day', async () => {
+    const shop = await seedShop('Read cap');
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare(
+      'INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read) VALUES (?1, ?2, 0, 0, 1000000)',
+    )
+      .bind(shop.tenantId, day)
+      .run();
+    const res = await api('/sync/pull?since=0', { token: shop.till.token });
+    expect(res.status).toBe(503);
+    const body = await json<{ error: { code: string } }>(res);
+    expect(body.error.code).toBe('TENANT_QUOTA');
+    const snap = await api('/sync/snapshot', { token: shop.till.token });
+    expect(snap.status).toBe(503);
+  });
+
   it('8: pull pages by cursor and ends at the max seq', async () => {
     const shop = await seedShop('Pages');
     const ops = [];

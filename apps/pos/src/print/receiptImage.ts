@@ -3,6 +3,7 @@
  * printer gets, drawn on a canvas `dots` wide in the receipt fonts, with the shop logo on top.
  * PNG for WhatsApp / Web Share; a one-page PDF (the JPEG of the same canvas) for Download PDF.
  */
+
 import {
   type Block,
   type ItemLayout,
@@ -11,6 +12,7 @@ import {
   prepareLogo,
   type RasterSource,
 } from '@bikri/printer';
+import qrcode from 'qrcode-generator';
 
 export type ImageOptions = {
   dots: number;
@@ -33,6 +35,7 @@ type Row =
       height: number;
     }
   | { kind: 'raster'; source: RasterSource; height: number }
+  | { kind: 'qr'; data: string; size: number; height: number }
   | { kind: 'gap'; height: number };
 
 /** Lines and heights in CSS pixels; exported for tests. */
@@ -75,16 +78,17 @@ export function receiptRows(blocks: Block[], options: ImageOptions): Row[] {
       case 'feed':
         rows.push({ kind: 'gap', height: line * c.lines });
         break;
-      case 'qr':
+      case 'qr': {
+        // A real, scannable QR on the shared picture/PDF, not the raw payload as text.
+        const size = Math.round(Math.min(options.dots * 0.6, line * 9));
         rows.push({
-          kind: 'text',
-          text: c.data,
-          align: 'center',
-          bold: false,
-          size: 'small',
-          height: Math.round(line * 0.75),
+          kind: 'qr',
+          data: c.data,
+          size,
+          height: size + Math.round(line * 0.5),
         });
         break;
+      }
       default:
         break; // cut and drawer have no picture
     }
@@ -131,6 +135,27 @@ export async function renderReceiptCanvas(
       const x =
         PAD + Math.max(0, Math.floor((options.dots - row.source.width) / 2));
       ctx.putImageData(toImageData(ctx, row.source), x, y);
+    } else if (row.kind === 'qr') {
+      const qr = qrcode(0, 'M');
+      qr.addData(row.data);
+      qr.make();
+      const modules = qr.getModuleCount();
+      const quiet = 4;
+      const unit = Math.max(1, Math.floor(row.size / (modules + quiet * 2)));
+      const drawSize = unit * (modules + quiet * 2);
+      const left = PAD + Math.floor((options.dots - drawSize) / 2);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(left, y, drawSize, drawSize);
+      ctx.fillStyle = '#000';
+      for (let r = 0; r < modules; r += 1)
+        for (let c = 0; c < modules; c += 1)
+          if (qr.isDark(r, c))
+            ctx.fillRect(
+              left + (quiet + c) * unit,
+              y + (quiet + r) * unit,
+              unit,
+              unit,
+            );
     } else if (row.kind === 'text') {
       const rtl = lineNeedsRtl(row.text);
       const px =

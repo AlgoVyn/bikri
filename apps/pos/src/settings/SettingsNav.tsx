@@ -67,7 +67,9 @@ function SettingsNavContent() {
   const leave = async () => {
     setLeaveError(null);
     const db = getDb();
-    const { leaveShop, UnsyncedOpsError } = await import('../data/enrol.ts');
+    const { leaveShop, PendingFilesError, UnsyncedOpsError } = await import(
+      '../data/enrol.ts'
+    );
     try {
       await leaveShop(db);
       window.location.assign(`${import.meta.env.BASE_URL || '/'}enrol`);
@@ -75,7 +77,9 @@ function SettingsNavContent() {
       setLeaveError(
         e instanceof UnsyncedOpsError
           ? t('enrol.leave_blocked', { count: e.count })
-          : String(e),
+          : e instanceof PendingFilesError
+            ? t('enrol.leave_files_blocked', { count: e.count })
+            : String(e),
       );
     }
   };

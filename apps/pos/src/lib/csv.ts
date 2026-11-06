@@ -12,6 +12,9 @@ export function csvCell(value: unknown): string {
     !/^-?\d+(?:\.\d+)?$/u.test(s)
   )
     s = `'${s}`;
+  // Excel auto-converts long digit strings (barcodes) to scientific notation and drops
+  // the leading zero of a phone number. An apostrophe keeps them as text.
+  if (typeof value === 'string' && /^(?:0\d+|\d{12,})$/u.test(s)) s = `'${s}`;
   return /[",\n\r]/u.test(s) ? `"${s.replace(/"/gu, '""')}"` : s;
 }
 

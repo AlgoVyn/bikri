@@ -141,6 +141,7 @@
     "leave": "Leave that shop",
     "leave_confirm": "Remove {{shop}} from this browser? All its data on this device is deleted; the shop keeps its synced data.",
     "leave_blocked": "{{count}} changes are not synced yet. Export them first, then leave.",
+    "leave_files_blocked": "{{count}} photos or logos are not uploaded yet. Upload them before leaving this shop.",
     "leave_pin_body": "Enter an owner PIN to remove this shop from the browser. Its local data will be deleted; synced data stays on the server.",
     "leave_pin_title": "Owner PIN needed",
     "revoked": "This device was disconnected by the owner. Unsynced sales were kept on this device.",
@@ -438,7 +439,8 @@
     "due_label": "Still due",
     "cart_changed": "This bill was already paid in another tab. Reload before taking payment again.",
     "backdate_summary": "Past sale for {{date}}, made by {{staff}}",
-    "backdate_failed": "The past sale was not saved. Check the date and the cashier."
+    "backdate_failed": "The past sale was not saved. Check the date and the cashier.",
+    "too_many_ops": "This reissue is too large to sync safely. Void the old bill and make the new sale separately."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",
@@ -1101,6 +1103,9 @@
     "files_title_other": "{{count}} photo or logo uploads failed",
     "files_hint": "Sales and reports are unaffected. Retry when you are online.",
     "file_retry": "Retry",
+    "file_remove": "Remove",
+    "file_remove_title": "Remove this upload?",
+    "file_remove_body": "The photo or logo will not be uploaded. This cannot be undone.",
     "file_kind_product_image": "Product photo",
     "file_kind_logo": "Shop logo"
   },

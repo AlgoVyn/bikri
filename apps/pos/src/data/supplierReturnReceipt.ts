@@ -1,5 +1,8 @@
 import type { BikriDb } from '@bikri/db';
-import type { SupplierReturnReceipt } from '@bikri/printer';
+import {
+  type SupplierReturnReceipt,
+  urduSupplierReturnLabels,
+} from '@bikri/printer';
 import { receiptShop } from './receipt.ts';
 
 /** Stored return + lines for the `RETURN TO SUPPLIER` slip. */
@@ -26,7 +29,7 @@ export async function loadSupplierReturnReceipt(
       .filter((product) => product !== undefined)
       .map((product) => [product.id, product]),
   );
-  const { shop } = await receiptShop(db);
+  const { shop, receiptLanguage } = await receiptShop(db);
   const entries = await db.ledger_entries
     .where('[party_type+party_id+created_at]')
     .between(
@@ -42,6 +45,7 @@ export async function loadSupplierReturnReceipt(
   );
   return {
     shop,
+    ...(receiptLanguage === 'ur' ? { labels: urduSupplierReturnLabels } : {}),
     supplierName: String(supplier.name),
     purchaseInvoice: purchase
       ? String(purchase.supplier_invoice_no || purchase.id)

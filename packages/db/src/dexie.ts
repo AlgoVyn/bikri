@@ -117,6 +117,8 @@ export type OutboxEntry = {
   claim_token?: string;
   attempts: number;
   last_error?: string;
+  /** Local-only marker for rows re-queued by restore recovery. */
+  recovery?: boolean;
 };
 
 export type KvRow = { key: string; value: unknown };

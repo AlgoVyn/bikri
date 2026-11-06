@@ -31,6 +31,110 @@ async function sample(prefix = 'report') {
 }
 
 describe('report bundle (screens/16 ACs 1–3, 6)', () => {
+  it('leaves a voided sale and its payout out of the payment mix', async () => {
+    const db = await readyDb('report-void-mix');
+    const base = {
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      customer_id: null,
+      business_date: TODAY,
+      created_at: NOW,
+      line_count: 0,
+      items_qty_milli: 0,
+      gross_total: 0,
+      item_discount_total: 0,
+      subtotal: 0,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      paid_total: 0,
+      udhaar_amount: 0,
+      cash_tendered: 0,
+      change_given: 0,
+      replaces_sale_id: null,
+      note: '',
+    };
+    await db.sales.bulkAdd([
+      {
+        ...base,
+        id: 'sale-voided',
+        invoice_no: 'A-A-1',
+        invoice_seq: 1,
+        total: 1000,
+        status: 'void',
+      },
+      {
+        ...base,
+        id: 'sale-live',
+        invoice_no: 'A-A-2',
+        invoice_seq: 2,
+        total: 2000,
+        status: 'paid',
+      },
+    ] as SyncedRow[]);
+    const payment = {
+      cash_tendered: null,
+      change_given: null,
+      reference: '',
+      refund_id: null,
+      purchase_id: null,
+      supplier_return_id: null,
+      party_type: null,
+      party_id: null,
+      note: '',
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      created_at: NOW,
+    };
+    await db.payments.bulkAdd([
+      {
+        ...payment,
+        id: 'pay-void-sale',
+        direction: 'in',
+        method: 'cash',
+        purpose: 'sale',
+        amount: 1000,
+        sale_id: 'sale-voided',
+      },
+      {
+        ...payment,
+        id: 'pay-void-out',
+        direction: 'out',
+        method: 'cash',
+        purpose: 'void',
+        amount: 1000,
+        sale_id: 'sale-voided',
+      },
+      {
+        ...payment,
+        id: 'pay-live',
+        direction: 'in',
+        method: 'card',
+        purpose: 'sale',
+        amount: 2000,
+        sale_id: 'sale-live',
+      },
+    ] as SyncedRow[]);
+    const bundle = await reportBundle(
+      db,
+      { from: TODAY, to: TODAY },
+      { now: NOW + 10, today: TODAY },
+    );
+    expect(bundle.summary.paymentMix).toEqual({
+      cash: 0,
+      card: 2000,
+      bank_wallet: 0,
+      udhaar: 0,
+    });
+  });
+
   it('validates report ranges and fills defaults', async () => {
     expect(reportDays('nope', TODAY)).toEqual([]);
     expect(() => reportDays('2025-01-01', '2026-06-01')).toThrow(RangeError);
@@ -621,7 +725,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       { now: NOW + 10, today: TODAY },
     );
     expect(bundle.summary.paymentMix).toMatchObject({
-      cash: 65000,
+      cash: 70000,
       card: 20000,
       bank_wallet: 10000,
       udhaar: 30000,

@@ -55,6 +55,7 @@ export function SyncPage() {
   const [discardTarget, setDiscardTarget] = useState<OutboxEntry[] | null>(
     null,
   );
+  const [fileRemoveTarget, setFileRemoveTarget] = useState<number | null>(null);
   const data = useLiveQuery(async () => {
     const [
       pending,
@@ -307,23 +308,36 @@ export function SyncPage() {
                   <span>
                     {t(`syncpage.file_kind_${e.kind}`)} · {e.target_id}
                   </span>
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    onClick={() => {
-                      if (e.id === undefined) return;
-                      void db.file_queue
-                        .update(e.id, {
-                          status: 'pending',
-                          // Legacy entries queued before the permission check did
-                          // not carry a staff id; retry as the unlocked profile.
-                          staff_id: staffId ?? e.staff_id ?? null,
-                        })
-                        .then(() => syncNow());
-                    }}
-                  >
-                    {t('syncpage.file_retry')}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() => {
+                        if (e.id === undefined) return;
+                        void db.file_queue
+                          .update(e.id, {
+                            status: 'pending',
+                            // Legacy entries queued before the permission check did
+                            // not carry a staff id; retry as the unlocked profile.
+                            staff_id: staffId ?? e.staff_id ?? null,
+                          })
+                          .then(() => syncNow());
+                      }}
+                    >
+                      {t('syncpage.file_retry')}
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() =>
+                        e.id === undefined
+                          ? undefined
+                          : setFileRemoveTarget(e.id)
+                      }
+                    >
+                      {t('syncpage.file_remove')}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -367,6 +381,20 @@ export function SyncPage() {
         </section>
         {dialog}
       </div>
+      <ConfirmDialog
+        open={fileRemoveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setFileRemoveTarget(null);
+        }}
+        title={t('syncpage.file_remove_title')}
+        body={t('syncpage.file_remove_body')}
+        confirmLabel={t('syncpage.file_remove')}
+        onConfirm={() => {
+          if (fileRemoveTarget !== null)
+            void db.file_queue.delete(fileRemoveTarget);
+          setFileRemoveTarget(null);
+        }}
+      />
       <ConfirmDialog
         open={discardTarget !== null}
         onOpenChange={(open) => {

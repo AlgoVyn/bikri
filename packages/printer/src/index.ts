@@ -75,7 +75,9 @@ export {
   englishReceiptLabels,
   receiptLabelsFor,
   resolveLabels,
+  urduDayCloseLabels,
   urduReceiptLabels,
+  urduSupplierReturnLabels,
 } from './templates/labels.ts';
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';

@@ -63,7 +63,7 @@ export function PrinterPage() {
   const { t, i18n } = useTranslation();
   const timeZone = useShopTimeZone();
   const toast = useToast();
-  const { staff, role, can } = useCurrentStaff();
+  const { staff, role, can, support } = useCurrentStaff();
   const readOnly = useReadOnly();
   const printer = useLiveQuery(
     async () =>
@@ -99,7 +99,15 @@ export function PrinterPage() {
         toast.push(t('tenant.readOnly.blocked'), 'error');
         return;
       }
-      if (what === 'test') await printTestPage(getDb(), printer ?? {}, deps);
+      if (what === 'test')
+        await printTestPage(getDb(), printer ?? {}, deps, {
+          // Test print is available to cashiers, but a drawer kick is not.
+          drawer:
+            can('drawer.open') &&
+            !readOnly &&
+            !support &&
+            printer?.drawer !== false,
+        });
       else await openDrawer(getDb(), deps, staff?.id ?? null);
       toast.push(
         t(what === 'test' ? 'printer.test_sent' : 'printer.drawer_opened'),

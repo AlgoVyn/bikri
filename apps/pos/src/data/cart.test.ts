@@ -79,7 +79,7 @@ describe('cart lines (screens/05)', () => {
     expect(cart.lines[0]?.product_id).toBe('b');
   });
 
-  it('uses last cost when the shop costs by last purchase; falls back to the other cost', () => {
+  it('uses exactly the chosen cost method, matching the server snapshot check', () => {
     const p = product('a', 100, { avg_cost: 70, last_cost: 80 });
     expect(
       addProduct(emptyCart('c1'), p, 1000, 'avg').lines[0]?.unit_cost,
@@ -94,8 +94,10 @@ describe('cart lines (screens/05)', () => {
       track_stock: 0,
     });
     const line = addProduct(emptyCart('c1'), onlyLast, 1000, 'avg').lines[0];
+    // avg_cost = 0 is the real average when only a last cost exists; the server
+    // verifies this exact value (07 §6), so falling back would reject the sale.
     expect(line).toMatchObject({
-      unit_cost: 60,
+      unit_cost: 0,
       image_key: 'products/b/x.webp',
       track_stock: 0,
     });

@@ -64,7 +64,7 @@ export async function loadRefundReceipt(
 export async function queueRefundPrint(
   db: BikriDb,
   refundId: string,
-  options: { now?: number } = {},
+  options: { now?: number; reprint?: boolean } = {},
 ): Promise<string> {
   const now = options.now ?? Date.now();
   const id = newId(now);
@@ -73,6 +73,7 @@ export async function queueRefundPrint(
     refund_id: refundId,
     kind: 'refund',
     status: 'queued',
+    reprint: options.reprint === true,
     created_at: now,
   });
   return id;

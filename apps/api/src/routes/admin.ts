@@ -38,6 +38,7 @@ import {
   tenantBySlug,
   usageHistory,
 } from '../platform/tenantAdmin.ts';
+import { usageToday } from '../platform/tenants.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { importOps } from '../sync/importOps.ts';
@@ -45,7 +46,7 @@ import { ImportOpsBody } from '../sync/opSchema.ts';
 import { revokeSupportDevices, supportPayload } from '../sync/status.ts';
 import { APPLY_ORDER, clientColumns, SNAPSHOT_TABLES } from '../sync/tables.ts';
 import type { DeviceRow, TenantRow, TenantStatus } from '../types.ts';
-import { snapshotPayload } from './sync.ts';
+import { assertReadQuota, snapshotPayload } from './sync.ts';
 
 type AdminEnv = {
   Bindings: Env;
@@ -125,7 +126,7 @@ admin.post('/tenants', async (c) => {
       daily_write_budget: BUDGET.default(18_000),
       note: z.string().max(500).default(''),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   try {
     const { tenant, owner_code } = await createTenant(c.env, {
       ...body,
@@ -186,7 +187,7 @@ admin.get('/shop-requests/:id/email-status', async (c) =>
 admin.post('/shop-requests/:id/email/manual', async (c) => {
   const body = z
     .object({ note: z.string().trim().min(1).max(200) })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   await manualVerifyRequestEmail(
     c.env,
     c.req.param('id'),
@@ -204,7 +205,7 @@ admin.post('/shop-requests/:id/approve', async (c) => {
       daily_write_budget: BUDGET.optional(),
       note: z.string().trim().max(500).optional(),
     })
-    .parse(await c.req.json().catch(() => ({})));
+    .parse(await readJsonBody(c, 64 * 1024).catch(() => ({})));
   return c.json(
     await approveShopRequest(c.env, c.req.param('id'), c.var.operator, {
       ...body,
@@ -215,7 +216,9 @@ admin.post('/shop-requests/:id/approve', async (c) => {
 });
 
 admin.post('/shop-requests/:id/reject', async (c) => {
-  const body = z.object({ reason: Reason }).parse(await c.req.json());
+  const body = z
+    .object({ reason: Reason })
+    .parse(await readJsonBody(c, 64 * 1024));
   return c.json(
     await rejectShopRequest(
       c.env,
@@ -227,7 +230,9 @@ admin.post('/shop-requests/:id/reject', async (c) => {
 });
 
 admin.post('/shop-requests/:id/reopen', async (c) => {
-  const body = z.object({ reason: Reason }).parse(await c.req.json());
+  const body = z
+    .object({ reason: Reason })
+    .parse(await readJsonBody(c, 64 * 1024));
   return c.json(
     await reopenShopRequest(
       c.env,
@@ -323,7 +328,7 @@ admin.patch('/tenants/:id', async (c) => {
       owner_email: Email.nullable().optional(),
     })
     .strict()
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const stmt = patchTenantStatement(c.env, tenant.id, patch, now);
   const extra =
     patch.owner_email !== undefined && patch.owner_email !== tenant.owner_email
@@ -377,11 +382,15 @@ async function changeStatus(
 }
 
 admin.post('/tenants/:id/read-only', async (c) => {
-  const { reason } = z.object({ reason: Reason }).parse(await c.req.json());
+  const { reason } = z
+    .object({ reason: Reason })
+    .parse(await readJsonBody(c, 64 * 1024));
   return c.json({ tenant: await changeStatus(c, 'read_only', reason) });
 });
 admin.post('/tenants/:id/suspend', async (c) => {
-  const { reason } = z.object({ reason: Reason }).parse(await c.req.json());
+  const { reason } = z
+    .object({ reason: Reason })
+    .parse(await readJsonBody(c, 64 * 1024));
   return c.json({ tenant: await changeStatus(c, 'suspended', reason) });
 });
 admin.post('/tenants/:id/reactivate', async (c) => {
@@ -390,7 +399,7 @@ admin.post('/tenants/:id/reactivate', async (c) => {
       reason: Reason,
       to: z.enum(['active', 'read_only']).default('active'),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const from = c.var.tenant.status;
   if (
     from === 'maintenance' ||
@@ -408,7 +417,7 @@ admin.post('/tenants/:id/reactivate', async (c) => {
 admin.post('/tenants/:id/delete', async (c) => {
   const body = z
     .object({ confirm_slug: z.string(), reason: Reason })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   if (body.confirm_slug !== c.var.tenant.slug)
     throw new ApiError('VALIDATION_FAILED', 400, 'Type the slug to confirm');
   return c.json(
@@ -431,7 +440,7 @@ admin.post('/tenants/:id/support-access', async (c) => {
         z.literal(24),
       ]),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   if (tenant.status !== 'active' && tenant.status !== 'read_only') {
     throw new ApiError(
       'BAD_STATUS_CHANGE',
@@ -520,7 +529,7 @@ admin.post('/tenants/:id/enrolment-codes', async (c) => {
       branch_id: z.string().max(40).optional(),
       grants_admin: z.boolean().default(true),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const now = Date.now();
   const branch = body.branch_id ?? (await defaultBranch(db));
   if (body.branch_id) {
@@ -605,7 +614,7 @@ admin.post('/tenants/:id/devices/:deviceId/revoke', async (c) => {
 
 admin.post('/tenants/:id/import-ops', async (c) => {
   const { tenant, db } = c.var;
-  const body = ImportOpsBody.parse(await c.req.json());
+  const body = ImportOpsBody.parse(await readJsonBody(c, 1_000_000));
   const now = Date.now();
   const out = await importOps(c.env, db, tenant, body.device_id, body.ops, now);
   await db.batch(
@@ -634,7 +643,7 @@ admin.post('/tenants/:id/reset-owner-pin', async (c) => {
       pin_iterations: z.number().int().min(100_000).max(1_000_000),
       pin_length: z.number().int().min(4).max(6),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const now = Date.now();
   const res = await db.batch([
     db.prepare(
@@ -677,6 +686,7 @@ admin.get('/tenants/:id/owners', async (c) => {
 admin.get('/tenants/:id/export', async (c) => {
   const { tenant, db } = c.var;
   const exportedAt = Date.now();
+  assertReadQuota(tenant, await usageToday(c.env, tenant.id, exportedAt));
   if (c.req.query('tbl') && !c.req.query('before'))
     throw new ApiError(
       'VALIDATION_FAILED',
@@ -714,7 +724,7 @@ admin.post('/tenants/:id/files/gc', async (c) => {
   const { tenant, db } = c.var;
   const body = z
     .object({ dry_run: z.boolean().default(true) })
-    .parse((await c.req.json().catch(() => ({}))) as unknown);
+    .parse((await readJsonBody(c, 64 * 1024).catch(() => ({}))) as unknown);
   const now = Date.now();
   const result = await gcTenantFiles(c.env, tenant, {
     now,
@@ -742,7 +752,7 @@ admin.post('/tenants/:id/maintenance', async (c) => {
       reason: z.string().trim().max(200).default('Restore'),
       to: z.enum(['active', 'read_only', 'suspended']).optional(),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   if (body.on) {
     if (tenant.status === 'maintenance') return c.json({ tenant });
     return c.json({
@@ -811,15 +821,29 @@ admin.post('/tenants/:id/purge', async (c) => {
   };
   let left = PURGE_CHUNK;
   let deleted = 0;
+  // Self-referencing rows (expense reversals, replacement sales) must be deleted before
+  // the rows they point at. Do not UPDATE these append-only tables just to dodge an FK:
+  // a purge that does not finish would otherwise leave their links permanently changed.
+  const passesFor = (tbl: string): string[] =>
+    tbl === 'expenses'
+      ? ['reverses_id IS NOT NULL', '1 = 1']
+      : tbl === 'sales'
+        ? ['replaces_sale_id IS NOT NULL', '1 = 1']
+        : ['1 = 1'];
   for (const { t, n } of await counts()) {
-    if (n === 0) continue;
-    if (left <= 0) break;
-    const r = await db.run(
-      `DELETE FROM ${t} WHERE tenant_id = ?1 AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 LIMIT ?2)`,
-      Math.min(left, n),
-    );
-    left -= r.meta.changes ?? 0;
-    deleted += r.meta.changes ?? 0;
+    if (n === 0 || left <= 0) continue;
+    let pending = n;
+    for (const where of passesFor(t)) {
+      if (pending <= 0 || left <= 0) break;
+      const r = await db.run(
+        `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
+        Math.min(left, pending),
+      );
+      const changed = r.meta.changes ?? 0;
+      left -= changed;
+      deleted += changed;
+      pending -= changed;
+    }
   }
   const remaining = (await counts()).reduce((s, x) => s + x.n, 0);
   return c.json({ deleted, remaining });
@@ -843,6 +867,12 @@ admin.post('/tenants/:id/import', async (c) => {
   const now = Date.now();
   const stmts: D1PreparedStatement[] = [];
   for (const raw of body.rows) {
+    if (raw.tenant_id !== undefined && raw.tenant_id !== tenant.id)
+      throw new ApiError(
+        'VALIDATION_FAILED',
+        400,
+        'A row belongs to another shop',
+      );
     const { tenant_id: _ignored, ...row } = raw;
     for (const k of Object.keys(row)) {
       if (!allowed.has(k))
@@ -852,7 +882,7 @@ admin.post('/tenants/:id/import', async (c) => {
           `Unknown column ${tbl}.${k}`,
         );
     }
-    if (typeof row.id !== 'string' || row.id.length > 64)
+    if (typeof row.id !== 'string' || row.id.length === 0 || row.id.length > 64)
       throw new ApiError('VALIDATION_FAILED', 400, 'Every row needs an id');
     for (const [k, value] of Object.entries(row)) {
       if (typeof value === 'string' && value.length > 4_000)
@@ -907,7 +937,7 @@ admin.post('/tenants/:id/restore-epoch', async (c) => {
       restore_point_at: z.number().int().min(0),
       reason: z.string().trim().max(200).optional(),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const now = Date.now();
   await db.batch([
     restoreEpochStatement(c.env, tenant.id, restore_point_at, now),

@@ -74,6 +74,7 @@
     "import_bad": "یہ فائل bikri-unsynced برآمد نہیں۔",
     "import_choose": "فائل چنیں",
     "import_done": "درآمد مکمل۔",
+    "import_partial": "درآمد رک گئی: {{rejected}} تبدیلیاں مسترد اور {{missing}} پر کارروائی نہیں ہوئی۔ فائل محفوظ ہے؛ دکان کا ڈیٹا درست کر کے دوبارہ کوشش کریں۔",
     "import_hint": "صرف منسوخ آلہ۔ bikri-unsynced JSON فائل چنیں۔",
     "import_not_revoked": "صرف اس دکان کے منسوخ آلے کے لیے۔",
     "import_ops": "غیر مطابقت شدہ آپریشن درآمد",

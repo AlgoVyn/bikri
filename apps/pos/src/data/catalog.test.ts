@@ -367,7 +367,7 @@ describe('products (screens/08)', () => {
     expect(cashier).not.toContain('cost');
     expect(cashier).not.toContain('1100');
     expect(owner.split('\r\n')[1]).toBe(
-      `'=SUM(A1),,,"A, ""B""",8901234567890,${rows[0]?.product.sku},1499,1100,1100,20,pc,0,1,0`,
+      `'=SUM(A1),,,"A, ""B""",'8901234567890,${rows[0]?.product.sku},1499,1100,1100,20,pc,0,1,0`,
     );
   });
 

@@ -83,6 +83,7 @@ export async function saleReceipt(
 export async function refundReceipt(
   db: BikriDb,
   refundId: string,
+  options: { reprint?: boolean } = {},
 ): Promise<RefundPrint | null> {
   const input = await loadRefundReceipt(db, refundId);
   if (!input) return null;
@@ -92,8 +93,9 @@ export async function refundReceipt(
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
     printLogo: printer?.print_logo !== false,
-    // The builder kicks the drawer only when cash is handed back (06 §7).
-    drawer: printer?.drawer !== false,
+    // The builder kicks the drawer only when cash is handed back (06 §7), and a
+    // reprint must never kick it again.
+    drawer: printer?.drawer !== false && options.reprint !== true,
   });
   return { input, blocks, paper, logo, printer };
 }
@@ -195,7 +197,8 @@ export function jobReceipt(
   if (job.kind === 'void' && job.sale_id) return voidReceipt(db, job.sale_id);
   if (job.sale_id)
     return saleReceipt(db, job.sale_id, { reprint: job.reprint === true });
-  if (job.refund_id) return refundReceipt(db, job.refund_id);
+  if (job.refund_id)
+    return refundReceipt(db, job.refund_id, { reprint: job.reprint === true });
   if (job.day_close_id) return dayCloseReceipt(db, job.day_close_id);
   if (job.supplier_return_id)
     return supplierReturnReceipt(db, job.supplier_return_id);

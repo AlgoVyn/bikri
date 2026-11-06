@@ -1,7 +1,11 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../errors.ts';
-import { addRowsRead, takeRowsRead } from '../platform/readCounter.ts';
+import {
+  addRowsRead,
+  pendingRowsRead,
+  takeRowsRead,
+} from '../platform/readCounter.ts';
 import {
   pollAfterMs,
   secondsToUtcMidnight,
@@ -66,6 +70,28 @@ export async function assertQuota(
   }
 }
 
+/** A shop cannot read the shared D1 budget without bound (13 §6). */
+export const READ_BUDGET_FLOOR = 1_000_000;
+
+export function assertReadQuota(
+  tenant: TenantRow,
+  usage: { rows_read: number },
+): void {
+  const cap = Math.max(
+    READ_BUDGET_FLOOR,
+    Number(tenant.daily_write_budget) * 50,
+  );
+  if (usage.rows_read + pendingRowsRead(tenant.id) < cap) return;
+  const wait = secondsToUtcMidnight(Date.now());
+  throw new ApiError(
+    'TENANT_QUOTA',
+    503,
+    'This shop reached its daily download limit',
+    { retry_after: wait },
+    { 'Retry-After': String(wait) },
+  );
+}
+
 export function assertCanWrite(device: DeviceRow): void {
   if (device.kind === 'support') {
     throw new ApiError('FORBIDDEN', 403, 'Support devices are view-only');
@@ -81,7 +107,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   if (length > MAX_PUSH_BYTES)
     throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Push body is over 1 MB');
   const text = await c.req.text();
-  if (text.length > MAX_PUSH_BYTES)
+  if (new TextEncoder().encode(text).length > MAX_PUSH_BYTES)
     throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Push body is over 1 MB');
   let raw: unknown;
   try {
@@ -184,6 +210,10 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
   }
   const seen = readOnlySeenStatement(db, tenant, device, now);
   if (seen) await seen.run();
+  // Check before the SELECT: a page that crosses the cap must not be read and then
+  // discarded, otherwise a blocked till keeps consuming the budget it is over.
+  const usage = await usageToday(c.env, tenant.id, now);
+  assertReadQuota(tenant, usage);
   const rows = await db.select<ChangeRow>(
     'SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE tenant_id = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3',
     q.since,
@@ -191,7 +221,6 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
   );
   const page = rows.slice(0, q.limit);
   addRowsRead(tenant.id, page.length);
-  const usage = await usageToday(c.env, tenant.id, now);
   return c.json({
     changes: page.map((r) => ({
       seq: r.seq,
@@ -280,6 +309,17 @@ export async function snapshotPayload(
 /** `GET /api/sync/snapshot` (03 §4.3). */
 export async function snapshot(c: Context<AppEnv>): Promise<Response> {
   assertClientSchema(c);
-  const { tenant, db } = c.var;
-  return c.json(await snapshotPayload((k) => c.req.query(k), db, tenant));
+  const { tenant, device, db } = c.var;
+  const now = Date.now();
+  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
+  // A snapshot is also a first successful request for a restored/new till. Teach it
+  // the current tenant status just like /me and pull, and mark read-only seen.
+  const seen = readOnlySeenStatement(db, tenant, device, now);
+  if (seen) await seen.run();
+  return c.json({
+    ...(await snapshotPayload((k) => c.req.query(k), db, tenant)),
+    server_time: now,
+    tenant_status: tenantStatusPayload(tenant),
+    support: supportPayload(tenant, now),
+  });
 }

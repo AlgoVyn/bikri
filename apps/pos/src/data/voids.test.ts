@@ -253,6 +253,62 @@ describe('void & reissue (screens/10 AC 3)', () => {
     expect(oldSale.status).toBe('paid');
   });
 
+  it('refuses a reissue whose transaction would exceed the op limit', async () => {
+    const { db, ctx, phone } = await shopWithStock();
+    const template = t2Cart(phone, phone).lines[0];
+    if (!template) throw new Error('missing line');
+    const bigCart = {
+      ...emptyCart('c1'),
+      lines: Array.from({ length: 60 }, (_, i) => ({
+        ...template,
+        key: `line-${i}`,
+        product_id: phone.id,
+        qty_milli: 1000,
+        unit_price: template.unit_price,
+        list_price: template.unit_price,
+        discount_type: undefined,
+        discount_value: 0,
+      })),
+    };
+    const total = cartTotals(bigCart, shopMoney(null)).total;
+    await completeSale(
+      db,
+      sale(bigCart, [{ method: 'cash', amount: total }], {
+        saleId: 'sale-big',
+      }),
+      ctx,
+      NOW,
+    );
+    const reissue = await startReissue(db, {
+      saleId: 'sale-big',
+      cartId: 'c2',
+      reason: 'Too large',
+      now: NOW + 1000,
+    });
+    reissue.overrides = Array.from({ length: 10 }, (_, i) => ({
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      bound_line: `line-${i}`,
+      bound_price: 1,
+    }));
+    await expect(
+      completeSale(
+        db,
+        {
+          saleId: 'sale-big-new',
+          cartId: 'c2',
+          cart: reissue,
+          money: shopMoney(null),
+          rows: [{ method: 'cash', amount: total }],
+          print: false,
+          maxDiscountBp: 10000,
+        },
+        ctx,
+        NOW + 2000,
+      ),
+    ).rejects.toThrow(/too many ops/u);
+  });
+
   it('refuses to reissue a voided or refunded bill', async () => {
     const { db } = await shopWithStock();
     await db.sales.put({

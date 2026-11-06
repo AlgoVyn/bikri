@@ -19,7 +19,12 @@ export function usePrintService(): void {
   const ref = useRef({ t, toast });
   ref.current = { t, toast };
   useEffect(() => {
-    void recoverInterruptedPrintJobs(getDb());
+    const db = getDb();
+    void recoverInterruptedPrintJobs(db);
+    // A job left `printing` by a tab that closed just before startup becomes stale
+    // after two minutes; keep checking instead of only doing this once.
+    const id = setInterval(() => void recoverInterruptedPrintJobs(db), 60_000);
+    return () => clearInterval(id);
   }, []);
   const trigger = useLiveQuery(async () => {
     const db = getDb();

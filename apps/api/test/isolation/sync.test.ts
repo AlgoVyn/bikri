@@ -657,6 +657,23 @@ describe('sync isolation', () => {
     ]);
   });
 
+  it('I25: the daily read cap is charged to one tenant only', async () => {
+    const a = await seedShop('Cap A');
+    const b = await seedShop('Cap B');
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare(
+      'INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read) VALUES (?1, ?2, 0, 0, 1000000)',
+    )
+      .bind(a.tenantId, day)
+      .run();
+    expect(
+      (await api('/sync/pull?since=0', { token: a.till.token })).status,
+    ).toBe(503);
+    expect(
+      (await api('/sync/pull?since=0', { token: b.till.token })).status,
+    ).toBe(200);
+  });
+
   it('I24 / 25: support devices cannot push, can pull and snapshot, stop at expires_at', async () => {
     const a = await seedShop('Sup A');
     const live = await addSupportDevice(a, Date.now() + 3_600_000);

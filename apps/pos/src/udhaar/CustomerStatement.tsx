@@ -153,6 +153,7 @@ export function CustomerStatement({
     to: to || null,
     rows,
     openingBalance: statement.openingBalance,
+    lang: i18n.language,
     labels: {
       title: t('office.udhaar.statement'),
       date: t('office.udhaar.date'),

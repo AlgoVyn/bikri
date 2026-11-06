@@ -141,6 +141,7 @@
     "leave": "Woh dukaan chhorein",
     "leave_confirm": "{{shop}} ko is browser se hatayein? Is device par us ka saara data mit jayega; dukaan ka sync shuda data mehfooz rahega.",
     "leave_blocked": "{{count}} tabdeeliyan abhi sync nahin huin. Pehle unhein export karein, phir niklein.",
+    "leave_files_blocked": "{{count}} tasveerein ya logo abhi upload nahin huin. Is dukaan ko chhornay se pehle unhein upload karein.",
     "leave_pin_body": "Is dukaan ko browser se hatane ke liye malik ka PIN darj karein. Is device ka local data mit jayega; synced data server par mehfooz rahega.",
     "leave_pin_title": "Malik ka PIN darkar hai",
     "revoked": "Maalik ne is device ko munqata kar diya hai. Jo sales sync nahin huin woh isi device par mehfooz hain.",
@@ -438,7 +439,8 @@
     "due_label": "Abhi baqi",
     "cart_changed": "Yeh bill kisi doosre tab mein ada ho chuka hai. Dobara payment se pehle page reload karein.",
     "backdate_summary": "{{date}} ki purani sale, {{staff}} ki taraf se",
-    "backdate_failed": "Purani sale save nahi hui. Date aur cashier check karein."
+    "backdate_failed": "Purani sale save nahi hui. Date aur cashier check karein.",
+    "too_many_ops": "Yeh dobara bill sync karne ke liye bohat bara hai. Purana bill wapas karein aur naya bill alag banayein."
   },
   "payment": {
     "bank_wallet": "Bank/wallet",
@@ -1101,6 +1103,9 @@
     "files_title_other": "{{count}} photos ya logos upload nakaam hue",
     "files_hint": "Sale aur reports mutasir nahi hain. Online hone par dobara koshish karein.",
     "file_retry": "Dobara koshish",
+    "file_remove": "Hatayein",
+    "file_remove_title": "Yeh upload hatayein?",
+    "file_remove_body": "Tasveer ya logo upload nahin hoga. Ise wapas nahin kiya ja sakta.",
     "file_kind_product_image": "Product ki photo",
     "file_kind_logo": "Dukan ka logo"
   },

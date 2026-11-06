@@ -1,4 +1,8 @@
-import type { ReceiptLabels } from './types.ts';
+import type {
+  DayCloseLabels,
+  ReceiptLabels,
+  SupplierReturnLabels,
+} from './types.ts';
 
 export const englishReceiptLabels: ReceiptLabels = {
   saleTitle: 'SALE RECEIPT',
@@ -113,3 +117,50 @@ export function receiptLabelsFor(
 export function resolveLabels(partial?: Partial<ReceiptLabels>): ReceiptLabels {
   return { ...englishReceiptLabels, ...partial };
 }
+
+/** Day-close (Z-report) slip labels for Urdu receipt language. */
+export const urduDayCloseLabels: DayCloseLabels = {
+  title: 'ڈے کلوز',
+  device: 'ڈیوائس',
+  from: 'سے',
+  to: 'تک',
+  opening: 'ابتدائی نقدی',
+  cashSales: 'نقد فروخت',
+  udhaarIn: 'ادھار وصول (نقد)',
+  payIns: 'نقدی ڈالی',
+  supplierIn: 'سپلائر سے واپسی (نقد)',
+  cashRefunds: 'واپسی اور منسوخ بل (نقد)',
+  cashExpenses: 'نقد اخراجات',
+  supplierOut: 'سپلائر کو ادا (نقد)',
+  payOuts: 'نقدی نکالی',
+  expected: 'دراز میں متوقع',
+  counted: 'گنی گئی',
+  difference: 'فرق',
+  denominations: 'گنی گئی نقدی',
+  correct: 'دراز درست ہے',
+  short: 'کم',
+  over: 'زیادہ',
+  card: 'کارڈ کل',
+  bank: 'بینک/والیٹ کل',
+  udhaarGiven: 'دیا گیا ادھار',
+  bills: 'بل',
+  refunds: 'واپسیاں',
+  note: 'نوٹ',
+  closedBy: 'بند کرنے والا',
+};
+
+/** Return-to-supplier slip labels for Urdu receipt language. */
+export const urduSupplierReturnLabels: SupplierReturnLabels = {
+  title: 'سپلائر کو واپسی',
+  supplier: 'سپلائر',
+  delivery: 'ڈیلیوری',
+  date: 'تاریخ',
+  total: 'کل کریڈٹ',
+  received: 'واپس ملا',
+  reason: 'وجہ',
+  note: 'نوٹ',
+  balance: 'بیلنس اب',
+  advance: 'ایڈوانس',
+  methodCash: 'نقد',
+  methodBank: 'بینک/والیٹ',
+};

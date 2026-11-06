@@ -76,13 +76,18 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   );
   const startAt = Math.max(
     0,
-    list.findIndex((t) => t.tenant_id > cursor),
+    list.findIndex((t) => t.tenant_id >= cursor),
   );
   const ordered = [...list.slice(startAt), ...list.slice(0, startAt)];
   let budget = LOG_MAX_PER_RUN;
   let lastTenant = cursor;
+  let completed = true;
   for (const { tenant_id, target } of ordered) {
-    if (budget <= 0 || !calls.ok(3)) break;
+    // Leave one call for the cursor write at the end of this pass.
+    if (budget <= 0 || !calls.ok(4)) {
+      completed = false;
+      break;
+    }
     const floorRow = await calls.run(() =>
       DB.prepare('SELECT change_log_floor FROM tenants WHERE id = ?1')
         .bind(tenant_id)
@@ -118,7 +123,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   if (calls.ok()) {
     await calls.run(() =>
       DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'prune_cursor'")
-        .bind(budget <= 0 ? lastTenant : '')
+        .bind(completed ? '' : lastTenant)
         .run(),
     );
   }
@@ -138,6 +143,11 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
           now - DAY,
         ),
         DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
+        // Public requests hold name/email/phone. A closed request has no operator use
+        // after the retention window (09 §9).
+        DB.prepare(
+          "DELETE FROM shop_requests WHERE status IN ('rejected','failed') AND updated_at < ?1",
+        ).bind(now - 30 * DAY),
       ]),
     );
     report.applied_ops = res[0]?.meta.changes ?? 0;

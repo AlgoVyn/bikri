@@ -92,10 +92,11 @@ export async function saveCart(
   await db.carts.put({ ...cart, updated_at: now });
 }
 
+/** The same snapshot the server verifies (07 §6): the chosen method's cost, no fallback. */
 export function unitCostOf(product: MasterRow, method: CostMethod): number {
-  const avg = Number(product.avg_cost ?? 0);
-  const last = Number(product.last_cost ?? 0);
-  return method === 'last' ? last || avg : avg || last;
+  return method === 'last'
+    ? Number(product.last_cost ?? 0)
+    : Number(product.avg_cost ?? 0);
 }
 
 /** Adds `qtyMilli` of a product; merges into its line unless that line has a note or a price override. */

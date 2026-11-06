@@ -335,7 +335,21 @@ export function DevicesTab({
               void (async () => {
                 let done = 0;
                 for (const slice of chunkOpsByTx(job.ops)) {
-                  await importOps(tenantId, job.deviceId, slice);
+                  const res = await importOps(tenantId, job.deviceId, slice);
+                  const results = (res.results ?? []) as {
+                    result?: string;
+                  }[];
+                  const rejected = results.filter(
+                    (row) => row.result === 'rejected',
+                  ).length;
+                  const missing = slice.length - results.length;
+                  if (rejected > 0 || missing > 0)
+                    throw new Error(
+                      t('admin.import_partial', {
+                        rejected: formatCount(rejected, lang),
+                        missing: formatCount(missing, lang),
+                      }),
+                    );
                   done += slice.length;
                   setProgress(
                     t('admin.import_progress', {

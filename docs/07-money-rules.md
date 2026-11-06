@@ -250,7 +250,7 @@ For a date range [from, to] by `business_date` (and branch, v2):
 | Profit margin | Gross profit ÷ Σ line_revenue |
 | Udhaar given | Σ `sales.udhaar_amount` (non-void) − Σ `refunds.udhaar_part` |
 | Udhaar received | Σ payments purpose `customer_payment` |
-| Payment mix | Σ applied per method + udhaar, minus refunds per method (`amount` by `refunds.method`; `udhaar_part` from udhaar) |
+| Payment mix | Σ applied per method + udhaar for non-void sales, minus refunds per method (`amount` by `refunds.method`; `udhaar_part` from udhaar). A voided sale's original payment and its void payout are both excluded |
 | Tax collected | Σ `sales.tax` (non-void) − tax share of refunds (Σ `mulDivRound(tax_alloc, q, Q)` per refunded line, cumulative pattern) |
 | Supplier returns | count, Σ `supplier_returns.total`, and the return difference Σ (`line_total` − `mulDivRound(qty_milli, cost_snapshot, 1000)`) — informational, **not** part of profit (like stock write-offs) |
 | Best sellers | top 10 products by qty and by revenue (net of refunds) |

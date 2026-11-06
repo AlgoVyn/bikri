@@ -4,6 +4,7 @@ import {
   can,
   creditLimitCheck,
   isBelowCost,
+  MAX_OPS_PER_TX,
   newId,
 } from '@bikri/core';
 import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
@@ -348,6 +349,27 @@ export async function completeSale(
             now,
           })
         : null;
+      if (reissuePlan) {
+        // One reissue writes the void and the replacement bill in one transaction. The
+        // server accepts at most 200 ops per transaction; refuse before writing a tx
+        // that can never leave the outbox. The estimate deliberately over-counts.
+        const newBillOps =
+          1 +
+          cart.lines.length * 2 +
+          3 + // one payment row per method (cash/card/bank)
+          1 + // udhaar ledger
+          (cart.overrides?.length ?? 0) +
+          (backdate ? 1 : 0) +
+          2; // discount/share audits
+        const voidOps =
+          1 +
+          reissuePlan.payments.length +
+          (reissuePlan.udhaar > 0 ? 1 : 0) +
+          reissuePlan.productOf.size +
+          2; // void + optional override audit
+        if (newBillOps + voidOps > MAX_OPS_PER_TX)
+          throw new SaleInvalidError('too many ops');
+      }
       const seq = Number((await kv.get('invoice_seq'))?.value ?? 0) + 1;
       await kv.put({ key: 'invoice_seq', value: seq });
       const bill =
@@ -501,6 +523,9 @@ export async function completeSale(
         });
       for (const o of cart.overrides ?? []) {
         if (o.permission === 'sale.void') continue;
+        // `bound_cart` is a large local signature used only by overrideMatches; the
+        // server ignores it and the audit row has a 4,000-character column cap.
+        const { bound_cart: _boundCart, ...approval } = o;
         // A price approval is bound to the cart key it was given for; store the bill's
         // line id so the Worker can link the audit row to the exact sale line.
         const boundLine =
@@ -509,7 +534,9 @@ export async function completeSale(
             : undefined;
         await audit(
           'override',
-          boundLine === undefined ? o : { ...o, bound_line: boundLine },
+          boundLine === undefined
+            ? approval
+            : { ...approval, bound_line: boundLine },
         );
       }
       // The recorder authorized a past price for the attributed seller. Write the same

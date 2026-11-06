@@ -364,17 +364,23 @@ export async function createExpenseCategory(
 ): Promise<MasterRow> {
   const name = input.name.trim().slice(0, 40);
   if (!name) throw new RangeError('name is required');
-  const code =
+  const base =
     name
       .toLowerCase()
       .replace(/[^a-z0-9]+/gu, '_')
       .replace(/^_+|_+$/gu, '')
       .slice(0, 30) || `cat_${now.toString(36)}`;
-  const existing = await db.expense_categories
-    .where('code')
-    .equals(code)
-    .first();
-  if (existing) throw new RangeError('category exists');
+  // A soft-deleted category keeps its code (the unique index includes it). Reusing the
+  // name after deleting it gets a fresh code instead of an "already exists" dead end.
+  const all = await db.expense_categories.toArray();
+  const same = all.find((row) => String(row.code) === base);
+  if (same && !same.deleted_at) throw new RangeError('category exists');
+  const taken = new Set(all.map((row) => String(row.code)));
+  let code = base;
+  if (same) {
+    for (let suffix = 2; taken.has(code); suffix += 1)
+      code = `${base.slice(0, 27)}_${suffix}`;
+  }
   return writeAction(
     db,
     (w) =>

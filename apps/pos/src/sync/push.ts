@@ -111,22 +111,30 @@ export async function pushAll(
     claim_token: undefined,
   });
   for (let round = 0; round < maxRounds; round += 1) {
-    const pending = await db.outbox
-      .where('status')
-      .equals('pending')
-      .sortBy('seq');
-    if (pending.length === 0) break;
-    const batch = nextBatch(pending);
-    const seqs = batch
-      .map((entry) => entry.seq)
-      .filter((seq): seq is number => seq !== undefined);
-    const claimToken = newId();
-    await db.outbox.where('seq').anyOf(seqs).modify({
-      status: 'sending',
-      sending_at: Date.now(),
-      sent_at: Date.now(),
-      claim_token: claimToken,
+    let batch: OutboxEntry[] = [];
+    let seqs: number[] = [];
+    let claimToken = '';
+    // Read, choose the batch and claim it in one transaction. A later edit must see
+    // `sending` and create a fresh op instead of coalescing into the payload we send.
+    await db.transaction('rw', db.outbox, async () => {
+      const pending = await db.outbox
+        .where('status')
+        .equals('pending')
+        .sortBy('seq');
+      if (pending.length === 0) return;
+      batch = nextBatch(pending);
+      seqs = batch
+        .map((entry) => entry.seq)
+        .filter((seq): seq is number => seq !== undefined);
+      claimToken = newId();
+      await db.outbox.where('seq').anyOf(seqs).modify({
+        status: 'sending',
+        sending_at: Date.now(),
+        sent_at: Date.now(),
+        claim_token: claimToken,
+      });
     });
+    if (batch.length === 0) break;
     let res: PushResponse;
     try {
       res = await tillRequest<PushResponse>(db, '/sync/push', {

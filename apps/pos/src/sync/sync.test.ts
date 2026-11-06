@@ -22,6 +22,8 @@ import { refreshMe } from './me.ts';
 import {
   fixInvoiceSeq,
   pullAll,
+  reconcileRecoveredMasterFields,
+  replayOutboxLocally,
   restoreRecovery,
   runSnapshot,
 } from './pull.ts';
@@ -700,9 +702,12 @@ describe('pull (03 §4.2)', () => {
     const resent = await db.outbox.toArray();
     expect(resent.map((e) => e.row_id)).toEqual(['s-new', 'l-new']);
     expect(resent[0]?.kind).toBe('insert');
-    expect(await db.sales.count()).toBe(1);
+    // The restored snapshot has s-old; the recovered s-new is replayed locally at once.
+    expect(await db.sales.count()).toBe(2);
+    expect((await db.sales.get('s-old'))?.invoice_no).toBe('A-A-1');
+    expect((await db.sales.get('s-new'))?.invoice_no).toBe('A-A-7');
     expect(await getKv(db, 'restore_epoch', null)).toBe('99');
-    expect(await getKv(db, 'invoice_seq', 0)).toBe(3);
+    expect(await getKv(db, 'invoice_seq', 0)).toBe(7);
     await db.sales.put({
       id: 's-9',
       device_id: 'dev-1',
@@ -933,6 +938,11 @@ describe('pull (03 §4.2)', () => {
       { id: 'a-other', entity: 'staff', entity_id: 'st-1', created_at: 1000 },
     ] as never);
 
+    // Ledger rows are caches' source of truth; give the synthetic rows the fields a
+    // real write always has so the replay after restore can rebuild balances.
+    await db.ledger_entries
+      .toCollection()
+      .modify({ amount: 100, party_type: 'customer', party_id: 'c1' });
     for (const tbl of [
       'payments',
       'refunds',
@@ -964,8 +974,9 @@ describe('pull (03 §4.2)', () => {
     expect(Math.max(...perTx.values())).toBeLessThanOrEqual(200);
     expect(await getKv(db, 'restore_epoch', null)).toBe('epoch-2');
     expect(await getKv(db, 'snapshot_state', null)).toBeNull();
-    expect(await db.sales.count()).toBe(0);
-    expect(await db.sale_voids.count()).toBe(0);
+    // Recovery replays the rows it queued so the till is usable before the next push.
+    expect(await db.sales.count()).toBe(1);
+    expect(await db.sale_voids.count()).toBe(1);
   });
 
   it('restore recovery re-sends master rows created or changed after the restore point', async () => {
@@ -1140,6 +1151,208 @@ describe('pull (03 §4.2)', () => {
     expect(byRow('sl-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
     expect(byRow('pay-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
     expect(byRow('st-new').some((entry) => entry.tx_id === saleTx)).toBe(true);
+  });
+
+  it('narrows recovered master edits to the fields that differ from the restored row', async () => {
+    const db = await readyDb('recover-master');
+    await db.customers.put({
+      id: 'c1',
+      name: 'Restored',
+      phone: '0300',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 2,
+      updated_by: null,
+    } as never);
+    await db.customers.put({
+      id: 'c-newer',
+      name: 'Restored newer',
+      phone: '0301',
+      created_at: NOW,
+      updated_at: NOW + 1000,
+      deleted_at: null,
+      rev: 3,
+      updated_by: null,
+    } as never);
+    await db.outbox.bulkAdd([
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'customers',
+        kind: 'upsert',
+        row_id: 'c1',
+        row: { id: 'c1', name: 'Mine', phone: '0300' },
+        base_rev: 2,
+        changed_fields: ['name', 'phone'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'customers',
+        kind: 'upsert',
+        row_id: 'c-new',
+        row: { id: 'c-new', name: 'New' },
+        base_rev: 0,
+        changed_fields: ['name'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'customers',
+        kind: 'upsert',
+        row_id: 'c-ordinary',
+        row: { id: 'c-ordinary', name: 'Ordinary', phone: '1' },
+        base_rev: 0,
+        changed_fields: ['name', 'phone'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'customers',
+        kind: 'upsert',
+        row_id: 'c-no-row',
+        base_rev: 0,
+        changed_fields: ['name'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'customers',
+        kind: 'upsert',
+        row_id: 'c-newer',
+        row: {
+          id: 'c-newer',
+          name: 'Old local',
+          phone: '0301',
+          updated_at: NOW,
+        },
+        base_rev: 2,
+        changed_fields: ['name'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+    ] as never);
+    await reconcileRecoveredMasterFields(db);
+    const entries = await db.outbox.toArray();
+    expect(entries[0]?.changed_fields).toEqual(['name']);
+    // No server copy for a row created after the restore point: keep the full upsert.
+    expect(entries[1]?.changed_fields).toEqual(['name']);
+    expect(entries[2]?.changed_fields).toEqual(['name', 'phone']);
+    expect(entries[3]?.changed_fields).toEqual(['name']);
+    // The restored row is newer than this local edit, so another till already won.
+    expect(entries[4]?.changed_fields).toEqual([]);
+    // Restore cleared the old shadow; recovered edits must get a new one so a later
+    // rejection can be discarded back to the restored row.
+    expect(await db.pull_shadow.get(['customers', 'c1'])).toBeDefined();
+    expect(await db.pull_shadow.get(['customers', 'c-new'])).toBeUndefined();
+  });
+
+  it('replays recovered deletes and master inserts locally', async () => {
+    const db = await readyDb('replay-delete');
+    await db.categories.put({
+      id: 'c-old',
+      name_en: 'Old',
+      name_ur: '',
+      color: 't1',
+      sort_order: 0,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+      updated_by: null,
+    } as never);
+    await db.categories.put({
+      id: 'c-existing',
+      name_en: 'Before',
+      name_ur: '',
+      color: 't1',
+      sort_order: 0,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 4,
+      updated_by: null,
+    } as never);
+    await db.outbox.bulkAdd([
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'categories',
+        kind: 'upsert',
+        row_id: 'c-existing',
+        row: { id: 'c-existing', name_en: 'After' },
+        base_rev: 4,
+        changed_fields: ['name_en'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'categories',
+        kind: 'delete',
+        row_id: 'c-old',
+        base_rev: 1,
+        updated_by: null,
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'categories',
+        kind: 'upsert',
+        row_id: 'c-new',
+        row: { id: 'c-new', name_en: 'New', code: 'new' },
+        base_rev: 0,
+        changed_fields: [],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: newId(),
+        tbl: 'categories',
+        kind: 'upsert',
+        row_id: 'c-failed',
+        row: { id: 'c-failed', name_en: 'Rejected' },
+        base_rev: 0,
+        changed_fields: [],
+        created_at: NOW,
+        status: 'failed',
+        attempts: 1,
+      },
+    ] as never);
+    await replayOutboxLocally(db);
+    expect((await db.categories.get('c-old'))?.deleted_at).toBe(NOW);
+    expect((await db.categories.get('c-new'))?.name_en).toBe('New');
+    expect((await db.categories.get('c-existing'))?.name_en).toBe('After');
+    expect((await db.categories.get('c-existing'))?.rev).toBe(4);
+    expect(await db.categories.get('c-failed')).toBeUndefined();
   });
 
   it('runSnapshot from scratch on a new device', async () => {

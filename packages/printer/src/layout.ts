@@ -101,37 +101,50 @@ export function lineNeedsRtl(text: string): boolean {
  * Word-wrap. A token longer than `width` is hard-broken.
  * Spaces used as the break are not kept.
  */
+const segmenter =
+  typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null;
+
+/** Code points/graphemes, so a surrogate pair or an Urdu base+mark is never split. */
+function graphemes(text: string): string[] {
+  if (segmenter)
+    return [...segmenter.segment(text)].map((part) => part.segment);
+  return Array.from(text);
+}
+
 export function wrapText(text: string, width: number): string[] {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
   }
-  const clean = Array.from(text, (ch) => {
-    const code = ch.codePointAt(0) ?? 0;
-    return code < 32 || code === 127 ? ' ' : ch;
-  })
+  const clean = graphemes(text)
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code < 32 || code === 127 ? ' ' : ch;
+    })
     .join('')
     .trimEnd();
   if (clean.length === 0) {
     return [];
   }
-  text = clean;
   const lines: string[] = [];
-  let rest = text;
+  let rest = graphemes(clean);
   while (rest.length > width) {
     const breakAt = rest.lastIndexOf(' ', width);
     if (breakAt <= 0) {
-      lines.push(rest.slice(0, width));
+      lines.push(rest.slice(0, width).join(''));
       rest = rest.slice(width);
       continue;
     }
-    const piece = rest.slice(0, breakAt).trimEnd();
-    rest = rest.slice(breakAt + 1).trimStart();
+    const piece = rest.slice(0, breakAt).join('').trimEnd();
+    rest = rest.slice(breakAt + 1);
+    while (rest[0] === ' ') rest = rest.slice(1);
     if (piece.length > 0) {
       lines.push(piece);
     }
   }
   if (rest.length > 0) {
-    lines.push(rest);
+    lines.push(rest.join(''));
   }
   return lines;
 }

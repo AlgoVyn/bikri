@@ -106,6 +106,13 @@ export class SyncEngine {
       return;
     }
     if (state.phase === 'revoked' || state.phase === 'outdated') return;
+    // Never push recovery ops before their restored snapshot is complete: their local
+    // tables and caches are still empty/incomplete until the snapshot settles them.
+    if (
+      kind !== 'pull' &&
+      (await getKv<boolean>(this.db, 'recovery_pending', false))
+    )
+      kind = 'pull';
     state.set({ phase: 'syncing', error: null });
     try {
       let serverTime: number | null = null;

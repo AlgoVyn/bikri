@@ -8,6 +8,7 @@ import {
   newSixDigitCode,
   normaliseCode,
   safeEqual,
+  sha256Hex,
   signToken,
   verifyToken,
 } from '../auth/crypto.ts';
@@ -30,14 +31,15 @@ import {
   maskEmail,
   supportStatement,
 } from '../platform/tenantAdmin.ts';
+import { usageToday } from '../platform/tenants.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { allocateDeviceCode } from '../sync/devices.ts';
-import { importOps } from '../sync/importOps.ts';
+import { importOps, opsBefore } from '../sync/importOps.ts';
 import { ImportOpsBody } from '../sync/opSchema.ts';
 import { revokeSupportDevices } from '../sync/status.ts';
 import type { AppEnv, DeviceRow, TenantRow } from '../types.ts';
-import { snapshotPayload } from './sync.ts';
+import { assertReadQuota, snapshotPayload } from './sync.ts';
 
 export const shop = new Hono<AppEnv>();
 
@@ -213,7 +215,7 @@ shop.post('/owner-signin/verify', async (c) => {
   await ipLimit(c);
   const body = z
     .object({ code_id: z.string().max(40), code: z.string().regex(/^\d{6}$/) })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const now = Date.now();
   const bad = (left: number) =>
     new ApiError('BAD_SIGNIN_CODE', 400, 'That code is not right', {
@@ -316,7 +318,7 @@ shop.post('/enrolment-codes', async (c) => {
       branch_id: z.string().max(40),
       is_admin: z.boolean().default(false),
     })
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   if (!(await branchExists(db, body.branch_id)))
     throw new ApiError('NOT_FOUND', 404, 'No such branch');
   const now = Date.now();
@@ -375,14 +377,20 @@ shop.delete('/enrolment-codes/:code', async (c) => {
   const { db } = c.var;
   const raw = c.req.param('code');
   const plain = normaliseCode(raw);
-  const match = plain
-    ? {
-        sql: 'code_hash = ?2',
-        value: await codeHash(plain),
-      }
-    : /^[0-9a-f]{16}$/.test(raw)
-      ? { sql: 'substr(code_hash, 1, 16) = ?2', value: raw }
-      : null;
+  let match: { sql: string; value: string } | null = null;
+  if (plain) {
+    const newHash = await codeHash(ownerCodeKey(c.env), plain);
+    // Codes issued before the keyed hash can still be cancelled by their plain code.
+    const legacyHash = await sha256Hex(`enrol:${plain}`);
+    const found = await db.first<{ code_hash: string }>(
+      "SELECT code_hash FROM enrolment_codes WHERE tenant_id = ?1 AND (code_hash = ?2 OR code_hash = ?3) AND used_at IS NULL AND kind = 'till'",
+      newHash,
+      legacyHash,
+    );
+    if (found) match = { sql: 'code_hash = ?2', value: found.code_hash };
+  } else if (/^[0-9a-f]{16}$/.test(raw)) {
+    match = { sql: 'substr(code_hash, 1, 16) = ?2', value: raw };
+  }
   if (!match) throw new ApiError('NOT_FOUND', 404, 'No such code');
   const code = await db.first<{ device_name: string; grants_admin: number }>(
     `SELECT device_name, grants_admin FROM enrolment_codes WHERE tenant_id = ?1 AND ${match.sql} AND used_at IS NULL AND kind = 'till'`,
@@ -458,7 +466,7 @@ shop.patch('/devices/:id', async (c) => {
       is_admin: z.boolean().optional(),
     })
     .strict()
-    .parse(await c.req.json());
+    .parse(await readJsonBody(c, 64 * 1024));
   const d = await deviceOf(db, c.req.param('id'));
   if (d.revoked_at !== null)
     throw new ApiError('CONFLICT', 409, 'This device is revoked');
@@ -579,6 +587,15 @@ shop.post('/import-ops', async (c) => {
   // importOps applies only transactions created before a read-only cutoff (13 §7.2).
   const body = ImportOpsBody.parse(await readJsonBody(c, 1_000_000));
   const now = Date.now();
+  if (
+    tenant.status === 'read_only' &&
+    tenant.status_changed_at !== null &&
+    opsBefore(body.ops, tenant.status_changed_at).length === 0
+  ) {
+    throw new ApiError('TENANT_READ_ONLY', 403, 'This shop is read-only', {
+      since: tenant.status_changed_at,
+    });
+  }
   const out = await importOps(c.env, db, tenant, body.device_id, body.ops, now);
   await db.batch(
     audit(c, 'ops_import', {
@@ -626,6 +643,7 @@ type ExportToken = {
 shop.get('/export', async (c) => {
   const { tenant, device, db } = c.var;
   const now = Date.now();
+  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
   const exportId = c.req.query('export_id');
   if (!exportId) {
     if (

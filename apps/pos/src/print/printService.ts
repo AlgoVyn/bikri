@@ -119,13 +119,35 @@ export async function printBlocks(
     return;
   }
   await prepareRasterFonts();
-  const one = encodeFor(blocks, printer, {
+  const language = languageOverride ?? (await receiptLanguage(db));
+  // A drawer kick belongs to the sale/refund action, not to every copy of its
+  // receipt. Encode the body without drawer blocks and append one kick after all
+  // copies (the command is harmless if no drawer is attached).
+  const drawer = blocks.some((block) => block.t === 'drawer');
+  const body = blocks.filter((block) => block.t !== 'drawer');
+  const one = encodeFor(body, printer, {
     logo,
     renderer: deps.renderer,
-    language: languageOverride ?? (await receiptLanguage(db)),
+    language,
   });
-  const bytes = new Uint8Array(one.length * copies);
-  for (let i = 0; i < copies; i += 1) bytes.set(one, i * one.length);
+  const parts: Uint8Array[] = [];
+  for (let i = 0; i < copies; i += 1) parts.push(one);
+  if (drawer)
+    parts.push(
+      encodeFor([{ t: 'drawer' }], printer, {
+        logo: null,
+        renderer: deps.renderer,
+        language,
+      }),
+    );
+  const bytes = new Uint8Array(
+    parts.reduce((length, part) => length + part.length, 0),
+  );
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.length;
+  }
   const timeout = deps.timeoutMs;
   if (printer.transport === 'usb') {
     const device = await findUsb(deps.usb, printer.usb);
@@ -234,14 +256,16 @@ export async function printTestPage(
   db: BikriDb,
   printer: PrinterKv,
   deps: PrintDeps,
+  options: { drawer?: boolean } = {},
 ): Promise<void> {
   const paper = receiptPaper(printer);
+  const drawer = options.drawer ?? printer.drawer !== false;
   await printBlocks(
     db,
     buildTestPrint({
       charsPerLine: paper.charsPerLine,
       printLogo: printer.print_logo !== false,
-      drawer: printer.drawer !== false,
+      drawer,
     }),
     printer,
     deps,

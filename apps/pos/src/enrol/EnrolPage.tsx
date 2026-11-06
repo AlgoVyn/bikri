@@ -21,6 +21,8 @@ import {
   leaveShop,
   markUnsyncedExported,
   normaliseCodeInput,
+  PendingFilesError,
+  pendingFileCount,
   UnsyncedOpsError,
   unexportedOps,
   unsyncedExport,
@@ -91,7 +93,7 @@ export function downloadJson(filename: string, data: unknown): void {
 export async function exportUnsynced(db: BikriDb): Promise<void> {
   const file = await unsyncedExport(db);
   downloadJson(file.filename, file.data);
-  await markUnsyncedExported(db);
+  await markUnsyncedExported(db, file.snapshot);
 }
 
 type Stage =
@@ -167,6 +169,11 @@ export function EnrolPage({
         setError(t('enrol.leave_blocked', { count }));
         return;
       }
+      const files = await pendingFileCount(db);
+      if (files > 0) {
+        setError(t('enrol.leave_files_blocked', { count: files }));
+        return;
+      }
     }
     setBusy(true);
     setError(null);
@@ -199,6 +206,8 @@ export function EnrolPage({
     } catch (e) {
       if (e instanceof UnsyncedOpsError)
         setLeaveError(t('enrol.leave_blocked', { count: e.count }));
+      else if (e instanceof PendingFilesError)
+        setLeaveError(t('enrol.leave_files_blocked', { count: e.count }));
       else setLeaveError(String(e));
     }
   };

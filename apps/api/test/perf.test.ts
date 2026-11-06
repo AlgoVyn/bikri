@@ -275,6 +275,12 @@ describe('T-062 performance', () => {
     const b = await seedShop('Perf B', { budget: 100_000 });
     const today = new Date().toISOString().slice(0, 10);
     for (const shop of [a, b]) {
+      // Reference bills snapshot the catalogue cost; keep the seeded product in step.
+      await env.DB.prepare(
+        'UPDATE products SET avg_cost = 50000, last_cost = 50000 WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, IDS.product)
+        .run();
       // 9 ops per bill, so 20 bills (180 ops) per push.
       const applied = [];
       for (let first = 0; first < 150; first += 20) {

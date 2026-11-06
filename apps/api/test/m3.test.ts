@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
 import {
@@ -195,6 +195,34 @@ describe('M3 server rules', () => {
       avg_cost: 13333,
       last_cost: 20000,
     });
+  });
+
+  it('validates a sale after a delivery in the same push at the new cost', async () => {
+    const shop = await seedShop('Same-push cost');
+    const buy = purchase(shop, IDS.product, 1000, 100000);
+    const buyTx = newId(now);
+    const saleTx = newId(now);
+    const sale = saleOps(shop, shop.till, 1).map((entry) => {
+      if (entry.tbl === 'sale_lines' && entry.row)
+        entry.row.unit_cost_snapshot = 100000;
+      entry.tx_id = saleTx;
+      return entry;
+    });
+    const res = await pushOk(shop.till, [
+      op('purchases', 'insert', buy.rows[0] as Record<string, unknown>, {
+        tx_id: buyTx,
+      }),
+      op('purchase_lines', 'insert', buy.line, { tx_id: buyTx }),
+      op('ledger_entries', 'insert', buy.ledger, { tx_id: buyTx }),
+      op(
+        'stock_movements',
+        'insert',
+        movement(shop, IDS.product, 'purchase', 1000, 100000, buy.id),
+        { tx_id: buyTx },
+      ),
+      ...sale,
+    ]);
+    expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
   });
 
   it('enforces purchase, cash move and supplier payment permissions (05 §6)', async () => {
@@ -487,7 +515,7 @@ describe('M3 server rules', () => {
       branch_id: shop.branchId,
       device_id: shop.till.id,
       staff_id: IDS.owner,
-      business_date: '2026-10-27',
+      business_date: businessDate(now),
       created_at: now,
     };
     await pushOk(shop.till, [op('expenses', 'insert', base)]);

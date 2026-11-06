@@ -86,6 +86,7 @@ export async function pullAll(
     );
     if (!res.has_more) break;
   }
+  await settleRecovery(db);
   return serverTime;
 }
 
@@ -161,10 +162,13 @@ export async function runSnapshot(
 ): Promise<void> {
   let state = await getKv<SnapshotState | null>(db, 'snapshot_state', null);
   if (!state) {
-    const start = await tillRequest<{
-      snapshot_seq: number;
-      tables: { tbl: string; rows: number }[];
-    }>(db, '/sync/snapshot');
+    const start = await tillRequest<
+      {
+        snapshot_seq: number;
+        tables: { tbl: string; rows: number }[];
+      } & StatusPayload
+    >(db, '/sync/snapshot');
+    await applyStatus(db, start);
     state = {
       seq: start.snapshot_seq,
       tables: start.tables,
@@ -178,14 +182,17 @@ export async function runSnapshot(
   onProgress?.(state.done, total);
   while (state.index < state.tables.length) {
     const tbl = state.tables[state.index]?.tbl ?? '';
-    const page = await tillRequest<{
-      rows: SyncedRow[];
-      next_after: string;
-      has_more: boolean;
-    }>(
+    const page = await tillRequest<
+      {
+        rows: SyncedRow[];
+        next_after: string;
+        has_more: boolean;
+      } & StatusPayload
+    >(
       db,
       `/sync/snapshot?tbl=${encodeURIComponent(tbl)}&after=${encodeURIComponent(state.after)}&limit=500`,
     );
+    await applyStatus(db, page);
     const next: SnapshotState = page.has_more
       ? {
           ...state,
@@ -215,6 +222,7 @@ export async function runSnapshot(
     await db.kv.delete('snapshot_state');
   });
   await fixInvoiceSeq(db);
+  await settleRecovery(db);
 }
 
 /** Never lower the invoice counter (03 §4.2 step 3). */
@@ -238,6 +246,134 @@ export async function fixInvoiceSeq(db: BikriDb): Promise<void> {
  * inserts, clear synced tables and caches (outbox kept), snapshot again.
  */
 type RecoveredOp = { tbl: LedgerTable; row: SyncedRow };
+
+const RECOVERY_KEY = 'recovery_pending';
+const SYSTEM_FIELDS = new Set([
+  'id',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'updated_by',
+  'rev',
+]);
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Restore recovery queued rows before clearing the local tables. Once the restored
+ * snapshot is down, narrow each recovered master upsert to the fields that actually
+ * differ from the restored server row, so this till cannot overwrite a field another
+ * till changed after the restore point.
+ */
+export async function reconcileRecoveredMasterFields(
+  db: BikriDb,
+): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    const entries = await db.outbox.toArray();
+    for (const entry of entries) {
+      if (
+        entry.recovery !== true ||
+        entry.kind === 'insert' ||
+        isLedgerTable(entry.tbl)
+      )
+        continue;
+      const local = (await db.table(entry.tbl).get(entry.row_id)) as
+        | Record<string, unknown>
+        | undefined;
+      // The pre-restore shadow is cleared with the local tables. Keep it for any recovered
+      // edit/delete so a rejection can be discarded back to the restored row.
+      if (local && !(await db.pull_shadow.get([entry.tbl, entry.row_id])))
+        await db.pull_shadow.put({
+          tbl: entry.tbl,
+          id: entry.row_id,
+          row: local,
+        });
+      if (entry.kind !== 'upsert' || !entry.row) continue;
+      // A row created after the restore point has no server copy: keep the full upsert.
+      if (!local) continue;
+      const localUpdatedAt = Number(local.updated_at ?? 0);
+      const entryUpdatedAt = Number(
+        entry.row.updated_at ?? entry.created_at ?? 0,
+      );
+      // If the restored row is newer than this till's local copy, another till has
+      // changed it since the restore point. Do not send the old local values back.
+      const changed =
+        localUpdatedAt > entryUpdatedAt
+          ? []
+          : Object.keys(entry.row).filter(
+              (key) =>
+                !SYSTEM_FIELDS.has(key) &&
+                !sameValue(entry.row?.[key], local[key]),
+            );
+      const narrowed: Record<string, unknown> = { id: entry.row.id };
+      for (const key of changed) narrowed[key] = entry.row[key];
+      if ('updated_at' in entry.row) narrowed.updated_at = entry.row.updated_at;
+      if ('updated_by' in entry.row) narrowed.updated_by = entry.row.updated_by;
+      if (entry.seq !== undefined)
+        await db.outbox.update(entry.seq, {
+          changed_fields: changed,
+          row: narrowed,
+        });
+    }
+  });
+}
+
+/**
+ * Make the recovered rows visible again immediately. The snapshot only contains the
+ * restored point; rows queued after it live in the outbox. This is also safe for any
+ * other pending local edits: their payloads are the local state that was cleared.
+ */
+export async function replayOutboxLocally(db: BikriDb): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    // Failed ops are not part of the restored state: their local rows were rejected
+    // and should stay hidden until the user retries or discards them.
+    const entries = (await db.outbox.orderBy('seq').toArray()).filter(
+      (entry) => entry.status === 'pending' || entry.status === 'sending',
+    );
+    for (const entry of entries) {
+      const table = db.table(entry.tbl);
+      if (!entry.row) {
+        if (entry.kind !== 'delete' || isLedgerTable(entry.tbl)) continue;
+        const current = (await table.get(entry.row_id)) as
+          | Record<string, unknown>
+          | undefined;
+        if (current && !current.deleted_at) {
+          await table.update(entry.row_id, {
+            deleted_at: entry.created_at,
+            updated_at: entry.created_at,
+            updated_by: entry.updated_by ?? null,
+          });
+        }
+        continue;
+      }
+      if (isLedgerTable(entry.tbl)) {
+        await table.put(entry.row);
+        continue;
+      }
+      const current = (await table.get(entry.row_id)) as
+        | Record<string, unknown>
+        | undefined;
+      await table.put({
+        ...(current ?? {}),
+        ...entry.row,
+        rev: current?.rev ?? 0,
+      });
+    }
+  });
+  await rebuildCaches(db);
+}
+
+export async function settleRecovery(db: BikriDb): Promise<void> {
+  if (!(await getKv<boolean>(db, RECOVERY_KEY, false))) return;
+  await reconcileRecoveredMasterFields(db);
+  await replayOutboxLocally(db);
+  // Recovered sales are replayed after the snapshot's counter fix; include them before
+  // the till allocates another invoice number.
+  await fixInvoiceSeq(db);
+  await db.kv.delete(RECOVERY_KEY);
+}
 
 const text = (value: unknown): string =>
   typeof value === 'string' ? value : '';
@@ -364,7 +500,7 @@ function masterDraft(item: RecoveredMaster, now: number): OutboxDraft {
       base_rev: baseRev,
       updated_by:
         typeof item.row.updated_by === 'string' ? item.row.updated_by : null,
-      created_at: now,
+      created_at: Number(item.row.updated_at ?? item.row.created_at ?? now),
     };
   }
   return {
@@ -376,7 +512,7 @@ function masterDraft(item: RecoveredMaster, now: number): OutboxDraft {
     changed_fields: Object.keys(row).filter((key) => key !== 'id'),
     updated_by:
       typeof item.row.updated_by === 'string' ? item.row.updated_by : null,
-    created_at: now,
+    created_at: Number(item.row.updated_at ?? item.row.created_at ?? now),
   };
 }
 
@@ -390,7 +526,7 @@ function ledgerDraft(
     kind: 'insert',
     row_id: row.id,
     row: opRow(tbl, row),
-    created_at: now,
+    created_at: Number(row.created_at ?? now),
   };
 }
 
@@ -424,10 +560,13 @@ export async function restoreRecovery(
   const device = await deviceInfo(db);
   const now = Date.now();
   if (device) {
-    const start = await tillRequest<{
-      snapshot_seq: number;
-      tables: { tbl: string; rows: number }[];
-    }>(db, '/sync/snapshot');
+    const start = await tillRequest<
+      {
+        snapshot_seq: number;
+        tables: { tbl: string; rows: number }[];
+      } & StatusPayload
+    >(db, '/sync/snapshot');
+    await applyStatus(db, start);
     await setKv(db, 'snapshot_state', {
       seq: start.snapshot_seq,
       tables: start.tables,
@@ -619,6 +758,7 @@ export async function restoreRecovery(
       }
       flush();
 
+      await db.kv.put({ key: RECOVERY_KEY, value: true });
       for (const drafts of chunks) {
         const txId = newId(now);
         for (const draft of drafts) {
@@ -628,6 +768,7 @@ export async function restoreRecovery(
             ...draft,
             status: 'pending',
             attempts: 0,
+            recovery: true,
           });
         }
       }
@@ -639,7 +780,9 @@ export async function restoreRecovery(
       await db.kv.put({ key: 'restore_epoch', value: restoreEpoch });
     });
   } catch (error) {
-    await db.kv.delete('snapshot_state');
+    // Keep the snapshot checkpoint while recovery is pending so the next pull resumes it.
+    if (!(await getKv<boolean>(db, RECOVERY_KEY, false)))
+      await db.kv.delete('snapshot_state');
     throw error;
   }
   // Resumes the snapshot state saved before the clear, even if the previous attempt failed.

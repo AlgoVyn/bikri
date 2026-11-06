@@ -13,7 +13,9 @@ export async function readJsonBody<E extends { Bindings: Env }>(
   if (Number.isFinite(length) && length > maxBytes)
     throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Request body is too large');
   const text = await c.req.text();
-  if (text.length > maxBytes)
+  // `content-length` can be absent (chunked) and string length counts UTF-16 units,
+  // not bytes. Measure the real UTF-8 payload.
+  if (new TextEncoder().encode(text).length > maxBytes)
     throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Request body is too large');
   try {
     return JSON.parse(text) as unknown;

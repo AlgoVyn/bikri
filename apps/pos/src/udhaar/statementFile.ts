@@ -1,3 +1,4 @@
+import { canvasFont, prepareCanvasFonts } from '../lib/canvasFont.ts';
 import { formatShopMoney } from '../lib/money';
 import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
@@ -19,6 +20,7 @@ export type StatementFileMeta = {
   to: string | null;
   rows: readonly StatementFileRow[];
   openingBalance: number;
+  lang?: string;
   labels: {
     title: string;
     date: string;
@@ -37,7 +39,8 @@ const MARGIN = 60;
 const ROW = 34;
 
 /** A4-ish statement picture, built locally (no network) for PDF / share (screens/12 AC 7). */
-function draw(meta: StatementFileMeta): HTMLCanvasElement {
+async function draw(meta: StatementFileMeta): Promise<HTMLCanvasElement> {
+  await prepareCanvasFonts(meta.lang);
   const extras = meta.openingBalance !== 0 ? 1 : 0;
   const height = 280 + (meta.rows.length + extras) * ROW + 80;
   const canvas = document.createElement('canvas');
@@ -48,24 +51,24 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   ctx.fillStyle = CANVAS.paper;
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.fillStyle = CANVAS.ink;
-  ctx.font = 'bold 38px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 38);
   ctx.fillText(meta.shopName, MARGIN, 70);
-  ctx.font = 'bold 28px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 28);
   ctx.fillText(meta.labels.title, MARGIN, 120);
-  ctx.font = '22px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 400, 22);
   ctx.fillText(
     `${meta.customerName}${meta.phone ? ` · ${meta.phone}` : ''}`,
     MARGIN,
     158,
   );
   ctx.fillText(meta.labels.balance, MARGIN, 194);
-  ctx.font = 'bold 24px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 24);
   ctx.fillText(
     formatShopMoney(meta.balance),
     MARGIN + ctx.measureText(meta.labels.balance).width + 12,
     194,
   );
-  ctx.font = '18px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 400, 18);
   ctx.fillStyle = CANVAS.muted;
   ctx.fillText(meta.labels.asOf, MARGIN, 228);
   ctx.fillStyle = CANVAS.ink;
@@ -78,7 +81,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
     credit: 950,
     balance: 1120,
   };
-  ctx.font = 'bold 20px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 20);
   ctx.fillText(meta.labels.date, cols.date, headerY);
   ctx.fillText(meta.labels.description, cols.description, headerY);
   ctx.textAlign = 'right';
@@ -94,7 +97,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
 
   let y = headerY + 44;
   const row = (values: StatementFileRow | null) => {
-    ctx.font = '19px Inter, sans-serif';
+    ctx.font = canvasFont(meta.lang, 400, 19);
     if (!values) {
       ctx.fillText(meta.labels.opening, cols.date, y);
       ctx.textAlign = 'right';
@@ -126,7 +129,7 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
   };
   if (extras) row(null);
   for (const values of meta.rows) row(values);
-  ctx.font = 'bold 20px Inter, sans-serif';
+  ctx.font = canvasFont(meta.lang, 700, 20);
   ctx.fillText(meta.labels.total, cols.description, y + 10);
   ctx.textAlign = 'right';
   ctx.fillText(formatShopMoney(meta.balance), cols.balance, y + 10);
@@ -134,11 +137,11 @@ function draw(meta: StatementFileMeta): HTMLCanvasElement {
 }
 
 export async function statementPng(meta: StatementFileMeta): Promise<Blob> {
-  return canvasBlob(draw(meta), 'image/png');
+  return canvasBlob(await draw(meta), 'image/png');
 }
 
 export async function statementPdf(meta: StatementFileMeta): Promise<Blob> {
-  const canvas = draw(meta);
+  const canvas = await draw(meta);
   const jpeg = new Uint8Array(
     await (await canvasBlob(canvas, 'image/jpeg', 0.92)).arrayBuffer(),
   );

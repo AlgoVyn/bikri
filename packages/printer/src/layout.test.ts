@@ -28,6 +28,15 @@ describe('wrapText', () => {
     expect(wrapText('Cable\t1m\r', 12)).toEqual(['Cable 1m']);
     expect(() => wrapText('x', 0)).toThrow();
   });
+
+  it('never splits a surrogate pair or an Urdu base letter from its mark', () => {
+    const emoji = wrapText('😀😀😀', 2);
+    expect(emoji.join('')).toBe('😀😀😀');
+    expect(emoji.every((line) => !/^[\uD800-\uDFFF]$/u.test(line))).toBe(true);
+    const urdu = wrapText('بَبَبَبَ', 2);
+    expect(urdu.join('')).toBe('بَبَبَبَ');
+    expect(urdu.every((line) => line.length % 2 === 0)).toBe(true);
+  });
 });
 
 describe('formatPair', () => {
