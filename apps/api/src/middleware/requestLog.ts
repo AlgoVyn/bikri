@@ -19,13 +19,16 @@ export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
       tenant?: { id?: string };
       device?: { id?: string };
     };
+    // `finally` runs before Hono's onError turns a thrown error into a response, so
+    // `c.res.status` is still 200. Log the error path as a 5xx instead of a false 200.
+    const failed = (c as { error?: unknown }).error !== undefined;
     console.log(
       JSON.stringify({
         level: 'info',
         request_id: id,
         method: c.req.method,
         route,
-        status: c.res.status,
+        status: failed ? 500 : c.res.status,
         tenant_id: vars.tenant?.id ?? null,
         device_id: vars.device?.id ?? null,
         ms: Math.round(performance.now() - start),

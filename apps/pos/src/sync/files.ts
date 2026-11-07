@@ -50,6 +50,9 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
     const code = body?.error?.code ?? 'HTTP_ERROR';
     if (
       (res.status >= 500 && code !== 'TENANT_STORAGE_FULL') ||
+      res.status === 408 ||
+      res.status === 425 ||
+      res.status === 429 ||
       code === 'TENANT_READ_ONLY' ||
       code === 'TENANT_QUOTA'
     ) {

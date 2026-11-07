@@ -31,6 +31,97 @@ async function sample(prefix = 'report') {
 }
 
 describe('report bundle (screens/16 ACs 1–3, 6)', () => {
+  it('keeps a backdated sale out of a single-day hourly chart', async () => {
+    const db = await readyDb('report-backdate');
+    await addShop(db, { timezone: TZ });
+    await db.sales.add({
+      id: 'sale-backdated',
+      invoice_no: 'A-A-1',
+      invoice_seq: 1,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      customer_id: null,
+      business_date: TODAY,
+      created_at: NOW - 86_400_000,
+      line_count: 0,
+      items_qty_milli: 0,
+      gross_total: 1000,
+      item_discount_total: 0,
+      subtotal: 1000,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      total: 1000,
+      paid_total: 1000,
+      udhaar_amount: 0,
+      cash_tendered: 1000,
+      change_given: 0,
+      status: 'paid',
+      replaces_sale_id: null,
+      note: '',
+    } as SyncedRow);
+    const bundle = await reportBundle(
+      db,
+      { from: TODAY, to: TODAY },
+      { now: NOW, today: TODAY, timeZone: TZ },
+    );
+    expect(bundle.summary.sold).toBe(1000);
+    expect(
+      bundle.summary.hourly.reduce((sum, hour) => sum + hour.sold, 0),
+    ).toBe(0);
+  });
+
+  it('does not treat a voided sale as recent demand for slow movers', async () => {
+    const db = await readyDb('report-slow-void');
+    await addShop(db, { timezone: TZ });
+    await db.products.add({
+      id: 'slow-1',
+      name_en: 'Slow item',
+      sku: 'SLOW-1',
+      price: 1000,
+      avg_cost: 500,
+      track_stock: 1,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    await db.stock_levels.put({ product_id: 'slow-1', on_hand_milli: 1000 });
+    await db.stock_movements.add({
+      id: 'move-sale',
+      product_id: 'slow-1',
+      qty_delta_milli: -1000,
+      reason_code: 'sale',
+      ref_type: 'sale',
+      ref_id: 'sale-voided',
+      business_date: TODAY,
+      created_at: NOW,
+    } as never);
+    await db.sale_voids.add({
+      id: 'void-1',
+      sale_id: 'sale-voided',
+      reason: 'test',
+      replacement_sale_id: null,
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      created_at: NOW,
+    } as never);
+    const bundle = await reportBundle(
+      db,
+      { from: TODAY, to: TODAY },
+      { now: NOW, today: TODAY, timeZone: TZ },
+    );
+    expect(bundle.products.slowMovers.map((row) => row.product.id)).toContain(
+      'slow-1',
+    );
+  });
+
   it('leaves a voided sale and its payout out of the payment mix', async () => {
     const db = await readyDb('report-void-mix');
     const base = {

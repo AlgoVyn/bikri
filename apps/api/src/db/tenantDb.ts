@@ -114,6 +114,43 @@ export function assertTenantScoped(sql: string): void {
       sql,
     );
   }
+  // Counting predicates alone lets a duplicate predicate on one table mask an
+  // unscoped joined table. Every alias that names a tenant table must carry its own
+  // `alias.tenant_id = ?1`; a table without an alias is covered by the count above.
+  const aliases = new Map<string, string>();
+  const keywords = new Set([
+    'on',
+    'where',
+    'join',
+    'left',
+    'right',
+    'inner',
+    'outer',
+    'cross',
+    'natural',
+    'group',
+    'order',
+    'limit',
+    'using',
+    'set',
+    'values',
+    'select',
+  ]);
+  for (const match of sql.matchAll(
+    /\b(?:FROM|JOIN)\s+"?(\w+)"?(?:\s+(?:AS\s+)?(\w+))?/giu,
+  )) {
+    const table = (match[1] ?? '').toLowerCase();
+    const alias = (match[2] ?? '').toLowerCase();
+    if (!TENANT_SET.has(table) || !alias || keywords.has(alias)) continue;
+    if (alias !== table) aliases.set(alias, table);
+  }
+  for (const alias of aliases.keys()) {
+    if (!new RegExp(`\\b${alias}\\.tenant_id\\s*=\\s*\\?1`, 'iu').test(sql))
+      throw new TenantScopeError(
+        `joined table alias ${alias} has no tenant_id = ?1 predicate`,
+        sql,
+      );
+  }
 }
 
 function assertTable(table: string): asserts table is TenantTable {
@@ -159,6 +196,8 @@ export type TenantDb = {
   first<T = Row>(sql: string, ...params: SqlValue[]): Promise<T | null>;
   run(sql: string, ...params: SqlValue[]): Promise<D1Result>;
   insert(table: TenantTable, row: Row): D1PreparedStatement;
+  /** Insert, but never overwrite an existing row (append-only imports). */
+  insertOnly(table: TenantTable, row: Row): D1PreparedStatement;
   upsert(table: TenantTable, row: Row): D1PreparedStatement;
   batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
 };
@@ -195,6 +234,10 @@ export function tenantDb(env: Env, tenant: TenantRef): TenantDb {
     insert(table, row) {
       const [sql, params] = insertSql(table, row);
       return prepare(sql, ...params);
+    },
+    insertOnly(table, row) {
+      const [sql, params] = insertSql(table, row);
+      return prepare(`${sql} ON CONFLICT(tenant_id, id) DO NOTHING`, ...params);
     },
     upsert(table, row) {
       const [sql, params] = upsertSql(table, row);

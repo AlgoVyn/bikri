@@ -1,3 +1,10 @@
+/** Platform tables that must be present in a complete dump (no per-tenant counts). */
+export const PLATFORM_TABLES = [
+  'shop_requests',
+  'operator_audit',
+  'expense_category_templates',
+];
+
 /**
  * Tenant tables included in the nightly backup manifest. Keep in sync with
  * `packages/db/src/tables.ts` (the backup test compares both lists).

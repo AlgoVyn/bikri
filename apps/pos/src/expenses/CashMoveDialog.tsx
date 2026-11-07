@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { cashMove, ExpenseError } from '../data/expenses.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -48,6 +49,7 @@ export function CashMoveDialog({
       const db = getDb();
       const ctx = await ledgerContext(db, staff?.id ?? '');
       await cashMove(db, { cashMoveId: id, kind, amount, reason }, ctx);
+      void kickDrawerForCash(db);
       toast.push(
         t(
           kind === 'pay_in'

@@ -7,7 +7,7 @@ import {
   countQueries,
   parseWranglerJson,
 } from './export.mjs';
-import { BACKUP_TABLES } from './tables.mjs';
+import { BACKUP_TABLES, PLATFORM_TABLES } from './tables.mjs';
 
 const tenant = { id: 't1', slug: 'shop', status: 'active' };
 
@@ -26,7 +26,7 @@ describe('nightly D1 export', () => {
     );
     const complete = [
       'x'.repeat(1100),
-      ...['meta', 'tenants', ...BACKUP_TABLES].map(
+      ...['meta', 'tenants', ...BACKUP_TABLES, ...PLATFORM_TABLES].map(
         (table) => `CREATE TABLE "${table}" (id TEXT);`,
       ),
       "INSERT INTO tenants VALUES ('t1');",

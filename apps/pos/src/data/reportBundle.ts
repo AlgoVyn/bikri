@@ -373,12 +373,25 @@ export async function reportBundle(
     sold: 0,
     bills: 0,
   }));
+  const timeZone = options.timeZone ?? 'Asia/Karachi';
   const hourFormat = new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
     hour12: false,
-    timeZone: options.timeZone ?? 'Asia/Karachi',
+    timeZone,
   });
   const hourOf = (at: unknown) => Number(hourFormat.format(n(at))) % 24;
+  // A backdated sale is recorded on a later day; its `created_at` hour belongs to the
+  // recording day, not the business date. Keep it in the daily total but out of the
+  // selected day's hourly chart. A cached formatter keeps the 20k-bill report fast.
+  const dayFormat = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  });
+  const singleDay = days.length === 1;
+  const onBusinessDay = (at: unknown, business: unknown) =>
+    !singleDay || dayFormat.format(n(at)) === String(business);
 
   const sales = (
     await db.sales
@@ -435,7 +448,9 @@ export async function reportBundle(
     day.sold += n(sale.total);
     day.bills += 1;
     day.tax += n(sale.tax);
-    const hour = hourly[hourOf(sale.created_at)];
+    const hour = onBusinessDay(sale.created_at, sale.business_date)
+      ? hourly[hourOf(sale.created_at)]
+      : undefined;
     if (hour) {
       hour.sold += n(sale.total);
       hour.bills += 1;
@@ -478,7 +493,9 @@ export async function reportBundle(
     const money = n(refund.amount);
     const khata = n(refund.udhaar_part);
     day.sold -= money + khata;
-    const refundHour = hourly[hourOf(refund.created_at)];
+    const refundHour = onBusinessDay(refund.created_at, refund.business_date)
+      ? hourly[hourOf(refund.created_at)]
+      : undefined;
     if (refundHour) refundHour.sold -= money + khata;
     day.udhaarGiven -= khata;
     day.mix.udhaar -= khata;
@@ -714,12 +731,21 @@ async function productReports(
       .map((level) => [level.product_id, level.on_hand_milli]),
   );
   const lastSales = new Map<string, string>();
+  const voidedSales = new Set(
+    (await db.sale_voids.toArray()).map((voidRow) => String(voidRow.sale_id)),
+  );
   const movements = await db.stock_movements
     .where('business_date')
     .belowOrEqual(input.today)
     .toArray();
   for (const movement of movements) {
-    if (movement.reason_code !== 'sale') continue;
+    // A voided sale still has its original `sale` movement; it must not keep a
+    // product out of the slow movers list.
+    if (
+      movement.reason_code !== 'sale' ||
+      voidedSales.has(String(movement.ref_id))
+    )
+      continue;
     const productId = String(movement.product_id);
     const date = String(movement.business_date);
     if (!lastSales.has(productId) || date > String(lastSales.get(productId)))

@@ -182,5 +182,6 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
       poll_after_ms: tenant.poll_after_ms,
     },
     201,
+    { 'Cache-Control': 'no-store' },
   );
 }

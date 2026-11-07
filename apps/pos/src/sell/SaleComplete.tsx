@@ -154,20 +154,17 @@ export function SaleComplete({
     saleChime();
     navigator.vibrate?.(12);
   }, [prefs?.saleSound]);
-  const settings = useLiveQuery(async () => {
-    const kv = getDb().kv;
-    return {
-      printer: (await kv.get('printer'))?.value != null,
-      autoClose:
-        ((await kv.get('display'))?.value as { auto_close?: boolean } | null)
-          ?.auto_close === true,
-    };
-  }, []);
+  const settings = useLiveQuery(
+    async () => ({
+      printer: (await getDb().kv.get('printer'))?.value != null,
+    }),
+    [],
+  );
   useEffect(() => {
-    if (!settings?.autoClose) return;
+    if (!prefs?.autoClose) return;
     const timer = setTimeout(onNewSale, AUTO_CLOSE_MS);
     return () => clearTimeout(timer);
-  }, [settings?.autoClose, onNewSale]);
+  }, [prefs?.autoClose, onNewSale]);
 
   const printAgain = async () => {
     await queueSalePrint(getDb(), saleId, { reprint: true });
@@ -185,7 +182,10 @@ export function SaleComplete({
       if (!r) return;
       const png = await receiptPng(r);
       const text = receiptShareText(r.input);
-      const link = done.customerPhone ? waLink(done.customerPhone, text) : null;
+      const link =
+        done.whatsapp && done.customerPhone
+          ? waLink(done.customerPhone, text)
+          : null;
       const file = new File([png], `${invoice}.png`, { type: 'image/png' });
       if (link) {
         downloadBlob(png, file.name);
@@ -233,7 +233,7 @@ export function SaleComplete({
 
   const change = Number(sale.change_given ?? 0);
   const udhaar = Number(sale.udhaar_amount ?? 0);
-  const whatsapp = Boolean(done.customerPhone);
+  const whatsapp = Boolean(done.whatsapp && done.customerPhone);
   return (
     <div
       className="mx-auto flex w-full max-w-md flex-col items-center gap-3 py-4 text-center"

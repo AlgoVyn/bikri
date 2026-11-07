@@ -26,6 +26,7 @@ import {
 } from '../data/supplierReturns.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Unlinked = {
@@ -223,7 +224,9 @@ export function SupplierReturnPage({
         { today: data.today },
       );
       if (data.printer && data.printer.auto_print !== false)
-        await queueSupplierReturnPrint(db, returnId);
+        await queueSupplierReturnPrint(db, returnId).catch(() => undefined);
+      if ((refundReceived ?? 0) > 0 && refundMethod === 'cash')
+        void kickDrawerForCash(db);
       const after = await supplierBalance(db, supplierId);
       toast.push(
         t('office.suppliers.return_saved', {

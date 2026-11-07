@@ -705,6 +705,7 @@
     "discount_max": "Zyada se zyada {{amount}}",
     "discount_pct": "Discount %",
     "discount_type": "Discount Rs ya % mein",
+    "discount_forbidden": "Aap ko discount dene ki ijazat nahin.",
     "drawer_denied": "Aap ko daraz kholne ki ijazat nahin.",
     "find_products": "Products talaash karein",
     "held_bills": "Ruke hue bill ({{count}})",

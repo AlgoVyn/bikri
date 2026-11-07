@@ -147,8 +147,12 @@ describe('enrolDevice', () => {
         ? { status: 201, json: enrolResponse('t-enrol') }
         : undefined;
     const { db } = await enrolDevice('ABCDEFGH', 'x');
-    const names = (await indexedDB.databases()).map((d) => d.name);
-    expect(names).not.toContain('bikri-t-old');
+    // The database is cleared rather than deleted so a second tab can never block the
+    // handover; no old value may remain readable.
+    const oldAfter = openTenantDb('t-old');
+    expect(await oldAfter.kv.get('secret')).toBeUndefined();
+    expect(await oldAfter.categories.count()).toBe(0);
+    oldAfter.close();
     db.close();
   });
 
@@ -196,10 +200,14 @@ describe('leave this shop', () => {
     expect(await unexportedOps(db)).toBe(0);
     const finalFile = await unsyncedExport(db);
     await markUnsyncedExported(db, finalFile.snapshot);
+    const tenantId = db.tenantId;
     await leaveShop(db);
     expect(localStorage.getItem('bikri.active_tenant')).toBeNull();
-    const names = await indexedDB.databases();
-    expect(names.map((d) => d.name)).not.toContain(`bikri-${db.tenantId}`);
+    const left = openTenantDb(tenantId);
+    expect(await left.sales.count()).toBe(0);
+    expect(await left.customers.count()).toBe(0);
+    expect(await left.staff.count()).toBe(0);
+    left.close();
   });
 
   it('is blocked by photos or logos that have not uploaded yet', async () => {

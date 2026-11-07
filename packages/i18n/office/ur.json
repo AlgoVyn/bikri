@@ -518,6 +518,7 @@
       "closed": "دن بند ہو گیا۔",
       "correct": "دراز درست ہے",
       "count_cash": "نقد گنیں",
+      "count_first": "فرق دیکھنے کے لیے دراز گنیں",
       "counted": "گنا",
       "difference": "فرق",
       "expected": "دراز میں متوقع",
@@ -880,7 +881,11 @@
       "action_support_access_end": "سپورٹ رسائی ختم",
       "action_support_access_start": "سپورٹ رسائی شروع",
       "action_sync_ops_discarded": "سنک تبدیلیاں خارج",
+      "action_sync_conflict_ack": "سنک تنازع تسلیم",
       "action_tenant_restore": "دکان بحال",
+      "action_tenant_purge": "بحالی کے لیے دکان کا ڈیٹا صاف",
+      "action_tenant_change": "آپریٹر نے دکان کی ترتیبات بدلیں",
+      "action_shop_created": "دکان بنائی گئی",
       "action_tenant_status_change": "دکان کی حالت تبدیلی",
       "action_void": "بل منسوخ",
       "all_actions": "تمام اعمال",
@@ -964,6 +969,7 @@
       "too_long": "یہ بارکوڈ منتخب لیبل کے لیے بہت لمبا ہے — بڑا سائز یا چھوٹا کوڈ بنائیں"
     },
     "display": {
+      "auto_close": "سیل مکمل ہونے کی سکرین خود بند کریں",
       "sale_sound": "سیل محفوظ ہونے پر آواز چلائیں",
       "auto_lock": "آٹو لاک (منٹ؛ 0 = کبھی نہیں)",
       "camera": "فون پر کیمرہ اسکیننگ",

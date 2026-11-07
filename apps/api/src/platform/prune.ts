@@ -5,7 +5,7 @@ import { revokeSupportDevices } from '../sync/status.ts';
 import { APPLY_ORDER } from '../sync/tables.ts';
 import type { TenantRow } from '../types.ts';
 
-export const MAX_CRON_CALLS = 40;
+export const MAX_CRON_CALLS = 50;
 const DAY = 86_400_000;
 const LOG_CHUNK = 5_000;
 const LOG_MAX_PER_RUN = 50_000;
@@ -188,26 +188,40 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       ).all<{ id: string; db_shard: string }>(),
     );
     let left = DELETE_MAX_PER_RUN;
+    // Self-referencing ledger rows (a reissued sale, a reversed expense) must be deleted
+    // before the row they point at. A single unordered DELETE can hit the parent first
+    // and abort the whole cron on an immediate FK, so use the same two passes as the
+    // operator purge.
+    const passesFor = (tbl: string): string[] =>
+      tbl === 'expenses'
+        ? ['reverses_id IS NOT NULL', '1 = 1']
+        : tbl === 'sales'
+          ? ['replaces_sale_id IS NOT NULL', '1 = 1']
+          : ['1 = 1'];
     for (const t of deleting.results) {
       let empty = true;
       for (const tbl of DELETE_ORDER) {
-        while (left > 0 && calls.ok(2)) {
-          const res = await calls.run(() =>
-            DB.prepare(
-              `DELETE FROM ${tbl} WHERE rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 LIMIT ?2)`,
-            )
-              .bind(t.id, Math.min(DELETE_CHUNK, left))
-              .run(),
-          );
-          const n = res.meta.changes ?? 0;
-          left -= n;
-          report.deleted_rows[t.id] = (report.deleted_rows[t.id] ?? 0) + n;
-          if (n < Math.min(DELETE_CHUNK, left + n)) break;
+        for (const where of passesFor(tbl)) {
+          while (left > 0 && calls.ok(2)) {
+            const limit = Math.min(DELETE_CHUNK, left);
+            const res = await calls.run(() =>
+              DB.prepare(
+                `DELETE FROM ${tbl} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
+              )
+                .bind(t.id, limit)
+                .run(),
+            );
+            const n = res.meta.changes ?? 0;
+            left -= n;
+            report.deleted_rows[t.id] = (report.deleted_rows[t.id] ?? 0) + n;
+            if (n < limit) break;
+          }
+          if (left <= 0 || !calls.ok(2)) {
+            empty = false;
+            break;
+          }
         }
-        if (left <= 0 || !calls.ok(2)) {
-          empty = false;
-          break;
-        }
+        if (!empty) break;
       }
       if (!empty) break;
       // R2 objects under t/<tenant>/ (list + delete; deletes are free).
@@ -228,8 +242,13 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
           DB.prepare('DELETE FROM tenant_usage WHERE tenant_id = ?1').bind(
             t.id,
           ),
+          // The public request carries the owner's name, phone and city. It is not a
+          // tenant table, so the DELETE_ORDER above never reaches it.
+          DB.prepare('DELETE FROM shop_requests WHERE tenant_id = ?1').bind(
+            t.id,
+          ),
           DB.prepare(
-            "UPDATE tenants SET status = 'deleted', deleted_at = ?2, owner_email = NULL, updated_at = ?2, status_changed_at = ?2, status_changed_by = 'cron' WHERE id = ?1",
+            "UPDATE tenants SET status = 'deleted', deleted_at = ?2, owner_email = NULL, note = '', support_reason = '', support_until = NULL, status_reason = '', updated_at = ?2, status_changed_at = ?2, status_changed_by = 'cron' WHERE id = ?1",
           ).bind(t.id, now),
         ]),
       );

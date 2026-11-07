@@ -30,6 +30,8 @@ export type DayCloseData = {
   periodEnd: number;
   openingCash: number;
   firstClose: boolean;
+  /** The latest close regardless of age, for the stale-form guard. */
+  lastClose: SyncedRow | null;
   recentClose: SyncedRow | null;
   expectedCash: number;
 };
@@ -177,6 +179,7 @@ export async function dayCloseData(
     periodEnd: now,
     openingCash: components.opening_cash,
     firstClose: !last,
+    lastClose: last,
     recentClose: last && now - n(last.created_at) < TEN_MIN ? last : null,
     expectedCash: expected.expected_cash,
   };
@@ -219,10 +222,10 @@ export async function closeDay(
       // with a second counted amount.
       if (
         input.expectedPeriodStart !== undefined &&
-        data.recentClose &&
-        n(data.recentClose.period_end) > input.expectedPeriodStart
+        data.lastClose &&
+        n(data.lastClose.period_end) > input.expectedPeriodStart
       )
-        return data.recentClose;
+        return data.lastClose;
       const result = computeDayClose({
         ...data.components,
         counted_cash: input.countedCash,
@@ -256,6 +259,13 @@ export async function closeDay(
         expected_cash: result.expected_cash,
         counted_cash: result.counted_cash,
         difference: result.difference,
+        // Snapshot the informational totals so a reprint cannot change after a late
+        // sync, void or refund (the cash components above are already stored).
+        card_total: data.components.cardTotal,
+        bank_total: data.components.bankTotal,
+        udhaar_given: data.components.udhaarGiven,
+        bills: data.components.bills,
+        refunds: data.components.refunds,
         denominations_json: input.denominations
           ? JSON.stringify(input.denominations)
           : null,
@@ -282,8 +292,12 @@ export async function closeDay(
     },
     { now, actor: ctx.staff_id },
   );
+  // The close is committed; a print-queue failure must not make the caller retry with a
+  // new dayCloseId and create a second close.
   if (options.print !== false && String(row.id) === input.dayCloseId)
-    await queueDayClosePrint(db, String(row.id), { now });
+    await queueDayClosePrint(db, String(row.id), { now }).catch(
+      () => undefined,
+    );
   return row;
 }
 

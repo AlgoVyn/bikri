@@ -144,7 +144,7 @@ test.describe('Sale complete (T-018)', () => {
     const text = url.searchParams.get('text') ?? '';
     expect(text).toContain('Bill A-A-1');
     expect(text).toContain('Galaxy A15 × 1');
-    expect(text).toContain('Udhaar Rs 42,000');
+    expect(text).toContain('Udhaar (on khata) Rs 42,000');
     expect(download.suggestedFilename()).toBe('A-A-1.png');
     const png = await readFile((await download.path()) as string);
     expect(png.subarray(1, 4).toString('latin1')).toBe('PNG');

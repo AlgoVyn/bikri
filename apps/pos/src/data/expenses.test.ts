@@ -28,6 +28,24 @@ async function setup(prefix = 'expenses') {
 }
 
 describe('expenses and cash moves (T-046)', () => {
+  it('rejects an impossible calendar date', async () => {
+    const { db, ctx } = await setup('expenses-date');
+    await expect(
+      createExpense(
+        db,
+        {
+          expenseId: 'bad-date',
+          categoryId: 'ec-1',
+          amount: 1000,
+          method: 'cash',
+          date: '2026-02-31',
+        },
+        ctx,
+        { role: 'owner', today: TODAY, now: NOW },
+      ),
+    ).rejects.toMatchObject({ code: 'date' });
+  });
+
   it('AC 1/2: a cash expense reduces expected cash, a bank expense does not', async () => {
     const { db, ctx } = await setup();
     await createExpense(

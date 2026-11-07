@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   cancelPrintJob,
   cancelQueuedPrintJobs,
+  latestUnresolvedFailed,
   recoverInterruptedPrintJobs,
   unresolvedFailedCount,
 } from './printJobs.ts';
@@ -29,6 +30,38 @@ async function setup() {
 }
 
 describe('waiting print jobs', () => {
+  it('returns the newest failed job that a later print has not superseded', async () => {
+    const db = await readyDb('print-latest');
+    await db.print_jobs.bulkAdd([
+      {
+        id: 'f-old',
+        kind: 'sale',
+        sale_id: 's1',
+        status: 'failed',
+        error: 'NO_PRINTER',
+        created_at: 1,
+      },
+      {
+        id: 'd-new',
+        kind: 'sale',
+        sale_id: 's1',
+        status: 'done',
+        created_at: 2,
+      },
+      {
+        id: 'f-new',
+        kind: 'sale',
+        sale_id: 's2',
+        status: 'failed',
+        error: 'PAPER',
+        created_at: 3,
+      },
+    ]);
+    expect(latestUnresolvedFailed(await db.print_jobs.toArray())?.id).toBe(
+      'f-new',
+    );
+  });
+
   it('cancels one queued job and leaves printing/done/failed jobs alone', async () => {
     const db = await setup();
     await cancelPrintJob(db, 'q1');

@@ -549,6 +549,11 @@ export const TABLE_COLUMNS = {
     'denominations_json',
     'note',
     'created_at',
+    'card_total',
+    'bank_total',
+    'udhaar_given',
+    'bills',
+    'refunds',
   ],
   audit_log: [
     'tenant_id',

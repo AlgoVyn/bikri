@@ -132,7 +132,7 @@ describe('sale receipt from local rows (screens/07)', () => {
     ]);
     const share = receiptShareText(r as NonNullable<typeof r>);
     expect(share).toContain('Bill A-A-1');
-    expect(share).toContain('Udhaar Rs 3,000');
+    expect(share).toContain('Udhaar (on khata) Rs 3,000');
     expect(share).toContain('Khata balance now Rs 3,000');
     expect(share).toContain('Galaxy A15 × 1');
   });

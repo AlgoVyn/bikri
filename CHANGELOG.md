@@ -78,6 +78,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Public/import bodies are capped, migration `0007` indexes `shop_requests.status_token_hash`, and `Restore from export` is documented as an operator action in v1.
 - Release gates: the website check fails closed, the backup verifies every table, `gen-tables` reads every migration, the bundle gate counts the theme/nested chunks (288 KB budget), and the e2e assertions/checks cover the repaired paths.
 
+### Seventh review remediation (2026-11-07)
+- Offline sync: a refund/void in the same push as its sale now sees the sale lines; a new cashier/shop setting is visible to later transactions; restore recovery no longer duplicates a queued ledger row; push settlement includes ledger tables; snapshots quarantine a bad row; cross-tab pushes use a lock and only reclaim stale claims.
+- Money/integrity: future row times are rejected, discount overrides need a different owner/manager within their limit, payment-sourced ledger rows are restricted, `paid_now` requires its supplier ledger row, replays are idempotent, and `sales.status` follows per-line refunded quantities.
+- Day close: blind count hides the expected difference; period uniqueness and the stale-form guard prevent overlapping closes; the Z-report snapshots its informational totals.
+- Cash handling: the drawer opens for customer/supplier payments, pay-ins/outs, expenses, supplier returns, voids and sales/refunds with auto-print off.
+- UI/print: privacy covers payment mix and expense shares; PNG/PDF receipts load the Urdu font; `Ctrl+Shift+H` is exact; reissue approvals are cart-bound; the WhatsApp toggle, auto-close, printer error and share text work.
+- Platform/schema: restore confirmation and insert-only ledger import; operator audit for settings/creation/purge; migration `0010` adds append-only triggers and day-close snapshot columns; streaming body caps, cached health, no-store enrolment tokens, error-status logs, tenant-deletion PII cleanup and platform tables in the backup gate.
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

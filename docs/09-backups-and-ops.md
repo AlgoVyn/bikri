@@ -98,7 +98,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 1. **Get the shop's data** as a `bikri-export` zip, from one of: the operator console export (current server state), the shop owner's on-device export, or a nightly backup: `wrangler d1 create bikri-restore` (counts against the 10-database Free limit; delete it afterwards), load the backup into it (§3.2 step 1), then `node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --backup-date YYYY-MM-DD --out export.zip` (pages each table with `wrangler d1 execute --json … WHERE tenant_id = ?`).
 2. Console → tenant → `Restore` → `maintenance on` (only this shop's tills get `503 MAINTENANCE` and keep selling offline).
 3. `purge` until nothing is left (≤ 5,000 rows per call; deletes count as rows written, so a large shop may take several calls and should be restored outside the shop's busy hours). `audit_log` is never purged: it is append-only, and `maintenance off` uses its last `tenant_status_change` to return the shop to `read_only`/`suspended`.
-4. `import` the zip (≤ 500 rows per call, parents first; rows validated like a push; `change_log` written).
+4. `import` the zip (≤ 500 rows per call, parents first; known columns, scalar/safe-integer values, D1 constraints and insert-only ledger writes; `change_log` written; `audit_log` is retained, not imported).
 5. `restore-epoch` with the restore point (the export's `exported_at` or the backup's date at 02:30 PKT) → the shop's tills run restore recovery ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) and re-send their own newer ledger rows.
 6. `maintenance off`. Audit `tenant_restore` in the tenant. Other shops are never touched.
 
@@ -124,7 +124,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 - `GET /api/health` (no auth) returns the shape in [04 §3.1](04-api.md#31-get-apihealth) (`db` is the result of `SELECT 1`); the operator can add a free uptime monitor on `https://algovyn.com/bikri/api/health`.
 - Operator console Overview: D1 size vs 500 MB, account-wide rows written/read today (Σ `tenant_usage`) vs 100k / 5M, per-tenant usage vs `daily_write_budget`, Σ budgets vs the 70 % Bikri share, last backup age, last prune, tenants by status. Tenant detail: devices with pending ops and oldest unsynced op (`devices.pending_ops` / `oldest_pending_at`, from the `X-Bikri-Pending` header, [03 §6](03-sync.md#6-scheduling)).
 - Shop owner (Settings → Devices / Sync): their devices, pending ops, conflicts, and "Today's sync budget: 62 %" from `/api/me`.
-- Warnings at 70 % of any account limit or of a tenant budget; at 90 % of a tenant budget its `poll_after_ms` doubles; at 100 % its pushes get `TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). Red "Consider Workers Paid ($5/month)" when the account stays above 70 % for 3 days.
+- Warnings at 70 % of any account limit or of a tenant budget; at 80 % of a tenant budget its `poll_after_ms` doubles; at 100 % its pushes get `TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). Red "Consider Workers Paid ($5/month)" when the account stays above 70 % for 3 days.
 - Logs: `console.log` JSON lines `{ level, route, tenant_id, device_id, op_count, ms, error_code }`; view with `wrangler tail` or Workers Logs (observability enabled in `wrangler.jsonc`, sampling 10%). Never log tokens, enrolment codes, PIN hashes, phone numbers or customer names.
 
 ## 5. Routine operations

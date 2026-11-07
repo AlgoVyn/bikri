@@ -324,6 +324,56 @@ describe('push (03 §3, §4.1)', () => {
     expect(await db.outbox.count()).toBe(0);
   });
 
+  it('serialises a push through navigator.locks when the browser provides it', async () => {
+    const db = await enrolled('push-lock');
+    let used = false;
+    vi.stubGlobal('navigator', {
+      ...globalThis.navigator,
+      locks: {
+        request: async (
+          _name: string,
+          fn: () => Promise<unknown>,
+        ): Promise<unknown> => {
+          used = true;
+          return fn();
+        },
+      },
+    });
+    await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'Locked' }),
+      { now: 44 },
+    );
+    await pushAll(db);
+    expect(used).toBe(true);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('queues a push requested while a pull is already running', async () => {
+    const db = await enrolled('engine-queue');
+    const engine = new SyncEngine(db);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls: string[] = [];
+    (
+      engine as unknown as {
+        cycle: (kind: string) => Promise<void>;
+      }
+    ).cycle = async (kind: string) => {
+      calls.push(kind);
+      if (kind === 'pull') await gate;
+    };
+    const pull = engine.run('pull');
+    const push = engine.run('push');
+    expect(calls).toEqual(['pull']);
+    release();
+    await Promise.all([pull, push]);
+    expect(calls).toEqual(['pull', 'push']);
+    engine.stop();
+  });
+
   it('reclaims an unfinished sending claim and sends it before later ops', async () => {
     const db = await enrolled('claim');
     await writeAction(
@@ -335,7 +385,7 @@ describe('push (03 §3, §4.1)', () => {
     // must resend it, in order, instead of skipping it and sending newer ops first.
     await db.outbox
       .toCollection()
-      .modify({ status: 'sending', sending_at: Date.now() });
+      .modify({ status: 'sending', sending_at: Date.now() - 10 * 60_000 });
     await writeAction(
       db,
       (w) =>
@@ -654,6 +704,55 @@ describe('pull (03 §4.2)', () => {
     expect(seen.at(-1)).toBe(1201);
   });
 
+  it('quarantines a snapshot row and lets the server void win a sale_id collision', async () => {
+    const db = await enrolled('snap-void');
+    const local = {
+      id: 'local-void',
+      sale_id: 'sale-1',
+      reason: 'local',
+      replacement_sale_id: null,
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: '2026-10-27',
+      created_at: NOW,
+    };
+    await db.sale_voids.add(local);
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'sale_voids',
+      kind: 'insert',
+      row_id: 'local-void',
+      row: local,
+      status: 'pending',
+      attempts: 0,
+      created_at: NOW,
+    });
+    server.tables = {
+      sale_voids: [
+        {
+          id: 'server-void',
+          sale_id: 'sale-1',
+          reason: 'server',
+          replacement_sale_id: null,
+          device_id: 'dev-1',
+          staff_id: 'st-1',
+          business_date: '2026-10-27',
+          created_at: NOW + 1,
+        },
+      ],
+    };
+    server.snapshotSeq = 70;
+    await runSnapshot(db);
+    expect(await db.sale_voids.get('server-void')).toMatchObject({
+      reason: 'server',
+    });
+    expect(await db.sale_voids.get('local-void')).toBeUndefined();
+    expect(await db.outbox.count()).toBe(0);
+    expect(await getKv(db, 'snapshot_state', null)).toBeNull();
+    expect(await getKv(db, 'pull_cursor', 0)).toBe(70);
+  });
+
   it('restore recovery re-sends own ledger rows since the restore point and re-downloads', async () => {
     const db = await enrolled('restore');
     await setKv(db, 'restore_epoch', '1');
@@ -721,6 +820,39 @@ describe('pull (03 §4.2)', () => {
     expect(
       (await db.outbox.toArray()).filter((e) => e.row_id === 's-9'),
     ).toHaveLength(1);
+  });
+
+  it('does not re-queue a ledger row that is already pending in the outbox', async () => {
+    const db = await enrolled('restore-queued');
+    await setKv(db, 'restore_epoch', '1');
+    const row = {
+      id: 's-pending',
+      device_id: 'dev-1',
+      invoice_seq: 5,
+      invoice_no: 'A-A-5',
+      created_at: NOW + 1000,
+    };
+    await db.sales.add(row);
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'sales',
+      kind: 'insert',
+      row_id: 's-pending',
+      row,
+      status: 'pending',
+      attempts: 0,
+      created_at: NOW + 1000,
+    });
+    server.restoreEpoch = '99';
+    server.restorePointAt = NOW + 1;
+    server.tables = { sales: [] };
+    await pullAll(db);
+    const queued = (await db.outbox.toArray()).filter(
+      (entry) => entry.row_id === 's-pending',
+    );
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.recovery).not.toBe(true);
   });
 
   it('groups restore recovery by document and keeps the snapshot state', async () => {

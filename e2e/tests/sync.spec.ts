@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { idbCount, makePng } from './helpers.ts';
+import { idbCount, idbCountFor, makePng } from './helpers.ts';
 import {
   API,
   createShop,
@@ -185,10 +185,10 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   await expect(
     a.page.getByRole('heading', { name: 'Connect this device to your shop' }),
   ).toBeVisible();
-  const dbs = await a.page.evaluate(async () =>
-    (await indexedDB.databases()).map((d) => d.name),
-  );
-  expect(dbs).not.toContain(`bikri-${shop.tenant.id}`);
+  // The database name may remain after Leave (clear, not delete, so a second tab can
+  // never block the handover); no shop rows may remain readable.
+  expect(await idbCountFor(a.page, shop.tenant.id, 'products')).toBe(0);
+  expect(await idbCountFor(a.page, shop.tenant.id, 'staff')).toBe(0);
   await a.ctx.close();
   await b.ctx.close();
 });

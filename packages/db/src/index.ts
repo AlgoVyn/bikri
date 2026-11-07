@@ -7,6 +7,7 @@ export {
   type CartBackdate,
   type CartLine,
   type CartOverride,
+  clearTenantDb,
   DEXIE_SCHEMA_V1,
   type DexieTableName,
   deleteTenantDb,

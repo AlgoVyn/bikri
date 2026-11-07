@@ -13,6 +13,7 @@ import {
   type RasterSource,
 } from '@bikri/printer';
 import qrcode from 'qrcode-generator';
+import { prepareRasterFonts } from './canvasRaster.ts';
 
 export type ImageOptions = {
   dots: number;
@@ -117,6 +118,9 @@ export async function renderReceiptCanvas(
   options: ImageOptions,
   doc: Document = document,
 ): Promise<HTMLCanvasElement> {
+  // A receipt can be Urdu while the UI is English; `fonts.ready` only waits for fonts
+  // already loading, so load Noto/Inter explicitly before measuring or drawing.
+  await prepareRasterFonts(doc);
   await doc.fonts?.ready;
   const rows = receiptRows(blocks, options);
   const font = options.dots / (options.charsPerLine * 0.6);

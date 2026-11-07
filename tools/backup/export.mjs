@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BACKUP_TABLES } from './tables.mjs';
+import { BACKUP_TABLES, PLATFORM_TABLES } from './tables.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -51,7 +51,7 @@ export function assertSqlDump(sql) {
       ),
     ].map((match) => String(match[1]).toLowerCase()),
   );
-  const required = ['meta', 'tenants', ...BACKUP_TABLES];
+  const required = ['meta', 'tenants', ...BACKUP_TABLES, ...PLATFORM_TABLES];
   const missing = required.filter((table) => !created.has(table.toLowerCase()));
   if (missing.length > 0)
     throw new Error(

@@ -13,10 +13,12 @@ export function changeLogStatement(
   op: 'upsert' | 'delete',
   deviceId: string | null,
   at: number,
+  onlyIfChanged = false,
 ): D1PreparedStatement {
   const params: SqlValue[] = [tbl, op, deviceId, at, rowId];
+  const guard = onlyIfChanged ? ' AND changes() = 1' : '';
   return db.prepare(
-    `INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at) SELECT ?1, ?2, id, ?3, ${rowJsonExpr(tbl)}, ?4, ?5 FROM ${tbl} WHERE tenant_id = ?1 AND id = ?6`,
+    `INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at) SELECT ?1, ?2, id, ?3, ${rowJsonExpr(tbl)}, ?4, ?5 FROM ${tbl} WHERE tenant_id = ?1 AND id = ?6${guard}`,
     ...params,
   );
 }

@@ -304,3 +304,24 @@ export function deleteTenantDb(
 ): Promise<void> {
   return new Dexie(tenantDbName(tenantId), options).delete();
 }
+
+/**
+ * Empties a tenant's local database without deleting it. `indexedDB.deleteDatabase`
+ * waits forever while another tab still holds a connection; clearing every store gives
+ * the same privacy result (no sales, customers, PIN hashes or cached photos readable)
+ * without blocking a handover or re-enrolment on a shared tablet.
+ */
+export async function clearTenantDb(
+  tenantId: string,
+  options?: DexieOptions,
+): Promise<void> {
+  const db = openTenantDb(tenantId, options);
+  try {
+    await db.open();
+    await db.transaction('rw', db.tables, async () => {
+      for (const table of db.tables) await table.clear();
+    });
+  } finally {
+    db.close();
+  }
+}

@@ -396,22 +396,49 @@ export async function refundSale(
         created_at: now,
       });
       // The sale's status is a derived cache; the server recomputes it on push (03 §6).
+      // `refunded` means every line's refunded quantity equals its sold quantity
+      // (02 §4), not that the refunded amount reached the bill total: a 100%-discounted
+      // line still has to be returned.
       const allRefunds = await (w.table('refunds') as Table<SyncedRow>)
         .where('sale_id')
         .equals(input.saleId)
         .toArray();
-      const refundedExact = allRefunds.reduce(
-        (s, r) => s + n(r.exact_amount),
-        0,
-      );
+      const saleLines = await (w.table('sale_lines') as Table<SyncedRow>)
+        .where('sale_id')
+        .equals(input.saleId)
+        .toArray();
+      const refundIds = allRefunds.map((refund) => String(refund.id));
+      const refundedByLine = new Map<string, number>();
+      if (refundIds.length > 0) {
+        const lines = await (w.table('refund_lines') as Table<SyncedRow>)
+          .where('refund_id')
+          .anyOf(refundIds)
+          .toArray();
+        for (const line of lines) {
+          const key = String(line.sale_line_id);
+          refundedByLine.set(
+            key,
+            (refundedByLine.get(key) ?? 0) + n(line.qty_milli),
+          );
+        }
+      }
+      const fullyRefunded =
+        saleLines.length > 0 &&
+        saleLines.every(
+          (line) =>
+            (refundedByLine.get(String(line.id)) ?? 0) >= n(line.qty_milli),
+        );
       await (w.table('sales') as Table<SyncedRow>).update(input.saleId, {
-        status: refundedExact >= n(sale.total) ? 'refunded' : 'part_refunded',
+        status: fullyRefunded ? 'refunded' : 'part_refunded',
       });
       return { refundRow, plan };
     },
     { now, actor: ctx.staff_id },
   );
 
-  if (input.print) await queueRefundPrint(db, input.refundId, { now });
+  // The refund is already committed; a print-queue failure must not make the money
+  // action look failed (a retry would reuse the refund id and still print nothing).
+  if (input.print)
+    await queueRefundPrint(db, input.refundId, { now }).catch(() => undefined);
   return { refund: result.refundRow, plan: result.plan, created: true };
 }

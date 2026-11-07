@@ -66,8 +66,16 @@ export async function mergeRows(
       .where('[tbl+row_id]')
       .anyOf(ids)
       .toArray();
-    for (const p of pending as { tbl: string; row_id: string }[])
+    for (const p of pending as {
+      tbl: string;
+      row_id: string;
+      status?: string;
+    }[]) {
+      // A failed op will not be pushed until the user retries it, so it must not hide
+      // every later server change for the same row.
+      if (p.status !== 'pending' && p.status !== 'sending') continue;
       pendingKeys.add(`${p.tbl}\u0000${p.row_id}`);
+    }
   }
   for (const { tbl, row } of rows) {
     if (!isPulledTable(tbl)) continue;

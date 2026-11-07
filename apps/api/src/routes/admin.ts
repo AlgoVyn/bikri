@@ -1,4 +1,5 @@
 /** Operator endpoints behind Cloudflare Access (04 §3.7, screens/19). */
+import { isLedgerTable } from '@bikri/core';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
@@ -133,6 +134,14 @@ admin.post('/tenants', async (c) => {
       owner_email: body.owner_email ?? null,
       created_by_email: c.var.operator,
     });
+    const tdb = tenantDb(c.env, tenant);
+    await tdb.batch(
+      auditStatements(tdb, {
+        action: 'shop_created',
+        after: { by: by(c.var.operator) },
+        now: Date.now(),
+      }),
+    );
     return c.json(
       {
         tenant,
@@ -205,7 +214,14 @@ admin.post('/shop-requests/:id/approve', async (c) => {
       daily_write_budget: BUDGET.optional(),
       note: z.string().trim().max(500).optional(),
     })
-    .parse(await readJsonBody(c, 64 * 1024).catch(() => ({})));
+    .parse(
+      await readJsonBody(c, 64 * 1024).catch((error: unknown) => {
+        // An empty body is allowed (auto slug/budget), but a malformed or oversized
+        // body must fail instead of silently approving with defaults.
+        if (error instanceof ApiError) throw error;
+        return {};
+      }),
+    );
   return c.json(
     await approveShopRequest(c.env, c.req.param('id'), c.var.operator, {
       ...body,
@@ -330,19 +346,46 @@ admin.patch('/tenants/:id', async (c) => {
     .strict()
     .parse(await readJsonBody(c, 64 * 1024));
   const stmt = patchTenantStatement(c.env, tenant.id, patch, now);
-  const extra =
-    patch.owner_email !== undefined && patch.owner_email !== tenant.owner_email
-      ? auditStatements(db, {
-          action: 'owner_email_change',
-          before: tenant.owner_email
-            ? { email: maskEmail(tenant.owner_email) }
-            : null,
-          after: patch.owner_email
-            ? { email: maskEmail(patch.owner_email) }
-            : null,
-          now,
-        })
-      : [];
+  const extra: D1PreparedStatement[] = [];
+  const fields = [
+    'display_name',
+    'daily_write_budget',
+    'poll_after_ms',
+    'note',
+  ] as const;
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (patch[field] === undefined || patch[field] === tenant[field]) continue;
+    before[field] = tenant[field];
+    after[field] = patch[field];
+  }
+  if (Object.keys(after).length > 0) {
+    extra.push(
+      ...auditStatements(db, {
+        action: 'tenant_change',
+        before,
+        after: { ...after, by: by(c.var.operator) },
+        now,
+      }),
+    );
+  }
+  if (
+    patch.owner_email !== undefined &&
+    patch.owner_email !== tenant.owner_email
+  )
+    extra.push(
+      ...auditStatements(db, {
+        action: 'owner_email_change',
+        before: tenant.owner_email
+          ? { email: maskEmail(tenant.owner_email) }
+          : null,
+        after: patch.owner_email
+          ? { email: maskEmail(patch.owner_email) }
+          : null,
+        now,
+      }),
+    );
   if (stmt) await db.batch([stmt, ...extra]);
   return c.json({ tenant: await fresh(c.env, tenant.id) });
 });
@@ -466,10 +509,12 @@ admin.post('/tenants/:id/support-access', async (c) => {
   });
   await db.batch([
     supportStatement(c.env, tenant.id, until, body.reason, now),
-    // Extending support also extends devices that are already enrolled.
+    // Extending support also extends devices that are already enrolled. Read the
+    // committed tenant value, not the value this request loaded: a concurrent grant
+    // may have extended it further.
     db.prepare(
-      "UPDATE devices SET expires_at = MAX(COALESCE(expires_at, 0), ?2), updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
-      until,
+      "UPDATE devices SET expires_at = MAX(COALESCE(expires_at, 0), (SELECT support_until FROM tenants WHERE id = ?1)), updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
+      now,
     ),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
@@ -486,8 +531,12 @@ admin.post('/tenants/:id/support-access', async (c) => {
       now,
     }),
   ]);
+  const committed = await fresh(c.env, tenant.id);
   return c.json(
-    { ...issued(c.env, c, code.code, code.expires_at), support_until: until },
+    {
+      ...issued(c.env, c, code.code, code.expires_at),
+      support_until: committed.support_until,
+    },
     201,
   );
 });
@@ -498,7 +547,7 @@ admin.post('/tenants/:id/support-access/end', async (c) => {
   if (tenant.support_until === null || tenant.support_until <= now)
     return c.json({ ended: false });
   await db.batch([
-    supportStatement(c.env, tenant.id, now, tenant.support_reason, now),
+    supportStatement(c.env, tenant.id, now, tenant.support_reason, now, 'set'),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
@@ -846,10 +895,22 @@ admin.post('/tenants/:id/purge', async (c) => {
     }
   }
   const remaining = (await counts()).reduce((s, x) => s + x.n, 0);
+  if (remaining === 0)
+    await db.batch(
+      auditStatements(db, {
+        action: 'tenant_purge',
+        after: { deleted, by: by(c.var.operator) },
+        now: Date.now(),
+      }),
+    );
   return c.json({ deleted, remaining });
 });
 
-const IMPORT_TABLES = SNAPSHOT_TABLES.filter((t) => t !== 'devices');
+// `audit_log` is retained through a restore purge and is append-only; importing an
+// older export must not rewrite it. `devices` are server-owned (D-105).
+const IMPORT_TABLES = SNAPSHOT_TABLES.filter(
+  (t) => t !== 'devices' && t !== 'audit_log',
+);
 const Scalar = z.union([z.string(), z.number(), z.null()]);
 
 admin.post('/tenants/:id/import', async (c) => {
@@ -899,7 +960,7 @@ admin.post('/tenants/:id/import', async (c) => {
         );
     }
     stmts.push(
-      db.upsert(tbl, row),
+      isLedgerTable(tbl) ? db.insertOnly(tbl, row) : db.upsert(tbl, row),
       changeLogStatement(db, tbl, row.id, 'upsert', null, now),
     );
   }

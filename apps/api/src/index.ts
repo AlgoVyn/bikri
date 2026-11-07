@@ -44,7 +44,13 @@ app.route('/shop', shop);
 
 // E2E only (journey 24 reads the sign-in code): never served unless ENV=test.
 app.get('/__test/outbox', (c) => {
-  if (String(c.env.ENV) !== 'test')
+  const host = new URL(c.req.url).hostname;
+  const localHost =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]' ||
+    host.endsWith('.test');
+  if (String(c.env.ENV) !== 'test' || !localHost)
     return c.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
   return c.json({ messages: testOutbox });
 });

@@ -289,7 +289,7 @@ shop.post('/support-access/end', async (c) => {
   if (tenant.support_until === null || tenant.support_until <= now)
     return c.json({ ended: false });
   await db.batch([
-    supportStatement(c.env, tenant.id, now, tenant.support_reason, now),
+    supportStatement(c.env, tenant.id, now, tenant.support_reason, now, 'set'),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
@@ -617,7 +617,17 @@ shop.post('/conflicts/:id/acknowledge', async (c) => {
       "UPDATE sync_conflicts SET resolution = 'acknowledged' WHERE tenant_id = ?1 AND id = ?2 AND resolution = 'needs_owner'",
       id,
     ),
-    changeLogStatement(db, 'sync_conflicts', id, 'upsert', null, now),
+    // The audit row is guarded by the UPDATE's changes(); the conflict change_log is
+    // guarded by the audit insert. A repeated acknowledgement writes nothing.
+    ...auditStatements(db, {
+      action: 'sync_conflict_ack',
+      entity: 'sync_conflicts',
+      entityId: id,
+      after: { resolution: 'acknowledged' },
+      onlyIfChanged: true,
+      now,
+    }),
+    changeLogStatement(db, 'sync_conflicts', id, 'upsert', null, now, true),
   ]);
   if ((res[0]?.meta.changes ?? 0) === 0) {
     const exists = await db.first(

@@ -5,6 +5,7 @@ import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
 import { isReadOnly } from '../sync/status.ts';
 import type { TableSource } from './caches.ts';
+import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
 import { waLink } from './receipt.ts';
 import { type Writer, writeAction } from './write.ts';
@@ -460,7 +461,7 @@ export async function receivePayment(
   if (!['cash', 'card', 'bank_wallet'].includes(input.method))
     throw new PaymentError('method');
   if (
-    !/^\d{4}-\d{2}-\d{2}$/u.test(input.date) ||
+    !isBusinessDate(input.date) ||
     input.date > options.today ||
     input.date < addDays(options.today, -7)
   )
@@ -567,10 +568,7 @@ export async function createPromise(
     today: businessDate(Date.now()),
   },
 ): Promise<MasterRow> {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/u.test(input.promisedOn) ||
-    input.promisedOn < options.today
-  )
+  if (!isBusinessDate(input.promisedOn) || input.promisedOn < options.today)
     throw new PromiseError('date');
   if (
     input.amount !== null &&

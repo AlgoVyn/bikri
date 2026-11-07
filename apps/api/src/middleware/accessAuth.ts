@@ -17,6 +17,8 @@ export const accessAuth: MiddlewareHandler<{
   Variables: OperatorVars;
 }> = async (c, next) => {
   let email: string | null = null;
+  // `assertSafeEnv` rejects ENV=test unless every allowed origin is local/test, so a
+  // production deployment cannot reach this bypass with its real origins configured.
   if (String(c.env.ENV) === 'test' && c.env.ACCESS_TEST_EMAIL) {
     email =
       c.req.header('x-test-access-email')?.toLowerCase() ??

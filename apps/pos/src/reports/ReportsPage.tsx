@@ -1324,7 +1324,9 @@ function ExpensesTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
             ? categoryName(row.category, lang)
             : t('office.reports.uncategorized'),
           <MoneyText key="amount" paisa={row.amount} />,
-          percentText(row.shareBp),
+          <PrivacyValue key="share" mask="••%">
+            {percentText(row.shareBp)}
+          </PrivacyValue>,
         ])}
         empty={t('office.reports.no_expenses')}
       />

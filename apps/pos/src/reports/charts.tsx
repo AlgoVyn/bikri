@@ -196,6 +196,8 @@ export function DailyChart({
 
 /** Payment mix as one stacked bar plus a legend with amount and share. */
 export function PaymentMixBar({ mix, t }: { mix: PaymentMix; t: TFunction }) {
+  const privacy = usePrivacyActive();
+  if (privacy) return <PrivacyCurtain className="h-24" />;
   const methods = ['cash', 'card', 'bank_wallet', 'udhaar'] as const;
   const total = methods.reduce(
     (sum, method) => sum + Math.max(0, mix[method]),

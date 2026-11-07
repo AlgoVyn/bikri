@@ -17,12 +17,35 @@ export async function loadDayCloseReceipt(
   const device = row.device_id
     ? await db.devices.get(String(row.device_id))
     : undefined;
-  const info = await dayCloseInfo(
-    db,
-    String(row.device_id),
-    Number(row.period_start),
-    Number(row.period_end),
-  );
+  // New closes snapshot the informational totals; older rows (and rows restored from
+  // an older export) fall back to recomputing them. A reprint never silently changes
+  // a new close.
+  const stored = {
+    cardTotal: row.card_total == null ? null : Number(row.card_total),
+    bankTotal: row.bank_total == null ? null : Number(row.bank_total),
+    udhaarGiven: row.udhaar_given == null ? null : Number(row.udhaar_given),
+    bills: row.bills == null ? null : Number(row.bills),
+    refunds: row.refunds == null ? null : Number(row.refunds),
+  };
+  const info =
+    stored.cardTotal !== null &&
+    stored.bankTotal !== null &&
+    stored.udhaarGiven !== null &&
+    stored.bills !== null &&
+    stored.refunds !== null
+      ? {
+          cardTotal: stored.cardTotal,
+          bankTotal: stored.bankTotal,
+          udhaarGiven: stored.udhaarGiven,
+          bills: stored.bills,
+          refunds: stored.refunds,
+        }
+      : await dayCloseInfo(
+          db,
+          String(row.device_id),
+          Number(row.period_start),
+          Number(row.period_end),
+        );
   let denominations: Record<string, number> | null = null;
   if (typeof row.denominations_json === 'string') {
     try {

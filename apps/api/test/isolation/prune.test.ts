@@ -55,7 +55,7 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     );
 
     const report = await pruneAll(env, now);
-    expect(report.calls).toBeLessThanOrEqual(40);
+    expect(report.calls).toBeLessThanOrEqual(50);
     expect(
       await n(
         'SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1',

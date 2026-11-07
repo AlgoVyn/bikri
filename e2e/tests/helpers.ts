@@ -61,6 +61,41 @@ export async function expectNoHorizontalScroll(page: Page): Promise<void> {
 }
 
 /** Row count of a store in the dev shop's database. */
+/** Row count in a named tenant's Dexie store, even after the app left that shop. */
+export async function idbCountFor(
+  page: Page,
+  tenantId: string,
+  store: string,
+): Promise<number> {
+  return page.evaluate(
+    ([id, s]) =>
+      new Promise<number>((resolve) => {
+        const open = indexedDB.open(`bikri-${id}`);
+        open.onerror = () => resolve(-1);
+        open.onsuccess = () => {
+          try {
+            const req = open.result
+              .transaction(s as string, 'readonly')
+              .objectStore(s as string)
+              .count();
+            req.onsuccess = () => {
+              open.result.close();
+              resolve(req.result);
+            };
+            req.onerror = () => {
+              open.result.close();
+              resolve(-1);
+            };
+          } catch {
+            open.result.close();
+            resolve(-1);
+          }
+        };
+      }),
+    [tenantId, store] as const,
+  );
+}
+
 export async function idbCount(page: Page, store: string): Promise<number> {
   return page.evaluate(
     (s) =>

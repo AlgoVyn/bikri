@@ -1,6 +1,6 @@
 /** Device enrolment and "Leave this shop" (screens/02, 05 §2, D-073). */
 import { APP_VERSION } from '@bikri/core';
-import { type BikriDb, deleteTenantDb, openTenantDb } from '@bikri/db';
+import { type BikriDb, clearTenantDb, openTenantDb } from '@bikri/db';
 import { request } from '../sync/client.ts';
 import { applyStatus, type StatusPayload } from '../sync/status.ts';
 import { closeDb, getDb } from './db.ts';
@@ -93,15 +93,12 @@ export async function enrolDevice(
   });
   closeDb();
   // A fresh device starts from a fresh database (a revoked device's old data was exported first).
-  // Drop the shop this browser was on before as well: a handover must not leave its sales,
-  // customers, PIN hashes or cached photos readable in IndexedDB.
-  if (previousTenant && previousTenant !== res.tenant.id) {
-    await deleteTenantDb(previousTenant);
-    await clearTenantFiles(previousTenant);
-  }
-  await deleteTenantDb(res.tenant.id);
-  await clearTenantFiles(res.tenant.id);
+  // Clear instead of delete: indexedDB.deleteDatabase waits forever while another tab holds
+  // the database, and a shared tablet must not strand a consumed one-time code.
+  await clearTenantDb(res.tenant.id);
   const db = openTenantDb(res.tenant.id);
+  // Persist the token before any destructive work on the previous shop. The code is
+  // single-use, so losing this write would orphan the device.
   await db.kv.bulkPut([
     { key: 'device_token', value: res.token },
     {
@@ -126,8 +123,15 @@ export async function enrolDevice(
     { key: 'pull_cursor', value: 0 },
     { key: 'enrolled_at', value: Date.now() },
   ]);
+  await clearTenantFiles(res.tenant.id).catch(() => undefined);
   await applyStatus(db, res);
   setActiveTenantId(res.tenant.id);
+  // The new token is safe; now drop the previous shop's local copy. Clearing (not
+  // deleting) cannot hang on a second tab and leaves no sales/customers/PIN hashes.
+  if (previousTenant && previousTenant !== res.tenant.id) {
+    await clearTenantDb(previousTenant).catch(() => undefined);
+    await clearTenantFiles(previousTenant);
+  }
   try {
     await navigator.storage?.persist?.();
   } catch {
@@ -255,7 +259,9 @@ export async function leaveShop(db: BikriDb): Promise<void> {
   const id = db.tenantId;
   db.close();
   closeDb();
-  await deleteTenantDb(id);
+  // Broadcast first so other tabs reload away from this shop and close their DB,
+  // then clear instead of waiting forever on deleteDatabase.
   if (activeTenantId() === id) setActiveTenantId(null);
+  await clearTenantDb(id);
   await clearTenantFiles(id);
 }

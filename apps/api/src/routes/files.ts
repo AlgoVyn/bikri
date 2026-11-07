@@ -2,6 +2,7 @@ import { can, type Role } from '@bikri/core';
 import type { Context } from 'hono';
 import { hex } from '../auth/crypto.ts';
 import { ApiError } from '../errors.ts';
+import { readBodyBytes } from '../middleware/body.ts';
 import type { AppEnv } from '../types.ts';
 import { assertCanWrite } from './sync.ts';
 
@@ -76,11 +77,7 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
     kind === 'product_image' ? 'catalog.edit' : 'settings.shop';
   if (!staff || !can(staff.role, staff.permissions_json, permission))
     throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
-  if (Number(c.req.header('content-length') ?? '0') > MAX_IMAGE_BYTES)
-    throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Image is over 2 MB');
-  const body = await c.req.arrayBuffer();
-  if (body.byteLength > MAX_IMAGE_BYTES)
-    throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Image is over 2 MB');
+  const body = await readBodyBytes(c, MAX_IMAGE_BYTES);
   if (hex(await crypto.subtle.digest('SHA-256', body)) !== sha256)
     throw new ApiError(
       'VALIDATION_FAILED',

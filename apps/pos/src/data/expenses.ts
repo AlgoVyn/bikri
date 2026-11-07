@@ -3,6 +3,7 @@ import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
+import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
 
@@ -211,7 +212,7 @@ export async function createExpense(
   if (!['cash', 'card', 'bank_wallet'].includes(input.method))
     throw new ExpenseError('method');
   if (
-    !/^\d{4}-\d{2}-\d{2}$/u.test(input.date) ||
+    !isBusinessDate(input.date) ||
     input.date > options.today ||
     input.date < addDays(options.today, -30)
   )

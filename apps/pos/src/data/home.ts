@@ -28,8 +28,12 @@ export async function syncAttention(
   const items: AttentionItem[] = [];
   const skew = (await kv<number>('clock_skew_ms')) ?? 0;
   if (Math.abs(skew) > CLOCK_WARN_MS) items.push({ kind: 'clock_wrong' });
+  // The stale warning is about received updates. A push-only cycle also stamps
+  // last_sync_at, so use the last successful pull/snapshot instead.
   const last =
-    (await kv<number>('last_sync_at')) ?? (await kv<number>('enrolled_at'));
+    (await kv<number>('last_pull_at')) ??
+    (await kv<number>('last_sync_at')) ??
+    (await kv<number>('enrolled_at'));
   if (last !== undefined) {
     const days = Math.floor((now - last) / DAY);
     if (days >= 7) items.push({ kind: 'sync_stale', days, severe: days >= 25 });

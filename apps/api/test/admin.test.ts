@@ -407,21 +407,23 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
 
   it('purges self-referencing sales and expenses without rewriting their links first', async () => {
     const shop = await seedShop('Purge refs');
-    await pushOk(shop.till, saleOps(shop, shop.till, 1));
-    await pushOk(shop.till, saleOps(shop, shop.till, 2));
+    const firstSale = saleOps(shop, shop.till, 1);
+    const secondSale = saleOps(shop, shop.till, 2);
+    // Build the reissue link in the insert itself; ledger rows are append-only and
+    // cannot be updated by a test (or any other caller) after the fact.
+    secondSale[0]!.row = {
+      ...secondSale[0]!.row,
+      replaces_sale_id: firstSale[0]!.row?.id,
+    };
+    await pushOk(shop.till, firstSale);
+    await pushOk(shop.till, secondSale);
     const sales = await env.DB.prepare(
-      'SELECT id, invoice_seq FROM sales WHERE tenant_id = ?1 ORDER BY invoice_seq',
+      'SELECT id, invoice_seq, replaces_sale_id FROM sales WHERE tenant_id = ?1 ORDER BY invoice_seq',
     )
       .bind(shop.tenantId)
-      .all<{ id: string }>();
-    const first = sales.results[0]?.id;
-    const second = sales.results[1]?.id;
-    expect(first && second).toBeTruthy();
-    await env.DB.prepare(
-      'UPDATE sales SET replaces_sale_id = ?3 WHERE tenant_id = ?1 AND id = ?2',
-    )
-      .bind(shop.tenantId, second, first)
-      .run();
+      .all<{ id: string; replaces_sale_id: string | null }>();
+    expect(sales.results).toHaveLength(2);
+    expect(sales.results[1]?.replaces_sale_id).toBe(sales.results[0]?.id);
     const day = new Date().toISOString().slice(0, 10);
     await env.DB.prepare(
       "INSERT INTO expense_categories (tenant_id, id, code, name_en, created_at, updated_at) VALUES (?1, 'purge-cat', 'purge-cat', 'Purge', ?2, ?2)",

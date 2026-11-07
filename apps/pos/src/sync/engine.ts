@@ -41,6 +41,7 @@ export class SyncEngine {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private pushTimer: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> | null = null;
+  private runningKind: 'first' | 'full' | 'push' | 'pull' | null = null;
   private failures = 0;
   private stopped = false;
   private readonly onOnline = () => void this.run('full');
@@ -90,9 +91,22 @@ export class SyncEngine {
   }
 
   run(kind: 'first' | 'full' | 'push' | 'pull'): Promise<void> {
-    if (this.running) return this.running;
+    if (this.running) {
+      // A write-debounced push must not be dropped just because a pull is in flight.
+      // Chain one after it so the caller (and the 5 s debounce) still sees the ops sent.
+      if (
+        (kind === 'push' || kind === 'full') &&
+        this.runningKind !== 'first' &&
+        this.runningKind !== 'full' &&
+        this.runningKind !== 'push'
+      )
+        return this.running.then(() => this.run('push'));
+      return this.running;
+    }
+    this.runningKind = kind;
     this.running = this.cycle(kind).finally(() => {
       this.running = null;
+      this.runningKind = null;
     });
     return this.running;
   }

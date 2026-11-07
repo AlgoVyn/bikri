@@ -51,6 +51,8 @@ export type AdjustInput = {
   qtyMilli: number;
   unitCost?: number | null;
   note?: string;
+  /** Caller-supplied movement id; a retry returns the existing row instead of adding stock twice. */
+  adjustmentId?: string;
 };
 
 /** On hand from the stock_levels cache; inside an action pass the Writer (its table is in the tx). */
@@ -93,10 +95,10 @@ async function insertMovement(
   delta: number,
   reason: string,
   ctx: LedgerContext,
-  extra: { unitCost: number | null; note: string },
+  extra: { unitCost: number | null; note: string; id?: string },
 ) {
   return w.insert('stock_movements', {
-    id: newId(w.now),
+    id: extra.id ?? newId(w.now),
     product_id: product.id,
     qty_delta_milli: delta,
     reason_code: reason,
@@ -140,6 +142,10 @@ export async function adjustStock(
     (unitCost == null || !Number.isSafeInteger(unitCost) || unitCost < 0)
   )
     throw new StockAdjustError('cost');
+  if (input.adjustmentId) {
+    const existing = await db.stock_movements.get(input.adjustmentId);
+    if (existing) return existing;
+  }
   return writeAction(
     db,
     async (w) => {
@@ -166,6 +172,7 @@ export async function adjustStock(
       return insertMovement(w, product, delta, reason, ctx, {
         unitCost: unitCost ?? null,
         note,
+        id: input.adjustmentId,
       });
     },
     { now, actor: ctx.staff_id },

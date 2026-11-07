@@ -128,7 +128,7 @@ export async function soldByProduct(
       const saleLine = saleLines.get(String(line.sale_line_id));
       if (!saleLine?.product_id) continue;
       const id = String(saleLine.product_id);
-      sold.set(id, Math.max(0, (sold.get(id) ?? 0) - Number(line.qty_milli)));
+      sold.set(id, (sold.get(id) ?? 0) - Number(line.qty_milli));
     }
   }
   return sold;
@@ -310,7 +310,7 @@ export async function productDetail(
           const day = days.find((d) => d.date === String(refund.business_date));
           const qty = Number(refundLine.qty_milli);
           if (day) {
-            day.qty = Math.max(0, day.qty - qty);
+            day.qty -= qty;
             day.revenue -= refundedRevenue(
               lineRevenue(line, sale.tax_inclusive === 1),
               Number(line.qty_milli),

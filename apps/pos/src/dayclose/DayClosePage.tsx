@@ -113,7 +113,7 @@ export function DayClosePage() {
     periodStartRef.current = null;
   };
   const noteNeeded =
-    Math.abs(result.difference) >= 10_000 && note.trim() === '';
+    !blind && Math.abs(result.difference) >= 10_000 && note.trim() === '';
   const period = (at: number) =>
     new Intl.DateTimeFormat(
       i18n.language === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK',
@@ -531,16 +531,20 @@ export function DayClosePage() {
             <span
               data-testid="day-close-difference"
               className={
-                result.difference === 0
-                  ? 'font-semibold text-success-subtle-ink'
-                  : result.difference < 0
-                    ? 'font-semibold text-danger'
-                    : 'font-semibold text-warning-subtle-ink'
+                blind
+                  ? 'font-semibold text-text-muted'
+                  : result.difference === 0
+                    ? 'font-semibold text-success-subtle-ink'
+                    : result.difference < 0
+                      ? 'font-semibold text-danger'
+                      : 'font-semibold text-warning-subtle-ink'
               }
             >
-              {result.difference === 0
-                ? t('office.dayclose.correct')
-                : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${money(Math.abs(result.difference))}`}
+              {blind
+                ? t('office.dayclose.count_first')
+                : result.difference === 0
+                  ? t('office.dayclose.correct')
+                  : `${result.difference < 0 ? t('office.dayclose.short') : t('office.dayclose.over')} ${money(Math.abs(result.difference))}`}
             </span>
           </p>
           <button

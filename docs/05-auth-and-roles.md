@@ -57,7 +57,7 @@ Every device is enrolled with a one-time **enrolment code**, which is tied to on
 
 **C. Operator-issued codes.** The operator can also issue a code for any tenant from the console (e.g. a replacement owner pairing code when the owner lost every admin device).
 
-Device codes are assigned per branch (per tenant) in order A, B, … Z, AA, AB … and never reused, even after revocation. A browser holds one tenant at a time (D-073): enrolling a browser that already belongs to another shop is refused on the device ("This browser is connected to <shop>. Leave that shop first.") until it has no unsynced ops (or they were exported) and the user chose Settings → Device → "Leave this shop", which deletes that tenant's Dexie database.
+Device codes are assigned per branch (per tenant) in order A, B, … Z, AA, AB … and never reused, even after revocation. A browser holds one tenant at a time (D-073): enrolling a browser that already belongs to another shop is refused on the device ("This browser is connected to <shop>. Leave that shop first.") until it has no unsynced ops (or they were exported) and the user chose Settings → Device → "Leave this shop", which clears that tenant's Dexie database (all stores; the empty name may remain).
 
 ## 3. Shop admin on admin devices
 
@@ -178,6 +178,6 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 
 ## 7. Audit log actions
 
-`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `sale_backdated`, `drawer_open`, `price_change`, `cost_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_file_gc`, `operator_import`, `tenant_restore`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
+`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `sale_backdated`, `drawer_open`, `price_change`, `cost_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `sync_conflict_ack`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_file_gc`, `operator_import`, `tenant_restore`, `tenant_purge`, `tenant_change`, `shop_created`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
 
 Each row stores `before_json`/`after_json` with only the changed fields and belongs to one tenant. The shop owner sees that shop's log in Settings → Activity (filter by action, staff, date; CSV export). For a refund, void/reissue, supplier return and a day-close difference the Worker checks the row's ids/amounts against the event and writes the canonical row itself if the till did not send one.

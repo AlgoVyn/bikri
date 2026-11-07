@@ -251,9 +251,10 @@ export function waNumber(phone: string): string | null {
 export function receiptShareText(input: SaleReceiptInput): string {
   const { shop, sale } = input;
   const money = (p: number) => formatReceiptMoney(p, shop.numberGrouping);
+  const labels = input.labels ?? receiptLabelsFor('en');
   const rows = [
     shop.name,
-    `Bill ${sale.invoiceNo} · ${
+    `${labels.bill} ${sale.invoiceNo} · ${
       sale.late
         ? formatIsoDate(sale.businessDate)
         : formatReceiptDate(sale.createdAt, shop.timeZone)
@@ -265,12 +266,12 @@ export function receiptShareText(input: SaleReceiptInput): string {
           : (l.qtyMilli / 1000).toFixed(3);
       return `${l.name} × ${qty}  ${money(l.final ?? l.net)}`;
     }),
-    `Total ${money(sale.total)}`,
+    `${labels.total} ${money(sale.total)}`,
   ];
   if (sale.udhaarAmount > 0) {
-    rows.push(`Udhaar ${money(sale.udhaarAmount)}`);
+    rows.push(`${labels.udhaar} ${money(sale.udhaarAmount)}`);
     if (sale.khataBalancePaisa !== null)
-      rows.push(`Khata balance now ${money(sale.khataBalancePaisa)}`);
+      rows.push(`${labels.khataBalance} ${money(sale.khataBalancePaisa)}`);
   }
   if (shop.receiptFooter.trim()) rows.push(shop.receiptFooter.trim());
   return rows.join('\n');

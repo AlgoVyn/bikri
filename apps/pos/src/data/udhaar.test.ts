@@ -80,6 +80,25 @@ async function udhaarSale(
 }
 
 describe('udhaar data', () => {
+  it('rejects an impossible calendar date for a payment', async () => {
+    const { db, ctx } = await setup('udhaar-date');
+    const ali = await customer(db);
+    await expect(
+      receivePayment(
+        db,
+        {
+          paymentId: 'pay-bad-date',
+          customerId: ali.id,
+          amount: 1000,
+          method: 'cash',
+          date: '2026-02-31',
+        },
+        ctx,
+        { role: 'owner', today: TODAY, now: NOW },
+      ),
+    ).rejects.toMatchObject({ code: 'date' });
+  });
+
   it('AC 1: a Rs 3,000 udhaar sale and a Rs 2,110 payment show 3,000 then 890', async () => {
     const { db, ctx } = await setup();
     const ali = await customer(db);

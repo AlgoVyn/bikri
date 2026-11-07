@@ -393,6 +393,7 @@ function overrideFor(
   permission: Permission,
   staff: Map<string, StaffRow>,
   roles: readonly Role[] = ['owner', 'manager', 'cashier'],
+  options: { excludeStaffId?: string; minDiscountBp?: number } = {},
 ): boolean {
   return group.some((o) => {
     if (o.tbl !== 'audit_log' || o.kind !== 'insert' || !o.row) return false;
@@ -415,6 +416,18 @@ function overrideFor(
       const approver =
         staff.get(after.approved_by) ??
         staffCreatedInGroup(group, after.approved_by);
+      if (
+        options.excludeStaffId !== undefined &&
+        after.approved_by === options.excludeStaffId
+      )
+        return false;
+      if (
+        options.minDiscountBp !== undefined &&
+        approver &&
+        approver.role !== 'owner' &&
+        Number(approver.max_discount_bp ?? 0) < options.minDiscountBp
+      )
+        return false;
       return Boolean(
         approver &&
           approver.active === 1 &&
@@ -1224,6 +1237,19 @@ function checkLedgerEntry(
     case 'payment': {
       if (!allowed('payment.receive') && !allowed('purchase.create'))
         throw new Reject('FORBIDDEN');
+      // Only a standalone customer/supplier payment may move a party balance through
+      // its payment row. A sale/refund/void payment has its own documented ledger row
+      // (`source_type = sale/refund/void`); accepting a payment-sourced row here would
+      // let a forged push mark a bill paid and reduce the khata at the same time.
+      if (
+        ![
+          'customer_payment',
+          'supplier_payment',
+          'purchase_paid_now',
+          'supplier_refund',
+        ].includes(String(src.purpose))
+      )
+        throw new Reject('CONSTRAINT_FAILED');
       if (row.party_type !== src.party_type || row.party_id !== src.party_id)
         throw new Reject('CONSTRAINT_FAILED');
       // Customer/supplier payments reduce the balance; a supplier refund (cash back)
@@ -1532,6 +1558,29 @@ function checkPurchase(
       : pays.length > 0
   )
     throw new Reject('CONSTRAINT_FAILED');
+  // The cash paid now must also reduce the supplier balance in the same transaction;
+  // otherwise payables reports overstate what the shop still owes.
+  if (paid > 0) {
+    const payment = group.find(
+      (candidate) =>
+        candidate.tbl === 'payments' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.purchase_id === id &&
+        candidate.row?.purpose === 'purchase_paid_now',
+    )?.row;
+    const paymentId = typeof payment?.id === 'string' ? payment.id : '';
+    const paymentLedger =
+      paymentId === ''
+        ? []
+        : linkedInGroup(group, 'ledger_entries', 'source_id', paymentId).filter(
+            (entry) =>
+              entry.source_type === 'payment' &&
+              entry.party_type === 'supplier' &&
+              entry.party_id === row.supplier_id &&
+              Number(entry.amount) === -paid,
+          );
+    if (paymentLedger.length !== 1) throw new Reject('CONSTRAINT_FAILED');
+  }
 }
 /** Sales are reconciled with their lines, payments and udhaar ledger row (07 §2). */
 function checkSaleInsert(
@@ -1854,7 +1903,15 @@ function checkSalePolicy(
     if (
       limitFresh &&
       share > maxBp &&
-      !overrideFor(group, 'sales', saleId, 'sale.discount', look.staff)
+      !overrideFor(
+        group,
+        'sales',
+        saleId,
+        'sale.discount',
+        look.staff,
+        ['owner', 'manager'],
+        { excludeStaffId: staff?.id, minDiscountBp: share },
+      )
     )
       throw new Reject('FORBIDDEN');
   }
@@ -1992,6 +2049,10 @@ function checkOp(
     if (!(field in row) || row[field] === null) continue;
     if (typeof row[field] !== 'number' || !Number.isSafeInteger(row[field]))
       throw new Reject('CONSTRAINT_FAILED');
+    // A future updated_at would make every later sale look older than the row and
+    // silently disable the price/tax/limit freshness checks.
+    if (field !== 'created_at' && (row[field] as number) > ctx.now + DAY_MS)
+      throw new Reject('CONSTRAINT_FAILED');
   }
   for (const [column, value] of Object.entries(row)) {
     if (typeof value === 'string' && value.length > 4_000)
@@ -2010,6 +2071,11 @@ function checkOp(
   )
     throw new Reject('CONSTRAINT_FAILED');
   if (op.kind === 'insert') {
+    // A restore-recovery replay (fresh op id) or an op older than the applied_ops
+    // retention window targets a row D1 already has. It cannot change anything, so
+    // skip the document checks that count stored companion rows; planOp marks it
+    // `existingInsert` and the group-level check rejects a mixed replay.
+    if (look.existingLedger.has(key(op.tbl, String(row.id)))) return;
     const rowCreatedAt =
       typeof row.created_at === 'number' ? row.created_at : null;
     if (
@@ -2412,6 +2478,14 @@ function checkOp(
         const closeId = String(row.id);
         const periodEnd = Number(row.period_end);
         const stored = look.lastClose.get(deviceId);
+        // A close is a continuation of the device's drawer. An older close must not be
+        // inserted after a newer one: it would overlap and its opening float could be
+        // fabricated. Restore replays are ordered by the client.
+        const outOfOrder =
+          stored !== undefined &&
+          stored.id !== closeId &&
+          stored.period_end >= periodEnd;
+        if (outOfOrder) throw new Reject('CONSTRAINT_FAILED');
         const candidates = [
           ...(stored && stored.period_end < periodEnd ? [stored] : []),
           ...(look.pushedCloses.get(deviceId) ?? []).filter(
@@ -2736,8 +2810,10 @@ function planOp(
       );
       // A second void for the same sale must never be half-accepted: its payment,
       // ledger and stock rows would be applied even though the void header is unique.
-      // `applied_ops` already handles a replay of the same op id.
-      if (look.existingVoids.has(saleId) || duplicateInGroup)
+      // `applied_ops` handles a replay of the same op id; a fresh op id is allowed only
+      // when it is the same stored void row (restore recovery / pruned applied_ops).
+      const replay = look.existingLedger.has(key('sale_voids', id));
+      if (!replay && (look.existingVoids.has(saleId) || duplicateInGroup))
         throw new Reject('CONSTRAINT_FAILED');
     }
     // A replay with a fresh op id (restore recovery or a pruned applied_ops row) must
@@ -2892,7 +2968,16 @@ function sideEffects(
     db.prepare(
       `UPDATE sales SET status = CASE
          WHEN EXISTS (SELECT 1 FROM sale_voids v WHERE v.tenant_id = ?1 AND v.sale_id = ?2) THEN 'void'
-         WHEN (SELECT COALESCE(SUM(r.exact_amount), 0) FROM refunds r WHERE r.tenant_id = ?1 AND r.sale_id = ?2) >= total THEN 'refunded'
+         WHEN NOT EXISTS (
+           SELECT 1 FROM sale_lines sl
+           WHERE sl.tenant_id = ?1 AND sl.sale_id = ?2
+             AND sl.qty_milli > COALESCE((
+               SELECT SUM(rl.qty_milli) FROM refund_lines rl
+               JOIN refunds r ON r.tenant_id = rl.tenant_id AND r.id = rl.refund_id
+               WHERE rl.tenant_id = ?1 AND r.tenant_id = ?1
+                 AND rl.sale_line_id = sl.id
+             ), 0)
+         ) THEN 'refunded'
          WHEN EXISTS (SELECT 1 FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?2) THEN 'part_refunded'
          ELSE 'paid' END
        WHERE tenant_id = ?1 AND id = ?2`,
@@ -3946,6 +4031,30 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     bill_prefix: string;
   }[])
     look.branches.set(b.id, { bill_prefix: b.bill_prefix });
+  // A refund or void can be pushed in the same request as the sale it refers to, but in a
+  // later transaction (one user action = one tx). The sale lines are not in D1 yet, so
+  // make every pending sale line visible to the document checks. A rejected sale still
+  // fails its own FK when the child insert reaches D1.
+  for (const op of ops) {
+    if (op.tbl !== 'sale_lines' || op.kind !== 'insert' || !op.row) continue;
+    const saleId = typeof op.row.sale_id === 'string' ? op.row.sale_id : '';
+    const id = typeof op.row.id === 'string' ? op.row.id : '';
+    if (!saleId || !id) continue;
+    const line = {
+      id,
+      sale_id: saleId,
+      product_id:
+        typeof op.row.product_id === 'string' ? op.row.product_id : null,
+      qty_milli: Number(op.row.qty_milli ?? 0),
+    };
+    if (!look.saleLineById.has(id)) {
+      look.saleLineById.set(id, line);
+      look.saleLineSale.set(id, saleId);
+      const list = look.saleLinesBySale.get(saleId) ?? [];
+      list.push(line);
+      look.saleLinesBySale.set(saleId, list);
+    }
+  }
   kinds.forEach((k, i) => {
     const rows = (res[i + 2]?.results ?? []) as Array<Record<string, unknown>>;
     for (const r of rows) {
@@ -4212,6 +4321,99 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
 }
 
 /**
+ * Apply a planned staff transaction to the in-memory state used by later transactions of
+ * the same push. A new cashier created offline can ring a sale before reconnect; the sale
+ * is a separate transaction, so the Worker must see the staff row that precedes it.
+ * Soft-deleted rows are never resurrected (03 §5), matching planOp.
+ */
+function applyStaffChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.tbl !== 'staff') continue;
+    const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+    if (typeof id !== 'string') continue;
+    const current = look.staff.get(id);
+    if (op.kind === 'delete') {
+      if (!current) continue;
+      const at = Number(op.created_at ?? current.updated_at);
+      look.staff.set(id, {
+        ...current,
+        active: 0,
+        deleted_at: at,
+        updated_at: at,
+        rev: current.rev + 1,
+      });
+      continue;
+    }
+    if (!op.row) continue;
+    if (!current) {
+      look.staff.set(id, {
+        id,
+        role: String(op.row.role ?? 'cashier') as Role,
+        permissions_json: String(op.row.permissions_json ?? '{}'),
+        max_discount_bp: Number(op.row.max_discount_bp ?? 0),
+        active: Number(op.row.active ?? 1),
+        deleted_at:
+          op.row.deleted_at === null || op.row.deleted_at === undefined
+            ? null
+            : Number(op.row.deleted_at),
+        created_at: Number(op.row.created_at ?? 0),
+        updated_at: Number(op.row.updated_at ?? 0),
+        rev: 1,
+      });
+      continue;
+    }
+    if (current.deleted_at !== null) continue;
+    const changed = new Set(op.changed_fields ?? []);
+    const merge = current.rev !== (op.base_rev ?? 0);
+    const pick = (field: keyof StaffRow): unknown => {
+      const raw = op.row?.[field];
+      if (merge && !changed.has(field)) return current[field];
+      return raw === undefined ? current[field] : raw;
+    };
+    const deleted = pick('deleted_at');
+    look.staff.set(id, {
+      ...current,
+      role: String(pick('role') ?? current.role) as Role,
+      permissions_json: String(pick('permissions_json') ?? '{}'),
+      max_discount_bp: Number(pick('max_discount_bp') ?? 0),
+      active: Number(pick('active') ?? 0),
+      deleted_at:
+        deleted === null || deleted === undefined ? null : Number(deleted),
+      updated_at: Number(pick('updated_at') ?? current.updated_at),
+      rev: current.rev + 1,
+    });
+  }
+}
+
+/** The shop settings a later transaction of the same push must see. */
+function applyShopChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.tbl !== 'shop' || op.kind !== 'upsert' || !op.row) continue;
+    const current = look.shop;
+    const changed = new Set(op.changed_fields ?? []);
+    const merge = current !== null && (op.base_rev ?? 0) !== 0;
+    const pick = (field: keyof ShopRules): unknown => {
+      const raw = op.row?.[field];
+      if (merge && !changed.has(field)) return current?.[field];
+      return raw === undefined ? current?.[field] : raw;
+    };
+    const taxMode = String(pick('tax_mode') ?? 'exclusive');
+    const costMethod = String(pick('cost_method') ?? 'avg');
+    const limit = pick('default_credit_limit');
+    look.shop = {
+      tax_rate_bp: Number(pick('tax_rate_bp') ?? 0),
+      tax_mode: taxMode === 'inclusive' ? 'inclusive' : 'exclusive',
+      cost_method: costMethod === 'last' ? 'last' : 'avg',
+      round_total_to: Number(pick('round_total_to') ?? 1),
+      default_credit_limit:
+        limit === null || limit === undefined ? null : Number(limit),
+      timezone: String(pick('timezone') ?? 'Asia/Karachi'),
+      updated_at: Number(pick('updated_at') ?? 0),
+    };
+  }
+}
+
+/**
  * Applies a list of ops for one device (03 §4.1 steps 3–7). Returns results in op order for the
  * processed ops; ops not processed (call budget, lost guard twice) are omitted.
  */
@@ -4243,6 +4445,11 @@ export async function applyOps(
   }
 
   let pending = groupByTx(fresh);
+  // Plan parents before the rows that reference them. A shop or staff change in an
+  // earlier transaction must be visible to a sale in a later one.
+  const groupRank = (group: PushOp[]): number =>
+    Math.min(...group.map((op) => applyRank(op.tbl)));
+  pending = [...pending].sort((a, b) => groupRank(a) - groupRank(b));
   for (let round = 0; round < 2 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     const look = await loadLookups(ctx, pending.flat());
@@ -4305,6 +4512,8 @@ export async function applyOps(
           throw new Reject('CONSTRAINT_FAILED');
         groups.push({ txId: ops[0]?.tx_id ?? '', planned });
         applyProductChanges(look, ops);
+        applyStaffChanges(look, ops);
+        applyShopChanges(look, ops);
         for (const [id, value] of groupAvg) avg.set(id, value);
       } catch (error) {
         if (!(error instanceof Reject)) throw error;

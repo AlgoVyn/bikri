@@ -3,6 +3,7 @@ import { LEDGER_TABLES, MASTER_TABLES } from '@bikri/core';
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  clearTenantDb,
   DEXIE_SCHEMA_V1,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
@@ -83,6 +84,26 @@ describe('Dexie schema (02 §3)', () => {
     expect((await b.products.get('p1'))?.name_en).toBe('Charger');
     expect(await a.products.count()).toBe(1);
     await deleteTenantDb('tenant-a').catch(() => undefined);
+  });
+
+  it('clears every store without deleting the database', async () => {
+    const db = open('clear-a');
+    await db.kv.put({ key: 'secret', value: 'old-shop' });
+    await db.categories.put({
+      id: 'c1',
+      name_en: 'Phones',
+      created_at: 1,
+      updated_at: 1,
+      deleted_at: null,
+      updated_by: null,
+      rev: 1,
+    });
+    db.close();
+    await clearTenantDb('clear-a');
+    const after = open('clear-a');
+    expect(await after.kv.count()).toBe(0);
+    expect(await after.categories.count()).toBe(0);
+    expect(await Dexie.getDatabaseNames()).toContain('bikri-clear-a');
   });
 
   it('deletes a tenant database without touching the other', async () => {

@@ -14,6 +14,7 @@ import {
   CartNotEmptyError,
   cartTotals,
   emptyCart,
+  isEmptyCart,
   overrideMatches,
   type ShopMoney,
   shopMoney,
@@ -251,11 +252,7 @@ export async function completeSale(
     !overrideMatches(cart, 'sale.below_cost')
   )
     throw new SaleInvalidError('below-cost approval');
-  if (
-    totals.discount_share_bp > 0 &&
-    !sellerPerm('sale.discount') &&
-    !overrideMatches(cart, 'sale.discount')
-  )
+  if (totals.discount_share_bp > 0 && !sellerPerm('sale.discount'))
     throw new SaleInvalidError('discount permission');
   if (
     totals.discount_share_bp > sellerLimit &&
@@ -641,7 +638,7 @@ export async function startReissue(
     .count();
   if (refunds > 0) throw new ReissueNotAllowedError('refunded');
   const target = await db.carts.get(input.cartId);
-  if (target && target.lines.length > 0) throw new CartNotEmptyError();
+  if (target && !isEmptyCart(target)) throw new CartNotEmptyError();
   // The cart stores newest-first and `createSale` reverses it back to line order.
   const lines = (
     await db.sale_lines.where('sale_id').equals(input.saleId).sortBy('line_no')

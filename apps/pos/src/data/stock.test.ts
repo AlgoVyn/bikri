@@ -39,6 +39,25 @@ const movements = (
 ) => db.stock_movements.filter((m) => m.reason_code === reason).toArray();
 
 describe('stock adjust (screens/09)', () => {
+  it('is idempotent when the caller reuses the adjustment id', async () => {
+    const { db, ctx, p } = await shop('stk-idem');
+    await db.outbox.clear();
+    const input = {
+      productId: p.id,
+      kind: 'out' as const,
+      reason: 'damaged' as const,
+      qtyMilli: 3000,
+      adjustmentId: 'adj-1',
+    };
+    const first = await adjustStock(db, input, ctx, NOW);
+    const second = await adjustStock(db, input, ctx, NOW + 1000);
+    expect(second?.id).toBe(first?.id);
+    expect(await onHand(db, p.id)).toBe(9000);
+    expect(
+      await db.outbox.filter((o) => o.tbl === 'stock_movements').count(),
+    ).toBe(1);
+  });
+
   it('AC 1: stock out 3 Damaged on 12 gives 9 and a damaged movement of −3000', async () => {
     const { db, ctx, p } = await shop();
     await db.outbox.clear();

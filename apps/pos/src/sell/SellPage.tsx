@@ -313,6 +313,11 @@ export function SellPage() {
         break;
       }
     }
+    if (now.discount_share_bp > 0 && !sellerCan('sale.discount')) {
+      // A revoked permission is not overrideable; only the discount limit is.
+      toast.push(t('sell.discount_forbidden'), 'error');
+      return;
+    }
     const checks = paymentChecks(current, now, {
       maxDiscountBp: Number(seller?.max_discount_bp ?? 0),
       canBelowCost: sellerCan('sale.below_cost'),
@@ -480,7 +485,13 @@ export function SellPage() {
     enabled: ready,
   });
   useHotkey(
-    (e) => e.key === 'F4' || (e.ctrlKey && e.key.toLowerCase() === 'h'),
+    (e) =>
+      e.key === 'F4' ||
+      (e.ctrlKey &&
+        !e.shiftKey &&
+        !e.altKey &&
+        !e.metaKey &&
+        e.key.toLowerCase() === 'h'),
     () => cart.lines.length > 0 && setDialog('hold'),
     {
       inFields: true,

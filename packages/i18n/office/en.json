@@ -518,6 +518,7 @@
       "closed": "Day closed.",
       "correct": "Drawer is correct",
       "count_cash": "Count cash",
+      "count_first": "Count the drawer to see the difference",
       "counted": "Counted",
       "difference": "Difference",
       "expected": "Expected in drawer",
@@ -880,7 +881,11 @@
       "action_support_access_end": "Support access ended",
       "action_support_access_start": "Support access started",
       "action_sync_ops_discarded": "Sync ops discarded",
+      "action_sync_conflict_ack": "Sync conflict acknowledged",
       "action_tenant_restore": "Shop restored",
+      "action_tenant_purge": "Shop data purged for restore",
+      "action_tenant_change": "Shop settings changed by operator",
+      "action_shop_created": "Shop created",
       "action_tenant_status_change": "Shop status change",
       "action_void": "Void bill",
       "all_actions": "All actions",
@@ -964,6 +969,7 @@
       "too_long": "This barcode is too long for the selected label — use a larger size or generate a shorter code"
     },
     "display": {
+      "auto_close": "Close the sale-complete screen automatically",
       "sale_sound": "Play a sound when a sale is saved",
       "auto_lock": "Auto-lock after (minutes; 0 = never)",
       "camera": "Camera scanning on phones",

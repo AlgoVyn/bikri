@@ -49,6 +49,7 @@ import {
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { Modal } from './Modal.tsx';
@@ -213,7 +214,8 @@ function PayStep({
     [],
   );
   const [print, setPrint] = useState<boolean | null>(null);
-  const [whatsapp, setWhatsapp] = useState(false);
+  // Default on when the customer has a phone; the checkbox lets the cashier opt out.
+  const [whatsapp, setWhatsapp] = useState(true);
   const printOn = print ?? (printer ? printer.auto_print !== false : false);
   const customer = useCustomer(cart.customer_id);
   const noteId = useId();
@@ -283,6 +285,12 @@ function PayStep({
         },
         ctx,
       );
+      // With auto-print off (or no printer) no receipt job exists to kick the drawer.
+      if (
+        !printOn &&
+        merged.some((row) => row.method === 'cash' && row.amount > 0)
+      )
+        void kickDrawerForCash(db);
       const after = cart.customer_id
         ? ((await db.party_balances.get(['customer', cart.customer_id]))
             ?.balance ?? 0)

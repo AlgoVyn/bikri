@@ -264,7 +264,7 @@ describe('totals and payment checks (07 §3)', () => {
         maxDiscountBp: 10000,
         canDiscount: false,
       }).discount,
-    ).toBe(true);
+    ).toBe(false);
     cart = addOverride(cart, {
       permission: 'sale.discount',
       approved_by: 'st-2',
@@ -273,6 +273,38 @@ describe('totals and payment checks (07 §3)', () => {
     expect(paymentChecks(cart, cartTotals(cart, money), cashier).discount).toBe(
       false,
     );
+  });
+
+  it('does not treat a backdate, reissue, note or approval as an empty cart', () => {
+    const base = emptyCart('c1');
+    expect(isEmptyCart(base)).toBe(true);
+    expect(
+      isEmptyCart({
+        ...base,
+        backdate: {
+          business_date: '2026-10-01',
+          staff_id: 'st-1',
+          reason: 'missed',
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isEmptyCart({
+        ...base,
+        reissue: {
+          sale_id: 's1',
+          void_id: 'v1',
+          reason: 'wrong',
+        },
+      }),
+    ).toBe(false);
+    expect(isEmptyCart({ ...base, note: 'hold' })).toBe(false);
+    expect(
+      isEmptyCart({
+        ...base,
+        overrides: [{ permission: 'sale.void', approved_by: 'st-2' }],
+      }),
+    ).toBe(false);
   });
 
   it('keeps one catalog.price approval per line', () => {

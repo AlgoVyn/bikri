@@ -153,6 +153,93 @@ async function applyPage(
 }
 
 /**
+ * Merge one snapshot page. A bad row is quarantined like a pull row and the page still
+ * advances, so a single unique collision can never wedge initial sync forever. A
+ * `sale_voids` collision means another till already voided the same sale: the server's
+ * void is the winner, so the local pending/failed void and its outbox entry are dropped.
+ */
+async function mergeSnapshotPage(
+  db: BikriDb,
+  tbl: string,
+  rows: SyncedRow[],
+  next: SnapshotState,
+): Promise<void> {
+  try {
+    await db.transaction('rw', mergeScope([tbl]), async (tx) => {
+      await mergeRows(
+        tx,
+        rows.map((row) => ({ tbl, row })),
+        { caches: false },
+      );
+      await tx.table('kv').put({ key: 'snapshot_state', value: next });
+    });
+    return;
+  } catch (error) {
+    if (!isRowError(error)) throw error;
+  }
+  const errors: { tbl: string; id: string; message: string; at: number }[] = [];
+  for (const row of rows) {
+    try {
+      await db.transaction('rw', mergeScope([tbl]), async (tx) => {
+        await mergeRows(tx, [{ tbl, row }], { caches: false });
+      });
+    } catch (error) {
+      if (!isRowError(error)) throw error;
+      const collision =
+        tbl === 'sale_voids' &&
+        error instanceof Error &&
+        error.name === 'ConstraintError' &&
+        typeof row.sale_id === 'string';
+      if (collision) {
+        const local = (await db.sale_voids
+          .where('sale_id')
+          .equals(String(row.sale_id))
+          .first()) as SyncedRow | undefined;
+        if (local && local.id !== row.id) {
+          await db.transaction(
+            'rw',
+            [db.sale_voids, db.outbox, db.pull_shadow],
+            async (tx) => {
+              await tx.table('sale_voids').delete(local.id);
+              await tx
+                .table('outbox')
+                .where('[tbl+row_id]')
+                .equals(['sale_voids', local.id])
+                .delete();
+              await tx.table('pull_shadow').delete(['sale_voids', local.id]);
+            },
+          );
+          try {
+            await db.transaction('rw', mergeScope([tbl]), async (tx) => {
+              await mergeRows(tx, [{ tbl, row }], { caches: false });
+            });
+            continue;
+          } catch (retryError) {
+            if (!isRowError(retryError)) throw retryError;
+          }
+        }
+      }
+      errors.push({
+        tbl,
+        id: String(row.id ?? ''),
+        message: error instanceof Error ? error.message : String(error),
+        at: Date.now(),
+      });
+    }
+  }
+  await db.transaction('rw', ['kv'], async (tx) => {
+    const stored = (await tx.table('kv').get('pull_errors')) as
+      | { value?: typeof errors }
+      | undefined;
+    await tx.table('kv').put({
+      key: 'pull_errors',
+      value: [...(stored?.value ?? []), ...errors].slice(-50),
+    });
+    await tx.table('kv').put({ key: 'snapshot_state', value: next });
+  });
+}
+
+/**
  * Resumable snapshot (kv.snapshot_state). Rows go through the same merge as a pull, so pending
  * local edits survive; caches are rebuilt at the end; then the pull continues from snapshot_seq.
  */
@@ -205,20 +292,14 @@ export async function runSnapshot(
           after: '',
           done: state.done + page.rows.length,
         };
-    await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-      await mergeRows(
-        tx,
-        page.rows.map((row) => ({ tbl, row })),
-        { caches: false },
-      );
-      await tx.table('kv').put({ key: 'snapshot_state', value: next });
-    });
+    await mergeSnapshotPage(db, tbl, page.rows, next);
     state = next;
     onProgress?.(state.done, total);
   }
   await rebuildCaches(db);
   await db.transaction('rw', db.kv, async () => {
     await setKv(db, 'pull_cursor', state.seq);
+    await setKv(db, 'last_pull_at', Date.now());
     await db.kv.delete('snapshot_state');
   });
   await fixInvoiceSeq(db);
@@ -578,6 +659,14 @@ export async function restoreRecovery(
   try {
     await db.transaction('rw', db.tables, async () => {
       const recoveredRows: RecoveredOp[] = [];
+      // A row that is still queued will be pushed by its original op. Re-enqueueing it
+      // here would put the same ledger id in one push twice, and the Worker rejects
+      // both transactions. Failed rows stay hidden until the user retries or discards.
+      const queued = new Set(
+        (await db.outbox.toArray()).map(
+          (entry) => `${entry.tbl}:${entry.row_id}`,
+        ),
+      );
       if (device) {
         const recovered = new Map<string, Set<string>>();
         const lineParents: Record<string, { table: string; field: string }> = {
@@ -600,7 +689,8 @@ export async function restoreRecovery(
               : row.device_id !== undefined && row.device_id === device.id;
             if (
               !mine ||
-              (!parent && Number(row.created_at ?? 0) < restorePointAt)
+              (!parent && Number(row.created_at ?? 0) < restorePointAt) ||
+              queued.has(`${tbl}:${row.id}`)
             )
               continue;
             if (!parent) {
@@ -615,11 +705,6 @@ export async function restoreRecovery(
       // Master rows created or updated after the restore point are not in the restored
       // server copy. Re-send them first so recovered sales/payments/expenses have their
       // customer, product, category and staff references.
-      const queued = new Set(
-        (await db.outbox.toArray()).map(
-          (entry) => `${entry.tbl}:${entry.row_id}`,
-        ),
-      );
       const masterRows: RecoveredMaster[] = [];
       for (const tbl of SYNC_IMPORT_ORDER) {
         if (!MASTER_SET.has(tbl)) continue;

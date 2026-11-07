@@ -255,6 +255,39 @@ describe('day close (T-047)', () => {
       cardTotal: 100000,
       bankTotal: 200000,
     });
+    // A close written before migration 0010 has no informational totals; the receipt
+    // recomputes them instead of showing zeros.
+    await db.day_closes.add({
+      id: 'close-old',
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      period_start: NOW,
+      period_end: NOW + 1000,
+      opening_cash: 0,
+      cash_sales: 0,
+      udhaar_cash_in: 0,
+      pay_ins: 0,
+      supplier_cash_in: 0,
+      cash_refunds: 0,
+      cash_expenses: 0,
+      supplier_cash_out: 0,
+      pay_outs: 0,
+      expected_cash: 0,
+      counted_cash: 0,
+      difference: 0,
+      denominations_json: null,
+      note: '',
+      created_at: NOW + 1000,
+    });
+    expect(await loadDayCloseReceipt(db, 'close-old')).toMatchObject({
+      cardTotal: 0,
+      bankTotal: 0,
+      udhaarGiven: 0,
+      bills: 0,
+      refunds: 0,
+    });
     const csv = dayCloseCsv(receipt as NonNullable<typeof receipt>, TODAY, TZ);
     expect(csv.split('\r\n')[0]).toBe(
       'date,device,cashier,period_start,period_end,opening,cash_sales,udhaar_in,pay_ins,supplier_in,refunds,expenses,supplier_out,pay_outs,expected,counted,difference,card,bank,udhaar_given,bills,refunds_count,note',

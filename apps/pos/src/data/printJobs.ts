@@ -1,4 +1,4 @@
-import type { BikriDb } from '@bikri/db';
+import type { BikriDb, PrintJob } from '@bikri/db';
 
 /** Puts a failed job back in the queue (T-020); kept separate from the receipt code. */
 export async function retryPrintJob(db: BikriDb, id: string): Promise<void> {
@@ -66,18 +66,30 @@ const documentKey = (job: {
           ? `return:${job.supplier_return_id}`
           : null;
 
-/** Failed jobs that a later successful job for the same document has not superseded. */
-export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
-  const all = await db.print_jobs.toArray();
+function unresolvedFailed(jobs: readonly PrintJob[]): PrintJob[] {
   const lastDone = new Map<string, number>();
-  for (const job of all) {
+  for (const job of jobs) {
     const key = documentKey(job);
     if (job.status !== 'done' || key === null) continue;
     lastDone.set(key, Math.max(lastDone.get(key) ?? 0, Number(job.created_at)));
   }
-  return all.filter((job) => {
+  return jobs.filter((job) => {
     if (job.status !== 'failed') return false;
     const key = documentKey(job);
     return key === null || Number(job.created_at) > (lastDone.get(key) ?? 0);
-  }).length;
+  });
+}
+
+/** The newest failed job whose document has not since printed successfully. */
+export function latestUnresolvedFailed(
+  jobs: readonly PrintJob[],
+): PrintJob | undefined {
+  return unresolvedFailed(jobs).sort(
+    (a, b) => Number(b.created_at) - Number(a.created_at),
+  )[0];
+}
+
+/** Failed jobs that a later successful job for the same document has not superseded. */
+export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
+  return unresolvedFailed(await db.print_jobs.toArray()).length;
 }

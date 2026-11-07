@@ -131,6 +131,7 @@
     "restore_abort": "Abort",
     "restore_aborted": "Restore aborted. The shop stays in maintenance.",
     "restore_bad_zip": "This zip is not a Bikri export.",
+    "restore_confirm": "I understand this purge deletes this shop's current rows before importing the export.",
     "restore_different_zip": "This zip is not the one this restore started with.",
     "restore_done": "Restore finished.",
     "restore_epoch": "Restore epoch",

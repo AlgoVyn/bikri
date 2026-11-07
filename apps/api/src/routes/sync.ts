@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../errors.ts';
+import { readTextBody } from '../middleware/body.ts';
 import {
   addRowsRead,
   pendingRowsRead,
@@ -103,12 +104,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   const { tenant, device, db } = c.var;
   const now = Date.now();
   assertCanWrite(device);
-  const length = Number(c.req.header('content-length') ?? '0');
-  if (length > MAX_PUSH_BYTES)
-    throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Push body is over 1 MB');
-  const text = await c.req.text();
-  if (new TextEncoder().encode(text).length > MAX_PUSH_BYTES)
-    throw new ApiError('PAYLOAD_TOO_LARGE', 413, 'Push body is over 1 MB');
+  const text = await readTextBody(c, MAX_PUSH_BYTES);
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -278,15 +274,19 @@ export async function snapshotPayload(
         );
       }),
     );
-    return {
-      snapshot_seq: seq,
-      tables: SNAPSHOT_TABLES.map((tbl, i) => ({
-        tbl,
-        rows: Number(
-          (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
-        ),
-      })),
-    };
+    const tables = SNAPSHOT_TABLES.map((tbl, i) => ({
+      tbl,
+      rows: Number(
+        (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
+      ),
+    }));
+    // The start runs one COUNT(*) per table; charge those reads so a device cannot
+    // loop the endpoint without ever advancing the per-shop read budget.
+    addRowsRead(
+      tenant.id,
+      tables.reduce((sum, table) => sum + table.rows, 0),
+    );
+    return { snapshot_seq: seq, tables };
   }
   const limit = Math.min(q.limit, maxLimit);
   const column = q.before === undefined ? null : cutoffColumn(q.tbl);

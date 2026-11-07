@@ -46,6 +46,40 @@ async function setUpTill(
   );
 }
 
+/** Rows left in an old tenant database after "Leave this shop" (the name may remain). */
+async function oldDbProductCount(
+  page: Page,
+  tenantId: string,
+): Promise<number> {
+  return page.evaluate(
+    (id) =>
+      new Promise<number>((resolve) => {
+        const open = indexedDB.open(`bikri-${id}`);
+        open.onsuccess = () => {
+          try {
+            const req = open.result
+              .transaction('products')
+              .objectStore('products')
+              .count();
+            req.onsuccess = () => {
+              open.result.close();
+              resolve(req.result);
+            };
+            req.onerror = () => {
+              open.result.close();
+              resolve(-1);
+            };
+          } catch {
+            open.result.close();
+            resolve(-1);
+          }
+        };
+        open.onerror = () => resolve(-1);
+      }),
+    tenantId,
+  );
+}
+
 async function productNames(page: Page): Promise<string[]> {
   return page.evaluate(
     () =>
@@ -146,10 +180,7 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
   expect(code.status(), await code.text()).toBe(201);
   await enrol(b.page, ((await code.json()) as { code: string }).code);
   await unlock(b.page);
-  const dbs = await b.page.evaluate(async () =>
-    (await indexedDB.databases()).map((d) => d.name),
-  );
-  expect(dbs).not.toContain(`bikri-${shopB.tenant.id}`);
+  expect(await oldDbProductCount(b.page, shopB.tenant.id)).toBe(0);
   expect(await productNames(b.page)).toEqual(['Cable of shop A']);
   await a.ctx.close();
   await b.ctx.close();

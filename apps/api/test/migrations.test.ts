@@ -479,7 +479,7 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
       .all<{ key: string; value: string }>();
     expect(
       Object.fromEntries(meta.results.map((r) => [r.key, r.value])),
-    ).toEqual({ last_prune_at: '0', prune_cursor: '', schema_version: '1' });
+    ).toEqual({ last_prune_at: '0', prune_cursor: '', schema_version: '2' });
     const cats = await db
       .prepare(
         'SELECT code FROM expense_category_templates ORDER BY sort_order',

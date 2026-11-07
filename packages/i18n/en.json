@@ -705,6 +705,7 @@
     "discount_max": "Max {{amount}}",
     "discount_pct": "Discount %",
     "discount_type": "Discount in Rs or %",
+    "discount_forbidden": "You don't have permission to give discounts.",
     "drawer_denied": "You don't have permission to open the drawer.",
     "find_products": "Find products",
     "held_bills": "Held bills ({{count}})",

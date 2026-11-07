@@ -89,7 +89,7 @@ Shown only on an admin device (`kv.is_admin`) when unlocked as an `owner` (`devi
 
 ## This device
 
-Shop name, device name/code/branch, admin or not. `Leave this shop` (owner PIN; blocked while ops are unsynced unless exported first): deletes this shop's local database `bikri-<tenant_id>`, clears `bikri.active_tenant` and goes to the enrol screen. It does not revoke the device on the server (an owner does that in Devices).
+Shop name, device name/code/branch, admin or not. `Leave this shop` (owner PIN; blocked while ops are unsynced unless exported first): clears every store of this shop's local database `bikri-<tenant_id>` (the database name may remain), clears `bikri.active_tenant` and goes to the enrol screen. It does not revoke the device on the server (an owner does that in Devices).
 
 ## Sync (everyone sees status; actions need owner)
 
@@ -122,6 +122,6 @@ Version, build hash, licence (link to LICENSE), source link (GitHub), check for 
 7. The `#printer` link opens the Printer section directly.
 8. With tax 0 the "Prices include tax" switch is hidden and `tax_mode` is `exclusive`; after setting 17% and switching it on, the next Rs 11,700 bill totals Rs 11,700 with "Includes Sales tax 17%: Rs 1,700" (T9), while bills saved earlier are unchanged.
 9. On an admin device unlocked as owner, `Add a till` produces a code that enrols a device into this shop only; on a non-admin device or as a manager the Devices section is hidden and `/api/shop/*` returns 403.
-10. `Leave this shop` removes every IndexedDB database and cache entry of this shop from the browser.
+10. `Leave this shop` clears every row and cache entry of this shop from the browser (the empty database name may remain, so a second tab can never block the handover).
 11. Device actions and `Download from server` need a fresh email code after Lock; a manager or a non-admin device never sees them.
 12. In a read-only shop, every section still shows its data; only local device settings (printer, scanner, display, language) can be changed.

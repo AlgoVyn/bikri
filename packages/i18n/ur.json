@@ -705,6 +705,7 @@
     "discount_max": "زیادہ سے زیادہ {{amount}}",
     "discount_pct": "رعایت %",
     "discount_type": "رعایت روپے یا % میں",
+    "discount_forbidden": "آپ کو رعایت دینے کی اجازت نہیں۔",
     "drawer_denied": "آپ کو دراز کھولنے کی اجازت نہیں۔",
     "find_products": "پروڈکٹس تلاش کریں",
     "held_bills": "رکے ہوئے بل ({{count}})",

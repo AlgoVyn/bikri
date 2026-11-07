@@ -22,6 +22,7 @@ import {
   refundSale,
 } from '../data/refunds.ts';
 import { billDetail, shopTimeZone } from '../data/salesHistory.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -171,6 +172,8 @@ export function RefundDialog({
         },
         ctx,
       );
+      if (!printOn && method === 'cash' && plan.amount > 0)
+        void kickDrawerForCash(db);
       setDone(String(result.refund.id));
       toast.push(t('office.refund.done'));
     } catch (err) {

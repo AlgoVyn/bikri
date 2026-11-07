@@ -16,6 +16,7 @@ import {
   expenseCategories,
 } from '../data/expenses.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { ApprovalDialog } from '../sales/ApprovalDialog.tsx';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -122,6 +123,7 @@ export function ExpenseDialog({
           override: override ? { ...override } : null,
         },
       );
+      if (method === 'cash') void kickDrawerForCash(db);
       toast.push(t('office.expenses.expense_saved'));
       onSaved?.();
       onOpenChange(false);

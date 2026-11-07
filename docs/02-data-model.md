@@ -24,12 +24,14 @@ This document is the **source of truth** for table and column names. D1 (server)
 | Kind | Tables | Rules |
 |---|---|---|
 | **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
-| **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). |
+| **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
 | **Server-owned** (tenant-scoped) | `devices`, `enrolment_codes`, `owner_email_codes`, `change_log`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` is never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
 | **Local-only** (Dexie) | `outbox`, `kv`, `carts`, `held_bills`, `file_queue`, `print_jobs`, `stock_levels`, `party_balances`, `pull_shadow` | Never synced. |
 
 Common columns on every synced row: `id`, `created_at` (plus `tenant_id` in D1 only). Ledger rows also carry `device_id`, `staff_id`, `branch_id`, `business_date` where listed.
+
+**Primary-key exceptions:** `change_log` is keyed by its global `seq`, `applied_ops` by `(tenant_id, op_id)`, and the enrolment/owner-email code tables by their unique hash keys; these are the exceptions listed in [10 §8 I20](10-testing.md#8-cross-tenant-isolation-suite-mandatory).
 
 ## 2. D1 schema (migration `0001_init.sql`)
 
@@ -977,6 +979,247 @@ BEGIN
 END;
 ```
 
+### 2.9 Seventh-review hardening (migration `0010_review_hardening.sql`)
+
+```sql
+-- Seventh-review hardening.
+--
+-- Bump the database marker with the Worker's SCHEMA_VERSION (apps/api/wrangler.jsonc).
+UPDATE meta SET value = '2' WHERE key = 'schema_version';
+--
+-- 1. Snapshot the day-close informational totals so a reprint is immutable.
+-- 2. Make the drawer period unique per device, including two concurrent first closes.
+-- 3. Enforce append-only at the database level. The Worker already rejects updates and
+--    deletes on ledger tables; these triggers also protect admin imports, cron paths and
+--    future code. Deletes are allowed only while the shop is in maintenance (restore
+--    purge) or deleting (tenant deletion), and only `sales.status` may change in place.
+
+ALTER TABLE day_closes ADD COLUMN card_total INTEGER;
+ALTER TABLE day_closes ADD COLUMN bank_total INTEGER;
+ALTER TABLE day_closes ADD COLUMN udhaar_given INTEGER;
+ALTER TABLE day_closes ADD COLUMN bills INTEGER;
+ALTER TABLE day_closes ADD COLUMN refunds INTEGER;
+
+DROP INDEX day_closes_device;
+CREATE UNIQUE INDEX day_closes_device ON day_closes (tenant_id, device_id, period_end);
+CREATE UNIQUE INDEX day_closes_device_start ON day_closes (tenant_id, device_id, period_start);
+
+CREATE TRIGGER sales_append_only_update
+BEFORE UPDATE OF tenant_id, id, invoice_no, invoice_seq, branch_id, device_id,
+  staff_id, customer_id, business_date, created_at, line_count, items_qty_milli,
+  gross_total, item_discount_total, subtotal, bill_discount_type,
+  bill_discount_value, bill_discount, tax_rate_bp, tax, tax_inclusive, rounding,
+  total, paid_total, udhaar_amount, cash_tendered, change_given, replaces_sale_id,
+  note
+ON sales
+BEGIN
+  SELECT RAISE(ABORT, 'sales is append-only');
+END;
+
+CREATE TRIGGER sales_append_only_delete
+BEFORE DELETE ON sales
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'sales is append-only');
+END;
+
+CREATE TRIGGER sale_lines_append_only_update
+BEFORE UPDATE ON sale_lines
+BEGIN
+  SELECT RAISE(ABORT, 'sale_lines is append-only');
+END;
+CREATE TRIGGER sale_lines_append_only_delete
+BEFORE DELETE ON sale_lines
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'sale_lines is append-only');
+END;
+
+CREATE TRIGGER payments_append_only_update
+BEFORE UPDATE ON payments
+BEGIN
+  SELECT RAISE(ABORT, 'payments is append-only');
+END;
+CREATE TRIGGER payments_append_only_delete
+BEFORE DELETE ON payments
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'payments is append-only');
+END;
+
+CREATE TRIGGER refunds_append_only_update
+BEFORE UPDATE ON refunds
+BEGIN
+  SELECT RAISE(ABORT, 'refunds is append-only');
+END;
+CREATE TRIGGER refunds_append_only_delete
+BEFORE DELETE ON refunds
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'refunds is append-only');
+END;
+
+CREATE TRIGGER refund_lines_append_only_update
+BEFORE UPDATE ON refund_lines
+BEGIN
+  SELECT RAISE(ABORT, 'refund_lines is append-only');
+END;
+CREATE TRIGGER refund_lines_append_only_delete
+BEFORE DELETE ON refund_lines
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'refund_lines is append-only');
+END;
+
+CREATE TRIGGER sale_voids_append_only_update
+BEFORE UPDATE ON sale_voids
+BEGIN
+  SELECT RAISE(ABORT, 'sale_voids is append-only');
+END;
+CREATE TRIGGER sale_voids_append_only_delete
+BEFORE DELETE ON sale_voids
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'sale_voids is append-only');
+END;
+
+CREATE TRIGGER ledger_entries_append_only_update
+BEFORE UPDATE ON ledger_entries
+BEGIN
+  SELECT RAISE(ABORT, 'ledger_entries is append-only');
+END;
+CREATE TRIGGER ledger_entries_append_only_delete
+BEFORE DELETE ON ledger_entries
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'ledger_entries is append-only');
+END;
+
+CREATE TRIGGER stock_movements_append_only_update
+BEFORE UPDATE ON stock_movements
+BEGIN
+  SELECT RAISE(ABORT, 'stock_movements is append-only');
+END;
+CREATE TRIGGER stock_movements_append_only_delete
+BEFORE DELETE ON stock_movements
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'stock_movements is append-only');
+END;
+
+CREATE TRIGGER purchases_append_only_update
+BEFORE UPDATE ON purchases
+BEGIN
+  SELECT RAISE(ABORT, 'purchases is append-only');
+END;
+CREATE TRIGGER purchases_append_only_delete
+BEFORE DELETE ON purchases
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'purchases is append-only');
+END;
+
+CREATE TRIGGER purchase_lines_append_only_update
+BEFORE UPDATE ON purchase_lines
+BEGIN
+  SELECT RAISE(ABORT, 'purchase_lines is append-only');
+END;
+CREATE TRIGGER purchase_lines_append_only_delete
+BEFORE DELETE ON purchase_lines
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'purchase_lines is append-only');
+END;
+
+CREATE TRIGGER supplier_returns_append_only_update
+BEFORE UPDATE ON supplier_returns
+BEGIN
+  SELECT RAISE(ABORT, 'supplier_returns is append-only');
+END;
+CREATE TRIGGER supplier_returns_append_only_delete
+BEFORE DELETE ON supplier_returns
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'supplier_returns is append-only');
+END;
+
+CREATE TRIGGER supplier_return_lines_append_only_update
+BEFORE UPDATE ON supplier_return_lines
+BEGIN
+  SELECT RAISE(ABORT, 'supplier_return_lines is append-only');
+END;
+CREATE TRIGGER supplier_return_lines_append_only_delete
+BEFORE DELETE ON supplier_return_lines
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'supplier_return_lines is append-only');
+END;
+
+CREATE TRIGGER expenses_append_only_update
+BEFORE UPDATE ON expenses
+BEGIN
+  SELECT RAISE(ABORT, 'expenses is append-only');
+END;
+CREATE TRIGGER expenses_append_only_delete
+BEFORE DELETE ON expenses
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'expenses is append-only');
+END;
+
+CREATE TRIGGER cash_moves_append_only_update
+BEFORE UPDATE ON cash_moves
+BEGIN
+  SELECT RAISE(ABORT, 'cash_moves is append-only');
+END;
+CREATE TRIGGER cash_moves_append_only_delete
+BEFORE DELETE ON cash_moves
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'cash_moves is append-only');
+END;
+
+CREATE TRIGGER day_closes_append_only_update
+BEFORE UPDATE ON day_closes
+BEGIN
+  SELECT RAISE(ABORT, 'day_closes is append-only');
+END;
+CREATE TRIGGER day_closes_append_only_delete
+BEFORE DELETE ON day_closes
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'day_closes is append-only');
+END;
+
+CREATE TRIGGER audit_log_append_only_update
+BEFORE UPDATE ON audit_log
+BEGIN
+  SELECT RAISE(ABORT, 'audit_log is append-only');
+END;
+CREATE TRIGGER audit_log_append_only_delete
+BEFORE DELETE ON audit_log
+WHEN (SELECT status FROM tenants WHERE id = OLD.tenant_id)
+  NOT IN ('maintenance', 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'audit_log is append-only');
+END;
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1020,7 +1263,7 @@ export const DEXIE_SCHEMA_V1 = {
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
   file_queue: '++id, status',
-  print_jobs: 'id, sale_id, refund_id, status, created_at',
+  print_jobs: 'id, sale_id, refund_id, status, created_at', // V1 was 'id, status, created_at'; V2 adds sale_id/refund_id
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at }
   pull_shadow: '[tbl+id]',        // server rows skipped while a local edit was pending (03 §4.2)

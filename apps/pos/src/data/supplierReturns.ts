@@ -233,6 +233,15 @@ export async function planSupplierReturn(
         (purchase && purchaseLine.purchase_id !== purchase.id)
       )
         throw new SupplierReturnError('purchase');
+      // A line linked without an explicit delivery must still belong to this supplier;
+      // the Worker checks the same rule when the return is pushed.
+      if (!purchase) {
+        const parent = await (
+          src.table('purchases') as Table<SyncedRow, string>
+        ).get(String(purchaseLine.purchase_id));
+        if (!parent || parent.supplier_id !== input.supplierId)
+          throw new SupplierReturnError('purchase');
+      }
       // Zero is a valid landed cost (free goods). Only a missing purchase line means
       // "fall back to avg/last cost".
       linkedCost = n(purchaseLine.landed_unit_cost);

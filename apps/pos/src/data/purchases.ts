@@ -8,6 +8,7 @@ import {
   type PurchaseLineResult,
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction } from './write.ts';
 
@@ -75,7 +76,7 @@ export async function saveDelivery(
   if (input.lines.length === 0 || input.lines.length > MAX_LINES)
     throw new DeliveryError('lines');
   if (
-    !/^\d{4}-\d{2}-\d{2}$/u.test(input.date) ||
+    !isBusinessDate(input.date) ||
     input.date > options.today ||
     input.date < addDays(options.today, -30)
   )

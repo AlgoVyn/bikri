@@ -72,7 +72,15 @@ export function emptyCart(id: CartId, now = Date.now()): Cart {
 }
 
 export function isEmptyCart(cart: Cart): boolean {
-  return cart.lines.length === 0 && !cart.customer_id && !cart.bill_discount;
+  return (
+    cart.lines.length === 0 &&
+    !cart.customer_id &&
+    !cart.bill_discount &&
+    !cart.backdate &&
+    !cart.reissue &&
+    cart.note.trim() === '' &&
+    (cart.overrides?.length ?? 0) === 0
+  );
 }
 
 export async function loadCarts(db: BikriDb): Promise<Record<CartId, Cart>> {
@@ -286,9 +294,10 @@ export function paymentChecks(
 ): { belowCost: boolean; discount: boolean } {
   const anyBelow = totals.lines.some((l) => l.below_cost === 1);
   const discounted = totals.item_discount_total + totals.bill_discount > 0;
+  // A staff member whose `sale.discount` permission is revoked cannot override the
+  // permission itself; only the max-discount limit is overrideable (05 §6).
   const overLimit =
-    discounted &&
-    (!staff.canDiscount || totals.discount_share_bp > staff.maxDiscountBp);
+    discounted && totals.discount_share_bp > staff.maxDiscountBp;
   return {
     belowCost:
       anyBelow &&

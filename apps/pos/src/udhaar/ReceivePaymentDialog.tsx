@@ -14,6 +14,7 @@ import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -111,6 +112,7 @@ export function ReceivePaymentDialog({
         ctx,
         { role, today },
       );
+      if (method === 'cash') void kickDrawerForCash(db);
       toast.push(t('office.udhaar.payment_saved', { amount: money(amount) }));
       onOpenChange(false);
     } catch (err) {

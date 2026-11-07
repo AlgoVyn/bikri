@@ -10,6 +10,7 @@ import { setKv } from '../data/kv.ts';
 import {
   cancelPrintJob,
   cancelQueuedPrintJobs,
+  latestUnresolvedFailed,
   retryPrintJob,
 } from '../data/printJobs.ts';
 import type { PrinterKv } from '../data/receipt.ts';
@@ -119,7 +120,9 @@ export function PrinterPage() {
   };
 
   if (printer === undefined) return null;
-  const lastFailed = jobs?.find((j) => j.job.status === 'failed');
+  const lastFailed = jobs
+    ? latestUnresolvedFailed(jobs.map((entry) => entry.job))
+    : undefined;
   const where =
     printer?.transport === 'usb'
       ? (printer.usb?.name ?? 'USB')
@@ -149,7 +152,7 @@ export function PrinterPage() {
         {lastFailed ? (
           <p className="text-small text-danger">
             {t('printer.last_error', {
-              reason: t(`print.err_${lastFailed.job.error ?? 'FAILED'}`),
+              reason: t(`print.err_${lastFailed.error ?? 'FAILED'}`),
             })}
           </p>
         ) : null}

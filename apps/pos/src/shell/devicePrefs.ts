@@ -12,6 +12,8 @@ export type DevicePrefs = {
   camera: boolean;
   suffixEnter: boolean;
   saleSound: boolean;
+  /** Close the sale-complete screen after a few seconds (screens/07). */
+  autoClose: boolean;
   /** Hide amounts on this device (shoulder-surfing privacy, docs/screens/04). */
   privacyMode: boolean;
 };
@@ -25,6 +27,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   camera: false,
   suffixEnter: true,
   saleSound: true,
+  autoClose: false,
   privacyMode: false,
 };
 
@@ -56,6 +59,7 @@ export async function saveDevicePrefs(
     camera: prefs.camera,
     suffixEnter: prefs.suffixEnter,
     saleSound: prefs.saleSound,
+    autoClose: prefs.autoClose,
     privacyMode: prefs.privacyMode,
   });
   await setKv(db, 'auto_lock_minutes', prefs.autoLockMinutes);

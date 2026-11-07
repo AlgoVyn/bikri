@@ -87,8 +87,27 @@ export type PushOutcome = {
   serverTime: number | null;
 };
 
-/** Pushes every pending op. Throws SyncHttpError / OfflineError for the engine to handle. */
+/** A claim older than this was left by a crashed/closed tab, not a live request. */
+const CLAIM_STALE_MS = 2 * 60_000;
+
+/**
+ * Pushes every pending op. Throws SyncHttpError / OfflineError for the engine to handle.
+ * A cross-tab lock stops two tills from claiming and sending dependent transactions
+ * out of order; the server is still idempotent when a lock is unavailable.
+ */
 export async function pushAll(
+  db: BikriDb,
+  maxRounds = 20,
+): Promise<PushOutcome> {
+  const locks = globalThis.navigator?.locks;
+  if (locks?.request)
+    return locks.request('bikri-push', () =>
+      pushAllUnlocked(db, maxRounds),
+    ) as Promise<PushOutcome>;
+  return pushAllUnlocked(db, maxRounds);
+}
+
+async function pushAllUnlocked(
   db: BikriDb,
   maxRounds = 20,
 ): Promise<PushOutcome> {
@@ -105,11 +124,19 @@ export async function pushAll(
   // (a product before its owner staff row is a real example), so the server would reject
   // them. Reclaim every unfinished claim now. A second push of the same op is safe: the
   // server answers from `applied_ops`, and this tab then settles the row itself.
-  await db.outbox.where('status').equals('sending').modify({
-    status: 'pending',
-    sending_at: undefined,
-    claim_token: undefined,
-  });
+  // Only reclaim a claim that is older than a live request. A second tab's in-flight
+  // claim must never be stolen: the two requests could arrive out of order and a
+  // dependent transaction (staff create then sale) would be rejected.
+  const staleBefore = Date.now() - CLAIM_STALE_MS;
+  await db.outbox
+    .where('status')
+    .equals('sending')
+    .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
+    .modify({
+      status: 'pending',
+      sending_at: undefined,
+      claim_token: undefined,
+    });
   for (let round = 0; round < maxRounds; round += 1) {
     let batch: OutboxEntry[] = [];
     let seqs: number[] = [];
@@ -159,16 +186,13 @@ export async function pushAll(
     out.sent += batch.length;
     out.serverTime = res.server_time;
     const bySeq = new Map(batch.map((e) => [e.op_id, e]));
-    const masterTables = [
-      ...new Set(
-        batch
-          .filter((entry) => !isLedgerTable(entry.tbl))
-          .map((entry) => db.table(entry.tbl)),
-      ),
-    ];
+    // Every table in the batch, including ledger tables: the settle reads an applied
+    // op's local row when a newer op is still pending. Dexie throws if a table is used
+    // outside the transaction scope.
+    const batchTables = [...new Set(batch.map((entry) => db.table(entry.tbl)))];
     await db.transaction(
       'rw',
-      [db.outbox, db.pull_shadow, db.kv, ...masterTables],
+      [db.outbox, db.pull_shadow, db.kv, ...batchTables],
       async () => {
         const answered = new Set(res.results.map((r) => r.op_id));
         for (const r of res.results) {
@@ -201,6 +225,11 @@ export async function pushAll(
             const newer = await db.outbox
               .where('[tbl+row_id]')
               .equals([entry.tbl, entry.row_id])
+              .filter(
+                (candidate) =>
+                  candidate.status === 'pending' ||
+                  candidate.status === 'sending',
+              )
               .count();
             if (newer > 0) {
               // Keep a restore point for the newer op. For an applied upsert, replace it
@@ -315,18 +344,42 @@ async function recomputeDiscardedStatuses(
       .where('sale_id')
       .equals(saleId)
       .toArray()) as SyncedRow[];
-    const refunded = refunds.reduce(
-      (sum, row) => sum + Number(row.exact_amount ?? 0),
-      0,
-    );
+    const saleLines = (await tx
+      .table('sale_lines')
+      .where('sale_id')
+      .equals(saleId)
+      .toArray()) as SyncedRow[];
+    const refundIds = refunds.map((refund) => String(refund.id));
+    const refundedByLine = new Map<string, number>();
+    if (refundIds.length > 0) {
+      const lines = (await tx
+        .table('refund_lines')
+        .where('refund_id')
+        .anyOf(refundIds)
+        .toArray()) as SyncedRow[];
+      for (const line of lines) {
+        const key = String(line.sale_line_id);
+        refundedByLine.set(
+          key,
+          (refundedByLine.get(key) ?? 0) + Number(line.qty_milli ?? 0),
+        );
+      }
+    }
     // A sale cannot hold a void and a refund at once, so a discarded void leaves no
-    // rows here and the bill returns to paid (or to its remaining refunds).
-    const status =
-      refunded >= Number(sale.total)
-        ? 'refunded'
-        : refunded > 0
-          ? 'part_refunded'
-          : 'paid';
+    // rows here and the bill returns to paid (or to its remaining refunds). `refunded`
+    // means every line's refunded quantity equals its sold quantity (02 §4).
+    const fullyRefunded =
+      saleLines.length > 0 &&
+      saleLines.every(
+        (line) =>
+          (refundedByLine.get(String(line.id)) ?? 0) >=
+          Number(line.qty_milli ?? 0),
+      );
+    const status = fullyRefunded
+      ? 'refunded'
+      : refunds.length > 0
+        ? 'part_refunded'
+        : 'paid';
     if (sale.status !== status) await sales.update(saleId, { status });
   }
 }

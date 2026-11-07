@@ -176,6 +176,14 @@ function DisplayContent() {
           />
           {t('office.display.sale_sound')}
         </label>
+        <label className="flex items-center gap-2 text-small">
+          <input
+            type="checkbox"
+            checked={form.autoClose}
+            onChange={(event) => change({ autoClose: event.target.checked })}
+          />
+          {t('office.display.auto_close')}
+        </label>
         <label className="flex flex-col gap-1 text-small">
           {t('office.display.scanner_test')}
           <input

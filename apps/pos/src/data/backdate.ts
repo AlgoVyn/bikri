@@ -10,6 +10,7 @@ import {
   loadCarts,
   saveCart,
 } from './cart.ts';
+import { isBusinessDate } from './dates.ts';
 import { ReadOnlyError } from './write.ts';
 
 /** How far back an owner may record a sale: any past business date (D-174). */
@@ -30,14 +31,7 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function isBusinessDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
-  const parsed = Date.parse(`${value}T00:00:00Z`);
-  return (
-    Number.isFinite(parsed) &&
-    new Date(parsed).toISOString().slice(0, 10) === value
-  );
-}
+export { isBusinessDate } from './dates.ts';
 
 export type StartBackdateInput = {
   /** The unlocked staff member asking; must hold `sale.backdate`. */

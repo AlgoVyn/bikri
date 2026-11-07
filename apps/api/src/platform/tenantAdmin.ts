@@ -215,9 +215,12 @@ export function supportStatement(
   until: number,
   reason: string,
   now: number,
+  mode: 'extend' | 'set' = 'extend',
 ) {
+  const value =
+    mode === 'extend' ? 'MAX(COALESCE(support_until, 0), ?2)' : '?2';
   return env.DB.prepare(
-    'UPDATE tenants SET support_until = ?2, support_reason = ?3, updated_at = ?4 WHERE id = ?1',
+    `UPDATE tenants SET support_until = ${value}, support_reason = ?3, updated_at = ?4 WHERE id = ?1`,
   ).bind(tenantId, until, reason, now);
 }
 

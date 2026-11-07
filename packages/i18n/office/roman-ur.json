@@ -518,6 +518,7 @@
       "closed": "Din band ho gaya.",
       "correct": "Daraz durust hai",
       "count_cash": "Cash ginein",
+      "count_first": "Farq dekhne ke liye drawer ginein",
       "counted": "Gina",
       "difference": "Farq",
       "expected": "Daraz mein expected",
@@ -880,7 +881,11 @@
       "action_support_access_end": "Support access khatam",
       "action_support_access_start": "Support access shuru",
       "action_sync_ops_discarded": "Sync changes discard",
+      "action_sync_conflict_ack": "Sync conflict tasleem",
       "action_tenant_restore": "Dukan restore",
+      "action_tenant_purge": "Restore ke liye dukan ka data saaf",
+      "action_tenant_change": "Operator ne dukan settings badlin",
+      "action_shop_created": "Dukan banayi gayi",
       "action_tenant_status_change": "Dukan status change",
       "action_void": "Bill mansookh",
       "all_actions": "Sab actions",
@@ -964,6 +969,7 @@
       "too_long": "Yeh barcode chune hue label ke liye bohat lamba hai — bara size ya chhota code banayein"
     },
     "display": {
+      "auto_close": "Sale mukammal screen khud band karein",
       "sale_sound": "Sale mehfooz hone par awaaz chalayein",
       "auto_lock": "Auto-lock (minutes; 0 = kabhi nahi)",
       "camera": "Phone par camera scanning",

@@ -137,6 +137,7 @@
     "restore_file": "Export zip",
     "restore_finished_reason": "Bahali mukammal",
     "restore_importing": "{{table}}: {{done}} / {{total}}",
+    "restore_confirm": "Main samajhta hoon ke yeh safai export import karne se pehle is dukaan ke maujooda record delete kar degi.",
     "restore_intro": "Is dukaan ki export zip chunein. Qadam: maintenance on, safai, import, restore point, maintenance off. Safha dobara kholne par jari rehta hai. Rokne par dukaan maintenance mein rehti hai.",
     "restore_need_file": "Jari rakhne ke liye wahi export zip chunein.",
     "restore_purged": "{{remaining}} qatarein baqi",

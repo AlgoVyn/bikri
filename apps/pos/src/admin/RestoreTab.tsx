@@ -79,6 +79,7 @@ export function RestoreTab({
   const [running, setRunning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const abortRef = useRef(false);
   const current = stepIndex(state.phase, zip !== null);
 
@@ -139,6 +140,7 @@ export function RestoreTab({
                   }
                   const next = { ...base, exportedAt: parsed.exported_at };
                   setZip(parsed);
+                  setConfirmed(false);
                   setError(null);
                   commit(next);
                 } catch {
@@ -200,11 +202,22 @@ export function RestoreTab({
             {t('admin.restore_done')}
           </p>
         ) : null}
+        <label className="flex items-start gap-2 text-small">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={confirmed}
+            onChange={(event) => setConfirmed(event.target.checked)}
+          />
+          <span>{t('admin.restore_confirm')}</span>
+        </label>
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           <button
             type="button"
             className={primaryBtn}
-            disabled={running || zip === null || state.phase === 'done'}
+            disabled={
+              running || zip === null || state.phase === 'done' || !confirmed
+            }
             onClick={() => {
               if (zip === null) {
                 setError(t('admin.restore_need_file'));

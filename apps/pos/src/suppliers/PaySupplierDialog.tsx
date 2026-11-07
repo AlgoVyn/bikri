@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { paySupplier, SupplierPaymentError } from '../data/purchases.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -66,6 +67,7 @@ export function PaySupplierDialog({
         { paymentId, supplierId, amount, method, reference, note },
         ctx,
       );
+      if (method === 'cash') void kickDrawerForCash(db);
       toast.push(
         t('office.suppliers.payment_saved', {
           amount: money(amount),

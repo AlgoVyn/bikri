@@ -14,7 +14,13 @@ import {
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
-import { CART_IDS, type CartId, isEmptyCart, loadCarts } from '../data/cart.ts';
+import {
+  CART_IDS,
+  type CartId,
+  cartSignature,
+  isEmptyCart,
+  loadCarts,
+} from '../data/cart.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint, receiptShareText, waLink } from '../data/receipt.ts';
@@ -28,6 +34,7 @@ import {
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date';
+import { kickDrawerForCash } from '../print/drawer.ts';
 import {
   closeShareWindow,
   navigateShareWindow,
@@ -239,6 +246,15 @@ export function BillDetail({
       );
       const { queueVoidPrint } = await import('../print/receiptFiles.ts');
       await queueVoidPrint(db, saleId).catch(() => undefined);
+      if (
+        detail.payments.some(
+          (payment) =>
+            payment.direction === 'in' &&
+            payment.purpose === 'sale' &&
+            payment.method === 'cash',
+        )
+      )
+        void kickDrawerForCash(db);
       toast.push(t('office.bill.void_done'));
     } catch (err) {
       if (err instanceof VoidNotAllowedError) {
@@ -268,7 +284,12 @@ export function BillDetail({
       if (approvedBy) {
         cart.overrides = [
           ...(cart.overrides ?? []),
-          { permission: 'sale.void', approved_by: approvedBy },
+          {
+            permission: 'sale.void',
+            approved_by: approvedBy,
+            approved_at: Date.now(),
+            bound_cart: cartSignature(cart),
+          },
         ];
         await db.carts.put(cart);
       }
