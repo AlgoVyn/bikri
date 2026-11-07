@@ -399,7 +399,7 @@ export function BillDetail({
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
+      <div className="flex flex-wrap gap-2 [&>*:last-child]:col-span-2 sm:grid sm:grid-cols-4 sm:[&>*:last-child]:col-span-1">
         <button
           type="button"
           className={`${buttonQuiet} gap-2`}

@@ -210,9 +210,7 @@ export function SalesList({
   return (
     <div
       className={
-        embedded
-          ? 'flex min-w-0 flex-col gap-3'
-          : `${pageClass('standard')} ms-0`
+        embedded ? 'flex min-w-0 flex-col gap-3' : pageClass('standard')
       }
     >
       <PageHeader

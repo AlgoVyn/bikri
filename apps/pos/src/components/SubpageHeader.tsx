@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 export type SubpageParent =
   | '/'
   | '/products'
+  | '/products/$id'
   | '/settings'
   | '/suppliers'
   | '/udhaar';
@@ -16,38 +17,59 @@ export type SubpageParent =
  */
 export function SubpageHeader({
   backTo,
+  backParams,
   backLabel,
+  onBack,
   icon,
   title,
+  titleLevel = 'h1',
   subtitle,
   actions,
   stackActions = false,
+  showBack = true,
 }: {
   backTo: SubpageParent;
+  /** Params when the parent is a dynamic detail route, e.g. `/products/$id`. */
+  backParams?: { id: string };
   /** Accessible name of the back link (the destination, not just "Back"). */
   backLabel: string;
+  /** Intercept the back link, e.g. to confirm unsaved changes before leaving. */
+  onBack?: () => void;
   icon?: ReactNode;
   title: string;
+  /** Use `h2` when the page's main title is already elsewhere (master–detail preview). */
+  titleLevel?: 'h1' | 'h2';
   subtitle?: ReactNode;
   actions?: ReactNode;
   /** Keep actions on their own row below the title, even on wide viewports. */
   stackActions?: boolean;
+  /** Hide the back affordance when the parent list is already on screen. */
+  showBack?: boolean;
 }) {
+  const Heading = titleLevel;
   return (
     <header className="flex flex-wrap items-start gap-3">
-      <Link
-        to={backTo}
-        aria-label={backLabel}
-        title={backLabel}
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
-      >
-        <span
-          aria-hidden="true"
-          className="text-title leading-none rtl:rotate-180"
+      {showBack ? (
+        <Link
+          to={backTo}
+          params={backParams}
+          aria-label={backLabel}
+          title={backLabel}
+          onClick={(event) => {
+            if (!onBack) return;
+            event.preventDefault();
+            onBack();
+          }}
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
         >
-          ‹
-        </span>
-      </Link>
+          <span
+            aria-hidden="true"
+            className="text-title leading-none rtl:rotate-180"
+          >
+            ‹
+          </span>
+        </Link>
+      ) : null}
       {icon ? (
         <span
           aria-hidden="true"
@@ -57,9 +79,9 @@ export function SubpageHeader({
         </span>
       ) : null}
       <div className="min-w-0 flex-1 pt-1.5">
-        <h1 className="text-balance text-h1 font-semibold tracking-[-0.01em]">
+        <Heading className="text-balance text-h1 font-semibold tracking-[-0.01em]">
           {title}
-        </h1>
+        </Heading>
         {subtitle ? (
           <p className="mt-1 max-w-2xl text-small text-text-muted">
             {subtitle}

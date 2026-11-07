@@ -66,6 +66,24 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     expect(csv).toContain('A-A-2');
   });
 
+  test('phone: bill actions share one compact row', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'phone layout');
+    await openReadyShop(page, '/bikri/sales');
+    await page.evaluate(() => window.__bikriTest?.seedTodaySales());
+    await page.getByRole('link', { name: /A-A-1/ }).click();
+    const detail = page.getByTestId('sales-detail');
+    const print = detail.getByRole('button', { name: 'Print', exact: true });
+    const refund = detail.getByRole('button', { name: 'Refund', exact: true });
+    const printBox = await print.boundingBox();
+    const refundBox = await refund.boundingBox();
+    expect(printBox && refundBox).toBeTruthy();
+    expect(Math.abs((printBox?.y ?? 0) - (refundBox?.y ?? 0))).toBeLessThan(2);
+    expect(printBox?.width ?? 999).toBeLessThan(120);
+    expect(refundBox?.height ?? 999).toBeLessThanOrEqual(44);
+  });
+
   test('AC 5 + screens/11 AC 1: refund a bill, status/history rows, failed print stays red until a success', async ({
     page,
   }) => {

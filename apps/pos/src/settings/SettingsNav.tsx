@@ -27,15 +27,15 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 const rowLink = 'flex min-h-14 items-center gap-3 p-3';
 
 /** The shared Settings index: groups, this-device card and leave action. */
-export function SettingsNav() {
+export function SettingsNav({ activePath }: { activePath?: string }) {
   return (
     <AreaStrings area="office">
-      <SettingsNavContent />
+      <SettingsNavContent activePath={activePath} />
     </AreaStrings>
   );
 }
 
-function SettingsNavContent() {
+function SettingsNavContent({ activePath }: { activePath?: string }) {
   const { t } = useTranslation();
   const { role, can, support } = useCurrentStaff();
   const [leaveError, setLeaveError] = useState<string | null>(null);
@@ -289,6 +289,7 @@ function SettingsNavContent() {
                   icon={row.icon}
                   title={row.title}
                   hint={row.hint}
+                  activePath={activePath}
                 />
               ))}
             </ul>
@@ -363,16 +364,21 @@ function SettingsRow({
   title,
   hint,
   active,
+  activePath,
 }: {
   to: string;
   icon: ReactNode;
   title: string;
   hint: string;
   active?: boolean;
+  activePath?: string;
 }) {
   const { pathname } = useLocation();
+  const target = to.replace(/\/+$/u, '');
   const current =
-    active ?? pathname.replace(/\/+$/u, '') === to.replace(/\/+$/u, '');
+    active ??
+    (pathname.replace(/\/+$/u, '') === target ||
+      activePath?.replace(/\/+$/u, '') === target);
   return (
     <li>
       <Link

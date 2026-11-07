@@ -226,6 +226,56 @@ test.describe('Products (T-014)', () => {
     await context.setOffline(false);
   });
 
+  test('the edit back button returns to the product and confirms unsaved edits', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    await addCable(page);
+    await expect(page).toHaveURL(/\/products\/[^/]+$/u);
+    const detailUrl = page.url();
+    await page
+      .getByTestId('product-actions')
+      .getByRole('link', { name: 'Edit' })
+      .click();
+    await expect(page).toHaveURL(/\/products\/[^/]+\/edit$/u);
+    const editUrl = page.url();
+
+    await page.getByLabel('Name (English)').fill('Changed before leaving');
+    await page.getByRole('link', { name: 'Back to product' }).click();
+    const discard = page.getByRole('dialog', { name: 'Discard changes?' });
+    await expect(discard).toBeVisible();
+    await discard.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page).toHaveURL(editUrl);
+    await expect(page.getByLabel('Name (English)')).toHaveValue(
+      'Changed before leaving',
+    );
+
+    await page.getByRole('link', { name: 'Back to product' }).click();
+    await discard.getByRole('button', { name: 'Discard' }).click();
+    await expect(page).toHaveURL(detailUrl);
+    await expect(
+      page.getByRole('heading', { name: 'Type-C cable 1 m white' }),
+    ).toBeVisible();
+  });
+
+  test('the duplicate form back button returns to the source product', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    await addCable(page);
+    const detailUrl = page.url();
+    await page
+      .getByTestId('product-actions')
+      .getByRole('button', { name: 'More actions' })
+      .click();
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Add product' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Back to product' }).click();
+    await expect(page).toHaveURL(detailUrl);
+  });
+
   test('1280 keeps the list full width until a product is selected', async ({
     page,
   }, testInfo) => {

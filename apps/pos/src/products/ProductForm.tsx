@@ -171,6 +171,7 @@ export function ProductFormPage({
   }, [draft?.name_en, editId]);
   const showCost = can('cost.view');
   const isEdit = editId !== undefined;
+  const backId = editId ?? duplicateOf;
 
   useEffect(() => {
     const sourceId = editId ?? duplicateOf;
@@ -215,8 +216,8 @@ export function ProductFormPage({
     JSON.stringify(draft) !==
       JSON.stringify(isEdit || duplicateOf ? initial : EMPTY);
   const leave = () =>
-    editId
-      ? void navigate({ to: '/products/$id', params: { id: editId } })
+    backId
+      ? void navigate({ to: '/products/$id', params: { id: backId } })
       : void navigate({ to: '/products' });
 
   useHotkey(
@@ -380,8 +381,10 @@ export function ProductFormPage({
       }}
     >
       <SubpageHeader
-        backTo="/products"
-        backLabel={t('products.back')}
+        backTo={backId ? '/products/$id' : '/products'}
+        backParams={backId ? { id: backId } : undefined}
+        backLabel={t(backId ? 'products.back_to_product' : 'products.back')}
+        onBack={() => (dirty ? setConfirmDiscard(true) : leave())}
         icon={<ProductsIcon />}
         title={isEdit ? t('form.edit_title') : t('form.new_title')}
       />

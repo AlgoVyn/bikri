@@ -28,7 +28,7 @@ Rows: time, invoice no (mono font), customer, items count, total, method chips, 
 
 ## Bill detail
 
-Header: invoice no, status pill, date/time, cashier, device, branch, customer (link to statement). Buttons: `Print` (P), `Share` (WhatsApp/PDF), `Refund` (R, `refund.create`, hidden when status refunded/void) → [11](11-refund.md), `Void` (`sale.void`; managers same business date only), `Void & reissue`. `Audit` (owner: shows audit rows for this bill) is a quiet link beside the status pill, not a primary button.
+Header: invoice no, status pill, date/time, cashier, device, branch, customer (link to statement). Buttons: `Print` (P), `Share` (WhatsApp/PDF), `Refund` (R, `refund.create`, hidden when status refunded/void) → [11](11-refund.md), `Void` (`sale.void`; managers same business date only), `Void & reissue`. On phones the actions are auto-width buttons that wrap; `Print`, `Share`, `PDF` and `Refund` share one row at 390 px, while tablet/desktop keep the four-column action grid. `Audit` (owner: shows audit rows for this bill) is a quiet link beside the status pill, not a primary button.
 
 Body: lines table (name, qty, unit price, line discount, line total, refunded qty, on-bill qty), totals block identical to the receipt, payments list (method, amount, reference, tendered/change), refunds list (each with the money paid back and method, and the part taken off the khata) (each with time, staff, reason, method, amount, rounding, `Print refund receipt`), void info. A backdated bill shows a warning notice with its sale date, the attributed cashier and the reason.
 

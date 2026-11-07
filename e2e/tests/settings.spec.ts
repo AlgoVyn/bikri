@@ -179,19 +179,45 @@ test.describe('Settings (T-050)', () => {
     await expect(main.getByText('No settings match.')).toBeVisible();
   });
 
-  test('desktop Settings keeps the index beside the selected section', async ({
+  test('desktop Settings opens with the shop section beside the index', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
     await openReadyShop(page, '/bikri/settings');
     const settings = page.getByRole('main');
-    await expect(settings.getByText('Choose a setting')).toBeVisible();
+    await expect(
+      settings.getByRole('heading', {
+        level: 2,
+        name: 'Shop profile & receipt',
+      }),
+    ).toBeVisible();
+    await expect(settings.getByText('Choose a setting')).toHaveCount(0);
+    await expect(
+      settings.getByRole('link', { name: /Shop profile & receipt/ }),
+    ).toHaveAttribute('aria-current', 'page');
     await settings.getByRole('link', { name: /Receipt printer/ }).click();
     await expect(
       settings.getByRole('heading', { name: 'Printer' }),
     ).toBeVisible();
-    await expect(settings.getByText('Choose a setting')).toHaveCount(0);
+    await expect(
+      settings.getByRole('link', { name: /Shop profile & receipt/ }),
+    ).not.toHaveAttribute('aria-current', 'page');
     await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
+  });
+
+  test('phone Settings keeps the index without a selected section', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'phone layout');
+    await openReadyShop(page, '/bikri/settings');
+    const settings = page.getByRole('main');
+    await expect(settings.getByTestId('settings-index')).toBeVisible();
+    await expect(
+      settings.getByRole('link', { name: /Shop profile & receipt/ }),
+    ).not.toHaveAttribute('aria-current', 'page');
+    await expect(
+      settings.getByRole('heading', { name: 'Shop profile & receipt' }),
+    ).toHaveCount(0);
   });
 
   test('Settings keeps the nav scroll when a section opens', async ({

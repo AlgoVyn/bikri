@@ -666,6 +666,7 @@
     "select_product": "Select a product",
     "select_product_hint": "Price, stock and history appear here.",
     "back": "Back to products",
+    "back_to_product": "Back to product",
     "min_stock_off": "Off",
     "last14_empty": "No stock movement in the last 14 days.",
     "sell": "Sell"

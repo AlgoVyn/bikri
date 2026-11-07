@@ -666,6 +666,7 @@
     "select_product": "Product muntakhib karein",
     "select_product_hint": "Price, stock aur history yahan nazar aayenge.",
     "back": "Products par wapas",
+    "back_to_product": "Product par wapas",
     "min_stock_off": "Off",
     "last14_empty": "Pichhle 14 din mein stock mein koi harkat nahin.",
     "sell": "Bechein"

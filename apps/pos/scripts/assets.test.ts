@@ -15,7 +15,7 @@ describe('self-hosted PWA assets', () => {
   it('loads the pre-paint theme without an inline script', async () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const html = await readFile(join(root, 'index.html'), 'utf8');
-    expect(html).toContain('src="%BASE_URL%theme-init.js"');
+    expect(html).toContain('src="/theme-init.js"');
     const inline = [
       ...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi),
     ].filter((match) => {

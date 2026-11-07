@@ -1,6 +1,6 @@
 # 08 — Products
 
-**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`. On ≥ 1280 px the list and the selected product share one master–detail screen ("Select a product" until one is picked); the embedded list shows name, price and stock, while the detail keeps every column and action. Below 1280 px the detail is a full page with a back arrow.
+**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`. On ≥ 1280 px the list and the selected product share one master–detail screen ("Select a product" until one is picked); the embedded list shows name, price and stock, while the detail keeps every column and action. Below 1280 px the detail is a full page. At every width the detail header starts with the shared circular back button and a 40 px product photo beside the name (the same header rhythm as Sales, Udhaar and Suppliers); the back button clears the selection.
 
 ## Reference
 
@@ -56,7 +56,7 @@ Single page form (sheet on mobile). Sections:
 | Warranty | select None / 7 days / 1 month / 3 / 6 / 12 months / custom days | printed on receipt line "Warranty till 26-04-2027" when > 0 |
 | Notes | textarea 0–500 | |
 
-Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price or cost change writes `audit_log` `price_change` / `cost_change`. Editing cost on an existing product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
+Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price or cost change writes `audit_log` `price_change` / `cost_change`. Editing cost on an existing product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
 
 Delete: only if not referenced by an unsynced op; soft delete (`deleted_at`), product disappears from Sell, history remains. `audit_log product_delete`.
 

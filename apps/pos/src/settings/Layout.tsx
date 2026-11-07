@@ -1,4 +1,10 @@
-import { type ReactNode, useLayoutEffect, useRef } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { pageClass } from '../components/classes.ts';
 import { SettingsIcon } from '../components/icons.tsx';
@@ -13,11 +19,25 @@ import { SettingsNav } from './SettingsNav.tsx';
  */
 let settingsNavScroll = 0;
 
+/** True inside the index preview, where the section renders without a second nav column. */
+const SettingsPreviewContext = createContext(false);
+
+export function SettingsPreview({ children }: { children: ReactNode }) {
+  return (
+    <SettingsPreviewContext.Provider value>
+      {children}
+    </SettingsPreviewContext.Provider>
+  );
+}
+
 export function SettingsSplit({
   index = false,
+  activePath,
   children,
 }: {
   index?: boolean;
+  /** Highlight a section while the index is showing its default preview. */
+  activePath?: string;
   children?: ReactNode;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
@@ -67,10 +87,10 @@ export function SettingsSplit({
             }}
             className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden`}
           >
-            <SettingsNav />
+            <SettingsNav activePath={activePath} />
           </div>
           <div className={index ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
-            {index ? <SettingsPlaceholder /> : children}
+            {index ? (children ?? <SettingsPlaceholder />) : children}
           </div>
         </div>
       </div>
@@ -107,17 +127,20 @@ export function SettingsPageLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  return (
-    <SettingsSplit>
-      <div className="flex min-w-0 flex-col gap-4">
-        <SubpageHeader
-          backTo="/settings"
-          backLabel={t('common.back')}
-          icon={icon ?? <SettingsIcon />}
-          title={title}
-        />
-        {children}
-      </div>
-    </SettingsSplit>
+  const preview = useContext(SettingsPreviewContext);
+  const content = (
+    <div className="flex min-w-0 flex-col gap-4">
+      <SubpageHeader
+        backTo="/settings"
+        backLabel={t('common.back')}
+        icon={icon ?? <SettingsIcon />}
+        title={title}
+        titleLevel={preview ? 'h2' : 'h1'}
+        showBack={!preview}
+      />
+      {children}
+    </div>
   );
+  if (preview) return <AreaStrings area="office">{content}</AreaStrings>;
+  return <SettingsSplit>{content}</SettingsSplit>;
 }

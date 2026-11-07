@@ -137,23 +137,27 @@ export function ProductDetailPage({
           : pageClass('standard', 'gap-4')
       }
     >
-      {embedded ? (
-        <Link
-          to="/products"
-          className={`${buttonQuiet} gap-2 self-start xl:hidden`}
-        >
-          <span aria-hidden="true" className="rtl:rotate-180">
-            ‹
-          </span>
-          {t('products.back')}
-        </Link>
-      ) : null}
-      <header className="flex flex-wrap items-start gap-4">
+      <header className="flex flex-wrap items-start gap-3">
+        {embedded ? (
+          <Link
+            to="/products"
+            aria-label={t('products.back')}
+            title={t('products.back')}
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
+          >
+            <span
+              aria-hidden="true"
+              className="text-title leading-none rtl:rotate-180"
+            >
+              ‹
+            </span>
+          </Link>
+        ) : null}
         <ProductThumb
           name={String(p.name_en)}
           imageKey={p.image_key}
           color={detail.category?.color}
-          size="lg"
+          size="header"
         />
         <div className="min-w-0 flex-1">
           <h1 className="ltr-name text-h1 font-semibold break-words">

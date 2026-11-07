@@ -58,6 +58,52 @@ test.describe('desktop master–detail', () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test('products: the detail has a Back to products link on desktop', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.seedProducts([
+        { name: 'Back button product', price: 100000, stock: 5 },
+      ]);
+    });
+    await page.getByRole('link', { name: /Back button product/ }).click();
+    const detail = page.getByTestId('products-detail');
+    await expect(detail).toBeVisible();
+    await detail.getByRole('link', { name: 'Back to products' }).click();
+    await expect(page).toHaveURL(/\/bikri\/products$/u);
+    await expect(page.getByTestId('products-master')).toBeVisible();
+    await expect(page.getByTestId('products-detail')).toHaveCount(0);
+  });
+
+  test('lists are centred in the workspace while no row is selected', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1920, height: 800 });
+    await openReadyShop(page, '/bikri/products');
+    const sections = [
+      { testId: 'products-master', path: '/products' },
+      { testId: 'sales-master', path: '/sales' },
+      { testId: 'udhaar-master', path: '/udhaar' },
+      { testId: 'suppliers-master', path: '/suppliers' },
+    ] as const;
+    for (const section of sections) {
+      await page.evaluate(
+        (to) => window.__bikriTest?.navigate(to),
+        section.path,
+      );
+      const master = page.getByTestId(section.testId);
+      await expect(master).toBeVisible();
+      const outer = await master.boundingBox();
+      const list = await master.locator(':scope > div').boundingBox();
+      expect(outer && list).toBeTruthy();
+      if (!outer || !list) continue;
+      const startGap = list.x - outer.x;
+      const endGap = outer.x + outer.width - (list.x + list.width);
+      expect(Math.abs(startGap - endGap)).toBeLessThan(2);
+    }
+  });
+
   test('products: selecting a row deep in the list keeps the scroll position', async ({
     page,
   }) => {
