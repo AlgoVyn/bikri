@@ -108,6 +108,9 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
   });
   await page.reload();
   await page.waitForSelector('nav[aria-label="Main"]');
+  // Home is a lazy route; wait for its content before asking for fonts, otherwise the
+  // screenshot can race the chunk and capture fallback text.
+  await page.locator('main h1').first().waitFor();
   await page.evaluate(() => document.fonts.ready);
 }
 
@@ -137,6 +140,8 @@ test.describe('deterministic visual snapshots', () => {
       };
 
       await page.evaluate(() => window.__bikriTest?.navigate('/'));
+      await page.locator('main h1').first().waitFor();
+      await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(400);
       await shot('home', [
         page.locator('main header p').first(),
