@@ -10,6 +10,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
+import { ChevronLeftIcon, CloseIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -218,12 +219,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
           title={t('office.suppliers.back')}
           className={`${buttonQuiet} gap-1 px-2`}
         >
-          <span
-            aria-hidden="true"
-            className="text-title leading-none rtl:rotate-180"
-          >
-            ‹
-          </span>
+          <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           <span>{t('common.back')}</span>
         </Link>
         <h1 className="me-auto text-h1 font-semibold">
@@ -348,12 +344,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                         )
                       }
                     >
-                      <span
-                        aria-hidden="true"
-                        className="text-title leading-none"
-                      >
-                        ×
-                      </span>
+                      <CloseIcon className="size-5" />
                     </button>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">

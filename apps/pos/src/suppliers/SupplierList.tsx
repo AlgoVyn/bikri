@@ -12,6 +12,7 @@ import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierList, suppliersCsv } from '../data/suppliers.ts';
@@ -67,6 +68,7 @@ export function SupplierList({
         title={t('office.suppliers.title')}
         subtitle={t('office.suppliers.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
+        hideTitleOnPhone
         actions={
           <>
             {can('export.data') ? (
@@ -82,7 +84,9 @@ export function SupplierList({
                 {t('office.suppliers.export_csv')}
               </button>
             ) : null}
-            {can('party.edit') ? (
+            {can('party.edit') &&
+            !detailOpen &&
+            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
               <button
                 type="button"
                 className={`${buttonPrimary} gap-2`}
@@ -103,12 +107,12 @@ export function SupplierList({
               <span className="mb-1 text-small">
                 {t('office.suppliers.search')}
               </span>
-              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+              <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
                   type="search"
                   autoComplete="off"
-                  className="min-w-0 flex-1 bg-transparent text-body outline-none"
+                  className={searchInputClass}
                   placeholder={t('office.suppliers.search_placeholder')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -162,7 +166,7 @@ export function SupplierList({
               data-testid="suppliers-list-header"
             >
               <span>{t('office.suppliers.col_supplier')}</span>
-              <span>{t('office.suppliers.balance')}</span>
+              <span className="text-end">{t('office.suppliers.balance')}</span>
               <span>{t('office.suppliers.col_last_delivery')}</span>
             </li>
             {data.rows.map((row) => (
@@ -188,7 +192,7 @@ export function SupplierList({
                       {String(row.supplier.phone ?? '')}
                     </span>
                   </span>
-                  <span className="min-w-0">
+                  <span className="min-w-0 text-end">
                     <span
                       className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
                     >

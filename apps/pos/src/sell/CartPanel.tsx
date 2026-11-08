@@ -2,8 +2,12 @@ import { type CartResult, type QtyUnit, qtyAllowsDecimals } from '@bikri/core';
 import type { Cart, CartBackdate, CartLine } from '@bikri/db';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
-import { SalesIcon, UdhaarIcon } from '../components/icons.tsx';
+import {
+  buttonDangerQuiet,
+  buttonPrimary,
+  buttonQuiet,
+} from '../components/classes.ts';
+import { CloseIcon, SalesIcon, UdhaarIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
@@ -281,7 +285,7 @@ export function CartPanel(p: CartPanelProps) {
         </button>
         <button
           type="button"
-          className={buttonQuiet}
+          className={buttonDangerQuiet}
           disabled={isEmptyCart(cart)}
           onClick={p.onClear}
         >
@@ -387,30 +391,39 @@ function LineRow({
           title={`${t('sell.remove_line')} ${line.name}`}
           onClick={() => p.onRemoveLine(line.key)}
         >
-          <span aria-hidden="true" className="text-title leading-none">
-            ×
-          </span>
+          <CloseIcon className="size-5" />
         </button>
       </div>
 
-      <div className="mt-1.5 grid grid-cols-[minmax(140px,auto)_minmax(70px,1fr)_minmax(90px,1.2fr)] gap-1.5 sm:grid-cols-3">
-        <QtyInput
-          dense
-          hideLabel
-          label={t('ui.qty_label')}
-          ariaLabel={t('sell.qty_of', { name: line.name })}
-          unit={unit}
-          value={line.qty_milli}
-          onChange={(milli) => {
-            if (milli !== null) p.onChangeLine(line.key, { qty_milli: milli });
-          }}
-        />
-        <InlinePrice line={line} onPrice={p.onPriceChange} />
-        <InlineDiscount
-          line={line}
-          gross={result?.gross ?? 0}
-          onChange={(patch) => p.onChangeLine(line.key, patch)}
-        />
+      <div className="mt-1.5 flex flex-col gap-1">
+        <div
+          aria-hidden="true"
+          className="grid grid-cols-[minmax(140px,auto)_minmax(70px,1fr)_minmax(90px,1.2fr)] gap-1.5 text-caption text-text-muted sm:grid-cols-3"
+        >
+          <span className="truncate">{t('ui.qty_label')}</span>
+          <span className="truncate">{t('sell.unit_price')}</span>
+          <span className="truncate">{t('sell.discount')}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(140px,auto)_minmax(70px,1fr)_minmax(90px,1.2fr)] items-start gap-1.5 sm:grid-cols-3">
+          <QtyInput
+            dense
+            hideLabel
+            label={t('ui.qty_label')}
+            ariaLabel={t('sell.qty_of', { name: line.name })}
+            unit={unit}
+            value={line.qty_milli}
+            onChange={(milli) => {
+              if (milli !== null)
+                p.onChangeLine(line.key, { qty_milli: milli });
+            }}
+          />
+          <InlinePrice line={line} onPrice={p.onPriceChange} />
+          <InlineDiscount
+            line={line}
+            gross={result?.gross ?? 0}
+            onChange={(patch) => p.onChangeLine(line.key, patch)}
+          />
+        </div>
       </div>
 
       {hasBadges ? (

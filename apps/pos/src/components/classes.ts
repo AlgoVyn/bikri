@@ -1,24 +1,32 @@
 export const buttonPrimary =
-  'inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-ink transition-colors duration-150 hover:bg-primary-hover active:bg-primary-hover disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted disabled:ring-1 disabled:ring-border disabled:ring-inset';
+  'inline-flex min-h-11 cursor-pointer items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-ink transition-colors duration-150 hover:bg-primary-hover active:bg-primary-hover disabled:pointer-events-none disabled:cursor-default disabled:bg-surface-2 disabled:text-text-muted disabled:ring-1 disabled:ring-border disabled:ring-inset';
 
 export const buttonDanger =
-  'inline-flex min-h-11 items-center justify-center rounded-control bg-danger px-4 font-medium text-danger-ink transition-colors duration-150 hover:opacity-90 active:opacity-90 disabled:pointer-events-none disabled:bg-surface-2 disabled:text-text-muted';
+  'inline-flex min-h-11 cursor-pointer items-center justify-center rounded-control bg-danger px-4 font-medium text-danger-ink transition-colors duration-150 hover:opacity-90 active:opacity-90 disabled:pointer-events-none disabled:cursor-default disabled:bg-surface-2 disabled:text-text-muted';
 
 export const buttonDangerQuiet =
-  'inline-flex min-h-11 items-center justify-center rounded-control border border-danger bg-surface px-4 font-medium text-danger transition-colors duration-150 hover:bg-danger-subtle disabled:pointer-events-none disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
+  'inline-flex min-h-11 cursor-pointer items-center justify-center rounded-control border border-danger bg-surface px-4 font-medium text-danger transition-colors duration-150 hover:bg-danger-subtle disabled:pointer-events-none disabled:cursor-default disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
 
 export const buttonQuiet =
-  'inline-flex min-h-11 items-center justify-center rounded-control border border-border-strong bg-surface px-4 text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 disabled:pointer-events-none disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
+  'inline-flex min-h-11 cursor-pointer items-center justify-center rounded-control border border-border-strong bg-surface px-4 text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 disabled:pointer-events-none disabled:cursor-default disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
 
 /** Square 44 px quiet control for dense rows (cart steppers, label copies). */
 export const buttonQuietDense =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-control border border-border-strong bg-surface px-0 text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 disabled:pointer-events-none disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
+  'inline-flex min-h-12 min-w-12 cursor-pointer items-center justify-center rounded-control border border-border-strong bg-surface px-0 text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 disabled:pointer-events-none disabled:cursor-default disabled:border-border disabled:bg-surface-2 disabled:text-text-muted';
 
 /** The standard card surface (settings sections, forms, list panels). */
 export const cardClass = 'rounded-card border border-border bg-surface';
 
+/** Standard text field. Numbers and identifiers opt into `monoFieldClass`. */
 export const fieldClass =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 font-mono text-body text-text outline-none transition-colors duration-150 focus:border-primary';
+  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-body text-text transition-colors duration-150';
+
+/** Identifiers, codes and numeric values that should use tabular/mono figures. */
+export const monoFieldClass = `${fieldClass} font-mono tabular-nums`;
+
+/** Multiline field matching `fieldClass`. */
+export const textareaClass =
+  'min-h-20 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-body text-text transition-colors duration-150';
 
 /**
  * Page containers (docs/08 §2 — Layout containers). A screen picks one width by its job;

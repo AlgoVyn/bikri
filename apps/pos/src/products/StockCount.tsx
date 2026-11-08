@@ -9,7 +9,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
-import { ProductsIcon } from '../components/icons.tsx';
+import { CountIcon } from '../components/icons.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
@@ -69,7 +69,7 @@ export function StockCountPage() {
         <SubpageHeader
           backTo="/products"
           backLabel={t('import.back_to_products')}
-          icon={<ProductsIcon />}
+          icon={<CountIcon />}
           title={t('count.title')}
         />
         <TaskLayout
@@ -160,7 +160,7 @@ export function StockCountPage() {
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
+        icon={<CountIcon />}
         title={t('count.title')}
       />
       <p className="text-text-muted" data-testid="count-progress">

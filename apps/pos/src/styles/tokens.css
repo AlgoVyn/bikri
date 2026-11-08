@@ -101,6 +101,10 @@
   --duration-fast: 140ms;
   --duration-overlay: 200ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --z-topbar: 30;
+  --z-sheet: 40;
+  --z-dialog: 50;
+  --z-toast: 60;
 }
 
 /* Dark palette values, referenced by both dark selectors below. */
@@ -234,14 +238,13 @@ html:lang(ur) {
   font-size: 18px;
 }
 
-/* Zero specificity: body copy keeps 1.7, while a dense component's leading-* utility wins. */
-:where([lang="ur"]) :where(*) {
-  line-height: 1.7;
-}
-
-:where(html:lang(ur)) :where(*) {
-  line-height: 1.7;
-}
+/*
+  Urdu body copy uses 1.7, but dense components and the receipt preview must still be able to
+  set their own leading with Tailwind's leading-* utilities. Those live in @layer utilities,
+  and an unlayered `:where(*) { line-height }` rule wins over a layered utility regardless of
+  specificity. Do not add a universal descendant rule here: the default is inherited from the
+  root, headings opt into 1.6 below, and everything else overrides with a utility.
+*/
 
 /* Single-line controls do not need the full Urdu leading; native selects clip it. */
 html:lang(ur) input,
@@ -259,6 +262,16 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* A dialog container may take programmatic focus; the ring belongs on its controls. */
+.bikri-dialog:focus-visible {
+  outline: none;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
 }
 
 /* Native checkboxes, radios and progress use the brand colour, not the browser blue. */

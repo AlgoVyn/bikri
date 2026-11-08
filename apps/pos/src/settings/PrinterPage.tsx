@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { PrinterIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -308,9 +309,11 @@ export function PrinterPage() {
           ) : null}
         </div>
         {jobs && jobs.length === 0 ? (
-          <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
-            {t('printer.recent_empty')}
-          </p>
+          <EmptyState
+            variant="plain"
+            icon={<PrinterIcon />}
+            message={t('printer.recent_empty')}
+          />
         ) : null}
         {jobs && jobs.length > 0 ? (
           <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">

@@ -7,6 +7,7 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -321,6 +322,7 @@ export function ReportsPage() {
         icon={<ReportsIcon />}
         title={t('office.reports.title')}
         subtitle={t('office.reports.subtitle')}
+        hideTitleOnPhone
         actions={
           <>
             <label className="flex items-center gap-1 text-small">
@@ -479,29 +481,6 @@ function reportRange(
   return rangeFor(preset, now, timeZone);
 }
 
-function Card({
-  label,
-  value,
-  hint,
-  testId,
-}: {
-  label: string;
-  value: ReactNode;
-  hint?: ReactNode;
-  testId?: string;
-}) {
-  return (
-    <div
-      className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3"
-      data-testid={testId}
-    >
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="text-title font-semibold">{value}</p>
-      {hint}
-    </div>
-  );
-}
-
 function Delta({
   current,
   previous,
@@ -653,7 +632,7 @@ function SummaryTab({
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <li className="min-w-0">
-          <Card
+          <Metric
             label={t('office.reports.sold')}
             testId="report-sold"
             value={<MoneyText paisa={summary.sold} />}
@@ -661,7 +640,7 @@ function SummaryTab({
           />
         </li>
         <li className="min-w-0">
-          <Card
+          <Metric
             label={t('office.reports.bills')}
             testId="report-bills"
             value={summary.bills}
@@ -671,7 +650,7 @@ function SummaryTab({
           />
         </li>
         <li className="min-w-0">
-          <Card
+          <Metric
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
             hint={
@@ -680,7 +659,7 @@ function SummaryTab({
           />
         </li>
         <li className="min-w-0">
-          <Card
+          <Metric
             label={t('office.reports.expenses')}
             value={<MoneyText paisa={summary.expenses} />}
             hint={
@@ -695,7 +674,7 @@ function SummaryTab({
         {cost ? (
           <>
             <li className="min-w-0">
-              <Card
+              <Metric
                 label={t('office.reports.gross_profit')}
                 testId="report-profit"
                 value={<MoneyText paisa={summary.grossProfit} />}
@@ -708,7 +687,7 @@ function SummaryTab({
               />
             </li>
             <li className="min-w-0">
-              <Card
+              <Metric
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
                 hint={
@@ -720,7 +699,7 @@ function SummaryTab({
               />
             </li>
             <li className="min-w-0">
-              <Card
+              <Metric
                 label={t('office.reports.margin')}
                 value={
                   <PrivacyValue mask="••%">
@@ -739,7 +718,7 @@ function SummaryTab({
               />
             </li>
             <li className="min-w-0">
-              <Card
+              <Metric
                 label={t('office.reports.refunds')}
                 value={<MoneyText paisa={summary.refunded} />}
                 hint={
@@ -755,7 +734,7 @@ function SummaryTab({
         ) : null}
         {bundle.taxEnabled || summary.tax !== 0 ? (
           <li className="min-w-0">
-            <Card
+            <Metric
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}
             />
@@ -1000,26 +979,26 @@ function StockTab({
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cost ? (
           <li>
-            <Card
+            <Metric
               label={t('office.reports.stock_value')}
               value={<MoneyText paisa={stock.value} />}
             />
           </li>
         ) : null}
         <li>
-          <Card
+          <Metric
             label={t('office.reports.low_stock')}
             value={stock.lowStock.length}
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.out_of_stock')}
             value={stock.outOfStock.length}
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.negative_stock')}
             value={stock.negativeStock.length}
           />
@@ -1071,19 +1050,19 @@ function StockTab({
         </h2>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <li>
-            <Card
+            <Metric
               label={t('office.reports.returns_count')}
               value={stock.supplierReturns.count}
             />
           </li>
           <li>
-            <Card
+            <Metric
               label={t('office.reports.returns_credit')}
               value={<MoneyText paisa={stock.supplierReturns.credit} />}
             />
           </li>
           <li>
-            <Card
+            <Metric
               label={t('office.reports.returns_difference')}
               value={<MoneyText paisa={stock.supplierReturns.difference} />}
             />
@@ -1125,14 +1104,14 @@ function UdhaarTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <li>
-          <Card
+          <Metric
             label={t('office.reports.total_owed')}
             testId="report-udhaar-total"
             value={<MoneyText paisa={udhaar.totalOwed} />}
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.customers_owing')}
             value={udhaar.count}
           />
@@ -1223,22 +1202,25 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <li>
-          <Card label={t('office.reports.closes')} value={closes.rows.length} />
+          <Metric
+            label={t('office.reports.closes')}
+            value={closes.rows.length}
+          />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.expected')}
             value={<MoneyText paisa={closes.expected} />}
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.counted')}
             value={<MoneyText paisa={closes.counted} />}
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.shorts')}
             value={
               <span>
@@ -1248,7 +1230,7 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
           />
         </li>
         <li>
-          <Card
+          <Metric
             label={t('office.reports.overs')}
             value={
               <span>
@@ -1301,7 +1283,7 @@ function ExpensesTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
     <>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <li>
-          <Card
+          <Metric
             label={t('office.reports.total_expenses')}
             testId="report-expenses-total"
             value={<MoneyText paisa={bundle.expenses.total} />}

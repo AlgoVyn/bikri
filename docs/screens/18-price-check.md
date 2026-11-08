@@ -1,4 +1,4 @@
-# 18 — Price check
+# 18 — Price
 
 Modal from Home / rail / hotkey `Ctrl+Shift+P`. Everyone. Customers often ask "how much is this?" without buying.
 
@@ -6,7 +6,7 @@ Modal from Home / rail / hotkey `Ctrl+Shift+P`. Everyone. Customers often ask "h
 
 | Dukaan | What to learn |
 |---|---|
-| ![Dukaan app-home](../reference/dukaan/app-home.png) | "Price check" is a Home quick action |
+| ![Dukaan app-home](../reference/dukaan/app-home.png) | "Price" is a Home quick action |
 
 ## Layout
 

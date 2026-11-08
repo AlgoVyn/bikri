@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StoreIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, StoreIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { adminErrorMessage, getTenant, setMaintenance } from './api.ts';
 import { DeleteTab } from './DeleteTab.tsx';
@@ -72,12 +72,7 @@ export function TenantPage({ id }: { id: string }) {
         href={adminHref('/admin/tenants')}
         className="inline-flex min-h-9 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"
       >
-        <span
-          aria-hidden="true"
-          className="text-title leading-none rtl:rotate-180"
-        >
-          ‹
-        </span>
+        <ChevronLeftIcon className="size-4 rtl:rotate-180" />
         {t('admin.back_to_shops')}
       </a>
       <header className="flex flex-wrap items-start gap-4 rounded-card border border-border bg-surface p-4 shadow-card lg:p-5">

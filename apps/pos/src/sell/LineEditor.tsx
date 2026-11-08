@@ -34,7 +34,7 @@ export function DiscountToggle({
           key={k}
           type="button"
           aria-pressed={type === k}
-          className={`min-h-11 min-w-11 px-3 ${type === k ? 'bg-primary text-primary-ink' : ''}`}
+          className={`min-h-11 min-w-11 px-3 ${type === k ? 'bg-primary-subtle text-primary-subtle-ink' : ''}`}
           onClick={() => onType(k)}
         >
           {k === 'amount' ? 'Rs' : '%'}

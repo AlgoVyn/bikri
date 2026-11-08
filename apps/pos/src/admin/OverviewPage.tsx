@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CloudIcon, ReportsIcon } from '../components/icons.tsx';
+import {
+  ChevronRightIcon,
+  CloudIcon,
+  ReportsIcon,
+} from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -296,9 +300,7 @@ export function OverviewPage() {
                           <span className="truncate">
                             {tenant?.display_name ?? id}
                           </span>
-                          <span aria-hidden="true" className="rtl:rotate-180">
-                            ›
-                          </span>
+                          <ChevronRightIcon className="size-4 shrink-0 text-text-muted rtl:rotate-180" />
                         </a>
                       </li>
                     );

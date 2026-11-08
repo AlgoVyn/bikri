@@ -102,7 +102,7 @@ export function MoneyInput({
         {trailing}
       </div>
       <div
-        className={`flex items-stretch rounded-control border border-border-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${compact ? 'h-12' : large ? 'h-14' : 'h-12'}`}
+        className={`flex items-stretch rounded-control border border-border-strong bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${large ? 'h-14' : compact ? 'h-12' : 'h-11'}`}
       >
         {leading ?? (
           <bdi
@@ -118,7 +118,7 @@ export function MoneyInput({
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
-          className={`min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
+          className={`bikri-focus-wrapper min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}

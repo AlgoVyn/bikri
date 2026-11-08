@@ -1,14 +1,15 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
-import { buttonDanger } from '../components/classes.ts';
+import { buttonDangerQuiet } from '../components/classes.ts';
 import {
+  ChevronRightIcon,
   ClockIcon,
   CloudIcon,
   DeviceIcon,
+  DisplayIcon,
   InfoIcon,
   PrinterIcon,
   SearchIcon,
@@ -18,6 +19,7 @@ import {
   UsersIcon,
 } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo, tenantInfo } from '../data/localTenant.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -27,15 +29,27 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 const rowLink = 'flex min-h-14 items-center gap-3 p-3';
 
 /** The shared Settings index: groups, this-device card and leave action. */
-export function SettingsNav({ activePath }: { activePath?: string }) {
+export function SettingsNav({
+  activePath,
+  headingLevel = 'h1',
+}: {
+  activePath?: string;
+  headingLevel?: 'h1' | 'h2';
+}) {
   return (
     <AreaStrings area="office">
-      <SettingsNavContent activePath={activePath} />
+      <SettingsNavContent activePath={activePath} headingLevel={headingLevel} />
     </AreaStrings>
   );
 }
 
-function SettingsNavContent({ activePath }: { activePath?: string }) {
+function SettingsNavContent({
+  activePath,
+  headingLevel,
+}: {
+  activePath?: string;
+  headingLevel: 'h1' | 'h2';
+}) {
   const { t } = useTranslation();
   const { role, can, support } = useCurrentStaff();
   const [leaveError, setLeaveError] = useState<string | null>(null);
@@ -130,7 +144,7 @@ function SettingsNavContent({ activePath }: { activePath?: string }) {
     {
       group: 'device',
       to: '/settings/display',
-      icon: <SettingsIcon />,
+      icon: <DisplayIcon />,
       title: t('office.settings.nav_display'),
       hint: t('office.settings.nav_display_hint'),
       show: true,
@@ -186,6 +200,8 @@ function SettingsNavContent({ activePath }: { activePath?: string }) {
         icon={<SettingsIcon />}
         title={t('nav.settings')}
         subtitle={t('office.settings.subtitle')}
+        headingLevel={headingLevel}
+        hideTitleOnPhone
       />
       <section
         aria-labelledby="data-safety"
@@ -263,12 +279,12 @@ function SettingsNavContent({ activePath }: { activePath?: string }) {
         </dl>
       </section>
 
-      <label className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+      <label className={searchWrapperClass}>
         <SearchIcon />
         <span className="sr-only">{t('office.settings.health_search')}</span>
         <input
           type="search"
-          className="min-w-0 flex-1 bg-transparent text-body outline-none"
+          className={searchInputClass}
           placeholder={t('office.settings.health_search')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -330,7 +346,7 @@ function SettingsNavContent({ activePath }: { activePath?: string }) {
               </p>
               <button
                 type="button"
-                className={`${buttonDanger} self-start`}
+                className={`${buttonDangerQuiet} self-start`}
                 onClick={() => setConfirmLeave(true)}
               >
                 {t('office.settings.nav_leave')}
@@ -379,9 +395,14 @@ function SettingsRow({
     active ??
     (pathname.replace(/\/+$/u, '') === target ||
       activePath?.replace(/\/+$/u, '') === target);
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (current) linkRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [current]);
   return (
     <li>
       <Link
+        ref={linkRef}
         to={to}
         resetScroll={false}
         onClick={rememberListScroll}
@@ -405,12 +426,7 @@ function SettingsRow({
           <span className="block font-medium">{title}</span>
           <span className="block text-small text-text-muted">{hint}</span>
         </span>
-        <span
-          aria-hidden="true"
-          className="text-title text-text-muted rtl:rotate-180"
-        >
-          ›
-        </span>
+        <ChevronRightIcon className="size-4 text-text-muted rtl:rotate-180" />
       </Link>
     </li>
   );

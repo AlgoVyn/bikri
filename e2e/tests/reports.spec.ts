@@ -131,9 +131,7 @@ test.describe('Reports (T-048)', () => {
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'phone', 'phone layout');
     await seedReports(page);
-    const title = await page
-      .getByRole('heading', { name: 'Reports' })
-      .boundingBox();
+    const title = await page.getByTestId('screen-title-bar').boundingBox();
     expect(title?.width ?? 0).toBeGreaterThan(100);
     const sold = await page.getByTestId('report-sold').boundingBox();
     expect(sold?.width ?? 0).toBeGreaterThan(150);

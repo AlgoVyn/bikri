@@ -6,7 +6,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
-import { CheckIcon, ProductsIcon, UploadIcon } from '../components/icons.tsx';
+import { CheckIcon, UploadIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
@@ -141,7 +141,7 @@ export function ImportPage() {
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
+        icon={<UploadIcon />}
         title={t('import.title')}
       />
       <ol className="flex flex-wrap gap-2" aria-label={t('import.steps')}>

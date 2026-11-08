@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
   buttonDangerQuiet,
-  buttonPrimary,
   buttonQuiet,
   fieldClass,
   pageClass,
 } from '../components/classes.ts';
+import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
@@ -356,12 +356,7 @@ export function BillDetail({
           }
         >
           {embedded ? (
-            <span
-              aria-hidden="true"
-              className="text-title leading-none rtl:rotate-180"
-            >
-              ‹
-            </span>
+            <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           ) : (
             t('office.bill.back')
           )}
@@ -424,7 +419,7 @@ export function BillDetail({
         {canRefund ? (
           <button
             type="button"
-            className={`${buttonPrimary} gap-2`}
+            className={`${buttonDangerQuiet} gap-2`}
             onClick={() =>
               void navigate({
                 to: '/sales/$id/refund',

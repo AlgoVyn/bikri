@@ -195,3 +195,40 @@ test.describe('design layout invariants', () => {
     expect(visible).toBeGreaterThanOrEqual(8);
   });
 });
+
+test.describe('typography and RTL identifiers', () => {
+  test.beforeEach(({ page }, testInfo) => {
+    if (testInfo.project.name !== 'desktop') {
+      test.skip();
+      return;
+    }
+    void page;
+  });
+
+  test('Urdu keeps compact leading and LTR identifier fields', async ({
+    page,
+  }) => {
+    await seedVisualShop(page);
+    await setLanguage(page, 'ur');
+    await page.evaluate(() => window.__bikriTest?.navigate('/settings/shop'));
+    await page.waitForTimeout(600);
+
+    // `text-receipt` is 10 px with a 1.25 line-height; the old universal Urdu rule
+    // forced 1.7 and made the printed-size preview too tall.
+    const metrics = await page
+      .locator('.text-receipt')
+      .first()
+      .evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          fontSize: Number.parseFloat(style.fontSize),
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
+    expect(metrics.lineHeight / metrics.fontSize).toBeLessThan(1.4);
+
+    const phone = page.locator('input[type="tel"]').first();
+    await expect(phone).toHaveAttribute('dir', 'ltr');
+    await setLanguage(page, 'en');
+  });
+});

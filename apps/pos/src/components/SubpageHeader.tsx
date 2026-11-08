@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { ChevronLeftIcon } from './icons.tsx';
 
 /** Parents a utility page can return to with the shared header. */
 export type SubpageParent =
@@ -62,12 +63,7 @@ export function SubpageHeader({
           }}
           className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
         >
-          <span
-            aria-hidden="true"
-            className="text-title leading-none rtl:rotate-180"
-          >
-            ‹
-          </span>
+          <ChevronLeftIcon className="size-5 rtl:rotate-180" />
         </Link>
       ) : null}
       {icon ? (
@@ -79,7 +75,11 @@ export function SubpageHeader({
         </span>
       ) : null}
       <div className="min-w-0 flex-1 pt-1.5">
-        <Heading className="text-balance text-h1 font-semibold tracking-[-0.01em]">
+        <Heading
+          className={`text-balance ${
+            titleLevel === 'h1' ? 'text-h1' : 'text-h2'
+          } font-semibold tracking-[-0.01em]`}
+        >
           {title}
         </Heading>
         {subtitle ? (

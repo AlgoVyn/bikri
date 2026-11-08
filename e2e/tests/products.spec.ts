@@ -220,8 +220,16 @@ test.describe('Products (T-014)', () => {
       window.__bikriTest?.navigate('/products/categories'),
     );
     await page.getByRole('button', { name: 'Delete Chargers' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete Chargers' })
+      .click();
     await expect(page.getByText('Move 1 product first')).toBeVisible();
     await page.getByRole('button', { name: 'Delete Cables' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete Cables' })
+      .click();
     await expect(page.getByLabel('Name of Cables')).toHaveCount(0);
     await context.setOffline(false);
   });

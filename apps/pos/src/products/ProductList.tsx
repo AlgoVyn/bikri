@@ -8,7 +8,12 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { FilterIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
+import {
+  ChevronRightIcon,
+  FilterIcon,
+  ProductsIcon,
+  SearchIcon,
+} from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import {
@@ -16,6 +21,7 @@ import {
   PageActions,
 } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import {
   listCategories,
   listProducts,
@@ -139,7 +145,7 @@ export function ProductList({
   }
 
   const primary =
-    canEdit && !selecting ? (
+    canEdit && !selecting && !detailOpen && total !== 0 ? (
       <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
         {t('products.add')}
       </Link>
@@ -156,6 +162,7 @@ export function ProductList({
         title={t('products.title')}
         subtitle={t('products.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
+        hideTitleOnPhone
         actions={
           <PageActions
             primary={primary}
@@ -206,12 +213,12 @@ export function ProductList({
             <search className="flex flex-wrap items-end gap-2">
               <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
                 <span className="mb-1 text-small">{t('products.search')}</span>
-                <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+                <span className={searchWrapperClass}>
                   <SearchIcon />
                   <input
                     type="search"
                     autoComplete="off"
-                    className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+                    className={searchInputClass}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
@@ -445,7 +452,7 @@ function SortHeader({
       {secondLine ? (
         <span className="block text-caption">{secondLine}</span>
       ) : null}
-      {active ? <span aria-hidden="true">↑</span> : null}
+      {active ? <ChevronRightIcon className="size-3 -rotate-90" /> : null}
     </button>
   );
 }

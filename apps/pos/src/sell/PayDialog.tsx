@@ -17,6 +17,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import {
   BankIcon,
   CardIcon,
@@ -362,7 +363,7 @@ function PayStep({
         </p>
       ) : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <div className="flex flex-col gap-4">
+        <div className="order-2 flex flex-col gap-4 lg:order-none">
           <div
             role="tablist"
             aria-label={t('pay.method')}
@@ -509,7 +510,7 @@ function PayStep({
         </div>
         <aside
           aria-label={t('pay.summary')}
-          className="flex flex-col gap-3 rounded-card border border-border bg-surface-2/50 p-3 lg:sticky lg:top-0"
+          className="order-1 flex flex-col gap-3 rounded-card border border-border bg-surface-2/50 p-3 lg:order-none lg:sticky lg:top-0"
         >
           <div>
             <p className="text-small text-text-muted">
@@ -611,14 +612,16 @@ function PayStep({
         </div>
       </div>
 
-      <button
-        type="submit"
-        className={`${buttonPrimary} min-h-14 text-title`}
-        disabled={!valid || pending}
-        data-testid="pay-done"
-      >
-        {label}
-      </button>
+      <DialogFooter>
+        <button
+          type="submit"
+          className={`${buttonPrimary} min-h-14 text-title max-md:flex-1`}
+          disabled={!valid || pending}
+          data-testid="pay-done"
+        >
+          {label}
+        </button>
+      </DialogFooter>
       <CustomerDialog
         open={picker}
         onOpenChange={setPicker}
@@ -700,7 +703,7 @@ function MethodPanel({
               key={p}
               type="button"
               aria-pressed={row.provider === p}
-              className={`min-h-11 rounded-full border px-3 ${row.provider === p ? 'border-primary bg-primary text-primary-ink' : 'border-border'}`}
+              className={`min-h-11 rounded-full border px-3 ${row.provider === p ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border'}`}
               onClick={() => onChange({ provider: p })}
             >
               {t(`pay.provider_${p.toLowerCase().replace(' ', '_')}`)}

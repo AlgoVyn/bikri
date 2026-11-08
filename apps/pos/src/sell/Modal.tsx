@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CloseIcon } from '../components/icons.tsx';
 
 const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-text/40';
 const base =
@@ -44,11 +45,21 @@ export function Modal({
   header?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const contentRef = useRef<HTMLDivElement>(null);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content
+          ref={contentRef}
+          onOpenAutoFocus={(event) => {
+            const field = contentRef.current?.querySelector<HTMLElement>(
+              'input:not([type="hidden"]), select, textarea, [data-autofocus]',
+            );
+            if (!field) return;
+            event.preventDefault();
+            field.focus();
+          }}
           className={
             SIZES[
               done
@@ -80,9 +91,7 @@ export function Modal({
               aria-label={t('ui.close_dialog')}
               className="absolute end-2 top-2 flex size-11 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-surface-2"
             >
-              <span aria-hidden="true" className="text-title leading-none">
-                ×
-              </span>
+              <CloseIcon className="size-5" />
             </button>
           </Dialog.Close>
           {description ? (

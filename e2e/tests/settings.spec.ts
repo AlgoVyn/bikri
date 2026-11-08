@@ -335,3 +335,22 @@ test.describe('Settings (T-050)', () => {
     expect(shop?.name).toBe('Saved Shop');
   });
 });
+
+test.describe('Settings navigation orientation', () => {
+  test('the active section is scrolled into view in the index', async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name !== 'desktop') {
+      test.skip();
+      return;
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openReadyShop(page, '/bikri/settings');
+    await navigate(page, '/settings/display');
+    await page.waitForTimeout(500);
+    const active = page
+      .getByTestId('settings-index')
+      .locator('a[aria-current="page"]');
+    await expect(active).toBeInViewport();
+  });
+});

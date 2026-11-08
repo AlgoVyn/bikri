@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
-  buttonDanger,
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
@@ -276,7 +276,7 @@ export function SyncPage() {
                     {owner ? (
                       <button
                         type="button"
-                        className={buttonDanger}
+                        className={buttonDangerQuiet}
                         onClick={() => setDiscardTarget([e])}
                       >
                         {t('syncpage.discard')}

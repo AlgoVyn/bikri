@@ -210,7 +210,7 @@ Shortcuts are listed in the `?` shortcut sheet (also linked from the staff menu)
 | `Enter` / `F8` | Take payment / confirm | Sell / Pay |
 | `F9` | Open drawer (`drawer.open`) | global |
 | `1`–`4` | Payment method | Pay |
-| `Ctrl+Shift+P` | Price check | global |
+| `Ctrl+Shift+P` | Price | global |
 | `Ctrl+Shift+H` | Hide/show amounts (privacy mode) | global (works in fields and dialogs) |
 | `Ctrl+Shift+1`…`Ctrl+Shift+9` | Rail items | global |
 | `P` | Print / print again | bill detail, sale complete |

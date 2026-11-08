@@ -48,7 +48,7 @@ const tile = (page: Page, name: string) =>
 test.describe('Sell (T-016)', () => {
   test('category chips show their names, never undefined', async ({ page }) => {
     await openReadyShop(page, '/bikri/products/categories');
-    await page.getByPlaceholder('New category').fill('Cables');
+    await page.getByLabel('New category').fill('Cables');
     await page
       .locator('form')
       .getByRole('button', { name: 'Add', exact: true })

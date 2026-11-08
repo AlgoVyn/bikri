@@ -45,7 +45,9 @@
     "products_one": "{{count}} product",
     "title": "Categories",
     "up": "{{name}} upar",
-    "name_ur": "Urdu naam"
+    "name_ur": "Urdu naam",
+    "delete_title": "Category “{{name}}” delete karein?",
+    "delete_body": "Is category ke products rahenge magar yeh colour khatam ho jayega."
   },
   "common": {
     "app_name": "Bikri",
@@ -265,7 +267,7 @@
     "export_data": "Data export karein",
     "no_bills": "Is device par abhi koi bill nahin.",
     "no_products": "Abhi koi product nahin. Bechne ke liye aik shamil karein.",
-    "price_check": "Qeemat dekhein",
+    "price_check": "Qeemat",
     "profit_today": "Aaj ka munafa",
     "quick_actions": "Fori kaam",
     "recent_bills": "Haaliya bill",
@@ -463,7 +465,7 @@
     "press_enter": "Talash ke liye Enter dabayen",
     "scan_another": "Agla scan karein",
     "search": "Scan karein ya naam likhein",
-    "title": "Qeemat dekhein"
+    "title": "Qeemat"
   },
   "prices": {
     "help_title": "Yeh kaise kaam karta hai",

@@ -31,7 +31,7 @@ Copy text in specs is the English source string; the implementer adds `en`, `ur`
 | 15 | Day close | `/day-close` | [15-day-close.md](15-day-close.md) |
 | 16 | Reports | `/reports` | [16-reports.md](16-reports.md) |
 | 17 | Settings (all subpages) | `/settings/*` | [17-settings.md](17-settings.md) |
-| 18 | Price check | `/price-check` (modal) | [18-price-check.md](18-price-check.md) |
+| 18 | Price | `/price-check` (modal) | [18-price-check.md](18-price-check.md) |
 | 19 | Operator console (platform operator, Cloudflare Access) | `/admin/*` | [19-admin.md](19-admin.md) |
 | 20 | Barcode labels (browser print) | `/labels` (modal) | [20-barcode-labels.md](20-barcode-labels.md) |
 

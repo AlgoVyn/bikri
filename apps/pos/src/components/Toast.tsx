@@ -97,15 +97,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed end-4 bottom-20 z-50 flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2 lg:bottom-4">
+      <div className="pointer-events-none fixed end-4 bottom-20 z-[60] flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2 lg:bottom-4">
         {items.map((item) => (
           <div
             key={item.id}
             role={item.tone === 'error' ? 'alert' : 'status'}
             className={
               item.tone === 'error'
-                ? 'bikri-toast pointer-events-auto flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
-                : 'bikri-toast pointer-events-auto flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
+                ? 'bikri-toast flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
+                : 'bikri-toast flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
             }
           >
             <span className="min-w-0 flex-1">{item.message}</span>
@@ -113,7 +113,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 key={action.label}
                 type="button"
-                className="min-h-11 shrink-0 px-2 font-medium underline"
+                className="pointer-events-auto min-h-11 shrink-0 px-2 font-medium underline"
                 onClick={() => {
                   dismiss(item.id);
                   action.onClick();
@@ -124,7 +124,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ))}
             <button
               type="button"
-              className="min-h-11 shrink-0 px-2"
+              className="pointer-events-auto min-h-11 shrink-0 px-2"
               onClick={() => {
                 dismiss(item.id);
               }}

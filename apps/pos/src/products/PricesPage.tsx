@@ -8,7 +8,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
-import { ProductsIcon } from '../components/icons.tsx';
+import { TagIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
@@ -109,7 +109,7 @@ export function PricesPage() {
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
+        icon={<TagIcon />}
         title={t('prices.title')}
       />
       <TaskLayout
@@ -226,7 +226,7 @@ export function PricesPage() {
           <div className="flex justify-end">
             <button
               type="button"
-              className={buttonQuiet}
+              className={rows ? buttonQuiet : buttonPrimary}
               onClick={() => void preview()}
             >
               {t('prices.preview')}

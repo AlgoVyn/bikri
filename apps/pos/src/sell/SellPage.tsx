@@ -752,13 +752,6 @@ export function SellPage() {
           >
             {t('sell.quick_sale')}
           </button>
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => setDialog('held')}
-          >
-            {t('sell.held_bills', { count: heldCount })}
-          </button>
         </div>
         {cart.lines.length > 0 ? (
           <button
@@ -970,7 +963,7 @@ function CategoryChips({
     ) ?? [];
   if (cats.length === 0) return null;
   const chip = (on: boolean) =>
-    `min-h-11 shrink-0 rounded-full border px-3 text-small ${on ? 'border-primary bg-primary text-primary-ink' : 'border-border bg-surface'}`;
+    `min-h-11 shrink-0 rounded-full border px-3 text-small ${on ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`;
   return (
     // biome-ignore lint/a11y/useSemanticElements: a row of filter chips
     <div

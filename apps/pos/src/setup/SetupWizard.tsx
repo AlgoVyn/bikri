@@ -325,7 +325,7 @@ export function SetupWizard() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-3 py-6 text-text">
-      <div className="grid w-full max-w-[1040px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+      <div className="grid w-full max-w-[896px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <aside className="hidden flex-col justify-between gap-8 rounded-card bg-rail p-6 text-rail-ink shadow-card lg:flex">
           <div>
             <div className="flex items-center gap-2">
@@ -335,7 +335,7 @@ export function SetupWizard() {
               >
                 <BikriMark className="size-5" />
               </span>
-              <span className="text-h2 font-semibold">
+              <span className="text-caption font-semibold uppercase tracking-[0.18em]">
                 {t('common.app_name')}
               </span>
             </div>
@@ -373,7 +373,7 @@ export function SetupWizard() {
             >
               <BikriMark className="size-5" />
             </span>
-            <span className="text-h2 font-semibold">
+            <span className="text-caption font-semibold uppercase tracking-[0.18em]">
               {t('common.app_name')}
             </span>
             {step > 0 ? (
@@ -426,7 +426,7 @@ export function SetupWizard() {
                     key={code}
                     type="button"
                     aria-pressed={language === code}
-                    className={`${buttonQuiet} inline-flex min-h-16 items-center justify-center gap-2 text-h2 aria-pressed:border-primary aria-pressed:text-primary`}
+                    className={`${buttonQuiet} inline-flex min-h-16 items-center justify-center gap-2 text-h2 aria-pressed:border-primary aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
                     onClick={() => void setLanguage(code)}
                   >
                     {language === code ? (
@@ -471,7 +471,7 @@ export function SetupWizard() {
                       key={type}
                       type="button"
                       aria-pressed={shop.business_type === type}
-                      className="min-h-11 rounded-pill border border-border-strong px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-ink"
+                      className="min-h-11 rounded-control border border-border-strong px-3 aria-pressed:border-primary aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink"
                       onClick={() =>
                         setShop({
                           ...shop,

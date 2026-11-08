@@ -11,6 +11,7 @@ export function PageHeader({
   actions,
   tone = 'bg-primary-subtle text-primary-subtle-ink',
   headingLevel = 'h1',
+  hideTitleOnPhone = false,
 }: {
   icon?: ReactNode;
   title: string;
@@ -18,8 +19,14 @@ export function PageHeader({
   actions?: ReactNode;
   tone?: string;
   headingLevel?: 'h1' | 'h2';
+  /** Shop list pages already show this title in the phone top bar. */
+  hideTitleOnPhone?: boolean;
 }) {
   const Heading = headingLevel;
+  const titleSize =
+    headingLevel === 'h1'
+      ? `text-h1${hideTitleOnPhone ? ' max-lg:sr-only' : ''}`
+      : 'text-h2';
   return (
     <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start">
       <div className="flex min-w-0 items-start gap-3 md:flex-1">
@@ -32,7 +39,9 @@ export function PageHeader({
           </span>
         ) : null}
         <div className="min-w-0 flex-1">
-          <Heading className="text-balance text-h1 font-semibold tracking-[-0.01em]">
+          <Heading
+            className={`text-balance ${titleSize} font-semibold tracking-[-0.01em]`}
+          >
             {title}
           </Heading>
           {subtitle ? (

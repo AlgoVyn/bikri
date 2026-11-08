@@ -2,9 +2,16 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  fieldClass,
+  monoFieldClass,
+  textareaClass,
+} from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { PageLoading } from '../components/PageLoading';
+import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -28,11 +35,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
-
-const field =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
-const area =
-  'min-h-20 w-full rounded-control border border-border-strong bg-surface px-3 py-2 text-text';
 
 /** Shop profile, receipt/tax and the single v1 branch (screens/17). */
 export function ShopSettingsPage() {
@@ -195,7 +197,7 @@ function ShopForm() {
         <label className="flex flex-col gap-1 text-small">
           {t('setup.shop_name')}
           <input
-            className={field}
+            className={fieldClass}
             maxLength={60}
             value={form.name}
             onChange={(event) => setForm({ ...form, name: event.target.value })}
@@ -206,7 +208,7 @@ function ShopForm() {
             {t('setup.business_type')}
           </legend>
           <select
-            className={`${field} sm:hidden`}
+            className={`${fieldClass} sm:hidden`}
             aria-label={t('setup.business_type')}
             value={form.business_type}
             onChange={(event) =>
@@ -228,7 +230,7 @@ function ShopForm() {
                 key={type}
                 type="button"
                 aria-pressed={form.business_type === type}
-                className={`${buttonQuiet} px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-ink`}
+                className={`${buttonQuiet} px-3 aria-pressed:border-primary aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
                 onClick={() => setForm({ ...form, business_type: type })}
               >
                 {t(`setup.biz.${type}`)}
@@ -237,20 +239,16 @@ function ShopForm() {
           </div>
         </fieldset>
         <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-small">
-            {t('setup.phone')}
-            <input
-              className={field}
-              value={form.phone}
-              onChange={(event) =>
-                setForm({ ...form, phone: event.target.value })
-              }
-            />
-          </label>
+          <PhoneInput
+            label={t('setup.phone')}
+            showWhatsApp={false}
+            value={form.phone}
+            onChange={(phone) => setForm({ ...form, phone: phone ?? '' })}
+          />
           <label className="flex flex-col gap-1 text-small">
             {t('setup.city')}
             <input
-              className={field}
+              className={fieldClass}
               maxLength={40}
               value={form.city}
               onChange={(event) =>
@@ -262,7 +260,7 @@ function ShopForm() {
         <label className="flex flex-col gap-1 text-small">
           {t('setup.address')}
           <input
-            className={field}
+            className={fieldClass}
             maxLength={120}
             value={form.address}
             onChange={(event) =>
@@ -274,7 +272,9 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('setup.ntn')}
             <input
-              className={field}
+              dir="ltr"
+              inputMode="numeric"
+              className={monoFieldClass}
               value={form.ntn}
               onChange={(event) =>
                 setForm({ ...form, ntn: event.target.value })
@@ -284,7 +284,9 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('setup.strn')}
             <input
-              className={field}
+              dir="ltr"
+              inputMode="numeric"
+              className={monoFieldClass}
               value={form.strn}
               onChange={(event) =>
                 setForm({ ...form, strn: event.target.value })
@@ -351,7 +353,7 @@ function ShopForm() {
         <label className="flex flex-col gap-1 text-small">
           {t('setup.header')}
           <textarea
-            className={area}
+            className={textareaClass}
             maxLength={120}
             value={form.receipt_header}
             onChange={(event) =>
@@ -362,7 +364,7 @@ function ShopForm() {
         <label className="flex flex-col gap-1 text-small">
           {t('setup.footer')}
           <textarea
-            className={area}
+            className={textareaClass}
             maxLength={160}
             value={form.receipt_footer}
             onChange={(event) =>
@@ -378,7 +380,7 @@ function ShopForm() {
               min={0}
               max={50}
               step={0.01}
-              className={field}
+              className={fieldClass}
               value={form.tax_rate_bp / 100}
               onChange={(event) =>
                 setForm({
@@ -394,7 +396,7 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('office.settings.tax_label')}
             <input
-              className={field}
+              className={fieldClass}
               maxLength={30}
               value={form.tax_label}
               onChange={(event) =>
@@ -405,7 +407,7 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('office.settings.round_total')}
             <select
-              className={field}
+              className={fieldClass}
               value={form.round_total_to}
               onChange={(event) =>
                 setForm({
@@ -427,7 +429,7 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('office.settings.refund_rounding')}
             <select
-              className={field}
+              className={fieldClass}
               value={form.refund_rounding}
               onChange={(event) =>
                 setForm({
@@ -449,7 +451,7 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('office.settings.receipt_language')}
             <select
-              className={field}
+              className={fieldClass}
               value={form.receipt_language}
               onChange={(event) =>
                 setForm({
@@ -466,7 +468,7 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('office.settings.number_grouping')}
             <select
-              className={field}
+              className={fieldClass}
               value={form.number_grouping}
               onChange={(event) =>
                 setForm({
@@ -571,7 +573,7 @@ function ShopForm() {
             <label className="flex flex-col gap-1 text-small">
               {t('office.settings.branch_name')}
               <input
-                className={field}
+                className={fieldClass}
                 value={branch.name}
                 onChange={(event) =>
                   setBranch({ ...branch, name: event.target.value })
@@ -581,7 +583,7 @@ function ShopForm() {
             <label className="flex flex-col gap-1 text-small">
               {t('office.settings.bill_prefix')}
               <input
-                className={field}
+                className={fieldClass}
                 maxLength={6}
                 value={branch.bill_prefix}
                 onChange={(event) =>
@@ -595,23 +597,19 @@ function ShopForm() {
             <label className="flex flex-col gap-1 text-small">
               {t('setup.address')}
               <input
-                className={field}
+                className={fieldClass}
                 value={branch.address}
                 onChange={(event) =>
                   setBranch({ ...branch, address: event.target.value })
                 }
               />
             </label>
-            <label className="flex flex-col gap-1 text-small">
-              {t('setup.phone')}
-              <input
-                className={field}
-                value={branch.phone}
-                onChange={(event) =>
-                  setBranch({ ...branch, phone: event.target.value })
-                }
-              />
-            </label>
+            <PhoneInput
+              label={t('setup.phone')}
+              showWhatsApp={false}
+              value={branch.phone}
+              onChange={(phone) => setBranch({ ...branch, phone: phone ?? '' })}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
             <button

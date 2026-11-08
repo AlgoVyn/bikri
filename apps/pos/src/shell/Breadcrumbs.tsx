@@ -1,5 +1,6 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { ChevronRightIcon } from '../components/icons.tsx';
 import { navItemFor } from './nav.ts';
 
 /** Desktop breadcrumb: Home / parent / current. Phones keep the compact title bar. */
@@ -30,9 +31,7 @@ export function Breadcrumbs({ current }: { current: string | null }) {
         </li>
         {parent && !onParent ? (
           <li className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden="true" className="text-text-muted">
-              ›
-            </span>
+            <ChevronRightIcon className="size-3.5 text-text-muted rtl:rotate-180" />
             <Link
               to={parent.to}
               className="truncate text-text-muted hover:text-text"
@@ -43,9 +42,7 @@ export function Breadcrumbs({ current }: { current: string | null }) {
         ) : null}
         {tail ? (
           <li className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden="true" className="text-text-muted">
-              ›
-            </span>
+            <ChevronRightIcon className="size-3.5 text-text-muted rtl:rotate-180" />
             <span
               aria-current="page"
               className="truncate font-medium text-text"
@@ -55,9 +52,7 @@ export function Breadcrumbs({ current }: { current: string | null }) {
           </li>
         ) : parent && onParent && pathname !== '/' ? (
           <li className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden="true" className="text-text-muted">
-              ›
-            </span>
+            <ChevronRightIcon className="size-3.5 text-text-muted rtl:rotate-180" />
             <span
               aria-current="page"
               className="truncate font-medium text-text"

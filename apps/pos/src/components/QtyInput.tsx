@@ -89,7 +89,7 @@ export function QtyInput({
           aria-label={ariaLabel}
           inputMode={qtyAllowsDecimals(unit) ? 'decimal' : 'numeric'}
           autoComplete="off"
-          className={`${dense ? 'h-11 px-2 text-small' : 'h-11 px-3 text-body'} min-w-0 flex-1 rounded-control border border-border-strong bg-surface text-center font-mono text-text outline-none`}
+          className={`${dense ? 'h-12 px-2 text-small' : 'h-11 px-3 text-body'} min-w-0 flex-1 rounded-control border border-border-strong bg-surface text-center font-mono text-text outline-none`}
           value={shown}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}

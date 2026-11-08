@@ -1,7 +1,7 @@
 import { businessDate } from '@bikri/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -11,8 +11,10 @@ import {
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import {
@@ -114,6 +116,7 @@ export function UdhaarList({
         title={t('office.udhaar.title')}
         subtitle={t('office.udhaar.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
+        hideTitleOnPhone
         actions={
           <>
             <Link to="/udhaar/chase" className={buttonQuiet}>
@@ -135,7 +138,9 @@ export function UdhaarList({
                 {t('office.udhaar.export_csv')}
               </button>
             ) : null}
-            {can('party.edit') ? (
+            {can('party.edit') &&
+            !detailOpen &&
+            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
               <button
                 type="button"
                 className={`${buttonPrimary} gap-2`}
@@ -149,39 +154,40 @@ export function UdhaarList({
         }
       />
 
-      {data ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Card
-            testid="udhaar-total"
-            className="col-span-2 sm:col-span-1"
-            label={t('office.udhaar.total_owed')}
-            value={<MoneyText paisa={data.totalOwed} />}
-          />
-          <Card
-            testid="udhaar-owing"
-            label={t('office.udhaar.customers_owing')}
-            value={String(data.owingCount)}
-          />
-          <Card
-            label={t('office.udhaar.received_this_month')}
-            value={<MoneyText paisa={data.receivedThisMonth} />}
-          />
-        </div>
-      ) : null}
-
       <ListSurface
+        summary={
+          data ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Metric
+                testId="udhaar-total"
+                className="col-span-2 sm:col-span-1"
+                label={t('office.udhaar.total_owed')}
+                value={<MoneyText paisa={data.totalOwed} />}
+              />
+              <Metric
+                testId="udhaar-owing"
+                label={t('office.udhaar.customers_owing')}
+                value={String(data.owingCount)}
+              />
+              <Metric
+                label={t('office.udhaar.received_this_month')}
+                value={<MoneyText paisa={data.receivedThisMonth} />}
+              />
+            </div>
+          ) : undefined
+        }
         toolbar={
           <search className="flex flex-wrap items-end gap-2">
             <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
               <span className="mb-1 text-small">
                 {t('office.udhaar.search')}
               </span>
-              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+              <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
                   type="search"
                   autoComplete="off"
-                  className="min-w-0 flex-1 bg-transparent text-body outline-none"
+                  className={searchInputClass}
                   placeholder={t('office.udhaar.search_placeholder')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -281,7 +287,7 @@ export function UdhaarList({
               data-testid="udhaar-list-header"
             >
               <span>{t('office.udhaar.col_customer')}</span>
-              <span>{t('office.udhaar.balance')}</span>
+              <span className="text-end">{t('office.udhaar.balance')}</span>
               <span>{t('office.udhaar.sort_oldest')}</span>
               <span>{t('office.udhaar.credit_limit')}</span>
               <span>{t('office.udhaar.promise')}</span>
@@ -317,7 +323,7 @@ export function UdhaarList({
                         {String(row.customer.phone ?? '')}
                       </span>
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 text-end">
                       <span
                         className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
                       >
@@ -404,28 +410,6 @@ export function UdhaarList({
       </ListSurface>
 
       <CustomerDialog open={newOpen} onOpenChange={setNewOpen} />
-    </div>
-  );
-}
-
-function Card({
-  label,
-  value,
-  testid,
-  className = '',
-}: {
-  label: string;
-  value: ReactNode;
-  testid?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-card border border-border bg-surface p-2 sm:p-3 ${className}`}
-      data-testid={testid}
-    >
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="text-title font-semibold">{value}</p>
     </div>
   );
 }

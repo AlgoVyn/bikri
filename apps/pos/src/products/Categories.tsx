@@ -2,12 +2,15 @@ import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
+  fieldClass,
   pageClass,
 } from '../components/classes.ts';
-import { ProductsIcon, TagIcon } from '../components/icons.tsx';
+import { ChevronRightIcon, CloseIcon, TagIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -25,9 +28,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { tileBg } from './tiles.ts';
 
-const textField =
-  'h-11 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-3 text-body text-text';
-
 /** Categories (screens/08): add, rename, colour, reorder, delete when empty. */
 export function CategoriesPage() {
   const { t } = useTranslation();
@@ -37,6 +37,10 @@ export function CategoriesPage() {
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [name, setName] = useState('');
   const [nameUr, setNameUr] = useState('');
+  const [deleting, setDeleting] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   if (!can('catalog.edit') || readOnly)
     return <Navigate to="/products" replace />;
 
@@ -45,7 +49,7 @@ export function CategoriesPage() {
       <SubpageHeader
         backTo="/products"
         backLabel={t('import.back_to_products')}
-        icon={<ProductsIcon />}
+        icon={<TagIcon />}
         title={t('categories.title')}
       />
       <TaskLayout
@@ -75,27 +79,34 @@ export function CategoriesPage() {
           }}
         >
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <label className="sr-only" htmlFor="new-category">
+            <label
+              className="flex flex-col gap-1 text-small"
+              htmlFor="new-category"
+            >
               {t('categories.new')}
+              <input
+                id="new-category"
+                className={fieldClass}
+                maxLength={40}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </label>
-            <input
-              id="new-category"
-              className={textField}
-              placeholder={t('categories.new')}
-              maxLength={40}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              className={textField}
-              placeholder={t('categories.name_ur')}
-              aria-label={t('categories.name_ur')}
-              lang="ur"
-              dir="rtl"
-              maxLength={40}
-              value={nameUr}
-              onChange={(e) => setNameUr(e.target.value)}
-            />
+            <label
+              className="flex flex-col gap-1 text-small"
+              htmlFor="new-category-ur"
+            >
+              {t('categories.name_ur')}
+              <input
+                id="new-category-ur"
+                className={fieldClass}
+                lang="ur"
+                dir="rtl"
+                maxLength={40}
+                value={nameUr}
+                onChange={(e) => setNameUr(e.target.value)}
+              />
+            </label>
           </div>
           <button
             type="submit"
@@ -134,7 +145,7 @@ export function CategoriesPage() {
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <input
                       aria-label={t('categories.name', { name: label })}
-                      className={textField}
+                      className={fieldClass}
                       maxLength={40}
                       defaultValue={label}
                       onBlur={(e) => {
@@ -153,7 +164,7 @@ export function CategoriesPage() {
                     />
                     <input
                       aria-label={t('categories.name_ur')}
-                      className={textField}
+                      className={fieldClass}
                       lang="ur"
                       dir="rtl"
                       maxLength={40}
@@ -216,7 +227,7 @@ export function CategoriesPage() {
                   <div className="ms-auto flex gap-1">
                     <button
                       type="button"
-                      className={buttonQuiet}
+                      className={`${buttonQuiet} w-11 px-0`}
                       disabled={i === 0}
                       aria-label={t('categories.up', { name: label })}
                       onClick={() =>
@@ -225,11 +236,11 @@ export function CategoriesPage() {
                         })
                       }
                     >
-                      ↑
+                      <ChevronRightIcon className="size-4 -rotate-90" />
                     </button>
                     <button
                       type="button"
-                      className={buttonQuiet}
+                      className={`${buttonQuiet} w-11 px-0`}
                       disabled={i === categories.length - 1}
                       aria-label={t('categories.down', { name: label })}
                       onClick={() =>
@@ -238,28 +249,15 @@ export function CategoriesPage() {
                         })
                       }
                     >
-                      ↓
+                      <ChevronRightIcon className="size-4 rotate-90" />
                     </button>
                     <button
                       type="button"
-                      className={buttonQuiet}
+                      className={`${buttonDangerQuiet} w-11 px-0`}
                       aria-label={t('categories.delete', { name: label })}
-                      onClick={async () => {
-                        try {
-                          await removeCategory(getDb(), c.id, {
-                            actor: staff?.id ?? null,
-                          });
-                        } catch (error) {
-                          if (error instanceof CategoryInUseError) {
-                            toast.push(
-                              t('categories.in_use', { count: error.count }),
-                              'error',
-                            );
-                          } else throw error;
-                        }
-                      }}
+                      onClick={() => setDeleting({ id: c.id, name: label })}
                     >
-                      ×
+                      <CloseIcon className="size-5" />
                     </button>
                   </div>
                 </div>
@@ -268,6 +266,34 @@ export function CategoriesPage() {
           })}
         </ul>
       </TaskLayout>
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title={t('categories.delete_title', {
+          name: deleting?.name ?? '',
+        })}
+        body={t('categories.delete_body')}
+        confirmLabel={t('categories.delete', {
+          name: deleting?.name ?? '',
+        })}
+        onConfirm={() => {
+          const target = deleting;
+          setDeleting(null);
+          if (!target) return;
+          void removeCategory(getDb(), target.id, {
+            actor: staff?.id ?? null,
+          }).catch((error: unknown) => {
+            if (error instanceof CategoryInUseError) {
+              toast.push(
+                t('categories.in_use', { count: error.count }),
+                'error',
+              );
+            } else throw error;
+          });
+        }}
+      />
     </div>
   );
 }

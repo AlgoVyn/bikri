@@ -156,7 +156,7 @@ function ActivityContent() {
         </div>
       ) : null}
       {rows && rows.length === 0 ? (
-        <EmptyState message={t('office.activity.empty')} />
+        <EmptyState icon={<ClockIcon />} message={t('office.activity.empty')} />
       ) : null}
       {rows && rows.length > 0 ? (
         <div className="overflow-x-auto rounded-card border border-border bg-surface">

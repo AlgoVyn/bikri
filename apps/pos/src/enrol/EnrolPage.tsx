@@ -4,13 +4,14 @@ import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BikriMark } from '../components/BikriMark.tsx';
 import {
   buttonDanger,
   buttonPrimary,
   buttonQuiet,
   fieldClass,
+  monoFieldClass,
 } from '../components/classes.ts';
-import { SalesIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import {
@@ -229,9 +230,11 @@ export function EnrolPage({
               aria-hidden="true"
               className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
             >
-              <SalesIcon />
+              <BikriMark className="size-5" />
             </span>
-            <p className="font-semibold text-h2">{t('common.app_name')}</p>
+            <p className="text-caption font-semibold uppercase tracking-[0.18em]">
+              {t('common.app_name')}
+            </p>
           </div>
           <LanguageSelect />
         </div>
@@ -389,7 +392,7 @@ export function EnrolPage({
             type="button"
             role="tab"
             aria-selected={tab === id}
-            className={tab === id ? buttonPrimary : buttonQuiet}
+            className={`${buttonQuiet} aria-selected:border-primary aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink`}
             onClick={() => setTab(id)}
           >
             {t(id === 'code' ? 'enrol.tab_code' : 'enrol.tab_new')}
@@ -410,7 +413,7 @@ export function EnrolPage({
         <label className="flex flex-col gap-1">
           <span>{t('enrol.code_label')}</span>
           <input
-            className={`${fieldClass} uppercase tracking-widest`}
+            className={`${monoFieldClass} uppercase tracking-widest`}
             value={formatCode(code)}
             onChange={(e) => {
               setCode(normaliseCodeInput(e.target.value));

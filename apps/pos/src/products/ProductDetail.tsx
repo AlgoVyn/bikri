@@ -10,6 +10,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
+import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -145,12 +146,7 @@ export function ProductDetailPage({
             title={t('products.back')}
             className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
           >
-            <span
-              aria-hidden="true"
-              className="text-title leading-none rtl:rotate-180"
-            >
-              ‹
-            </span>
+            <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           </Link>
         ) : null}
         <ProductThumb
@@ -292,7 +288,7 @@ export function ProductDetailPage({
           ) : null}
         </div>
         {showCost || p.track_stock === 1 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3 xl:grid-cols-4">
             {showCost ? (
               <>
                 <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
@@ -345,26 +341,22 @@ export function ProductDetailPage({
         ) : null}
       </section>
 
-      <section
-        aria-labelledby="last14-heading"
-        className="rounded-card border border-border bg-surface p-4"
-      >
-        <h2 id="last14-heading" className="text-h2 font-semibold">
-          {t('products.last14')}
-        </h2>
-        {totalQty > 0 ? (
-          <p className="text-small text-text-muted">
-            {t('products.last14_total', {
-              qty: qtyWithUnit(t, totalQty, unit),
-              amount: displayMoney(totalRevenue),
-            })}
-          </p>
-        ) : null}
-        {totalQty === 0 ? (
-          <p className="mt-3 text-small text-text-muted">
-            {t('products.last14_empty')}
-          </p>
-        ) : (
+      {totalQty > 0 ? (
+        <section
+          aria-labelledby="last14-heading"
+          className="rounded-card border border-border bg-surface p-4"
+        >
+          <h2 id="last14-heading" className="text-h2 font-semibold">
+            {t('products.last14')}
+          </h2>
+          {totalQty > 0 ? (
+            <p className="text-small text-text-muted">
+              {t('products.last14_total', {
+                qty: qtyWithUnit(t, totalQty, unit),
+                amount: displayMoney(totalRevenue),
+              })}
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-col gap-1">
             <div
               className="flex h-24 items-end gap-1"
@@ -400,8 +392,8 @@ export function ProductDetailPage({
                 ))}
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section aria-labelledby="history-heading">
         <div className="mb-2 flex items-center gap-2">
@@ -550,7 +542,7 @@ function Figure({
       className={
         emphasize
           ? 'rounded-card border border-primary/20 bg-primary-subtle p-3 text-primary-subtle-ink'
-          : 'rounded-card border border-border bg-surface p-3'
+          : 'p-0'
       }
       data-testid={testId}
     >

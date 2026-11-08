@@ -79,8 +79,52 @@ export function UdhaarIcon() {
 export function SettingsIcon() {
   return (
     <Svg>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3.5v2.2M12 18.3V20.5M4.8 7.2l1.6 1.6M17.6 15.2l1.6 1.6M3.5 12h2.2M18.3 12H20.5M4.8 16.8l1.6-1.6M17.6 8.8l1.6-1.6" />
+      <path d="M6 4v6M6 14v6M12 4v10M12 18v2M18 4v2M18 10v10" />
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="12" cy="16" r="2" />
+      <circle cx="18" cy="8" r="2" />
+    </Svg>
+  );
+}
+
+export function DisplayIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="4.5" width="17" height="12" rx="2" />
+      <path d="M9 20h6M12 16.5V20M8 9h8M8 12h5" />
+    </Svg>
+  );
+}
+
+export function ChevronLeftIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m15 18-6-6 6-6" />
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </Svg>
+  );
+}
+
+export function CloseIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}
+
+export function UndoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
     </Svg>
   );
 }
@@ -232,9 +276,9 @@ export function UsersIcon() {
   );
 }
 
-export function PrinterIcon() {
+export function PrinterIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <path d="M7 8V4h10v4" />
       <path d="M6 8h12a2 2 0 0 1 2 2v6h-3v4H7v-4H4v-6a2 2 0 0 1 2-2Z" />
       <path d="M7 16h10M8 12h1" />

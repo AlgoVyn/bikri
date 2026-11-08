@@ -538,6 +538,7 @@ function EditDialog({
         <input
           id="edit-email"
           type="email"
+          dir="ltr"
           className="h-11 w-full rounded-control border border-border-strong bg-surface px-3"
           value={email}
           aria-describedby="edit-email-hint"

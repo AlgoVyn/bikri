@@ -1,5 +1,6 @@
 import { useId, useRef } from 'react';
 import { SearchIcon } from './icons.tsx';
+import { searchInputClass, searchWrapperClass } from './search.ts';
 
 const BARCODE_GAP_MS = 30;
 const BARCODE_MIN_LENGTH = 4;
@@ -57,14 +58,14 @@ export function SearchBox({
       <label htmlFor={inputId} className="mb-1 block text-small text-text">
         {label}
       </label>
-      <div className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+      <div className={searchWrapperClass}>
         <SearchIcon />
         <input
           id={inputId}
           type="search"
           autoComplete="off"
           placeholder={placeholder}
-          className="h-full min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+          className={searchInputClass}
           value={value}
           onChange={(event) => {
             const next = event.target.value;

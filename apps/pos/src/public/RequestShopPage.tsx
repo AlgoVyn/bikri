@@ -5,6 +5,7 @@ import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary, fieldClass } from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
+import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
 
@@ -151,6 +152,7 @@ function RequestShop() {
             <input
               data-testid="register-email"
               className={fieldClass}
+              dir="ltr"
               type="email"
               required
               maxLength={254}
@@ -159,17 +161,14 @@ function RequestShop() {
               onChange={(event) => set('email', event.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1 text-small">
-            <span>{t('register.phone')}</span>
-            <input
-              data-testid="register-phone"
-              className={fieldClass}
-              maxLength={30}
-              autoComplete="tel"
-              value={form.phone}
-              onChange={(event) => set('phone', event.target.value)}
-            />
-          </label>
+          <PhoneInput
+            label={t('register.phone')}
+            kind="any"
+            testId="register-phone"
+            showWhatsApp={false}
+            value={form.phone}
+            onChange={(phone) => set('phone', phone ?? '')}
+          />
           <label className="flex flex-col gap-1 text-small">
             <span>{t('register.city')}</span>
             <input

@@ -231,3 +231,18 @@ test.describe('Pay (T-017)', () => {
     await setLanguage(page, 'en');
   });
 });
+
+test.describe('Pay on a phone', () => {
+  test('the primary action stays inside the visual viewport', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await t2(page);
+    await page.getByTestId('cart-bar').click();
+    await page.getByRole('button', { name: 'Take payment' }).click();
+    await expect(pay(page)).toBeVisible();
+    const box = await pay(page).getByTestId('pay-done').boundingBox();
+    expect(box).not.toBeNull();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
+  });
+});

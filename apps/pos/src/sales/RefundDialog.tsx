@@ -9,6 +9,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -536,13 +537,17 @@ export function RefundDialog({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={buttonQuiet} onClick={onClose}>
+      <DialogFooter>
+        <button
+          type="button"
+          className={`${buttonQuiet} max-md:flex-1`}
+          onClick={onClose}
+        >
           {t('common.cancel')}
         </button>
         <button
           type="button"
-          className={buttonDanger}
+          className={`${buttonDanger} max-md:flex-1`}
           disabled={!canSave}
           aria-busy={pending}
           onClick={() => {
@@ -563,7 +568,7 @@ export function RefundDialog({
                 })
               : t('office.refund.button_empty')}
         </button>
-      </div>
+      </DialogFooter>
       {!can('refund.create') ? (
         <p className="text-small text-text-muted">
           {t('office.refund.override_hint')}

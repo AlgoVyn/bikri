@@ -10,6 +10,8 @@ export function PhoneInput({
   value,
   onChange,
   name,
+  testId,
+  showWhatsApp = true,
   required = false,
 }: {
   id?: string;
@@ -18,6 +20,9 @@ export function PhoneInput({
   value: string;
   onChange: (e164: string | null) => void;
   name?: string;
+  testId?: string;
+  /** Show the “message on WhatsApp” shortcut for party phone numbers. */
+  showWhatsApp?: boolean;
   /** Visible required mark next to the label. */
   required?: boolean;
 }) {
@@ -47,11 +52,12 @@ export function PhoneInput({
       <input
         id={inputId}
         name={name}
+        data-testid={testId}
         type="tel"
         inputMode="tel"
         autoComplete="tel"
         dir="ltr"
-        className={fieldClass}
+        className={`${fieldClass} font-mono tabular-nums`}
         value={shown}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? errorId : undefined}
@@ -78,7 +84,7 @@ export function PhoneInput({
           {t('errors.phone_invalid')}
         </p>
       ) : null}
-      {whatsApp !== null ? (
+      {showWhatsApp && whatsApp !== null ? (
         <a
           className="mt-1 inline-flex min-h-11 items-center text-primary"
           href={whatsApp}

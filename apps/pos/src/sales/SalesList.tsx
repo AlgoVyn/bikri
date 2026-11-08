@@ -1,16 +1,18 @@
 import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { SalesIcon, SearchIcon } from '../components/icons.tsx';
+import { PrinterIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
@@ -218,6 +220,7 @@ export function SalesList({
         title={t('nav.sales')}
         subtitle={t('office.sales.subtitle')}
         headingLevel={detailOpen ? 'h2' : 'h1'}
+        hideTitleOnPhone
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {!readOnly && can('sale.backdate') ? (
@@ -295,12 +298,12 @@ export function SalesList({
               <span className="mb-1 text-small">
                 {t('office.sales.search')}
               </span>
-              <span className="flex h-11 items-center gap-2 rounded-control border border-border-strong bg-surface px-3">
+              <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
                   type="search"
                   autoComplete="off"
-                  className="min-w-0 flex-1 bg-transparent text-body text-text outline-none"
+                  className={searchInputClass}
                   placeholder={t('office.sales.search_placeholder')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -530,15 +533,6 @@ export function SalesList({
   );
 }
 
-function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <p className="text-small text-text-muted">{label}</p>
-      <p className="text-total font-semibold">{value}</p>
-    </div>
-  );
-}
-
 function SaleRow({
   row,
   current,
@@ -624,12 +618,12 @@ function SaleRow({
       {row.printFailed ? (
         <button
           type="button"
-          className="absolute end-1 top-1/2 -translate-y-1/2 rounded-control p-2 text-danger"
+          className="absolute end-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-control text-danger"
           title={t('office.sales.print_failed')}
           aria-label={t('office.sales.print_failed')}
           onClick={() => void onReprint()}
         >
-          <span aria-hidden="true">⎙</span>
+          <PrinterIcon className="size-5" />
         </button>
       ) : null}
     </li>

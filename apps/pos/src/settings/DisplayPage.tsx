@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary } from '../components/classes.ts';
-import { SettingsIcon } from '../components/icons.tsx';
+import { DisplayIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -68,7 +68,7 @@ function DisplayContent() {
   return (
     <SettingsPageLayout
       title={t('office.display.title')}
-      icon={<SettingsIcon />}
+      icon={<DisplayIcon />}
     >
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <label className="flex flex-col gap-1 text-small">

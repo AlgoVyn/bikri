@@ -33,7 +33,7 @@ async function shop(page: Page, path = '/bikri/') {
 }
 
 const dialog = (page: Page) =>
-  page.getByRole('dialog', { name: /Price check|قیمت دیکھیں/u });
+  page.getByRole('dialog', { name: /Price|قیمت/u });
 const field = (page: Page) => dialog(page).getByRole('searchbox');
 const writes = async (page: Page) => ({
   outbox: (await idbAll(page, 'outbox')).length,
@@ -78,7 +78,7 @@ test.describe('Price check (T-022)', () => {
     await page.context().setOffline(true);
     await page
       .getByRole('main')
-      .getByRole('button', { name: /^Price check/u })
+      .getByRole('button', { name: /^Price/u })
       .click();
     await expect(field(page)).toBeFocused();
     const before = await writes(page);
@@ -179,12 +179,12 @@ test.describe('Price check (T-022)', () => {
       await page.getByRole('button', { name: 'More' }).click();
       await page
         .locator('#more-menu')
-        .getByRole('button', { name: 'Price check' })
+        .getByRole('button', { name: 'Price' })
         .click();
     } else {
       await page
         .getByRole('navigation')
-        .getByRole('button', { name: /Price check/u })
+        .getByRole('button', { name: /Price/u })
         .click();
     }
     await expect(field(page)).toBeFocused();

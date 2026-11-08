@@ -234,6 +234,7 @@ export function NewShopPage() {
                 <input
                   id="shop-email"
                   type="email"
+                  dir="ltr"
                   className={inputClass}
                   value={email}
                   maxLength={254}
@@ -278,7 +279,7 @@ export function NewShopPage() {
               {t('admin.err_budget')}
             </p>
           ) : null}
-          <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-5 flex flex-wrap justify-end gap-2 border-t border-border bg-surface px-4 py-3">
             <a href={adminHref('/admin/tenants')} className={quietBtn}>
               {t('common.cancel')}
             </a>

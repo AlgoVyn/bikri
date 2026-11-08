@@ -8,9 +8,11 @@ import {
   buttonPrimary,
   buttonQuiet,
   fieldClass,
+  monoFieldClass,
   pageClass,
+  textareaClass,
 } from '../components/classes.ts';
-import { ProductsIcon } from '../components/icons.tsx';
+import { CloseIcon, ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
@@ -39,8 +41,6 @@ import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
 
 const WARRANTY_PRESETS = ['0', '7', '30', '90', '180', '365'] as const;
-const textField =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-body text-text outline-none';
 
 type Draft = {
   name_en: string;
@@ -467,7 +467,7 @@ export function ProductFormPage({
             <input
               ref={nameRef}
               id={fieldId('name_en')}
-              className={textField}
+              className={fieldClass}
               maxLength={80}
               value={draft.name_en}
               aria-invalid={errors.name_en ? true : undefined}
@@ -502,7 +502,7 @@ export function ProductFormPage({
               id={fieldId('name_ur')}
               dir="rtl"
               lang="ur"
-              className={`${textField} font-urdu`}
+              className={`${fieldClass} font-urdu`}
               maxLength={80}
               value={draft.name_ur}
               onChange={(e) => set('name_ur', e.target.value)}
@@ -520,7 +520,7 @@ export function ProductFormPage({
               <div className="flex gap-2">
                 <select
                   id={fieldId('category')}
-                  className={`${textField} min-w-0 flex-1`}
+                  className={`${fieldClass} min-w-0 flex-1`}
                   value={draft.category_id}
                   onChange={(e) => set('category_id', e.target.value)}
                 >
@@ -546,7 +546,7 @@ export function ProductFormPage({
                   </label>
                   <input
                     id={fieldId('new-category')}
-                    className={`${textField} min-w-0 flex-1`}
+                    className={`${fieldClass} min-w-0 flex-1`}
                     placeholder={t('form.new_category_name')}
                     maxLength={40}
                     // biome-ignore lint/a11y/noAutofocus: opened by the user's own click
@@ -594,7 +594,7 @@ export function ProductFormPage({
               </label>
               <input
                 id={fieldId('brand')}
-                className={textField}
+                className={fieldClass}
                 maxLength={40}
                 list={fieldId('brands')}
                 value={draft.brand}
@@ -626,7 +626,7 @@ export function ProductFormPage({
                       id={fieldId(key)}
                       dir="ltr"
                       inputMode="numeric"
-                      className={fieldClass}
+                      className={monoFieldClass}
                       maxLength={64}
                       value={code}
                       aria-invalid={err ? true : undefined}
@@ -665,7 +665,7 @@ export function ProductFormPage({
                           }
                         }}
                       >
-                        ×
+                        <CloseIcon className="size-5" />
                       </button>
                     ) : null}
                   </div>
@@ -706,7 +706,7 @@ export function ProductFormPage({
               <input
                 id={fieldId('sku')}
                 dir="ltr"
-                className={fieldClass}
+                className={monoFieldClass}
                 maxLength={40}
                 value={draft.sku}
                 aria-invalid={errors.sku ? true : undefined}
@@ -778,7 +778,7 @@ export function ProductFormPage({
               </label>
               <select
                 id={fieldId('unit')}
-                className={textField}
+                className={fieldClass}
                 value={draft.unit}
                 onChange={(e) => set('unit', e.target.value as QtyUnit)}
               >
@@ -833,7 +833,7 @@ export function ProductFormPage({
               </label>
               <select
                 id={fieldId('warranty')}
-                className={textField}
+                className={fieldClass}
                 value={draft.warranty}
                 onChange={(e) => set('warranty', e.target.value)}
               >
@@ -858,7 +858,7 @@ export function ProductFormPage({
                   id={fieldId('warranty_days')}
                   inputMode="numeric"
                   dir="ltr"
-                  className={fieldClass}
+                  className={monoFieldClass}
                   value={draft.warranty_days}
                   aria-invalid={errors.warranty_days ? true : undefined}
                   aria-describedby={
@@ -881,7 +881,7 @@ export function ProductFormPage({
             </label>
             <textarea
               id={fieldId('notes')}
-              className="min-h-20 w-full rounded-control border border-border-strong bg-surface p-3 text-body text-text"
+              className={textareaClass}
               maxLength={500}
               value={draft.notes}
               onChange={(e) => set('notes', e.target.value)}

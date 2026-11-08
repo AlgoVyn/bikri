@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
-  buttonDanger,
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
@@ -248,7 +248,7 @@ export function CustomerDialog({
             {canDelete ? (
               <button
                 type="button"
-                className={buttonDanger}
+                className={buttonDangerQuiet}
                 onClick={() => setConfirmDelete(true)}
               >
                 {t('office.udhaar.delete')}

@@ -44,8 +44,10 @@ export function SettingsSplit({
 
   // Restore the index's own scroll after a section route remounts the nav.
   useLayoutEffect(() => {
-    if (navRef.current) navRef.current.scrollTop = settingsNavScroll;
-  }, []);
+    if (!navRef.current) return;
+    // Returning to the index shows its title and data-safety card from the top.
+    navRef.current.scrollTop = index ? 0 : settingsNavScroll;
+  }, [index]);
 
   // Selecting a section is a route change, so SettingsNav remounts and the document height
   // briefly collapses. Keep the scroll of the nav on the desktop split; on smaller screens
@@ -85,9 +87,12 @@ export function SettingsSplit({
             onScroll={(event) => {
               settingsNavScroll = event.currentTarget.scrollTop;
             }}
-            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden`}
+            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]`}
           >
-            <SettingsNav activePath={activePath} />
+            <SettingsNav
+              activePath={activePath}
+              headingLevel={index ? 'h1' : 'h2'}
+            />
           </div>
           <div className={index ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
             {index ? (children ?? <SettingsPlaceholder />) : children}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClockIcon, SearchIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { listShopRequests } from './api.ts';
 import { adminHref, formatWhen } from './format.ts';
 import type { ShopRequest, ShopRequestStatus } from './types.ts';
@@ -69,12 +70,12 @@ export function RequestsPage() {
       />
       <Panel bodyClassName="p-0">
         <div className="flex flex-wrap items-end gap-3 border-b border-border p-3">
-          <label className="flex min-w-56 flex-1 items-center gap-2 rounded-control border border-border-strong bg-surface px-3 focus-within:border-primary">
+          <label className={`${searchWrapperClass} min-w-56 flex-1`}>
             <SearchIcon />
             <span className="sr-only">{t('admin.requests_search')}</span>
             <input
               type="search"
-              className="h-11 min-w-0 flex-1 bg-transparent text-text outline-none"
+              className={searchInputClass}
               placeholder={t('admin.requests_search_placeholder')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}

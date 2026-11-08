@@ -9,7 +9,9 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import {
+  ChevronRightIcon,
   ClockIcon,
+  CloseIcon,
   CountIcon,
   LockIcon,
   ProductsIcon,
@@ -33,7 +35,6 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { formatTimestamp } from '../lib/date';
 import { NAV } from '../shell/nav.ts';
 import { usePriceCheck } from '../shell/priceCheckStore.ts';
-import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { useSession } from '../state/session.ts';
@@ -103,7 +104,6 @@ export function HomePage() {
       return false;
     }
   });
-  const online = useOnline();
   const timeZone =
     useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
   const { today, yesterday, now } = useBusinessDates(timeZone);
@@ -207,11 +207,6 @@ export function HomePage() {
               <span>{data.branchName}</span>
             </>
           ) : null}
-          {online ? null : (
-            <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-warning-subtle-ink">
-              {t('home.as_of_device')}
-            </span>
-          )}
         </p>
       </header>
 
@@ -385,12 +380,7 @@ export function HomePage() {
                     {t('home.new_sale_hint')}
                   </span>
                 </span>
-                <span
-                  aria-hidden="true"
-                  className="relative text-title text-rail-active rtl:rotate-180"
-                >
-                  ›
-                </span>
+                <ChevronRightIcon className="size-4 relative text-title text-rail-active rtl:rotate-180" />
               </Link>
             )}
 
@@ -427,12 +417,7 @@ export function HomePage() {
                         <span className="min-w-0 flex-1">
                           {attentionText(t, i18n.language, timeZone, item)}
                         </span>
-                        <span
-                          aria-hidden="true"
-                          className="text-base text-text-muted rtl:rotate-180"
-                        >
-                          ›
-                        </span>
+                        <ChevronRightIcon className="size-4 text-base text-text-muted rtl:rotate-180" />
                       </Link>
                     </li>
                   ))}
@@ -570,9 +555,7 @@ function GettingStarted({
             aria-label={t('common.dismiss')}
             onClick={onDismiss}
           >
-            <span aria-hidden="true" className="text-title leading-none">
-              ×
-            </span>
+            <CloseIcon className="size-5 text-title leading-none" />
           </button>
         </div>
         <Link
@@ -589,12 +572,7 @@ function GettingStarted({
             <p className="font-medium">{step.title}</p>
             <p className="text-small text-text-muted">{step.hint}</p>
           </div>
-          <span
-            aria-hidden="true"
-            className="text-title leading-none text-text-muted"
-          >
-            ›
-          </span>
+          <ChevronRightIcon className="size-4 text-title leading-none text-text-muted rtl:rotate-180" />
         </Link>
         <div
           role="progressbar"
@@ -635,9 +613,7 @@ function GettingStarted({
           aria-label={t('common.dismiss')}
           onClick={onDismiss}
         >
-          <span aria-hidden="true" className="text-title leading-none">
-            ×
-          </span>
+          <CloseIcon className="size-5 text-title leading-none" />
         </button>
       </div>
       <div className="px-4 pb-3">
@@ -723,12 +699,7 @@ function QuickActions({
                   {t(tile.desc)}
                 </span>
               </span>
-              <span
-                aria-hidden="true"
-                className="text-title text-text-muted rtl:rotate-180"
-              >
-                ›
-              </span>
+              <ChevronRightIcon className="size-4 text-title text-text-muted rtl:rotate-180" />
             </Link>
           </li>
         ))}
@@ -751,12 +722,7 @@ function QuickActions({
                   {t('home.desc_price_check')}
                 </span>
               </span>
-              <span
-                aria-hidden="true"
-                className="text-title text-text-muted rtl:rotate-180"
-              >
-                ›
-              </span>
+              <ChevronRightIcon className="size-4 text-title text-text-muted rtl:rotate-180" />
             </button>
           </li>
         ) : null}
@@ -858,9 +824,7 @@ function RegisterCard({
             className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary"
           >
             {t('home.day_close')}
-            <span aria-hidden="true" className="rtl:rotate-180">
-              ›
-            </span>
+            <ChevronRightIcon className="size-4 rtl:rotate-180" />
           </Link>
         </div>
       ) : null}

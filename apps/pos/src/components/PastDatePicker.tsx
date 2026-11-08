@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { addDays } from '../data/backdate.ts';
 import { formatBusinessDate } from '../lib/date.ts';
+import { ChevronLeftIcon, ChevronRightIcon } from './icons.tsx';
 
 const PRESETS = [
   { id: 'today', key: 'office.backdate.preset_today', days: 0 },
@@ -127,10 +128,10 @@ export function PastDatePicker({
             type="button"
             data-testid="backdate-prev-month"
             aria-label={t('office.backdate.prev_month')}
-            className="flex size-10 items-center justify-center rounded-control text-title text-text-muted hover:bg-surface-2 rtl:rotate-180"
+            className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2"
             onClick={() => setView(shiftMonth(view.y, view.m, -1))}
           >
-            ‹
+            <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           </button>
           <span className="text-small font-medium">{monthLabel}</span>
           <button
@@ -138,10 +139,10 @@ export function PastDatePicker({
             data-testid="backdate-next-month"
             aria-label={t('office.backdate.next_month')}
             disabled={nextDisabled}
-            className="flex size-10 items-center justify-center rounded-control text-title text-text-muted hover:bg-surface-2 disabled:opacity-40 rtl:rotate-180"
+            className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 disabled:opacity-40"
             onClick={() => setView(shiftMonth(view.y, view.m, 1))}
           >
-            ›
+            <ChevronRightIcon className="size-5 rtl:rotate-180" />
           </button>
         </div>
         <div

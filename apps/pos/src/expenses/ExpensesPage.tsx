@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
-import { ExpensesIcon } from '../components/icons.tsx';
+import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
@@ -148,6 +149,7 @@ export function ExpensesPage() {
         icon={<ExpensesIcon />}
         title={t('office.expenses.title')}
         subtitle={t('office.expenses.subtitle')}
+        hideTitleOnPhone
         actions={
           <>
             {can('cash.move') ? (
@@ -173,7 +175,8 @@ export function ExpensesPage() {
                 {t('office.expenses.export_csv')}
               </button>
             ) : null}
-            {can('expense.create') ? (
+            {can('expense.create') &&
+            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
               <button
                 type="button"
                 className={`${buttonPrimary} gap-2`}
@@ -349,10 +352,12 @@ export function ExpensesPage() {
                   {canReverse(row) ? (
                     <button
                       type="button"
-                      className={buttonQuiet}
+                      className={`${buttonDangerQuiet} w-11 px-0`}
+                      aria-label={t('office.expenses.reverse')}
+                      title={t('office.expenses.reverse')}
                       onClick={() => setReversing(row)}
                     >
-                      {t('office.expenses.reverse')}
+                      <UndoIcon className="size-5" />
                     </button>
                   ) : row.reversed ? (
                     <span className="text-small text-text-muted">

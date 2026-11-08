@@ -282,6 +282,7 @@ export function DayClosePage() {
       <PageHeader
         icon={<ClockIcon />}
         title={t('office.dayclose.title')}
+        hideTitleOnPhone
         subtitle={`${data.deviceName} · ${t('office.dayclose.period')} ${
           data.firstClose
             ? t('office.dayclose.since_start')
@@ -319,11 +320,13 @@ export function DayClosePage() {
               {[
                 [5000, ...(show75 ? [COMMEMORATIVE] : []), 1000, 500, 100, 50],
                 [20, 10, 5, 2, 1],
-              ].map((values) => (
+              ].map((values, index) => (
                 <section
                   key={values.join('-')}
                   aria-label={`${t('office.dayclose.count_cash')} ${values[0]}–${values.at(-1)}`}
-                  className="rounded-control border border-border p-3"
+                  className={
+                    index === 0 ? '' : 'sm:border-s sm:border-border sm:ps-3'
+                  }
                 >
                   <div className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2 text-small text-text-muted">
                     <span>{t('office.dayclose.column_note')}</span>
