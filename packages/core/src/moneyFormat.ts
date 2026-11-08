@@ -51,10 +51,12 @@ export function parseMoneyToPaisa(
   return negative ? -paisa : paisa;
 }
 
+const INTL_GROUP = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+});
+
 function groupIntl(rupees: number): string {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(
-    rupees,
-  );
+  return INTL_GROUP.format(rupees);
 }
 
 /** Last three digits, then groups of two (1,24,500). */

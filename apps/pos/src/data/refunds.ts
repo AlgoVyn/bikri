@@ -7,7 +7,7 @@ import {
   saleLineFinal,
   splitRefund,
 } from '@bikri/core';
-import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import type { BikriDb, DexieTableName, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
@@ -15,6 +15,26 @@ import { queueRefundPrint } from './refundReceipt.ts';
 import { writeAction } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
+
+/** Stores a refund action may touch; narrower than `db.tables`. */
+const REFUND_WRITE_TABLES = [
+  'outbox',
+  'pull_shadow',
+  'kv',
+  'refunds',
+  'refund_lines',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
+  'stock_levels',
+  'party_balances',
+  'audit_log',
+  'sales',
+  'sale_lines',
+  'products',
+  'sale_voids',
+  'shop',
+] as const satisfies readonly DexieTableName[];
 
 export class RefundNotAllowedError extends Error {
   readonly code: 'void' | 'nothing' | 'qty' | 'reason' | 'line' | 'missing';
@@ -433,7 +453,7 @@ export async function refundSale(
       });
       return { refundRow, plan };
     },
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: REFUND_WRITE_TABLES },
   );
 
   // The refund is already committed; a print-queue failure must not make the money

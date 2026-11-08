@@ -56,33 +56,23 @@ function dosTime(ms: number): { time: number; date: number } {
   return { time, date };
 }
 
-function concat(parts: readonly Uint8Array[]): Uint8Array {
-  let size = 0;
-  for (const part of parts) size += part.length;
-  const out = new Uint8Array(size);
-  let at = 0;
-  for (const part of parts) {
-    out.set(part, at);
-    at += part.length;
-  }
-  return out;
+function write16(view: DataView, at: number, value: number): number {
+  view.setUint16(at, value & 0xffff, true);
+  return at + 2;
 }
 
-function u16(n: number): Uint8Array {
-  const b = new Uint8Array(2);
-  new DataView(b.buffer).setUint16(0, n & 0xffff, true);
-  return b;
-}
-
-function u32(n: number): Uint8Array {
-  const b = new Uint8Array(4);
-  new DataView(b.buffer).setUint32(0, n >>> 0, true);
-  return b;
+function write32(view: DataView, at: number, value: number): number {
+  view.setUint32(at, value >>> 0, true);
+  return at + 4;
 }
 
 /**
  * Writes a ZIP. `zipStore` is the STORE-only helper the export uses.
  * Method 8 exists so tests (and a hand-built archive) can exercise the reader.
+ *
+ * One allocation, one pass for sizes and one for bytes: the previous version copied
+ * every table into a local chunk and then copied all chunks again, which tripled the
+ * memory needed for a large shop export.
  */
 export function writeZip(
   files: readonly ZipWrite[],
@@ -91,10 +81,7 @@ export function writeZip(
   if (files.length > 0xffff) throw new ZipError('too many files');
   const stamp = dosTime(now);
   const encoder = new TextEncoder();
-  const locals: Uint8Array[] = [];
-  const centrals: Uint8Array[] = [];
-  let offset = 0;
-  for (const file of files) {
+  const prepared = files.map((file) => {
     const method = file.method ?? 0;
     const compressed = method === 0 ? file.data : file.compressed;
     if (compressed === undefined) throw new ZipError('missing deflate bytes');
@@ -103,59 +90,75 @@ export function writeZip(
     }
     const name = encoder.encode(file.name);
     if (name.length > 0xffff) throw new ZipError('name too long');
-    const crc = crc32(file.data);
-    const local = concat([
-      u32(SIG_LOCAL),
-      u16(VERSION),
-      u16(FLAG_UTF8),
-      u16(method),
-      u16(stamp.time),
-      u16(stamp.date),
-      u32(crc),
-      u32(compressed.length),
-      u32(file.data.length),
-      u16(name.length),
-      u16(0),
-      name,
+    return {
+      method,
       compressed,
-    ]);
-    locals.push(local);
-    centrals.push(
-      concat([
-        u32(SIG_CENTRAL),
-        u16(VERSION),
-        u16(VERSION),
-        u16(FLAG_UTF8),
-        u16(method),
-        u16(stamp.time),
-        u16(stamp.date),
-        u32(crc),
-        u32(compressed.length),
-        u32(file.data.length),
-        u16(name.length),
-        u16(0),
-        u16(0),
-        u16(0),
-        u16(0),
-        u32(0),
-        u32(offset),
-        name,
-      ]),
-    );
-    offset += local.length;
+      rawSize: file.data.length,
+      crc: crc32(file.data),
+      name,
+      offset: 0,
+    };
+  });
+  const localSize = prepared.reduce(
+    (sum, file) => sum + 30 + file.name.length + file.compressed.length,
+    0,
+  );
+  const centralSize = prepared.reduce(
+    (sum, file) => sum + 46 + file.name.length,
+    0,
+  );
+  const out = new Uint8Array(localSize + centralSize + 22);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  let at = 0;
+  for (const file of prepared) {
+    file.offset = at;
+    at = write32(view, at, SIG_LOCAL);
+    at = write16(view, at, VERSION);
+    at = write16(view, at, FLAG_UTF8);
+    at = write16(view, at, file.method);
+    at = write16(view, at, stamp.time);
+    at = write16(view, at, stamp.date);
+    at = write32(view, at, file.crc);
+    at = write32(view, at, file.compressed.length);
+    at = write32(view, at, file.rawSize);
+    at = write16(view, at, file.name.length);
+    at = write16(view, at, 0);
+    out.set(file.name, at);
+    at += file.name.length;
+    out.set(file.compressed, at);
+    at += file.compressed.length;
   }
-  const central = concat(centrals);
-  const eocd = concat([
-    u32(SIG_EOCD),
-    u16(0),
-    u16(0),
-    u16(files.length),
-    u16(files.length),
-    u32(central.length),
-    u32(offset),
-    u16(0),
-  ]);
-  return concat([...locals, central, eocd]);
+  const centralStart = at;
+  for (const file of prepared) {
+    at = write32(view, at, SIG_CENTRAL);
+    at = write16(view, at, VERSION);
+    at = write16(view, at, VERSION);
+    at = write16(view, at, FLAG_UTF8);
+    at = write16(view, at, file.method);
+    at = write16(view, at, stamp.time);
+    at = write16(view, at, stamp.date);
+    at = write32(view, at, file.crc);
+    at = write32(view, at, file.compressed.length);
+    at = write32(view, at, file.rawSize);
+    at = write16(view, at, file.name.length);
+    at = write16(view, at, 0);
+    at = write16(view, at, 0);
+    at = write16(view, at, 0);
+    at = write16(view, at, 0);
+    at = write32(view, at, 0);
+    at = write32(view, at, file.offset);
+    out.set(file.name, at);
+    at += file.name.length;
+  }
+  at = write32(view, at, SIG_EOCD);
+  at = write16(view, at, 0);
+  at = write16(view, at, 0);
+  at = write16(view, at, files.length);
+  at = write16(view, at, files.length);
+  at = write32(view, at, at - 12 - centralStart);
+  at = write32(view, at, centralStart);
+  write16(view, at, 0);
+  return out;
 }
 
 /** STORE-method ZIP used for operator exports. */

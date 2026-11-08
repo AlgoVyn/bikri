@@ -1,7 +1,7 @@
 import { businessDate } from '@bikri/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -41,6 +41,8 @@ import {
 const selectClass =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 
+const PAGE = 50;
+
 const CUSTOMER_GRID =
   'grid grid-cols-2 items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] sm:gap-3';
 
@@ -62,6 +64,7 @@ export function UdhaarList({
   const readOnly = useReadOnly();
   const canEditPromises = can('party.edit');
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
   const [sort, setSort] = useState<CustomerSort>('balance');
   const [newOpen, setNewOpen] = useState(false);
@@ -84,10 +87,34 @@ export function UdhaarList({
     const tz = await shopTimeZone(db);
     const today = businessDate(Date.now(), tz);
     return {
-      ...(await customerList(db, { query, filter, sort, today })),
+      ...(await customerList(db, {
+        query: deferredQuery,
+        filter,
+        sort,
+        today,
+      })),
       tz,
     };
-  }, [query, filter, sort]);
+  }, [deferredQuery, filter, sort]);
+
+  const [shown, setShown] = useState(PAGE);
+  const sentinel = useRef<HTMLLIElement>(null);
+  // A new filter starts from the first page again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the filter changes
+  useEffect(() => setShown(PAGE), [deferredQuery, filter, sort]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !data || shown >= data.rows.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting))
+          setShown((count) => count + PAGE);
+      },
+      { rootMargin: '240px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [data, shown]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
@@ -292,7 +319,7 @@ export function UdhaarList({
               <span>{t('office.udhaar.credit_limit')}</span>
               <span>{t('office.udhaar.promise')}</span>
             </li>
-            {data.rows.map((row) => {
+            {data.rows.slice(0, shown).map((row) => {
               const percent = limitPercent(
                 row.balance,
                 row.customer.credit_limit === null ||
@@ -405,6 +432,9 @@ export function UdhaarList({
                 </li>
               );
             })}
+            {shown < data.rows.length ? (
+              <li ref={sentinel} aria-hidden="true" className="h-px" />
+            ) : null}
           </ul>
         ) : null}
       </ListSurface>

@@ -17,6 +17,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - List screens now use one surface (toolbar, summary and rows) with a shared `PageActions` menu, 56 px product rows and 44 px list targets; a layout spec checks 390/768/1280/1920 in English and Urdu, and the design checklist is in [docs/design-review-checklist.md](docs/design-review-checklist.md) (D-152).
 - Vite dev serves the language catalogs again; dynamic JSON imports no longer carry Node-only import attributes.
 
+### Performance
+- Sell and Products now load the catalogue once and filter in memory, with a short-lived 30-day sold cache; global search uses a session index plus the invoice prefix index; print status queries only failed jobs; day-close pushes use new Device+created indexes (`0011`); sale/refund/void writes lock only the stores they touch; `Intl` formatters are cached; product/category/Home routes are lazy chunks and the export ZIP uses one output buffer (D-185).
+
 ### Selling and back office
 - Offline-first selling with three carts, held bills, cash/card/bank/wallet/udhaar payments, change, receipt printing and sharing.
 - Refunds (including the part-udhaar split), voids and void-and-reissue, append-only corrections and printable notices.

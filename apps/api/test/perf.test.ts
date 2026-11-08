@@ -61,6 +61,24 @@ const HOT_QUERIES: Array<{
     index: 'payments_refund',
   },
   {
+    name: 'payments for a day close',
+    sql: 'SELECT id FROM payments WHERE tenant_id = ? AND device_id = ? AND created_at > ? AND created_at <= ?',
+    args: ['t', 'd', 0, 1],
+    index: 'payments_device_created',
+  },
+  {
+    name: 'cash moves for a day close',
+    sql: 'SELECT id FROM cash_moves WHERE tenant_id = ? AND device_id = ? AND created_at > ? AND created_at <= ?',
+    args: ['t', 'd', 0, 1],
+    index: 'cash_moves_device_created',
+  },
+  {
+    name: 'expenses for a day close',
+    sql: 'SELECT id FROM expenses WHERE tenant_id = ? AND device_id = ? AND created_at > ? AND created_at <= ?',
+    args: ['t', 'd', 0, 1],
+    index: 'expenses_device_created',
+  },
+  {
     name: 'payments by supplier return',
     sql: 'SELECT id FROM payments WHERE tenant_id = ? AND supplier_return_id = ?',
     args: ['t', 'r'],

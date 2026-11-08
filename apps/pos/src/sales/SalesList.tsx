@@ -1,7 +1,7 @@
 import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -112,6 +112,7 @@ export function SalesList({
     to: stored.to,
   });
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [method, setMethod] = useState<MethodFilter | ''>('');
   const [status, setStatus] = useState<SaleStatus | ''>('');
   const [staffId, setStaffId] = useState('');
@@ -142,7 +143,7 @@ export function SalesList({
       : rangeFor(preset, Date.now(), timeZone, custom);
     const history = await salesHistory(db, {
       ...range,
-      query,
+      query: deferredQuery,
       method: method || null,
       status: status || null,
       staffId: staffId || null,
@@ -154,7 +155,7 @@ export function SalesList({
     preset,
     custom.from,
     custom.to,
-    query,
+    deferredQuery,
     method,
     status,
     staffId,

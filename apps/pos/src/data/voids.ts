@@ -1,11 +1,31 @@
 import { businessDate, newId, type Role } from '@bikri/core';
-import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import type { BikriDb, DexieTableName, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
 import { type Writer, writeAction } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
+
+/** Stores a void may touch; narrower than `db.tables`. */
+const VOID_WRITE_TABLES = [
+  'outbox',
+  'pull_shadow',
+  'kv',
+  'sales',
+  'sale_lines',
+  'sale_voids',
+  'refunds',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
+  'stock_levels',
+  'party_balances',
+  'audit_log',
+  'products',
+  'staff',
+  'shop',
+] as const satisfies readonly DexieTableName[];
 
 export class VoidNotAllowedError extends Error {
   readonly code:
@@ -312,7 +332,7 @@ export async function voidSale(
         override: input.override,
       });
     },
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: VOID_WRITE_TABLES },
   );
   return { voidRow, created: true };
 }

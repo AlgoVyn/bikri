@@ -8,28 +8,31 @@ import {
   type ShopMoney,
   shopMoney,
 } from '../data/cart.ts';
-import { listProducts, type ProductListRow } from '../data/catalog.ts';
+import type { ProductListRow } from '../data/catalog.ts';
+import { filterAndSortProducts } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import {
+  productHaystack,
+  useCatalogueRows,
+  useSold30,
+} from '../state/catalogue.ts';
 
 export type SellRow = ProductListRow & { haystack: string };
 
+const NO_SOLD = new Map<string, number>();
+
 /** Products in Sell order (30-day sales on this till, then name) with a search haystack. */
 export function useSellProducts(): SellRow[] | undefined {
-  const rows = useLiveQuery(() => listProducts(getDb(), { sort: 'best' }), []);
+  const sold = useSold30();
+  const rows = useCatalogueRows(sold ?? NO_SOLD);
   return useMemo(
     () =>
-      rows?.map((r) => ({
-        ...r,
-        haystack: [
-          r.product.name_en,
-          r.product.name_ur,
-          r.product.brand,
-          r.product.sku,
-          ...r.barcodes,
-        ]
-          .map((v) => String(v ?? '').toLowerCase())
-          .join(' '),
-      })),
+      rows === undefined
+        ? undefined
+        : filterAndSortProducts(rows, { sort: 'best' }).map((row) => ({
+            ...row,
+            haystack: productHaystack(row),
+          })),
     [rows],
   );
 }

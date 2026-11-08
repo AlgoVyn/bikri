@@ -2,7 +2,13 @@ import { parsePkPhone } from '@bikri/core';
 import type { HeldBill } from '@bikri/db';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import {
+  type FormEvent,
+  useDeferredValue,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -376,6 +382,7 @@ export function CustomerDialog({
   const searchId = useId();
   const nameId = useId();
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState<string | null>(null);
@@ -388,7 +395,11 @@ export function CustomerDialog({
     setPhone(null);
     setError(null);
   }, [open]);
-  const hits = useLiveQuery(() => findCustomers(getDb(), query), [query]) ?? [];
+  const hits =
+    useLiveQuery(
+      () => findCustomers(getDb(), deferredQuery),
+      [deferredQuery],
+    ) ?? [];
   const pick = (id: string | null) => {
     onPick(id);
     onOpenChange(false);

@@ -13,15 +13,16 @@ export type DateStyle =
 
 const LOCALE = { en: 'en-PK', ur: 'ur-PK-u-nu-latn' } as const;
 
-export function formatTimestamp(
-  value: number | Date,
-  lang: string,
-  timeZone = 'Asia/Karachi',
-  style: DateStyle = 'datetime',
-): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (!Number.isFinite(date.getTime())) return '—';
-  const locale = lang === 'ur' ? LOCALE.ur : LOCALE.en;
+const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function formatterFor(
+  locale: string,
+  style: DateStyle,
+  timeZone: string,
+): Intl.DateTimeFormat {
+  const key = `${locale}\u0000${style}\u0000${timeZone}`;
+  const cached = FORMATTERS.get(key);
+  if (cached !== undefined) return cached;
   const options: Intl.DateTimeFormatOptions =
     style === 'time'
       ? { hour: 'numeric', minute: '2-digit' }
@@ -45,10 +46,24 @@ export function formatTimestamp(
                   hour: 'numeric',
                   minute: '2-digit',
                 };
-  const formatted = new Intl.DateTimeFormat(locale, {
+  const formatter = new Intl.DateTimeFormat(locale, {
     ...options,
     timeZone,
-  }).format(date);
+  });
+  FORMATTERS.set(key, formatter);
+  return formatter;
+}
+
+export function formatTimestamp(
+  value: number | Date,
+  lang: string,
+  timeZone = 'Asia/Karachi',
+  style: DateStyle = 'datetime',
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return '—';
+  const locale = lang === 'ur' ? LOCALE.ur : LOCALE.en;
+  const formatted = formatterFor(locale, style, timeZone).format(date);
   return lang === 'ur'
     ? formatted
     : formatted.replace(/\b(am|pm)\b/giu, (part) => part.toUpperCase());

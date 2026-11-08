@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -31,6 +31,8 @@ import { SupplierDialog } from './SupplierDialog.tsx';
 const SUPPLIER_GRID =
   'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:gap-3';
 
+const PAGE = 50;
+
 /** Suppliers list (screens/13). */
 export function SupplierList({
   embedded = false,
@@ -46,12 +48,31 @@ export function SupplierList({
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [newOpen, setNewOpen] = useState(false);
   const data = useLiveQuery(async () => {
     const db = getDb();
     const tz = await shopTimeZone(db);
-    return { ...(await supplierList(db, { query })), tz };
-  }, [query]);
+    return { ...(await supplierList(db, { query: deferredQuery })), tz };
+  }, [deferredQuery]);
+
+  const [shown, setShown] = useState(PAGE);
+  const sentinel = useRef<HTMLLIElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the search changes
+  useEffect(() => setShown(PAGE), [deferredQuery]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !data || shown >= data.rows.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting))
+          setShown((count) => count + PAGE);
+      },
+      { rootMargin: '240px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [data, shown]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
@@ -169,7 +190,7 @@ export function SupplierList({
               <span className="text-end">{t('office.suppliers.balance')}</span>
               <span>{t('office.suppliers.col_last_delivery')}</span>
             </li>
-            {data.rows.map((row) => (
+            {data.rows.slice(0, shown).map((row) => (
               <li key={row.supplier.id}>
                 <Link
                   to="/suppliers/$supplierId"
@@ -223,6 +244,9 @@ export function SupplierList({
                 </Link>
               </li>
             ))}
+            {shown < data.rows.length ? (
+              <li ref={sentinel} aria-hidden="true" className="h-px" />
+            ) : null}
           </ul>
         ) : null}
       </ListSurface>

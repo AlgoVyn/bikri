@@ -1220,6 +1220,25 @@ BEGIN
 END;
 ```
 
+### 2.10 Day-close index coverage (migration `0011_perf_close_indexes.sql`)
+
+The push lookups for `day_closes` filter payments, cash moves and expenses by
+`(tenant_id, device_id, created_at)`. Without a matching index SQLite uses only the
+tenant prefix, so a year-old shop scans every row it has ever written during each close.
+These are additive indexes and do not change `SCHEMA_VERSION`.
+
+```sql
+-- T-062 follow-up: selective indexes for the day-close push. Additive only.
+--
+-- applyOps reads the payments, cash moves and expenses of each closing device between
+-- period_start and period_end. Without these indexes SQLite scans every row the tenant
+-- has ever written for those tables (only the tenant_id prefix is usable), which grows
+-- with the shop's age and burns the D1 rows-read budget on every close.
+CREATE INDEX payments_device_created ON payments (tenant_id, device_id, created_at);
+CREATE INDEX expenses_device_created ON expenses (tenant_id, device_id, created_at);
+CREATE INDEX cash_moves_device_created ON cash_moves (tenant_id, device_id, created_at);
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1253,7 +1272,7 @@ export const DEXIE_SCHEMA_V1 = {
   purchase_lines: 'id, purchase_id, product_id',
   supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date',
   supplier_return_lines: 'id, return_id, product_id, purchase_line_id',
-  expenses: 'id, business_date, category_id, [device_id+created_at]',
+  expenses: 'id, business_date, category_id, [device_id+created_at], reverses_id', // V3 adds reverses_id
   cash_moves: 'id, [device_id+created_at]',
   day_closes: 'id, [device_id+period_end], business_date',
   audit_log: 'id, [entity+entity_id], created_at',
@@ -1263,7 +1282,7 @@ export const DEXIE_SCHEMA_V1 = {
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
   file_queue: '++id, status',
-  print_jobs: 'id, sale_id, refund_id, status, created_at', // V1 was 'id, status, created_at'; V2 adds sale_id/refund_id
+  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, status, created_at', // V1 'id, status, created_at'; V2 adds sale_id/refund_id; V3 adds day_close/supplier ids
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at }
   pull_shadow: '[tbl+id]',        // server rows skipped while a local edit was pending (03 §4.2)

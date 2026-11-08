@@ -45,11 +45,20 @@ export function supplierEntryDescription(
   return row.note || t('office.suppliers.entry_adjustment');
 }
 
+const DATE = new Map<string, Intl.DateTimeFormat>();
+
 export function dateText(date: string, lang: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone,
-  }).format(new Date(`${date}T12:00:00Z`));
+  const locale = lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
+  const key = `${locale}\u0000${timeZone}`;
+  let formatter = DATE.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone,
+    });
+    DATE.set(key, formatter);
+  }
+  return formatter.format(new Date(`${date}T12:00:00Z`));
 }

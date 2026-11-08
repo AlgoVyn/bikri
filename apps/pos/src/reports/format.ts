@@ -40,31 +40,58 @@ export function groupName(
   return row.name;
 }
 
+const SHORT_DATE = new Map<string, Intl.DateTimeFormat>();
+const LONG_DATE = new Map<string, Intl.DateTimeFormat>();
+const TIME = new Map<string, Intl.DateTimeFormat>();
+
+function localeOf(lang: string): string {
+  return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
+}
+
 export function shortDate(date: string, lang: string): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  }).format(new Date(`${date}T12:00:00Z`));
+  const locale = localeOf(lang);
+  let formatter = SHORT_DATE.get(locale);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    });
+    SHORT_DATE.set(locale, formatter);
+  }
+  return formatter.format(new Date(`${date}T12:00:00Z`));
 }
 
 export function longDate(date: string, lang: string): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${date}T12:00:00Z`));
+  const locale = localeOf(lang);
+  let formatter = LONG_DATE.get(locale);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    LONG_DATE.set(locale, formatter);
+  }
+  return formatter.format(new Date(`${date}T12:00:00Z`));
 }
 
 export function timeText(at: number, lang: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(at);
+  const locale = localeOf(lang);
+  const key = `${locale}\u0000${timeZone}`;
+  let formatter = TIME.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    });
+    TIME.set(key, formatter);
+  }
+  return formatter.format(at);
 }
 
 export function bucketLabel(t: TFunction, bucket: string): string {

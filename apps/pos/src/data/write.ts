@@ -85,6 +85,12 @@ export type WriteOptions = {
   actor?: string | null;
   /** Local-only fixups that must still run in a read-only shop. */
   allowReadOnly?: boolean;
+  /**
+   * Stores the action may touch. Narrowing this is a performance choice, not a safety
+   * one: IndexedDB locks every store in the scope for the transaction, so a sale should
+   * not lock unrelated stores for the whole commit.
+   */
+  tables?: readonly DexieTableName[];
 };
 
 const SYSTEM_FIELDS = new Set([
@@ -290,7 +296,11 @@ export async function writeAction<T>(
 
   let result: T;
   try {
-    result = await db.transaction('rw', db.tables, run);
+    result = await db.transaction(
+      'rw',
+      options.tables === undefined ? db.tables : [...options.tables],
+      run,
+    );
   } catch (e) {
     // Dexie wraps errors thrown inside a transaction; callers match on our classes.
     const inner = (e as { inner?: unknown }).inner;

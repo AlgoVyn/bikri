@@ -69,6 +69,38 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     ).toMatchObject({ sold: 0 });
   });
 
+  it('handles a range with more than one index chunk', async () => {
+    const db = await readyDb('rep-large');
+    const sales = Array.from({ length: 101 }, (_, index) => ({
+      id: `sale-${index}`,
+      invoice_no: `A-A-${index}`,
+      invoice_seq: index,
+      business_date: '2026-10-27',
+      created_at: NOW,
+      total: 10_000,
+      udhaar_amount: 0,
+      tax_inclusive: 0,
+      status: 'paid',
+      device_id: 'dev-1',
+    }));
+    await db.sales.bulkAdd(sales as never[]);
+    await db.sale_lines.bulkAdd(
+      sales.map((sale, index) => ({
+        id: `line-${index}`,
+        sale_id: sale.id,
+        product_id: 'p1',
+        qty_milli: 1000,
+        net: 10_000,
+        bill_discount_alloc: 0,
+        tax_alloc: 0,
+        unit_cost_snapshot: 5_000,
+      })) as never[],
+    );
+    expect(
+      await summary(db, { from: '2026-10-27', to: '2026-10-27' }),
+    ).toMatchObject({ bills: 101, sold: 1_010_000, grossProfit: 505_000 });
+  });
+
   it('skips voided bills', async () => {
     const db = await readyDb();
     await seedSampleDay(db, '2026-10-27', NOW);

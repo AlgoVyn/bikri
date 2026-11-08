@@ -7,7 +7,14 @@ import {
   MAX_OPS_PER_TX,
   newId,
 } from '@bikri/core';
-import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
+import type {
+  BikriDb,
+  Cart,
+  CartLine,
+  DexieTableName,
+  MasterRow,
+  SyncedRow,
+} from '@bikri/db';
 import { addDays, BACKDATE_REASON_MAX, isBusinessDate } from './backdate.ts';
 import {
   type CartId,
@@ -32,6 +39,29 @@ export const PAY_METHODS: readonly PayMethod[] = [
   'card',
   'udhaar',
 ];
+/**
+ * Stores a sale (including a same-action void/reissue) may touch. Everything else stays
+ * unlocked while the bill commits.
+ */
+const SALE_WRITE_TABLES = [
+  'outbox',
+  'pull_shadow',
+  'kv',
+  'carts',
+  'sales',
+  'sale_lines',
+  'payments',
+  'ledger_entries',
+  'stock_movements',
+  'stock_levels',
+  'party_balances',
+  'audit_log',
+  'products',
+  'sale_voids',
+  'refunds',
+  'staff',
+  'shop',
+] as const satisfies readonly DexieTableName[];
 export const WALLET_PROVIDERS = [
   'JazzCash',
   'Easypaisa',
@@ -586,7 +616,7 @@ export async function completeSale(
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
       return saleRow;
     },
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: SALE_WRITE_TABLES },
   );
   if (!created) return { sale, created: false };
   // 06 §9: the print job is a separate, best-effort write; the sale is already committed.

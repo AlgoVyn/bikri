@@ -95,9 +95,16 @@ export function tenantTablesIn(sql: string): string[] {
  * one `tenant_id = ?1` per reference, where an INSERT's leading `(tenant_id, …) VALUES (?1, …)`
  * counts for its target table.
  */
+const SCOPE_CACHE = new Set<string>();
+const SCOPE_CACHE_MAX = 1_000;
+
 export function assertTenantScoped(sql: string): void {
+  if (SCOPE_CACHE.has(sql)) return;
   const refs = tenantTablesIn(sql).length;
-  if (refs === 0) return;
+  if (refs === 0) {
+    rememberScoped(sql);
+    return;
+  }
   let scoped = [...sql.matchAll(TENANT_PREDICATE)].length;
   if (/^\s*INSERT\b/i.test(sql)) {
     if (!TENANT_INSERT.test(sql)) {
@@ -151,6 +158,13 @@ export function assertTenantScoped(sql: string): void {
         sql,
       );
   }
+  rememberScoped(sql);
+}
+
+/** Caches only successful checks; a bad statement must throw every time it is used. */
+function rememberScoped(sql: string): void {
+  if (SCOPE_CACHE.size >= SCOPE_CACHE_MAX) SCOPE_CACHE.clear();
+  SCOPE_CACHE.add(sql);
 }
 
 function assertTable(table: string): asserts table is TenantTable {

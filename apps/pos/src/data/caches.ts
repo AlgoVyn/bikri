@@ -60,13 +60,38 @@ function balanceOf(
   };
 }
 
-/** Recomputes one party's balance row after a ledger entry was written. */
+/**
+ * Recomputes one party's balance row after a ledger entry was written.
+ *
+ * A new debit (a credit sale, opening balance, purchase) appends in time order on a sale
+ * write: the previous balance only grows and the oldest open debit cannot move earlier,
+ * so the cache can be updated without reading the party's whole history. Credits (and
+ * out-of-order rows from a pull/restore) still take the exact full scan.
+ */
 export async function applyLedgerEntry(
   src: TableSource,
   row: SyncedRow,
 ): Promise<void> {
   const type = row.party_type as PartyType;
   const id = String(row.party_id);
+  const amount = Number(row.amount);
+  const at = Number(row.created_at);
+  const current = await partyBalances(src).get([type, id]);
+  if (
+    amount > 0 &&
+    (current === undefined ||
+      (Number.isFinite(at) && at >= Number(current.last_activity_at)))
+  ) {
+    const balance = (current?.balance ?? 0) + amount;
+    await partyBalances(src).put({
+      party_type: type,
+      party_id: id,
+      balance,
+      last_activity_at: Math.max(current?.last_activity_at ?? 0, at),
+      oldest_unpaid_at: balance > 0 ? (current?.oldest_unpaid_at ?? at) : null,
+    });
+    return;
+  }
   await partyBalances(src).put(
     balanceOf(type, id, await partyEntries(src, type, id)),
   );

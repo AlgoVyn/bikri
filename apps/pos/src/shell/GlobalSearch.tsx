@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useId, useState } from 'react';
+import { useDeferredValue, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
@@ -24,16 +24,17 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const allDates = seesAllDates(role, support, can('report.view'));
   const timeZone = useShopTimeZone();
   const { today } = useBusinessDates(timeZone);
+  const deferredQuery = useDeferredValue(query);
   const hits =
     useLiveQuery(async () => {
-      if (!query.trim()) return [];
+      if (!deferredQuery.trim()) return [];
       const db = getDb();
-      return searchAll(db, query, {
+      return searchAll(db, deferredQuery, {
         allDates,
         today,
         branchId: allDates ? null : branchId,
       });
-    }, [query, allDates, branchId, today]) ?? [];
+    }, [deferredQuery, allDates, branchId, today]) ?? [];
   const optionId = (index: number) => `${listId}-opt-${index}`;
   useEffect(() => {
     if (!open || active < 0) return;

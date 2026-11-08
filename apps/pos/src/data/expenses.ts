@@ -279,7 +279,8 @@ export async function reverseExpense(
   if (!original) throw new ExpenseError('missing');
   if (original.reverses_id) throw new ExpenseError('already');
   const existing = await db.expenses
-    .filter((e) => e.reverses_id === input.expenseId)
+    .where('reverses_id')
+    .equals(input.expenseId)
     .first();
   if (existing) throw new ExpenseError('already');
   if (
@@ -295,7 +296,8 @@ export async function reverseExpense(
       // optimistic check above.
       const duplicate = await w
         .table<SyncedRow, string>('expenses')
-        .filter((row) => row.reverses_id === input.expenseId)
+        .where('reverses_id')
+        .equals(input.expenseId)
         .first();
       if (duplicate) throw new ExpenseError('already');
       return w.insert('expenses', {

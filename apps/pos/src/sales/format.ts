@@ -34,24 +34,41 @@ export function localeOf(lang: string): string {
   return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
 }
 
+const TIME_FORMATS = new Map<string, Intl.DateTimeFormat>();
+const DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
 export function timeText(at: number, lang: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(localeOf(lang), {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(at);
+  const locale = localeOf(lang);
+  const key = `${locale}\u0000${timeZone}`;
+  let formatter = TIME_FORMATS.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    });
+    TIME_FORMATS.set(key, formatter);
+  }
+  return formatter.format(at);
 }
 
 export function dateText(date: string, lang: string, timeZone: string): string {
+  const locale = localeOf(lang);
+  const key = `${locale}\u0000${timeZone}`;
+  let formatter = DATE_FORMATS.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone,
+    });
+    DATE_FORMATS.set(key, formatter);
+  }
   const at = Date.parse(`${date}T12:00:00Z`);
-  return new Intl.DateTimeFormat(localeOf(lang), {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone,
-  }).format(at);
+  return formatter.format(at);
 }
 
 /** "Today" / "Yesterday" for the day group headings, else the formatted date. */

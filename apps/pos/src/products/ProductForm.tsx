@@ -147,28 +147,32 @@ export function ProductFormPage({
   const [photoError, setPhotoError] = useState(false);
   const existingUrl = useFileUrl(existingKey);
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
-  const brands =
-    useLiveQuery(async () => {
-      const all = await getDb().products.toArray();
-      return [
-        ...new Set(
-          all
-            .filter((p) => !p.deleted_at && p.brand)
-            .map((p) => String(p.brand)),
-        ),
-      ].sort();
-    }, []) ?? [];
-  const sameName = useLiveQuery(async () => {
-    const name = draft?.name_en.trim().toLowerCase();
-    if (!name) return false;
+  const catalogue = useLiveQuery(async () => {
     const all = await getDb().products.toArray();
-    return all.some(
-      (p) =>
-        !p.deleted_at &&
-        p.id !== editId &&
-        String(p.name_en).toLowerCase() === name,
-    );
-  }, [draft?.name_en, editId]);
+    const brands = new Set<string>();
+    const names = new Map<string, string>();
+    for (const product of all) {
+      if (product.deleted_at) continue;
+      const name = String(product.name_en ?? '')
+        .trim()
+        .toLowerCase();
+      if (name) names.set(name, product.id);
+      const brand = String(product.brand ?? '').trim();
+      if (brand) brands.add(brand);
+    }
+    return {
+      brands: [...brands].sort((a, b) => a.localeCompare(b)),
+      names,
+    };
+  }, []) ?? { brands: [], names: new Map<string, string>() };
+  const brands = catalogue.brands;
+  const draftName = String(draft?.name_en ?? '')
+    .trim()
+    .toLowerCase();
+  const sameName =
+    draftName !== '' &&
+    catalogue.names.has(draftName) &&
+    catalogue.names.get(draftName) !== editId;
   const showCost = can('cost.view');
   const isEdit = editId !== undefined;
   const backId = editId ?? duplicateOf;

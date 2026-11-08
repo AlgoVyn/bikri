@@ -6,6 +6,7 @@ import {
   refundedRevenue,
 } from '@bikri/core';
 import type { BikriDb, SyncedRow } from '@bikri/db';
+import type { Table } from 'dexie';
 
 /** Business-date range (inclusive), optionally one device (07 §9). */
 export type ReportRange = { from: string; to: string; deviceId?: string };
@@ -36,6 +37,49 @@ function inRange(row: SyncedRow, range: ReportRange): boolean {
   return range.deviceId === undefined || row.device_id === range.deviceId;
 }
 
+const ID_CHUNK = 100;
+
+/** Rows whose key is in `ids`; one table scan beats hundreds of index lookups. */
+async function rowsForIds<T>(
+  table: Table<T, string>,
+  index: string,
+  keyOf: (row: T) => string,
+  ids: readonly string[],
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  if (ids.length > ID_CHUNK) {
+    const wanted = new Set(ids);
+    return (await table.toArray()).filter((row) => wanted.has(keyOf(row)));
+  }
+  const out: T[] = [];
+  for (let at = 0; at < ids.length; at += ID_CHUNK) {
+    const chunk = ids.slice(at, at + ID_CHUNK);
+    if (chunk.length > 0)
+      out.push(...(await table.where(index).anyOf(chunk).toArray()));
+  }
+  return out;
+}
+
+async function byIds<T extends { id: string }>(
+  table: Table<T, string>,
+  ids: readonly string[],
+): Promise<Map<string, T>> {
+  const out = new Map<string, T>();
+  const unique = [...new Set(ids)];
+  if (unique.length > ID_CHUNK) {
+    const wanted = new Set(unique);
+    for (const row of await table.toArray())
+      if (wanted.has(row.id)) out.set(row.id, row);
+    return out;
+  }
+  for (let at = 0; at < unique.length; at += ID_CHUNK) {
+    for (const row of await table.bulkGet(unique.slice(at, at + ID_CHUNK))) {
+      if (row) out.set(row.id, row);
+    }
+  }
+  return out;
+}
+
 /** Sold, bills, gross profit and udhaar figures for a range (07 §9). Refunds count on their own date. */
 export async function summary(
   db: BikriDb,
@@ -60,36 +104,85 @@ export async function summary(
     udhaarGiven: 0,
     udhaarReceived: 0,
   };
+  const saleById = new Map(sales.map((sale) => [String(sale.id), sale]));
+  const saleLines = await rowsForIds(
+    db.sale_lines,
+    'sale_id',
+    (line: SyncedRow) => String(line.sale_id),
+    [...saleById.keys()],
+  );
   for (const sale of sales) {
     out.sold += n(sale.total);
     out.udhaarGiven += n(sale.udhaar_amount);
-    for (const line of await db.sale_lines
-      .where('sale_id')
-      .equals(sale.id)
-      .toArray()) {
-      out.grossProfit +=
-        lineRevenue(line, sale.tax_inclusive === 1) -
-        mulDivRound(n(line.qty_milli), n(line.unit_cost_snapshot), 1000);
-    }
   }
-  for (const refund of refunds) {
-    out.sold -= n(refund.amount) + n(refund.udhaar_part);
-    out.udhaarGiven -= n(refund.udhaar_part);
-    for (const rl of await db.refund_lines
-      .where('refund_id')
-      .equals(refund.id)
-      .toArray()) {
-      const line = await db.sale_lines.get(String(rl.sale_line_id));
-      if (!line) continue;
-      const sale = await db.sales.get(String(line.sale_id));
-      const earlier = (
-        await db.refund_lines.where('sale_line_id').equals(line.id).toArray()
-      ).filter(
-        (x) =>
-          n(x.created_at) < n(rl.created_at) ||
-          (n(x.created_at) === n(rl.created_at) && x.id < rl.id),
+  for (const line of saleLines) {
+    const sale = saleById.get(String(line.sale_id));
+    if (!sale) continue;
+    out.grossProfit +=
+      lineRevenue(line, sale.tax_inclusive === 1) -
+      mulDivRound(n(line.qty_milli), n(line.unit_cost_snapshot), 1000);
+  }
+  if (refunds.length > 0) {
+    const refundById = new Map(
+      refunds.map((refund) => [String(refund.id), refund]),
+    );
+    const refundLines = await rowsForIds(
+      db.refund_lines,
+      'refund_id',
+      (line: SyncedRow) => String(line.refund_id),
+      [...refundById.keys()],
+    );
+    const touchedLineIds = [
+      ...new Set(refundLines.map((line) => String(line.sale_line_id))),
+    ];
+    const originalLines = await byIds<SyncedRow>(db.sale_lines, touchedLineIds);
+    const originalSales = await byIds<SyncedRow>(
+      db.sales,
+      [
+        ...new Set(
+          [...originalLines.values()].map((line) => String(line.sale_id)),
+        ),
+      ].filter((id) => !saleById.has(id)),
+    );
+    // Every refund of a touched line, including refunds outside this range, decides the
+    // cumulative quantity each refund returns (07 §6).
+    const allLineRefunds = await rowsForIds(
+      db.refund_lines,
+      'sale_line_id',
+      (line: SyncedRow) => String(line.sale_line_id),
+      touchedLineIds,
+    );
+    const previousByRefundLine = new Map<string, number>();
+    const byLine = new Map<string, SyncedRow[]>();
+    for (const line of allLineRefunds) {
+      const key = String(line.sale_line_id);
+      const list = byLine.get(key) ?? [];
+      list.push(line);
+      byLine.set(key, list);
+    }
+    for (const list of byLine.values()) {
+      list.sort(
+        (a, b) =>
+          n(a.created_at) - n(b.created_at) ||
+          String(a.id).localeCompare(String(b.id)),
       );
-      const prev = earlier.reduce((s, x) => s + n(x.qty_milli), 0);
+      let previous = 0;
+      for (const line of list) {
+        previousByRefundLine.set(String(line.id), previous);
+        previous += n(line.qty_milli);
+      }
+    }
+    for (const refund of refunds) {
+      out.sold -= n(refund.amount) + n(refund.udhaar_part);
+      out.udhaarGiven -= n(refund.udhaar_part);
+    }
+    for (const rl of refundLines) {
+      const line = originalLines.get(String(rl.sale_line_id));
+      if (!line) continue;
+      const sale =
+        saleById.get(String(line.sale_id)) ??
+        originalSales.get(String(line.sale_id));
+      const prev = previousByRefundLine.get(String(rl.id)) ?? 0;
       const q = n(rl.qty_milli);
       out.grossProfit -=
         refundedRevenue(

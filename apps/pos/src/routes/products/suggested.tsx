@@ -1,6 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { SuggestedPage } from '../../products/Suggested.tsx';
+import { lazy, Suspense } from 'react';
+import { PageLoading } from '../../components/PageLoading.tsx';
+
+const SuggestedPage = lazy(() =>
+  import('../../products/Suggested.tsx').then((module) => ({
+    default: module.SuggestedPage,
+  })),
+);
 
 export const Route = createFileRoute('/products/suggested')({
-  component: SuggestedPage,
+  component: SuggestedRoute,
 });
+
+function SuggestedRoute() {
+  return (
+    <Suspense fallback={<PageLoading compact />}>
+      <SuggestedPage />
+    </Suspense>
+  );
+}

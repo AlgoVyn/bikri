@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { searchAll } from './search.ts';
+import { clearSearchCache, searchAll } from './search.ts';
 import { dropTestDbs } from './testDb.ts';
 import { NOW, readyDb } from './testShop.ts';
 
@@ -143,6 +143,17 @@ describe('searchAll (screens/04)', () => {
     );
     expect(await searchAll(db, '12')).toEqual([]);
     expect(await searchAll(db, '999')).toEqual([]);
+  });
+
+  it('reuses the session index and finds an invoice fragment', async () => {
+    const db = await seeded();
+    await searchAll(db, 'charger');
+    const fragment = await searchAll(db, 'a-1');
+    expect(fragment.some((hit) => hit.kind === 'bill')).toBe(true);
+    clearSearchCache();
+    expect(
+      (await searchAll(db, 'a-1')).some((hit) => hit.kind === 'bill'),
+    ).toBe(true);
   });
 
   it('scopes bills by date, branch or both for a cashier', async () => {

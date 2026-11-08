@@ -734,23 +734,22 @@ async function productReports(
   const voidedSales = new Set(
     (await db.sale_voids.toArray()).map((voidRow) => String(voidRow.sale_id)),
   );
-  const movements = await db.stock_movements
+  await db.stock_movements
     .where('business_date')
     .belowOrEqual(input.today)
-    .toArray();
-  for (const movement of movements) {
-    // A voided sale still has its original `sale` movement; it must not keep a
-    // product out of the slow movers list.
-    if (
-      movement.reason_code !== 'sale' ||
-      voidedSales.has(String(movement.ref_id))
-    )
-      continue;
-    const productId = String(movement.product_id);
-    const date = String(movement.business_date);
-    if (!lastSales.has(productId) || date > String(lastSales.get(productId)))
-      lastSales.set(productId, date);
-  }
+    .each((movement) => {
+      // A voided sale still has its original `sale` movement; it must not keep a
+      // product out of the slow movers list.
+      if (
+        movement.reason_code !== 'sale' ||
+        voidedSales.has(String(movement.ref_id))
+      )
+        return;
+      const productId = String(movement.product_id);
+      const date = String(movement.business_date);
+      if (!lastSales.has(productId) || date > String(lastSales.get(productId)))
+        lastSales.set(productId, date);
+    });
   const slowCutoff = addDays(input.today, -30);
   const slowMovers: SlowMover[] = allProducts
     .filter((product) => product.track_stock === 1)

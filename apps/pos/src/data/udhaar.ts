@@ -611,27 +611,38 @@ export async function refreshPromises(
   if (promises.length === 0) return 0;
   const now = options.now ?? Date.now();
   const updates: { id: string; status: 'kept' | 'broken' }[] = [];
+  const byCustomer = new Map<string, typeof promises>();
   for (const promise of promises) {
+    const key = String(promise.customer_id);
+    const list = byCustomer.get(key) ?? [];
+    list.push(promise);
+    byCustomer.set(key, list);
+  }
+  // One ledger read per customer, not one per promise.
+  for (const [customerId, customerPromises] of byCustomer) {
     const entries = await db.ledger_entries
       .where('[party_type+party_id+created_at]')
       .between(
-        ['customer', String(promise.customer_id), -Infinity],
-        ['customer', String(promise.customer_id), Infinity],
+        ['customer', customerId, -Infinity],
+        ['customer', customerId, Infinity],
       )
       .toArray();
     const balance = entries.reduce((sum, e) => sum + n(e.amount), 0);
-    const since = entries
-      .filter(
-        (e) =>
-          e.source_type === 'payment' &&
-          n(e.created_at) >= n(promise.created_at),
-      )
-      .reduce((sum, e) => sum - n(e.amount), 0);
-    const amount = promise.amount === null ? null : Number(promise.amount ?? 0);
-    if (balance <= 0 || (amount !== null && since >= amount))
-      updates.push({ id: promise.id, status: 'kept' });
-    else if (options.today > String(promise.promised_on))
-      updates.push({ id: promise.id, status: 'broken' });
+    for (const promise of customerPromises) {
+      const since = entries
+        .filter(
+          (e) =>
+            e.source_type === 'payment' &&
+            n(e.created_at) >= n(promise.created_at),
+        )
+        .reduce((sum, e) => sum - n(e.amount), 0);
+      const amount =
+        promise.amount === null ? null : Number(promise.amount ?? 0);
+      if (balance <= 0 || (amount !== null && since >= amount))
+        updates.push({ id: promise.id, status: 'kept' });
+      else if (options.today > String(promise.promised_on))
+        updates.push({ id: promise.id, status: 'broken' });
+    }
   }
   if (updates.length === 0) return 0;
   // Keep every action under the 200-op limit even when a large shop has many
@@ -644,7 +655,11 @@ export async function refreshPromises(
         for (const update of chunk)
           await w.update('promises', update.id, { status: update.status });
       },
-      { now, actor: options.actor },
+      {
+        now,
+        actor: options.actor,
+        tables: ['outbox', 'pull_shadow', 'kv', 'promises'],
+      },
     );
   }
   return updates.length;

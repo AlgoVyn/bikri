@@ -56,6 +56,15 @@ export const DEXIE_SCHEMA_V2 = {
   print_jobs: 'id, sale_id, refund_id, status, created_at',
 } as const;
 
+/** Performance additions: reversal lookup and print history by every document type. */
+export const DEXIE_SCHEMA_V3 = {
+  ...DEXIE_SCHEMA_V2,
+  expenses:
+    'id, business_date, category_id, [device_id+created_at], reverses_id',
+  print_jobs:
+    'id, sale_id, refund_id, day_close_id, supplier_return_id, status, created_at',
+} as const;
+
 export type DexieTableName = keyof typeof DEXIE_SCHEMA_V1;
 
 export const LOCAL_ONLY_TABLES = [
@@ -286,6 +295,7 @@ export class BikriDb extends Dexie {
     this.tenantId = tenantId;
     this.version(1).stores(DEXIE_SCHEMA_V1);
     this.version(2).stores(DEXIE_SCHEMA_V2);
+    this.version(3).stores(DEXIE_SCHEMA_V3);
   }
 }
 

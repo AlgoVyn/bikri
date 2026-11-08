@@ -227,9 +227,7 @@ export async function latestSaleJob(
   db: BikriDb,
   saleId: string,
 ): Promise<PrintJob | undefined> {
-  const jobs = await db.print_jobs
-    .filter((j) => j.sale_id === saleId)
-    .toArray();
+  const jobs = await db.print_jobs.where('sale_id').equals(saleId).toArray();
   return jobs.sort(
     (a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id),
   )[0];

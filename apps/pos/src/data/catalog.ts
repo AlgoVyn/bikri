@@ -19,6 +19,11 @@ import { lineRevenue } from './reports.ts';
 import { type WriteOptions, type Writer, writeAction } from './write.ts';
 
 const DAY_MS = 86_400_000;
+/** Reused for every product sort; creating a collator per comparison is measurably slower. */
+const NAME_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 export type StockFilter = 'all' | 'low' | 'out' | 'untracked';
 export type ProductSort = 'name' | 'price' | 'stock' | 'best';
@@ -81,6 +86,39 @@ export function stockStateOf(
   return min > 0 && onHand <= min ? 'low' : 'ok';
 }
 
+/**
+ * Rows whose `keyOf` is in `ids`.
+ *
+ * A few hundred index lookups are slower than one table scan in some IndexedDB
+ * implementations and every lookup has a round-trip cost; a range scan is also bounded
+ * by the 30-day list, not by the shop's lifetime. This is the shape that replaced the
+ * old one-query-per-sale N+1: a handful of queries (or one scan), never one per row.
+ */
+async function rowsForIds<T>(
+  table: {
+    toArray(): Promise<T[]>;
+    where(index: string): {
+      anyOf(keys: string[]): { toArray(): Promise<T[]> };
+    };
+  },
+  index: string,
+  keyOf: (row: T) => string,
+  ids: readonly string[],
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  if (ids.length > 100) {
+    const wanted = new Set(ids);
+    return (await table.toArray()).filter((row) => wanted.has(keyOf(row)));
+  }
+  const out: T[] = [];
+  for (let at = 0; at < ids.length; at += 100) {
+    const chunk = ids.slice(at, at + 100);
+    if (chunk.length > 0)
+      out.push(...(await table.where(index).anyOf(chunk).toArray()));
+  }
+  return out;
+}
+
 /** Qty sold per product over the last `days` business days, net of refunds. */
 export async function soldByProduct(
   db: BikriDb,
@@ -94,16 +132,17 @@ export async function soldByProduct(
     .where('business_date')
     .between(from, to, true, true)
     .toArray();
-  for (const sale of sales) {
-    if (sale.status === 'void') continue;
-    for (const line of await db.sale_lines
-      .where('sale_id')
-      .equals(sale.id)
-      .toArray()) {
-      if (!line.product_id) continue;
-      const id = String(line.product_id);
-      sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
-    }
+  const liveSales = sales.filter((sale) => sale.status !== 'void');
+  const saleIds = liveSales.map((sale) => String(sale.id));
+  for (const line of await rowsForIds(
+    db.sale_lines,
+    'sale_id',
+    (row: SyncedRow) => String(row.sale_id),
+    saleIds,
+  )) {
+    if (!line.product_id) continue;
+    const id = String(line.product_id);
+    sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
   }
   // Refunds count on their own business date (07 §9), including refunds of older bills.
   const refunds = await db.refunds
@@ -111,10 +150,12 @@ export async function soldByProduct(
     .between(from, to, true, true)
     .toArray();
   if (refunds.length > 0) {
-    const refundLines = await db.refund_lines
-      .where('refund_id')
-      .anyOf(refunds.map((refund) => String(refund.id)))
-      .toArray();
+    const refundLines = await rowsForIds(
+      db.refund_lines,
+      'refund_id',
+      (row: SyncedRow) => String(row.refund_id),
+      refunds.map((refund) => String(refund.id)),
+    );
     const saleLines = new Map(
       (
         await db.sale_lines.bulkGet(
@@ -145,6 +186,37 @@ export function matchesQuery(row: ProductListRow, query: string): boolean {
   return words.every((w) => haystack.includes(w));
 }
 
+export function filterAndSortProducts(
+  input: readonly ProductListRow[],
+  opts: {
+    query?: string;
+    categoryId?: string | null;
+    stock?: StockFilter;
+    sort?: ProductSort;
+  } = {},
+): ProductListRow[] {
+  let rows = input.slice();
+  if (opts.query) rows = rows.filter((r) => matchesQuery(r, opts.query ?? ''));
+  if (opts.categoryId)
+    rows = rows.filter((r) => r.product.category_id === opts.categoryId);
+  const stock = opts.stock ?? 'all';
+  if (stock === 'low') rows = rows.filter((r) => r.stockState === 'low');
+  if (stock === 'out') rows = rows.filter((r) => r.stockState === 'out');
+  if (stock === 'untracked')
+    rows = rows.filter((r) => r.stockState === 'untracked');
+  const byName = (a: ProductListRow, b: ProductListRow) =>
+    NAME_COLLATOR.compare(String(a.product.name_en), String(b.product.name_en));
+  const sort = opts.sort ?? 'name';
+  rows.sort((a, b) => {
+    if (sort === 'price')
+      return Number(a.product.price) - Number(b.product.price) || byName(a, b);
+    if (sort === 'stock') return a.onHand - b.onHand || byName(a, b);
+    if (sort === 'best') return b.sold30 - a.sold30 || byName(a, b);
+    return byName(a, b);
+  });
+  return rows;
+}
+
 export async function listProducts(
   db: BikriDb,
   opts: {
@@ -171,7 +243,7 @@ export async function listProducts(
     ]),
   );
   const sold = await soldByProduct(db, 30, opts.now);
-  let rows: ProductListRow[] = products.map((product) => {
+  const rows: ProductListRow[] = products.map((product) => {
     const onHand = levels.get(product.id) ?? 0;
     return {
       product,
@@ -182,25 +254,7 @@ export async function listProducts(
       stockState: stockStateOf(product, onHand),
     };
   });
-  if (opts.query) rows = rows.filter((r) => matchesQuery(r, opts.query ?? ''));
-  if (opts.categoryId)
-    rows = rows.filter((r) => r.product.category_id === opts.categoryId);
-  const stock = opts.stock ?? 'all';
-  if (stock === 'low') rows = rows.filter((r) => r.stockState === 'low');
-  if (stock === 'out') rows = rows.filter((r) => r.stockState === 'out');
-  if (stock === 'untracked')
-    rows = rows.filter((r) => r.stockState === 'untracked');
-  const byName = (a: ProductListRow, b: ProductListRow) =>
-    String(a.product.name_en).localeCompare(String(b.product.name_en));
-  const sort = opts.sort ?? 'name';
-  rows.sort((a, b) => {
-    if (sort === 'price')
-      return Number(a.product.price) - Number(b.product.price) || byName(a, b);
-    if (sort === 'stock') return a.onHand - b.onHand || byName(a, b);
-    if (sort === 'best') return b.sold30 - a.sold30 || byName(a, b);
-    return byName(a, b);
-  });
-  return rows;
+  return filterAndSortProducts(rows, opts);
 }
 
 export type HistoryRow = {
@@ -252,6 +306,7 @@ export async function productDetail(
   const days: ProductDetail['last14'] = [];
   for (let i = 13; i >= 0; i -= 1)
     days.push({ date: businessDate(now - i * DAY_MS), qty: 0, revenue: 0 });
+  const dayByDate = new Map(days.map((day) => [day.date, day]));
   const first = days[0]?.date ?? '';
   const last = days[13]?.date ?? '';
   const sales = await db.sales
@@ -261,6 +316,9 @@ export async function productDetail(
   const byId = new Map(
     sales.filter((s) => s.status !== 'void').map((s) => [s.id, s]),
   );
+  // The product index is selective (one product, not the shop's whole line table); the
+  // sale map then keeps only the 14-day window. Loading every sale line by sale id
+  // would make one round trip per chunk on a busy shop.
   const productLines: { line: SyncedRow; sale: SyncedRow }[] = [];
   for (const line of await db.sale_lines
     .where('product_id')
@@ -269,7 +327,7 @@ export async function productDetail(
     const sale = byId.get(String(line.sale_id));
     if (!sale) continue;
     productLines.push({ line, sale });
-    const day = days.find((d) => d.date === sale.business_date);
+    const day = dayByDate.get(String(sale.business_date));
     if (!day) continue;
     day.qty += Number(line.qty_milli);
     // Each sale keeps its own tax-inclusive snapshot; using the shop's current mode
@@ -281,10 +339,12 @@ export async function productDetail(
   const allRefundLines =
     productLines.length === 0
       ? []
-      : await db.refund_lines
-          .where('sale_line_id')
-          .anyOf(productLines.map(({ line }) => String(line.id)))
-          .toArray();
+      : await rowsForIds(
+          db.refund_lines,
+          'sale_line_id',
+          (row: SyncedRow) => String(row.sale_line_id),
+          productLines.map(({ line }) => String(line.id)),
+        );
   if (allRefundLines.length > 0) {
     const allRefunds = new Map(
       (
@@ -295,19 +355,24 @@ export async function productDetail(
         .filter((refund): refund is SyncedRow => refund !== undefined)
         .map((refund) => [String(refund.id), refund]),
     );
+    const bySaleLine = new Map<string, SyncedRow[]>();
+    for (const refundLine of allRefundLines) {
+      const key = String(refundLine.sale_line_id);
+      const list = bySaleLine.get(key) ?? [];
+      list.push(refundLine);
+      bySaleLine.set(key, list);
+    }
     for (const { line, sale } of productLines) {
-      const forLine = allRefundLines
-        .filter((refundLine) => String(refundLine.sale_line_id) === line.id)
-        .sort(
-          (a, b) =>
-            Number(a.created_at) - Number(b.created_at) ||
-            String(a.id).localeCompare(String(b.id)),
-        );
+      const forLine = (bySaleLine.get(String(line.id)) ?? []).sort(
+        (a, b) =>
+          Number(a.created_at) - Number(b.created_at) ||
+          String(a.id).localeCompare(String(b.id)),
+      );
       let previous = 0;
       for (const refundLine of forLine) {
         const refund = allRefunds.get(String(refundLine.refund_id));
         if (refund) {
-          const day = days.find((d) => d.date === String(refund.business_date));
+          const day = dayByDate.get(String(refund.business_date));
           const qty = Number(refundLine.qty_milli);
           if (day) {
             day.qty -= qty;

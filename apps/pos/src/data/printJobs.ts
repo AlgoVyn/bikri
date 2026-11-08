@@ -89,7 +89,59 @@ export function latestUnresolvedFailed(
   )[0];
 }
 
+/** Jobs of the same document, using the indexed ids where possible. */
+async function jobsForDocument(
+  db: BikriDb,
+  job: PrintJob,
+): Promise<PrintJob[]> {
+  if (job.sale_id)
+    return db.print_jobs.where('sale_id').equals(String(job.sale_id)).toArray();
+  if (job.refund_id)
+    return db.print_jobs
+      .where('refund_id')
+      .equals(String(job.refund_id))
+      .toArray();
+  if (job.day_close_id)
+    return db.print_jobs
+      .where('day_close_id')
+      .equals(String(job.day_close_id))
+      .toArray();
+  if (job.supplier_return_id)
+    return db.print_jobs
+      .where('supplier_return_id')
+      .equals(String(job.supplier_return_id))
+      .toArray();
+  return [];
+}
+
 /** Failed jobs that a later successful job for the same document has not superseded. */
 export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
-  return unresolvedFailed(await db.print_jobs.toArray()).length;
+  const failed = await db.print_jobs.where('status').equals('failed').toArray();
+  if (failed.length === 0) return 0;
+  const docs = new Map<string, PrintJob[]>();
+  let count = 0;
+  for (const job of failed) {
+    const key = documentKey(job);
+    if (key === null) {
+      count += 1;
+      continue;
+    }
+    const list = docs.get(key) ?? [];
+    list.push(job);
+    docs.set(key, list);
+  }
+  for (const list of docs.values()) {
+    const first = list[0];
+    if (!first) continue;
+    const jobs = await jobsForDocument(db, first);
+    for (const job of list) {
+      const superseded = jobs.some(
+        (candidate) =>
+          candidate.status === 'done' &&
+          Number(candidate.created_at) > Number(job.created_at),
+      );
+      if (!superseded) count += 1;
+    }
+  }
+  return count;
 }

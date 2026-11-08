@@ -1,6 +1,6 @@
 import { businessDate } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -22,6 +22,8 @@ import { SettingsPageLayout } from './Layout.tsx';
 
 const field =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
+
+const PAGE = 100;
 
 /** Activity viewer over audit_log (screens/17). */
 export function ActivityPage() {
@@ -70,6 +72,32 @@ function ActivityContent() {
       const shop = await getDb().shop.get('shop');
       return String(shop?.timezone ?? 'Asia/Karachi');
     }, []) ?? 'Asia/Karachi';
+  const [shown, setShown] = useState(PAGE);
+  const sentinel = useRef<HTMLTableRowElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the range/filter changes
+  useEffect(
+    () => setShown(PAGE),
+    [
+      filters.from,
+      filters.to,
+      filters.action,
+      filters.staffId,
+      filters.deviceId,
+    ],
+  );
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !rows || shown >= rows.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting))
+          setShown((count) => count + PAGE);
+      },
+      { rootMargin: '240px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rows, shown]);
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
       <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -181,7 +209,7 @@ function ActivityContent() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((entry) => (
+              {rows.slice(0, shown).map((entry) => (
                 <tr
                   key={String(entry.row.id)}
                   className="border-b border-border last:border-0"
@@ -213,6 +241,11 @@ function ActivityContent() {
                   <td className="px-3 py-2 text-text-muted">{entry.summary}</td>
                 </tr>
               ))}
+              {shown < rows.length ? (
+                <tr ref={sentinel}>
+                  <td colSpan={5} className="h-px" />
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

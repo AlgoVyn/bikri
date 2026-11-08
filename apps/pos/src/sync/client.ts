@@ -40,14 +40,22 @@ export function deviceToken(db: BikriDb): Promise<string | null> {
 }
 
 /** `X-Bikri-Pending: <count>;<oldest created_at or 0>` (03 §6). */
+const PENDING_TTL_MS = 1_000;
+const pendingCache = new WeakMap<BikriDb, { at: number; value: string }>();
+
 export async function pendingHeader(db: BikriDb): Promise<string> {
+  const cached = pendingCache.get(db);
+  if (cached !== undefined && Date.now() - cached.at < PENDING_TTL_MS)
+    return cached.value;
   const pending = db.outbox.where('status').equals('pending');
   const count = await pending.count();
   const first =
     count > 0
       ? await db.outbox.where('status').equals('pending').first()
       : undefined;
-  return `${count};${first?.created_at ?? 0}`;
+  const value = `${count};${first?.created_at ?? 0}`;
+  pendingCache.set(db, { at: Date.now(), value });
+  return value;
 }
 
 export type RequestOptions = {

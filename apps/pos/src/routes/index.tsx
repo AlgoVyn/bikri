@@ -1,6 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { HomePage } from '../home/HomePage.tsx';
+import { lazy, Suspense } from 'react';
+import { PageLoading } from '../components/PageLoading.tsx';
+
+const HomePage = lazy(() =>
+  import('../home/HomePage.tsx').then((module) => ({
+    default: module.HomePage,
+  })),
+);
 
 export const Route = createFileRoute('/')({
-  component: HomePage,
+  component: HomeRoute,
 });
+
+function HomeRoute() {
+  return (
+    <Suspense fallback={<PageLoading compact />}>
+      <HomePage />
+    </Suspense>
+  );
+}

@@ -118,6 +118,34 @@ describe('waiting print jobs', () => {
     expect(await unresolvedFailedCount(db)).toBe(1);
   });
 
+  it('counts failed day-close and supplier-return jobs by their own document', async () => {
+    const db = await readyDb('print-docs');
+    await db.print_jobs.bulkAdd([
+      {
+        id: 'day-f',
+        kind: 'day_close',
+        day_close_id: 'dc-1',
+        status: 'failed',
+        created_at: 1,
+      },
+      {
+        id: 'day-d',
+        kind: 'day_close',
+        day_close_id: 'dc-1',
+        status: 'done',
+        created_at: 2,
+      },
+      {
+        id: 'ret-f',
+        kind: 'supplier',
+        supplier_return_id: 'sr-1',
+        status: 'failed',
+        created_at: 3,
+      },
+    ]);
+    expect(await unresolvedFailedCount(db)).toBe(1);
+  });
+
   it('leaves a fresh printing job alone', async () => {
     const db = await setup();
     await db.print_jobs.update('p1', { started_at: 1_000, created_at: 1_000 });

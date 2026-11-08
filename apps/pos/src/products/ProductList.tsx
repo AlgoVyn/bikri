@@ -1,6 +1,14 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -23,8 +31,8 @@ import {
 import { PageHeader } from '../components/PageHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import {
+  filterAndSortProducts,
   listCategories,
-  listProducts,
   type ProductListRow,
   type ProductSort,
   productsCsv,
@@ -35,6 +43,12 @@ import { categoryName } from '../lib/category.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
+import {
+  buildProductRows,
+  useCatalogueMaster,
+  useSold30,
+  useStockLevels,
+} from '../state/catalogue.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
@@ -76,23 +90,21 @@ export function ProductList({
     (categoryId ? 1 : 0) +
     (stock !== 'all' ? 1 : 0) +
     (sort !== 'name' ? 1 : 0);
-  const rows = useLiveQuery(
-    () =>
-      listProducts(getDb(), {
-        query,
-        categoryId: categoryId || null,
-        stock,
-        sort,
-      }),
-    [query, categoryId, stock, sort],
-  );
-  const total = useLiveQuery(
-    () =>
-      getDb()
-        .products.filter((p) => !p.deleted_at)
-        .count(),
-    [],
-  );
+  const deferredQuery = useDeferredValue(query);
+  const master = useCatalogueMaster();
+  const levels = useStockLevels();
+  const sold = useSold30();
+  const rows = useMemo(() => {
+    if (master === undefined || levels === undefined || sold === undefined)
+      return undefined;
+    return filterAndSortProducts(buildProductRows(master, levels, sold), {
+      query: deferredQuery,
+      categoryId: categoryId || null,
+      stock,
+      sort,
+    });
+  }, [master, levels, sold, deferredQuery, categoryId, stock, sort]);
+  const total = master?.products.length;
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const showCost = can('cost.view');
   const canEdit = can('catalog.edit');
