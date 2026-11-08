@@ -57,10 +57,10 @@ test.describe('Reports (T-048)', () => {
       .getByTestId('report-best-qty')
       .getByRole('columnheader');
     const cells = page.getByTestId('report-best-qty').getByRole('cell');
-    await expect(headers.nth(1)).toHaveCSS('text-align', 'end');
-    await expect(cells.nth(1)).toHaveCSS('text-align', 'end');
-    await expect(headers.nth(2)).toHaveCSS('text-align', 'end');
-    await expect(cells.nth(2)).toHaveCSS('text-align', 'end');
+    await expect(headers.nth(1)).toHaveCSS('text-align', 'start');
+    await expect(cells.nth(1)).toHaveCSS('text-align', 'start');
+    await expect(headers.nth(2)).toHaveCSS('text-align', 'start');
+    await expect(cells.nth(2)).toHaveCSS('text-align', 'start');
     await expectNoHorizontalScroll(page);
     await page.getByRole('tab', { name: 'Udhaar' }).click();
     await expect(page.getByTestId('report-udhaar-total')).toContainText(
