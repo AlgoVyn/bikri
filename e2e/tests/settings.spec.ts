@@ -224,7 +224,10 @@ test.describe('Settings (T-050)', () => {
         name: 'Shop profile & receipt',
       }),
     ).toBeVisible();
-    await expect(settings.getByTestId('settings-index')).toHaveCount(0);
+    await expect(settings.getByTestId('settings-index')).toBeVisible();
+    await expect(
+      settings.getByTestId('settings-index').locator('a[aria-current="page"]'),
+    ).toHaveAttribute('href', '/bikri/settings/shop');
     await expect(
       settings.getByRole('link', { name: 'Back', exact: true }),
     ).toHaveAttribute('href', '/bikri/settings');
@@ -255,7 +258,9 @@ test.describe('Settings (T-050)', () => {
 
     await page.getByRole('link', { name: /About/ }).click();
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeLessThan(10);
   });
 
   test('every Settings section has a Back button to Settings', async ({

@@ -389,7 +389,8 @@ function ListHeader({
   const { t } = useTranslation();
   return (
     <div
-      className={`hidden gap-3 border-b border-border px-3 pb-1 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
+      data-testid="products-list-header"
+      className={`hidden gap-3 border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
     >
       <span />
       <SortHeader
@@ -583,7 +584,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full focus-visible:outline-offset-[-2px] w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 ${gridCols(showCost, embedded)}`}
+          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-s-2 border-b border-s-transparent border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-offset-[-2px] ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
