@@ -20,10 +20,7 @@ import { type WriteOptions, type Writer, writeAction } from './write.ts';
 
 const DAY_MS = 86_400_000;
 /** Reused for every product sort; creating a collator per comparison is measurably slower. */
-const NAME_COLLATOR = new Intl.Collator(undefined, {
-  numeric: true,
-  sensitivity: 'base',
-});
+const NAME_COLLATOR = new Intl.Collator();
 
 export type StockFilter = 'all' | 'low' | 'out' | 'untracked';
 export type ProductSort = 'name' | 'price' | 'stock' | 'best';
