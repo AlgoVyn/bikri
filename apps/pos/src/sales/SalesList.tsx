@@ -475,6 +475,7 @@ export function SalesList({
             </div>
             <ul className="flex flex-col">
               <li
+                data-testid="sales-list-header"
                 className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
                 aria-hidden="true"
               >
