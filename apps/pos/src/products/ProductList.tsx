@@ -646,7 +646,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-s-2 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}

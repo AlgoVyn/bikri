@@ -325,4 +325,28 @@ test.describe('Products (T-014)', () => {
     await page.reload();
     await expect(page.getByText('Rs 12,34,567.89').first()).toBeVisible();
   });
+
+  test('the list header uses the shared style and aligns with row columns', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop columns');
+    await openReadyShop(page, '/bikri/products');
+    await page.evaluate(() =>
+      window.__bikriTest?.seedProducts([
+        { name: 'Header alignment', price: 100000, stock: 5 },
+      ]),
+    );
+    const header = page.getByTestId('products-list-header');
+    await expect(header).toBeVisible();
+    await expect(header).toHaveClass(/bg-surface-2/);
+    const headerName = await header
+      .getByRole('button', { name: /Name/ })
+      .boundingBox();
+    const rowName = await page.locator('.ltr-name').first().boundingBox();
+    expect(headerName).not.toBeNull();
+    expect(rowName).not.toBeNull();
+    expect(
+      Math.abs((headerName as { x: number }).x - (rowName as { x: number }).x),
+    ).toBeLessThan(1);
+  });
 });
