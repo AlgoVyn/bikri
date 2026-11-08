@@ -18,7 +18,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Vite dev serves the language catalogs again; dynamic JSON imports no longer carry Node-only import attributes.
 
 ### Performance
-- Sell and Products now load the catalogue once and filter in memory, with a short-lived 30-day sold cache; global search uses a session index plus the invoice prefix index; print status queries only failed jobs; day-close pushes use new Device+created indexes (`0011`); sale/refund/void writes lock only the stores they touch; `Intl` formatters are cached; product/category/Home routes are lazy chunks and the export ZIP uses one output buffer (D-185).
+- Sell and Products now load the catalogue once and filter in memory, with a short-lived 30-day sold cache; global search uses a session index plus the invoice prefix index; print status queries only failed jobs; day-close pushes use new Device+created indexes (`0011`); sale/refund/void writes lock only the stores they touch; `Intl` formatters are cached; Home and category routes are lazy chunks while the offline product screens stay eager; the export ZIP uses one output buffer (D-185).
 
 ### Selling and back office
 - Offline-first selling with three carts, held bills, cash/card/bank/wallet/udhaar payments, change, receipt printing and sharing.
