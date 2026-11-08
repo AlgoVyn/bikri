@@ -10,6 +10,18 @@ const WIDTHS = [
   { width: 390, height: 844, name: 'phone' },
 ] as const;
 
+/** Force the variable font axes before the deterministic screenshot. */
+async function readyFonts(page: import('@playwright/test').Page) {
+  await page.evaluate(async () => {
+    await Promise.all(
+      [400, 500, 600, 700].map((weight) =>
+        document.fonts.load(`${weight} 16px Inter`),
+      ),
+    );
+    await document.fonts.ready;
+  });
+}
+
 async function seedVisualShop(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
     localStorage.setItem('bikri.onboarding_dismissed', '1');
@@ -111,7 +123,7 @@ async function seedVisualShop(page: import('@playwright/test').Page) {
   // Home is a lazy route; wait for its content before asking for fonts, otherwise the
   // screenshot can race the chunk and capture fallback text.
   await page.locator('main h1').first().waitFor();
-  await page.evaluate(() => document.fonts.ready);
+  await readyFonts(page);
 }
 
 test.describe('deterministic visual snapshots', () => {
@@ -141,7 +153,7 @@ test.describe('deterministic visual snapshots', () => {
 
       await page.evaluate(() => window.__bikriTest?.navigate('/'));
       await page.locator('main h1').first().waitFor();
-      await page.evaluate(() => document.fonts.ready);
+      await readyFonts(page);
       await page.waitForTimeout(400);
       await shot('home', [
         page.locator('main header p').first(),
