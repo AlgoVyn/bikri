@@ -566,7 +566,7 @@ function ReportTable({
                     key={header}
                     scope="col"
                     className={`px-3 py-2 font-medium ${
-                      headerIndex === 0 ? 'text-start' : 'text-end'
+                      headerIndex === 0 ? 'text-start' : 'text-start'
                     }`}
                   >
                     {header}
@@ -583,7 +583,7 @@ function ReportTable({
                   {row.map((cell, cellIndex) => (
                     <td
                       key={headers[cellIndex]}
-                      className={`px-3 py-2 ${cellIndex === 0 ? '' : 'text-end'}`}
+                      className={`px-3 py-2 ${cellIndex === 0 ? '' : 'text-start'}`}
                     >
                       {cell}
                     </td>

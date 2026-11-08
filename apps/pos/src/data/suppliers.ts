@@ -2,6 +2,7 @@ import { businessDate, newId } from '@bikri/core';
 import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
+import type { SortDirection } from '../lib/sort.ts';
 import type { TableSource } from './caches.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
@@ -23,6 +24,21 @@ export type SupplierRow = {
   /** The latest delivery's business date (`YYYY-MM-DD`), not its entry time. */
   lastDeliveryDate: string | null;
 };
+
+export type SupplierSort = 'name' | 'balance' | 'last';
+
+/** Natural first-click order for each supplier column. */
+export const SUPPLIER_SORT_DIRECTIONS: Record<SupplierSort, SortDirection> = {
+  name: 'asc',
+  balance: 'desc',
+  last: 'desc',
+};
+
+export function defaultSupplierSortDirection(
+  sort: SupplierSort,
+): SortDirection {
+  return SUPPLIER_SORT_DIRECTIONS[sort];
+}
 
 export type SupplierList = {
   rows: SupplierRow[];
@@ -82,7 +98,11 @@ async function balancesOf(
 /** Suppliers with balances and last delivery (screens/13). */
 export async function supplierList(
   src: TableSource,
-  options: { query?: string } = {},
+  options: {
+    query?: string;
+    sort?: SupplierSort;
+    direction?: SortDirection;
+  } = {},
 ): Promise<SupplierList> {
   const query = (options.query ?? '').trim().toLowerCase();
   const words = query.split(/\s+/u).filter(Boolean);
@@ -116,9 +136,29 @@ export async function supplierList(
       (digits.length >= 3 && phone.includes(digits))
     );
   });
-  rows.sort((a, b) =>
-    String(a.supplier.name).localeCompare(String(b.supplier.name)),
-  );
+  const sort = options.sort ?? 'name';
+  const sign =
+    (options.direction ?? defaultSupplierSortDirection(sort)) === 'asc'
+      ? 1
+      : -1;
+  const byName = (a: SupplierRow, b: SupplierRow) =>
+    String(a.supplier.name).localeCompare(String(b.supplier.name));
+  rows.sort((a, b) => {
+    if (sort === 'last') {
+      if (a.lastDeliveryDate === null || b.lastDeliveryDate === null) {
+        if (a.lastDeliveryDate === null && b.lastDeliveryDate === null)
+          return byName(a, b);
+        return a.lastDeliveryDate === null ? 1 : -1;
+      }
+      return (
+        sign * a.lastDeliveryDate.localeCompare(b.lastDeliveryDate) ||
+        byName(a, b)
+      );
+    }
+    if (sort === 'balance')
+      return sign * (a.balance - b.balance) || byName(a, b);
+    return sign * byName(a, b);
+  });
   return {
     rows,
     // screens/13: "total you owe suppliers" is a shop total, not a search result

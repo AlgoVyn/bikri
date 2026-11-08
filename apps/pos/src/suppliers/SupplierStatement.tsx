@@ -299,7 +299,7 @@ export function SupplierStatement({
                   <dt className="text-text-muted">
                     {t('office.suppliers.got')}
                   </dt>
-                  <dd className="text-end">
+                  <dd className="text-start">
                     {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
                   </dd>
                 </div>
@@ -307,7 +307,7 @@ export function SupplierStatement({
                   <dt className="text-text-muted">
                     {t('office.suppliers.paid')}
                   </dt>
-                  <dd className="text-end">
+                  <dd className="text-start">
                     {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
                   </dd>
                 </div>
@@ -329,9 +329,11 @@ export function SupplierStatement({
               <th className="p-2 text-start">
                 {t('office.suppliers.description')}
               </th>
-              <th className="p-2 text-end">{t('office.suppliers.got')}</th>
-              <th className="p-2 text-end">{t('office.suppliers.paid')}</th>
-              <th className="p-2 text-end">{t('office.suppliers.balance')}</th>
+              <th className="p-2 text-start">{t('office.suppliers.got')}</th>
+              <th className="p-2 text-start">{t('office.suppliers.paid')}</th>
+              <th className="p-2 text-start">
+                {t('office.suppliers.balance')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -370,13 +372,13 @@ export function SupplierStatement({
                       </Link>
                     ) : null}
                   </td>
-                  <td className="p-2 text-end">
+                  <td className="p-2 text-start">
                     {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
                   </td>
-                  <td className="p-2 text-end">
+                  <td className="p-2 text-start">
                     {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
                   </td>
-                  <td className="p-2 text-end font-medium">
+                  <td className="p-2 text-start font-medium">
                     <MoneyText paisa={row.balance} />
                   </td>
                 </tr>

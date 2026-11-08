@@ -266,10 +266,10 @@ export function ExpensesPage() {
                         style={{ width: `${percent}%` }}
                       />
                     </span>
-                    <span className="w-10 text-end tabular-nums text-text-muted">
+                    <span className="w-10 text-start tabular-nums text-text-muted">
                       {percent}%
                     </span>
-                    <span className="w-20 text-end">
+                    <span className="w-20 text-start">
                       <MoneyText paisa={row.net} />
                     </span>
                   </div>
@@ -336,7 +336,7 @@ export function ExpensesPage() {
                     )}
                     {row.staffName ? ` · ${row.staffName}` : ''}
                   </span>
-                  <span className="min-w-24 text-end font-medium">
+                  <span className="min-w-24 text-start font-medium">
                     {row.expense.reverses_id ? '−' : ''}
                     <MoneyText paisa={Number(row.expense.amount)} />
                   </span>

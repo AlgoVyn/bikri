@@ -65,7 +65,9 @@
     "required": "لازمی",
     "yes": "ہاں",
     "back": "واپس",
-    "filters": "فلٹرز"
+    "filters": "فلٹرز",
+    "sort_ascending": "چڑھتی ترتیب",
+    "sort_descending": "اترتی ترتیب"
   },
   "count": {
     "help_title": "گنتی کے نکات",
@@ -647,6 +649,11 @@
     "search": "مصنوعات تلاش کریں",
     "sku": "SKU",
     "sort": "ترتیب",
+    "sort_ascending": "چڑھتی ترتیب",
+    "sort_category": "کیٹیگری",
+    "sort_cost": "اوسط لاگت",
+    "sort_descending": "اترتی ترتیب",
+    "sort_margin": "مارجن",
     "sort_best": "سب سے زیادہ بکنے والی",
     "sort_name": "نام",
     "sort_price": "قیمت",

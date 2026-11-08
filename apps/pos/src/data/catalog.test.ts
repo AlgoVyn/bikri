@@ -9,12 +9,15 @@ import {
   DuplicateBarcodeError,
   DuplicateSkuError,
   duplicateDraft,
+  filterAndSortProducts,
   generateBarcode,
   ledgerContext,
   listCategories,
   listProducts,
   moveCategory,
   ProductInUseError,
+  type ProductListRow,
+  type ProductSort,
   productDetail,
   productsCsv,
   removeCategory,
@@ -345,6 +348,128 @@ describe('products (screens/08)', () => {
     const best = await listProducts(db, { sort: 'best' });
     expect(best[0]?.product.name_en).toBe('Charger');
     expect(best[0]?.sold30).toBe(2000);
+  });
+
+  it('sorts every product column in both directions', () => {
+    const row = (
+      name: string,
+      price: number,
+      cost: number,
+      stock: number,
+      sold: number,
+      category: string | null,
+    ): ProductListRow =>
+      ({
+        product: {
+          id: name,
+          name_en: name,
+          price,
+          avg_cost: cost,
+          category_id: category ? `cat-${category}` : null,
+        },
+        category: category
+          ? { id: `cat-${category}`, name_en: category, name_ur: category }
+          : null,
+        onHand: stock,
+        sold30: sold,
+        barcodes: [],
+        stockState: 'ok',
+      }) as unknown as ProductListRow;
+    const rows = [
+      row('Alpha', 300, 200, 3, 5, 'Phones'),
+      row('Bravo', 100, 90, 1, 20, 'Cables'),
+      row('Charlie', 500, 400, 2, 10, null),
+    ];
+    const names = (
+      input: ProductListRow[],
+      sort: ProductSort,
+      direction: 'asc' | 'desc',
+    ) =>
+      filterAndSortProducts(input, { sort, direction }).map(
+        (item) => item.product.name_en,
+      );
+    expect(names(rows, 'name', 'asc')).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(names(rows, 'name', 'desc')).toEqual(['Charlie', 'Bravo', 'Alpha']);
+    expect(names(rows, 'category', 'asc')).toEqual([
+      'Bravo',
+      'Alpha',
+      'Charlie',
+    ]);
+    expect(names(rows, 'category', 'desc')).toEqual([
+      'Alpha',
+      'Bravo',
+      'Charlie',
+    ]);
+    expect(names(rows, 'price', 'asc')).toEqual(['Bravo', 'Alpha', 'Charlie']);
+    expect(names(rows, 'price', 'desc')).toEqual(['Charlie', 'Alpha', 'Bravo']);
+    expect(names(rows, 'stock', 'asc')).toEqual(['Bravo', 'Charlie', 'Alpha']);
+    expect(names(rows, 'stock', 'desc')).toEqual(['Alpha', 'Charlie', 'Bravo']);
+    expect(names(rows, 'cost', 'asc')).toEqual(['Bravo', 'Alpha', 'Charlie']);
+    expect(names(rows, 'cost', 'desc')).toEqual(['Charlie', 'Alpha', 'Bravo']);
+    expect(names(rows, 'margin', 'asc')).toEqual(['Bravo', 'Charlie', 'Alpha']);
+    expect(names(rows, 'margin', 'desc')).toEqual([
+      'Alpha',
+      'Charlie',
+      'Bravo',
+    ]);
+    expect(names(rows, 'best', 'asc')).toEqual(['Alpha', 'Charlie', 'Bravo']);
+    expect(names(rows, 'best', 'desc')).toEqual(['Bravo', 'Charlie', 'Alpha']);
+
+    // Defaults: name ascending, Sold best-first, and a name tiebreak for equal values.
+    expect(
+      filterAndSortProducts(rows, {}).map((item) => item.product.name_en),
+    ).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(
+      filterAndSortProducts(rows, { sort: 'best' }).map(
+        (item) => item.product.name_en,
+      )[0],
+    ).toBe('Bravo');
+    const tied = [
+      row('Zed', 100, 50, 2, 1, 'Phones'),
+      row('Abe', 100, 50, 2, 1, 'Phones'),
+    ];
+    for (const sort of [
+      'category',
+      'price',
+      'stock',
+      'cost',
+      'margin',
+      'best',
+    ] as const) {
+      expect(names(tied, sort, 'desc')).toEqual(['Abe', 'Zed']);
+    }
+
+    // Empty categories and margins sort last; two empties fall back to name.
+    const partial = [
+      row('No price', 0, 0, 1, 0, null),
+      row('Zero price', 0, 0, 1, 0, null),
+      row('No category', 100, 50, 1, 0, null),
+      row('Phones', 100, 50, 1, 0, 'Phones'),
+    ];
+    expect(names(partial, 'category', 'asc')).toEqual([
+      'Phones',
+      'No category',
+      'No price',
+      'Zero price',
+    ]);
+    expect(names(partial, 'category', 'desc')).toEqual([
+      'Phones',
+      'No category',
+      'No price',
+      'Zero price',
+    ]);
+    expect(names(partial, 'margin', 'asc')).toEqual([
+      'No category',
+      'Phones',
+      'No price',
+      'Zero price',
+    ]);
+    expect(names(partial, 'margin', 'desc')).toEqual([
+      'No category',
+      'Phones',
+      'No price',
+      'Zero price',
+    ]);
   });
 
   it('AC 4: the CSV has cost columns only with cost.view and guards formulas', async () => {

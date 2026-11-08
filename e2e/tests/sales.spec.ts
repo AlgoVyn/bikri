@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  expectNoHorizontalScroll,
   idbAll,
   idbPut,
   idbUpdate,
@@ -64,6 +65,47 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     );
     expect(csv).toContain('A-A-1');
     expect(csv).toContain('A-A-2');
+  });
+
+  test('every sales column sorts in both directions', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop header');
+    await openReadyShop(page, '/bikri/sales');
+    await page.evaluate(() => window.__bikriTest?.seedTodaySales());
+    const header = page.getByTestId('sales-list-header');
+    await expect(header).toBeVisible();
+    for (const column of [
+      'Time',
+      'Invoice',
+      'Customer',
+      'Items',
+      'Total',
+      'Method',
+      'Status',
+    ]) {
+      await expect(
+        header.getByRole('button', { name: new RegExp(`^${column}`) }),
+      ).toBeVisible();
+    }
+    const firstBill = page
+      .locator('[data-testid="sales-list-header"] ~ li a')
+      .first();
+    await expect(firstBill).toContainText('A-A-2');
+    const total = header.getByRole('button', { name: /^Total/ });
+    await total.click();
+    await expect(total).toHaveAttribute('data-sort-direction', 'desc');
+    await expect(firstBill).toContainText('A-A-1');
+    await total.click();
+    await expect(total).toHaveAttribute('data-sort-direction', 'asc');
+    await expect(firstBill).toContainText('A-A-2');
+
+    const direction = page.getByTestId('sales-sort-direction');
+    await expect(direction).toHaveAttribute('data-direction', 'asc');
+    await direction.click();
+    await expect(direction).toHaveAttribute('data-direction', 'desc');
+    await expect(firstBill).toContainText('A-A-1');
+    await expectNoHorizontalScroll(page);
   });
 
   test('phone: bill actions share one compact row', async ({

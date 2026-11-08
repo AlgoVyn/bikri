@@ -12,12 +12,19 @@ import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
-import { supplierList, suppliersCsv } from '../data/suppliers.ts';
+import {
+  defaultSupplierSortDirection,
+  type SupplierSort,
+  supplierList,
+  suppliersCsv,
+} from '../data/suppliers.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
+import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -49,17 +56,28 @@ export function SupplierList({
   const readOnly = useReadOnly();
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
+  const [sort, setSort] = useState<SupplierSort>('name');
+  const [direction, setDirection] = useState<SortDirection>(
+    defaultSupplierSortDirection('name'),
+  );
   const [newOpen, setNewOpen] = useState(false);
   const data = useLiveQuery(async () => {
     const db = getDb();
     const tz = await shopTimeZone(db);
-    return { ...(await supplierList(db, { query: deferredQuery })), tz };
-  }, [deferredQuery]);
+    return {
+      ...(await supplierList(db, {
+        query: deferredQuery,
+        sort,
+        direction,
+      })),
+      tz,
+    };
+  }, [deferredQuery, sort, direction]);
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the search changes
-  useEffect(() => setShown(PAGE), [deferredQuery]);
+  useEffect(() => setShown(PAGE), [deferredQuery, sort, direction]);
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !data || shown >= data.rows.length) return;
@@ -73,6 +91,19 @@ export function SupplierList({
     observer.observe(el);
     return () => observer.disconnect();
   }, [data, shown]);
+
+  const applySort = (next: SupplierSort) => {
+    if (next === sort) {
+      setDirection(toggleSortDirection);
+      return;
+    }
+    setSort(next);
+    setDirection(defaultSupplierSortDirection(next));
+  };
+  const changeSort = (next: SupplierSort) => {
+    setSort(next);
+    setDirection(defaultSupplierSortDirection(next));
+  };
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
@@ -123,8 +154,8 @@ export function SupplierList({
 
       <ListSurface
         toolbar={
-          <search className="flex flex-col">
-            <label className="flex min-w-0 flex-col">
+          <search className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
               <span className="mb-1 text-small">
                 {t('office.suppliers.search')}
               </span>
@@ -140,6 +171,34 @@ export function SupplierList({
                 />
               </span>
             </label>
+            <div className="flex min-w-0 flex-[1_1_11rem] flex-col">
+              <span className="mb-1 text-small">
+                {t('office.suppliers.sort')}
+              </span>
+              <div className="flex gap-1">
+                <select
+                  aria-label={t('office.suppliers.sort')}
+                  className="h-11 min-w-0 flex-1 rounded-control border border-border-strong bg-surface px-2 text-text"
+                  value={sort}
+                  onChange={(e) => changeSort(e.target.value as SupplierSort)}
+                >
+                  <option value="name">
+                    {t('office.suppliers.col_supplier')}
+                  </option>
+                  <option value="balance">
+                    {t('office.suppliers.balance')}
+                  </option>
+                  <option value="last">
+                    {t('office.suppliers.col_last_delivery')}
+                  </option>
+                </select>
+                <SortDirectionButton
+                  direction={direction}
+                  onToggle={() => setDirection(toggleSortDirection)}
+                  testId="suppliers-sort-direction"
+                />
+              </div>
+            </div>
           </search>
         }
         summary={
@@ -183,12 +242,26 @@ export function SupplierList({
           <ul className="flex flex-col divide-y divide-border">
             <li
               className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
-              aria-hidden="true"
               data-testid="suppliers-list-header"
             >
-              <span>{t('office.suppliers.col_supplier')}</span>
-              <span className="text-end">{t('office.suppliers.balance')}</span>
-              <span>{t('office.suppliers.col_last_delivery')}</span>
+              <SortHeader
+                label={t('office.suppliers.col_supplier')}
+                active={sort === 'name'}
+                direction={direction}
+                onClick={() => applySort('name')}
+              />
+              <SortHeader
+                label={t('office.suppliers.balance')}
+                active={sort === 'balance'}
+                direction={direction}
+                onClick={() => applySort('balance')}
+              />
+              <SortHeader
+                label={t('office.suppliers.col_last_delivery')}
+                active={sort === 'last'}
+                direction={direction}
+                onClick={() => applySort('last')}
+              />
             </li>
             {data.rows.slice(0, shown).map((row) => (
               <li key={row.supplier.id}>
@@ -213,7 +286,7 @@ export function SupplierList({
                       {String(row.supplier.phone ?? '')}
                     </span>
                   </span>
-                  <span className="min-w-0 text-end">
+                  <span className="min-w-0 text-start">
                     <span
                       className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
                     >
@@ -236,7 +309,7 @@ export function SupplierList({
                       </span>
                     ) : null}
                   </span>
-                  <span className="min-w-0 text-end text-small text-text-muted sm:text-start">
+                  <span className="min-w-0 text-start text-small text-text-muted sm:text-start">
                     {row.lastDeliveryDate
                       ? dateText(row.lastDeliveryDate, i18n.language, data.tz)
                       : '—'}

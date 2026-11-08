@@ -3,6 +3,7 @@ import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
+import type { SortDirection } from '../lib/sort.ts';
 import { isReadOnly } from '../sync/status.ts';
 import type { TableSource } from './caches.ts';
 import { isBusinessDate } from './dates.ts';
@@ -19,7 +20,29 @@ export type CustomerFilter =
   | 'over_limit'
   | 'in_credit'
   | 'promise_due';
-export type CustomerSort = 'balance' | 'oldest' | 'name' | 'activity';
+export type CustomerSort =
+  | 'balance'
+  | 'oldest'
+  | 'name'
+  | 'activity'
+  | 'limit'
+  | 'promise';
+
+/** Natural first-click order for each Udhaar column. */
+export const CUSTOMER_SORT_DIRECTIONS: Record<CustomerSort, SortDirection> = {
+  balance: 'desc',
+  oldest: 'asc',
+  name: 'asc',
+  activity: 'desc',
+  limit: 'desc',
+  promise: 'asc',
+};
+
+export function defaultCustomerSortDirection(
+  sort: CustomerSort,
+): SortDirection {
+  return CUSTOMER_SORT_DIRECTIONS[sort];
+}
 
 export type CustomerRow = {
   customer: MasterRow;
@@ -41,6 +64,7 @@ export type CustomerListOptions = {
   query?: string;
   filter?: CustomerFilter;
   sort?: CustomerSort;
+  direction?: SortDirection;
   today: string;
   now?: number;
 };
@@ -185,16 +209,49 @@ export async function customerList(
   });
 
   const sort = options.sort ?? 'name';
+  const sign =
+    (options.direction ?? defaultCustomerSortDirection(sort)) === 'asc'
+      ? 1
+      : -1;
+  const byName = (a: CustomerRow, b: CustomerRow) =>
+    String(a.customer.name).localeCompare(String(b.customer.name));
   filtered.sort((a, b) => {
-    if (sort === 'balance') return b.balance - a.balance;
-    if (sort === 'oldest')
-      return (
-        (a.oldestUnpaidAt ?? Number.POSITIVE_INFINITY) -
-          (b.oldestUnpaidAt ?? Number.POSITIVE_INFINITY) ||
-        String(a.customer.name).localeCompare(String(b.customer.name))
-      );
-    if (sort === 'activity') return b.lastActivityAt - a.lastActivityAt;
-    return String(a.customer.name).localeCompare(String(b.customer.name));
+    let value = 0;
+    if (sort === 'balance') value = a.balance - b.balance;
+    else if (sort === 'oldest') {
+      if (a.oldestUnpaidAt === null || b.oldestUnpaidAt === null) {
+        if (a.oldestUnpaidAt === null && b.oldestUnpaidAt === null)
+          return byName(a, b);
+        return a.oldestUnpaidAt === null ? 1 : -1;
+      }
+      value = a.oldestUnpaidAt - b.oldestUnpaidAt;
+    } else if (sort === 'activity') value = a.lastActivityAt - b.lastActivityAt;
+    else if (sort === 'limit') {
+      const aLimit =
+        a.customer.credit_limit === null ||
+        a.customer.credit_limit === undefined
+          ? null
+          : Number(a.customer.credit_limit);
+      const bLimit =
+        b.customer.credit_limit === null ||
+        b.customer.credit_limit === undefined
+          ? null
+          : Number(b.customer.credit_limit);
+      if (aLimit === null || bLimit === null) {
+        if (aLimit === null && bLimit === null) return byName(a, b);
+        return aLimit === null ? 1 : -1;
+      }
+      value = aLimit - bLimit;
+    } else if (sort === 'promise') {
+      const aDate = a.promise ? String(a.promise.promised_on) : null;
+      const bDate = b.promise ? String(b.promise.promised_on) : null;
+      if (aDate === null || bDate === null) {
+        if (aDate === null && bDate === null) return byName(a, b);
+        return aDate === null ? 1 : -1;
+      }
+      value = aDate.localeCompare(bDate);
+    } else value = byName(a, b);
+    return value === 0 ? byName(a, b) : sign * value;
   });
 
   const month = options.today.slice(0, 7);

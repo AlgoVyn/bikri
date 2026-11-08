@@ -348,5 +348,62 @@ test.describe('Products (T-014)', () => {
     expect(
       Math.abs((headerName as { x: number }).x - (rowName as { x: number }).x),
     ).toBeLessThan(1);
+    const centers = await page.evaluate(() => {
+      const header = document.querySelector(
+        '[data-testid="products-list-header"]',
+      );
+      if (!header) return [];
+      return [...header.children].slice(1).map((cell) => {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        const box = range.getBoundingClientRect();
+        return box.top + box.height / 2;
+      });
+    });
+    expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
+  });
+
+  test('every column sorts in both directions', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop columns');
+    await openReadyShop(page, '/bikri/products');
+    await page.evaluate(() =>
+      window.__bikriTest?.seedProducts([
+        { name: 'Alpha', price: 30000, cost: 20000, stock: 3 },
+        { name: 'Cheap', price: 10000, cost: 9000, stock: 1 },
+        { name: 'Premium', price: 50000, cost: 40000, stock: 2 },
+      ]),
+    );
+    const header = page.getByTestId('products-list-header');
+    for (const column of [
+      'Category',
+      'Price',
+      'Stock',
+      'Avg cost',
+      'Margin',
+      'Sold',
+    ]) {
+      await expect(
+        header.getByRole('button', { name: new RegExp(`^${column}`) }),
+      ).toBeVisible();
+    }
+    const first = page.locator('.ltr-name').first();
+    await expect(first).toHaveText('Alpha');
+    const price = header.getByRole('button', { name: /^Price/ });
+    await price.click();
+    await expect(price).toHaveAttribute('data-sort-direction', 'asc');
+    await expect(first).toHaveText('Cheap');
+    await price.click();
+    await expect(price).toHaveAttribute('data-sort-direction', 'desc');
+    await expect(first).toHaveText('Premium');
+
+    const direction = page.getByTestId('products-sort-direction');
+    await expect(direction).toHaveAttribute('data-direction', 'desc');
+    await direction.click();
+    await expect(direction).toHaveAttribute('data-direction', 'asc');
+    await expect(first).toHaveText('Cheap');
+
+    const category = header.getByRole('button', { name: /^Category/ });
+    await category.click();
+    await expect(category).toHaveAttribute('data-sort-direction', 'asc');
   });
 });

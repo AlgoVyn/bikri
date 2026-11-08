@@ -299,13 +299,16 @@ test.describe('Settings (T-050)', () => {
     await expect(page.getByRole('heading', { name: 'Printer' })).toBeVisible();
   });
 
-  test('About shows version, source and terms, not a second shortcut table', async ({
+  test('About shows version and terms without external source links', async ({
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings/about');
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
     await expect(page.getByText(/^Version:/u)).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Source code' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Source code' })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('link', { name: 'Licence' })).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Terms of use' }),
     ).toBeVisible();

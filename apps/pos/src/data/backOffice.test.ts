@@ -388,6 +388,119 @@ describe('back-office branch coverage', () => {
     ).toBe(false);
   });
 
+  it('sorts every sales column in both directions', async () => {
+    const { db } = await rawHistory();
+    const day = { from: '2026-10-27', to: '2026-10-27' };
+    const ids = async (
+      sort:
+        | 'time'
+        | 'invoice'
+        | 'customer'
+        | 'items'
+        | 'total'
+        | 'method'
+        | 'status',
+      direction: 'asc' | 'desc',
+    ) =>
+      (await salesHistory(db, { ...day, sort, direction })).rows.map(
+        (row) => row.sale.id,
+      );
+    expect(await ids('time', 'asc')).toEqual([
+      's1',
+      's2',
+      's3',
+      's4',
+      's5',
+      's6',
+    ]);
+    expect(await ids('time', 'desc')).toEqual([
+      's6',
+      's5',
+      's4',
+      's3',
+      's2',
+      's1',
+    ]);
+    expect(await ids('invoice', 'asc')).toEqual([
+      's1',
+      's2',
+      's3',
+      's4',
+      's5',
+      's6',
+    ]);
+    expect(await ids('invoice', 'desc')).toEqual([
+      's6',
+      's5',
+      's4',
+      's3',
+      's2',
+      's1',
+    ]);
+    expect(await ids('customer', 'asc')).toEqual([
+      's2',
+      's6',
+      's5',
+      's4',
+      's3',
+      's1',
+    ]);
+    expect(await ids('customer', 'desc')).toEqual([
+      's6',
+      's2',
+      's5',
+      's4',
+      's3',
+      's1',
+    ]);
+    expect(await ids('total', 'asc')).toEqual([
+      's6',
+      's2',
+      's5',
+      's4',
+      's3',
+      's1',
+    ]);
+    expect(await ids('total', 'desc')).toEqual([
+      's5',
+      's4',
+      's3',
+      's1',
+      's6',
+      's2',
+    ]);
+    expect(await ids('items', 'asc')).toEqual([
+      's6',
+      's5',
+      's4',
+      's3',
+      's2',
+      's1',
+    ]);
+    expect(await ids('status', 'asc')).toEqual([
+      's6',
+      's5',
+      's3',
+      's2',
+      's1',
+      's4',
+    ]);
+    expect(await ids('status', 'desc')).toEqual([
+      's4',
+      's6',
+      's5',
+      's3',
+      's2',
+      's1',
+    ]);
+    expect(await ids('method', 'asc')).toHaveLength(6);
+    expect(await ids('method', 'desc')).toHaveLength(6);
+    // The default stays newest-first for the existing screen.
+    expect(
+      (await salesHistory(db, day)).rows.map((row) => row.sale.id),
+    ).toEqual(['s6', 's5', 's4', 's3', 's2', 's1']);
+  });
+
   it('bill detail covers missing links, quick sales, refunds, voids and conflicts', async () => {
     const { db } = await rawHistory();
     expect(await billDetail(db, 'missing')).toBeNull();

@@ -537,32 +537,32 @@ export function BillDetail({
           <thead>
             <tr className="border-b border-border text-start text-text-muted">
               <th className="p-2 text-start">{t('office.bill.col_name')}</th>
-              <th className="p-2 text-end">{t('office.bill.col_qty')}</th>
+              <th className="p-2 text-start">{t('office.bill.col_qty')}</th>
               <th
                 className={
-                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                  embedded ? 'hidden' : 'hidden p-2 text-start sm:table-cell'
                 }
               >
                 {t('office.bill.col_price')}
               </th>
               <th
                 className={
-                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                  embedded ? 'hidden' : 'hidden p-2 text-start sm:table-cell'
                 }
               >
                 {t('office.bill.col_discount')}
               </th>
-              <th className="p-2 text-end">{t('office.bill.col_total')}</th>
+              <th className="p-2 text-start">{t('office.bill.col_total')}</th>
               <th
                 className={
-                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                  embedded ? 'hidden' : 'hidden p-2 text-start sm:table-cell'
                 }
               >
                 {t('office.bill.col_refunded')}
               </th>
               <th
                 className={
-                  embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                  embedded ? 'hidden' : 'hidden p-2 text-start sm:table-cell'
                 }
               >
                 {t('office.bill.col_kept')}
@@ -606,24 +606,28 @@ export function BillDetail({
                       {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
                     </span>
                   </td>
-                  <td className="p-2 text-end tabular-nums">
+                  <td className="p-2 text-start tabular-nums">
                     {qty / 1000} {t(`unit.${unit}`)}
                   </td>
                   <td
                     className={
-                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                      embedded
+                        ? 'hidden'
+                        : 'hidden p-2 text-start sm:table-cell'
                     }
                   >
                     <MoneyText paisa={Number(line.unit_price)} />
                   </td>
                   <td
                     className={
-                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                      embedded
+                        ? 'hidden'
+                        : 'hidden p-2 text-start sm:table-cell'
                     }
                   >
                     <MoneyText paisa={Number(line.discount ?? 0)} />
                   </td>
-                  <td className="p-2 text-end">
+                  <td className="p-2 text-start">
                     <MoneyText
                       paisa={saleLineFinal(
                         {
@@ -638,14 +642,18 @@ export function BillDetail({
                   </td>
                   <td
                     className={
-                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                      embedded
+                        ? 'hidden'
+                        : 'hidden p-2 text-start sm:table-cell'
                     }
                   >
                     {refundedMilli > 0 ? refundedMilli / 1000 : '—'}
                   </td>
                   <td
                     className={
-                      embedded ? 'hidden' : 'hidden p-2 text-end sm:table-cell'
+                      embedded
+                        ? 'hidden'
+                        : 'hidden p-2 text-start sm:table-cell'
                     }
                   >
                     {keptMilli / 1000}

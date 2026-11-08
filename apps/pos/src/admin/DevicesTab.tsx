@@ -241,7 +241,7 @@ export function DevicesTab({
                   <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_last_seen')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-end font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_pending')}
                   </th>
                   <th scope="col" className="px-4 py-3 text-start font-medium">
@@ -450,7 +450,7 @@ function DeviceRow({
           </p>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-end tabular-nums">
+      <td className="px-4 py-3 text-start tabular-nums">
         {formatCount(device.pending_ops, lang)}
       </td>
       <td className="px-4 py-3 whitespace-nowrap">

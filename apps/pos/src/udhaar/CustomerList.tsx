@@ -14,6 +14,7 @@ import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
@@ -22,10 +23,12 @@ import {
   type CustomerSort,
   customerList,
   customersCsv,
+  defaultCustomerSortDirection,
   refreshPromises,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
+import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -67,6 +70,9 @@ export function UdhaarList({
   const deferredQuery = useDeferredValue(query);
   const [filter, setFilter] = useState<CustomerFilter>(initialFilter);
   const [sort, setSort] = useState<CustomerSort>('balance');
+  const [direction, setDirection] = useState<SortDirection>(
+    defaultCustomerSortDirection('balance'),
+  );
   const [newOpen, setNewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -91,17 +97,18 @@ export function UdhaarList({
         query: deferredQuery,
         filter,
         sort,
+        direction,
         today,
       })),
       tz,
     };
-  }, [deferredQuery, filter, sort]);
+  }, [deferredQuery, filter, sort, direction]);
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
   // A new filter starts from the first page again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the filter changes
-  useEffect(() => setShown(PAGE), [deferredQuery, filter, sort]);
+  useEffect(() => setShown(PAGE), [deferredQuery, filter, sort, direction]);
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !data || shown >= data.rows.length) return;
@@ -122,7 +129,8 @@ export function UdhaarList({
   const today = data ? businessDate(Date.now(), data.tz) : '';
 
   const activeFilterCount =
-    (filter === 'all' ? 0 : 1) + (sort === 'balance' ? 0 : 1);
+    (filter === 'all' ? 0 : 1) +
+    (sort === 'balance' && direction === 'desc' ? 0 : 1);
   const filters: CustomerFilter[] = [
     'all',
     'owes',
@@ -130,7 +138,26 @@ export function UdhaarList({
     'in_credit',
     'promise_due',
   ];
-  const sorts: CustomerSort[] = ['balance', 'oldest', 'name', 'activity'];
+  const sorts: CustomerSort[] = [
+    'balance',
+    'oldest',
+    'name',
+    'activity',
+    'limit',
+    'promise',
+  ];
+  const applySort = (next: CustomerSort) => {
+    if (next === sort) {
+      setDirection(toggleSortDirection);
+      return;
+    }
+    setSort(next);
+    setDirection(defaultCustomerSortDirection(next));
+  };
+  const changeSort = (next: CustomerSort) => {
+    setSort(next);
+    setDirection(defaultCustomerSortDirection(next));
+  };
 
   return (
     <div
@@ -257,22 +284,30 @@ export function UdhaarList({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col">
+              <div className="flex flex-col">
                 <span className="mb-1 text-small">
                   {t('office.udhaar.sort')}
                 </span>
-                <select
-                  className={selectClass}
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as CustomerSort)}
-                >
-                  {sorts.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`office.udhaar.sort_${value}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="flex gap-1">
+                  <select
+                    aria-label={t('office.udhaar.sort')}
+                    className={selectClass}
+                    value={sort}
+                    onChange={(e) => changeSort(e.target.value as CustomerSort)}
+                  >
+                    {sorts.map((value) => (
+                      <option key={value} value={value}>
+                        {t(`office.udhaar.sort_${value}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <SortDirectionButton
+                    direction={direction}
+                    onToggle={() => setDirection(toggleSortDirection)}
+                    testId="udhaar-sort-direction"
+                  />
+                </div>
+              </div>
             </div>
           </search>
         }
@@ -310,14 +345,38 @@ export function UdhaarList({
           <ul className="flex flex-col divide-y divide-border">
             <li
               className={`${CUSTOMER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
-              aria-hidden="true"
               data-testid="udhaar-list-header"
             >
-              <span>{t('office.udhaar.col_customer')}</span>
-              <span className="text-end">{t('office.udhaar.balance')}</span>
-              <span>{t('office.udhaar.sort_oldest')}</span>
-              <span>{t('office.udhaar.credit_limit')}</span>
-              <span>{t('office.udhaar.promise')}</span>
+              <SortHeader
+                label={t('office.udhaar.col_customer')}
+                active={sort === 'name'}
+                direction={direction}
+                onClick={() => applySort('name')}
+              />
+              <SortHeader
+                label={t('office.udhaar.balance')}
+                active={sort === 'balance'}
+                direction={direction}
+                onClick={() => applySort('balance')}
+              />
+              <SortHeader
+                label={t('office.udhaar.sort_oldest')}
+                active={sort === 'oldest'}
+                direction={direction}
+                onClick={() => applySort('oldest')}
+              />
+              <SortHeader
+                label={t('office.udhaar.credit_limit')}
+                active={sort === 'limit'}
+                direction={direction}
+                onClick={() => applySort('limit')}
+              />
+              <SortHeader
+                label={t('office.udhaar.promise')}
+                active={sort === 'promise'}
+                direction={direction}
+                onClick={() => applySort('promise')}
+              />
             </li>
             {data.rows.slice(0, shown).map((row) => {
               const percent = limitPercent(
@@ -350,7 +409,7 @@ export function UdhaarList({
                         {String(row.customer.phone ?? '')}
                       </span>
                     </span>
-                    <span className="min-w-0 text-end">
+                    <span className="min-w-0 text-start">
                       <span
                         className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
                       >
@@ -373,7 +432,7 @@ export function UdhaarList({
                         </span>
                       ) : null}
                     </span>
-                    <span className="min-w-0 text-small text-text-muted max-sm:text-end">
+                    <span className="min-w-0 text-small text-text-muted max-sm:text-start">
                       {ageLabel(t, row.oldestUnpaidAt) || '—'}
                     </span>
                     <span className="col-span-2 min-w-0 sm:col-span-1">

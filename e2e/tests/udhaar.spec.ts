@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-043/T-044: customers, statement, payments, reminders, promises and chase (screens/12).
 
@@ -69,6 +74,66 @@ async function opened(page: Page): Promise<string> {
 }
 
 test.describe('Udhaar (T-043, T-044)', () => {
+  test('every Udhaar column sorts in both directions', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop header');
+    await openReadyShop(page, '/bikri/udhaar');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.seedCustomer({
+        name: 'Ali',
+        phone: '03001234567',
+        limit: 1000000,
+        balance: 300000,
+      });
+      await window.__bikriTest?.seedCustomer({
+        name: 'Bilal',
+        phone: '03007654321',
+        limit: 500000,
+        balance: 100000,
+      });
+    });
+    const header = page.getByTestId('udhaar-list-header');
+    await expect(header).toBeVisible();
+    for (const column of [
+      'Customer',
+      'Balance',
+      'Oldest unpaid',
+      'Credit limit',
+      'Promise',
+    ]) {
+      await expect(
+        header.getByRole('button', { name: new RegExp(`^${column}`) }),
+      ).toBeVisible();
+    }
+    const first = page
+      .locator('[data-testid="udhaar-list-header"] ~ li a')
+      .first();
+    await expect(first).toContainText('Ali');
+    const balance = header.getByRole('button', { name: /^Balance/ });
+    await balance.click();
+    await expect(balance).toHaveAttribute('data-sort-direction', 'asc');
+    await expect(first).toContainText('Bilal');
+    await balance.click();
+    await expect(balance).toHaveAttribute('data-sort-direction', 'desc');
+    await expect(first).toContainText('Ali');
+
+    const limit = header.getByRole('button', { name: /^Credit limit/ });
+    await limit.click();
+    await expect(limit).toHaveAttribute('data-sort-direction', 'desc');
+    await expect(first).toContainText('Ali');
+    await limit.click();
+    await expect(limit).toHaveAttribute('data-sort-direction', 'asc');
+    await expect(first).toContainText('Bilal');
+
+    const direction = page.getByTestId('udhaar-sort-direction');
+    await expect(direction).toHaveAttribute('data-direction', 'asc');
+    await direction.click();
+    await expect(direction).toHaveAttribute('data-direction', 'desc');
+    await expect(first).toContainText('Ali');
+    await expectNoHorizontalScroll(page);
+  });
+
   test('AC 1, 2, 4, 5, 7: statement 3,000 → 890, reminder URL, promise kept, chase total and offline exports', async ({
     page,
     context,

@@ -50,7 +50,8 @@
       "select_bill": "Select a bill",
       "select_bill_hint": "Its items, payments and actions appear here.",
       "record_past": "Record past sale",
-      "late": "Late"
+      "late": "Late",
+      "sort": "Sort"
     },
     "bill": {
       "audit": "Audit",
@@ -305,6 +306,8 @@
       "sort_balance": "Balance",
       "sort_name": "Name",
       "sort_oldest": "Oldest unpaid",
+      "sort_limit": "Credit limit",
+      "sort_promise": "Promise",
       "statement": "Statement",
       "title": "Udhaar",
       "to": "To",
@@ -322,6 +325,7 @@
       "as_of": "As of {{date}}",
       "back": "Back to suppliers",
       "col_last_delivery": "Last delivery",
+      "sort": "Sort",
       "col_supplier": "Supplier",
       "balance": "Balance",
       "balance_after": "Balance after {{amount}}",
@@ -912,10 +916,8 @@
     "about": {
       "built_note": "The app updates itself when online.",
       "check_update": "Check for update",
-      "license": "Licence",
       "privacy": "Privacy",
       "privacy_note": "No analytics, ads or tracking scripts. Customer data stays in your shop, the operator backups and your exports.",
-      "source": "Source code",
       "terms": "Terms of use",
       "terms_1": "Who runs Bikri. Algovyn runs this Bikri deployment for several shops. Your shop is kept apart from other shops; no other shop can see it.",
       "terms_2": "What Algovyn can see. Algovyn runs the database and holds the backup key, so it can technically read your data. It looks only to run the service, restore it, or when you ask for help.",

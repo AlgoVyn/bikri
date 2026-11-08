@@ -65,7 +65,9 @@
     "required": "zaroori",
     "yes": "Haan",
     "back": "Wapas",
-    "filters": "Filters"
+    "filters": "Filters",
+    "sort_ascending": "Chadhti tarteeb",
+    "sort_descending": "Utarti tarteeb"
   },
   "count": {
     "help_title": "Ginti ke tips",
@@ -647,6 +649,11 @@
     "search": "Products talash karein",
     "sku": "SKU",
     "sort": "Tarteeb",
+    "sort_ascending": "Chadhti tarteeb",
+    "sort_category": "Category",
+    "sort_cost": "Ausat laagat",
+    "sort_descending": "Utarti tarteeb",
+    "sort_margin": "Margin",
     "sort_best": "Sab se zyada bikne wali",
     "sort_name": "Naam",
     "sort_price": "Qeemat",

@@ -157,7 +157,7 @@ export function ChaseList() {
                   </span>
                 </Link>
                 <span
-                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-end text-small font-semibold max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
+                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-start text-small font-semibold max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
                 >
                   <MoneyText paisa={row.customer.balance} />
                 </span>

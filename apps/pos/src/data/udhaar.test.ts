@@ -523,6 +523,7 @@ describe('udhaar branch coverage', () => {
     const { db, ctx } = await setup('filters');
     const ali = await customer(db, 'Ali', '');
     const bilal = await customer(db, 'Bilal', '');
+    const charlie = await customer(db, 'Charlie', '');
     await udhaarSale(db, ctx, ali.id, 300000);
     await updateCustomer(
       db,
@@ -554,12 +555,24 @@ describe('udhaar branch coverage', () => {
         await customerList(db, { today: TODAY, filter: 'promise_due' })
       ).rows.map((row) => row.customer.name),
     ).toEqual(['Bilal']);
-    expect(
-      (await customerList(db, { today: TODAY, sort: 'oldest' })).rows,
-    ).toHaveLength(2);
-    expect(
-      (await customerList(db, { today: TODAY, sort: 'activity' })).rows,
-    ).toHaveLength(2);
+    const names = async (
+      sort: 'balance' | 'oldest' | 'name' | 'activity' | 'limit' | 'promise',
+      direction?: 'asc' | 'desc',
+    ) =>
+      (await customerList(db, { today: TODAY, sort, direction })).rows.map(
+        (row) => row.customer.name,
+      );
+    expect(await names('balance', 'desc')).toEqual(['Ali', 'Bilal', 'Charlie']);
+    expect(await names('balance', 'asc')).toEqual(['Bilal', 'Charlie', 'Ali']);
+    expect(await names('name', 'desc')).toEqual(['Charlie', 'Bilal', 'Ali']);
+    expect(await names('oldest', 'asc')).toEqual(['Ali', 'Bilal', 'Charlie']);
+    expect(await names('oldest', 'desc')).toEqual(['Ali', 'Bilal', 'Charlie']);
+    expect(await names('limit', 'desc')).toEqual(['Ali', 'Bilal', 'Charlie']);
+    expect(await names('limit', 'asc')).toEqual(['Ali', 'Bilal', 'Charlie']);
+    expect(await names('promise', 'asc')).toEqual(['Bilal', 'Ali', 'Charlie']);
+    expect(await names('promise', 'desc')).toEqual(['Bilal', 'Ali', 'Charlie']);
+    expect(await names('activity', 'desc')).toHaveLength(3);
+    expect(charlie.id).toBeTruthy();
     const csv = customersCsv(
       (await customerList(db, { today: TODAY })).rows,
       TZ,

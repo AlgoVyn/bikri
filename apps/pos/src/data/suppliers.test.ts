@@ -110,6 +110,13 @@ describe('suppliers and deliveries (T-045)', () => {
     const item = await product(db, ctx);
     const alpha = await createSupplier(db, { name: 'Alpha' }, ctx, 'st-1', NOW);
     const bravo = await createSupplier(db, { name: 'Bravo' }, ctx, 'st-1', NOW);
+    const charlie = await createSupplier(
+      db,
+      { name: 'Charlie' },
+      ctx,
+      'st-1',
+      NOW,
+    );
     const delivery = (
       id: string,
       supplierId: string,
@@ -132,6 +139,29 @@ describe('suppliers and deliveries (T-045)', () => {
       );
     await delivery('p-alpha', alpha.id, '2026-10-01', 100000);
     await delivery('p-bravo', bravo.id, '2026-10-02', 200000);
+
+    const names = async (
+      sort: 'name' | 'balance' | 'last',
+      direction?: 'asc' | 'desc',
+    ) =>
+      (await supplierList(db, { sort, direction })).rows.map(
+        (row) => row.supplier.name,
+      );
+    expect(await names('name')).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(await names('name', 'desc')).toEqual(['Charlie', 'Bravo', 'Alpha']);
+    expect(await names('balance', 'desc')).toEqual([
+      'Bravo',
+      'Alpha',
+      'Charlie',
+    ]);
+    expect(await names('balance', 'asc')).toEqual([
+      'Charlie',
+      'Alpha',
+      'Bravo',
+    ]);
+    expect(await names('last', 'desc')).toEqual(['Bravo', 'Alpha', 'Charlie']);
+    expect(await names('last', 'asc')).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(charlie.id).toBeTruthy();
 
     const filtered = await supplierList(db, { query: 'alpha' });
     expect(filtered.rows.map((row) => row.supplier.name)).toEqual(['Alpha']);

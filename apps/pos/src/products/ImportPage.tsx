@@ -466,7 +466,7 @@ function PreviewTable({
             <th className="px-2 py-2 text-start">
               {t('import.field.name_en')}
             </th>
-            <th className="px-2 py-2 text-end">{t('import.field.price')}</th>
+            <th className="px-2 py-2 text-start">{t('import.field.price')}</th>
             <th className="px-2 py-2 text-start">{t('import.col_action')}</th>
             <th className="px-2 py-2 text-start">{t('import.col_errors')}</th>
           </tr>
@@ -480,7 +480,7 @@ function PreviewTable({
             >
               <td className="px-2 py-1">{r.line}</td>
               <td className="px-2 py-1">{r.parsed.name_en}</td>
-              <td className="px-2 py-1 text-end">
+              <td className="px-2 py-1 text-start">
                 {r.parsed.price === null ? (
                   ''
                 ) : (

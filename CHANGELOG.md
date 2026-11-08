@@ -18,6 +18,10 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Vite dev serves the language catalogs again; dynamic JSON imports no longer carry Node-only import attributes.
 - Settings has a centred index like the other list sections; choosing a row opens that section and, at desktop width, keeps the index beside it in the same two-column master–detail frame as the other sections (D-186, D-187).
 - The Products list header now uses the shared list-surface background and the same start border as its rows, so the column labels line up with their values.
+- List and table columns now use one direction-based alignment: left in English and Roman Urdu, right in Urdu, with no mixed numeric right-alignment inside a list (D-188).
+- Every Products column now sorts — including Category, Avg cost and Margin — and clicking the active header or the phone direction button reverses the order (D-189).
+- Sales, Udhaar and Suppliers now have the same two-way clickable header sorting, with toolbar sort controls on phones (D-190).
+- Settings → About keeps the version, update check, terms and privacy cards but no longer shows external Source code or Licence links.
 
 ### Performance
 - Sell and Products now load the catalogue once and filter in memory, with a short-lived 30-day sold cache; global search uses a session index plus the invoice prefix index; print status queries only failed jobs; day-close pushes use new Device+created indexes (`0011`); sale/refund/void writes lock only the stores they touch; `Intl` formatters are cached; Home and category routes are lazy chunks while the offline product screens stay eager; the export ZIP uses one output buffer (D-185).

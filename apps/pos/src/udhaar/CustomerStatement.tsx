@@ -463,7 +463,7 @@ export function CustomerStatement({
                   <dt className="text-text-muted">
                     {t('office.udhaar.debit')}
                   </dt>
-                  <dd className="text-end">
+                  <dd className="text-start">
                     {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
                   </dd>
                 </div>
@@ -471,7 +471,7 @@ export function CustomerStatement({
                   <dt className="text-text-muted">
                     {t('office.udhaar.credit')}
                   </dt>
-                  <dd className="text-end">
+                  <dd className="text-start">
                     {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
                   </dd>
                 </div>
@@ -492,9 +492,9 @@ export function CustomerStatement({
               <th className="p-2 text-start">
                 {t('office.udhaar.description')}
               </th>
-              <th className="p-2 text-end">{t('office.udhaar.debit')}</th>
-              <th className="p-2 text-end">{t('office.udhaar.credit')}</th>
-              <th className="p-2 text-end">{t('office.udhaar.balance')}</th>
+              <th className="p-2 text-start">{t('office.udhaar.debit')}</th>
+              <th className="p-2 text-start">{t('office.udhaar.credit')}</th>
+              <th className="p-2 text-start">{t('office.udhaar.balance')}</th>
             </tr>
           </thead>
           <tbody>
@@ -504,7 +504,7 @@ export function CustomerStatement({
                 <td className="p-2">{t('office.udhaar.entry_opening')}</td>
                 <td className="p-2" />
                 <td className="p-2" />
-                <td className="p-2 text-end">
+                <td className="p-2 text-start">
                   <MoneyText paisa={statement.openingBalance} />
                 </td>
               </tr>
@@ -541,13 +541,13 @@ export function CustomerStatement({
                       rows[index]?.description
                     )}
                   </td>
-                  <td className="p-2 text-end">
+                  <td className="p-2 text-start">
                     {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
                   </td>
-                  <td className="p-2 text-end">
+                  <td className="p-2 text-start">
                     {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
                   </td>
-                  <td className="p-2 text-end font-medium">
+                  <td className="p-2 text-start font-medium">
                     <MoneyText paisa={row.balance} />
                   </td>
                 </tr>

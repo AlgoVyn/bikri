@@ -12,14 +12,17 @@ import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
+import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
 import {
+  defaultSaleSortDirection,
   type MethodFilter,
   rangeFor,
   type SaleListRow,
+  type SaleSort,
   type SaleStatus,
   type SalesDay,
   type SalesPreset,
@@ -32,6 +35,7 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
+import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -117,6 +121,10 @@ export function SalesList({
   const [status, setStatus] = useState<SaleStatus | ''>('');
   const [staffId, setStaffId] = useState('');
   const [deviceId, setDeviceId] = useState('');
+  const [sort, setSort] = useState<SaleSort>('time');
+  const [direction, setDirection] = useState<SortDirection>(
+    defaultSaleSortDirection('time'),
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -124,9 +132,21 @@ export function SalesList({
   const readOnly = useReadOnly();
   const setActive = useSellStore((s) => s.setActive);
   const [backdateOpen, setBackdateOpen] = useState(false);
-  const activeFilters = [method, status, staffId, deviceId].filter(
-    Boolean,
-  ).length;
+  const activeFilters =
+    [method, status, staffId, deviceId].filter(Boolean).length +
+    (sort === 'time' && direction === 'desc' ? 0 : 1);
+  const applySort = (next: SaleSort) => {
+    if (next === sort) {
+      setDirection(toggleSortDirection);
+      return;
+    }
+    setSort(next);
+    setDirection(defaultSaleSortDirection(next));
+  };
+  const changeSort = (next: SaleSort) => {
+    setSort(next);
+    setDirection(defaultSaleSortDirection(next));
+  };
 
   useEffect(() => {
     if (bill) void navigate({ to: '/sales/$id', params: { id: bill } });
@@ -149,6 +169,8 @@ export function SalesList({
       staffId: staffId || null,
       deviceId: deviceId || null,
       branchId: limited ? branchId : null,
+      sort,
+      direction,
     });
     return { ...history, timeZone, range };
   }, [
@@ -160,6 +182,8 @@ export function SalesList({
     status,
     staffId,
     deviceId,
+    sort,
+    direction,
     limited,
     branchId,
     timeZone,
@@ -174,7 +198,18 @@ export function SalesList({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the query changes
   useEffect(
     () => setShown(PAGE),
-    [preset, custom.from, custom.to, query, method, status, staffId, deviceId],
+    [
+      preset,
+      custom.from,
+      custom.to,
+      query,
+      method,
+      status,
+      staffId,
+      deviceId,
+      sort,
+      direction,
+    ],
   );
 
   const visibleDays = useMemo(() => {
@@ -397,6 +432,40 @@ export function SalesList({
                   ))}
                 </select>
               </label>
+              <div className="flex min-w-0 flex-[1_1_11rem] flex-col">
+                <span className="mb-1 text-small">
+                  {t('office.sales.sort')}
+                </span>
+                <div className="flex gap-1">
+                  <select
+                    aria-label={t('office.sales.sort')}
+                    className={`${selectClass} min-w-0 flex-1`}
+                    value={sort}
+                    onChange={(e) => changeSort(e.target.value as SaleSort)}
+                  >
+                    <option value="time">{t('office.sales.col_time')}</option>
+                    <option value="invoice">
+                      {t('office.sales.col_invoice')}
+                    </option>
+                    <option value="customer">
+                      {t('office.sales.col_customer')}
+                    </option>
+                    <option value="items">{t('office.sales.col_items')}</option>
+                    <option value="total">{t('office.sales.col_total')}</option>
+                    <option value="method">
+                      {t('office.sales.col_method')}
+                    </option>
+                    <option value="status">
+                      {t('office.sales.col_status')}
+                    </option>
+                  </select>
+                  <SortDirectionButton
+                    direction={direction}
+                    onToggle={() => setDirection(toggleSortDirection)}
+                    testId="sales-sort-direction"
+                  />
+                </div>
+              </div>
             </div>
           </search>
         }
@@ -477,21 +546,55 @@ export function SalesList({
               <li
                 data-testid="sales-list-header"
                 className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
-                aria-hidden="true"
               >
-                <span>{t('office.sales.col_time')}</span>
-                <span>{t('office.sales.col_invoice')}</span>
+                <SortHeader
+                  label={t('office.sales.col_time')}
+                  active={sort === 'time'}
+                  direction={direction}
+                  onClick={() => applySort('time')}
+                />
+                <SortHeader
+                  label={t('office.sales.col_invoice')}
+                  active={sort === 'invoice'}
+                  direction={direction}
+                  onClick={() => applySort('invoice')}
+                />
                 {embedded ? null : (
                   <>
-                    <span>{t('office.sales.col_customer')}</span>
-                    <span className="text-end">
-                      {t('office.sales.col_items')}
-                    </span>
+                    <SortHeader
+                      label={t('office.sales.col_customer')}
+                      active={sort === 'customer'}
+                      direction={direction}
+                      onClick={() => applySort('customer')}
+                    />
+                    <SortHeader
+                      label={t('office.sales.col_items')}
+                      active={sort === 'items'}
+                      direction={direction}
+                      onClick={() => applySort('items')}
+                    />
                   </>
                 )}
-                <span className="text-end">{t('office.sales.col_total')}</span>
-                {embedded ? null : <span>{t('office.sales.col_method')}</span>}
-                <span className="text-end">{t('office.sales.col_status')}</span>
+                <SortHeader
+                  label={t('office.sales.col_total')}
+                  active={sort === 'total'}
+                  direction={direction}
+                  onClick={() => applySort('total')}
+                />
+                {embedded ? null : (
+                  <SortHeader
+                    label={t('office.sales.col_method')}
+                    active={sort === 'method'}
+                    direction={direction}
+                    onClick={() => applySort('method')}
+                  />
+                )}
+                <SortHeader
+                  label={t('office.sales.col_status')}
+                  active={sort === 'status'}
+                  direction={direction}
+                  onClick={() => applySort('status')}
+                />
               </li>
               {day.rows.map((row) => (
                 <SaleRow
@@ -591,12 +694,12 @@ function SaleRow({
             <span className="hidden min-w-0 truncate text-text-muted sm:block">
               {row.customerName ?? t('office.sales.walk_in')}
             </span>
-            <span className="hidden text-end text-small text-text-muted sm:block">
+            <span className="hidden text-start text-small text-text-muted sm:block">
               {qtyText(Number(sale.items_qty_milli))}
             </span>
           </>
         )}
-        <span className="text-end">
+        <span className="text-start">
           <MoneyText paisa={Number(sale.total)} />
         </span>
         {embedded ? null : (
@@ -612,7 +715,7 @@ function SaleRow({
           </span>
         )}
         <span
-          className={`justify-self-start whitespace-nowrap rounded-full px-2 text-small font-medium sm:justify-self-end ${statusTone(status)}`}
+          className={`justify-self-start whitespace-nowrap rounded-full px-2 text-small font-medium sm:justify-self-start ${statusTone(status)}`}
         >
           {statusLabel(t, status)}
         </span>

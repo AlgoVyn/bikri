@@ -50,7 +50,8 @@
       "select_bill": "Bill muntakhib karein",
       "select_bill_hint": "Us ki items, payments aur actions yahan nazar aayenge.",
       "record_past": "Purani sale darj karein",
-      "late": "Der se"
+      "late": "Der se",
+      "sort": "Tarteeb"
     },
     "bill": {
       "audit": "Audit",
@@ -305,6 +306,8 @@
       "sort_balance": "Baqaya",
       "sort_name": "Naam",
       "sort_oldest": "Purana baqaya",
+      "sort_limit": "Udhaar ki hadd",
+      "sort_promise": "Wada",
       "statement": "Khata",
       "title": "Udhaar",
       "to": "Tak",
@@ -322,6 +325,7 @@
       "as_of": "{{date}} tak",
       "back": "Suppliers par wapas",
       "col_last_delivery": "Aakhri delivery",
+      "sort": "Tarteeb",
       "col_supplier": "Supplier",
       "balance": "Baqaya",
       "balance_after": "Baad mein baqaya {{amount}}",
@@ -912,10 +916,8 @@
     "about": {
       "built_note": "App online hone par khud update hoti hai.",
       "check_update": "Update check karein",
-      "license": "Licence",
       "privacy": "Privacy",
       "privacy_note": "Koi analytics, ads ya tracking script nahi. Customer data aap ki dukan, operator backups aur aap ki exports mein rehta hai.",
-      "source": "Source code",
       "terms": "Terms of use",
       "terms_1": "Bikri kaun chalata hai. Algovyn kai dukanon ke liye yeh Bikri chalata hai. Aap ki dukan doosri dukanon se alag rakhi jati hai.",
       "terms_2": "Algovyn kya dekh sakta hai. Database aur backup key Algovyn ke paas hai, is liye woh technically aap ka data parh sakta hai. Woh sirf service chalane, restore ya aap ki madad par dekhta hai.",

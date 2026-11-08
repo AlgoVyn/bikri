@@ -423,10 +423,10 @@ export function ProductDetailPage({
                   <th className="px-3 py-2 text-start font-normal">
                     {t('products.history_reason')}
                   </th>
-                  <th className="px-3 py-2 text-end font-normal">
+                  <th className="px-3 py-2 text-start font-normal">
                     {t('products.history_qty')}
                   </th>
-                  <th className="px-3 py-2 text-end font-normal">
+                  <th className="px-3 py-2 text-start font-normal">
                     {t('products.history_balance')}
                   </th>
                   <th className="px-3 py-2 text-start font-normal max-sm:hidden">
@@ -452,7 +452,7 @@ export function ProductDetailPage({
                         {t(`stock.reason.${String(h.movement.reason_code)}`)}
                       </td>
                       <td
-                        className={`px-3 py-2 text-end ${delta < 0 ? 'text-danger' : 'text-success'}`}
+                        className={`px-3 py-2 text-start ${delta < 0 ? 'text-danger' : 'text-success'}`}
                       >
                         <bdi dir="ltr">
                           {delta > 0 ? '+' : '−'}
@@ -460,7 +460,7 @@ export function ProductDetailPage({
                         </bdi>
                       </td>
                       <td
-                        className="px-3 py-2 text-end"
+                        className="px-3 py-2 text-start"
                         data-testid="history-balance"
                       >
                         <bdi dir="ltr">

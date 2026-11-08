@@ -192,7 +192,10 @@ export function TenantsPage() {
                     >
                       {t('admin.col_status')}
                     </th>
-                    <th scope="col" className="px-4 py-3 text-end font-medium">
+                    <th
+                      scope="col"
+                      className="px-4 py-3 text-start font-medium"
+                    >
                       {t('admin.col_devices')}
                     </th>
                     <th
@@ -238,7 +241,7 @@ export function TenantsPage() {
                         <td className="px-4 py-3">
                           <StatusBadge status={tenant.status} />
                         </td>
-                        <td className="px-4 py-3 text-end tabular-nums">
+                        <td className="px-4 py-3 text-start tabular-nums">
                           {formatCount(tenant.devices, lang)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">

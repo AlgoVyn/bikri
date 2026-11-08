@@ -109,7 +109,7 @@ Audit log viewer: filters action, staff, device, date; rows show time, staff, ac
 
 ## About
 
-Version, build hash, licence (link to LICENSE), source link (GitHub), check for update, a "Terms of use" card ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)) and a separate "Privacy" card with the no-analytics/no-tracking note.
+Version, build hash, check for update, a "Terms of use" card ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)) and a separate "Privacy" card with the no-analytics/no-tracking note.
 
 ## Acceptance criteria
 

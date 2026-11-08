@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openReadyShop } from './helpers.ts';
+import { openReadyShop, setLanguage } from './helpers.ts';
 
 type Align = 'start' | 'end';
 
@@ -17,7 +17,11 @@ async function expectAligned(
       if (!header || !row) return null;
       const rect = (element: Element) => {
         const box = element.getBoundingClientRect();
-        return { x: box.x, right: box.x + box.width };
+        return {
+          x: box.x,
+          right: box.x + box.width,
+          align: getComputedStyle(element).textAlign,
+        };
       };
       return {
         header: [...header.children].slice(skipHeaderCells).map(rect),
@@ -33,6 +37,8 @@ async function expectAligned(
     const header = boxes?.header[index];
     const row = boxes?.row[index];
     if (!header || !row) continue;
+    expect(header.align).toBe('start');
+    expect(row.align).toBe('start');
     if (align[index] === 'start')
       expect(Math.abs(header.x - row.x)).toBeLessThanOrEqual(2);
     else expect(Math.abs(header.right - row.right)).toBeLessThanOrEqual(2);
@@ -70,7 +76,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="products-list-header"]',
       'ul[aria-label="Products"] > li a',
-      ['start', 'start', 'end', 'end', 'end', 'end', 'end'],
+      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
       1,
     );
 
@@ -80,7 +86,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="sales-list-header"]',
       '[data-testid="sales-list-header"] ~ li a',
-      ['start', 'start', 'start', 'end', 'end', 'start', 'end'],
+      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/udhaar'));
@@ -89,7 +95,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="udhaar-list-header"]',
       '[data-testid="udhaar-list-header"] ~ li a',
-      ['start', 'end', 'start', 'start', 'start'],
+      ['start', 'start', 'start', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/suppliers'));
@@ -98,7 +104,42 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="suppliers-list-header"]',
       '[data-testid="suppliers-list-header"] ~ li a',
-      ['start', 'end', 'start'],
+      ['start', 'start', 'start'],
     );
+  });
+  test('Urdu flips the same columns to the right edge', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop columns');
+    await openReadyShop(page, '/bikri/');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.seedTodaySales();
+    });
+    await page.evaluate(() => window.__bikriTest?.navigate('/sales'));
+    await expect(page.getByTestId('sales-list-header')).toBeVisible();
+    await setLanguage(page, 'ur');
+    await expect(page.getByTestId('sales-list-header')).toBeVisible();
+    const styles = await page.evaluate(() => {
+      const header = document.querySelector(
+        '[data-testid="sales-list-header"]',
+      );
+      const row = document.querySelector(
+        '[data-testid="sales-list-header"] ~ li a',
+      );
+      if (!header || !row) return null;
+      const read = (element: Element) => {
+        const style = getComputedStyle(element);
+        return { align: style.textAlign, direction: style.direction };
+      };
+      return {
+        header: [...header.children].map(read),
+        row: [...row.children].map(read),
+      };
+    });
+    expect(styles).not.toBeNull();
+    for (const cell of [...(styles?.header ?? []), ...(styles?.row ?? [])]) {
+      expect(cell.align).toBe('start');
+      expect(cell.direction).toBe('rtl');
+    }
   });
 });

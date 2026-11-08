@@ -20,7 +20,7 @@ Bikri differences: photos (REQ-B10), weighted-average cost shown next to last co
 
 ## Product list
 
-Layout: page header with a Products icon, title, subtitle and a primary `+ Add product` (N) plus a `More` kebab menu (Select, Export CSV, Import, Update prices, Manage categories, Add from suggested list, Stock count). The filter toolbar and the table each sit in a card. Table (desktop) / cards (mobile) columns: photo 40 px, Name (+ brand, SKU small), Category, Price, Stock (with unit; amber ≤ min, red ≤ 0), Avg cost and Margin % (only `cost.view`), 30-day sold. Virtualised; 5,000 products scroll at 60 fps.
+Layout: page header with a Products icon, title, subtitle and a primary `+ Add product` (N) plus a `More` kebab menu (Select, Export CSV, Import, Update prices, Manage categories, Add from suggested list, Stock count). The filter toolbar and the table each sit in a card. Table (desktop) / cards (mobile) columns: photo 40 px, Name (+ brand, SKU small), Category, Price, Stock (with unit; amber ≤ min, red ≤ 0), Avg cost and Margin % (only `cost.view`), 30-day sold. Every column header sorts: the first click uses the column's natural order (A–Z, low to high, or best sellers first for Sold) and clicking the active header again reverses it; the arrow shows the current direction. On phones, where the header row is hidden, the sort select and the direction button in the filter toolbar do the same. Virtualised; 5,000 products scroll at 60 fps.
 
 Select mode: checkboxes; bulk actions `Change category`, `Update prices`, `Print labels` ([screens/20](20-barcode-labels.md)), `Delete` (owner), `Export selected`.
 

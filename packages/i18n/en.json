@@ -65,7 +65,9 @@
     "required": "required",
     "yes": "Yes",
     "back": "Back",
-    "filters": "Filters"
+    "filters": "Filters",
+    "sort_ascending": "Ascending",
+    "sort_descending": "Descending"
   },
   "count": {
     "help_title": "Counting tips",
@@ -647,6 +649,11 @@
     "search": "Search products",
     "sku": "SKU",
     "sort": "Sort",
+    "sort_ascending": "Ascending",
+    "sort_category": "Category",
+    "sort_cost": "Avg cost",
+    "sort_descending": "Descending",
+    "sort_margin": "Margin",
     "sort_best": "Best selling",
     "sort_name": "Name",
     "sort_price": "Price",

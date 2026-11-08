@@ -249,8 +249,8 @@ export function PricesPage() {
                     <th className="px-2 py-2 text-start">
                       {t('import.field.name_en')}
                     </th>
-                    <th className="px-2 py-2 text-end">{t('prices.old')}</th>
-                    <th className="px-2 py-2 text-end">{t('prices.new')}</th>
+                    <th className="px-2 py-2 text-start">{t('prices.old')}</th>
+                    <th className="px-2 py-2 text-start">{t('prices.new')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,11 +261,11 @@ export function PricesPage() {
                       className="border-t border-border"
                     >
                       <td className="px-2 py-1">{String(r.product.name_en)}</td>
-                      <td className="px-2 py-1 text-end">
+                      <td className="px-2 py-1 text-start">
                         <MoneyText paisa={r.old} />
                       </td>
                       <td
-                        className={`px-2 py-1 text-end ${r.next !== r.old ? 'font-semibold' : ''}`}
+                        className={`px-2 py-1 text-start ${r.next !== r.old ? 'font-semibold' : ''}`}
                       >
                         <MoneyText paisa={r.next} />
                       </td>

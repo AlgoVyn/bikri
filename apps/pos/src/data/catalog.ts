@@ -6,7 +6,9 @@ import {
   refundedRevenue,
 } from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
+import { categoryName } from '../lib/category.ts';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
+import type { SortDirection } from '../lib/sort.ts';
 import { type Photo, photoKey } from '../products/photo.ts';
 import { putFile } from './fileCache.ts';
 import { defaultBranch, deviceInfo } from './localTenant.ts';
@@ -23,7 +25,29 @@ const DAY_MS = 86_400_000;
 const NAME_COLLATOR = new Intl.Collator();
 
 export type StockFilter = 'all' | 'low' | 'out' | 'untracked';
-export type ProductSort = 'name' | 'price' | 'stock' | 'best';
+export type ProductSort =
+  | 'name'
+  | 'category'
+  | 'price'
+  | 'stock'
+  | 'cost'
+  | 'margin'
+  | 'best';
+
+/** A column's natural first-click order: numbers and names low/A first, best sellers high first. */
+export const PRODUCT_SORT_DIRECTIONS: Record<ProductSort, SortDirection> = {
+  name: 'asc',
+  category: 'asc',
+  price: 'asc',
+  stock: 'asc',
+  cost: 'asc',
+  margin: 'asc',
+  best: 'desc',
+};
+
+export function defaultProductSortDirection(sort: ProductSort): SortDirection {
+  return PRODUCT_SORT_DIRECTIONS[sort];
+}
 
 export type ProductListRow = {
   product: MasterRow;
@@ -190,6 +214,8 @@ export function filterAndSortProducts(
     categoryId?: string | null;
     stock?: StockFilter;
     sort?: ProductSort;
+    direction?: SortDirection;
+    language?: string;
   } = {},
 ): ProductListRow[] {
   let rows = input.slice();
@@ -204,12 +230,44 @@ export function filterAndSortProducts(
   const byName = (a: ProductListRow, b: ProductListRow) =>
     NAME_COLLATOR.compare(String(a.product.name_en), String(b.product.name_en));
   const sort = opts.sort ?? 'name';
+  const sign =
+    (opts.direction ?? defaultProductSortDirection(sort)) === 'asc' ? 1 : -1;
+  const margin = (row: ProductListRow): number | null => {
+    const price = Number(row.product.price);
+    if (!(price > 0)) return null;
+    return (price - Number(row.product.avg_cost ?? 0)) / price;
+  };
   rows.sort((a, b) => {
+    if (sort === 'category') {
+      const aName = categoryName(a.category, opts.language ?? 'en');
+      const bName = categoryName(b.category, opts.language ?? 'en');
+      if (!aName && !bName) return byName(a, b);
+      if (!aName) return 1;
+      if (!bName) return -1;
+      return sign * NAME_COLLATOR.compare(aName, bName) || byName(a, b);
+    }
     if (sort === 'price')
-      return Number(a.product.price) - Number(b.product.price) || byName(a, b);
-    if (sort === 'stock') return a.onHand - b.onHand || byName(a, b);
-    if (sort === 'best') return b.sold30 - a.sold30 || byName(a, b);
-    return byName(a, b);
+      return (
+        sign * (Number(a.product.price) - Number(b.product.price)) ||
+        byName(a, b)
+      );
+    if (sort === 'stock') return sign * (a.onHand - b.onHand) || byName(a, b);
+    if (sort === 'cost')
+      return (
+        sign *
+          (Number(a.product.avg_cost ?? 0) - Number(b.product.avg_cost ?? 0)) ||
+        byName(a, b)
+      );
+    if (sort === 'margin') {
+      const aMargin = margin(a);
+      const bMargin = margin(b);
+      if (aMargin === null && bMargin === null) return byName(a, b);
+      if (aMargin === null) return 1;
+      if (bMargin === null) return -1;
+      return sign * (aMargin - bMargin) || byName(a, b);
+    }
+    if (sort === 'best') return sign * (a.sold30 - b.sold30) || byName(a, b);
+    return sign * byName(a, b);
   });
   return rows;
 }
@@ -221,6 +279,8 @@ export async function listProducts(
     categoryId?: string | null;
     stock?: StockFilter;
     sort?: ProductSort;
+    direction?: SortDirection;
+    language?: string;
     now?: number;
   } = {},
 ): Promise<ProductListRow[]> {

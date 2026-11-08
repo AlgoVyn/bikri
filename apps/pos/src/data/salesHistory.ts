@@ -2,9 +2,18 @@ import { businessDate, mulDivRound } from '@bikri/core';
 import type { MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
+import type { SortDirection } from '../lib/sort.ts';
 import type { TableSource } from './caches.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
+const INVOICE_COLLATOR = new Intl.Collator(undefined, { numeric: true });
+const NAME_COLLATOR = new Intl.Collator();
+const STATUS_RANK: Record<string, number> = {
+  paid: 0,
+  part_refunded: 1,
+  refunded: 2,
+  void: 3,
+};
 
 export type SalesPreset =
   | 'today'
@@ -17,6 +26,29 @@ export type SalesPreset =
 export type SaleMethod = 'cash' | 'card' | 'bank_wallet' | 'udhaar';
 export type MethodFilter = SaleMethod | 'split';
 export type SaleStatus = 'paid' | 'part_refunded' | 'refunded' | 'void';
+export type SaleSort =
+  | 'time'
+  | 'invoice'
+  | 'customer'
+  | 'items'
+  | 'total'
+  | 'method'
+  | 'status';
+
+/** Natural first-click order for each sales column. */
+export const SALE_SORT_DIRECTIONS: Record<SaleSort, SortDirection> = {
+  time: 'desc',
+  invoice: 'asc',
+  customer: 'asc',
+  items: 'asc',
+  total: 'desc',
+  method: 'asc',
+  status: 'asc',
+};
+
+export function defaultSaleSortDirection(sort: SaleSort): SortDirection {
+  return SALE_SORT_DIRECTIONS[sort];
+}
 
 export type SalesFilter = {
   from: string;
@@ -28,6 +60,8 @@ export type SalesFilter = {
   deviceId?: string | null;
   /** Cashiers only see their own branch (screens/10). */
   branchId?: string | null;
+  sort?: SaleSort;
+  direction?: SortDirection;
 };
 
 export type SaleListRow = {
@@ -347,12 +381,37 @@ export async function salesHistory(
     });
   }
 
-  rows.sort(
-    (a, b) =>
-      n(b.sale.created_at) - n(a.sale.created_at) ||
-      n(b.sale.invoice_seq) - n(a.sale.invoice_seq) ||
-      String(b.sale.id).localeCompare(String(a.sale.id)),
-  );
+  const sort = filter.sort ?? 'time';
+  const sign =
+    (filter.direction ?? defaultSaleSortDirection(sort)) === 'asc' ? 1 : -1;
+  const newest = (a: SaleListRow, b: SaleListRow) =>
+    n(b.sale.created_at) - n(a.sale.created_at) ||
+    n(b.sale.invoice_seq) - n(a.sale.invoice_seq) ||
+    String(b.sale.id).localeCompare(String(a.sale.id));
+  rows.sort((a, b) => {
+    let value = 0;
+    if (sort === 'invoice')
+      value = INVOICE_COLLATOR.compare(
+        String(a.sale.invoice_no),
+        String(b.sale.invoice_no),
+      );
+    else if (sort === 'customer') {
+      if (a.customerName === null || b.customerName === null) {
+        if (a.customerName === null && b.customerName === null) value = 0;
+        else return a.customerName === null ? 1 : -1;
+      } else value = NAME_COLLATOR.compare(a.customerName, b.customerName);
+    } else if (sort === 'items')
+      value = n(a.sale.items_qty_milli) - n(b.sale.items_qty_milli);
+    else if (sort === 'total') value = n(a.sale.total) - n(b.sale.total);
+    else if (sort === 'method')
+      value = NAME_COLLATOR.compare(a.methods.join(' '), b.methods.join(' '));
+    else if (sort === 'status')
+      value =
+        (STATUS_RANK[String(a.sale.status)] ?? 9) -
+        (STATUS_RANK[String(b.sale.status)] ?? 9);
+    else value = n(a.sale.created_at) - n(b.sale.created_at);
+    return value === 0 ? newest(a, b) : sign * value;
+  });
 
   const byDate = new Map<string, SalesDay>();
   for (const row of rows) {

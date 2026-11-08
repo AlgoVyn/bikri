@@ -42,22 +42,6 @@ function AboutContent() {
         </p>
         <p className="text-text-muted">{t('office.about.built_note')}</p>
         <div className="flex flex-wrap gap-2">
-          <a
-            className={buttonQuiet}
-            href="https://github.com/AlgoVyn/bikri"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('office.about.source')}
-          </a>
-          <a
-            className={buttonQuiet}
-            href="https://github.com/AlgoVyn/bikri/blob/main/LICENSE"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('office.about.license')}
-          </a>
           <button
             type="button"
             className={buttonQuiet}

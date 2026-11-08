@@ -310,10 +310,10 @@ export function SupplierReturnPage({
                 <th className="p-2 text-start">
                   {t('office.suppliers.product')}
                 </th>
-                <th className="p-2 text-end">
+                <th className="p-2 text-start">
                   {t('office.suppliers.received')}
                 </th>
-                <th className="p-2 text-end">
+                <th className="p-2 text-start">
                   {t('office.suppliers.returned')}
                 </th>
                 <th className="p-2 text-start">
@@ -324,7 +324,7 @@ export function SupplierReturnPage({
                     {t('office.suppliers.credit_unit')}
                   </th>
                 ) : null}
-                <th className="p-2 text-end">
+                <th className="p-2 text-start">
                   {t('office.suppliers.line_total')}
                 </th>
               </tr>
@@ -340,8 +340,8 @@ export function SupplierReturnPage({
                     className="border-b border-border last:border-0"
                   >
                     <td className="p-2">{String(line.product.name_en)}</td>
-                    <td className="p-2 text-end">{line.received / 1000}</td>
-                    <td className="p-2 text-end">{line.returned / 1000}</td>
+                    <td className="p-2 text-start">{line.received / 1000}</td>
+                    <td className="p-2 text-start">{line.returned / 1000}</td>
                     <td className="w-36 p-2">
                       <QtyInput
                         label={`${t('office.suppliers.return_qty')} ${String(line.product.name_en)}`}
@@ -374,7 +374,7 @@ export function SupplierReturnPage({
                         />
                       </td>
                     ) : null}
-                    <td className="p-2 text-end">
+                    <td className="p-2 text-start">
                       <MoneyText paisa={mulDivRound(qty, credit, 1000)} />
                     </td>
                   </tr>

@@ -17,7 +17,7 @@
 
 ## Customers list
 
-Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`), `+ New customer` (N), `Chase list`, `Export CSV`.
+Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`, `Credit limit`, `Promise`) with a direction button, `+ New customer` (N), `Chase list`, `Export CSV`. Every table header also sorts: the first click uses the column's natural order (Balance highest, Oldest unpaid first, names A–Z, Credit limit highest, Promise earliest) and clicking it again reverses it; the arrow shows the direction.
 
 Rows use one table header (`Customer`, `Balance`, `Oldest unpaid`, `Credit limit`, `Promise`) and compact cells: name and phone; the balance amount only (green `In credit` for a negative balance, grey `Settled` for zero; screen readers still hear "Owes you Rs …" for positive balances); oldest unpaid age (`Today`, `1 day`, `45 days`); credit-limit bar with percent and limit (or `No limit`); next promise date as a pill (amber when due). Below 640 px the row stacks into a compact card with the same information. Click → statement.
 

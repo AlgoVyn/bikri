@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
+import {
+  expectNoHorizontalScroll,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-045: suppliers, deliveries and paying a supplier (screens/13 ACs 1–5).
 
@@ -24,6 +29,48 @@ async function newSupplier(page: Page, name = 'Hall Road Traders') {
 }
 
 test.describe('Suppliers and deliveries (T-045)', () => {
+  test('every supplier column sorts in both directions', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop header');
+    await openReadyShop(page, '/bikri/suppliers');
+    await page.evaluate(async () => {
+      await window.__bikriTest?.seedSupplier({
+        name: 'Alpha',
+        opening: 100000,
+      });
+      await window.__bikriTest?.seedSupplier({
+        name: 'Bravo',
+        opening: 300000,
+      });
+    });
+    const header = page.getByTestId('suppliers-list-header');
+    await expect(header).toBeVisible();
+    for (const column of ['Supplier', 'Balance', 'Last delivery']) {
+      await expect(
+        header.getByRole('button', { name: new RegExp(`^${column}`) }),
+      ).toBeVisible();
+    }
+    const first = page
+      .locator('[data-testid="suppliers-list-header"] ~ li a')
+      .first();
+    await expect(first).toContainText('Alpha');
+    const balance = header.getByRole('button', { name: /^Balance/ });
+    await balance.click();
+    await expect(balance).toHaveAttribute('data-sort-direction', 'desc');
+    await expect(first).toContainText('Bravo');
+    await balance.click();
+    await expect(balance).toHaveAttribute('data-sort-direction', 'asc');
+    await expect(first).toContainText('Alpha');
+
+    const direction = page.getByTestId('suppliers-sort-direction');
+    await expect(direction).toHaveAttribute('data-direction', 'asc');
+    await direction.click();
+    await expect(direction).toHaveAttribute('data-direction', 'desc');
+    await expect(first).toContainText('Bravo');
+    await expectNoHorizontalScroll(page);
+  });
+
   test('AC 1, 2, 3, 5: delivery raises stock/avg cost, paid-now is a cash out, balance is deliveries minus payments', async ({
     page,
   }) => {

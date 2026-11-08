@@ -16,12 +16,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
-import {
-  ChevronRightIcon,
-  FilterIcon,
-  ProductsIcon,
-  SearchIcon,
-} from '../components/icons.tsx';
+import { FilterIcon, ProductsIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import {
@@ -29,8 +24,10 @@ import {
   PageActions,
 } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import {
+  defaultProductSortDirection,
   filterAndSortProducts,
   listCategories,
   type ProductListRow,
@@ -42,6 +39,7 @@ import { getDb } from '../data/db.ts';
 import { categoryName } from '../lib/category.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
+import type { SortDirection } from '../lib/sort.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import {
   buildProductRows,
@@ -82,6 +80,9 @@ export function ProductList({
   const [categoryId, setCategoryId] = useState('');
   const [stock, setStock] = useState<StockFilter>('all');
   const [sort, setSort] = useState<ProductSort>('name');
+  const [direction, setDirection] = useState<SortDirection>(
+    defaultProductSortDirection('name'),
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -89,7 +90,7 @@ export function ProductList({
   const activeFilters =
     (categoryId ? 1 : 0) +
     (stock !== 'all' ? 1 : 0) +
-    (sort !== 'name' ? 1 : 0);
+    (sort !== 'name' || direction !== 'asc' ? 1 : 0);
   const deferredQuery = useDeferredValue(query);
   const master = useCatalogueMaster();
   const levels = useStockLevels();
@@ -102,8 +103,20 @@ export function ProductList({
       categoryId: categoryId || null,
       stock,
       sort,
+      direction,
+      language: i18n.language,
     });
-  }, [master, levels, sold, deferredQuery, categoryId, stock, sort]);
+  }, [
+    master,
+    levels,
+    sold,
+    deferredQuery,
+    categoryId,
+    stock,
+    sort,
+    direction,
+    i18n.language,
+  ]);
   const total = master?.products.length;
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const showCost = can('cost.view');
@@ -116,6 +129,20 @@ export function ProductList({
       else next.add(id);
       return next;
     });
+  const applySort = (next: ProductSort) => {
+    if (next === sort) {
+      setDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSort(next);
+    setDirection(defaultProductSortDirection(next));
+  };
+  const changeSort = (next: ProductSort) => {
+    setSort(next);
+    setDirection(defaultProductSortDirection(next));
+  };
+  const toggleDirection = () =>
+    setDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
 
   useHotkey(plainKey('n'), () => void navigate({ to: '/products/new' }), {
     enabled: canEdit,
@@ -290,19 +317,40 @@ export function ProductList({
                     </option>
                   </select>
                 </label>
-                <label className="flex min-w-0 flex-[1_1_8rem] flex-col">
+                <div className="flex min-w-0 flex-[1_1_11rem] flex-col">
                   <span className="mb-1 text-small">{t('products.sort')}</span>
-                  <select
-                    className={selectClass}
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as ProductSort)}
-                  >
-                    <option value="name">{t('products.sort_name')}</option>
-                    <option value="price">{t('products.sort_price')}</option>
-                    <option value="stock">{t('products.sort_stock')}</option>
-                    <option value="best">{t('products.sort_best')}</option>
-                  </select>
-                </label>
+                  <div className="flex gap-1">
+                    <select
+                      aria-label={t('products.sort')}
+                      className={`${selectClass} min-w-0 flex-1`}
+                      value={sort}
+                      onChange={(e) =>
+                        changeSort(e.target.value as ProductSort)
+                      }
+                    >
+                      <option value="name">{t('products.sort_name')}</option>
+                      <option value="category">
+                        {t('products.sort_category')}
+                      </option>
+                      <option value="price">{t('products.sort_price')}</option>
+                      <option value="stock">{t('products.sort_stock')}</option>
+                      {showCost ? (
+                        <option value="cost">{t('products.sort_cost')}</option>
+                      ) : null}
+                      {showCost ? (
+                        <option value="margin">
+                          {t('products.sort_margin')}
+                        </option>
+                      ) : null}
+                      <option value="best">{t('products.sort_best')}</option>
+                    </select>
+                    <SortDirectionButton
+                      direction={direction}
+                      onToggle={toggleDirection}
+                      testId="products-sort-direction"
+                    />
+                  </div>
+                </div>
               </div>
             </search>
           }
@@ -325,6 +373,7 @@ export function ProductList({
                   setCategoryId('');
                   setStock('all');
                   setSort('name');
+                  setDirection(defaultProductSortDirection('name'));
                 }}
               >
                 {t('common.clear_filters')}
@@ -336,7 +385,8 @@ export function ProductList({
                 showCost={showCost}
                 embedded={embedded}
                 sort={sort}
-                onSort={setSort}
+                direction={direction}
+                onSort={applySort}
               />
               <VirtualRows
                 selectedId={selectedId}
@@ -379,11 +429,13 @@ function ListHeader({
   showCost,
   embedded,
   sort,
+  direction,
   onSort,
 }: {
   showCost: boolean;
   embedded: boolean;
   sort: ProductSort;
+  direction: SortDirection;
   onSort: (sort: ProductSort) => void;
 }) {
   const { t } = useTranslation();
@@ -396,77 +448,62 @@ function ListHeader({
       <SortHeader
         label={t('products.col_name')}
         active={sort === 'name'}
+        direction={direction}
         onClick={() => onSort('name')}
       />
       {embedded ? (
         <SortHeader
           label={t('products.col_price')}
           active={sort === 'price'}
+          direction={direction}
           onClick={() => onSort('price')}
-          align="end"
         />
       ) : (
         <>
-          <span>{t('products.col_category')}</span>
+          <SortHeader
+            label={t('products.col_category')}
+            active={sort === 'category'}
+            direction={direction}
+            onClick={() => onSort('category')}
+          />
           <SortHeader
             label={t('products.col_price')}
             active={sort === 'price'}
+            direction={direction}
             onClick={() => onSort('price')}
-            align="end"
           />
           <SortHeader
             label={t('products.col_stock')}
             active={sort === 'stock'}
+            direction={direction}
             onClick={() => onSort('stock')}
-            align="end"
           />
           {showCost ? (
-            <span className="text-end">{t('products.col_avg_cost')}</span>
+            <SortHeader
+              label={t('products.col_avg_cost')}
+              active={sort === 'cost'}
+              direction={direction}
+              onClick={() => onSort('cost')}
+            />
           ) : null}
           {showCost ? (
-            <span className="text-end">{t('products.col_margin')}</span>
+            <SortHeader
+              label={t('products.col_margin')}
+              active={sort === 'margin'}
+              direction={direction}
+              onClick={() => onSort('margin')}
+            />
           ) : null}
           <SortHeader
             label={t('products.col_sold')}
             active={sort === 'best'}
+            direction={direction}
             onClick={() => onSort('best')}
-            align="end"
             secondLine={t('products.col_sold_days')}
           />
         </>
       )}
     </div>
-  );
-}
-
-function SortHeader({
-  label,
-  active,
-  onClick,
-  align = 'start',
-  secondLine,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  align?: 'start' | 'end';
-  secondLine?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex min-h-8 items-center gap-1 leading-tight hover:text-text ${
-        align === 'end' ? 'justify-end text-end' : 'text-start'
-      }`}
-    >
-      {label}
-      {secondLine ? (
-        <span className="block text-caption">{secondLine}</span>
-      ) : null}
-      {active ? <ChevronRightIcon className="size-3 -rotate-90" /> : null}
-    </button>
   );
 }
 
@@ -606,7 +643,7 @@ function ProductRow({
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+          <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
               className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
@@ -618,22 +655,22 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <>
-              <span className={`hidden text-end lg:block ${stockTone}`}>
+              <span className={`hidden text-start lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span className="hidden text-start lg:block">
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span className="hidden text-start lg:block">
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-end lg:block">
+              <span className="hidden text-start lg:block">
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
@@ -667,7 +704,7 @@ function ProductRow({
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
+          <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
               className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
@@ -679,22 +716,22 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <>
-              <span className={`hidden text-end lg:block ${stockTone}`}>
+              <span className={`hidden text-start lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span className="hidden text-start lg:block">
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-end lg:block">
+                <span className="hidden text-start lg:block">
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-end lg:block">
+              <span className="hidden text-start lg:block">
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>

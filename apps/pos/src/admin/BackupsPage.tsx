@@ -150,7 +150,7 @@ export function BackupsPage() {
                   <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_date')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-end font-medium">
+                  <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_size')}
                   </th>
                   <th scope="col" className="px-4 py-3 text-start font-medium">
@@ -170,7 +170,7 @@ export function BackupsPage() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       {formatWhen(row.uploaded, lang)}
                     </td>
-                    <td className="px-4 py-3 text-end tabular-nums">
+                    <td className="px-4 py-3 text-start tabular-nums">
                       {formatBytes(row.size, lang)}
                     </td>
                     <td className="px-4 py-3">
