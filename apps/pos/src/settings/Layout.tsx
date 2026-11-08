@@ -1,127 +1,26 @@
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useLayoutEffect,
-  useRef,
-} from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pageClass } from '../components/classes.ts';
 import { SettingsIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
-import { takeListScroll } from '../lib/listScroll.ts';
 import { SettingsNav } from './SettingsNav.tsx';
 
 /**
- * Settings on ≥1280 px uses the reference app's master–detail split: the index stays on the
- * start side and the selected section fills the end side. Below that, a section is a full page.
+ * Settings is a single centred index, matching the other list sections. Choosing a row
+ * opens that section as its own full page; there is no side-by-side preview.
  */
-let settingsNavScroll = 0;
-
-/** True inside the index preview, where the section renders without a second nav column. */
-const SettingsPreviewContext = createContext(false);
-
-export function SettingsPreview({ children }: { children: ReactNode }) {
-  return (
-    <SettingsPreviewContext.Provider value>
-      {children}
-    </SettingsPreviewContext.Provider>
-  );
-}
-
-export function SettingsSplit({
-  index = false,
-  activePath,
-  children,
-}: {
-  index?: boolean;
-  /** Highlight a section while the index is showing its default preview. */
-  activePath?: string;
-  children?: ReactNode;
-}) {
-  const navRef = useRef<HTMLDivElement>(null);
-
-  // Restore the index's own scroll after a section route remounts the nav.
-  useLayoutEffect(() => {
-    if (!navRef.current) return;
-    // Returning to the index shows its title and data-safety card from the top.
-    navRef.current.scrollTop = index ? 0 : settingsNavScroll;
-  }, [index]);
-
-  // Selecting a section is a route change, so SettingsNav remounts and the document height
-  // briefly collapses. Keep the scroll of the nav on the desktop split; on smaller screens
-  // the section is a full page and should start at its top.
-  useLayoutEffect(() => {
-    if (index) return;
-    if (typeof window.matchMedia !== 'function') return;
-    if (!window.matchMedia('(min-width: 1280px)').matches) {
-      window.scrollTo(0, 0);
-      return;
-    }
-    const y = takeListScroll();
-    if (y <= 0) return;
-    const root = document.documentElement;
-    const previousMinHeight = root.style.minHeight;
-    root.style.minHeight = `${y + window.innerHeight}px`;
-    window.scrollTo(0, y);
-    let frames = 0;
-    const release = () => {
-      frames += 1;
-      if ((navRef.current?.scrollHeight ?? 0) >= y || frames > 30) {
-        root.style.minHeight = previousMinHeight;
-        return;
-      }
-      requestAnimationFrame(release);
-    };
-    requestAnimationFrame(release);
-  }, [index]);
-
+export function SettingsIndex({ activePath }: { activePath?: string }) {
   return (
     <AreaStrings area="office">
-      <div className={pageClass('wide', 'gap-6')}>
-        <div className="grid gap-6 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)] xl:items-start">
-          <div
-            ref={navRef}
-            data-testid="settings-index"
-            onScroll={(event) => {
-              settingsNavScroll = event.currentTarget.scrollTop;
-            }}
-            className={`${index ? 'min-w-0' : 'min-w-0 max-xl:hidden'} xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]`}
-          >
-            <SettingsNav
-              activePath={activePath}
-              headingLevel={index ? 'h1' : 'h2'}
-            />
-          </div>
-          <div className={index ? 'hidden min-w-0 xl:block' : 'min-w-0'}>
-            {index ? (children ?? <SettingsPlaceholder />) : children}
-          </div>
-        </div>
+      <div className={pageClass('standard', 'gap-6')}>
+        <SettingsNav activePath={activePath} headingLevel="h1" />
       </div>
     </AreaStrings>
   );
 }
 
-function SettingsPlaceholder() {
-  const { t } = useTranslation();
-  return (
-    <div className="flex min-h-[24rem] flex-col items-center justify-center gap-3 text-center">
-      <span
-        aria-hidden="true"
-        className="flex size-14 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink"
-      >
-        <SettingsIcon />
-      </span>
-      <p className="text-title font-semibold">{t('office.settings.choose')}</p>
-      <p className="max-w-xs text-small text-text-muted">
-        {t('office.settings.choose_hint')}
-      </p>
-    </div>
-  );
-}
-
-/** Shared Settings subpage frame with the split index, a back link and title. */
+/** Shared Settings subpage frame: a centred page with a back link and title. */
 export function SettingsPageLayout({
   title,
   icon,
@@ -132,20 +31,19 @@ export function SettingsPageLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const preview = useContext(SettingsPreviewContext);
-  const content = (
-    <div className="flex min-w-0 flex-col gap-4">
-      <SubpageHeader
-        backTo="/settings"
-        backLabel={t('common.back')}
-        icon={icon ?? <SettingsIcon />}
-        title={title}
-        titleLevel={preview ? 'h2' : 'h1'}
-        showBack={!preview}
-      />
-      {children}
-    </div>
+  return (
+    <AreaStrings area="office">
+      <div className={pageClass('standard', 'gap-4')}>
+        <div className="flex min-w-0 flex-col gap-4">
+          <SubpageHeader
+            backTo="/settings"
+            backLabel={t('common.back')}
+            icon={icon ?? <SettingsIcon />}
+            title={title}
+          />
+          {children}
+        </div>
+      </div>
+    </AreaStrings>
   );
-  if (preview) return <AreaStrings area="office">{content}</AreaStrings>;
-  return <SettingsSplit>{content}</SettingsSplit>;
 }

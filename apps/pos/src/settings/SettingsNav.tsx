@@ -195,7 +195,7 @@ function SettingsNavContent({
     .filter((group) => group.rows.length > 0);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div data-testid="settings-index" className="flex flex-col gap-5">
       <PageHeader
         icon={<SettingsIcon />}
         title={t('nav.settings')}

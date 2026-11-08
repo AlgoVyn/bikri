@@ -179,50 +179,72 @@ test.describe('Settings (T-050)', () => {
     await expect(main.getByText('No settings match.')).toBeVisible();
   });
 
-  test('desktop Settings opens with the shop section beside the index', async ({
+  test('desktop Settings is a centred index and a row opens that section', async ({
     page,
   }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
+    test.skip(testInfo.project.name !== 'desktop', 'desktop layout');
     await openReadyShop(page, '/bikri/settings');
     const settings = page.getByRole('main');
+    const index = settings.getByTestId('settings-index');
+    await expect(index).toBeVisible();
     await expect(
-      settings.getByRole('heading', {
-        level: 2,
-        name: 'Shop profile & receipt',
-      }),
+      settings.getByRole('heading', { level: 1, name: 'Settings' }),
     ).toBeVisible();
     await expect(settings.getByText('Choose a setting')).toHaveCount(0);
     await expect(
-      settings.getByRole('link', { name: /Shop profile & receipt/ }),
-    ).toHaveAttribute('aria-current', 'page');
-    await settings.getByRole('link', { name: /Receipt printer/ }).click();
+      settings.getByRole('heading', { name: 'Shop profile & receipt' }),
+    ).toHaveCount(0);
+    await expect(settings.locator('a[aria-current="page"]')).toHaveCount(0);
+
+    // The index is a normal centred page in the workspace, like Products and Sales.
+    const indexBox = await index.boundingBox();
+    const railBox = await page
+      .getByRole('navigation', { name: 'Main' })
+      .boundingBox();
+    const viewport = page.viewportSize();
+    expect(indexBox).not.toBeNull();
+    const contentCenter =
+      (railBox?.width ?? 0) +
+      ((viewport?.width ?? 0) - (railBox?.width ?? 0)) / 2;
+    expect(
+      Math.abs(
+        (indexBox as { x: number; width: number }).x +
+          (indexBox as { width: number }).width / 2 -
+          contentCenter,
+      ),
+    ).toBeLessThan(2);
+
+    await settings
+      .getByRole('link', { name: /Shop profile & receipt/ })
+      .click();
+    await expect(page).toHaveURL(/\/settings\/shop$/u);
     await expect(
-      settings.getByRole('heading', { name: 'Printer' }),
+      settings.getByRole('heading', {
+        level: 1,
+        name: 'Shop profile & receipt',
+      }),
     ).toBeVisible();
+    await expect(settings.getByTestId('settings-index')).toHaveCount(0);
     await expect(
-      settings.getByRole('link', { name: /Shop profile & receipt/ }),
-    ).not.toHaveAttribute('aria-current', 'page');
-    await expect(settings.getByRole('link', { name: /About/ })).toBeVisible();
+      settings.getByRole('link', { name: 'Back', exact: true }),
+    ).toHaveAttribute('href', '/bikri/settings');
   });
 
-  test('phone Settings keeps the index without a selected section', async ({
+  test('Settings index has no selected section before choosing', async ({
     page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  }) => {
     await openReadyShop(page, '/bikri/settings');
     const settings = page.getByRole('main');
     await expect(settings.getByTestId('settings-index')).toBeVisible();
-    await expect(
-      settings.getByRole('link', { name: /Shop profile & receipt/ }),
-    ).not.toHaveAttribute('aria-current', 'page');
+    await expect(settings.locator('a[aria-current="page"]')).toHaveCount(0);
     await expect(
       settings.getByRole('heading', { name: 'Shop profile & receipt' }),
     ).toHaveCount(0);
   });
 
-  test('Settings keeps the nav scroll when a section opens', async ({
+  test('choosing a section opens it at the top of the page', async ({
     page,
-  }, testInfo) => {
+  }) => {
     await openReadyShop(page, '/bikri/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     await page.waitForTimeout(300);
@@ -233,28 +255,7 @@ test.describe('Settings (T-050)', () => {
 
     await page.getByRole('link', { name: /About/ }).click();
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
-    const after = await page.evaluate(() => window.scrollY);
-    if (testInfo.project.name === 'phone') expect(after).toBe(0);
-    else expect(after).toBeGreaterThan(0);
-  });
-
-  test('the Settings index keeps its own scroll and has no visible bar', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'desktop split view');
-    await openReadyShop(page, '/bikri/settings');
-    const index = page.getByTestId('settings-index');
-    await index.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
-    });
-    const before = await index.evaluate((element) => element.scrollTop);
-    expect(before).toBeGreaterThan(0);
-    await page.getByRole('link', { name: /About/ }).click();
-    await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
-    const after = await page
-      .getByTestId('settings-index')
-      .evaluate((element) => element.scrollTop);
-    expect(after).toBeGreaterThan(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   });
 
   test('every Settings section has a Back button to Settings', async ({
@@ -333,24 +334,5 @@ test.describe('Settings (T-050)', () => {
     await expect(page.getByText('Settings saved.')).toBeVisible();
     const [shop] = await idbAll<{ name: string }>(page, 'shop');
     expect(shop?.name).toBe('Saved Shop');
-  });
-});
-
-test.describe('Settings navigation orientation', () => {
-  test('the active section is scrolled into view in the index', async ({
-    page,
-  }, testInfo) => {
-    if (testInfo.project.name !== 'desktop') {
-      test.skip();
-      return;
-    }
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openReadyShop(page, '/bikri/settings');
-    await navigate(page, '/settings/display');
-    await page.waitForTimeout(500);
-    const active = page
-      .getByTestId('settings-index')
-      .locator('a[aria-current="page"]');
-    await expect(active).toBeInViewport();
   });
 });
