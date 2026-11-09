@@ -33,7 +33,7 @@ export function PageHeader({
         {icon ? (
           <span
             aria-hidden="true"
-            className={`flex size-10 shrink-0 items-center justify-center rounded-control ${tone}`}
+            className={`${hideTitleOnPhone ? 'max-lg:hidden ' : ''}flex size-10 shrink-0 items-center justify-center rounded-control ${tone}`}
           >
             {icon}
           </span>
@@ -45,7 +45,9 @@ export function PageHeader({
             {title}
           </Heading>
           {subtitle ? (
-            <p className="mt-1 max-w-2xl text-small text-text-muted">
+            <p
+              className={`${hideTitleOnPhone ? 'max-lg:hidden ' : ''}mt-1 max-w-2xl text-small text-text-muted`}
+            >
               {subtitle}
             </p>
           ) : null}

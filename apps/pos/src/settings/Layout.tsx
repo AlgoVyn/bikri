@@ -36,9 +36,9 @@ export function SettingsPageLayout({
   const activePath = pathname.replace(/\/+$/u, '');
   return (
     <AreaStrings area="office">
-      <div className={pageClass('wide', 'gap-6')}>
+      <div className={pageClass('standard', 'gap-6')}>
         <div className="grid gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] xl:items-start">
-          <div className="hidden min-w-0 xl:sticky xl:top-[calc(var(--spacing-topbar)+1.5rem)] xl:block xl:max-h-[calc(100dvh-var(--spacing-topbar)-3rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]">
+          <div className="hidden min-w-0 xl:block">
             <SettingsNav activePath={activePath} headingLevel="h2" />
           </div>
           <div className="flex min-w-0 flex-col gap-4">

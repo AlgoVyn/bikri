@@ -135,7 +135,7 @@ export function AdminShell() {
             </div>
             <nav
               aria-label={t('admin.title')}
-              className="flex gap-1 overflow-x-auto px-3 pb-2 lg:hidden"
+              className="flex gap-1 overflow-x-auto px-3 pb-2 [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 lg:hidden"
             >
               {NAV.map((item) => (
                 <Link

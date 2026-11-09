@@ -70,7 +70,7 @@ function DisplayContent() {
       title={t('office.display.title')}
       icon={<DisplayIcon />}
     >
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+      <section className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <label className="flex flex-col gap-1 text-small">
           {t('office.display.language')}
           <select

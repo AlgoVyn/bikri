@@ -1,6 +1,6 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonDangerQuiet } from '../components/classes.ts';
@@ -193,6 +193,9 @@ function SettingsNavContent({
       rows: rows.filter((row) => row.group === group.id),
     }))
     .filter((group) => group.rows.length > 0);
+  const healthy = Boolean(
+    info && info.pending === 0 && info.lastSync && info.printer,
+  );
 
   return (
     <div data-testid="settings-index" className="flex flex-col gap-5">
@@ -210,73 +213,82 @@ function SettingsNavContent({
         <h2 id="data-safety" className="text-h2 font-semibold">
           {t('office.settings.health_title')}
         </h2>
-        <dl className="mt-2 grid grid-cols-2 gap-2 text-small">
-          <div>
-            <dt className="text-text-muted">
-              {t('office.settings.health_sync')}
-            </dt>
-            <dd className="font-medium">
-              {info?.pending
-                ? t('office.settings.health_pending', {
-                    count: info.pending,
-                  })
-                : t('office.settings.health_up_to_date')}
-              <span className="block text-caption font-normal text-text-muted">
-                {t('office.settings.health_last_sync')}:{' '}
-                {info?.lastSync
-                  ? t('shell.sync_ago', {
-                      minutes: Math.max(
-                        0,
-                        Math.round((Date.now() - info.lastSync) / 60_000),
-                      ),
+        {healthy ? (
+          <p className="mt-1 text-small text-text-muted">
+            {t('office.settings.health_ok')}
+          </p>
+        ) : (
+          <dl className="mt-2 grid grid-cols-2 gap-2 text-small">
+            <div>
+              <dt className="text-text-muted">
+                {t('office.settings.health_sync')}
+              </dt>
+              <dd className="font-medium">
+                {info?.pending
+                  ? t('office.settings.health_pending', {
+                      count: info.pending,
                     })
-                  : t('shell.sync_never')}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-text-muted">
-              {t('office.settings.health_storage')}
-            </dt>
-            <dd className="font-medium">
-              {info?.storageBytes ? (
-                <bdi dir="ltr">
-                  {t('office.settings.health_storage_value', {
-                    mb: Math.max(1, Math.round(info.storageBytes / 1_048_576)),
-                  })}
-                </bdi>
-              ) : (
-                '—'
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-text-muted">
-              {t('office.settings.health_backup')}
-            </dt>
-            <dd className="font-medium">
-              {owner && can('export.data') ? (
-                <Link to="/settings/backup" className="text-primary">
-                  {t('office.settings.health_backup_value')}
+                  : t('office.settings.health_up_to_date')}
+                <span className="block text-caption font-normal text-text-muted">
+                  {t('office.settings.health_last_sync')}:{' '}
+                  {info?.lastSync
+                    ? t('shell.sync_ago', {
+                        minutes: Math.max(
+                          0,
+                          Math.round((Date.now() - info.lastSync) / 60_000),
+                        ),
+                      })
+                    : t('shell.sync_never')}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-muted">
+                {t('office.settings.health_storage')}
+              </dt>
+              <dd className="font-medium">
+                {info?.storageBytes ? (
+                  <bdi dir="ltr">
+                    {t('office.settings.health_storage_value', {
+                      mb: Math.max(
+                        1,
+                        Math.round(info.storageBytes / 1_048_576),
+                      ),
+                    })}
+                  </bdi>
+                ) : (
+                  '—'
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-muted">
+                {t('office.settings.health_backup')}
+              </dt>
+              <dd className="font-medium">
+                {owner && can('export.data') ? (
+                  <Link to="/settings/backup" className="text-primary">
+                    {t('office.settings.health_backup_value')}
+                  </Link>
+                ) : (
+                  t('office.settings.health_backup_value')
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-muted">
+                {t('office.settings.health_printer')}
+              </dt>
+              <dd className="font-medium">
+                <Link to="/settings/printer" className="text-primary">
+                  {info?.printer
+                    ? t('shell.printer_ready')
+                    : t('shell.printer_none')}
                 </Link>
-              ) : (
-                t('office.settings.health_backup_value')
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-text-muted">
-              {t('office.settings.health_printer')}
-            </dt>
-            <dd className="font-medium">
-              <Link to="/settings/printer" className="text-primary">
-                {info?.printer
-                  ? t('shell.printer_ready')
-                  : t('shell.printer_none')}
-              </Link>
-            </dd>
-          </div>
-        </dl>
+              </dd>
+            </div>
+          </dl>
+        )}
       </section>
 
       <label className={searchWrapperClass}>
@@ -395,16 +407,10 @@ function SettingsRow({
     active ??
     (pathname.replace(/\/+$/u, '') === target ||
       activePath?.replace(/\/+$/u, '') === target);
-  const linkRef = useRef<HTMLAnchorElement>(null);
-  useEffect(() => {
-    if (current) linkRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [current]);
   return (
     <li>
       <Link
-        ref={linkRef}
         to={to}
-        resetScroll={false}
         onClick={rememberListScroll}
         aria-current={current ? 'page' : undefined}
         className={`${rowLink} ${

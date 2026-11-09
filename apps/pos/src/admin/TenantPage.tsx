@@ -29,6 +29,24 @@ const TABS: readonly { id: Tab; key: string }[] = [
   { id: 'delete', key: 'admin.tab_delete' },
 ];
 
+const TENANT_TONES = [
+  'bg-t1',
+  'bg-t2',
+  'bg-t3',
+  'bg-t4',
+  'bg-t5',
+  'bg-t6',
+  'bg-t7',
+  'bg-t8',
+] as const;
+
+/** Stable tenant accent, so destructive actions always carry the shop's identity. */
+function tenantTone(id: string): (typeof TENANT_TONES)[number] {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return TENANT_TONES[hash % TENANT_TONES.length] ?? 'bg-t1';
+}
+
 export function TenantPage({ id }: { id: string }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -65,20 +83,25 @@ export function TenantPage({ id }: { id: string }) {
   const tenant = detail.tenant;
   const maintenance = tenant.status === 'maintenance';
   const lang = i18n.language;
+  const tone = tenantTone(tenant.id);
 
   return (
     <div className="flex flex-col gap-5">
       <a
         href={adminHref('/admin/tenants')}
-        className="inline-flex min-h-9 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"
+        className="inline-flex min-h-11 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"
       >
         <ChevronLeftIcon className="size-4 rtl:rotate-180" />
         {t('admin.back_to_shops')}
       </a>
-      <header className="flex flex-wrap items-start gap-4 rounded-card border border-border bg-surface p-4 shadow-card lg:p-5">
+      <header className="relative flex flex-wrap items-start gap-4 overflow-hidden rounded-card border border-border bg-surface p-4 shadow-card lg:p-5">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink"
+          className={`absolute inset-x-0 top-0 h-1 ${tone}`}
+        />
+        <span
+          aria-hidden="true"
+          className={`flex size-10 shrink-0 items-center justify-center rounded-control text-tile-ink ${tone}`}
         >
           <StoreIcon />
         </span>

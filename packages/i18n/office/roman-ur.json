@@ -721,6 +721,7 @@
     },
     "settings": {
       "health_title": "Data ki hifazat",
+      "health_ok": "Sync, storage, backup aur printer sab theek hain.",
       "health_last_sync": "Aakhri sync",
       "health_sync": "Sync",
       "health_pending": "{{count}} changes baqi",

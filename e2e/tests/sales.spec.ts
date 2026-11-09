@@ -108,7 +108,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await expectNoHorizontalScroll(page);
   });
 
-  test('phone: bill actions share one compact row', async ({
+  test('phone: bill detail keeps one primary and hides destructive actions behind More', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -117,13 +117,13 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await page.getByRole('link', { name: /A-A-1/ }).click();
     const detail = page.getByTestId('sales-detail');
     const print = detail.getByRole('button', { name: 'Print', exact: true });
-    const refund = detail.getByRole('button', { name: 'Refund', exact: true });
-    const printBox = await print.boundingBox();
-    const refundBox = await refund.boundingBox();
-    expect(printBox && refundBox).toBeTruthy();
-    expect(Math.abs((printBox?.y ?? 0) - (refundBox?.y ?? 0))).toBeLessThan(2);
-    expect(printBox?.width ?? 999).toBeLessThan(120);
-    expect(refundBox?.height ?? 999).toBeLessThanOrEqual(44);
+    await expect(print).toHaveClass(/bg-primary/u);
+    const more = detail.getByTestId('page-actions-more');
+    await expect(more).toBeVisible();
+    await more.click();
+    await expect(
+      page.getByRole('button', { name: 'Refund', exact: true }),
+    ).toBeVisible();
   });
 
   test('AC 5 + screens/11 AC 1: refund a bill, status/history rows, failed print stays red until a success', async ({
@@ -131,6 +131,10 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
   }) => {
     await sellOne(page);
     await expect(page.getByTestId('bill-status')).toHaveText('Paid');
+    await page
+      .getByTestId('sales-detail')
+      .getByTestId('page-actions-more')
+      .click();
     await page.getByRole('button', { name: /^Refund\b/ }).click();
     const dialog = page.getByRole('dialog', { name: /Refund/ });
     await dialog.getByRole('button', { name: 'Faulty' }).click();
@@ -205,6 +209,10 @@ test.describe('Void and reissue (T-042)', () => {
     const original = await page
       .getByRole('heading', { level: 1 })
       .textContent();
+    await page
+      .getByTestId('sales-detail')
+      .getByTestId('page-actions-more')
+      .click();
     await page.getByRole('button', { name: 'Void & reissue' }).click();
     const reissue = page.getByRole('dialog', { name: 'Void & reissue' });
     await reissue.getByRole('button', { name: 'Wrong price' }).click();
@@ -245,6 +253,10 @@ test.describe('Void and reissue (T-042)', () => {
     const done2 = page.getByRole('dialog', { name: 'Sale complete' });
     await done2.getByRole('button', { name: 'Open bill' }).click();
     await expect(page.getByTestId('bill-status')).toHaveText('Paid');
+    await page
+      .getByTestId('sales-detail')
+      .getByTestId('page-actions-more')
+      .click();
     await page.getByRole('button', { name: 'Void', exact: true }).click();
     const voidDialog = page.getByRole('dialog', { name: 'Void this bill?' });
     await expect(voidDialog).toContainText('Return Rs 3,500 to the customer');
@@ -286,6 +298,10 @@ test.describe('Urdu refunds (screens/11 AC 4–6)', () => {
       'کچھ رقم واپس',
     );
     await page.getByRole('link', { name: /A-A-2/ }).click();
+    await page
+      .getByTestId('sales-detail')
+      .getByTestId('page-actions-more')
+      .click();
     await page.getByRole('button', { name: /^رقم واپس/ }).click();
     const dialog = page.getByRole('dialog', { name: /A-A-2/ });
     await expect(dialog.getByText('ادا شدہ اور کھاتے کی تقسیم')).toBeVisible();

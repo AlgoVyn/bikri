@@ -89,6 +89,7 @@ export type DeviceInfo = {
   id: string;
   name: string;
   branch_id: string;
+  branch_name: string | null;
   device_code: string;
   is_admin: boolean;
   kind: 'till' | 'support';

@@ -18,7 +18,7 @@ export function ExportTab({ tenantId }: { tenantId: string }) {
     <Panel
       title={t('admin.tab_export')}
       description={t('admin.export_hint')}
-      className="max-w-2xl"
+      className="mx-auto w-full max-w-2xl"
     >
       <div className="flex flex-col gap-4">
         <p className="text-small text-text-muted">{t('admin.export_intro')}</p>

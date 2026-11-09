@@ -4,10 +4,12 @@ import { ClockIcon, SearchIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { listShopRequests } from './api.ts';
-import { adminHref, formatWhen } from './format.ts';
+import { adminHref, formatCount, formatWhen } from './format.ts';
 import type { ShopRequest, ShopRequestStatus } from './types.ts';
-import { AdminErrorState, Panel } from './ui.tsx';
+import { AdminErrorState, EmailBadge, Panel, quietBtn } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
+
+const PAGE_SIZE = 20;
 
 const STATUSES: ShopRequestStatus[] = [
   'pending',
@@ -50,6 +52,7 @@ export function RequestsPage() {
   const { t, i18n } = useTranslation();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const query = useAdminQuery(`shop-requests:${status}:${search}`, () =>
     listShopRequests({ status, q: search }),
   );
@@ -61,6 +64,9 @@ export function RequestsPage() {
     );
   }
   const rows = query.data.requests;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const pageRows = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -78,7 +84,10 @@ export function RequestsPage() {
               className={searchInputClass}
               placeholder={t('admin.requests_search_placeholder')}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
             />
           </label>
           <label className="flex items-center gap-2 text-small">
@@ -88,7 +97,10 @@ export function RequestsPage() {
             <select
               className="h-11 rounded-control border border-border-strong bg-surface px-2 text-text"
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
             >
               <option value="">{t('admin.requests_all')}</option>
               {STATUSES.map((item) => (
@@ -104,32 +116,67 @@ export function RequestsPage() {
             {t('admin.requests_empty')}
           </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {rows.map((row) => (
-              <li key={row.id}>
-                <a
-                  href={adminHref(`/admin/requests/${row.id}`)}
-                  className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-surface-2"
+          <>
+            <ul className="divide-y divide-border">
+              {pageRows.map((row) => {
+                const email =
+                  row.email_verified_at !== null
+                    ? ('verified' as const)
+                    : row.cloudflare_address_id
+                      ? ('sent' as const)
+                      : ('missing' as const);
+                return (
+                  <li key={row.id}>
+                    <a
+                      href={adminHref(`/admin/requests/${row.id}`)}
+                      className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {row.shop_name}
+                        </span>
+                        <span className="block truncate text-small text-text-muted">
+                          {row.owner_name} · {row.email}
+                        </span>
+                      </span>
+                      <EmailBadge state={email} label={emailState(row, t)} />
+                      <RequestStatus status={row.status} />
+                      <span className="w-36 text-end text-small text-text-muted">
+                        {formatWhen(row.created_at, i18n.language)}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+              <p className="text-small text-text-muted tabular-nums">
+                {t('admin.requests_count', { count: rows.length })} ·{' '}
+                {t('admin.page_of', {
+                  page: formatCount(current, i18n.language),
+                  pages: formatCount(pages, i18n.language),
+                })}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={quietBtn}
+                  disabled={current <= 1}
+                  onClick={() => setPage(current - 1)}
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      {row.shop_name}
-                    </span>
-                    <span className="block truncate text-small text-text-muted">
-                      {row.owner_name} · {row.email}
-                    </span>
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {emailState(row, t)}
-                  </span>
-                  <RequestStatus status={row.status} />
-                  <span className="w-36 text-end text-small text-text-muted">
-                    {formatWhen(row.created_at, i18n.language)}
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
+                  {t('admin.prev')}
+                </button>
+                <button
+                  type="button"
+                  className={quietBtn}
+                  disabled={current >= pages}
+                  onClick={() => setPage(current + 1)}
+                >
+                  {t('admin.next')}
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </Panel>
     </div>

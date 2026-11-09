@@ -14,6 +14,7 @@ import {
 import type { TenantListItem } from './types.ts';
 import {
   AdminErrorState,
+  MeterBar,
   Panel,
   primaryBtn,
   quietBtn,
@@ -173,111 +174,117 @@ export function TenantsPage() {
                 </li>
               ))}
             </ul>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[880px] text-start text-small">
-                <caption className="sr-only">
-                  {t('admin.tenants_title')}
-                </caption>
-                <thead className="border-b border-border bg-surface-2 text-text-muted">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_name')}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_status')}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_devices')}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_last_seen')}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_setup')}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-start font-medium"
-                    >
-                      {t('admin.col_writes')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((tenant) => {
-                    return (
-                      <tr
-                        key={tenant.id}
-                        className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
+            <div className="relative hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] text-start text-small">
+                  <caption className="sr-only">
+                    {t('admin.tenants_title')}
+                  </caption>
+                  <thead className="border-b border-border bg-surface-2 text-text-muted">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
                       >
-                        <td className="px-4 py-3">
-                          <a
-                            href={adminHref(`/admin/tenants/${tenant.id}`)}
-                            className="group inline-flex min-w-0 flex-col"
-                          >
-                            <span className="truncate font-medium text-text group-hover:text-primary">
-                              {tenant.display_name}
-                            </span>
-                            <span className="font-mono text-small text-text-muted">
-                              {tenant.slug}
-                            </span>
-                          </a>
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={tenant.status} />
-                        </td>
-                        <td className="px-4 py-3 text-start tabular-nums">
-                          {formatCount(tenant.devices, lang)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {tenant.last_seen_at === null
-                            ? t('admin.never')
-                            : formatWhen(tenant.last_seen_at, lang)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 ${
-                              tenant.setup_completed
-                                ? 'text-success-subtle-ink'
-                                : 'text-text-muted'
-                            }`}
-                          >
+                        {t('admin.col_name')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
+                      >
+                        {t('admin.col_status')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
+                      >
+                        {t('admin.col_devices')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
+                      >
+                        {t('admin.col_last_seen')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
+                      >
+                        {t('admin.col_setup')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-start font-medium"
+                      >
+                        {t('admin.col_writes')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((tenant) => {
+                      return (
+                        <tr
+                          key={tenant.id}
+                          className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
+                        >
+                          <td className="px-4 py-3">
+                            <a
+                              href={adminHref(`/admin/tenants/${tenant.id}`)}
+                              className="group inline-flex min-w-0 flex-col"
+                            >
+                              <span className="truncate font-medium text-text group-hover:text-primary">
+                                {tenant.display_name}
+                              </span>
+                              <span className="font-mono text-small text-text-muted">
+                                {tenant.slug}
+                              </span>
+                            </a>
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={tenant.status} />
+                          </td>
+                          <td className="px-4 py-3 text-start tabular-nums">
+                            {formatCount(tenant.devices, lang)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {tenant.last_seen_at === null
+                              ? t('admin.never')
+                              : formatWhen(tenant.last_seen_at, lang)}
+                          </td>
+                          <td className="px-4 py-3">
                             <span
-                              aria-hidden="true"
-                              className={`size-1.5 rounded-full ${
+                              className={`inline-flex items-center gap-1.5 ${
                                 tenant.setup_completed
-                                  ? 'bg-success'
-                                  : 'bg-border-strong'
+                                  ? 'text-success-subtle-ink'
+                                  : 'text-text-muted'
                               }`}
-                            />
-                            {tenant.setup_completed
-                              ? t('admin.setup_done')
-                              : t('admin.setup_pending')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <WriteMeter tenant={tenant} lang={lang} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`size-1.5 rounded-full ${
+                                  tenant.setup_completed
+                                    ? 'bg-success'
+                                    : 'bg-border-strong'
+                                }`}
+                              />
+                              {tenant.setup_completed
+                                ? t('admin.setup_done')
+                                : t('admin.setup_pending')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <WriteMeter tenant={tenant} lang={lang} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-linear-to-r from-surface to-transparent rtl:bg-linear-to-l lg:hidden"
+              />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
               <p className="text-small text-text-muted tabular-nums">
@@ -326,24 +333,24 @@ function WriteMeter({
   let tone = 'var(--color-primary)';
   if (warn) tone = 'var(--color-warning)';
   if (hot) tone = 'var(--color-danger)';
+  const limit = budget > 0 ? budget : 1;
+  const percent = Math.round((tenant.today.rows_written / limit) * 100);
+  const valueText = t('admin.writes_bar', {
+    written: formatCount(tenant.today.rows_written, lang),
+    budget: formatCount(budget, lang),
+  });
   return (
     <div>
-      <meter
-        className="h-2 w-full max-w-28"
-        min={0}
-        max={budget > 0 ? budget : 1}
+      <MeterBar
+        label={valueText}
+        valueText={valueText}
         value={tenant.today.rows_written}
-        style={{ accentColor: tone }}
-        aria-label={t('admin.writes_bar', {
-          written: formatCount(tenant.today.rows_written, lang),
-          budget: formatCount(budget, lang),
-        })}
+        max={limit}
+        tone={tone}
+        className="max-w-28"
       />
       <p className="mt-1 text-small text-text-muted tabular-nums">
-        {t('admin.writes_bar', {
-          written: formatCount(tenant.today.rows_written, lang),
-          budget: formatCount(budget, lang),
-        })}
+        {valueText} · {percent}%
       </p>
     </div>
   );

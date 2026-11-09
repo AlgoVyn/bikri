@@ -620,8 +620,10 @@ admin.post('/tenants/:id/enrolment-codes', async (c) => {
 });
 
 admin.get('/tenants/:id/devices', async (c) => {
-  const rows = await c.var.db.select<DeviceRow>(
-    'SELECT * FROM devices WHERE tenant_id = ?1 ORDER BY revoked_at IS NOT NULL, enrolled_at',
+  const rows = await c.var.db.select<
+    DeviceRow & { branch_name: string | null }
+  >(
+    'SELECT d.*, b.name AS branch_name FROM devices d LEFT JOIN branches b ON b.tenant_id = d.tenant_id AND b.id = d.branch_id WHERE d.tenant_id = ?1 AND b.tenant_id = ?1 ORDER BY d.revoked_at IS NOT NULL, d.enrolled_at',
   );
   return c.json({
     devices: rows.map(({ token_hash: _hidden, ...d }) => ({

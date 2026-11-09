@@ -120,13 +120,21 @@ function RequestShop() {
         <div>
           <h1 className="text-h1 font-semibold">{t('register.title')}</h1>
           <p className="mt-2 text-text-muted">{t('register.subtitle')}</p>
-          <p className="mt-2 rounded-control bg-surface-2 p-3 text-small text-text-muted">
-            {t('register.intro')}
-          </p>
+          <details className="mt-2 rounded-control bg-surface-2 p-3 text-small text-text-muted">
+            <summary className="cursor-pointer font-medium text-text">
+              {t('register.intro_title')}
+            </summary>
+            <p className="mt-2">{t('register.intro')}</p>
+          </details>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-small sm:col-span-2">
-            <span>{t('register.shop_name')}</span>
+            <span>
+              {t('register.shop_name')}{' '}
+              <span aria-hidden="true" className="text-danger">
+                *
+              </span>
+            </span>
             <input
               data-testid="register-shop-name"
               className={fieldClass}
@@ -137,7 +145,12 @@ function RequestShop() {
             />
           </label>
           <label className="flex flex-col gap-1 text-small">
-            <span>{t('register.owner_name')}</span>
+            <span>
+              {t('register.owner_name')}{' '}
+              <span aria-hidden="true" className="text-danger">
+                *
+              </span>
+            </span>
             <input
               data-testid="register-owner-name"
               className={fieldClass}
@@ -148,7 +161,12 @@ function RequestShop() {
             />
           </label>
           <label className="flex flex-col gap-1 text-small">
-            <span>{t('register.email')}</span>
+            <span>
+              {t('register.email')}{' '}
+              <span aria-hidden="true" className="text-danger">
+                *
+              </span>
+            </span>
             <input
               data-testid="register-email"
               className={fieldClass}

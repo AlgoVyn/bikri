@@ -113,6 +113,7 @@ export function PageActions({
           <button
             ref={triggerRef}
             type="button"
+            data-testid="page-actions-more"
             className="flex size-11 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2"
             aria-label={label}
             aria-haspopup="true"

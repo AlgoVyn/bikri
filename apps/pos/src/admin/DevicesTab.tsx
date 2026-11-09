@@ -15,6 +15,7 @@ import {
   AdminConfirm,
   AdminErrorState,
   Field,
+  FileField,
   inputClass,
   PairingPanel,
   Panel,
@@ -274,45 +275,44 @@ export function DevicesTab({
 
       <Panel title={t('admin.import_ops')} description={t('admin.import_hint')}>
         <div className="flex max-w-xl flex-col gap-3">
-          <Field id="unsynced-file" label={t('admin.import_choose')}>
-            <input
-              id="unsynced-file"
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file === undefined) return;
-                void file.text().then((text) => {
-                  const parsed = parseUnsynced(text);
-                  if (parsed === null) {
-                    setPreview(null);
-                    toast.push(t('admin.import_bad'), 'error');
-                    return;
-                  }
-                  if (parsed.tenant_id !== tenantId) {
-                    setPreview(null);
-                    toast.push(t('admin.import_tenant_mismatch'), 'error');
-                    return;
-                  }
-                  const device = devices.find(
-                    (item) => item.id === parsed.device_id,
-                  );
-                  if (device === undefined || device.revoked_at === null) {
-                    setPreview(null);
-                    toast.push(t('admin.import_not_revoked'), 'error');
-                    return;
-                  }
-                  setPreview({
-                    deviceId: parsed.device_id,
-                    name: device.name,
-                    ops: parsed.ops,
-                  });
-                  setProgress(null);
+          <FileField
+            id="unsynced-file"
+            label={t('admin.import_file')}
+            accept="application/json,.json"
+            onPick={(file) => {
+              if (file === null) {
+                setPreview(null);
+                return;
+              }
+              void file.text().then((text) => {
+                const parsed = parseUnsynced(text);
+                if (parsed === null) {
+                  setPreview(null);
+                  toast.push(t('admin.import_bad'), 'error');
+                  return;
+                }
+                if (parsed.tenant_id !== tenantId) {
+                  setPreview(null);
+                  toast.push(t('admin.import_tenant_mismatch'), 'error');
+                  return;
+                }
+                const device = devices.find(
+                  (item) => item.id === parsed.device_id,
+                );
+                if (device === undefined || device.revoked_at === null) {
+                  setPreview(null);
+                  toast.push(t('admin.import_not_revoked'), 'error');
+                  return;
+                }
+                setPreview({
+                  deviceId: parsed.device_id,
+                  name: device.name,
+                  ops: parsed.ops,
                 });
-              }}
-            />
-          </Field>
+                setProgress(null);
+              });
+            }}
+          />
           {preview !== null ? (
             <p className="rounded-control bg-info-subtle px-3 py-2 text-small text-info-subtle-ink">
               {t('admin.import_preview', {
@@ -432,7 +432,7 @@ function DeviceRow({
           ) : null}
         </div>
         <p className="font-mono text-small text-text-muted">
-          {device.device_code} · {device.branch_id}
+          {device.device_code} · {device.branch_name ?? device.branch_id}
         </p>
       </td>
       <td className="px-4 py-3">

@@ -24,7 +24,10 @@ export function Breadcrumbs({ current }: { current: string | null }) {
           {pathname === '/' ? (
             <span className="font-medium text-text">{t('nav.home')}</span>
           ) : (
-            <Link to="/" className="text-text-muted hover:text-text">
+            <Link
+              to="/"
+              className="inline-flex min-h-11 items-center text-text-muted hover:text-text"
+            >
               {t('nav.home')}
             </Link>
           )}
@@ -34,7 +37,7 @@ export function Breadcrumbs({ current }: { current: string | null }) {
             <ChevronRightIcon className="size-3.5 text-text-muted rtl:rotate-180" />
             <Link
               to={parent.to}
-              className="truncate text-text-muted hover:text-text"
+              className="inline-flex min-h-11 items-center truncate text-text-muted hover:text-text"
             >
               {parentLabel}
             </Link>

@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useToast } from '../components/Toast.tsx';
 import { AdminApiError, adminErrorMessage } from './api.ts';
 
 export function useAdminQuery<T>(key: string, query: () => Promise<T>) {
   const { t } = useTranslation();
-  const toast = useToast();
   const queryRef = useRef(query);
   queryRef.current = query;
   const [data, setData] = useState<T | null>(null);
@@ -33,12 +31,11 @@ export function useAdminQuery<T>(key: string, query: () => Promise<T>) {
               ? t('admin.err_server')
               : adminErrorMessage(err, t('admin.err_generic'));
         setError(message);
-        toast.push(message, 'error');
       });
     return () => {
       cancelled = true;
     };
-  }, [key, nonce, t, toast]);
+  }, [key, nonce, t]);
 
   return {
     data,

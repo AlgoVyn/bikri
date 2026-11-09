@@ -13,3 +13,6 @@ test-results/
 
 # Generated performance fixture (tools/seed/large.ts); never commit it.
 e2e/fixtures/large.json
+
+# Review artifacts are local working notes, not shipped docs.
+docs/reviews/

@@ -433,6 +433,9 @@ export function UdhaarList({
                       ) : null}
                     </span>
                     <span className="min-w-0 text-small text-text-muted max-sm:text-start">
+                      <span className="sm:hidden">
+                        {t('office.udhaar.sort_oldest')} ·{' '}
+                      </span>
                       {ageLabel(t, row.oldestUnpaidAt) || '—'}
                     </span>
                     <span className="col-span-2 min-w-0 sm:col-span-1">

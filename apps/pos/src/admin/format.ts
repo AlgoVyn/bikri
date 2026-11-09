@@ -93,6 +93,17 @@ export function formatWhen(ms: number, lang: string): string {
   }).format(ms);
 }
 
+/** Short axis/day label for a YYYY-MM-DD business date. */
+export function formatDayShort(iso: string, lang: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(iso)) return iso;
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat(localeOf(lang), {
+    timeZone: 'Asia/Karachi',
+    day: '2-digit',
+    month: 'short',
+  }).format(new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, 12)));
+}
+
 export function exportFilename(slug: string, at: number): string {
   return `bikri-export-${slug}-${businessDate(at)}.zip`;
 }

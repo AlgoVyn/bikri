@@ -721,6 +721,7 @@
     },
     "settings": {
       "health_title": "ڈیٹا کی حفاظت",
+      "health_ok": "سنک، اسٹوریج، بیک اپ اور پرنٹر سب ٹھیک ہیں۔",
       "health_last_sync": "آخری سنک",
       "health_sync": "سنک",
       "health_pending": "{{count}} تبدیلیاں باقی",

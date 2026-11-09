@@ -9,6 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
+  buttonDangerQuiet,
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
@@ -83,6 +84,110 @@ export function Modal({
 export const primaryBtn = buttonPrimary;
 export const quietBtn = buttonQuiet;
 export const dangerBtn = buttonDanger;
+export const dangerQuietBtn = buttonDangerQuiet;
+
+const EMAIL_TONE = {
+  verified: 'bg-success-subtle text-success-subtle-ink',
+  sent: 'bg-info-subtle text-info-subtle-ink',
+  missing: 'bg-warning-subtle text-warning-subtle-ink',
+} as const;
+
+/** Email-verification state shared by the request list and request detail. */
+export function EmailBadge({
+  state,
+  label,
+}: {
+  state: keyof typeof EMAIL_TONE;
+  label: string;
+}) {
+  return (
+    <span
+      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium ${EMAIL_TONE[state]}`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+      {label}
+    </span>
+  );
+}
+
+/** Localized file picker: one 44 px trigger, the chosen filename and a clear action. */
+export function FileField({
+  id,
+  label,
+  hint,
+  accept,
+  disabled = false,
+  onPick,
+  testId,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  accept?: string;
+  disabled?: boolean;
+  onPick: (file: File | null) => void;
+  testId?: string;
+}) {
+  const { t } = useTranslation();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState<string | null>(null);
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={`${id}-label`} className="text-small">
+        {label}
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={inputRef}
+          id={id}
+          type="file"
+          accept={accept}
+          disabled={disabled}
+          aria-labelledby={`${id}-label ${id}-choose`}
+          className="peer sr-only"
+          data-testid={testId}
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            setName(file?.name ?? null);
+            onPick(file);
+            // Allow choosing the same file again after a validation error.
+            event.target.value = '';
+          }}
+        />
+        <label
+          id={`${id}-choose`}
+          htmlFor={id}
+          className={`${quietBtn} cursor-pointer ${
+            disabled
+              ? 'pointer-events-none border-border bg-surface-2 text-text-muted'
+              : ''
+          }`}
+        >
+          {t('admin.step_file')}
+        </label>
+        <span className="min-w-0 flex-1 truncate text-small text-text-muted">
+          {name ?? t('admin.file_none')}
+        </span>
+        {name !== null && !disabled ? (
+          <button
+            type="button"
+            className="min-h-11 px-2 text-small text-text-muted underline underline-offset-2"
+            onClick={() => {
+              setName(null);
+              if (inputRef.current !== null) inputRef.current.value = '';
+              onPick(null);
+            }}
+          >
+            {t('admin.file_clear')}
+          </button>
+        ) : null}
+      </div>
+      {hint !== undefined ? (
+        <p className="text-small text-text-muted">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
 
 export const inputClass =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text focus:border-primary';
@@ -225,6 +330,52 @@ export function Field({
   );
 }
 
+/** One visible meter bar; native <meter> renders too faintly at a glance. */
+export function MeterBar({
+  label,
+  valueText,
+  value,
+  max,
+  tone = 'var(--color-primary)',
+  warnAt,
+  className = '',
+}: {
+  label: string;
+  valueText: string;
+  value: number;
+  max: number;
+  tone?: string;
+  warnAt?: number;
+  className?: string;
+}) {
+  const limit = max > 0 ? max : Math.max(value, 1);
+  const pct = Math.max(0, Math.min(100, (value / limit) * 100));
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: the native <meter> is too faint; this has the same ARIA.
+    <div
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={limit}
+      aria-valuenow={value}
+      aria-valuetext={valueText}
+      className={`relative h-2 w-full overflow-hidden rounded-full bg-surface-2 ${className}`}
+    >
+      <span
+        className="absolute inset-y-0 start-0 rounded-full transition-[width] duration-200"
+        style={{ width: `${pct}%`, backgroundColor: tone }}
+      />
+      {warnAt !== undefined && warnAt > 0 && warnAt < limit ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 w-px bg-text/30"
+          style={{ insetInlineStart: `${(warnAt / limit) * 100}%` }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function Meter({
   label,
   valueText,
@@ -244,19 +395,23 @@ export function Meter({
   if (warn) tone = 'var(--color-warning)';
   if (over) tone = 'var(--color-danger)';
   const limit = max > 0 ? max : Math.max(value, 1);
+  const pct = Math.round((value / limit) * 100);
   return (
     <div>
       <div className="flex justify-between gap-3 text-small">
         <span>{label}</span>
-        <span className="tabular-nums">{valueText}</span>
+        <span className="tabular-nums">
+          {valueText} · {pct}%
+        </span>
       </div>
-      <meter
-        className="mt-1 h-2 w-full"
-        min={0}
-        max={limit}
+      <MeterBar
+        label={label}
+        valueText={valueText}
         value={value}
-        aria-label={label}
-        style={{ accentColor: tone }}
+        max={max}
+        tone={tone}
+        warnAt={warnAt}
+        className="mt-1"
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   buttonPrimary,
   buttonQuiet,
 } from '../components/classes.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { CloudIcon } from '../components/icons.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -344,14 +345,18 @@ export function SyncPage() {
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-2">
-          <h2 className="text-h2 font-semibold">
+        <section className="overflow-hidden rounded-card border border-border bg-surface">
+          <h2 className="border-b border-border px-4 py-3 text-h2 font-semibold">
             {t('syncpage.conflicts_title')}
           </h2>
           {data.conflicts.length === 0 ? (
-            <p className="text-text-muted">{t('syncpage.no_conflicts')}</p>
+            <EmptyState
+              variant="plain"
+              icon={<CloudIcon />}
+              message={t('syncpage.no_conflicts')}
+            />
           ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+            <ul className="flex flex-col divide-y divide-border">
               {data.conflicts.map((c) => (
                 <li
                   key={String(c.id)}

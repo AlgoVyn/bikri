@@ -13,6 +13,7 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
@@ -226,12 +227,12 @@ export function ExpensesPage() {
             />
           </div>
         ) : null}
-        <p className="ms-auto text-small">
-          {t('office.expenses.total')}:{' '}
-          <span className="text-title font-semibold">
-            <MoneyText paisa={data?.total ?? 0} />
-          </span>
-        </p>
+        <div className="ms-auto rounded-card border border-border bg-surface px-4 py-2 shadow-card">
+          <Metric
+            label={t('office.expenses.total')}
+            value={<MoneyText paisa={data?.total ?? 0} />}
+          />
+        </div>
       </div>
       {preset === 'custom' && !customValid ? (
         <p role="alert" className="text-small text-danger">
@@ -352,12 +353,13 @@ export function ExpensesPage() {
                   {canReverse(row) ? (
                     <button
                       type="button"
-                      className={`${buttonDangerQuiet} w-11 px-0`}
-                      aria-label={t('office.expenses.reverse')}
-                      title={t('office.expenses.reverse')}
+                      className={`${buttonDangerQuiet} gap-1.5 px-3`}
                       onClick={() => setReversing(row)}
                     >
-                      <UndoIcon className="size-5" />
+                      <UndoIcon className="size-4" />
+                      <span className="text-small">
+                        {t('office.expenses.reverse')}
+                      </span>
                     </button>
                   ) : row.reversed ? (
                     <span className="text-small text-text-muted">

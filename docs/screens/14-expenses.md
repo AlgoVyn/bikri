@@ -25,7 +25,7 @@ Top: date range Today / 7 days / 30 days / This month / Last month / Custom (fro
 | Note | optional 0–120 |
 | Date | today (owner can back-date 30 days) |
 
-Expenses are append-only. Mistakes are fixed with `⋯ → Reverse` (same permission, same business date for cashiers): it writes a new `expenses` row with the same category, amount and method and `reverses_id` = the original; the list shows both struck through with "Reversed". Reversal rows count as negative in every total and in day close ([07 §8](../07-money-rules.md#8-day-close)). An expense can be reversed once.
+Expenses are append-only. Mistakes are fixed with the labelled `Reverse` action (same permission, same business date for cashiers): it writes a new `expenses` row with the same category, amount and method and `reverses_id` = the original; the list shows both struck through with "Reversed". Reversal rows count as negative in every total and in day close ([07 §8](../07-money-rules.md#8-day-close)). An expense can be reversed once.
 
 ## Cash in / out (pay-in / pay-out)
 

@@ -19,6 +19,8 @@ import type { ApproveShopRequestResult } from './types.ts';
 import {
   AdminErrorState,
   dangerBtn,
+  dangerQuietBtn,
+  EmailBadge,
   inputClass,
   Modal,
   PairingPanel,
@@ -181,6 +183,11 @@ export function RequestPage({ id }: { id: string }) {
     : request.cloudflare_address_id
       ? t('admin.request_email_sent')
       : t('admin.request_email_not_added');
+  const emailState = verified
+    ? ('verified' as const)
+    : request.cloudflare_address_id
+      ? ('sent' as const)
+      : ('missing' as const);
 
   return (
     <div className="flex flex-col gap-5">
@@ -280,12 +287,8 @@ export function RequestPage({ id }: { id: string }) {
             description={t('admin.request_email_hint')}
           >
             <div className="flex flex-col gap-3">
-              <p className="text-small">{emailText}</p>
-              {verified ? (
-                <p className="rounded-control bg-success-subtle p-2 text-small text-success-subtle-ink">
-                  {t('admin.request_email_verified')}
-                </p>
-              ) : request.cloudflare_address_id ? (
+              <EmailBadge state={emailState} label={emailText} />
+              {verified ? null : request.cloudflare_address_id ? (
                 <button
                   type="button"
                   className={primaryBtn}
@@ -337,6 +340,15 @@ export function RequestPage({ id }: { id: string }) {
                 >
                   {t('admin.request_reopen')}
                 </button>
+              ) : request.status === 'approved' ? (
+                tenant ? (
+                  <a
+                    href={adminHref(`/admin/tenants/${tenant.id}`)}
+                    className={primaryBtn}
+                  >
+                    {t('admin.request_open_tenant')}
+                  </a>
+                ) : null
               ) : (
                 <>
                   <button
@@ -355,9 +367,9 @@ export function RequestPage({ id }: { id: string }) {
                   ) : null}
                   <button
                     type="button"
-                    className={dangerBtn}
+                    className={dangerQuietBtn}
                     data-testid="request-reject"
-                    disabled={busy !== null || request.status === 'approved'}
+                    disabled={busy !== null}
                     onClick={() => {
                       setReason('');
                       setRejectOpen(true);
@@ -365,16 +377,16 @@ export function RequestPage({ id }: { id: string }) {
                   >
                     {t('admin.request_reject')}
                   </button>
+                  {tenant ? (
+                    <a
+                      href={adminHref(`/admin/tenants/${tenant.id}`)}
+                      className={quietBtn}
+                    >
+                      {t('admin.request_open_tenant')}
+                    </a>
+                  ) : null}
                 </>
               )}
-              {tenant ? (
-                <a
-                  href={adminHref(`/admin/tenants/${tenant.id}`)}
-                  className={quietBtn}
-                >
-                  {t('admin.request_open_tenant')}
-                </a>
-              ) : null}
             </div>
           </Panel>
         </div>

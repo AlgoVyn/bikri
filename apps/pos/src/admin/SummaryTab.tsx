@@ -14,13 +14,14 @@ import {
   barPercent,
   EMAIL_RE,
   formatCount,
+  formatDayShort,
   formatWhen,
   statusLabelKey,
 } from './format.ts';
 import type { IssuedCode, TenantDetail } from './types.ts';
 import {
   AdminConfirm,
-  dangerBtn,
+  dangerQuietBtn,
   Field,
   HoursDialog,
   Modal,
@@ -89,6 +90,11 @@ export function SummaryTab({
   };
 
   const total = detail.usage.reduce((sum, day) => sum + day.rows_written, 0);
+  const peak = Math.max(1, ...detail.usage.map((day) => day.rows_written));
+  const peakPercent =
+    tenant.daily_write_budget > 0
+      ? Math.round((peak / tenant.daily_write_budget) * 1000) / 10
+      : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -117,7 +123,7 @@ export function SummaryTab({
           </div>
           <button
             type="button"
-            className={dangerBtn}
+            className={dangerQuietBtn}
             onClick={() => setEndOpen(true)}
           >
             {t('admin.support_end')}
@@ -125,7 +131,7 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
         <Panel
           title={t('admin.tenant_status')}
           description={t('admin.tenant_status_hint')}
@@ -256,36 +262,51 @@ export function SummaryTab({
         {detail.usage.length === 0 ? (
           <p className="text-small text-text-muted">{t('admin.usage_empty')}</p>
         ) : (
-          <ul className="flex h-36 items-end gap-2 border-b border-border pb-2">
-            {detail.usage.map((day) => (
-              <li
-                key={day.day}
-                className="flex h-full flex-1 flex-col justify-end"
-              >
-                <div
-                  className="mx-auto w-full max-w-24 rounded-t-control bg-primary transition-colors hover:bg-primary-hover"
-                  style={{
-                    height: `${barPercent(day.rows_written, maxWrite)}%`,
-                    minHeight: day.rows_written > 0 ? '4px' : '2px',
-                    backgroundColor:
-                      day.rows_written > 0
-                        ? undefined
-                        : 'var(--color-surface-2)',
-                  }}
-                  title={t('admin.writes_bar', {
-                    written: formatCount(day.rows_written, lang),
-                    budget: day.day,
-                  })}
-                />
-                <span className="mt-1 text-center text-small text-text-muted">
-                  {day.day.slice(5)}
-                </span>
-                <span className="sr-only">
-                  {day.day} {formatCount(day.rows_written, lang)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-stretch gap-2">
+              <div className="flex h-36 flex-col justify-between pb-6 text-caption tabular-nums text-text-muted">
+                <span>{formatCount(maxWrite, lang)}</span>
+                <span>0</span>
+              </div>
+              <ul className="flex h-36 flex-1 items-end gap-2 border-b border-border pb-2">
+                {detail.usage.map((day) => (
+                  <li
+                    key={day.day}
+                    className="flex h-full flex-1 flex-col justify-end"
+                  >
+                    <div
+                      className="mx-auto w-full max-w-24 rounded-t-control bg-primary transition-colors hover:bg-primary-hover"
+                      style={{
+                        height: `${barPercent(day.rows_written, maxWrite)}%`,
+                        minHeight: day.rows_written > 0 ? '4px' : '2px',
+                        backgroundColor:
+                          day.rows_written > 0
+                            ? undefined
+                            : 'var(--color-surface-2)',
+                      }}
+                      title={t('admin.writes_bar', {
+                        written: formatCount(day.rows_written, lang),
+                        budget: formatCount(tenant.daily_write_budget, lang),
+                      })}
+                    />
+                    <span className="mt-1 text-center text-caption text-text-muted">
+                      {formatDayShort(day.day, lang)}
+                    </span>
+                    <span className="sr-only">
+                      {day.day} {formatCount(day.rows_written, lang)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-small text-text-muted">
+              {t('admin.usage_peak', {
+                peak: formatCount(maxWrite, lang),
+                percent: peakPercent,
+                budget: formatCount(tenant.daily_write_budget, lang),
+              })}
+            </p>
+          </div>
         )}
       </Panel>
 
@@ -335,7 +356,11 @@ export function SummaryTab({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={quietBtn}
+            className={
+              status === 'active' || status === 'maintenance'
+                ? primaryBtn
+                : quietBtn
+            }
             onClick={() => setEdit(true)}
           >
             {t('admin.edit')}
@@ -352,7 +377,7 @@ export function SummaryTab({
           {status === 'active' || status === 'read_only' ? (
             <button
               type="button"
-              className={quietBtn}
+              className={dangerQuietBtn}
               onClick={() => setAction({ kind: 'suspend' })}
             >
               {t('admin.suspend')}
@@ -379,7 +404,7 @@ export function SummaryTab({
           {status !== 'deleting' ? (
             <button
               type="button"
-              className={primaryBtn}
+              className={quietBtn}
               disabled={pending}
               onClick={() => {
                 void run(async () => {

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoSeriousAxe, openReadyShop } from './helpers.ts';
+import { createShop } from './syncHelpers.ts';
 
 // T-031 (screens/19): the operator console against `wrangler dev`, where Access is not enforced
 // for the local operator (13 §7.1). Desktop only.
@@ -87,4 +88,17 @@ test('operator console has no serious axe violations', async ({ page }) => {
   await expect(
     page.getByTitle('Signed in as operator@example.com'),
   ).toBeVisible();
+});
+
+test('tenant header pluralizes devices and the file pickers are localized', async ({
+  page,
+  request,
+}) => {
+  const shop = await createShop(request, `files-${Date.now()}@e2e.test`);
+  await page.goto(`/bikri/admin/tenants/${shop.tenant.id}`);
+  await expect(page.getByText('0 devices')).toBeVisible();
+  await page.getByRole('tab', { name: 'Devices' }).click();
+  await expect(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
+  await expect(page.getByText('No file chosen')).toBeVisible();
+  await expect(page.locator('input[type="file"]')).toHaveClass(/sr-only/u);
 });

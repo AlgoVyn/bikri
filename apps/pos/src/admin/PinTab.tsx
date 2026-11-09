@@ -44,7 +44,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
     <Panel
       title={t('admin.tab_pin')}
       description={t('admin.pin_subtitle')}
-      className="max-w-xl"
+      className="mx-auto w-full max-w-xl"
     >
       <form
         className="flex flex-col gap-4"

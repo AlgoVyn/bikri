@@ -721,6 +721,7 @@
     },
     "settings": {
       "health_title": "Data safety",
+      "health_ok": "Sync, storage, backup and printer are healthy.",
       "health_sync": "Sync",
       "health_last_sync": "Last sync",
       "health_pending": "{{count}} changes waiting",

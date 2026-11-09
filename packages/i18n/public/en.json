@@ -4,6 +4,7 @@
     "title": "Request a Bikri shop",
     "subtitle": "Tell us about your shop. We review every request before creating a shop.",
     "intro": "After you submit, we review your request. If it passes the first review, we ask Cloudflare to send a verification email to this address. Click the link in that email; your registration code is issued only after the email is verified and the request is approved. The email comes from Cloudflare, not Bikri.",
+    "intro_title": "How approval works",
     "shop_name": "Shop name",
     "owner_name": "Owner name",
     "email": "Email address",

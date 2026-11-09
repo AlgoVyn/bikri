@@ -18,12 +18,18 @@
 .ltr-name {
   direction: ltr;
   text-align: start;
+  font-family: var(--font-sans);
 }
 
 [dir="rtl"] .ltr-name {
   text-align: end;
   /* Latin names do not need the Urdu line-height; the product list rows are compact. */
   line-height: 1.35;
+}
+
+/* Latin names stay in the interface face even when the document is Urdu. */
+html:lang(ur) .ltr-name {
+  font-family: var(--font-sans);
 }
 
 /* Cards use one soft elevation level; dashed empty states stay flat. */
@@ -39,16 +45,22 @@
     -webkit-mask-image: linear-gradient(
       to right,
       transparent,
-      black 12px,
-      black calc(100% - 12px),
+      black 24px,
+      black calc(100% - 24px),
       transparent
     );
     mask-image: linear-gradient(
       to right,
       transparent,
-      black 12px,
-      black calc(100% - 12px),
+      black 24px,
+      black calc(100% - 24px),
       transparent
     );
+    scroll-padding-inline: 24px;
+    scroll-snap-type: x proximity;
+  }
+
+  .scroll-strip > * {
+    scroll-snap-align: start;
   }
 }

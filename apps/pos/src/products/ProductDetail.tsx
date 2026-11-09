@@ -96,6 +96,21 @@ export function ProductDetailPage({
   const avg = Number(p.avg_cost ?? 0);
   const showCost = can('cost.view');
   const margin = marginText(price, avg);
+  const minStock = Number(p.min_stock_milli ?? 0);
+  const stockTone =
+    p.track_stock !== 1
+      ? 'default'
+      : detail.onHand <= 0
+        ? 'danger'
+        : minStock > 0 && detail.onHand <= minStock
+          ? 'warning'
+          : 'default';
+  const stockLabel =
+    stockTone === 'danger'
+      ? t('products.stock_out')
+      : stockTone === 'warning'
+        ? t('products.stock_low')
+        : null;
   const maxQty = Math.max(1, ...detail.last14.map((d) => d.qty));
   const totalQty = detail.last14.reduce((s, d) => s + d.qty, 0);
   const totalRevenue = detail.last14.reduce((s, d) => s + d.revenue, 0);
@@ -282,8 +297,14 @@ export function ProductDetailPage({
               label={t('products.on_hand')}
               testId="detail-on-hand"
               emphasize
+              tone={stockTone}
             >
               {qtyWithUnit(t, detail.onHand, unit)}
+              {stockLabel !== null ? (
+                <span className="ms-2 rounded-full bg-surface/70 px-2 py-0.5 align-middle text-small font-medium">
+                  {stockLabel}
+                </span>
+              ) : null}
             </Figure>
           ) : null}
         </div>
@@ -531,19 +552,23 @@ function Figure({
   testId,
   children,
   emphasize = false,
+  tone = 'default',
 }: {
   label: string;
   testId: string;
   children: React.ReactNode;
   emphasize?: boolean;
+  tone?: 'default' | 'warning' | 'danger';
 }) {
+  const toneClass =
+    tone === 'danger'
+      ? 'border-danger/30 bg-danger-subtle text-danger-subtle-ink'
+      : tone === 'warning'
+        ? 'border-warning/30 bg-warning-subtle text-warning-subtle-ink'
+        : 'border-primary/20 bg-primary-subtle text-primary-subtle-ink';
   return (
     <div
-      className={
-        emphasize
-          ? 'rounded-card border border-primary/20 bg-primary-subtle p-3 text-primary-subtle-ink'
-          : 'p-0'
-      }
+      className={emphasize ? `rounded-card border p-3 ${toneClass}` : 'p-0'}
       data-testid={testId}
     >
       <p className="text-small text-text-muted">{label}</p>

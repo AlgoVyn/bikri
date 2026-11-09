@@ -6,7 +6,6 @@ import {
   ReportsIcon,
 } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
-import { useToast } from '../components/Toast.tsx';
 import {
   AdminApiError,
   adminErrorMessage,
@@ -37,7 +36,6 @@ import {
 
 export function OverviewPage() {
   const { t, i18n } = useTranslation();
-  const toast = useToast();
   const [usage, setUsage] = useState<UsageOverview | null>(null);
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -62,12 +60,11 @@ export function OverviewPage() {
               ? t('admin.err_server')
               : adminErrorMessage(err, t('admin.err_generic'));
         setError(message);
-        toast.push(message, 'error');
       });
     return () => {
       cancelled = true;
     };
-  }, [t, toast, tick]);
+  }, [t, tick]);
 
   if (error !== null && usage === null) {
     return (
@@ -194,25 +191,6 @@ export function OverviewPage() {
                 })}
               </p>
             </div>
-          </Panel>
-
-          <Panel
-            title={t('admin.by_status')}
-            description={t('admin.by_status_hint')}
-          >
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {knownStatuses().map((status) => (
-                <li
-                  key={status}
-                  className="flex items-center justify-between gap-3 rounded-control bg-surface-2/60 px-3 py-2"
-                >
-                  <StatusBadge status={status} />
-                  <span className="font-semibold tabular-nums">
-                    {formatCount(usage.tenants_by_status[status] ?? 0, lang)}
-                  </span>
-                </li>
-              ))}
-            </ul>
           </Panel>
         </div>
 
@@ -362,6 +340,25 @@ export function OverviewPage() {
           </div>
         </Panel>
       </div>
+
+      <Panel
+        title={t('admin.by_status')}
+        description={t('admin.by_status_hint')}
+      >
+        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {knownStatuses().map((status) => (
+            <li
+              key={status}
+              className="flex items-center justify-between gap-3 rounded-control bg-surface-2/60 px-3 py-2"
+            >
+              <StatusBadge status={status} />
+              <span className="font-semibold tabular-nums">
+                {formatCount(usage.tenants_by_status[status] ?? 0, lang)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Panel>
     </div>
   );
 }

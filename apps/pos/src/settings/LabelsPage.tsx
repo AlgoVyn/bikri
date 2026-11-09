@@ -78,7 +78,7 @@ function LabelsContent() {
     'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
   return (
     <SettingsPageLayout title={t('office.labels.title')} icon={<TagIcon />}>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+      <section className="mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-card border border-border bg-surface p-4">
         <label className="flex flex-col gap-1 text-small">
           {t('office.labels.size')}
           <select

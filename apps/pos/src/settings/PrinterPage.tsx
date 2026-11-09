@@ -289,8 +289,11 @@ export function PrinterPage() {
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-2" aria-labelledby="recent-prints">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <section
+        className="overflow-hidden rounded-card border border-border bg-surface"
+        aria-labelledby="recent-prints"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 id="recent-prints" className="font-semibold">
             {t('printer.recent')}
           </h2>
@@ -316,7 +319,7 @@ export function PrinterPage() {
           />
         ) : null}
         {jobs && jobs.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+          <ul className="flex flex-col divide-y divide-border">
             {jobs.map(({ job, invoice }) => (
               <li
                 key={job.id}

@@ -24,7 +24,7 @@ import {
   restoreAction,
   writeRestoreState,
 } from './restore.ts';
-import { dangerBtn, Field, Panel, primaryBtn } from './ui.tsx';
+import { dangerBtn, FileField, Panel, primaryBtn } from './ui.tsx';
 import { unzip, ZipError } from './zip.ts';
 
 const STEP_KEYS = [
@@ -93,65 +93,64 @@ export function RestoreTab({
     <Panel
       title={t('admin.tab_restore')}
       description={t('admin.restore_intro')}
-      className="max-w-3xl"
+      className="mx-auto w-full max-w-3xl"
     >
       <div className="flex flex-col gap-4">
-        <Field id="restore-file" label={t('admin.restore_file')}>
-          <input
-            id="restore-file"
-            type="file"
-            accept=".zip,application/zip"
-            disabled={running}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file === undefined) return;
-              void file.arrayBuffer().then(async (buffer) => {
-                try {
-                  const parsed = parseExport(
-                    await unzip(new Uint8Array(buffer)),
-                  );
-                  if (parsed.tenant.id !== tenantId) {
-                    setZip(null);
-                    setError(t('admin.restore_wrong_shop'));
-                    toast.push(t('admin.restore_wrong_shop'), 'error');
-                    return;
-                  }
-                  if (missingRestoreTables(parsed).length > 0) {
-                    setZip(null);
-                    setError(t('admin.restore_incomplete'));
-                    toast.push(t('admin.restore_incomplete'), 'error');
-                    return;
-                  }
-                  const stored =
-                    readRestoreState(tenantId, sessionStorage) ??
-                    initialRestoreState();
-                  const base =
-                    stored.phase === 'done' ? initialRestoreState() : stored;
-                  if (
-                    base.exportedAt !== null &&
-                    base.exportedAt !== parsed.exported_at &&
-                    hasStarted(base)
-                  ) {
-                    setZip(null);
-                    setError(t('admin.restore_different_zip'));
-                    toast.push(t('admin.restore_different_zip'), 'error');
-                    return;
-                  }
-                  const next = { ...base, exportedAt: parsed.exported_at };
-                  setZip(parsed);
-                  setConfirmed(false);
-                  setError(null);
-                  commit(next);
-                } catch {
+        <FileField
+          id="restore-file"
+          label={t('admin.restore_file')}
+          accept=".zip,application/zip"
+          disabled={running}
+          onPick={(file) => {
+            if (file === null) {
+              setZip(null);
+              setConfirmed(false);
+              setError(null);
+              return;
+            }
+            void file.arrayBuffer().then(async (buffer) => {
+              try {
+                const parsed = parseExport(await unzip(new Uint8Array(buffer)));
+                if (parsed.tenant.id !== tenantId) {
                   setZip(null);
-                  setError(t('admin.restore_bad_zip'));
-                  toast.push(t('admin.restore_bad_zip'), 'error');
+                  setError(t('admin.restore_wrong_shop'));
+                  toast.push(t('admin.restore_wrong_shop'), 'error');
+                  return;
                 }
-              });
-            }}
-          />
-        </Field>
+                if (missingRestoreTables(parsed).length > 0) {
+                  setZip(null);
+                  setError(t('admin.restore_incomplete'));
+                  toast.push(t('admin.restore_incomplete'), 'error');
+                  return;
+                }
+                const stored =
+                  readRestoreState(tenantId, sessionStorage) ??
+                  initialRestoreState();
+                const base =
+                  stored.phase === 'done' ? initialRestoreState() : stored;
+                if (
+                  base.exportedAt !== null &&
+                  base.exportedAt !== parsed.exported_at &&
+                  hasStarted(base)
+                ) {
+                  setZip(null);
+                  setError(t('admin.restore_different_zip'));
+                  toast.push(t('admin.restore_different_zip'), 'error');
+                  return;
+                }
+                const next = { ...base, exportedAt: parsed.exported_at };
+                setZip(parsed);
+                setConfirmed(false);
+                setError(null);
+                commit(next);
+              } catch {
+                setZip(null);
+                setError(t('admin.restore_bad_zip'));
+                toast.push(t('admin.restore_bad_zip'), 'error');
+              }
+            });
+          }}
+        />
         <section aria-labelledby="restore-steps">
           <h2
             id="restore-steps"

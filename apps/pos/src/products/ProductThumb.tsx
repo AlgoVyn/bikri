@@ -68,13 +68,26 @@ export function ProductThumb({
     );
   }
   const palette = typeof color === 'string' && color in TILE_BG ? color : null;
+  const rings = [
+    'ring-t1/40',
+    'ring-t2/40',
+    'ring-t3/40',
+    'ring-t4/40',
+    'ring-t5/40',
+    'ring-t6/40',
+    'ring-t7/40',
+    'ring-t8/40',
+  ] as const;
+  let hash = 0;
+  for (const char of clean) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  const ring = rings[hash % rings.length] ?? rings[0];
   return (
     <span
       aria-hidden="true"
       className={`flex shrink-0 items-center justify-center font-semibold ${box} ${
         palette
           ? `text-tile-ink ${tileBg(palette)}`
-          : 'bg-surface-2 text-text-muted'
+          : `bg-surface-2 text-text-muted ring-1 ring-inset ${ring}`
       }`}
     >
       {monogram.toUpperCase()}

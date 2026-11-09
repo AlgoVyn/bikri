@@ -510,6 +510,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       await api(`/admin/tenants/${a.tenantId}/devices`),
     );
     expect(devs.devices).toHaveLength(2);
+    expect(devs.devices[0]).toMatchObject({ branch_name: 'Main' });
     expect(devs.devices[0]).not.toHaveProperty('token_hash');
     // B's device id under A's path → 404.
     expect(

@@ -852,7 +852,7 @@ function RecentBillsCard({
         </h2>
         <Link
           to="/sales"
-          className="text-small font-medium text-primary hover:underline"
+          className="-mx-1 inline-flex min-h-11 items-center px-1 text-small font-medium text-primary hover:underline"
         >
           {t('home.view_all')}
         </Link>

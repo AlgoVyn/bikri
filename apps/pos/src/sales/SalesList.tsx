@@ -360,7 +360,7 @@ export function SalesList({
               ) : null}
             </button>
             <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.filter_method')}
                 </span>
@@ -381,7 +381,7 @@ export function SalesList({
                   ))}
                 </select>
               </label>
-              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.filter_status')}
                 </span>
@@ -398,7 +398,7 @@ export function SalesList({
                   ))}
                 </select>
               </label>
-              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.filter_cashier')}
                 </span>
@@ -415,7 +415,7 @@ export function SalesList({
                   ))}
                 </select>
               </label>
-              <label className="flex min-w-0 flex-[1_1_9rem] flex-col">
+              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.filter_device')}
                 </span>
@@ -432,7 +432,7 @@ export function SalesList({
                   ))}
                 </select>
               </label>
-              <div className="flex min-w-0 flex-[1_1_11rem] flex-col">
+              <div className="flex min-w-0 flex-[0_1_11rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.sort')}
                 </span>

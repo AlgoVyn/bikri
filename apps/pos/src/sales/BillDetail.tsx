@@ -5,13 +5,14 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
-  buttonDangerQuiet,
+  buttonPrimary,
   buttonQuiet,
   fieldClass,
   pageClass,
 } from '../components/classes.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -338,6 +339,36 @@ export function BillDetail({
     else setReissueOpen(true);
     setPendingApproval({ mode, approvedBy });
   };
+
+  const moreActions = [
+    ...(canRefund
+      ? [
+          {
+            label: t('office.bill.refund'),
+            tone: 'danger' as const,
+            onSelect: () =>
+              void navigate({
+                to: '/sales/$id/refund',
+                params: { id: saleId },
+              }),
+          },
+        ]
+      : []),
+    ...(canVoid
+      ? [
+          {
+            label: t('office.bill.void'),
+            tone: 'danger' as const,
+            onSelect: () => askVoid('void'),
+          },
+          {
+            label: t('office.bill.void_reissue'),
+            tone: 'danger' as const,
+            onSelect: () => askVoid('reissue'),
+          },
+        ]
+      : []),
+  ];
   return (
     <div
       className={
@@ -394,61 +425,36 @@ export function BillDetail({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 [&>*:last-child]:col-span-2 sm:grid sm:grid-cols-4 sm:[&>*:last-child]:col-span-1">
-        <button
-          type="button"
-          className={`${buttonQuiet} gap-2`}
-          onClick={() => void print()}
-        >
-          {t('office.bill.print')}
-        </button>
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => void share()}
-        >
-          {t('office.bill.share')}
-        </button>
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() => void pdf()}
-        >
-          {t('office.bill.pdf')}
-        </button>
-        {canRefund ? (
+      <PageActions
+        primary={
           <button
             type="button"
-            className={`${buttonDangerQuiet} gap-2`}
-            onClick={() =>
-              void navigate({
-                to: '/sales/$id/refund',
-                params: { id: saleId },
-              })
-            }
+            className={buttonPrimary}
+            onClick={() => void print()}
           >
-            {t('office.bill.refund')}
+            {t('office.bill.print')}
           </button>
-        ) : null}
-        {canVoid ? (
+        }
+        secondary={
           <>
             <button
               type="button"
-              className={buttonDangerQuiet}
-              onClick={() => askVoid('void')}
+              className={buttonQuiet}
+              onClick={() => void share()}
             >
-              {t('office.bill.void')}
+              {t('office.bill.share')}
             </button>
             <button
               type="button"
               className={buttonQuiet}
-              onClick={() => askVoid('reissue')}
+              onClick={() => void pdf()}
             >
-              {t('office.bill.void_reissue')}
+              {t('office.bill.pdf')}
             </button>
           </>
-        ) : null}
-      </div>
+        }
+        more={moreActions}
+      />
 
       {canVoid && blocker === 'same_day' ? (
         <p className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink">

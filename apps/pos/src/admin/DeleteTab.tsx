@@ -63,7 +63,7 @@ export function DeleteTab({
       <Panel
         title={t('admin.delete_zone')}
         description={t('admin.delete_zone_hint')}
-        className="max-w-2xl border-danger/30"
+        className="mx-auto w-full max-w-2xl border-danger/30"
       >
         <div className="flex flex-col gap-4">
           <p className="rounded-control border border-danger-subtle bg-danger-subtle px-3 py-2 text-small text-danger-subtle-ink">
