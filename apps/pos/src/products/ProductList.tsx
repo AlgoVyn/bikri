@@ -419,10 +419,10 @@ export function ProductList({
 }
 
 const gridCols = (showCost: boolean, embedded: boolean) => {
-  if (embedded) return 'grid-cols-[2.5rem_minmax(0,1fr)_auto]';
+  if (embedded) return 'grid-cols-[2.5rem_minmax(0,1fr)_7rem_6rem]';
   return showCost
-    ? 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]'
-    : 'lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]';
+    ? 'grid-cols-[2.5rem_minmax(0,1fr)_auto] lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]'
+    : 'grid-cols-[2.5rem_minmax(0,1fr)_auto] lg:grid-cols-[2.5rem_minmax(0,3fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]';
 };
 
 function ListHeader({
@@ -452,12 +452,20 @@ function ListHeader({
         onClick={() => onSort('name')}
       />
       {embedded ? (
-        <SortHeader
-          label={t('products.col_price')}
-          active={sort === 'price'}
-          direction={direction}
-          onClick={() => onSort('price')}
-        />
+        <>
+          <SortHeader
+            label={t('products.col_price')}
+            active={sort === 'price'}
+            direction={direction}
+            onClick={() => onSort('price')}
+          />
+          <SortHeader
+            label={t('products.col_stock')}
+            active={sort === 'stock'}
+            direction={direction}
+            onClick={() => onSort('stock')}
+          />
+        </>
       ) : (
         <>
           <SortHeader
@@ -621,7 +629,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-s-2 border-b border-s-transparent border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-offset-[-2px] ${gridCols(showCost, embedded)}`}
+          className={`grid h-full w-full items-center gap-x-3 border-s-2 border-b border-s-transparent border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-offset-[-2px] ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
@@ -646,14 +654,20 @@ function ProductRow({
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+              className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           </span>
-          {embedded ? null : (
+          {embedded ? (
+            <span className={`text-start ${stockTone}`}>
+              {row.stockState === 'untracked'
+                ? t('products.not_tracked')
+                : qtyWithUnit(t, row.onHand, unit)}
+            </span>
+          ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'
@@ -683,7 +697,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full focus-visible:outline-offset-[-2px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-s-2 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] items-center gap-x-3 border-s-2 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}
@@ -707,14 +721,20 @@ function ProductRow({
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? '' : 'lg:hidden'} ${stockTone}`}
+              className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           </span>
-          {embedded ? null : (
+          {embedded ? (
+            <span className={`text-start ${stockTone}`}>
+              {row.stockState === 'untracked'
+                ? t('products.not_tracked')
+                : qtyWithUnit(t, row.onHand, unit)}
+            </span>
+          ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'

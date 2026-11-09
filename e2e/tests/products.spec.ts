@@ -363,6 +363,23 @@ test.describe('Products (T-014)', () => {
     expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
   });
 
+  test('split view names the stock column instead of stacking it under price', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop columns');
+    await openReadyShop(page, '/bikri/products');
+    await page.evaluate(() =>
+      window.__bikriTest?.seedProducts([
+        { name: 'Stock column product', price: 100000, stock: 5 },
+      ]),
+    );
+    await page.locator('main ul a').first().click();
+    const header = page.getByTestId('products-list-header');
+    await expect(header).toBeVisible();
+    await expect(header.getByRole('button', { name: /^Price/ })).toBeVisible();
+    await expect(header.getByRole('button', { name: /^Stock/ })).toBeVisible();
+  });
+
   test('every column sorts in both directions', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop columns');
     await openReadyShop(page, '/bikri/products');
