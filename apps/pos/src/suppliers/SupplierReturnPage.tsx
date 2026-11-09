@@ -304,84 +304,74 @@ export function SupplierReturnPage({
           <h2 className="text-title font-semibold">
             {t('office.suppliers.return_delivery_lines')}
           </h2>
-          <table className="w-full text-small">
-            <thead>
-              <tr className="border-b border-border text-text-muted">
-                <th className="p-2 text-start">
-                  {t('office.suppliers.product')}
-                </th>
-                <th className="p-2 text-start">
-                  {t('office.suppliers.received')}
-                </th>
-                <th className="p-2 text-start">
-                  {t('office.suppliers.returned')}
-                </th>
-                <th className="p-2 text-start">
-                  {t('office.suppliers.return_qty')}
-                </th>
-                {can('cost.view') ? (
-                  <th className="p-2 text-start">
-                    {t('office.suppliers.credit_unit')}
-                  </th>
-                ) : null}
-                <th className="p-2 text-start">
-                  {t('office.suppliers.line_total')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchase.lines.map((line) => {
-                const key = String(line.purchaseLine.id);
-                const qty = linkedQty[key] ?? 0;
-                const credit = linkedCredit[key] ?? line.landedCost;
-                return (
-                  <tr
-                    key={key}
-                    className="border-b border-border last:border-0"
+          <ul className="flex flex-col gap-2">
+            {purchase.lines.map((line) => {
+              const key = String(line.purchaseLine.id);
+              const qty = linkedQty[key] ?? 0;
+              const credit = linkedCredit[key] ?? line.landedCost;
+              return (
+                <li
+                  key={key}
+                  className="flex flex-col gap-3 rounded-control border border-border p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="ltr-name font-medium">
+                        {String(line.product.name_en)}
+                      </p>
+                      <p className="text-small text-text-muted">
+                        {t('office.suppliers.received')} {line.received / 1000}{' '}
+                        · {t('office.suppliers.returned')}{' '}
+                        {line.returned / 1000} ·{' '}
+                        {t('office.suppliers.remaining')}{' '}
+                        {line.remaining / 1000}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-end">
+                      <p className="text-small text-text-muted">
+                        {t('office.suppliers.line_total')}
+                      </p>
+                      <p className="font-medium">
+                        <MoneyText paisa={mulDivRound(qty, credit, 1000)} />
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`grid gap-2 ${can('cost.view') ? 'grid-cols-2 lg:grid-cols-[minmax(0,16rem)_minmax(0,16rem)]' : ''}`}
                   >
-                    <td className="p-2">{String(line.product.name_en)}</td>
-                    <td className="p-2 text-start">{line.received / 1000}</td>
-                    <td className="p-2 text-start">{line.returned / 1000}</td>
-                    <td className="w-36 p-2">
-                      <QtyInput
-                        label={`${t('office.suppliers.return_qty')} ${String(line.product.name_en)}`}
-                        unit={String(line.product.unit ?? 'pc') as never}
-                        value={qty || null}
+                    <QtyInput
+                      label={`${t('office.suppliers.return_qty')} ${String(line.product.name_en)}`}
+                      unit={String(line.product.unit ?? 'pc') as never}
+                      value={qty || null}
+                      onChange={(value) =>
+                        setLinkedQty((current) => ({
+                          ...current,
+                          [key]: Math.min(value ?? 0, line.remaining),
+                        }))
+                      }
+                    />
+                    {can('cost.view') ? (
+                      <MoneyInput
+                        label={t('office.suppliers.credit_unit')}
+                        value={credit}
                         onChange={(value) =>
-                          setLinkedQty((current) => ({
+                          setLinkedCredit((current) => ({
                             ...current,
-                            [key]: Math.min(value ?? 0, line.remaining),
+                            [key]: value ?? 0,
                           }))
                         }
                       />
-                      {line.remaining === 0 ? (
-                        <p className="text-small text-text-muted">
-                          {t('office.suppliers.return_none_left')}
-                        </p>
-                      ) : null}
-                    </td>
-                    {can('cost.view') ? (
-                      <td className="w-36 p-2">
-                        <MoneyInput
-                          label={t('office.suppliers.credit_unit')}
-                          value={credit}
-                          onChange={(value) =>
-                            setLinkedCredit((current) => ({
-                              ...current,
-                              [key]: value ?? 0,
-                            }))
-                          }
-                        />
-                      </td>
                     ) : null}
-                    <td className="p-2 text-start">
-                      <MoneyText paisa={mulDivRound(qty, credit, 1000)} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  </div>
+                  {line.remaining === 0 ? (
+                    <p className="text-small text-text-muted">
+                      {t('office.suppliers.return_none_left')}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       ) : (
         <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
