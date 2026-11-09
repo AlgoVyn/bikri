@@ -44,7 +44,7 @@ function RequestShop() {
   const toast = useToast();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [busy, setBusy] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
   const set = (key: keyof FormState, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -58,14 +58,8 @@ function RequestShop() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const body = (await response.json().catch(() => null)) as {
-        status_token?: unknown;
-      } | null;
       if (response.status === 202) {
-        // A duplicate email gets no new status token; the original applicant keeps it.
-        setToken(
-          typeof body?.status_token === 'string' ? body.status_token : '',
-        );
+        setSent(true);
         return;
       }
       toast.push(
@@ -81,7 +75,7 @@ function RequestShop() {
     }
   };
 
-  if (token !== null) {
+  if (sent) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-5 p-4 py-10">
         <Brand />
@@ -93,15 +87,6 @@ function RequestShop() {
             {t('register.success_title')}
           </h1>
           <p className="mt-2 text-text-muted">{t('register.success_body')}</p>
-          {token ? (
-            <a
-              data-testid="register-status-link"
-              className={`${buttonPrimary} mt-5 inline-flex`}
-              href={`${BASE_PATH}/request-status#${encodeURIComponent(token)}`}
-            >
-              {t('register.check_status')}
-            </a>
-          ) : null}
         </section>
       </main>
     );

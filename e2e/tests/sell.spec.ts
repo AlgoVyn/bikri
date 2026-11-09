@@ -53,8 +53,16 @@ test.describe('Sell (T-016)', () => {
       .locator('form')
       .getByRole('button', { name: 'Add', exact: true })
       .click();
+    // The add field still shows "Cables" until the IndexedDB write finishes
+    // and the form clears. The saved row uses aria-label "Name of Cables".
+    await expect(
+      page.getByRole('textbox', { name: 'Name of Cables' }),
+    ).toBeVisible();
+    await expect(page.locator('#new-category')).toHaveValue('');
     await page.goto('/bikri/sell');
-    await expect(page.getByRole('button', { name: 'Cables' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cables' })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText('undefined', { exact: true })).toHaveCount(0);
   });
 

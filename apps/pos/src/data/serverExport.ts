@@ -117,7 +117,9 @@ async function buildOnce(
     };
   else {
     clearServerExportSession();
-    const start = await shopRequest<ServerExportStart>(db, staffId, '/export');
+    const start = await shopRequest<ServerExportStart>(db, staffId, '/export', {
+      method: 'POST',
+    });
     session = {
       export_id: start.export_id,
       snapshot_seq: start.snapshot_seq,

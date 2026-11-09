@@ -354,7 +354,7 @@ describe('shop admin (T-038, 04 §3.8)', () => {
     const sa = await ownerSession(a, a.ownerEmail ?? '');
     const sb = await ownerSession(b, b.ownerEmail ?? '');
     const start = await json<{ export_id: string; tables: { tbl: string }[] }>(
-      await shopApi(b, sb, '/shop/export'),
+      await shopApi(b, sb, '/shop/export', { method: 'POST' }),
     );
     expect(start.tables.map((t) => t.tbl)).not.toContain('owner_email_codes');
     const page = await json<{ rows: Record<string, unknown>[] }>(
@@ -374,10 +374,13 @@ describe('shop admin (T-038, 04 §3.8)', () => {
       ),
     );
     expect(devices.rows.every((r) => !('token_hash' in r))).toBe(true);
-    expect((await shopApi(b, sb, '/shop/export')).status).toBe(429);
+    expect((await shopApi(b, sb, '/shop/export')).status).toBe(400);
+    expect(
+      (await shopApi(b, sb, '/shop/export', { method: 'POST' })).status,
+    ).toBe(429);
     // A's limit is independent; an export_id from A is refused on B.
     const aStart = await json<{ export_id: string }>(
-      await shopApi(a, sa, '/shop/export'),
+      await shopApi(a, sa, '/shop/export', { method: 'POST' }),
     );
     const cross = await shopApi(
       b,
@@ -414,7 +417,9 @@ describe('shop admin (T-038, 04 §3.8)', () => {
       ).status,
     ).toBe(403);
     expect((await shopApi(a, s, '/shop/devices')).status).toBe(200);
-    expect((await shopApi(a, s, '/shop/export')).status).toBe(200);
+    expect(
+      (await shopApi(a, s, '/shop/export', { method: 'POST' })).status,
+    ).toBe(200);
   });
 
   it('conflict acknowledge', async () => {

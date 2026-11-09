@@ -1,5 +1,5 @@
 # Deploy to https://algovyn.com/bikri/ (01 §7.2, roadmap T-004).
-# Order: website check (blocks the deploy, 01 §5.5) → build → D1 migrations → wrangler deploy → smoke test.
+# Order: website check (blocks the deploy, 01 §5.5) → build → refuse destructive migrations → record D1 Time Travel bookmark → D1 migrations → wrangler deploy → smoke test.
 # The deploy job runs only once the owner has done the one-time setup in 01 §7.1 and set the
 # repository variable DEPLOY_ENABLED=true (Settings → Secrets and variables → Actions → Variables).
 # Required secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
@@ -90,12 +90,49 @@ jobs:
             exit 1
           fi
       - run: pnpm build
+      - name: Refuse destructive D1 migrations
+        run: node tools/check-migrations-safe.mjs
+      - name: Record D1 Time Travel bookmark
+        id: d1_bookmark
+        working-directory: apps/api
+        continue-on-error: true
+        run: |
+          set +e
+          INFO=$(pnpm exec wrangler d1 time-travel info bikri 2>&1)
+          STATUS=$?
+          set -e
+          echo "$INFO"
+          {
+            echo "## D1 pre-migration bookmark"
+            echo ""
+            echo "Captured before \`wrangler d1 migrations apply\`. Time Travel rolls back **every** shop — prefer a tenant-extract restore (docs/09 §3.4) if only one shop is affected."
+            echo ""
+            echo '```'
+            echo "$INFO"
+            echo '```'
+            echo ""
+            echo "If migrate succeeds and the Worker deploy then fails, the previous Worker stays live. Additive migrations should keep serving. To undo the schema itself:"
+            echo ""
+            echo "    wrangler d1 time-travel restore bikri --bookmark=<id from above>"
+            echo ""
+            echo "Then follow docs/09 §3.1 (MAINTENANCE, restore_epoch). Do not rerun \`migrations apply\` blindly."
+            if [ "$STATUS" -ne 0 ]; then
+              echo ""
+              echo "::warning::Could not read D1 Time Travel info (exit $STATUS). Copy any wrangler output above if a later step fails."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Apply D1 migrations (remote)
+        id: migrate
         working-directory: apps/api
         run: pnpm exec wrangler d1 migrations apply bikri --remote
       - name: Deploy Worker
+        id: deploy_worker
         working-directory: apps/api
         run: pnpm exec wrangler deploy
+      - name: Notes if deploy failed after migrate
+        if: failure() && steps.migrate.outcome == 'success'
+        run: |
+          echo "::error::Worker deploy failed after remote D1 migrations were applied. Do not rerun migrate blindly. See the job summary for the pre-migration Time Travel bookmark and docs/09 §3.1."
       - name: Set Email Routing token (optional)
         working-directory: apps/api
         env:

@@ -121,7 +121,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 
 **T-052 Barcode labels.** `packages/printer/labels` (Code 128 encoder, SVG, label layouts 50×25, 38×25, 40×30 mm and A4 3×8), `/labels` dialog from product detail, product list selection and delivery saved, `Generate barcode`, Settings → Labels ([screens/20](screens/20-barcode-labels.md)). AC: screen 20 ACs 1–6; E2E journey 18; H13 at release.
 
-**T-053 Owner's server export (MT, new, D-081).** `GET /api/shop/export` (start with signed 2-hour `export_id`, `owner_export` audit, `tenants.last_owner_export_at` 24-hour limit; pages like the snapshot, ≤ 500 rows), Settings → Backup → `Download from server` building the T-049 zip in the browser with `manifest.source = "server"`, resumable ([13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)). Needs owner email sign-in (T-028). AC: row counts equal the server's for every table; a second start within 24 h gets `429` with `Retry-After`; works in a read-only shop; E2E journey 24 (export part); isolation I22.
+**T-053 Owner's server export (MT, new, D-081).** `POST /api/shop/export` (start with signed 2-hour `export_id`, `owner_export` audit, `tenants.last_owner_export_at` 24-hour limit; pages like the snapshot, ≤ 500 rows), Settings → Backup → `Download from server` building the T-049 zip in the browser with `manifest.source = "server"`, resumable ([13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)). Needs owner email sign-in (T-028). AC: row counts equal the server's for every table; a second start within 24 h gets `429` with `Retry-After`; works in a read-only shop; E2E journey 24 (export part); isolation I22.
 
 ## M4 — Hardening and release
 

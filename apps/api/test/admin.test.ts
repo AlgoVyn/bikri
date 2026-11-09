@@ -784,6 +784,137 @@ describe('operator export and restore (I17, I18)', () => {
     await setStatus(a.tenantId, 'active');
   });
 
+  it('restore round-trip keeps sale totals, stock movements and ledger balances', async () => {
+    const a = await seedShop('Restore money');
+    const now = Date.now();
+    const total = 175_000;
+    await pushOk(a.till, saleOps(a, a.till, 1, { total, now }));
+    await pushOk(a.till, [
+      op('stock_movements', 'insert', {
+        id: newId(now),
+        product_id: IDS.product,
+        qty_delta_milli: 10_000,
+        reason_code: 'opening',
+        ref_type: 'opening',
+        ref_id: null,
+        unit_cost: 8_000,
+        note: '',
+        branch_id: a.branchId,
+        device_id: a.till.id,
+        staff_id: IDS.owner,
+        business_date: '2026-10-27',
+        created_at: now,
+      }),
+    ]);
+    const snapshot = async () => ({
+      sales: await n(
+        'SELECT COALESCE(SUM(total), 0) AS n FROM sales WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+      payments: await n(
+        'SELECT COALESCE(SUM(amount), 0) AS n FROM payments WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+      stock: await n(
+        'SELECT COALESCE(SUM(qty_delta_milli), 0) AS n FROM stock_movements WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+      ledger: await n(
+        'SELECT COALESCE(SUM(amount), 0) AS n FROM ledger_entries WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+    });
+    const before = await snapshot();
+    expect(before.sales).toBe(total);
+    expect(before.payments).toBe(total);
+    expect(before.stock).not.toBe(0);
+    const exportCutoff = Date.now();
+    const tables: Record<string, Record<string, unknown>[]> = {};
+    for (const tbl of [
+      'shop',
+      'staff',
+      'categories',
+      'products',
+      'customers',
+      'sales',
+      'sale_lines',
+      'payments',
+      'stock_movements',
+      'ledger_entries',
+    ]) {
+      tables[tbl] = (
+        await json<{ rows: Record<string, unknown>[] }>(
+          await api(
+            `/admin/tenants/${a.tenantId}/export?tbl=${tbl}&limit=1000&before=${exportCutoff}`,
+          ),
+        )
+      ).rows;
+    }
+    expect(
+      (
+        await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+          method: 'POST',
+          json: { on: true },
+        })
+      ).status,
+    ).toBe(200);
+    let remaining = 1;
+    while (remaining > 0) {
+      const purged = await json<{ remaining: number }>(
+        await api(`/admin/tenants/${a.tenantId}/purge`, { method: 'POST' }),
+      );
+      remaining = purged.remaining;
+    }
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+    ).toBe(0);
+    for (const tbl of [
+      'shop',
+      'staff',
+      'categories',
+      'products',
+      'customers',
+      'sales',
+      'sale_lines',
+      'payments',
+      'stock_movements',
+      'ledger_entries',
+    ]) {
+      const rows = tables[tbl] ?? [];
+      if (rows.length === 0) continue;
+      const imported = await api(`/admin/tenants/${a.tenantId}/import`, {
+        method: 'POST',
+        json: { tbl, rows, reason: 'restore money drill' },
+      });
+      expect(imported.status, `${tbl}: ${await imported.clone().text()}`).toBe(
+        200,
+      );
+    }
+    expect(
+      (
+        await api(`/admin/tenants/${a.tenantId}/restore-epoch`, {
+          method: 'POST',
+          json: {
+            restore_point_at: Date.now() - 1000,
+            reason: 'restore money drill',
+          },
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+          method: 'POST',
+          json: { on: false },
+        })
+      ).status,
+    ).toBe(200);
+    expect(await snapshot()).toEqual(before);
+  });
+
   it('usage reports open conflicts per shop without extra requests', async () => {
     const shop = await seedShop('Conflict usage');
     const at = Date.now();

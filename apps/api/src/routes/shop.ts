@@ -650,43 +650,56 @@ type ExportToken = {
   before?: number;
 };
 
+async function startOwnerExport(c: Context<AppEnv>) {
+  const { tenant, device, db } = c.var;
+  const now = Date.now();
+  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
+  if (
+    tenant.last_owner_export_at !== null &&
+    now - tenant.last_owner_export_at < EXPORT_EVERY
+  ) {
+    throw rateLimited(
+      'One server export per day',
+      (tenant.last_owner_export_at + EXPORT_EVERY - now) / 1000,
+    );
+  }
+  // Claim the slot atomically before building the export; two concurrent starts must
+  // not both receive an export token.
+  const [claimed] = await db.batch([
+    claimOwnerExportStatement(c.env, tenant.id, now, EXPORT_EVERY),
+  ]);
+  if ((claimed?.meta.changes ?? 0) !== 1)
+    throw rateLimited('One server export per day', EXPORT_EVERY / 1000);
+  const start = await snapshotPayload(
+    (k) => (k === 'before' ? String(now) : undefined),
+    db,
+    tenant,
+    500,
+  );
+  const token = await signToken(ownerSessionKey(c.env), {
+    kind: 'export',
+    tenant_id: tenant.id,
+    device_id: device.id,
+    exp: now + EXPORT_TTL,
+    before: now,
+  } satisfies ExportToken);
+  await db.batch(audit(c, 'owner_export'));
+  return c.json({ export_id: token, exported_at: now, ...start });
+}
+
+shop.post('/export', (c) => startOwnerExport(c));
+
 shop.get('/export', async (c) => {
   const { tenant, device, db } = c.var;
   const now = Date.now();
   assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
   const exportId = c.req.query('export_id');
   if (!exportId) {
-    if (
-      tenant.last_owner_export_at !== null &&
-      now - tenant.last_owner_export_at < EXPORT_EVERY
-    ) {
-      throw rateLimited(
-        'One server export per day',
-        (tenant.last_owner_export_at + EXPORT_EVERY - now) / 1000,
-      );
-    }
-    // Claim the slot atomically before building the export; two concurrent starts must
-    // not both receive an export token.
-    const [claimed] = await db.batch([
-      claimOwnerExportStatement(c.env, tenant.id, now, EXPORT_EVERY),
-    ]);
-    if ((claimed?.meta.changes ?? 0) !== 1)
-      throw rateLimited('One server export per day', EXPORT_EVERY / 1000);
-    const start = await snapshotPayload(
-      (k) => (k === 'before' ? String(now) : undefined),
-      db,
-      tenant,
-      500,
+    throw new ApiError(
+      'VALIDATION_FAILED',
+      400,
+      'Start an export with POST /shop/export',
     );
-    const token = await signToken(ownerSessionKey(c.env), {
-      kind: 'export',
-      tenant_id: tenant.id,
-      device_id: device.id,
-      exp: now + EXPORT_TTL,
-      before: now,
-    } satisfies ExportToken);
-    await db.batch(audit(c, 'owner_export'));
-    return c.json({ export_id: token, exported_at: now, ...start });
   }
   const t = await verifyToken<ExportToken>(ownerSessionKey(c.env), exportId);
   if (

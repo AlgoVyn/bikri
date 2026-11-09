@@ -7,6 +7,7 @@ interface __BaseEnv_Env {
 	EMAIL: SendEmail;
 	OWNER_SIGNIN_LIMIT: RateLimit;
 	REGISTER_LIMIT: RateLimit;
+	ENROL_LIMIT: RateLimit;
 	ASSETS: Fetcher;
 	APP_VERSION: "1.0.0";
 	SCHEMA_VERSION: "2";

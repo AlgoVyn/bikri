@@ -78,4 +78,28 @@ describe('read-only cutoff', () => {
     });
     expect(readOnlyEligible([legacy], seen)).toHaveLength(1);
   });
+
+  it('when unseen, still drops ops after status_changed_at plus grace', () => {
+    const changed = 1_000_000;
+    expect(
+      readOnlyEligible(
+        [op('H', { id: 'p1', created_at: changed - 1 }, changed - 1)],
+        null,
+        changed,
+      ),
+    ).toHaveLength(1);
+    expect(
+      readOnlyEligible(
+        [
+          op(
+            'I',
+            { id: 'p1', created_at: changed + READ_ONLY_GRACE_MS + 1 },
+            changed + READ_ONLY_GRACE_MS + 1,
+          ),
+        ],
+        null,
+        changed,
+      ),
+    ).toHaveLength(0);
+  });
 });

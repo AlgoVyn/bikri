@@ -25,15 +25,9 @@ for (const lang of ['en', 'ur'] as const) {
     await expectNoSeriousAxe(page);
     await page.getByTestId('register-submit').click();
     await expect(page.getByTestId('register-success')).toBeVisible();
-    const link = page.getByTestId('register-status-link');
-    await expect(link).toHaveAttribute('href', /\/request-status#/);
-    await link.click();
-    await expect(page.getByTestId('register-status')).toBeVisible();
+    await expect(page.getByTestId('register-status-link')).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await expectNoSeriousAxe(page);
-    await expect(page.getByTestId('register-status-label')).toContainText(
-      lang === 'en' ? 'Waiting for review' : 'جائزے کا انتظار',
-    );
   });
 }
 
