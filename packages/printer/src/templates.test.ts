@@ -73,7 +73,7 @@ describe('sale receipt conditional rows (06 §4.1)', () => {
     expect(t.indexOf('Includes')).toBeGreaterThan(t.indexOf('TOTAL'));
   });
 
-  it('shows rounding, udhaar with khata balance, customer, card and bank/wallet references', () => {
+  it('shows rounding, credit with ledger balance, customer, card and bank/wallet references', () => {
     const t = text80(
       buildSaleReceipt(
         variant((i) => {
@@ -89,8 +89,8 @@ describe('sale receipt conditional rows (06 §4.1)', () => {
       ),
     );
     expect(t).toMatch(/^Rounding +-Rs 0\.50$/m);
-    expect(t).toMatch(/^Udhaar \(on khata\) +Rs 10,000$/m);
-    expect(t).toMatch(/^Khata balance now +Rs 25,000$/m);
+    expect(t).toMatch(/^Credit \(on ledger\) +Rs 10,000$/m);
+    expect(t).toMatch(/^Ledger balance now +Rs 25,000$/m);
     expect(t).toMatch(/^Customer +Bilal Hussain$/m);
     expect(t).toMatch(/^Card 4421 +Rs 20,000$/m);
     expect(t).toMatch(/^Bank\/wallet JazzCash +Rs 12,999\.50$/m);
@@ -111,8 +111,8 @@ describe('sale receipt conditional rows (06 §4.1)', () => {
     expect(t).not.toMatch(/^Cash /m);
     expect(t).not.toContain('Cashier');
     // Udhaar is part of the bill's trust, not a payment-detail row.
-    expect(t).toMatch(/^Udhaar \(on khata\) +Rs 500$/m);
-    expect(t).toMatch(/^Khata balance now +Rs 2,500$/m);
+    expect(t).toMatch(/^Credit \(on ledger\) +Rs 500$/m);
+    expect(t).toMatch(/^Ledger balance now +Rs 2,500$/m);
   });
 
   it('prints warranty lines, you saved, NTN/STRN, header, REPRINT and the QR when enabled', () => {

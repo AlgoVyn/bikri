@@ -139,10 +139,10 @@ test.describe('Pay (T-017)', () => {
     );
     await page.keyboard.press('F8');
     await pay(page)
-      .getByRole('tab', { name: /Udhaar/ })
+      .getByRole('tab', { name: /Credit/ })
       .click();
     await expect(
-      pay(page).getByText('Choose a customer for udhaar'),
+      pay(page).getByText('Choose a customer for credit'),
     ).toBeVisible();
     await expect(pay(page).getByTestId('pay-done')).toBeDisabled();
     await pay(page).getByRole('button', { name: 'Choose customer' }).click();
@@ -157,11 +157,11 @@ test.describe('Pay (T-017)', () => {
       'Rs 8,000 over the limit of Rs 40,000',
     );
     await expect(pay(page).getByTestId('pay-done')).toHaveText(
-      'Write Rs 43,000 in khata',
+      'Write Rs 43,000 to the ledger',
     );
     await pay(page).getByTestId('pay-done').click();
     await expect(page.getByTestId('done-udhaar')).toHaveText(
-      "Rs 43,000 written in Ali's khata · now owes Rs 48,000",
+      "Rs 43,000 written in Ali's ledger · now owes Rs 48,000",
     );
     await page.getByRole('button', { name: /New sale/ }).click();
 
@@ -176,7 +176,7 @@ test.describe('Pay (T-017)', () => {
     await pay(page).getByLabel('Received').fill('40000');
     await page.keyboard.press('Control+Enter');
     await pay(page)
-      .getByRole('tab', { name: /Udhaar/ })
+      .getByRole('tab', { name: /Credit/ })
       .click();
     await pay(page).getByRole('button', { name: 'Choose customer' }).click();
     await page
@@ -184,11 +184,11 @@ test.describe('Pay (T-017)', () => {
       .getByRole('button', { name: /^Ali/ })
       .click();
     await expect(pay(page).getByTestId('pay-done')).toHaveText(
-      'Done — Rs 40,000 paid, Rs 3,000 in khata',
+      'Done — Rs 40,000 paid, Rs 3,000 in the ledger',
     );
     await pay(page).getByTestId('pay-done').click();
     await expect(page.getByTestId('done-udhaar')).toHaveText(
-      "Rs 3,000 written in Ali's khata · now owes Rs 51,000",
+      "Rs 3,000 written in Ali's ledger · now owes Rs 51,000",
     );
     const balances = await idbAll<Row>(page, 'party_balances');
     expect(balances.map((b) => b.balance)).toEqual([5100000]);

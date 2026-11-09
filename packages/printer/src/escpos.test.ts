@@ -314,7 +314,7 @@ describe('ESC/POS commands (06 §3)', () => {
     );
     const text = renderReceiptText(blocks, resolvePaper({ paperMm: 80 }));
     expect(text).toContain('REFUND RECEIPT');
-    expect(text).toContain('Taken off khata');
+    expect(text).toContain('Taken off ledger');
     expect(text).not.toContain('Paid back');
     expect(blocks.some((b) => b.t === 'drawer')).toBe(false);
   });

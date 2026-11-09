@@ -77,7 +77,7 @@ test.describe('Home and shell (T-013)', () => {
         'Sell',
         'Products',
         'Sales',
-        'Udhaar',
+        'Credit',
         'Suppliers',
         'Expenses',
         'Reports',

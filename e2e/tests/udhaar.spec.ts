@@ -73,8 +73,8 @@ async function opened(page: Page): Promise<string> {
   );
 }
 
-test.describe('Udhaar (T-043, T-044)', () => {
-  test('every Udhaar column sorts in both directions', async ({
+test.describe('Credit (T-043, T-044)', () => {
+  test('every Credit column sorts in both directions', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop header');

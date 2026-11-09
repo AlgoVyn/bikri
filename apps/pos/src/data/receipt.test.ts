@@ -103,7 +103,7 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(rows[title + 1]).toBe('REPRINT');
   });
 
-  it('udhaar part prints the khata balance; wallet provider and reference travel together', async () => {
+  it('credit part prints the ledger balance; wallet provider and reference travel together', async () => {
     const fx = await shopWithStock('rcptU');
     await addShop(fx.db);
     const ali = await createCustomer(
@@ -132,8 +132,8 @@ describe('sale receipt from local rows (screens/07)', () => {
     ]);
     const share = receiptShareText(r as NonNullable<typeof r>);
     expect(share).toContain('Bill A-A-1');
-    expect(share).toContain('Udhaar (on khata) Rs 3,000');
-    expect(share).toContain('Khata balance now Rs 3,000');
+    expect(share).toContain('Credit (on ledger) Rs 3,000');
+    expect(share).toContain('Ledger balance now Rs 3,000');
     expect(share).toContain('Galaxy A15 × 1');
   });
 

@@ -121,7 +121,7 @@ describe('app shell', () => {
       'Sell',
       'Products',
       'Sales',
-      'Udhaar',
+      'Credit',
       'Suppliers',
       'Expenses',
       'Reports',

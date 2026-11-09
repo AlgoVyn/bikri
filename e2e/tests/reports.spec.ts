@@ -62,7 +62,7 @@ test.describe('Reports (T-048)', () => {
     await expect(headers.nth(2)).toHaveCSS('text-align', 'start');
     await expect(cells.nth(2)).toHaveCSS('text-align', 'start');
     await expectNoHorizontalScroll(page);
-    await page.getByRole('tab', { name: 'Udhaar' }).click();
+    await page.getByRole('tab', { name: 'Credit' }).click();
     await expect(page.getByTestId('report-udhaar-total')).toContainText(
       'Rs 200',
     );
