@@ -13,8 +13,7 @@ const SPEC_HEADERS = {
     "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
-  'Permissions-Policy':
-    'camera=(self), usb=(self), serial=(self), bluetooth=()',
+  'Permissions-Policy': 'camera=(self), usb=(self), serial=(self)',
 } as const;
 
 function parseAssetHeaders(file: string): Record<string, string> {

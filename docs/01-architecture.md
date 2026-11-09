@@ -279,7 +279,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval
 Cache-Control: public, max-age=0, must-revalidate, no-transform
 X-Content-Type-Options: nosniff
 Referrer-Policy: same-origin
-Permissions-Policy: camera=(self), usb=(self), serial=(self), bluetooth=()
+Permissions-Policy: camera=(self), usb=(self), serial=(self)
 ```
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
