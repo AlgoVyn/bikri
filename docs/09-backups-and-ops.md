@@ -80,6 +80,12 @@ Time Travel restores the **entire** database in place, so it rolls back **every 
 
 Note: rows created after the restore point, including master-data edits, are re-sent by the tills that created them; only rows from tills that no longer exist or whose browser data was cleared are lost. Warn every affected shop owner before step 4 (count of `change_log` rows per tenant after the bookmark).
 
+### 3.1.1 Bookmark captured on every deploy
+
+The production deploy workflow records `wrangler d1 time-travel info bikri` in the GitHub Actions job summary *before* it applies remote migrations. It also refuses migrations that `DROP TABLE`, `DROP COLUMN`, or `RENAME` a table or column (`tools/check-migrations-safe.mjs`). `DROP INDEX` is allowed (rebuilds). A file that must do otherwise can start with `-- bikri:allow-destructive` after human review.
+
+If `migrations apply` succeeds and `wrangler deploy` then fails, the previous Worker stays live. Additive migrations should keep serving. Do not rerun `migrations apply` blindly. To undo the schema itself, restore the bookmark from the job summary (`wrangler d1 time-travel restore bikri --bookmark=…`) and follow the rest of §3.1 — this rolls back every shop.
+
 ### 3.2 Restore a nightly backup to a new database
 
 1. `wrangler d1 create bikri-restore`; `gunzip`; `wrangler d1 execute bikri-restore --remote --file=bikri-YYYY-MM-DD.sql`.

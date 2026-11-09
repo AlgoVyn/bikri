@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
+import { READ_ONLY_GRACE_MS } from '../../src/routes/sync.ts';
 import { SNAPSHOT_TABLES } from '../../src/sync/tables.ts';
 import {
   addSupportDevice,
@@ -597,7 +598,9 @@ describe('sync isolation', () => {
     const a = await seedShop('RO A');
     const roStart = Date.now();
     await setStatus(r.tenantId, 'read_only', roStart);
-    // A1 was offline: its first push after read-only applies everything.
+    // A1 was offline: its first push after read-only still applies pre-freeze ops
+    // (created before status_changed_at). Ops after that cutoff are dropped even
+    // when read_only_seen_at is still null.
     const offline = [];
     for (let i = 1; i <= 30; i += 1)
       offline.push(...saleOps(r, r.till, i, { now: roStart - 60_000 }));
@@ -655,6 +658,26 @@ describe('sync isolation', () => {
       'applied',
       'applied',
     ]);
+  });
+
+  it('first push after read-only still drops ops after status_changed_at plus grace', async () => {
+    const r = await seedShop('RO first late');
+    const roStart = Date.now();
+    await setStatus(r.tenantId, 'read_only', roStart);
+    const late = saleOps(r, r.till, 1, {
+      now: roStart + READ_ONLY_GRACE_MS + 60_000,
+    });
+    const res = await push(r.till, late);
+    expect(res.status).toBe(403);
+    expect((await json<{ error: { code: string } }>(res)).error.code).toBe(
+      'TENANT_READ_ONLY',
+    );
+    const sales = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
+    )
+      .bind(r.tenantId)
+      .first<{ n: number }>();
+    expect(Number(sales?.n ?? 0)).toBe(0);
   });
 
   it('I25: the daily read cap is charged to one tenant only', async () => {

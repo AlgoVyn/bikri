@@ -176,7 +176,16 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   // The leave action is intentionally blocked while the outbox has ops. Make the test wait
   // for the queue instead of racing a background sync under CI load.
   await syncNow(a.page);
-  await expect.poll(() => idbCount(a.page, 'outbox')).toBe(0);
+  await expect
+    .poll(
+      async () => {
+        const pending = await idbCount(a.page, 'outbox');
+        if (pending > 0) await syncNow(a.page);
+        return pending;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(0);
   await a.page.getByRole('button', { name: 'Leave this shop' }).click();
   await a.page
     .getByRole('dialog', { name: 'Leave that shop' })

@@ -4,35 +4,45 @@ import { testOutbox } from '../src/auth/mailer.ts';
 import {
   addRequestEmail,
   checkRequestEmail,
+  createShopRequest,
 } from '../src/platform/shopRequests.ts';
 import { api, json } from './helpers/fixtures.ts';
 
-type Created = { request_id: string; status_token?: string };
 type Err = { error: { code: string } };
 
 let ip = 0;
 const nextIp = () => `10.80.0.${++ip}`;
 
+function requestFields(email: string, extra: Record<string, unknown> = {}) {
+  return {
+    shop_name: `Shop ${email.split('@')[0]}`,
+    owner_name: 'Owner',
+    email,
+    phone: '+923001234567',
+    city: 'Lahore',
+    business_type: 'mobile',
+    note: 'Please approve',
+    ...extra,
+  };
+}
+
 async function publicRequest(
   email: string,
   extra: Record<string, unknown> = {},
-): Promise<Created> {
+) {
   const res = await api('/public/shop-requests', {
     method: 'POST',
     headers: { 'cf-connecting-ip': nextIp() },
-    json: {
-      shop_name: `Shop ${email.split('@')[0]}`,
-      owner_name: 'Owner',
-      email,
-      phone: '+923001234567',
-      city: 'Lahore',
-      business_type: 'mobile',
-      note: 'Please approve',
-      ...extra,
-    },
+    json: requestFields(email, extra),
   });
   expect(res.status, await res.clone().text()).toBe(202);
-  return json<Created>(res);
+  return json<{ ok?: boolean; request_id?: string; status_token?: string }>(
+    res,
+  );
+}
+
+async function seedRequest(email: string) {
+  return createShopRequest(env, requestFields(email));
 }
 
 const admin = (path: string, init: RequestInit & { json?: unknown } = {}) =>
@@ -48,32 +58,34 @@ const count = async (sql: string, ...params: unknown[]) =>
   );
 
 describe('public shop requests (D-175)', () => {
-  it('creates one pending request, returns a status token and masks the email', async () => {
+  it('creates one pending request without leaking ids or tokens, and masks the email', async () => {
     const email = `new-${Date.now()}@example.com`;
     const created = await publicRequest(email);
-    expect(created.request_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/u);
-    expect((created.status_token ?? '').length).toBeGreaterThan(20);
+    expect(created).toEqual({ ok: true });
+    expect(created).not.toHaveProperty('request_id');
+    expect(created).not.toHaveProperty('status_token');
     expect(
       await count(
         'SELECT COUNT(*) AS n FROM shop_requests WHERE email = ?1',
         email,
       ),
     ).toBe(1);
+    const seeded = await seedRequest(`token-${Date.now()}@example.com`);
+    expect((seeded.token ?? '').length).toBeGreaterThan(20);
     expect(
       await count(
         'SELECT COUNT(*) AS n FROM shop_requests WHERE status_token_hash = ?1',
-        created.status_token,
+        seeded.token,
       ),
     ).toBe(0);
     const status = await api('/public/shop-requests/status', {
       method: 'POST',
       headers: { 'cf-connecting-ip': nextIp() },
-      json: { token: created.status_token },
+      json: { token: seeded.token },
     });
     expect(status.status).toBe(200);
     const body = await json<{ status: string; email: string }>(status);
     expect(body.status).toBe('pending');
-    expect(body.email).not.toBe(email);
     expect(body.email).toContain('***');
   });
 
@@ -81,9 +93,8 @@ describe('public shop requests (D-175)', () => {
     const email = `dup-${Date.now()}@example.com`;
     const first = await publicRequest(email);
     const second = await publicRequest(email);
-    // The duplicate gets no new status token and cannot rewrite the first request.
-    expect(second.request_id).toBe(first.request_id);
-    expect(second.status_token).toBeUndefined();
+    expect(first).toEqual({ ok: true });
+    expect(second).toEqual({ ok: true });
     expect(
       await count(
         "SELECT COUNT(*) AS n FROM shop_requests WHERE email = ?1 AND status IN ('pending','awaiting_email','email_verified','approving')",
@@ -132,23 +143,21 @@ describe('public shop requests (D-175)', () => {
 describe('operator request review (D-175)', () => {
   it('requires a verified email, then approves exactly once and creates the owner code', async () => {
     const email = `approve-${Date.now()}@example.com`;
-    const created = await publicRequest(email);
+    const created = await seedRequest(email);
 
     const list = await admin(`?q=${encodeURIComponent(email)}`);
     expect(list.status).toBe(200);
     const listed = await json<{ requests: { id: string }[] }>(list);
-    expect(listed.requests.some((row) => row.id === created.request_id)).toBe(
-      true,
-    );
+    expect(listed.requests.some((row) => row.id === created.id)).toBe(true);
 
-    const blocked = await admin(`/${created.request_id}/approve`, {
+    const blocked = await admin(`/${created.id}/approve`, {
       method: 'POST',
       json: {},
     });
     expect(blocked.status).toBe(409);
     expect((await json<Err>(blocked)).error.code).toBe('EMAIL_NOT_VERIFIED');
 
-    const manual = await admin(`/${created.request_id}/email/manual`, {
+    const manual = await admin(`/${created.id}/email/manual`, {
       method: 'POST',
       json: { note: 'Checked in Cloudflare dashboard' },
     });
@@ -156,7 +165,7 @@ describe('operator request review (D-175)', () => {
     const afterManual = await json<{ request: { status: string } }>(manual);
     expect(afterManual.request.status).toBe('email_verified');
 
-    const approved = await admin(`/${created.request_id}/approve`, {
+    const approved = await admin(`/${created.id}/approve`, {
       method: 'POST',
       json: {},
     });
@@ -177,7 +186,7 @@ describe('operator request review (D-175)', () => {
     const request = await env.DB.prepare(
       'SELECT status, tenant_id, reviewed_by FROM shop_requests WHERE id = ?1',
     )
-      .bind(created.request_id)
+      .bind(created.id)
       .first<{ status: string; tenant_id: string; reviewed_by: string }>();
     expect(request).toMatchObject({
       status: 'approved',
@@ -196,7 +205,7 @@ describe('operator request review (D-175)', () => {
     expect(
       await count(
         "SELECT COUNT(*) AS n FROM operator_audit WHERE request_id = ?1 AND action = 'shop_request_approve'",
-        created.request_id,
+        created.id,
       ),
     ).toBe(1);
     expect(
@@ -206,7 +215,7 @@ describe('operator request review (D-175)', () => {
       ),
     ).toBe(1);
 
-    const again = await admin(`/${created.request_id}/approve`, {
+    const again = await admin(`/${created.id}/approve`, {
       method: 'POST',
       json: {},
     });
@@ -227,15 +236,15 @@ describe('operator request review (D-175)', () => {
     const status = await api('/public/shop-requests/status', {
       method: 'POST',
       headers: { 'cf-connecting-ip': nextIp() },
-      json: { token: created.status_token },
+      json: { token: created.token },
     });
     expect((await json<{ status: string }>(status)).status).toBe('approved');
   });
 
   it('rejects without a tenant, reopens, and can be verified/approved later', async () => {
     const email = `reject-${Date.now()}@example.com`;
-    const created = await publicRequest(email);
-    const rejected = await admin(`/${created.request_id}/reject`, {
+    const created = await seedRequest(email);
+    const rejected = await admin(`/${created.id}/reject`, {
       method: 'POST',
       json: { reason: 'Not a real shop' },
     });
@@ -249,25 +258,25 @@ describe('operator request review (D-175)', () => {
     const row = await env.DB.prepare(
       'SELECT status, reject_reason FROM shop_requests WHERE id = ?1',
     )
-      .bind(created.request_id)
+      .bind(created.id)
       .first<{ status: string; reject_reason: string }>();
     expect(row).toEqual({
       status: 'rejected',
       reject_reason: 'Not a real shop',
     });
-    const reopened = await admin(`/${created.request_id}/reopen`, {
+    const reopened = await admin(`/${created.id}/reopen`, {
       method: 'POST',
       json: { reason: 'Rechecked' },
     });
     expect(reopened.status, await reopened.clone().text()).toBe(200);
     const reopenedRow = await json<{ status: string }>(reopened);
     expect(reopenedRow.status).toBe('pending');
-    const manual = await admin(`/${created.request_id}/email/manual`, {
+    const manual = await admin(`/${created.id}/email/manual`, {
       method: 'POST',
       json: { note: 'Checked in Cloudflare dashboard' },
     });
     expect(manual.status, await manual.clone().text()).toBe(200);
-    const approved = await admin(`/${created.request_id}/approve`, {
+    const approved = await admin(`/${created.id}/approve`, {
       method: 'POST',
       json: {},
     });
@@ -276,7 +285,7 @@ describe('operator request review (D-175)', () => {
 
   it('adds and checks the email through the Cloudflare API when configured', async () => {
     const email = `cf-${Date.now()}@example.com`;
-    const created = await publicRequest(email);
+    const created = await seedRequest(email);
     const calls: string[] = [];
     vi.stubGlobal(
       'fetch',
@@ -319,7 +328,7 @@ describe('operator request review (D-175)', () => {
     try {
       const added = await addRequestEmail(
         proxied,
-        created.request_id,
+        created.id,
         'operator@example.com',
       );
       expect(added.verified).toBe(false);
@@ -328,12 +337,12 @@ describe('operator request review (D-175)', () => {
       );
       const checked = await checkRequestEmail(
         proxied,
-        created.request_id,
+        created.id,
         'operator@example.com',
       );
       expect(checked.verified).toBe(true);
       expect(checked.status).toBe('email_verified');
-      const approved = await admin(`/${created.request_id}/approve`, {
+      const approved = await admin(`/${created.id}/approve`, {
         method: 'POST',
         json: {},
       });

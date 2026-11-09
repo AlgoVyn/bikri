@@ -38,9 +38,11 @@ function readOnlyError(tenant: TenantRow): ApiError {
 export function readOnlyEligible(
   ops: PushOp[],
   seenAt: number | null,
+  statusChangedAt: number | null = null,
 ): PushOp[] {
-  if (seenAt === null) return ops;
-  const limit = seenAt + READ_ONLY_GRACE_MS;
+  const origin = seenAt ?? statusChangedAt;
+  if (origin === null) return ops;
+  const limit = origin + READ_ONLY_GRACE_MS;
   const ok = new Map<string, boolean>();
   for (const op of ops) {
     const created = op.created_at ?? op.row?.updated_at ?? op.row?.created_at;
@@ -134,7 +136,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   const tail: D1PreparedStatement[] = [];
   if (tenant.status === 'read_only') {
     const seenBefore = device.read_only_seen_at;
-    ops = readOnlyEligible(ops, seenBefore);
+    ops = readOnlyEligible(ops, seenBefore, tenant.status_changed_at);
     if (ops.length === 0) throw readOnlyError(tenant);
     const seen = readOnlySeenStatement(db, tenant, device, now);
     if (seen) tail.push(seen);

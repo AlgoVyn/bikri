@@ -53,15 +53,10 @@ publicShopRequests.post('/shop-requests', async (c) => {
   const body = RequestBody.parse(await readJsonBody(c, 16 * 1024));
   // A filled honeypot gets the same answer as a real request; nothing is stored.
   if (body.website) return c.json({ ok: true }, 202);
-  const created = await createShopRequest(c.env, body);
-  return c.json(
-    {
-      ok: true,
-      request_id: created.id,
-      ...(created.token ? { status_token: created.token } : {}),
-    },
-    202,
-  );
+  await createShopRequest(c.env, body);
+  // Same body for a new request, a duplicate email, and the honeypot so the
+  // response cannot be used to probe whether an address is already registered.
+  return c.json({ ok: true }, 202);
 });
 
 publicShopRequests.post('/shop-requests/status', async (c) => {

@@ -48,6 +48,23 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
   }
   const now = Date.now();
   const ip = c.req.header('cf-connecting-ip') ?? 'local';
+  // Production-only: the binding is approximate per location (10 / 60s). ENV=test skips
+  // it so unit tests and the e2e suite can enrol many shops from one machine.
+  if (String(c.env.ENV) !== 'test') {
+    const limiter = c.env.ENROL_LIMIT;
+    if (limiter) {
+      const { success } = await limiter.limit({ key: `enrol:${ip}` });
+      if (!success) {
+        throw new ApiError(
+          'RATE_LIMITED',
+          429,
+          'Too many attempts. Wait a minute.',
+          { retry_after: 60 },
+          { 'Retry-After': '60' },
+        );
+      }
+    }
+  }
   if (enrolBlocked(ip, now)) {
     throw new ApiError(
       'RATE_LIMITED',
