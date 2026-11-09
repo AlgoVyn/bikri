@@ -8,6 +8,7 @@ export function EmptyState({
   actionLabel,
   onAction,
   variant = 'card',
+  showHeading = false,
 }: {
   icon?: ReactNode;
   heading?: string;
@@ -16,6 +17,8 @@ export function EmptyState({
   onAction?: () => void;
   /** `plain` when the empty state already sits inside a list surface. */
   variant?: 'card' | 'plain';
+  /** Show the heading visually (404). Other callers keep it as a landmark only. */
+  showHeading?: boolean;
 }) {
   return (
     <div
@@ -30,7 +33,15 @@ export function EmptyState({
           {icon}
         </div>
       ) : null}
-      {heading !== undefined ? <h1 className="sr-only">{heading}</h1> : null}
+      {heading !== undefined ? (
+        <h1
+          className={
+            showHeading ? 'text-title font-semibold text-text' : 'sr-only'
+          }
+        >
+          {heading}
+        </h1>
+      ) : null}
       <p className="max-w-sm text-body font-medium text-text">{message}</p>
       {actionLabel !== undefined && onAction !== undefined ? (
         <button type="button" className={buttonPrimary} onClick={onAction}>

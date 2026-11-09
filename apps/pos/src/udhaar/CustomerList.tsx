@@ -358,6 +358,7 @@ export function UdhaarList({
                 active={sort === 'balance'}
                 direction={direction}
                 onClick={() => applySort('balance')}
+                align="end"
               />
               <SortHeader
                 label={t('office.udhaar.sort_oldest')}
@@ -409,7 +410,7 @@ export function UdhaarList({
                         {String(row.customer.phone ?? '')}
                       </span>
                     </span>
-                    <span className="min-w-0 text-start">
+                    <span className="min-w-0 text-end">
                       <span
                         className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
                       >

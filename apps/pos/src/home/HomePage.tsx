@@ -340,9 +340,7 @@ export function HomePage() {
                     >
                       {t('home.read_only_title')}
                     </h2>
-                    <p className="mt-1 text-small">
-                      {t('home.read_only_hint')}
-                    </p>
+                    <p className="sr-only">{t('home.read_only_hint')}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -359,7 +357,7 @@ export function HomePage() {
             ) : (
               <Link
                 to="/sell"
-                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border border-rail-active/30 bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-rail-active/60"
+                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-accent"
               >
                 <span
                   aria-hidden="true"

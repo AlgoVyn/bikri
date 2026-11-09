@@ -572,6 +572,7 @@ export function SalesList({
                       active={sort === 'items'}
                       direction={direction}
                       onClick={() => applySort('items')}
+                      align="end"
                     />
                   </>
                 )}
@@ -580,6 +581,7 @@ export function SalesList({
                   active={sort === 'total'}
                   direction={direction}
                   onClick={() => applySort('total')}
+                  align="end"
                 />
                 {embedded ? null : (
                   <SortHeader
@@ -694,12 +696,12 @@ function SaleRow({
             <span className="hidden min-w-0 truncate text-text-muted sm:block">
               {row.customerName ?? t('office.sales.walk_in')}
             </span>
-            <span className="hidden text-start text-small text-text-muted sm:block">
+            <span className="hidden text-end text-small text-text-muted sm:block">
               {qtyText(Number(sale.items_qty_milli))}
             </span>
           </>
         )}
-        <span className="text-start">
+        <span className="text-end">
           <MoneyText paisa={Number(sale.total)} />
         </span>
         {embedded ? null : (

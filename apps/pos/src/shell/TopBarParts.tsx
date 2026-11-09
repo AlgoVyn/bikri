@@ -193,7 +193,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         data-state={state}
         aria-label={label}
         title={detail}
-        className={`relative inline-flex h-8 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
+        className={`relative inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-small before:absolute before:-inset-2 before:content-[''] ${tone}`}
       >
         <span aria-hidden="true" className="size-2 rounded-full bg-current" />
         <span>{label}</span>
@@ -213,7 +213,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className="relative hidden h-9 items-center gap-1.5 rounded-full px-2.5 text-small text-text transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 lg:inline-flex"
+        className="relative hidden min-h-11 items-center gap-1.5 rounded-full px-2.5 text-small text-text transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 lg:inline-flex"
       >
         <span
           aria-hidden="true"
@@ -246,7 +246,7 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
             aria-label={label}
             title={detail}
             onClick={() => setOpen(false)}
-            className={`inline-flex h-8 w-fit items-center gap-1.5 rounded-full px-2.5 text-small font-medium ${tone}`}
+            className={`inline-flex min-h-11 w-fit items-center gap-1.5 rounded-full px-2.5 text-small font-medium ${tone}`}
           >
             <span
               aria-hidden="true"

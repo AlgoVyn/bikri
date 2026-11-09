@@ -216,14 +216,16 @@ function RequestShop() {
           />
         </label>
         <p className="text-small text-text-muted">{t('register.privacy')}</p>
-        <button
-          type="submit"
-          data-testid="register-submit"
-          className={buttonPrimary}
-          disabled={busy}
-        >
-          {busy ? t('register.submitting') : t('register.submit')}
-        </button>
+        <div className="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="submit"
+            data-testid="register-submit"
+            className={`${buttonPrimary} w-full`}
+            disabled={busy}
+          >
+            {busy ? t('register.submitting') : t('register.submit')}
+          </button>
+        </div>
       </form>
       <p className="text-center text-small text-text-muted">
         {t('register.already_have_code')}{' '}
