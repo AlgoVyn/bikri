@@ -30,7 +30,6 @@ import {
   PrivacyToggle,
   StaffMenu,
   SyncBadge,
-  useOnline,
   useShopName,
 } from './TopBarParts.tsx';
 
@@ -72,7 +71,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   usePrintService();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
-  const online = useOnline();
   const shopName = useShopName();
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -258,7 +256,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             enabled={privacyEnabled ?? false}
             onToggle={togglePrivacy}
           />
-          {online ? <SyncBadge /> : null}
+          <SyncBadge />
           <StaffMenu shopName={shopName} />
         </div>
       </header>
