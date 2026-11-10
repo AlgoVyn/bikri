@@ -87,6 +87,34 @@ test.describe('shell and languages (T-006, T-007)', () => {
     await page.keyboard.press('Control+Shift+Digit3');
     await expect(page).toHaveURL(/\/bikri\/products$/);
   });
+
+  test('the top-bar search keeps its Home size on every screen', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop top bar');
+    await openReadyShop(page, '/bikri/');
+    const search = page.locator('#global-search');
+    await expect(search).toBeVisible();
+    const homeWidth = (await search.boundingBox())?.width;
+    expect(homeWidth).toBeGreaterThan(0);
+
+    for (const path of [
+      '/sell',
+      '/products',
+      '/sales',
+      '/udhaar',
+      '/suppliers',
+      '/settings',
+    ]) {
+      await page.evaluate((to) => window.__bikriTest?.navigate(to), path);
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(search).toBeVisible();
+      expect((await search.boundingBox())?.width).toBeCloseTo(
+        homeWidth ?? 0,
+        0,
+      );
+    }
+  });
 });
 
 test.describe('PWA (T-005)', () => {

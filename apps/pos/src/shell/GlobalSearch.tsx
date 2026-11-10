@@ -12,7 +12,7 @@ import { seesAllDates } from '../state/reportScope.ts';
 import { ignoresHotkey } from './hotkeys.ts';
 
 /** Top-bar search over products, customers and bills (screens/04). `/` focuses it. */
-export function GlobalSearch({ compact = false }: { compact?: boolean }) {
+export function GlobalSearch() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
@@ -86,7 +86,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
     <search className="relative">
       <button
         type="button"
-        className={`flex size-11 items-center justify-center rounded-control text-text-muted ${compact ? '' : 'lg:hidden'}`}
+        className="flex size-11 items-center justify-center rounded-control text-text-muted lg:hidden"
         aria-label={t('shell.search_label')}
         aria-expanded={phoneOpen}
         onClick={() => {
@@ -100,11 +100,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         <SearchIcon />
       </button>
       <div
-        className={
-          compact
-            ? `${phoneOpen ? 'flex' : 'hidden'} fixed inset-x-2 top-1.5 z-40 h-11 items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:w-auto`
-            : `${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} h-11 items-center gap-2 rounded-control border border-border bg-surface-2 px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 lg:flex lg:w-96`
-        }
+        className={`${phoneOpen ? 'max-lg:flex' : 'max-lg:hidden'} h-11 items-center gap-2 rounded-control border border-border bg-surface-2 px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 max-lg:fixed max-lg:inset-x-2 max-lg:top-1.5 max-lg:z-40 lg:flex lg:w-96`}
       >
         <SearchIcon />
         <input
@@ -166,11 +162,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           id={listId}
           role="listbox"
           aria-label={t('shell.search_label')}
-          className={`fixed inset-x-2 top-topbar z-40 max-h-[60dvh] overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-modal ${
-            compact
-              ? ''
-              : 'lg:absolute lg:inset-x-auto lg:end-0 lg:top-12 lg:w-80'
-          }`}
+          className="fixed inset-x-2 top-topbar z-40 max-h-[60dvh] overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-modal lg:absolute lg:inset-x-auto lg:end-0 lg:top-12 lg:w-80"
         >
           {hits.length === 0 ? (
             <p className="px-3 py-2 text-text-muted">

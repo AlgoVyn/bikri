@@ -39,19 +39,6 @@ function isSellingRoute(pathname: string): boolean {
   return path === '/sell' || path.startsWith('/sell/');
 }
 
-/** Routes with their own primary search keep the global search as a compact icon. */
-function hasLocalSearch(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/u, '');
-  return [
-    '/sell',
-    '/products',
-    '/sales',
-    '/udhaar',
-    '/suppliers',
-    '/settings',
-  ].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
-}
-
 const navLink =
   'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted transition-colors duration-150 lg:flex-none lg:py-1.5';
 
@@ -240,7 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </span>
         <Breadcrumbs current={screenTitle} />
         <div className="flex shrink-0 items-center gap-1 lg:gap-2">
-          <GlobalSearch compact={hasLocalSearch(pathname)} />
+          <GlobalSearch />
           {updateReady ? (
             <button
               type="button"
