@@ -10,7 +10,8 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  ci:
+  # Fast gates run in parallel with the long Playwright suite.
+  quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -37,13 +38,49 @@ jobs:
         run: pnpm build
       - name: Bundle size (08 §7)
         run: pnpm size
+
+  # Four independent shards keep each runner on one Playwright worker, so the
+  # import/keystroke budgets still measure the app rather than a starved runner.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         run: pnpm --filter @bikri/e2e exec playwright install --with-deps chromium
-      - name: E2E (Playwright against wrangler dev + local D1)
-        run: pnpm e2e
+      - name: E2E shard ${{ matrix.shard }}/4 (Playwright against wrangler dev + local D1)
+        run: pnpm --filter @bikri/e2e e2e --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: e2e/playwright-report
           retention-days: 7
+
+  # The stable check name used by deploy and (later) branch protection.
+  ci:
+    if: always()
+    needs: [quality, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI job
+        run: |
+          echo "quality: ${{ needs.quality.result }}"
+          echo "e2e: ${{ needs.e2e.result }}"
+          test "${{ needs.quality.result }}" = "success"
+          test "${{ needs.e2e.result }}" = "success"

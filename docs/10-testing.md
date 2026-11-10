@@ -114,7 +114,7 @@ Record results in `docs/releases/<version>-hardware.md`.
 
 ## 7. CI
 
-`.github/workflows/ci.yml` on every PR: `pnpm biome ci`, `pnpm typecheck`, `pnpm test` (unit + integration + the isolation suite, §8), `pnpm build`, `pnpm e2e` (Desktop Chrome, 1280×800 and 390×844, one worker), bundle size check (08 §7), i18n key parity check, link check of `docs/` (all relative links and images resolve). Required to merge.
+`.github/workflows/ci.yml` on every PR: a `quality` job runs `pnpm biome ci`, `pnpm typecheck`, `pnpm test` (unit + integration + the isolation suite, §8), `pnpm build`, bundle size check (08 §7), i18n key parity check and link check of `docs/` (all relative links and images resolve); four `e2e` shards run `pnpm e2e` in parallel (Desktop Chrome, 1280×800 and 390×844, one worker per shard). The `ci` aggregator job is required to merge.
 
 `deploy.yml` and the nightly `website-guard.yml` run `node tools/check-website.mjs` ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)); `tools/check-website.test.mjs` covers it with saved HTML samples (a page with `cdn.tailwindcss.com` → fail; a page with `navigator.serviceWorker.register('/sw.js')` → fail; Google Fonts stylesheet only → warn; clean page → pass).
 
