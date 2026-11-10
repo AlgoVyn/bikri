@@ -324,7 +324,7 @@ export function SetupWizard() {
       : {};
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-bg px-3 py-6 text-text">
+    <main className="flex min-h-dvh items-center justify-center bg-bg px-3 py-6 text-text">
       <div className="grid w-full max-w-[896px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <aside className="hidden flex-col justify-between gap-8 rounded-card bg-rail p-6 text-rail-ink shadow-card lg:flex">
           <div>
@@ -417,9 +417,6 @@ export function SetupWizard() {
             <section className="flex flex-col gap-4">
               <h1 className="text-h1 font-semibold">{t('setup.welcome')}</h1>
               <p className="text-text-muted">{t('setup.welcome_hint')}</p>
-              <p className="text-small text-text-muted">
-                {t('setup.offline_hint')}
-              </p>
               <div className="grid gap-2 sm:grid-cols-3">
                 {LANGS.map(([code, key]) => (
                   <button
@@ -923,6 +920,6 @@ export function SetupWizard() {
           ) : null}
         </form>
       </div>
-    </div>
+    </main>
   );
 }

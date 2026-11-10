@@ -37,8 +37,10 @@ async function expectAligned(
     const header = boxes?.header[index];
     const row = boxes?.row[index];
     if (!header || !row) continue;
-    expect(header.align).toBe('start');
-    expect(row.align).toBe('start');
+    const norm = (value: string) =>
+      value === 'right' ? 'end' : value === 'left' ? 'start' : value;
+    expect(norm(header.align)).toBe(align[index]);
+    expect(norm(row.align)).toBe(align[index]);
     if (align[index] === 'start')
       expect(Math.abs(header.x - row.x)).toBeLessThanOrEqual(2);
     else expect(Math.abs(header.right - row.right)).toBeLessThanOrEqual(2);
@@ -76,7 +78,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="products-list-header"]',
       'ul[aria-label="Products"] > li a',
-      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
+      ['start', 'start', 'end', 'end', 'end', 'end', 'end'],
       1,
     );
 
@@ -86,7 +88,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="sales-list-header"]',
       '[data-testid="sales-list-header"] ~ li a',
-      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
+      ['start', 'start', 'start', 'end', 'end', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/udhaar'));
@@ -95,7 +97,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="udhaar-list-header"]',
       '[data-testid="udhaar-list-header"] ~ li a',
-      ['start', 'start', 'start', 'start', 'start'],
+      ['start', 'end', 'start', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/suppliers'));
@@ -104,7 +106,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="suppliers-list-header"]',
       '[data-testid="suppliers-list-header"] ~ li a',
-      ['start', 'start', 'start'],
+      ['start', 'end', 'start'],
     );
   });
   test('Urdu flips the same columns to the right edge', async ({
@@ -138,7 +140,13 @@ test.describe('list header alignment', () => {
     });
     expect(styles).not.toBeNull();
     for (const cell of [...(styles?.header ?? []), ...(styles?.row ?? [])]) {
-      expect(cell.align).toBe('start');
+      const norm =
+        cell.align === 'right'
+          ? 'end'
+          : cell.align === 'left'
+            ? 'start'
+            : cell.align;
+      expect(['start', 'end']).toContain(norm);
       expect(cell.direction).toBe('rtl');
     }
   });

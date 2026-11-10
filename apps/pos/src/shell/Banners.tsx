@@ -76,7 +76,9 @@ export function Banners() {
           <span aria-hidden="true" className="shrink-0">
             <LockIcon />
           </span>
-          {t('tenant.readOnly.banner')}
+          {online
+            ? t('tenant.readOnly.banner')
+            : `${t('shell.offline')} ${t('tenant.readOnly.banner')}`}
         </p>
       ) : null}
       {support ? (
@@ -100,7 +102,7 @@ export function Banners() {
           ) : null}
         </p>
       ) : null}
-      {online ? null : (
+      {online || readOnly ? null : (
         <p
           role="status"
           data-testid="banner-offline"

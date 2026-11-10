@@ -282,11 +282,14 @@ test.describe('Home and shell (T-013)', () => {
     ).toBeDisabled();
     await page.evaluate(() => window.__bikriTest?.navigate('/'));
     await context.setOffline(true);
-    await expect(page.getByTestId('banner-offline')).toContainText(
+    await expect(page.getByTestId('banner-read-only')).toContainText(
       'Offline — sales are saved on this device',
     );
-    await context.setOffline(false);
     await expect(page.getByTestId('banner-offline')).toHaveCount(0);
+    await context.setOffline(false);
+    await expect(page.getByTestId('banner-read-only')).not.toContainText(
+      'Offline — sales are saved on this device',
+    );
     await expectNoHorizontalScroll(page);
   });
 

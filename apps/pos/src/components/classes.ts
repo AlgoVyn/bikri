@@ -19,7 +19,7 @@ export const cardClass = 'rounded-card border border-border bg-surface';
 
 /** Standard text field. Numbers and identifiers opt into `monoFieldClass`. */
 export const fieldClass =
-  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-body text-text transition-colors duration-150';
+  'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-body text-text placeholder:text-text-muted transition-colors duration-150';
 
 /** Identifiers, codes and numeric values that should use tabular/mono figures. */
 export const monoFieldClass = `${fieldClass} font-mono tabular-nums`;

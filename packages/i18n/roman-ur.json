@@ -62,6 +62,7 @@
     "loading": "Load ho raha hai…",
     "no": "Nahin",
     "not_found": "Yeh safha dastiyab nahi.",
+    "not_found_hint": "Pata check karein ya Home par wapas jayein.",
     "required": "zaroori",
     "yes": "Haan",
     "back": "Wapas",

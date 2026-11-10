@@ -577,16 +577,7 @@ function PayStep({
         </aside>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="flex min-h-11 items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-5"
-            checked={printOn}
-            onChange={(e) => setPrint(e.target.checked)}
-          />
-          {t('pay.print')}
-        </label>
+      <div className="flex flex-col gap-2 max-md:pb-8">
         {customer?.customer.phone ? (
           <label className="flex min-h-11 items-center gap-2">
             <input
@@ -613,6 +604,15 @@ function PayStep({
       </div>
 
       <DialogFooter>
+        <label className="me-auto flex min-h-11 items-center gap-2">
+          <input
+            type="checkbox"
+            className="size-5"
+            checked={printOn}
+            onChange={(e) => setPrint(e.target.checked)}
+          />
+          {t('pay.print')}
+        </label>
         <button
           type="submit"
           className={`${buttonPrimary} min-h-14 text-title max-md:flex-1`}

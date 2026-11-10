@@ -458,12 +458,14 @@ function ListHeader({
             active={sort === 'price'}
             direction={direction}
             onClick={() => onSort('price')}
+            align="end"
           />
           <SortHeader
             label={t('products.col_stock')}
             active={sort === 'stock'}
             direction={direction}
             onClick={() => onSort('stock')}
+            align="end"
           />
         </>
       ) : (
@@ -479,12 +481,14 @@ function ListHeader({
             active={sort === 'price'}
             direction={direction}
             onClick={() => onSort('price')}
+            align="end"
           />
           <SortHeader
             label={t('products.col_stock')}
             active={sort === 'stock'}
             direction={direction}
             onClick={() => onSort('stock')}
+            align="end"
           />
           {showCost ? (
             <SortHeader
@@ -492,6 +496,7 @@ function ListHeader({
               active={sort === 'cost'}
               direction={direction}
               onClick={() => onSort('cost')}
+              align="end"
             />
           ) : null}
           {showCost ? (
@@ -500,6 +505,7 @@ function ListHeader({
               active={sort === 'margin'}
               direction={direction}
               onClick={() => onSort('margin')}
+              align="end"
             />
           ) : null}
           <SortHeader
@@ -508,6 +514,7 @@ function ListHeader({
             direction={direction}
             onClick={() => onSort('best')}
             secondLine={t('products.col_sold_days')}
+            align="end"
           />
         </>
       )}
@@ -651,7 +658,7 @@ function ProductRow({
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
+          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
               className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
@@ -662,29 +669,29 @@ function ProductRow({
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>
+            <span className={`text-end ${stockTone}`}>
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           ) : (
             <>
-              <span className={`hidden text-start lg:block ${stockTone}`}>
+              <span className={`hidden text-end lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-start lg:block">
+                <span className="hidden text-end lg:block">
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-start lg:block">
+                <span className="hidden text-end lg:block">
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-start lg:block">
+              <span className="hidden text-end lg:block">
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
@@ -718,7 +725,7 @@ function ProductRow({
                 t('form.no_category')}
             </span>
           )}
-          <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
+          <span className="text-end max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
               className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
@@ -729,29 +736,29 @@ function ProductRow({
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>
+            <span className={`text-end ${stockTone}`}>
               {row.stockState === 'untracked'
                 ? t('products.not_tracked')
                 : qtyWithUnit(t, row.onHand, unit)}
             </span>
           ) : (
             <>
-              <span className={`hidden text-start lg:block ${stockTone}`}>
+              <span className={`hidden text-end lg:block ${stockTone}`}>
                 {row.stockState === 'untracked'
                   ? t('products.not_tracked')
                   : qtyWithUnit(t, row.onHand, unit)}
               </span>
               {showCost ? (
-                <span className="hidden text-start lg:block">
+                <span className="hidden text-end lg:block">
                   <MoneyText paisa={Number(p.avg_cost ?? 0)} />
                 </span>
               ) : null}
               {showCost ? (
-                <span className="hidden text-start lg:block">
+                <span className="hidden text-end lg:block">
                   <bdi dir="ltr">{margin ?? '—'}</bdi>
                 </span>
               ) : null}
-              <span className="hidden text-start lg:block">
+              <span className="hidden text-end lg:block">
                 {qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>

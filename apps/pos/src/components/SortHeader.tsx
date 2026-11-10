@@ -14,6 +14,7 @@ export function SortHeader({
   secondLine,
   className = '',
   testId,
+  align = 'start',
 }: {
   label: string;
   active: boolean;
@@ -22,6 +23,7 @@ export function SortHeader({
   secondLine?: string;
   className?: string;
   testId?: string;
+  align?: 'start' | 'end';
 }) {
   const { t } = useTranslation();
   return (
@@ -34,7 +36,7 @@ export function SortHeader({
       }
       data-sort-direction={active ? direction : undefined}
       data-testid={testId}
-      className={`flex min-h-8 min-w-0 items-center gap-1 text-start leading-tight hover:text-text ${className}`}
+      className={`flex min-h-8 w-full min-w-0 items-center gap-1 leading-tight hover:text-text max-lg:min-h-11 ${align === 'end' ? 'justify-end text-end' : 'text-start'} ${className}`}
     >
       <span className="min-w-0">{label}</span>
       {secondLine ? (

@@ -62,6 +62,7 @@
     "loading": "Loading…",
     "no": "No",
     "not_found": "This page is not available.",
+    "not_found_hint": "Check the address or go back to Home.",
     "required": "required",
     "yes": "Yes",
     "back": "Back",

@@ -267,7 +267,10 @@ function SettingsNavContent({
               </dt>
               <dd className="font-medium">
                 {owner && can('export.data') ? (
-                  <Link to="/settings/backup" className="text-primary">
+                  <Link
+                    to="/settings/backup"
+                    className="inline-flex min-h-11 items-center text-primary underline underline-offset-2"
+                  >
                     {t('office.settings.health_backup_value')}
                   </Link>
                 ) : (
@@ -280,7 +283,10 @@ function SettingsNavContent({
                 {t('office.settings.health_printer')}
               </dt>
               <dd className="font-medium">
-                <Link to="/settings/printer" className="text-primary">
+                <Link
+                  to="/settings/printer"
+                  className="inline-flex min-h-11 items-center text-primary underline underline-offset-2"
+                >
                   {info?.printer
                     ? t('shell.printer_ready')
                     : t('shell.printer_none')}
