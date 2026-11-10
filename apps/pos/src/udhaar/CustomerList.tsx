@@ -411,27 +411,33 @@ export function UdhaarList({
                       </span>
                     </span>
                     <span className="min-w-0 text-end">
-                      <span
-                        className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
-                      >
-                        {row.balance > 0 ? (
-                          <span className="sr-only">
-                            {balanceLabel(t, row.balance, money)}
-                          </span>
-                        ) : null}
-                        <span aria-hidden={row.balance > 0 ? true : undefined}>
-                          <MoneyText paisa={row.balance} />
-                        </span>
-                      </span>
-                      {row.balance < 0 ? (
-                        <span className="block text-small text-success-subtle-ink">
-                          {t('office.udhaar.in_credit_label')}
-                        </span>
-                      ) : row.balance === 0 ? (
-                        <span className="block text-small text-text-muted">
+                      {row.balance === 0 ? (
+                        <span className="block whitespace-nowrap font-semibold text-text-muted">
                           {t('office.udhaar.settled')}
                         </span>
-                      ) : null}
+                      ) : (
+                        <>
+                          <span
+                            className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
+                          >
+                            {row.balance > 0 ? (
+                              <span className="sr-only">
+                                {balanceLabel(t, row.balance, money)}
+                              </span>
+                            ) : null}
+                            <span
+                              aria-hidden={row.balance > 0 ? true : undefined}
+                            >
+                              <MoneyText paisa={row.balance} />
+                            </span>
+                          </span>
+                          {row.balance < 0 ? (
+                            <span className="block text-small text-success-subtle-ink">
+                              {t('office.udhaar.in_credit_label')}
+                            </span>
+                          ) : null}
+                        </>
+                      )}
                     </span>
                     <span className="min-w-0 text-small text-text-muted max-sm:text-start">
                       <span className="sm:hidden">

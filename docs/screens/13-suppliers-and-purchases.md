@@ -15,7 +15,7 @@ On ≥ 1280 px the supplier list and the selected ledger share one master–deta
 
 ## Suppliers list
 
-Summary: total you owe suppliers. Rows use one table header (`Supplier`, `Balance`, `Last delivery`): name and phone; balance amount only (green `Advance` for a negative balance, grey `Settled` for zero; screen readers still hear "You owe Rs …" for positive balances); formatted last-delivery date, or `—` when there has been no delivery. Every header sorts: the first click uses the column's natural order (Supplier A–Z, Balance highest, Last delivery newest) and clicking it again reverses it; the arrow shows the direction. The toolbar has the same Sort field and direction button for phones, where the header row is hidden. Below 640 px the row stacks into a compact card. `+ New supplier`, `Export CSV`.
+Summary: total you owe suppliers. Rows use one table header (`Supplier`, `Balance`, `Last delivery`): name and phone; balance amount only (green `Advance` for a negative balance; a zero balance shows only grey `Settled`, never `Rs 0`; screen readers still hear "You owe Rs …" for positive balances); formatted last-delivery date, or `—` when there has been no delivery. Every header sorts: the first click uses the column's natural order (Supplier A–Z, Balance highest, Last delivery newest) and clicking it again reverses it; the arrow shows the direction. The toolbar has the same Sort field and direction button for phones, where the header row is hidden. Below 640 px the row stacks into a compact card. `+ New supplier`, `Export CSV`.
 
 New supplier: name (1–60), phone (optional), address, note, opening balance ("You already owe them", creates `ledger_entries` source opening).
 

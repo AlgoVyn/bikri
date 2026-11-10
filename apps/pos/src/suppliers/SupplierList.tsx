@@ -288,27 +288,33 @@ export function SupplierList({
                     </span>
                   </span>
                   <span className="min-w-0 text-end">
-                    <span
-                      className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
-                    >
-                      {row.balance > 0 ? (
-                        <span className="sr-only">
-                          {supplierBalanceLabel(t, row.balance, money)}
-                        </span>
-                      ) : null}
-                      <span aria-hidden={row.balance > 0 ? true : undefined}>
-                        <MoneyText paisa={row.balance} />
-                      </span>
-                    </span>
-                    {row.balance < 0 ? (
-                      <span className="block text-small text-success-subtle-ink">
-                        {t('office.suppliers.advance_label')}
-                      </span>
-                    ) : row.balance === 0 ? (
-                      <span className="block text-small text-text-muted">
+                    {row.balance === 0 ? (
+                      <span className="block whitespace-nowrap font-semibold text-text-muted">
                         {t('office.suppliers.settled')}
                       </span>
-                    ) : null}
+                    ) : (
+                      <>
+                        <span
+                          className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
+                        >
+                          {row.balance > 0 ? (
+                            <span className="sr-only">
+                              {supplierBalanceLabel(t, row.balance, money)}
+                            </span>
+                          ) : null}
+                          <span
+                            aria-hidden={row.balance > 0 ? true : undefined}
+                          >
+                            <MoneyText paisa={row.balance} />
+                          </span>
+                        </span>
+                        {row.balance < 0 ? (
+                          <span className="block text-small text-success-subtle-ink">
+                            {t('office.suppliers.advance_label')}
+                          </span>
+                        ) : null}
+                      </>
+                    )}
                   </span>
                   <span className="min-w-0 text-start text-small text-text-muted sm:text-start">
                     {row.lastDeliveryDate
