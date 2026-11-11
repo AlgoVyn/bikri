@@ -626,7 +626,8 @@
     "agent_download_all": "All downloads",
     "agent_download_sha": "SHA-256 checksums",
     "agent_download_hint": "Unsigned builds: verify SHA-256; Windows may show SmartScreen.",
-    "agent_checking": "Looking for the print service…"
+    "agent_checking": "Looking for the print service…",
+    "use_48": "Use 48 characters"
   },
   "privacy": {
     "title": "Hide amounts",

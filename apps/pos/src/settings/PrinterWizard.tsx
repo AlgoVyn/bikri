@@ -397,6 +397,15 @@ export function PrinterWizard({
               {t('printer.use_42')}
             </button>
           ) : null}
+          {draft.paper_mm === 80 && draft.chars_per_line !== 48 ? (
+            <button
+              type="button"
+              className={`${buttonQuiet} self-center`}
+              onClick={() => paper(80)}
+            >
+              {t('printer.use_48')}
+            </button>
+          ) : null}
         </fieldset>
       ) : null}
 
