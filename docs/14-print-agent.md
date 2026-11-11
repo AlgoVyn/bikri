@@ -501,7 +501,7 @@ Implemented in this repository (Phase 1):
   - the wizard fetches the short-lived code from `/v1/health`, so pairing and unpairing happen inside Bikri; the separate agent page is only a fallback;
   - drawer kick refused in compatibility mode;
   - `PAPER_OUT` and `AGENT_AUTH` error codes and localized strings in `en`, `ur`, `roman-ur`.
-- **Packaging:** `scripts/build.sh` creates Windows/Linux/macOS archives, `print-agent-release.yml` publishes them to a GitHub release, and `apps/pos/public/print-agent/` is the download page linked from the wizard.
+- **Packaging:** `scripts/build.sh` creates Windows/Linux/macOS archives, `print-agent-release.yml` publishes them to a GitHub release, and the wizard links directly to the platform assets (no separate download page).
 - **Tests:** Go unit tests, print-service tests with a fake agent, printer Playwright tests for raw and compatibility modes, docs and i18n checks.
 
 Remaining release work:

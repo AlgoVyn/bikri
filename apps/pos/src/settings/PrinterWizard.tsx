@@ -5,12 +5,15 @@ import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
 import {
-  AGENT_DOWNLOAD_URL,
+  AGENT_DOWNLOADS,
+  AGENT_RELEASE_URL,
+  AGENT_SHA256_URL,
   AGENT_URL,
   type AgentHealth,
   type AgentMode,
   type AgentPrinter,
   AgentRequestError,
+  agentPlatform,
   httpAgentClient,
 } from '../print/agent.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
@@ -76,6 +79,22 @@ export function PrinterWizard({
   const { t } = useTranslation();
   const deps = browserPrintDeps();
   const agent = deps.agent ?? httpAgentClient;
+  const platform = agentPlatform();
+  const primaryDownload =
+    platform === 'windows'
+      ? 'windows'
+      : platform === 'linux'
+        ? 'linux'
+        : platform === 'macos'
+          ? 'macos'
+          : null;
+  const downloadKeys = [
+    'windows',
+    'linux',
+    'linuxArm',
+    'macos',
+    'macosArm',
+  ] as const;
   const desktop =
     typeof navigator === 'undefined' ||
     !/Mobi|Android/iu.test(navigator.userAgent);
@@ -115,21 +134,25 @@ export function PrinterWizard({
     if (!desktop) return;
     let cancelled = false;
     void (async () => {
+      const url = current?.agent?.url ?? AGENT_URL;
+      let health: AgentHealth;
       try {
-        const health = await agent.health(current?.agent?.url ?? AGENT_URL);
-        if (cancelled) return;
-        setAgentHealth(health);
-        if (!health.paired && health.pairingCode)
-          setAgentCode(health.pairingCode);
-        if (health.paired && current?.agent?.token) {
-          const list = await agent.printers(
-            current.agent.url,
-            current.agent.token,
-          );
-          if (!cancelled) setAgentPrinters(list);
-        }
+        health = await agent.health(url);
       } catch {
         if (!cancelled) setAgentHealth(null);
+        return;
+      }
+      if (cancelled) return;
+      setAgentHealth(health);
+      if (!health.paired && health.pairingCode)
+        setAgentCode(health.pairingCode);
+      if (health.paired && current?.agent?.token) {
+        try {
+          const list = await agent.printers(url, current.agent.token);
+          if (!cancelled) setAgentPrinters(list);
+        } catch {
+          if (!cancelled) setAgentError('agent_unreachable');
+        }
       }
     })();
     return () => {
@@ -148,8 +171,12 @@ export function PrinterWizard({
         setAgentCode(health.pairingCode);
       if (health.paired) {
         if (draft.agent?.token) {
-          const list = await agent.printers(draft.agent.url, draft.agent.token);
-          setAgentPrinters(list);
+          try {
+            const list = await agent.printers(url, draft.agent.token);
+            setAgentPrinters(list);
+          } catch {
+            setAgentError('agent_unreachable');
+          }
         } else {
           setAgentError('agent_already_paired');
         }
@@ -171,22 +198,41 @@ export function PrinterWizard({
         setAgentError('agent_pair_failed');
         return;
       }
-      const paired = await agent.pair(AGENT_URL, code, 'Bikri');
+      const url = draft.agent?.url ?? AGENT_URL;
+      const paired = await agent.pair(url, code, 'Bikri');
       const config = {
-        url: AGENT_URL,
+        url,
         token: paired.token,
         agentId: paired.agentId,
         printerName: '',
         mode: 'raw' as AgentMode,
       };
       patch({ transport: 'agent', agent: config });
-      const list = await agent.printers(AGENT_URL, paired.token);
-      setAgentPrinters(list);
-      const chosen = list.find((p) => p.isDefault) ?? list[0];
-      if (chosen) patch({ agent: { ...config, printerName: chosen.name } });
-      setAgentHealth((health) =>
-        health === null ? health : { ...health, paired: true },
-      );
+      try {
+        const health = await agent.health(url);
+        setAgentHealth(health);
+      } catch {
+        setAgentHealth((health) => ({
+          ...(health ?? {
+            app: 'bikri-print-agent',
+            version: '',
+            protocol: 1,
+            platform: '',
+            paired: true,
+            printers: 0,
+          }),
+          paired: true,
+          pairingCode: undefined,
+        }));
+      }
+      try {
+        const list = await agent.printers(url, paired.token);
+        setAgentPrinters(list);
+        const chosen = list.find((p) => p.isDefault) ?? list[0];
+        if (chosen) patch({ agent: { ...config, printerName: chosen.name } });
+      } catch {
+        setAgentError('agent_unreachable');
+      }
       setAgentCode('');
     } catch (err) {
       setAgentError(
@@ -206,15 +252,21 @@ export function PrinterWizard({
     setAgentError(null);
     try {
       await agent.unpair(config.url, config.token);
-      const health = await agent.health(config.url);
-      setAgentHealth(health);
-      setAgentPrinters([]);
-      setAgentCode(health.pairingCode ?? '');
       setDraft((currentDraft) => {
         const next = { ...currentDraft };
         delete next.agent;
         return next;
       });
+      setAgentPrinters([]);
+      setAgentCode('');
+      try {
+        const health = await agent.health(config.url);
+        setAgentHealth(health);
+        setAgentCode(health.pairingCode ?? '');
+      } catch {
+        setAgentHealth(null);
+        setAgentError('agent_unreachable');
+      }
     } catch {
       setAgentError('agent_unreachable');
     } finally {
@@ -341,44 +393,48 @@ export function PrinterWizard({
 
       {step === 'connection' ? (
         <div className="flex flex-col gap-3">
-          <fieldset className="flex flex-col gap-2 sm:flex-row">
+          <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 font-medium">
               {t('printer.connection')}
             </legend>
-            {(['agent', 'usb', 'serial', 'system'] as const)
-              .filter((tr) => tr !== 'agent' || desktop)
-              .map((tr) => {
-                const supported =
-                  tr === 'agent'
-                    ? desktop
-                    : tr === 'system' ||
-                      (tr === 'usb' ? deps.usb : deps.serial) !== null;
-                return (
-                  <label
-                    key={tr}
-                    className={`${choice(draft.transport === tr)} ${supported ? '' : 'opacity-60'}`}
-                  >
-                    <span className="flex items-center gap-2 font-medium">
-                      <input
-                        type="radio"
-                        name="transport"
-                        disabled={!supported}
-                        checked={draft.transport === tr}
-                        onChange={() => {
-                          patch({ transport: tr });
-                          if (tr === 'agent') void checkAgent();
-                        }}
-                      />
-                      {t(`printer.transport_${tr}`)}
-                    </span>
-                    <span className="text-small text-text-muted">
-                      {supported
-                        ? t(`printer.transport_${tr}_hint`)
-                        : t('printer.needs_chrome')}
-                    </span>
-                  </label>
-                );
-              })}
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(['agent', 'usb', 'serial', 'system'] as const)
+                .filter((tr) => tr !== 'agent' || desktop)
+                .map((tr) => {
+                  const supported =
+                    tr === 'agent'
+                      ? desktop
+                      : tr === 'system' ||
+                        (tr === 'usb' ? deps.usb : deps.serial) !== null;
+                  return (
+                    <label
+                      key={tr}
+                      className={`${choice(draft.transport === tr)} ${
+                        tr === 'agent' ? 'sm:col-span-3' : ''
+                      } ${supported ? '' : 'opacity-60'}`}
+                    >
+                      <span className="flex items-center gap-2 font-medium">
+                        <input
+                          type="radio"
+                          name="transport"
+                          disabled={!supported}
+                          checked={draft.transport === tr}
+                          onChange={() => {
+                            patch({ transport: tr });
+                            if (tr === 'agent') void checkAgent();
+                          }}
+                        />
+                        {t(`printer.transport_${tr}`)}
+                      </span>
+                      <span className="text-small text-text-muted">
+                        {supported
+                          ? t(`printer.transport_${tr}_hint`)
+                          : t('printer.needs_chrome')}
+                      </span>
+                    </label>
+                  );
+                })}
+            </div>
           </fieldset>
           {draft.transport === 'usb' ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -450,15 +506,47 @@ export function PrinterWizard({
               {agentHealth === null ? (
                 <>
                   <p className="text-small">{t('printer.agent_not_found')}</p>
+                  <p className="text-small font-medium">
+                    {t('printer.agent_download')}
+                  </p>
                   <div className="flex flex-wrap gap-2">
+                    {downloadKeys.map((key) => (
+                      <a
+                        key={key}
+                        href={AGENT_DOWNLOADS[key]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={
+                          key === primaryDownload ? buttonPrimary : buttonQuiet
+                        }
+                      >
+                        {t(`printer.agent_download_${key}`)}
+                      </a>
+                    ))}
+                  </div>
+                  <p className="text-small text-text-muted">
                     <a
-                      href={AGENT_DOWNLOAD_URL}
+                      href={AGENT_RELEASE_URL}
                       target="_blank"
                       rel="noreferrer"
-                      className={buttonPrimary}
+                      className="underline"
                     >
-                      {t('printer.agent_download')}
+                      {t('printer.agent_download_all')}
                     </a>
+                    {' · '}
+                    <a
+                      href={AGENT_SHA256_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      {t('printer.agent_download_sha')}
+                    </a>
+                  </p>
+                  <p className="text-small text-text-muted">
+                    {t('printer.agent_download_hint')}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       className={buttonQuiet}

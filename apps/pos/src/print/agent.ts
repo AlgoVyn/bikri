@@ -5,8 +5,33 @@
  */
 
 export const AGENT_URL = 'http://127.0.0.1:17890';
-/** Installer landing page. The binaries are published separately from the PWA. */
-export const AGENT_DOWNLOAD_URL = 'https://algovyn.com/bikri/print-agent/';
+/** Update this tag when publishing a new print-agent release. */
+export const AGENT_RELEASE_TAG = 'print-agent-v0.1.0';
+export const AGENT_RELEASE_URL = `https://github.com/AlgoVyn/bikri/releases/tag/${AGENT_RELEASE_TAG}`;
+const releaseAsset = (name: string) =>
+  `https://github.com/AlgoVyn/bikri/releases/download/${AGENT_RELEASE_TAG}/${name}`;
+
+/** Platform archives, linked directly from the wizard. */
+export const AGENT_DOWNLOADS = {
+  windows: releaseAsset('bikri-print-agent-windows-amd64.zip'),
+  linux: releaseAsset('bikri-print-agent-linux-amd64.tar.gz'),
+  linuxArm: releaseAsset('bikri-print-agent-linux-arm64.tar.gz'),
+  macos: releaseAsset('bikri-print-agent-darwin-amd64.tar.gz'),
+  macosArm: releaseAsset('bikri-print-agent-darwin-arm64.tar.gz'),
+} as const;
+export const AGENT_SHA256_URL = releaseAsset('SHA256SUMS');
+export type AgentDownloadKey = keyof typeof AGENT_DOWNLOADS;
+export type AgentPlatform = 'windows' | 'linux' | 'macos' | null;
+
+/** Best-effort platform for choosing the primary download; never used for security. */
+export function agentPlatform(
+  ua = typeof navigator === 'undefined' ? '' : navigator.userAgent,
+): AgentPlatform {
+  if (/Windows/iu.test(ua)) return 'windows';
+  if (/Mac OS X|Macintosh/iu.test(ua)) return 'macos';
+  if (/Linux|X11/iu.test(ua)) return 'linux';
+  return null;
+}
 
 export type AgentMode = 'raw' | 'driver';
 export type AgentJobState =

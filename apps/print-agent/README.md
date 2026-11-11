@@ -32,7 +32,7 @@ GOOS=linux   GOARCH=arm64 go build ./...
 - `bikri-print-agent-darwin-{amd64,arm64}.tar.gz` — binary, `install.sh`;
 - `SHA256SUMS`.
 
-The public download page is `apps/pos/public/print-agent/index.html`; it links to the GitHub release assets. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, builds the archives and publishes the release.
+The wizard links directly to the GitHub release assets; there is no separate download page. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, builds the archives and publishes the release.
 
 Windows:
 

@@ -438,3 +438,30 @@ test.describe('Print service agent compatibility mode (docs/14)', () => {
     expect(String(job?.data ?? '').length).toBeGreaterThan(1000);
   });
 });
+
+test.describe('Print service agent install links (docs/14)', () => {
+  test('shows platform downloads inside the wizard when the agent is not installed', async ({
+    page,
+  }) => {
+    await page.route('**/v1/**', (route) => route.abort());
+    await openReadyShop(page, '/bikri/settings/printer');
+    await page.getByRole('button', { name: 'Set up printer' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page
+      .getByRole('radio', { name: /Print service \(recommended\)/ })
+      .check();
+    await expect(
+      page.getByText('Print service not found on this computer.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Windows 10/11 (x64)' }),
+    ).toHaveAttribute(
+      'href',
+      'https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-windows-amd64.zip',
+    );
+    await expect(
+      page.getByRole('link', { name: 'SHA-256 checksums' }),
+    ).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
+});
