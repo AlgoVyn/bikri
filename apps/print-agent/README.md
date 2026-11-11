@@ -23,12 +23,31 @@ GOOS=darwin  GOARCH=arm64 go build ./...
 GOOS=linux   GOARCH=arm64 go build ./...
 ```
 
-Release artifacts:
+## Packages
 
-```bash
-./scripts/build.sh
+`scripts/build.sh` creates one archive per platform in `dist/`:
+
+- `bikri-print-agent-windows-amd64.zip` — `bikri-print-agent.exe`, `install.ps1`, `uninstall.ps1`;
+- `bikri-print-agent-linux-{amd64,arm64}.tar.gz` — binary, `install.sh`, systemd user unit;
+- `bikri-print-agent-darwin-{amd64,arm64}.tar.gz` — binary, `install.sh`;
+- `SHA256SUMS`.
+
+The public download page is `apps/pos/public/print-agent/index.html`; it links to the GitHub release assets. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, builds the archives and publishes the release.
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
+Linux/macOS:
+
+```bash
+tar -xzf bikri-print-agent-*.tar.gz
+./install.sh
+```
+
+The archives are unsigned until the Authenticode/notarization certificate is added; verify `SHA256SUMS` and expect a SmartScreen/Gatekeeper warning.
 The script writes binaries to `dist/` and a `SHA256SUMS` file. Windows builds hide the console window (`-H=windowsgui`); logs go to the config directory.
 
 ## Run (development)

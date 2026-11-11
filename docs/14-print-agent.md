@@ -1,6 +1,6 @@
 # 14 — Print agent
 
-**Status:** Phase 1 implemented, 11 Nov 2026. Core agent, Windows/CUPS backends and the Bikri `agent` transport are in `apps/print-agent` and the PWA; signed installers, auto-update, direct TCP and macOS notarization remain release tasks. See §18.
+**Status:** Phase 1 implemented, 11 Nov 2026. Core agent, Windows/CUPS backends, GitHub-release packages and the Bikri `agent` transport are in `apps/print-agent` and the PWA. Authenticode signing/notarization, auto-update and direct TCP remain release tasks. See §18.
 
 **Related:** [06-printing](06-printing.md), [01-architecture](01-architecture.md), [10-testing](10-testing.md), [11-roadmap](11-roadmap.md), [13-multi-tenancy](13-multi-tenancy.md), [screens/17](screens/17-settings.md#printer), [decisions](decisions.md).
 
@@ -504,11 +504,12 @@ Implemented in this repository (Phase 1):
 
 Remaining release work:
 
-- signed Windows/macOS installers, Linux packages and auto-update manifest;
+- Authenticode signing for the Windows executable and notarization for macOS; the GitHub release workflow builds the unsigned archives (`print-agent-release.yml`);
+- an auto-update manifest and signed updates;
 - direct TCP 9100 and Bluetooth SPP backends;
 - a Windows service mode for multi-user/RDP tills;
 - live hardware validation on the SRP-350III (raw queue, drawer, cut, QR, 42/48 chars) and a second printer family;
-- code signing certificate and download hosting.
+- code signing certificate and download hosting (GitHub Releases is wired; a branded `algovyn.com` mirror can follow).
 
 ## Appendix A — API examples
 

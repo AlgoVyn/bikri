@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bikri Print Agent — Download</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; background: #f1f5f9; color: #0f172a; }
+  main { max-width: 46rem; margin: 3rem auto; padding: 0 1.25rem; }
+  article { background: #fff; border: 1px solid #cbd5e1; border-radius: 0.85rem; padding: 1.5rem; }
+  h1 { margin: 0 0 0.35rem; font-size: 1.45rem; }
+  h2 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
+  p, li { line-height: 1.55; }
+  a { color: #006bb3; }
+  .muted { color: #475569; font-size: 0.9rem; }
+  .downloads { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); margin: 0.75rem 0 1rem; padding: 0; list-style: none; }
+  .downloads a { display: block; padding: 0.8rem 0.9rem; border: 1px solid #94a3b8; border-radius: 0.55rem; color: #006bb3; text-decoration: none; background: #f8fafc; }
+  .downloads a:hover, .downloads a:focus-visible { background: #e0f2fe; border-color: #006bb3; }
+  .downloads strong { display: block; color: #0f172a; }
+  .downloads span { font-size: 0.8rem; color: #475569; }
+  code { font: 0.9em ui-monospace, monospace; background: #e2e8f0; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+  .warn { border-inline-start: 3px solid #c2410c; padding: 0.6rem 0.8rem; background: #fff7ed; border-radius: 0.35rem; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0f172a; color: #e2e8f0; }
+    a { color: #7dd3fc; }
+    article { background: #111c2e; border-color: #334155; }
+    .muted, .downloads span { color: #94a3b8; }
+    .downloads a { background: #0b1727; border-color: #475569; color: #7dd3fc; }
+    .downloads a:hover, .downloads a:focus-visible { background: #082f49; border-color: #7dd3fc; }
+    .downloads strong { color: #e2e8f0; }
+    code { background: #1e293b; }
+    .warn { background: #2a170a; border-color: #fb923c; }
+  }
+</style>
+</head>
+<body>
+<main>
+<article>
+  <h1>Bikri Print Agent</h1>
+  <p class="muted">Print through the printer already installed in Windows, Linux or macOS. No WinUSB driver replacement and no browser print dialog.</p>
+
+  <p><a href="/bikri/">← Back to Bikri</a></p>
+
+  <h2>Download</h2>
+  <ul class="downloads">
+    <li><a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-windows-amd64.zip"><strong>Windows 10/11</strong><span>64-bit · ZIP</span></a></li>
+    <li><a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-linux-amd64.tar.gz"><strong>Linux</strong><span>x86_64 · tar.gz</span></a></li>
+    <li><a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-linux-arm64.tar.gz"><strong>Linux</strong><span>ARM64 · tar.gz</span></a></li>
+    <li><a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-darwin-amd64.tar.gz"><strong>macOS</strong><span>Intel · tar.gz</span></a></li>
+    <li><a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/bikri-print-agent-darwin-arm64.tar.gz"><strong>macOS</strong><span>Apple Silicon · tar.gz</span></a></li>
+  </ul>
+  <p class="muted">
+    <a href="https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.0/SHA256SUMS">SHA256SUMS</a>
+    · <a href="https://github.com/AlgoVyn/bikri/releases/tag/print-agent-v0.1.0">Release notes</a>
+  </p>
+
+  <h2>Install</h2>
+  <p><strong>Windows:</strong> unzip, then run in PowerShell:</p>
+  <p><code>powershell -ExecutionPolicy Bypass -File .\install.ps1</code></p>
+  <p><strong>Linux or macOS:</strong> extract the archive and run <code>./install.sh</code>.</p>
+  <p>Then open Bikri → <strong>Settings → Printer → Set up printer → Print service</strong>, copy the pairing code from <a href="http://127.0.0.1:17890/">http://127.0.0.1:17890/</a> and choose your printer.</p>
+
+  <p class="warn"><strong>Unsigned build:</strong> Windows SmartScreen (or macOS Gatekeeper) may warn the first time. Verify the archive against <code>SHA256SUMS</code> and only download from the official Algovyn/Bikri release page. Do not disable security warnings globally.</p>
+
+  <h2>What it does</h2>
+  <ul>
+    <li><strong>POS mode</strong> sends ESC/POS through the installed print queue, keeping the cash drawer, cutter and QR code working.</li>
+    <li><strong>Compatibility mode</strong> prints a rendered receipt image through the printer driver for non-ESC/POS printers.</li>
+    <li>The agent listens only on this computer (<code>127.0.0.1:17890</code>), pairs with a one-time code, and never sends shop data to Algovyn.</li>
+  </ul>
+</article>
+</main>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# Build the cross-platform print agent and publish its archives when a
+# `print-agent-v*` tag is pushed.
+#
+# The artifacts are currently unsigned. Add Authenticode signing for the Windows
+# executable and notarization for macOS before calling this a production release.
+name: print-agent-release
+on:
+  push:
+    tags:
+      - "print-agent-v*"
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/print-agent
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: apps/print-agent/go.mod
+      - name: Test
+        run: go test ./...
+      - name: Build packages
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION#print-agent-v}" ./scripts/build.sh
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            apps/print-agent/dist/bikri-print-agent-windows-amd64.zip \
+            apps/print-agent/dist/bikri-print-agent-linux-amd64.tar.gz \
+            apps/print-agent/dist/bikri-print-agent-linux-arm64.tar.gz \
+            apps/print-agent/dist/bikri-print-agent-darwin-amd64.tar.gz \
+            apps/print-agent/dist/bikri-print-agent-darwin-arm64.tar.gz \
+            apps/print-agent/dist/SHA256SUMS \
+            --title "Bikri Print Agent ${GITHUB_REF_NAME#print-agent-v}" \
+            --latest=false \
+            --notes "Cross-platform Bikri Print Agent build. The binaries are unsigned: verify the archives against SHA256SUMS and only use this release page. See docs/14-print-agent.md for setup."
