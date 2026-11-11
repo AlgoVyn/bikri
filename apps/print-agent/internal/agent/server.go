@@ -51,6 +51,7 @@ func NewServer(cfg *Config, cfgPath string, auth *Auth, jobs *Manager, b backend
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.ui)
+	mux.HandleFunc("POST /ui/unpair", s.uiUnpair)
 	mux.HandleFunc("GET /v1/health", s.health)
 	mux.HandleFunc("POST /v1/pair", s.pair)
 	mux.HandleFunc("POST /v1/unpair", s.requireAuth(s.unpair))
@@ -194,6 +195,18 @@ func (s *Server) unpair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// uiUnpair is the local status page's reset action. It is intentionally
+// loopback-only (the security middleware checks Host and Origin) so a user who
+// lost the Bikri-side token can pair the till again.
+func (s *Server) uiUnpair(w http.ResponseWriter, r *http.Request) {
+	s.auth.Unpair()
+	if err := SaveConfig(s.cfgPath, s.cfg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) printers(w http.ResponseWriter, r *http.Request) {

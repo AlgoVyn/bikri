@@ -51,7 +51,7 @@ The config file lives in the OS user config directory:
 - Linux: `~/.config/bikri-print-agent/config.json`
 - macOS: `~/Library/Application Support/bikri-print-agent/config.json`
 
-The pairing token is stored only as a SHA-256 hash. The agent does not persist receipt data; jobs are kept in memory for 24 hours for idempotency/status.
+The pairing token is stored only as a SHA-256 hash. The agent does not persist receipt data; jobs are kept in memory for 24 hours for idempotency/status. If the Bikri-side token is lost, open the local page and use **Unpair this computer** to start a new pairing window.
 
 ## HTTP API
 

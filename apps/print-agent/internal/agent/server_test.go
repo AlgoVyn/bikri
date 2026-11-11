@@ -208,3 +208,32 @@ func authGet(t *testing.T, url, token string) []byte {
 	body, _ := io.ReadAll(res.Body)
 	return body
 }
+
+func TestUIUnpairResetsPairing(t *testing.T) {
+	s, _ := testServer(t)
+	httpServer := httptest.NewServer(s.Handler())
+	defer httpServer.Close()
+
+	token, err := s.auth.Pair(s.auth.PairingCode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	req, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/ui/unpair", nil)
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("unpair status = %d", res.StatusCode)
+	}
+	if s.auth.Verify(token) {
+		t.Fatal("token still works after the local reset")
+	}
+	if s.cfg.Paired {
+		t.Fatal("config still says paired")
+	}
+}

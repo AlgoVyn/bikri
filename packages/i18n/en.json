@@ -504,6 +504,7 @@
     "err_FAILED": "printing failed",
     "err_NO_PRINTER": "no printer set up",
     "err_PERMISSION": "the browser can't use this printer",
+    "err_AGENT_AUTH": "the print service needs to be paired again",
     "err_TIMEOUT": "printer did not answer",
     "err_PAPER_OUT": "printer is out of paper",
     "err_UNSUPPORTED": "this browser can't print this way",

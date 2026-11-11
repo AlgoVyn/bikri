@@ -292,7 +292,7 @@ function agentErrorCode(code: string | undefined): PrintErrorCode {
       return 'NO_PRINTER';
     case 'UNAUTHORIZED':
     case 'PAIRING_CODE':
-      return 'PERMISSION';
+      return 'AGENT_AUTH';
     case 'TIMEOUT':
       return 'TIMEOUT';
     default:
@@ -304,7 +304,7 @@ function mapAgentError(err: unknown): PrintError {
   if (err instanceof PrintError) return err;
   if (err instanceof AgentRequestError) {
     if (err.code === 'UNAVAILABLE') return new PrintError('DISCONNECTED');
-    if (err.status === 401) return new PrintError('PERMISSION');
+    if (err.status === 401) return new PrintError('AGENT_AUTH');
     return new PrintError(agentErrorCode(err.code));
   }
   return new PrintError('DISCONNECTED', (err as Error)?.message);

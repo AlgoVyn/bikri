@@ -504,6 +504,7 @@
     "err_FAILED": "printing nakaam",
     "err_NO_PRINTER": "koi printer set nahin",
     "err_PERMISSION": "browser yeh printer istemal nahin kar sakta",
+    "err_AGENT_AUTH": "print service ko dobara pair karna hoga",
     "err_TIMEOUT": "printer ne jawab nahin diya",
     "err_PAPER_OUT": "printer mein kaghaz nahin hai",
     "err_UNSUPPORTED": "yeh browser is tarah print nahin kar sakta",

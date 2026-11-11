@@ -6,6 +6,7 @@
 export type PrintErrorCode =
   | 'NO_PRINTER'
   | 'PERMISSION'
+  | 'AGENT_AUTH'
   | 'DISCONNECTED'
   | 'TIMEOUT'
   | 'UNSUPPORTED'

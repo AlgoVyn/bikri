@@ -18,6 +18,7 @@
   ul { padding-inline-start: 1.2rem; }
   li { margin: 0.25rem 0; }
   a { color: #006bb3; }
+  button { padding: 0.45rem 0.8rem; border: 1px solid #94a3b8; border-radius: 0.45rem; background: #fff; color: #0f172a; cursor: pointer; }
   @media (prefers-color-scheme: dark) {
     body { background: #0f172a; color: #e2e8f0; }
     main { background: #111c2e; border-color: #334155; }
@@ -37,6 +38,9 @@
   {{if .Paired}}
     <p class="ok">Paired with Bikri</p>
     <p class="muted">Bikri can print silently to the printer you selected. Unpair from Bikri if this till changes owner.</p>
+    <form method="post" action="/ui/unpair">
+      <button type="submit">Unpair this computer</button>
+    </form>
   {{else}}
     <p class="warn">Not paired</p>
     <p>Open <strong>Bikri → Settings → Printer → Set up printer → Print service</strong> and enter this code:</p>
