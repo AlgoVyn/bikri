@@ -498,9 +498,11 @@ Implemented in this repository (Phase 1):
   - `transport: 'agent'` in `PrinterKv` (local-only `kv`, no sync/D1 change);
   - raw ESC/POS and driver-PNG jobs, polling, idempotency via `print_jobs.id`;
   - pairing/printer/mode UI in the printer wizard, agent status in Settings → Printer;
+  - the wizard fetches the short-lived code from `/v1/health`, so pairing and unpairing happen inside Bikri; the separate agent page is only a fallback;
   - drawer kick refused in compatibility mode;
-  - `PAPER_OUT` error code and localized strings in `en`, `ur`, `roman-ur`.
-- **Tests:** Go unit tests, print-service tests with a fake agent, docs and i18n checks.
+  - `PAPER_OUT` and `AGENT_AUTH` error codes and localized strings in `en`, `ur`, `roman-ur`.
+- **Packaging:** `scripts/build.sh` creates Windows/Linux/macOS archives, `print-agent-release.yml` publishes them to a GitHub release, and `apps/pos/public/print-agent/` is the download page linked from the wizard.
+- **Tests:** Go unit tests, print-service tests with a fake agent, printer Playwright tests for raw and compatibility modes, docs and i18n checks.
 
 Remaining release work:
 
