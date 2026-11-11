@@ -301,6 +301,7 @@ test.describe('Print service agent (docs/14)', () => {
           platform: 'windows/amd64',
           paired,
           printers: 2,
+          pairingCode: paired ? undefined : '123456',
         });
       if (url.pathname === '/v1/pair') {
         paired = true;
@@ -333,7 +334,7 @@ test.describe('Print service agent (docs/14)', () => {
     await page
       .getByRole('radio', { name: /Print service \(recommended\)/ })
       .check();
-    await page.getByLabel('Pairing code').fill('123456');
+    await expect(page.getByLabel('Pairing code')).toHaveValue('123456');
     await page.getByRole('button', { name: 'Pair', exact: true }).click();
     await expect(page.getByTestId('agent-printer')).toHaveValue(
       'BIXOLON SRP-350III',

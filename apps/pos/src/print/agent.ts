@@ -25,6 +25,8 @@ export type AgentHealth = {
   platform: string;
   paired: boolean;
   printers: number;
+  /** Present only while unpaired; short-lived, shown inside Bikri. */
+  pairingCode?: string;
 };
 
 export type AgentPrinter = {
@@ -81,6 +83,7 @@ export type AgentClient = {
   ): Promise<AgentJob>;
   job(url: string, token: string, id: string): Promise<AgentJob>;
   cancel(url: string, token: string, id: string): Promise<AgentJob>;
+  unpair(url: string, token: string): Promise<void>;
   diagnostics(url: string, token: string): Promise<unknown>;
 };
 
@@ -205,6 +208,13 @@ export const httpAgentClient: AgentClient = {
       `${base(url)}/v1/jobs/${encodeURIComponent(id)}`,
       { method: 'DELETE', headers: headers(token) },
       STATUS_TIMEOUT_MS,
+    );
+  },
+  async unpair(url, token) {
+    await request<unknown>(
+      `${base(url)}/v1/unpair`,
+      { method: 'POST', headers: headers(token) },
+      REQUEST_TIMEOUT_MS,
     );
   },
   diagnostics(url, token) {

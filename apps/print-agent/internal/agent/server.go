@@ -129,12 +129,13 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 type healthResponse struct {
-	App      string `json:"app"`
-	Version  string `json:"version"`
-	Protocol int    `json:"protocol"`
-	Platform string `json:"platform"`
-	Paired   bool   `json:"paired"`
-	Printers int    `json:"printers"`
+	App         string `json:"app"`
+	Version     string `json:"version"`
+	Protocol    int    `json:"protocol"`
+	Platform    string `json:"platform"`
+	Paired      bool   `json:"paired"`
+	Printers    int    `json:"printers"`
+	PairingCode string `json:"pairingCode,omitempty"`
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -145,12 +146,13 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		printers = len(list)
 	}
 	writeJSON(w, http.StatusOK, healthResponse{
-		App:      "bikri-print-agent",
-		Version:  s.version,
-		Protocol: Protocol,
-		Platform: platformName(),
-		Paired:   s.cfg.Paired,
-		Printers: printers,
+		App:         "bikri-print-agent",
+		Version:     s.version,
+		Protocol:    Protocol,
+		Platform:    platformName(),
+		Paired:      s.cfg.Paired,
+		Printers:    printers,
+		PairingCode: s.auth.PairingCode(),
 	})
 }
 

@@ -87,6 +87,7 @@ function fakeAgent(
     },
     job: async () => agentJob('done'),
     cancel: async () => agentJob('canceled'),
+    unpair: async () => undefined,
     diagnostics: async () => ({}),
   };
   return { ...base, ...overrides };

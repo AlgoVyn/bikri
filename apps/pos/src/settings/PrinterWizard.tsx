@@ -119,6 +119,8 @@ export function PrinterWizard({
         const health = await agent.health(current?.agent?.url ?? AGENT_URL);
         if (cancelled) return;
         setAgentHealth(health);
+        if (!health.paired && health.pairingCode)
+          setAgentCode(health.pairingCode);
         if (health.paired && current?.agent?.token) {
           const list = await agent.printers(
             current.agent.url,
@@ -142,6 +144,8 @@ export function PrinterWizard({
       const url = draft.agent?.url ?? AGENT_URL;
       const health = await agent.health(url);
       setAgentHealth(health);
+      if (!health.paired && health.pairingCode)
+        setAgentCode(health.pairingCode);
       if (health.paired) {
         if (draft.agent?.token) {
           const list = await agent.printers(draft.agent.url, draft.agent.token);
@@ -162,7 +166,12 @@ export function PrinterWizard({
     setAgentBusy(true);
     setAgentError(null);
     try {
-      const paired = await agent.pair(AGENT_URL, agentCode.trim(), 'Bikri');
+      const code = agentCode.trim() || agentHealth?.pairingCode || '';
+      if (code.length !== 6) {
+        setAgentError('agent_pair_failed');
+        return;
+      }
+      const paired = await agent.pair(AGENT_URL, code, 'Bikri');
       const config = {
         url: AGENT_URL,
         token: paired.token,
@@ -185,6 +194,29 @@ export function PrinterWizard({
           ? 'agent_already_paired'
           : 'agent_pair_failed',
       );
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const unpairAgent = async () => {
+    const config = draft.agent;
+    if (!config || !agentHealth) return;
+    setAgentBusy(true);
+    setAgentError(null);
+    try {
+      await agent.unpair(config.url, config.token);
+      const health = await agent.health(config.url);
+      setAgentHealth(health);
+      setAgentPrinters([]);
+      setAgentCode(health.pairingCode ?? '');
+      setDraft((currentDraft) => {
+        const next = { ...currentDraft };
+        delete next.agent;
+        return next;
+      });
+    } catch {
+      setAgentError('agent_unreachable');
     } finally {
       setAgentBusy(false);
     }
@@ -467,16 +499,21 @@ export function PrinterWizard({
                     >
                       {t('printer.agent_pair')}
                     </button>
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      onClick={() =>
-                        window.open(AGENT_URL, '_blank', 'noopener')
-                      }
-                    >
-                      {t('printer.agent_open')}
-                    </button>
+                    {agentHealth.pairingCode ? null : (
+                      <button
+                        type="button"
+                        className={buttonQuiet}
+                        onClick={() =>
+                          window.open(AGENT_URL, '_blank', 'noopener')
+                        }
+                      >
+                        {t('printer.agent_open')}
+                      </button>
+                    )}
                   </div>
+                  <p className="text-small text-text-muted">
+                    {t('printer.agent_code_hint')}
+                  </p>
                   <p className="text-small text-text-muted">
                     {t('printer.agent_version', {
                       version: agentHealth.version,
@@ -571,6 +608,14 @@ export function PrinterWizard({
                       }
                     >
                       {t('printer.agent_open')}
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      disabled={agentBusy}
+                      onClick={() => void unpairAgent()}
+                    >
+                      {t('printer.agent_unpair')}
                     </button>
                   </div>
                 </>

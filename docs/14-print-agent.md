@@ -240,7 +240,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - **Rate limits:** pairing 5/min/IP, jobs 60/min/token, diagnostics 10/min.
 - **Limits:** 5 MiB body, 30 s job timeout, 100 queued jobs, 1 concurrent job per printer, 24 h idempotency window.
 - **No receipt contents in logs.** Log job id, printer, mode, byte count, duration, status and error code only. Rotate logs at 10 MB, keep 7 days.
-- **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions).
+- **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing.
 
 ### Browser constraints to validate in Phase 0
 
@@ -360,7 +360,7 @@ type PrinterKv = {
 
 - New connection option **"Print service (recommended)"** in `PrinterWizard`, visible on Windows/Linux/macOS.
 - Flow: detect `/health` → install link if missing → pair (code from agent UI) → choose printer from `/printers` → choose raw/driver → test print → save.
-- Settings → Printer shows agent status, version, selected queue, last job status, "Open agent" and "Copy diagnostics".
+- Settings → Printer shows agent status, version, selected queue, last job status, "Open agent" (fallback page) and "Copy diagnostics".
 - Fallback message and a one-click "Switch to system printing" if the agent is unavailable.
 - i18n keys in `en.json`, `ur.json`, `roman-ur.json`; unit tests with a fake agent; Playwright test against a mock agent; docs 06/17 updated.
 
@@ -376,7 +376,7 @@ No changes to `apps/api`, D1, sync, auth or tenancy. The agent is per-till infra
 2. Selects **Print service (recommended)**.
 3. Bikri probes `GET http://127.0.0.1:17890/v1/health` (500 ms timeout).
    - Not found: "Install Bikri Print Agent" (download for the current OS), "I've installed it — check again".
-   - Found, unpaired: shows "Open agent" (local UI with the 6-digit code) and a code field.
+   - Found, unpaired: the wizard fetches the short-lived code from `/v1/health` and fills the pairing field automatically; the separate agent page is only a fallback for an older agent or troubleshooting.
 4. Pair → Bikri stores the token.
 5. Bikri lists installed queues; user picks the receipt printer.
 6. Mode: **POS (raw ESC/POS)** default, **Compatibility (driver)** for non-ESC/POS.
@@ -488,7 +488,7 @@ Implemented in this repository (Phase 1):
 
 - **Go agent** in `apps/print-agent`:
   - loopback HTTP API, pairing, bearer-token auth, rate limits, CORS/PNA headers, Host/Origin checks;
-  - local status page with the pairing code and installed printers;
+  - local status page with the pairing code and installed printers; `/v1/health` also returns the short-lived code while unpaired so the Bikri wizard can pair without opening the page;
   - job manager with idempotency, status polling, cancellation and 24 h in-memory retention;
   - Windows spooler `RAW` printing, printer enumeration, `GetJob` status and cancel;
   - Windows GDI image printing for compatibility mode;

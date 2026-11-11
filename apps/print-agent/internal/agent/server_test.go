@@ -54,6 +54,9 @@ func TestHealthAndUI(t *testing.T) {
 	if health.Paired || health.Printers != 2 || health.Protocol != Protocol {
 		t.Fatalf("health = %+v", health)
 	}
+	if health.PairingCode == "" {
+		t.Fatal("unpaired health did not expose the pairing code")
+	}
 
 	ui, err := http.Get(httpServer.URL + "/")
 	if err != nil {
@@ -96,6 +99,20 @@ func TestPairThenPrint(t *testing.T) {
 	}
 	if pair.Token == "" || pair.AgentID == "" {
 		t.Fatalf("pair response = %+v", pair)
+	}
+
+	// Once paired, health must not expose a pairing code.
+	res, err := http.Get(httpServer.URL + "/v1/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var pairedHealth healthResponse
+	if err := json.NewDecoder(res.Body).Decode(&pairedHealth); err != nil {
+		t.Fatal(err)
+	}
+	if !pairedHealth.Paired || pairedHealth.PairingCode != "" {
+		t.Fatalf("paired health = %+v", pairedHealth)
 	}
 
 	noAuth, _ := http.Get(httpServer.URL + "/v1/printers")

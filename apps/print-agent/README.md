@@ -56,11 +56,11 @@ The script writes binaries to `dist/` and a `SHA256SUMS` file. Windows builds hi
 go run ./cmd/bikri-print-agent --config /tmp/bikri-print-agent.json
 ```
 
-Open <http://127.0.0.1:17890/> to see the pairing code and installed printers. In Bikri:
+In Bikri, open **Settings → Printer → Set up printer → Print service**; the wizard fetches and fills the pairing code from the agent automatically. The agent page at <http://127.0.0.1:17890/> is a fallback for troubleshooting and for unpairing a lost Bikri token.
 
 1. **Settings → Printer → Set up printer**
 2. **Print service (recommended)**
-3. **Open print service**, copy the 6-digit code, enter it in Bikri
+3. The wizard fills the pairing code; click **Pair**
 4. Pick the OS printer queue and **POS (drawer and cut)** mode
 5. **Test print** → **Save printer**
 
