@@ -406,6 +406,21 @@ describe('print agent transport (docs/14)', () => {
     ).toMatchObject({ status: 'failed', error: 'PAPER_OUT' });
   });
 
+  it('reports a revoked agent token as a re-pair error', async () => {
+    const { db } = await soldShop('psAgentAuth');
+    await db.kv.put({ key: 'printer', value: agentPrinter() });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const agent = fakeAgent({
+      print: async () => {
+        throw new AgentRequestError('UNAUTHORIZED', 'pair again', 401);
+      },
+    });
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'failed', error: 'AGENT_AUTH' });
+  });
+
   it('reports a stopped agent as disconnected', async () => {
     const { db } = await soldShop('psAgentDown');
     await db.kv.put({ key: 'printer', value: agentPrinter() });
