@@ -734,7 +734,6 @@
     "add_discount": "Discount lagayein",
     "add_product": "Product shamil karein",
     "add_to_cart": "Cart mein daalein",
-    "all": "Sab",
     "apply": "Lagu karein",
     "back_to_products": "Products par wapas",
     "below_cost": "Laagat se kam!",
@@ -746,7 +745,6 @@
     "cart_lines": "Bill ki cheezein",
     "cart_tab": "Bill {{n}}",
     "carts": "Khule bill",
-    "categories": "Categories",
     "change_customer": "Badlein",
     "clear": "Saaf karein",
     "clear_body": "{{count}} cheezein hata di jayengi.",
@@ -827,7 +825,6 @@
     "view_cart_one": "Cart dekhein · 1 cheez",
     "walk_in": "Aam gahak",
     "empty_tab": "Nayi bill",
-    "add_first_item": "Payment ke liye product shamil karein",
     "backdate_banner": "Purani sale darj ho rahi hai · {{date}} · {{staff}}",
     "backdate_cancel": "Purani sale cancel karein"
   },

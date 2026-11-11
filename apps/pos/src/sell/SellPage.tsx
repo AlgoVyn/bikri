@@ -37,7 +37,6 @@ import {
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
-import { categoryName } from '../lib/category.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -90,7 +89,6 @@ export function SellPage() {
   const active = useSellStore((s) => s.active);
   const setActive = useSellStore((s) => s.setActive);
   const [query, setQuery] = useState('');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState(-1);
   const [nextQty, setNextQty] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -119,12 +117,10 @@ export function SellPage() {
   }, [cart.lines]);
   const prefix = parseQtyPrefix(query);
   const term = prefix ? prefix.rest : query;
-  const results = useMemo(() => {
-    const found = rows ? filterRows(rows, term) : [];
-    return categoryId && !term.trim()
-      ? found.filter((r) => r.product.category_id === categoryId)
-      : found;
-  }, [rows, term, categoryId]);
+  const results = useMemo(
+    () => (rows ? filterRows(rows, term) : []),
+    [rows, term],
+  );
   const stock = useMemo(
     () => new Map((rows ?? []).map((r) => [r.product.id, r.onHand])),
     [rows],
@@ -653,7 +649,7 @@ export function SellPage() {
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
           </label>
-          <div className="flex h-14 items-center gap-2 rounded-control border border-border bg-surface px-4 shadow-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+          <div className="flex h-12 items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:h-10">
             <SearchIcon />
             <input
               id="sell-search"
@@ -718,9 +714,6 @@ export function SellPage() {
             ) : null}
           </div>
         </search>
-        {!searching ? (
-          <CategoryChips selected={categoryId} onPick={setCategoryId} />
-        ) : null}
         <div
           ref={scrollRef}
           id="sell-results"
@@ -978,55 +971,6 @@ export function SellPage() {
         }
         verify={verify}
       />
-    </div>
-  );
-}
-
-function CategoryChips({
-  selected,
-  onPick,
-}: {
-  selected: string | null;
-  onPick: (id: string | null) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const cats =
-    useLiveQuery(
-      async () =>
-        (await getDb().categories.orderBy('sort_order').toArray()).filter(
-          (c) => !c.deleted_at,
-        ),
-      [],
-    ) ?? [];
-  if (cats.length === 0) return null;
-  const chip = (on: boolean) =>
-    `min-h-11 shrink-0 rounded-full border px-3 text-small ${on ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`;
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: a row of filter chips
-    <div
-      className="flex gap-2 overflow-x-auto"
-      aria-label={t('sell.categories')}
-      role="group"
-    >
-      <button
-        type="button"
-        aria-pressed={selected === null}
-        className={chip(selected === null)}
-        onClick={() => onPick(null)}
-      >
-        {t('sell.all')}
-      </button>
-      {cats.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          aria-pressed={selected === c.id}
-          className={chip(selected === c.id)}
-          onClick={() => onPick(c.id)}
-        >
-          {categoryName(c, i18n.language)}
-        </button>
-      ))}
     </div>
   );
 }

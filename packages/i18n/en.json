@@ -734,7 +734,6 @@
     "add_discount": "Add discount",
     "add_product": "Add product",
     "add_to_cart": "Add to cart",
-    "all": "All",
     "apply": "Apply",
     "back_to_products": "Back to products",
     "below_cost": "Below cost!",
@@ -746,7 +745,6 @@
     "cart_lines": "Items in the bill",
     "cart_tab": "Bill {{n}}",
     "carts": "Open bills",
-    "categories": "Categories",
     "change_customer": "Change",
     "clear": "Clear",
     "clear_body": "{{count}} items will be removed.",
@@ -827,7 +825,6 @@
     "view_cart_one": "View cart · 1 item",
     "walk_in": "Walk-in customer",
     "empty_tab": "New bill",
-    "add_first_item": "Add a product to take payment",
     "backdate_banner": "Recording a past sale · {{date}} · {{staff}}",
     "backdate_cancel": "Cancel past sale"
   },

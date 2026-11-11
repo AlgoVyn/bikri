@@ -734,7 +734,6 @@
     "add_discount": "رعایت شامل کریں",
     "add_product": "پروڈکٹ شامل کریں",
     "add_to_cart": "کارٹ میں ڈالیں",
-    "all": "سب",
     "apply": "لاگو کریں",
     "back_to_products": "پروڈکٹس پر واپس",
     "below_cost": "لاگت سے کم!",
@@ -746,7 +745,6 @@
     "cart_lines": "بل کی اشیاء",
     "cart_tab": "بل {{n}}",
     "carts": "کھلے بل",
-    "categories": "زمرے",
     "change_customer": "تبدیل کریں",
     "clear": "صاف کریں",
     "clear_body": "{{count}} اشیاء ہٹا دی جائیں گی۔",
@@ -827,7 +825,6 @@
     "view_cart_one": "کارٹ دیکھیں · 1 چیز",
     "walk_in": "عام گاہک",
     "empty_tab": "نئی بل",
-    "add_first_item": "ادائیگی کے لیے پروڈکٹ شامل کریں",
     "backdate_banner": "پرانی فروخت درج ہو رہی ہے · {{date}} · {{staff}}",
     "backdate_cancel": "پرانی فروخت منسوخ کریں"
   },

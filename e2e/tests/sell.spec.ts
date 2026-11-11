@@ -46,24 +46,17 @@ const tile = (page: Page, name: string) =>
   page.getByTestId('sell-tile').filter({ hasText: name });
 
 test.describe('Sell (T-016)', () => {
-  test('category chips show their names, never undefined', async ({ page }) => {
-    await openReadyShop(page, '/bikri/products/categories');
-    await page.getByLabel('New category').fill('Cables');
-    await page
-      .locator('form')
-      .getByRole('button', { name: 'Add', exact: true })
-      .click();
-    // The add field still shows "Cables" until the IndexedDB write finishes
-    // and the form clears. The saved row uses aria-label "Name of Cables".
-    await expect(
-      page.getByRole('textbox', { name: 'Name of Cables' }),
-    ).toBeVisible();
-    await expect(page.locator('#new-category')).toHaveValue('');
-    await page.goto('/bikri/sell');
-    await expect(page.getByRole('button', { name: 'Cables' })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(page.getByText('undefined', { exact: true })).toHaveCount(0);
+  test('Take payment on an empty bill focuses the search', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'desktop',
+      'the cart panel is always visible on desktop',
+    );
+    await openSell(page, [{ name: 'Cable', price: 50000, stock: 5 }]);
+    const search = page.getByRole('combobox', { name: /Search or scan/ });
+    await page.getByRole('button', { name: 'Take payment' }).click();
+    await expect(search).toBeFocused();
   });
 
   test('AC 1, 8: scanning one barcode 3 times is one line of 3 with 3 beeps; unknown barcode; quick sale', async ({

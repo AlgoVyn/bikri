@@ -298,25 +298,14 @@ export function CartPanel(p: CartPanelProps) {
         >
           {t('sell.clear')}
         </button>
-        {cart.lines.length > 0 ? (
-          <button
-            type="button"
-            className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-9 lg:px-3`}
-            onClick={p.onPay}
-          >
-            {t('sell.take_payment')}
-          </button>
-        ) : null}
-      </div>
-      {cart.lines.length === 0 ? (
         <button
           type="button"
-          className={`${buttonQuiet} min-h-14 w-full text-small lg:min-h-12`}
-          onClick={p.onAddItem}
+          className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-9 lg:px-3`}
+          onClick={cart.lines.length === 0 ? p.onAddItem : p.onPay}
         >
-          {t('sell.add_first_item')}
+          {t('sell.take_payment')}
         </button>
-      ) : null}
+      </div>
     </div>
   );
 }
