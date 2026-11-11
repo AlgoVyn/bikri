@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bikri Print Agent</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { margin: 0; background: #f1f5f9; color: #0f172a; }
+  main { max-width: 42rem; margin: 3rem auto; padding: 1.5rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 0.75rem; }
+  h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+  h2 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
+  p { margin: 0.5rem 0; line-height: 1.5; }
+  .muted { color: #475569; font-size: 0.875rem; }
+  .code { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 0.4rem; background: #e0f2fe; font: 700 1.5rem ui-monospace, monospace; letter-spacing: 0.15em; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #9a3412; font-weight: 600; }
+  ul { padding-inline-start: 1.2rem; }
+  li { margin: 0.25rem 0; }
+  a { color: #006bb3; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0f172a; color: #e2e8f0; }
+    main { background: #111c2e; border-color: #334155; }
+    .muted { color: #94a3b8; }
+    .code { background: #082f49; color: #e0f2fe; }
+    .ok { color: #86efac; }
+    .warn { color: #fdba74; }
+    a { color: #7dd3fc; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bikri Print Agent</h1>
+  <p class="muted">Version {{.Version}} · protocol {{.Protocol}} · {{.Platform}}</p>
+
+  {{if .Paired}}
+    <p class="ok">Paired with Bikri</p>
+    <p class="muted">Bikri can print silently to the printer you selected. Unpair from Bikri if this till changes owner.</p>
+  {{else}}
+    <p class="warn">Not paired</p>
+    <p>Open <strong>Bikri → Settings → Printer → Set up printer → Print service</strong> and enter this code:</p>
+    <p><span class="code">{{.Code}}</span></p>
+    <p class="muted">The code expires after 2 minutes. Refresh this page for a new one.</p>
+  {{end}}
+
+  <h2>Printers</h2>
+  {{if .Printers}}
+    <ul>
+      {{range .Printers}}
+        <li>{{.Name}}{{if .IsDefault}} <span class="muted">(default)</span>{{end}}</li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="muted">No printers found. Install the printer and its driver in the operating system, then refresh.</p>
+  {{end}}
+  {{if .PrinterError}}<p class="warn">{{.PrinterError}}</p>{{end}}
+
+  <h2>How it works</h2>
+  <p class="muted">The agent uses the printers already installed in Windows, Linux or macOS. Raw ESC/POS jobs keep the cash drawer and cutter working; compatibility mode prints a picture through the printer driver.</p>
+  <p><a href="/">Refresh</a></p>
+</main>
+</body>
+</html>

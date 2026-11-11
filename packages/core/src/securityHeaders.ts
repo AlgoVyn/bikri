@@ -7,7 +7,7 @@ import { BASE_PATH } from './paths.ts';
 export const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000',
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(self), usb=(self), serial=(self)',

@@ -258,6 +258,8 @@ Baud choices: 9600 (default), 19200, 38400, 115200; flow control none (default) 
 
 v1 does not implement a Bluetooth transport. Android users use System printing with the printer vendor's print service app, or a USB OTG cable with WebUSB. (Web Bluetooth only reaches BLE printers; most cheap printers are classic SPP.) Revisit in v2.
 
+> **Implemented as `apps/print-agent`:** a local print agent uses the installed OS print queue directly — Windows spooler `RAW` or CUPS `lp -o raw` — avoiding both the Windows USB-driver conflict and the system-print dialog. It restores drawer/cut/QR and reports spooler status for network and shared printers. See [14-print-agent](14-print-agent.md).
+
 ## 6. Logo and Urdu raster rendering
 
 - Before drawing, `await document.fonts.load('24px "Noto Naskh Arabic UI"')` (and Inter); canvas text silently falls back to a system font if the web font is not loaded yet. Render on the main thread's `OffscreenCanvas` (fonts loaded in the document are available there; a worker would need its own `FontFace`).

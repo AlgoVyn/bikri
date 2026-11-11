@@ -1,0 +1,17 @@
+[Unit]
+Description=Bikri Print Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/bikri-print-agent
+Restart=on-failure
+RestartSec=3
+# The agent only binds 127.0.0.1 and never needs root. Keep it in the user session
+# so CUPS policy and the user's print queues apply.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

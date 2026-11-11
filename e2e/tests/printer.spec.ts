@@ -270,3 +270,170 @@ test.describe('Printer (T-020)', () => {
     await expectNoHorizontalScroll(page);
   });
 });
+
+test.describe('Print service agent (docs/14)', () => {
+  test('pairs with the loopback agent, picks the queue and sends a raw ESC/POS test job', async ({
+    page,
+  }) => {
+    let paired = false;
+    let lastJob: Record<string, unknown> | null = null;
+    const cors = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-private-network': 'true',
+      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    };
+    await page.route('**/v1/**', async (route) => {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({ status: 204, headers: cors });
+      const url = new URL(route.request().url());
+      const json = (value: unknown, status = 200) =>
+        route.fulfill({
+          status,
+          headers: { 'content-type': 'application/json', ...cors },
+          body: JSON.stringify(value),
+        });
+      if (url.pathname === '/v1/health')
+        return json({
+          app: 'bikri-print-agent',
+          version: '0.1.0-test',
+          protocol: 1,
+          platform: 'windows/amd64',
+          paired,
+          printers: 2,
+        });
+      if (url.pathname === '/v1/pair') {
+        paired = true;
+        return json({ token: 'test-token', agentId: 'agent-1' });
+      }
+      if (url.pathname === '/v1/printers')
+        return json([
+          { name: 'BIXOLON SRP-350III', isDefault: true },
+          { name: 'Office PDF', isDefault: false },
+        ]);
+      if (url.pathname === '/v1/jobs' && route.request().method() === 'POST') {
+        lastJob = JSON.parse(route.request().postData() ?? '{}') as Record<
+          string,
+          unknown
+        >;
+        return json({
+          jobId: String(lastJob.jobId),
+          status: 'done',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+      return json({ error: 'NOT_FOUND' }, 404);
+    });
+
+    await openReadyShop(page, '/bikri/settings/printer');
+    await page.getByRole('button', { name: 'Set up printer' }).click();
+    await page.getByLabel('80 mm (recommended)').check();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page
+      .getByRole('radio', { name: /Print service \(recommended\)/ })
+      .check();
+    await page.getByLabel('Pairing code').fill('123456');
+    await page.getByRole('button', { name: 'Pair', exact: true }).click();
+    await expect(page.getByTestId('agent-printer')).toHaveValue(
+      'BIXOLON SRP-350III',
+    );
+    await expect(
+      page.getByRole('radio', { name: /^POS \(drawer and cut\)/ }),
+    ).toBeChecked();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Test print' }).click();
+    await expect(
+      page.getByText('Test page sent to the printer.'),
+    ).toBeVisible();
+    expect(lastJob).toMatchObject({
+      printer: 'BIXOLON SRP-350III',
+      mode: 'raw',
+      encoding: 'escpos',
+      paperMm: 80,
+      copies: 1,
+    });
+    await answerYes(page);
+    await page.getByRole('button', { name: 'Save printer' }).click();
+    await expect(page.getByTestId('printer-summary')).toHaveText(
+      'BIXOLON SRP-350III · 80 mm · 48 characters',
+    );
+  });
+});
+
+test.describe('Print service agent compatibility mode (docs/14)', () => {
+  test('sends a rendered PNG through the agent', async ({ page }) => {
+    let paired = false;
+    let lastJob: Record<string, unknown> | null = null;
+    const cors = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-private-network': 'true',
+      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    };
+    await page.route('**/v1/**', async (route) => {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({ status: 204, headers: cors });
+      const url = new URL(route.request().url());
+      const json = (value: unknown, status = 200) =>
+        route.fulfill({
+          status,
+          headers: { 'content-type': 'application/json', ...cors },
+          body: JSON.stringify(value),
+        });
+      if (url.pathname === '/v1/health')
+        return json({
+          app: 'bikri-print-agent',
+          version: '0.1.0-test',
+          protocol: 1,
+          platform: 'windows/amd64',
+          paired,
+          printers: 1,
+        });
+      if (url.pathname === '/v1/pair') {
+        paired = true;
+        return json({ token: 'test-token', agentId: 'agent-1' });
+      }
+      if (url.pathname === '/v1/printers')
+        return json([{ name: 'BIXOLON SRP-350III', isDefault: true }]);
+      if (url.pathname === '/v1/jobs' && route.request().method() === 'POST') {
+        lastJob = JSON.parse(route.request().postData() ?? '{}') as Record<
+          string,
+          unknown
+        >;
+        return json({
+          jobId: String(lastJob.jobId),
+          status: 'done',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+      return json({ error: 'NOT_FOUND' }, 404);
+    });
+
+    await openReadyShop(page, '/bikri/settings/printer');
+    await page.getByRole('button', { name: 'Set up printer' }).click();
+    await page.getByLabel('80 mm (recommended)').check();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page
+      .getByRole('radio', { name: /Print service \(recommended\)/ })
+      .check();
+    await page.getByLabel('Pairing code').fill('123456');
+    await page.getByRole('button', { name: 'Pair', exact: true }).click();
+    await expect(page.getByTestId('agent-printer')).toHaveValue(
+      'BIXOLON SRP-350III',
+    );
+    await page.getByRole('radio', { name: /^Compatibility/ }).check();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Test print' }).click();
+    await expect(
+      page.getByText('Test page sent to the printer.'),
+    ).toBeVisible();
+    const job = lastJob as Record<string, unknown> | null;
+    expect(job?.printer).toBe('BIXOLON SRP-350III');
+    expect(job?.mode).toBe('driver');
+    expect(job?.encoding).toBe('png');
+    expect(job?.paperMm).toBe(80);
+    expect(String(job?.data ?? '').length).toBeGreaterThan(1000);
+  });
+});

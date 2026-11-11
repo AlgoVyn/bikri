@@ -2,6 +2,8 @@
  * Print service (06 §9): takes queued print jobs oldest first, builds the receipt, sends it with
  * the device's transport and records done / failed. A failed print never touches the sale.
  */
+
+import { newId } from '@bikri/core';
 import type { BikriDb, PrintJob } from '@bikri/db';
 import {
   type Block,
@@ -20,8 +22,16 @@ import {
 } from '../data/receipt.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { isReadOnly } from '../sync/status.ts';
+import {
+  type AgentClient,
+  type AgentJob,
+  type AgentPrintRequest,
+  AgentRequestError,
+  httpAgentClient,
+} from './agent.ts';
 import { prepareRasterFonts } from './canvasRaster.ts';
 import { jobReceipt } from './receiptFiles.ts';
+import { renderReceiptCanvas } from './receiptImage.ts';
 import { printHtmlViaSystem, type SystemPrintResult } from './systemPrint.ts';
 import {
   findSerial,
@@ -38,6 +48,8 @@ import {
 export type PrintDeps = {
   usb: UsbLike | null;
   serial: SerialLike | null;
+  /** Local print agent (docs/14-print-agent.md). */
+  agent?: AgentClient;
   renderer?: RasterRenderer;
   system?: (html: string, widthMm: 58 | 80) => Promise<SystemPrintResult>;
   timeoutMs?: number;
@@ -94,10 +106,38 @@ export async function printBlocks(
   deps: PrintDeps,
   copies = 1,
   languageOverride?: 'en' | 'ur',
+  jobId?: string,
 ): Promise<void> {
   if (!printer?.transport) throw new PrintError('NO_PRINTER');
   const logo = await readLogo(db);
   const paper = receiptPaper(printer);
+  if (printer.transport === 'agent' && printer.agent?.mode === 'driver') {
+    const canvas = await renderReceiptCanvas(blocks, {
+      dots: paper.dots,
+      charsPerLine: paper.charsPerLine,
+      itemLayout: paper.itemLayout,
+      logo: printer.print_logo === false ? null : logo,
+      padding: 0,
+    });
+    const png = canvas.toDataURL('image/png').split(',')[1];
+    if (!png) throw new PrintError('FAILED', 'receipt image is empty');
+    await sendAgentJob(
+      printer,
+      {
+        mode: 'driver',
+        encoding: 'png',
+        data: png,
+        copies: Math.min(3, Math.max(1, copies)),
+        paperMm: paper.paperMm,
+        widthDots: canvas.width,
+      },
+      deps,
+      jobId,
+    );
+    return;
+  }
+  if (printer.transport === 'agent' && printer.agent?.mode !== 'raw')
+    throw new PrintError('NO_PRINTER');
   if (printer.transport === 'system') {
     const html = renderReceiptHtml(blocks, {
       widthMm: paper.paperMm,
@@ -148,6 +188,22 @@ export async function printBlocks(
     bytes.set(part, at);
     at += part.length;
   }
+  if (printer.transport === 'agent') {
+    await sendAgentJob(
+      printer,
+      {
+        mode: 'raw',
+        encoding: 'escpos',
+        data: toBase64(bytes),
+        copies: 1,
+        paperMm: paper.paperMm,
+        widthDots: paper.dots,
+      },
+      deps,
+      jobId,
+    );
+    return;
+  }
   const timeout = deps.timeoutMs;
   if (printer.transport === 'usb') {
     const device = await findUsb(deps.usb, printer.usb);
@@ -165,6 +221,93 @@ export async function printBlocks(
     }),
     timeout,
   );
+}
+
+type AgentPayload = Omit<AgentPrintRequest, 'jobId' | 'printer'>;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Browser-safe base64 for potentially large ESC/POS buffers. */
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function sendAgentJob(
+  printer: PrinterKv,
+  payload: AgentPayload,
+  deps: PrintDeps,
+  jobId?: string,
+): Promise<void> {
+  const config = printer.agent;
+  if (!config) throw new PrintError('NO_PRINTER');
+  const client = deps.agent ?? httpAgentClient;
+  const request: AgentPrintRequest = {
+    ...payload,
+    jobId: jobId ?? newId(),
+    printer: config.printerName,
+  };
+  let job: AgentJob;
+  try {
+    job = await client.print(config.url, config.token, request);
+  } catch (err) {
+    throw mapAgentError(err);
+  }
+  const deadline = Date.now() + (deps.timeoutMs ?? 30_000);
+  while (
+    job.status !== 'done' &&
+    job.status !== 'failed' &&
+    job.status !== 'canceled'
+  ) {
+    if (Date.now() >= deadline) throw new PrintError('TIMEOUT');
+    await sleep(400);
+    try {
+      job = await client.job(config.url, config.token, job.jobId);
+    } catch (err) {
+      throw mapAgentError(err);
+    }
+  }
+  if (job.status === 'failed')
+    throw new PrintError(agentErrorCode(job.error), job.detail);
+  if (job.status === 'canceled')
+    throw new PrintError('FAILED', 'print job canceled');
+}
+
+function agentErrorCode(code: string | undefined): PrintErrorCode {
+  switch (code) {
+    case 'PAPER_OUT':
+      return 'PAPER_OUT';
+    case 'PRINTER_OFFLINE':
+      return 'DISCONNECTED';
+    case 'RAW_UNSUPPORTED':
+      return 'UNSUPPORTED';
+    case 'UNKNOWN_PRINTER':
+      return 'NO_PRINTER';
+    case 'UNAUTHORIZED':
+    case 'PAIRING_CODE':
+      return 'PERMISSION';
+    case 'TIMEOUT':
+      return 'TIMEOUT';
+    default:
+      return 'FAILED';
+  }
+}
+
+function mapAgentError(err: unknown): PrintError {
+  if (err instanceof PrintError) return err;
+  if (err instanceof AgentRequestError) {
+    if (err.code === 'UNAVAILABLE') return new PrintError('DISCONNECTED');
+    if (err.status === 401) return new PrintError('PERMISSION');
+    return new PrintError(agentErrorCode(err.code));
+  }
+  return new PrintError('DISCONNECTED', (err as Error)?.message);
 }
 
 export function errorCode(err: unknown): PrintErrorCode {
@@ -193,6 +336,8 @@ export async function runJob(
       printer,
       deps,
       Math.min(3, Math.max(1, printer.copies ?? 1)),
+      undefined,
+      job.id,
     );
     await db.print_jobs.update(job.id, { status: 'done' });
     return { ...job, status: 'done', error: undefined };
@@ -281,6 +426,8 @@ export async function kickDrawer(
   deps: PrintDeps,
 ): Promise<void> {
   if (printer?.transport === 'system') throw new PrintError('UNSUPPORTED');
+  if (printer?.transport === 'agent' && printer.agent?.mode !== 'raw')
+    throw new PrintError('UNSUPPORTED');
   await printBlocks(db, [{ t: 'drawer' }], printer, deps);
 }
 

@@ -20,7 +20,7 @@ import { writeAction } from './write.ts';
 
 /** `kv.printer` (06 §8, screens/17 Printer). Missing fields take the defaults noted. */
 export type PrinterKv = {
-  transport?: 'usb' | 'serial' | 'system';
+  transport?: 'usb' | 'serial' | 'system' | 'agent';
   paper_mm?: 58 | 80;
   chars_per_line?: number;
   dots?: number;
@@ -35,6 +35,14 @@ export type PrinterKv = {
     usbProductId?: number;
     baudRate: number;
     flowControl: 'none' | 'hardware';
+  };
+  /** Local print agent (docs/14-print-agent.md). The token is device-local and never exported. */
+  agent?: {
+    url: string;
+    token: string;
+    agentId: string;
+    printerName: string;
+    mode: 'raw' | 'driver';
   };
   /** Default partial. */
   cut?: 'partial' | 'full' | 'none';

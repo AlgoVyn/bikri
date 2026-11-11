@@ -1,0 +1,6 @@
+dist/
+bikri-print-agent
+bikri-print-agent.exe
+bikri-print-agent-*
+*.log
+config.json

@@ -24,6 +24,7 @@ An offline-first, **multi-tenant** POS PWA: many independent shops (tenants), ea
 | 11 | [11-roadmap](docs/11-roadmap.md) | **Ordered task list with acceptance criteria — your build plan** |
 | 12 | [12-fbr-later](docs/12-fbr-later.md) | Optional FBR module (do not build in v1) |
 | 13 | [13-multi-tenancy](docs/13-multi-tenancy.md) | Tenancy model, tenant scoping rules, per-shop budget, onboarding, read-only/suspended status, export/restore/delete, operator support access, migration from M0, open questions |
+| 14 | [14-print-agent](docs/14-print-agent.md) | **Implemented (Phase 1)** local print agent: cross-platform Go service, raw ESC/POS via the OS queue, driver-rendered fallback, pairing/security, rollout; installers/signing remain release tasks |
 | — | [fixtures/](docs/fixtures/money-totals.json) | Machine-readable test vectors: money (`money-*.json`) used by `packages/core` tests, and Code 128 (`barcode-code128.json`) used by `packages/printer` |
 | — | [decisions](docs/decisions.md) | Design decisions log — append here when you resolve an unclear point |
 | — | [screens/](docs/screens/README.md) | One spec per screen: layout, fields, validation, states, hotkeys, acceptance criteria |

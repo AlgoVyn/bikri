@@ -72,15 +72,43 @@ jobs:
           path: e2e/playwright-report
           retention-days: 7
 
+  # The Go companion service is a separate module; lint/typecheck/test it and
+  # prove the Windows/macOS/Linux cross-builds still compile.
+  print_agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/print-agent
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: apps/print-agent/go.mod
+      - name: Format
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Go tests
+        run: go test ./...
+      - name: Cross-build (Windows)
+        run: GOOS=windows GOARCH=amd64 go build ./...
+      - name: Cross-build (macOS)
+        run: GOOS=darwin GOARCH=arm64 go build ./...
+      - name: Cross-build (Linux arm64)
+        run: GOOS=linux GOARCH=arm64 go build ./...
+
   # The stable check name used by deploy and (later) branch protection.
   ci:
     if: always()
-    needs: [quality, e2e]
+    needs: [quality, e2e, print_agent]
     runs-on: ubuntu-latest
     steps:
       - name: Require every CI job
         run: |
           echo "quality: ${{ needs.quality.result }}"
           echo "e2e: ${{ needs.e2e.result }}"
+          echo "print-agent: ${{ needs.print_agent.result }}"
           test "${{ needs.quality.result }}" = "success"
           test "${{ needs.e2e.result }}" = "success"
+          test "${{ needs.print_agent.result }}" = "success"

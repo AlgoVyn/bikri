@@ -1,3 +1,4 @@
+import { httpAgentClient } from './agent.ts';
 import { createCanvasRasterRenderer } from './canvasRaster.ts';
 import type { PrintDeps } from './printService.ts';
 import { bitmapDataUrl } from './receiptImage.ts';
@@ -10,6 +11,7 @@ export function browserPrintDeps(): PrintDeps {
   deps ??= {
     usb: webUsb(),
     serial: webSerial(),
+    agent: httpAgentClient,
     renderer: createCanvasRasterRenderer(),
     logoUrl: (logo) => bitmapDataUrl(logo),
   };

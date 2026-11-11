@@ -12,7 +12,7 @@
 | Files | Cloudflare R2 bucket `bikri-files`, binding `FILES` (logo, product photos only, keys prefixed `t/<tenant_id>/`); separate bucket `bikri-backups`, binding `BACKUPS` (nightly D1 exports, admin-only) |
 | Auth | Device token (Bearer, identifies the tenant) for the till API; staff PIN on the device; admin devices for the shop-admin API `/bikri/api/shop/*`; Cloudflare Access (email OTP, only the platform operator `operator@example.com`) for the operator console `/bikri/admin*` and `/bikri/api/admin/*` ([05](05-auth-and-roles.md)) |
 | Sync | Outbox push + cursor pull ([03-sync](03-sync.md)) |
-| Printing | Printer-agnostic ESC/POS over WebUSB **or** Web Serial, 58 mm or 80 mm paper; browser print (`window.print`) fallback ([06-printing](06-printing.md)) |
+| Printing | Printer-agnostic ESC/POS over WebUSB **or** Web Serial, 58 mm or 80 mm paper; browser print (`window.print`) fallback; optional local **print agent** (`apps/print-agent`) that prints through the OS queue, raw or driver-rendered ([06-printing](06-printing.md), [14-print-agent](14-print-agent.md)) |
 | Hosting | Cloudflare free tier, **path-based at `https://algovyn.com/bikri/`** on the existing `algovyn.com` zone, via Worker routes (§5.3) |
 | Backups | GitHub Actions nightly `wrangler d1 export` of the whole database (all tenants) → R2 + copy encrypted with the operator's `age` key; per-tenant export/restore in the console ([09](09-backups-and-ops.md)) |
 
@@ -166,7 +166,7 @@ bikri/
 │   │       ├─ export/    CSV/PDF builders
 │   │       ├─ i18n/      i18next init, direction handling
 │   │       └─ state/     zustand stores (carts, session, ui)
-│   └─ api/               Cloudflare Worker
+│   ├─ api/               Cloudflare Worker
 │       ├─ wrangler.jsonc
 │       └─ src/
 │           ├─ index.ts   Hono app, routes mount, static asset fallthrough
@@ -176,6 +176,7 @@ bikri/
 │           ├─ routes/    health, devices, sync (push, pull, snapshot), files, shop (shop admin), admin (operator)
 │           ├─ sync/      applyOps, pull, snapshot, avgCost recompute
 │           └─ cron/      prune.ts (scheduled(): per-tenant change_log floors, applied_ops retention, tenant deletion, 03 §4.4)
+│   └─ print-agent/       Go companion service: loopback HTTP, Windows spooler/CUPS, raw ESC/POS + driver image (14-print-agent)
 ├─ packages/
 │   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/ (op/table metadata)
 │   ├─ db/                drizzle schema (D1), migrations/*.sql, dexie.ts (Dexie schema), tables.ts (shared table metadata)
@@ -275,7 +276,7 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 
 ```
 Strict-Transport-Security: max-age=31536000
-Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'
 Cache-Control: public, max-age=0, must-revalidate, no-transform
 X-Content-Type-Options: nosniff
 Referrer-Policy: same-origin

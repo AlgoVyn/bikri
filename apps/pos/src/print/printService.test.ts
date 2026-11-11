@@ -8,6 +8,13 @@ import {
 import { completeSale } from '../data/sale.ts';
 import { dropTestDbs } from '../data/testDb.ts';
 import { addShop, NOW, sale, shopWithStock, t2Cart } from '../data/testShop.ts';
+import {
+  type AgentClient,
+  type AgentHealth,
+  type AgentJob,
+  type AgentPrintRequest,
+  AgentRequestError,
+} from './agent.ts';
 import { fakeSerial, fakeUsb, joined } from './fakePrinters.ts';
 import {
   kickDrawer,
@@ -37,6 +44,53 @@ const serialPrinter = (extra: PrinterKv = {}): PrinterKv => ({
   },
   ...extra,
 });
+const agentPrinter = (extra: PrinterKv = {}): PrinterKv => ({
+  transport: 'agent',
+  paper_mm: 80,
+  agent: {
+    url: 'http://127.0.0.1:17890',
+    token: 'test-token',
+    agentId: 'agent-1',
+    printerName: 'Bixolon',
+    mode: 'raw',
+  },
+  ...extra,
+});
+
+const agentJob = (status: AgentJob['status'], error?: string): AgentJob => ({
+  jobId: 'job-1',
+  status,
+  error,
+  createdAt: NOW,
+  updatedAt: NOW,
+});
+
+function fakeAgent(
+  overrides: Partial<AgentClient> = {},
+  requests: AgentPrintRequest[] = [],
+): AgentClient {
+  const healthy: AgentHealth = {
+    app: 'bikri-print-agent',
+    version: 'test',
+    protocol: 1,
+    platform: 'linux/amd64',
+    paired: true,
+    printers: 1,
+  };
+  const base: AgentClient = {
+    health: async () => healthy,
+    pair: async () => ({ token: 't', agentId: 'a' }),
+    printers: async () => [{ name: 'Bixolon', isDefault: true }],
+    print: async (_url, _token, request) => {
+      requests.push(request);
+      return agentJob('done');
+    },
+    job: async () => agentJob('done'),
+    cancel: async () => agentJob('canceled'),
+    diagnostics: async () => ({}),
+  };
+  return { ...base, ...overrides };
+}
 
 async function soldShop(
   prefix: string,
@@ -307,5 +361,79 @@ describe('print queue (06 §9)', () => {
       1,
     );
     expect(await b.db.print_jobs.count()).toBe(0);
+  });
+});
+
+describe('print agent transport (docs/14)', () => {
+  it('sends one raw ESC/POS job through the agent, with the drawer once', async () => {
+    const { db } = await soldShop('psAgentRaw');
+    await db.kv.put({ key: 'printer', value: agentPrinter() });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const requests: AgentPrintRequest[] = [];
+    const agent = fakeAgent({}, requests);
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'done' });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      jobId: job.id,
+      printer: 'Bixolon',
+      mode: 'raw',
+      encoding: 'escpos',
+      copies: 1,
+      paperMm: 80,
+      widthDots: 576,
+    });
+    const bytes = Uint8Array.from(atob(requests[0]?.data ?? ''), (c) =>
+      c.charCodeAt(0),
+    );
+    const text = new TextDecoder('latin1').decode(bytes);
+    expect(text).toContain('SALE RECEIPT');
+    expect(hex(bytes)).toContain(DRAWER);
+  });
+
+  it('maps an agent failure to the print job error', async () => {
+    const { db } = await soldShop('psAgentFail');
+    await db.kv.put({ key: 'printer', value: agentPrinter() });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const agent = fakeAgent({
+      print: async () => agentJob('failed', 'PAPER_OUT'),
+    });
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'failed', error: 'PAPER_OUT' });
+  });
+
+  it('reports a stopped agent as disconnected', async () => {
+    const { db } = await soldShop('psAgentDown');
+    await db.kv.put({ key: 'printer', value: agentPrinter() });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const agent = fakeAgent({
+      print: async () => {
+        throw new AgentRequestError('UNAVAILABLE', 'not running');
+      },
+    });
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'failed', error: 'DISCONNECTED' });
+  });
+
+  it('refuses a drawer kick in driver mode', async () => {
+    const { db } = await soldShop('psAgentDrawer');
+    const printer = agentPrinter({
+      agent: {
+        url: 'http://127.0.0.1:17890',
+        token: 't',
+        agentId: 'a',
+        printerName: 'Bixolon',
+        mode: 'driver',
+      },
+    });
+    await expect(
+      kickDrawer(db, printer, { usb: null, serial: null, agent: fakeAgent() }),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED' });
   });
 });

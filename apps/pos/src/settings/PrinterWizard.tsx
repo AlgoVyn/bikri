@@ -1,9 +1,18 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
+import {
+  AGENT_DOWNLOAD_URL,
+  AGENT_URL,
+  type AgentHealth,
+  type AgentMode,
+  type AgentPrinter,
+  AgentRequestError,
+  httpAgentClient,
+} from '../print/agent.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, printTestPage } from '../print/printService.ts';
 import type {
@@ -66,6 +75,10 @@ export function PrinterWizard({
 }) {
   const { t } = useTranslation();
   const deps = browserPrintDeps();
+  const agent = deps.agent ?? httpAgentClient;
+  const desktop =
+    typeof navigator === 'undefined' ||
+    !/Mobi|Android/iu.test(navigator.userAgent);
   const [step, setStep] = useState<Step>('paper');
   const [draft, setDraft] = useState<PrinterKv>(() => ({
     auto_print: true,
@@ -87,7 +100,95 @@ export function PrinterWizard({
   const [ruler, setRuler] = useState<Answer>(null);
   const [urdu, setUrdu] = useState<Answer>(null);
   const [cut, setCut] = useState<Answer>(null);
+  const [agentHealth, setAgentHealth] = useState<AgentHealth | null>(null);
+  const [agentPrinters, setAgentPrinters] = useState<AgentPrinter[]>([]);
+  const [agentCode, setAgentCode] = useState('');
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentBusy, setAgentBusy] = useState(false);
   const patch = (p: Partial<PrinterKv>) => setDraft((d) => ({ ...d, ...p }));
+  const patchAgent = (p: Partial<NonNullable<PrinterKv['agent']>>) =>
+    setDraft((d) =>
+      d.agent === undefined ? d : { ...d, agent: { ...d.agent, ...p } },
+    );
+
+  useEffect(() => {
+    if (!desktop) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const health = await agent.health(current?.agent?.url ?? AGENT_URL);
+        if (cancelled) return;
+        setAgentHealth(health);
+        if (health.paired && current?.agent?.token) {
+          const list = await agent.printers(
+            current.agent.url,
+            current.agent.token,
+          );
+          if (!cancelled) setAgentPrinters(list);
+        }
+      } catch {
+        if (!cancelled) setAgentHealth(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agent, current, desktop]);
+
+  const checkAgent = async () => {
+    setAgentBusy(true);
+    setAgentError(null);
+    try {
+      const url = draft.agent?.url ?? AGENT_URL;
+      const health = await agent.health(url);
+      setAgentHealth(health);
+      if (health.paired) {
+        if (draft.agent?.token) {
+          const list = await agent.printers(draft.agent.url, draft.agent.token);
+          setAgentPrinters(list);
+        } else {
+          setAgentError('agent_already_paired');
+        }
+      }
+    } catch {
+      setAgentHealth(null);
+      setAgentError('agent_unreachable');
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const pairAgent = async () => {
+    setAgentBusy(true);
+    setAgentError(null);
+    try {
+      const paired = await agent.pair(AGENT_URL, agentCode.trim(), 'Bikri');
+      const config = {
+        url: AGENT_URL,
+        token: paired.token,
+        agentId: paired.agentId,
+        printerName: '',
+        mode: 'raw' as AgentMode,
+      };
+      patch({ transport: 'agent', agent: config });
+      const list = await agent.printers(AGENT_URL, paired.token);
+      setAgentPrinters(list);
+      const chosen = list.find((p) => p.isDefault) ?? list[0];
+      if (chosen) patch({ agent: { ...config, printerName: chosen.name } });
+      setAgentHealth((health) =>
+        health === null ? health : { ...health, paired: true },
+      );
+      setAgentCode('');
+    } catch (err) {
+      setAgentError(
+        err instanceof AgentRequestError && err.code === 'ALREADY_PAIRED'
+          ? 'agent_already_paired'
+          : 'agent_pair_failed',
+      );
+    } finally {
+      setAgentBusy(false);
+    }
+  };
 
   const paper = (mm: 58 | 80, wide = false) =>
     patch({
@@ -138,7 +239,9 @@ export function PrinterWizard({
   const connected =
     draft.transport === 'system' ||
     (draft.transport === 'usb' && Boolean(draft.usb)) ||
-    (draft.transport === 'serial' && Boolean(draft.serial));
+    (draft.transport === 'serial' && Boolean(draft.serial)) ||
+    (draft.transport === 'agent' &&
+      Boolean(draft.agent?.token && draft.agent.printerName));
 
   const test = async () => {
     setBusy(true);
@@ -192,6 +295,15 @@ export function PrinterWizard({
               </span>
             </label>
           ))}
+          {draft.paper_mm === 80 && draft.chars_per_line !== 42 ? (
+            <button
+              type="button"
+              className={`${buttonQuiet} self-center`}
+              onClick={() => paper(80, true)}
+            >
+              {t('printer.use_42')}
+            </button>
+          ) : null}
         </fieldset>
       ) : null}
 
@@ -201,33 +313,40 @@ export function PrinterWizard({
             <legend className="mb-2 font-medium">
               {t('printer.connection')}
             </legend>
-            {(['usb', 'serial', 'system'] as const).map((tr) => {
-              const supported =
-                tr === 'system' ||
-                (tr === 'usb' ? deps.usb : deps.serial) !== null;
-              return (
-                <label
-                  key={tr}
-                  className={`${choice(draft.transport === tr)} ${supported ? '' : 'opacity-60'}`}
-                >
-                  <span className="flex items-center gap-2 font-medium">
-                    <input
-                      type="radio"
-                      name="transport"
-                      disabled={!supported}
-                      checked={draft.transport === tr}
-                      onChange={() => patch({ transport: tr })}
-                    />
-                    {t(`printer.transport_${tr}`)}
-                  </span>
-                  <span className="text-small text-text-muted">
-                    {supported
-                      ? t(`printer.transport_${tr}_hint`)
-                      : t('printer.needs_chrome')}
-                  </span>
-                </label>
-              );
-            })}
+            {(['agent', 'usb', 'serial', 'system'] as const)
+              .filter((tr) => tr !== 'agent' || desktop)
+              .map((tr) => {
+                const supported =
+                  tr === 'agent'
+                    ? desktop
+                    : tr === 'system' ||
+                      (tr === 'usb' ? deps.usb : deps.serial) !== null;
+                return (
+                  <label
+                    key={tr}
+                    className={`${choice(draft.transport === tr)} ${supported ? '' : 'opacity-60'}`}
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <input
+                        type="radio"
+                        name="transport"
+                        disabled={!supported}
+                        checked={draft.transport === tr}
+                        onChange={() => {
+                          patch({ transport: tr });
+                          if (tr === 'agent') void checkAgent();
+                        }}
+                      />
+                      {t(`printer.transport_${tr}`)}
+                    </span>
+                    <span className="text-small text-text-muted">
+                      {supported
+                        ? t(`printer.transport_${tr}_hint`)
+                        : t('printer.needs_chrome')}
+                    </span>
+                  </label>
+                );
+              })}
           </fieldset>
           {draft.transport === 'usb' ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -291,6 +410,188 @@ export function PrinterWizard({
                 <span data-testid="printer-device">
                   {t('printer.port_chosen')}
                 </span>
+              ) : null}
+            </div>
+          ) : null}
+          {draft.transport === 'agent' ? (
+            <div className="flex flex-col gap-3 rounded-card border border-border bg-surface-2 p-3">
+              {agentHealth === null ? (
+                <>
+                  <p className="text-small">{t('printer.agent_not_found')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={AGENT_DOWNLOAD_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonPrimary}
+                    >
+                      {t('printer.agent_download')}
+                    </a>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      disabled={agentBusy}
+                      onClick={() => void checkAgent()}
+                    >
+                      {t('printer.agent_check')}
+                    </button>
+                  </div>
+                  <p className="text-small text-text-muted">
+                    {t('printer.agent_help')}
+                  </p>
+                </>
+              ) : agentHealth.paired === false ? (
+                <>
+                  <p className="text-small">{t('printer.agent_pair_hint')}</p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-small">
+                        {t('printer.agent_code')}
+                      </span>
+                      <input
+                        className="h-11 w-32 rounded-control border border-border-strong bg-surface px-2 text-center font-mono text-title tracking-[0.2em]"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={agentCode}
+                        onChange={(e) =>
+                          setAgentCode(e.target.value.replace(/\D/gu, ''))
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className={buttonPrimary}
+                      disabled={agentBusy || agentCode.trim().length !== 6}
+                      onClick={() => void pairAgent()}
+                    >
+                      {t('printer.agent_pair')}
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() =>
+                        window.open(AGENT_URL, '_blank', 'noopener')
+                      }
+                    >
+                      {t('printer.agent_open')}
+                    </button>
+                  </div>
+                  <p className="text-small text-text-muted">
+                    {t('printer.agent_version', {
+                      version: agentHealth.version,
+                    })}
+                  </p>
+                </>
+              ) : draft.agent?.token ? (
+                <>
+                  <p className="text-small">
+                    {t('printer.agent_paired')} ·{' '}
+                    {t('printer.agent_version', {
+                      version: agentHealth.version,
+                    })}
+                  </p>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-small">
+                      {t('printer.agent_printers')}
+                    </span>
+                    <select
+                      data-testid="agent-printer"
+                      className="h-11 rounded-control border border-border-strong bg-surface px-2"
+                      value={draft.agent.printerName}
+                      onChange={(e) =>
+                        patchAgent({ printerName: e.target.value })
+                      }
+                    >
+                      <option value="">
+                        {t('printer.agent_select_printer')}
+                      </option>
+                      {agentPrinters.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name}
+                          {p.isDefault
+                            ? ` · ${t('printer.agent_default')}`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {agentPrinters.length === 0 ? (
+                    <p className="text-small text-text-muted">
+                      {t('printer.agent_no_printers')}
+                    </p>
+                  ) : null}
+                  <fieldset className="flex flex-col gap-2 sm:flex-row">
+                    <legend className="mb-1 w-full font-medium">
+                      {t('printer.agent_mode')}
+                    </legend>
+                    {(['raw', 'driver'] as const).map((mode) => (
+                      <label
+                        key={mode}
+                        className={choice(draft.agent?.mode === mode)}
+                      >
+                        <span className="flex items-center gap-2 font-medium">
+                          <input
+                            type="radio"
+                            name="agent-mode"
+                            checked={draft.agent?.mode === mode}
+                            onChange={() => patchAgent({ mode })}
+                          />
+                          {t(`printer.agent_mode_${mode}`)}
+                        </span>
+                        <span className="text-small text-text-muted">
+                          {t(`printer.agent_mode_${mode}_hint`)}
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  {draft.agent.mode === 'driver' ? (
+                    <p className="text-small text-text-muted">
+                      {t('printer.agent_driver_warning')}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      disabled={agentBusy}
+                      onClick={() => void checkAgent()}
+                    >
+                      {t('printer.agent_recheck')}
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() =>
+                        window.open(
+                          draft.agent?.url ?? AGENT_URL,
+                          '_blank',
+                          'noopener',
+                        )
+                      }
+                    >
+                      {t('printer.agent_open')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-small">
+                    {t('printer.agent_already_paired')}
+                  </p>
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => window.open(AGENT_URL, '_blank', 'noopener')}
+                  >
+                    {t('printer.agent_open')}
+                  </button>
+                </>
+              )}
+              {agentError ? (
+                <p className="text-small text-danger">
+                  {t(`printer.${agentError}`)}
+                </p>
               ) : null}
             </div>
           ) : null}

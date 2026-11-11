@@ -20,6 +20,8 @@ export type ImageOptions = {
   charsPerLine: number;
   itemLayout: ItemLayout;
   logo: RasterSource | null;
+  /** Side padding in pixels; 0 for a print image, default 16 for sharing. */
+  padding?: number;
 };
 
 const PAD = 16;
@@ -124,20 +126,21 @@ export async function renderReceiptCanvas(
   await doc.fonts?.ready;
   const rows = receiptRows(blocks, options);
   const font = options.dots / (options.charsPerLine * 0.6);
+  const pad = options.padding ?? PAD;
   const canvas = doc.createElement('canvas');
-  canvas.width = options.dots + PAD * 2;
-  canvas.height = rows.reduce((h, r) => h + r.height, 0) + PAD * 2;
+  canvas.width = options.dots + pad * 2;
+  canvas.height = rows.reduce((h, r) => h + r.height, 0) + pad * 2;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas unavailable');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#000';
   ctx.textBaseline = 'top';
-  let y = PAD;
+  let y = pad;
   for (const row of rows) {
     if (row.kind === 'raster') {
       const x =
-        PAD + Math.max(0, Math.floor((options.dots - row.source.width) / 2));
+        pad + Math.max(0, Math.floor((options.dots - row.source.width) / 2));
       ctx.putImageData(toImageData(ctx, row.source), x, y);
     } else if (row.kind === 'qr') {
       const qr = qrcode(0, 'M');
@@ -147,7 +150,7 @@ export async function renderReceiptCanvas(
       const quiet = 4;
       const unit = Math.max(1, Math.floor(row.size / (modules + quiet * 2)));
       const drawSize = unit * (modules + quiet * 2);
-      const left = PAD + Math.floor((options.dots - drawSize) / 2);
+      const left = pad + Math.floor((options.dots - drawSize) / 2);
       ctx.fillStyle = '#fff';
       ctx.fillRect(left, y, drawSize, drawSize);
       ctx.fillStyle = '#000';
@@ -175,10 +178,10 @@ export async function renderReceiptCanvas(
             : 'left';
       const x =
         row.align === 'center'
-          ? PAD + options.dots / 2
+          ? pad + options.dots / 2
           : row.align === 'right'
-            ? PAD + options.dots
-            : PAD;
+            ? pad + options.dots
+            : pad;
       if (row.size === 'double-height') {
         ctx.translate(0, y);
         ctx.scale(1, 2);

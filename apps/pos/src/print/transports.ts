@@ -9,6 +9,7 @@ export type PrintErrorCode =
   | 'DISCONNECTED'
   | 'TIMEOUT'
   | 'UNSUPPORTED'
+  | 'PAPER_OUT'
   | 'FAILED';
 
 export class PrintError extends Error {

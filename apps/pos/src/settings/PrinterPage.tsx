@@ -1,6 +1,6 @@
 import type { PrintJob } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
@@ -16,6 +16,11 @@ import {
 } from '../data/printJobs.ts';
 import type { PrinterKv } from '../data/receipt.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import {
+  AGENT_URL,
+  type AgentHealth,
+  httpAgentClient,
+} from '../print/agent.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, openDrawer, printTestPage } from '../print/printService.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -91,6 +96,28 @@ export function PrinterPage() {
   const canUse = can('settings.device');
   const editable = canUse && role !== 'cashier';
   const deps = browserPrintDeps();
+  const [agentHealth, setAgentHealth] = useState<AgentHealth | null>(null);
+
+  useEffect(() => {
+    if (printer?.transport !== 'agent') {
+      setAgentHealth(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const health = await (deps.agent ?? httpAgentClient).health(
+          printer.agent?.url ?? AGENT_URL,
+        );
+        if (!cancelled) setAgentHealth(health);
+      } catch {
+        if (!cancelled) setAgentHealth(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deps.agent, printer?.agent?.url, printer?.transport]);
 
   const update = (p: Partial<PrinterKv>) =>
     void setKv(getDb(), 'printer', { ...printer, ...p });
@@ -129,7 +156,9 @@ export function PrinterPage() {
       ? (printer.usb?.name ?? 'USB')
       : printer?.transport === 'serial'
         ? t('printer.transport_serial')
-        : t('printer.transport_system');
+        : printer?.transport === 'agent'
+          ? (printer.agent?.printerName ?? t('printer.transport_agent'))
+          : t('printer.transport_system');
 
   return (
     <SettingsPageLayout title={t('printer.title')} icon={<PrinterIcon />}>
@@ -157,6 +186,30 @@ export function PrinterPage() {
             })}
           </p>
         ) : null}
+        {printer?.transport === 'agent' ? (
+          <p className="text-small text-text-muted" data-testid="agent-status">
+            {agentHealth
+              ? t('printer.agent_running')
+              : t('printer.agent_stopped')}
+            {agentHealth
+              ? ` · ${t('printer.agent_version', { version: agentHealth.version })}`
+              : ''}
+            {' · '}
+            <button
+              type="button"
+              className="underline"
+              onClick={() =>
+                window.open(
+                  printer.agent?.url ?? AGENT_URL,
+                  '_blank',
+                  'noopener',
+                )
+              }
+            >
+              {t('printer.agent_open')}
+            </button>
+          </p>
+        ) : null}
         <p className="text-small text-text-muted">{t('printer.never_loses')}</p>
         {wizard ? null : editable ? (
           <div className="flex flex-wrap gap-2">
@@ -179,7 +232,10 @@ export function PrinterPage() {
                 {editable &&
                 can('drawer.open') &&
                 !readOnly &&
-                printer.transport !== 'system' ? (
+                printer.transport !== 'system' &&
+                !(
+                  printer.transport === 'agent' && printer.agent?.mode !== 'raw'
+                ) ? (
                   <button
                     type="button"
                     className={buttonQuiet}
