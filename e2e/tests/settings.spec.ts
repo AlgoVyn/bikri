@@ -326,8 +326,11 @@ test.describe('Settings (T-050)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.getByLabel('Text size').selectOption('130');
     await expect(page.locator('html')).toHaveCSS('font-size', '19.5px');
+    await page.getByLabel('Lock-screen keypad').selectOption('computer');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Display settings saved.')).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Lock-screen keypad')).toHaveValue('computer');
     await page.getByRole('main').getByLabel('Language').selectOption('ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   });

@@ -433,6 +433,15 @@ export function SetupWizard() {
                   </button>
                 ))}
               </div>
+              {import.meta.env.DEV ? (
+                <button
+                  type="button"
+                  className="min-h-11 self-start text-small text-text-muted underline underline-offset-2"
+                  onClick={() => void navigate({ to: '/dev/demo' })}
+                >
+                  {t('dev.seed')}
+                </button>
+              ) : null}
               <button type="submit" className={buttonPrimary}>
                 {t('setup.start')}
               </button>

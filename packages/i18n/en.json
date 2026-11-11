@@ -96,6 +96,10 @@
     "zero_uncounted": "Set uncounted to 0",
     "save_failed": "The count could not be saved. Try fewer products at once."
   },
+  "dev": {
+    "seed": "Load demo data",
+    "seeding": "Loading demo data…"
+  },
   "done": {
     "download_pdf": "Download PDF",
     "image_saved": "Receipt picture saved. Attach it in WhatsApp.",
@@ -572,6 +576,10 @@
     "none": "No printer set up on this device.",
     "open_drawer": "Open drawer",
     "options": "Options",
+    "chars_42": "42 characters (wide)",
+    "chars_48": "48 characters (standard)",
+    "chars_hint": "Most 80 mm printers fit 48 characters. Choose 42 if the test print's ruler wraps.",
+    "chars_per_line": "Characters per line",
     "paper": "Paper width",
     "paper_58": "58 mm",
     "paper_80": "80 mm (recommended)",
@@ -626,8 +634,7 @@
     "agent_download_all": "All downloads",
     "agent_download_sha": "SHA-256 checksums",
     "agent_download_hint": "Unsigned builds: verify SHA-256; Windows may show SmartScreen.",
-    "agent_checking": "Looking for the print service…",
-    "use_48": "Use 48 characters"
+    "agent_checking": "Looking for the print service…"
   },
   "privacy": {
     "title": "Hide amounts",
@@ -777,6 +784,7 @@
     "line_discount": "Discount (Rs)",
     "line_discount_pct": "Discount (%)",
     "line_note": "Note (serial no / IMEI)",
+    "more_options": "More options",
     "new_customer": "+ New customer",
     "no_branch": "Ask the owner to assign this device to a branch",
     "no_free_cart": "All carts are in use. Finish or hold one first.",
@@ -1170,6 +1178,9 @@
     "locked_for": "Locked for {{time}}",
     "clear": "Clear",
     "backspace": "Delete last digit",
+    "keypad": "Keypad",
+    "keypad_computer": "Computer keypad (7 8 9 on top)",
+    "keypad_phone": "Phone keypad (1 2 3 on top)",
     "forgot": "Forgot PIN?",
     "forgot_staff": "Ask the owner to reset it in Settings → Cashiers.",
     "forgot_owner": "Another owner of your shop can reset it in Settings → Cashiers. If you are the only owner, contact Algovyn to reset it after checking it's you.",

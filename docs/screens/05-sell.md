@@ -14,18 +14,20 @@ Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14
 
 ## Layout (≥ 1024 px: two columns; < 1024 px: product area full screen with a sticky cart bar that expands into a sheet)
 
+Sell is the one screen without the global app top bar (breadcrumbs, global search, privacy, sync badge, staff menu), so the search box and cart start at the top of the viewport. Staff, sync and privacy controls stay available on every other screen through the rail/bottom navigation.
+
 **Start column (≈ 60%) — find products**
 1. Search box (autofocus; placeholder "Search or scan — name, barcode, SKU"; shortcut F2 (shown in the `?` shortcut sheet)). Results replace the grid as you type.
 2. Category chips row (All, then categories by sort order, horizontally scrollable).
 3. Product grid: elevated tiles 128×172 px min (196 px tall in Urdu; 64 px photo, or coloured initials if none), name (2 lines max), bold price, stock pill ("12 left", green when in stock, amber when ≤ `min_stock_milli`, red "Out" when ≤ 0, hidden if `track_stock = 0`), and a small badge with the quantity already in the active cart. The search is a 56 px field with a focus ring, and category chips sit below it. Sorted by: selling frequency over 30 days on this device, then name. Virtualised.
-4. Below the grid on desktop: `Quick sale` (F7) and `Held bills (n)` (F6) buttons.
+There is no standalone action row below the product grid; held bills sit in the cart panel.
 
 **End column (≈ 40%) — cart**
-1. Cart tabs: `Bill 1`, `Bill 2`, `Bill 3` (Ctrl+1/2/3); each shows its total or `New bill`, the active tab is solid brand blue and a dot marks non-empty carts. Each tab is an independent cart persisted in Dexie `carts` (survives reload and lock).
-2. Customer row: avatar icon, "Walk-in customer" or chosen customer name + balance ("Owes you Rs 5,890"), `Change` button (search customers by name/phone, `+ New customer`). Choosing a customer is optional except for udhaar.
-3. Cart lines (newest on top, configurable) sit on tinted cards inside the cart panel: the header shows the name and line total, followed by one aligned row with `QtyInput`, a unit-price override and a `Discount` field with a built-in 44 px `Rs/%` toggle (tap the toggle to switch between rupees and percent). **Both price and discount are editable directly on every line**, and every control in the row stays at least 44×44 px at 390 px; the row stays one line by giving the discount column enough width for the toggle and its amount; a small expand chevron reveals the optional note (e.g. serial no / IMEI, 0–60 chars) and cost hint. Remove is an explicit × on the line. Badges on line: `−Rs 200` discount, `Below cost` (red), `Not enough stock` (amber, informational).
-4. Totals block (exact labels): `Subtotal (n items)` = Σ gross, `Item discounts` (−, hidden if 0), `Discount` with an `Add discount` link (F3) opening Rs/% input (hidden if 0 until added), `Sales tax 17%` (only if tax > 0 and `tax_mode = exclusive`), `Rounding` (only if ≠ 0), **`Total to pay`** (large); with `tax_mode = inclusive` a small muted line under the total: `Includes Sales tax 17%: Rs 1,700`. Figures from [07 §3](../07-money-rules.md#3-bill-totals).
-5. Actions row: `Hold` (Ctrl+H / F4), `Clear` (Esc, confirm if > 0 lines), **`Take payment`** (Enter / F8, primary, full width, shows total).
+1. Cart tabs: compact single-line `Bill 1`, `Bill 2`, `Bill 3` (Ctrl+1/2/3) segmented tabs. Each shows its total (or `New bill`) at ≥640 px; below that the label and a dot marking a non-empty cart. The active tab is solid brand blue. Each tab is an independent cart persisted in Dexie `carts` (survives reload and lock).
+2. Customer row: compact 40–44 px row with a 24 px avatar, "Walk-in customer" or chosen customer name + balance ("Owes you Rs 5,890"), and a `Change` text button (search customers by name/phone, `+ New customer`). Choosing a customer is optional except for udhaar.
+3. Cart lines (newest on top, configurable) are compact divider-separated rows: a 44 px summary shows the expand chevron, the name, `qty × unit price` and the line total, with a × to remove. Badges sit inline in the summary: `−Rs 200` discount, `Below cost` (red), `Not enough stock` (amber, informational). Tapping a line (or ↑/↓) opens its editor below the summary: one aligned row with `QtyInput` and a unit-price override, each at least 44×44 px at 390 px. A `More options` disclosure under that row reveals the line `Discount` (with the built-in 44 px `Rs/%` toggle), the optional note (e.g. serial no / IMEI, 0–60 chars) and the cost hint; a line with a discount or note shows the badge/note in the summary without opening it. **Only one line is expanded at a time**; the line just scanned/added opens automatically so qty and price stay one tap away, while the other lines stay compact.
+4. Totals block (exact labels, compact 13 px rows with a 20 px total): `Subtotal (n items)` = Σ gross, `Item discounts` (−, hidden if 0), an `Add discount` link (F3) when no bill discount is set, changing to a `Discount` row with its amount once set, `Sales tax 17%` (only if tax > 0 and `tax_mode = exclusive`), `Rounding` (only if ≠ 0), **`Total to pay`**; with `tax_mode = inclusive` a small muted line under the total: `Includes Sales tax 17%: Rs 1,700`. Figures from [07 §3](../07-money-rules.md#3-bill-totals).
+5. Actions row: compact `Hold` (Ctrl+H / F4), `Held bills (n)` (F6) and `Clear` (Esc, confirm if > 0 lines) buttons, with a shorter **`Take payment`** (Enter / F8, primary) at the end of the same line; its amount stays in the totals block directly above, so the button does not repeat it.
 
 ## Adding items
 
@@ -35,6 +37,7 @@ Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14
 | Scan unknown barcode | Toast "No product with barcode 8964000…" with `Add product` (prefills barcode; needs `catalog.edit`) and `Quick sale` |
 | Type + Enter with exactly 1 result | Adds it |
 | Type + ↓/↑ + Enter | Adds highlighted result |
+| After adding from a typed search | The query stays in the box and is selected, so another result can be added; a barcode scan replaces the selection and clears the box after the add |
 | `*` then number in search (e.g. `3*` before scan) | Sets quantity for the next add |
 | Tap tile | Adds 1 |
 | Quick sale (F7) | Dialog: description (default "Item"), price (`MoneyInput`, required > 0), qty; adds a line with `product_id = null`, no stock movement, cost 0 |
@@ -73,7 +76,7 @@ A cart opened from **Sales → Record past sale** shows a warning banner above t
 
 ## Hotkeys
 
-`F2`/`Ctrl+F` search, `Ctrl+1–3` cart tabs, `↑/↓` move in results or lines, `+`/`-` change qty of the selected line, `Delete` remove selected line, `F3` bill discount, `Ctrl+H`/`F4` hold, `F6` held bills, `F7` quick sale, `Enter`/`F8` take payment (when search is empty), `F9` open drawer (`drawer.open`), `Esc` clear search → collapse line → clear cart (confirm), `N` new sale (clears current tab after confirm when not focused in an input).
+`F2`/`Ctrl+F` search, `Ctrl+1–3` cart tabs, `↑/↓` move in results or lines (the open line editor follows the selection), `+`/`-` change qty of the selected line, `Delete` remove selected line, `F3` bill discount, `Ctrl+H`/`F4` hold, `F6` held bills, `F7` quick sale, `Enter`/`F8` take payment (when search is empty), `F9` open drawer (`drawer.open`), `Esc` clear search → collapse line → clear cart (confirm), `N` new sale (clears current tab after confirm when not focused in an input).
 
 ## Acceptance criteria
 
@@ -86,3 +89,4 @@ A cart opened from **Sales → Record past sale** shows a warning banner above t
 7. Selling more than stock shows the amber badge and completes the sale; stock goes negative.
 8. Quick sale "Repair labour Rs 500" completes with no stock movement.
 9. RTL: in Urdu, cart is on the left, grid on the right, numbers remain LTR.
+10. At 1920×1080 a 14-line bill shows all fourteen lines without scrolling while the active line's editor is open.

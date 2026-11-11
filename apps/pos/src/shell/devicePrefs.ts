@@ -4,6 +4,8 @@ import { BROWSER_CHROME } from '../lib/palette.ts';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 export type TextSizePref = '100' | '115' | '130';
+/** Lock-screen keypad: phone (1-2-3 top) or computer numpad (7-8-9 top). */
+export type KeypadLayout = 'phone' | 'computer';
 
 export type DevicePrefs = {
   theme: ThemePref;
@@ -16,6 +18,7 @@ export type DevicePrefs = {
   autoClose: boolean;
   /** Hide amounts on this device (shoulder-surfing privacy, docs/screens/04). */
   privacyMode: boolean;
+  keypad: KeypadLayout;
 };
 
 export const THEME_STORAGE_KEY = 'bikri.theme';
@@ -29,6 +32,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   saleSound: true,
   autoClose: false,
   privacyMode: false,
+  keypad: 'phone',
 };
 
 export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
@@ -45,6 +49,7 @@ export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
       stored.autoLockMinutes ?? autoLock ?? DEFAULT_PREFS.autoLockMinutes,
     ),
     privacyMode: stored.privacyMode === true,
+    keypad: stored.keypad === 'computer' ? 'computer' : 'phone',
   };
 }
 
@@ -61,8 +66,18 @@ export async function saveDevicePrefs(
     saleSound: prefs.saleSound,
     autoClose: prefs.autoClose,
     privacyMode: prefs.privacyMode,
+    keypad: prefs.keypad,
   });
   await setKv(db, 'auto_lock_minutes', prefs.autoLockMinutes);
+}
+
+/** Persist the lock-screen keypad layout without disturbing the other settings. */
+export async function setKeypadLayout(
+  db: BikriDb,
+  keypad: KeypadLayout,
+): Promise<void> {
+  const prefs = await loadDevicePrefs(db);
+  await saveDevicePrefs(db, { ...prefs, keypad });
 }
 
 /** Persist the privacy toggle without disturbing the other display settings. */

@@ -51,7 +51,10 @@ function Gate() {
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';
   const devUi = import.meta.env.DEV && pathname.startsWith('/dev/');
+  const devDemo = import.meta.env.DEV && pathname.startsWith('/dev/demo');
   if (gate === 'loading') return <PageLoading />;
+  // The demo seeder resets the database, so it runs without the app shell's queries.
+  if (devDemo) return <Outlet />;
   const onEnrol = pathname === '/enrol' || pathname === '/enrol/';
   if (gate === 'enrol' || revoked || onEnrol)
     return (

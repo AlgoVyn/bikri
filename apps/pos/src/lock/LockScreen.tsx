@@ -16,9 +16,14 @@ import {
 } from '../data/pinLock.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { Banners } from '../shell/Banners.tsx';
-import { applyDevicePrefs, loadDevicePrefs } from '../shell/devicePrefs.ts';
+import {
+  applyDevicePrefs,
+  loadDevicePrefs,
+  setKeypadLayout,
+} from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
 import { useSession } from '../state/session.ts';
+import { keypadDigits } from './keypad.ts';
 
 const DOT_KEYS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8'];
 const URDU = '۰۱۲۳۴۵۶۷۸۹';
@@ -58,6 +63,7 @@ export function LockScreen() {
     }),
     [db],
   );
+  const prefs = useLiveQuery(() => loadDevicePrefs(db), [db]);
   const [chosen, setChosen] = useState<MasterRow | null>(null);
   const [pin, setPin] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -144,6 +150,7 @@ export function LockScreen() {
   }, [press, pin]);
 
   if (!data) return null;
+  const keypad = prefs?.keypad ?? 'phone';
   const length = chosen ? Number(chosen.pin_length ?? 4) || 4 : 4;
   const chosenLock = chosen ? locks[String(chosen.id)] : undefined;
   const isLocked = chosenLock !== undefined && chosenLock > now;
@@ -258,8 +265,11 @@ export function LockScreen() {
                 {message}
               </p>
             ) : null}
-            <div className="grid w-full max-w-72 grid-cols-3 gap-2">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+            <div
+              data-testid="lock-keypad"
+              className="grid w-full max-w-72 grid-cols-3 gap-2"
+            >
+              {keypadDigits(keypad).map((d) => (
                 <button
                   key={d}
                   type="button"
@@ -293,6 +303,37 @@ export function LockScreen() {
               >
                 ⌫
               </button>
+            </div>
+            <div className="flex items-center gap-2 text-small text-text-muted">
+              <span>{t('lock.keypad')}</span>
+              {/* biome-ignore lint/a11y/useSemanticElements: a two-button display toggle, not a form fieldset */}
+              <div
+                role="group"
+                aria-label={t('lock.keypad')}
+                className="flex rounded-control border border-border bg-surface p-0.5"
+              >
+                {(['phone', 'computer'] as const).map((layout) => {
+                  const label =
+                    layout === 'phone'
+                      ? t('lock.keypad_phone')
+                      : t('lock.keypad_computer');
+                  return (
+                    <button
+                      key={layout}
+                      type="button"
+                      aria-pressed={keypad === layout}
+                      aria-label={label}
+                      title={label}
+                      className={`min-h-10 min-w-12 rounded-control px-2 font-mono text-small ${keypad === layout ? 'bg-primary text-primary-ink' : 'text-text-muted hover:bg-surface-2'}`}
+                      onClick={() => {
+                        void setKeypadLayout(db, layout);
+                      }}
+                    >
+                      {layout === 'phone' ? '123' : '789'}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <button
               type="button"

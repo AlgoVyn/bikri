@@ -48,8 +48,10 @@ test.describe('Privacy mode (screens/04)', () => {
     await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
     await expect(page.getByTestId('sell-tile').first()).toContainText('Rs 500');
 
-    await page.getByTestId('privacy-toggle').click();
+    // Sell hides the app header, so privacy turns off from Home.
     await page.evaluate(() => window.__bikriTest?.navigate('/'));
+    await expect(page.getByTestId('today-sold')).toContainText('Rs ••••');
+    await page.getByTestId('privacy-toggle').click();
     await expect(page.getByTestId('today-sold')).toContainText('Rs 1,000');
 
     await page.keyboard.press('Control+Shift+H');

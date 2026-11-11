@@ -115,6 +115,23 @@ function DisplayContent() {
             <option value="130">130%</option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-small">
+          {t('office.display.keypad')}
+          <select
+            className={field}
+            value={form.keypad}
+            onChange={(event) =>
+              change({
+                keypad: event.target.value as DevicePrefs['keypad'],
+              })
+            }
+          >
+            <option value="phone">{t('office.display.keypad_phone')}</option>
+            <option value="computer">
+              {t('office.display.keypad_computer')}
+            </option>
+          </select>
+        </label>
         <label className="flex items-start gap-2 text-small">
           <input
             type="checkbox"

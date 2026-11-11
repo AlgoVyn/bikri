@@ -119,6 +119,153 @@ export async function seedProducts(list: TestProduct[]): Promise<string[]> {
   return ids;
 }
 
+/** A mobile-shop catalogue for the local demo (paisa, stock in units). */
+export const DEMO_PRODUCTS: TestProduct[] = [
+  {
+    name: 'Samsung Galaxy A15 128 GB',
+    name_ur: 'سام سنگ گلیکسی اے 15 128 جی بی',
+    price: 5299000,
+    cost: 4850000,
+    barcode: '8800000000015',
+    sku: 'SAM-A15',
+    stock: 6,
+  },
+  {
+    name: 'Infinix Hot 40',
+    name_ur: 'انفینکس ہاٹ 40',
+    price: 3199000,
+    cost: 2900000,
+    barcode: '8800000000022',
+    sku: 'INF-H40',
+    stock: 11,
+  },
+  {
+    name: 'Samsung Galaxy A05',
+    name_ur: 'سام سنگ گلیکسی اے 05',
+    price: 2699000,
+    cost: 2450000,
+    barcode: '8800000000039',
+    sku: 'SAM-A05',
+    stock: 4,
+  },
+  {
+    name: 'Bluetooth speaker',
+    name_ur: 'بلوٹوتھ اسپیکر',
+    price: 289900,
+    cost: 210000,
+    barcode: '8800000000046',
+    sku: 'SPK-BT1',
+    stock: 12,
+  },
+  {
+    name: 'Wireless earbuds',
+    name_ur: 'وائرلیس ایئربڈز',
+    price: 349900,
+    cost: 260000,
+    barcode: '8800000000053',
+    sku: 'EAR-WL1',
+    stock: 8,
+  },
+  {
+    name: 'Power bank 10000 mAh',
+    name_ur: 'پاور بینک 10000 mAh',
+    price: 449900,
+    cost: 340000,
+    barcode: '8800000000060',
+    sku: 'PWB-10K',
+    stock: 4,
+  },
+  {
+    name: 'Type-C fast charger 25W',
+    name_ur: 'ٹائپ سی فاسٹ چارجر 25W',
+    price: 129900,
+    cost: 90000,
+    barcode: '8800000000077',
+    sku: 'CHG-25W',
+    stock: 34,
+  },
+  {
+    name: 'USB-C cable 1 m',
+    name_ur: 'USB-C کیبل 1 میٹر',
+    price: 49900,
+    cost: 25000,
+    barcode: '8800000000084',
+    sku: 'CBL-UC1',
+    stock: 60,
+  },
+  {
+    name: 'Clear phone cover',
+    name_ur: 'شفاف فون کور',
+    price: 39900,
+    cost: 18000,
+    barcode: '8800000000091',
+    sku: 'COV-CLR',
+    stock: 25,
+  },
+  {
+    name: 'Tempered glass',
+    name_ur: 'ٹمپرڈ گلاس',
+    price: 24900,
+    cost: 12000,
+    barcode: '8800000000107',
+    sku: 'GLS-TMP',
+    stock: 2,
+  },
+  {
+    name: 'Car mount',
+    price: 89900,
+    cost: 55000,
+    barcode: '8800000000114',
+    sku: 'MNT-CAR',
+    stock: 9,
+  },
+  {
+    name: '64 GB memory card',
+    price: 189900,
+    cost: 130000,
+    barcode: '8800000000121',
+    sku: 'MEM-64',
+    stock: 15,
+  },
+  {
+    name: 'SIM ejector pin',
+    price: 9900,
+    cost: 2000,
+    barcode: '8800000000138',
+    sku: 'SIM-PIN',
+    stock: 0,
+  },
+  {
+    name: 'Screen repair labour',
+    price: 150000,
+    cost: 0,
+    sku: 'SRV-SCR',
+    stock: 0,
+    track: false,
+  },
+];
+
+/**
+ * Reset the local dev shop to a ready shop with a demo catalogue, a customer, a
+ * supplier and today's sample sales (dev only). The caller reloads the app afterwards.
+ */
+export async function seedDemoShop(): Promise<void> {
+  await seedReadyShop();
+  await seedProducts(DEMO_PRODUCTS);
+  await seedCustomer({
+    name: 'Bilal Ahmed',
+    phone: '+923001112233',
+    balance: 1250000,
+    limit: 5000000,
+  });
+  await seedSupplier({
+    name: 'Hall Road Mobiles',
+    phone: '+924235761234',
+    opening: 8500000,
+  });
+  await seedTodaySales();
+}
+
 /** Supplier for E2E admin screens; returns its id. */
 export async function seedSupplier(s: {
   name: string;

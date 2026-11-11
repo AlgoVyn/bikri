@@ -20,6 +20,7 @@ import { Route as SetupRouteImport } from './routes/setup.tsx';
 import { Route as AdminIndexRouteImport } from './routes/admin/index.tsx';
 import { Route as AdminBackupsRouteImport } from './routes/admin/backups.tsx';
 import { Route as DayCloseIndexRouteImport } from './routes/day-close/index.tsx';
+import { Route as DevDemoRouteImport } from './routes/dev.demo.tsx';
 import { Route as DevUiRouteImport } from './routes/dev.ui.tsx';
 import { Route as ExpensesIndexRouteImport } from './routes/expenses/index.tsx';
 import { Route as ProductsIndexRouteImport } from './routes/products/index.tsx';
@@ -124,6 +125,11 @@ const DayCloseIndexRoute = DayCloseIndexRouteImport.update({
 } as any).lazy(() =>
   import('./routes/day-close/index.lazy.tsx').then((d) => d.Route),
 );
+const DevDemoRoute = DevDemoRouteImport.update({
+  id: '/dev/demo',
+  path: '/dev/demo',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const DevUiRoute = DevUiRouteImport.update({
   id: '/dev/ui',
   path: '/dev/ui',
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
+  '/dev/demo': typeof DevDemoRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
@@ -430,6 +437,7 @@ export interface FileRoutesByTo {
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
+  '/dev/demo': typeof DevDemoRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
@@ -483,6 +491,7 @@ export interface FileRoutesById {
   '/sell': typeof SellRoute;
   '/setup': typeof SetupRoute;
   '/admin/backups': typeof AdminBackupsRoute;
+  '/dev/demo': typeof DevDemoRoute;
   '/dev/ui': typeof DevUiRoute;
   '/products/categories': typeof ProductsCategoriesRoute;
   '/products/import': typeof ProductsImportRoute;
@@ -538,6 +547,7 @@ export interface FileRouteTypes {
     | '/sell'
     | '/setup'
     | '/admin/backups'
+    | '/dev/demo'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
@@ -590,6 +600,7 @@ export interface FileRouteTypes {
     | '/sell'
     | '/setup'
     | '/admin/backups'
+    | '/dev/demo'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
@@ -642,6 +653,7 @@ export interface FileRouteTypes {
     | '/sell'
     | '/setup'
     | '/admin/backups'
+    | '/dev/demo'
     | '/dev/ui'
     | '/products/categories'
     | '/products/import'
@@ -695,6 +707,7 @@ export interface RootRouteChildren {
   RequestStatusRoute: typeof RequestStatusRoute;
   SellRoute: typeof SellRoute;
   SetupRoute: typeof SetupRoute;
+  DevDemoRoute: typeof DevDemoRoute;
   DevUiRoute: typeof DevUiRoute;
   ProductsCategoriesRoute: typeof ProductsCategoriesRoute;
   ProductsImportRoute: typeof ProductsImportRoute;
@@ -806,6 +819,13 @@ declare module '@tanstack/react-router' {
       path: '/day-close';
       fullPath: '/day-close/';
       preLoaderRoute: typeof DayCloseIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/dev/demo': {
+      id: '/dev/demo';
+      path: '/dev/demo';
+      fullPath: '/dev/demo';
+      preLoaderRoute: typeof DevDemoRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/dev/ui': {
@@ -1148,6 +1168,7 @@ const rootRouteChildren: RootRouteChildren = {
   RequestStatusRoute: RequestStatusRoute,
   SellRoute: SellRoute,
   SetupRoute: SetupRoute,
+  DevDemoRoute: DevDemoRoute,
   DevUiRoute: DevUiRoute,
   ProductsCategoriesRoute: ProductsCategoriesRoute,
   ProductsImportRoute: ProductsImportRoute,

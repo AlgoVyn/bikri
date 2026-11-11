@@ -86,10 +86,13 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
   await unlock(a.page);
 
   await a.ctx.setOffline(true);
+  // Sell hides the app header, so check the badge on Home.
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
     'data-state',
     'offline',
   );
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
   for (let i = 0; i < 5; i += 1) await sellOne(a.page, 'Charger 20 W');
   await a.page.reload();
   await unlock(a.page);
@@ -97,6 +100,7 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
 
   await a.ctx.setOffline(false);
   await syncNow(a.page);
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
     'data-state',
     'synced',
@@ -192,10 +196,13 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
     ]),
   );
   await syncNow(a.page);
+  // Sell hides the app header, so check the badge on Home.
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
     'data-state',
     'paused',
   );
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
   await sellOne(a.page, 'Cable');
   const re = await request.post(
     `${API}/admin/tenants/${shop.tenant.id}/reactivate`,
@@ -203,6 +210,7 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
   );
   expect(re.status(), await re.text()).toBe(200);
   await syncNow(a.page);
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
     'data-state',
     'synced',

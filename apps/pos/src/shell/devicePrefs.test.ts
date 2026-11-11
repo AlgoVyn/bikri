@@ -28,15 +28,18 @@ describe('device preferences', () => {
       theme: 'dark',
       textSize: '115',
       autoLockMinutes: 2,
+      keypad: 'computer',
     });
     expect(await loadDevicePrefs(db)).toMatchObject({
       theme: 'dark',
       textSize: '115',
       autoLockMinutes: 2,
+      keypad: 'computer',
     });
-    // Older builds stored only the separate key.
+    // Older builds stored only the separate key; an unknown keypad is a phone one.
     await setKv(db, 'ui.prefs', { theme: 'light', textSize: '130' });
     expect((await loadDevicePrefs(db)).autoLockMinutes).toBe(2);
+    expect((await loadDevicePrefs(db)).keypad).toBe('phone');
   });
 
   it('mirrors the theme for the lock and operator screens', () => {

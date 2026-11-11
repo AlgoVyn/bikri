@@ -9,6 +9,7 @@ import {
   finishSetupHere,
   resetDevDb,
   seedCustomer,
+  seedDemoShop,
   seedManyProducts,
   seedProducts,
   seedReadyShop,
@@ -26,6 +27,8 @@ declare global {
       /** Push + pull now (T-030 engine). */
       syncNow: () => Promise<void>;
       reset: () => Promise<void>;
+      /** Reset the local dev shop and seed a demo catalogue, parties and a sample day. */
+      seedDemo: () => Promise<void>;
       unlockAs: typeof unlockAs;
       seedTodaySales: () => Promise<void>;
       setKv: (key: string, value: unknown) => Promise<void>;
@@ -53,6 +56,7 @@ export function installTestHooks(): void {
     finishSetupHere: () => finishSetupHere(),
     syncNow: async () => (await import('../sync/engine.ts')).syncNow(),
     reset: resetDevDb,
+    seedDemo: seedDemoShop,
     unlockAs,
     seedTodaySales,
     setKv: (key, value) => setKv(getDb(), key, value),

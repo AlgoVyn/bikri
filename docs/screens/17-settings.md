@@ -63,7 +63,7 @@ Printer-agnostic ([06 §0](../06-printing.md#0-printer-agnostic-design-decision-
 - Serial: `Choose port` (Web Serial), baud rate (9600 / 19200 / 38400 / 115200; default 9600).
 - System: uses `window.print()` with the 58 mm or 80 mm receipt CSS ([06 §5.3](../06-printing.md#53-system-printing-fallback-also-for-a4office-printers)); tip to set the printer's margins to none. Always available, also as the fallback when USB/Serial is unavailable.
 - A4: for invoices/statements on an office printer.
-- Common: paper width (58 / 80 mm; advanced 44/76/112), characters per line (default 32 / 48), raster width in dots (default 384 / 576), auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with all character widths, Urdu raster line and logo), `Open drawer`.
+- Common: paper width (58 / 80 mm; advanced 44/76/112), characters per line (default 32 / 48; the wizard shows a 48/42 choice inside the selected 80 mm option), raster width in dots (default 384 / 576), auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with all character widths, Urdu raster line and logo), `Open drawer`.
 - Status: connected / not connected / last error. "A failed print never loses the bill" note (REQ-B15).
 - Recent prints: each **Waiting** job has `Cancel print`, and when any are waiting the heading offers `Cancel waiting (N)`; jobs already printing are not cancelled. A job left in `printing` by a closed tab becomes `INTERRUPTED` on the next start and can be retried.
 
@@ -73,7 +73,7 @@ Label size (50×25 mm roll, 38×25 mm roll, 40×30 mm roll, A4 sheet 3×8), show
 
 ## Scanner and display (`settings.device`)
 
-Scanner: test field showing keystroke timing; "suffix Enter" check; camera scanning on/off for phones. Display: theme (Light / Dark / System), text size (100/115/130%), **Hide amounts** (the top-bar eye; stored in `kv.ui.prefs.privacyMode`, masks figures on browsing/reporting screens but never in Sell, Pay, Price check or printed/exported output), cart order (newest on top/bottom), auto-close sale complete, sounds on/off, auto-lock minutes.
+Scanner: test field showing keystroke timing; "suffix Enter" check; camera scanning on/off for phones. Display: theme (Light / Dark / System), text size (100/115/130%), **Hide amounts** (the top-bar eye; stored in `kv.ui.prefs.privacyMode`, masks figures on browsing/reporting screens but never in Sell, Pay, Price check or printed/exported output), lock-screen keypad (Phone: 1 2 3 on top, or Computer: 7 8 9 on top; stored in `kv.ui.prefs.keypad`), cart order (newest on top/bottom), auto-close sale complete, sounds on/off, auto-lock minutes.
 
 ## Language (inside Scanner & display)
 

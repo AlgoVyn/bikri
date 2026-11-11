@@ -137,6 +137,11 @@ test.describe('Sell (T-016)', () => {
     await page
       .getByTestId('cart-line')
       .filter({ hasText: 'Galaxy A15' })
+      .getByRole('button', { name: 'More options' })
+      .click();
+    await page
+      .getByTestId('cart-line')
+      .filter({ hasText: 'Galaxy A15' })
       .getByLabel('Discount', { exact: true })
       .fill('2000');
     await page.keyboard.press('F3');
@@ -227,6 +232,7 @@ test.describe('Sell (T-016)', () => {
       .getByTestId('cart-line')
       .getByRole('button', { name: /^Glass/ })
       .click();
+    await page.getByRole('button', { name: 'More options' }).click();
     await page.getByLabel('Discount', { exact: true }).fill('50');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 250');
     await page.getByRole('button', { name: /^Hold/ }).click();
@@ -377,7 +383,110 @@ test.describe('Sell (T-016)', () => {
     await setLanguage(page, 'en');
   });
 
-  test('line price and discount are editable without opening the detail panel', async ({
+  test('AC 10: fourteen lines fit on a 1080p screen with the active line open', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop density check');
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const names = [
+      'Alpha',
+      'Bravo',
+      'Charlie',
+      'Delta',
+      'Echo',
+      'Foxtrot',
+      'Golf',
+      'Hotel',
+      'India',
+      'Juliet',
+      'Kilo',
+      'Lima',
+      'Mike',
+      'November',
+    ];
+    const codes = names.map(
+      (_, i) => `9900000000${String(i).padStart(3, '0')}`,
+    );
+    await openSell(
+      page,
+      names.map((name, i) => ({
+        name,
+        price: 10000 + i * 100,
+        stock: 20,
+        barcode: codes[i],
+      })),
+    );
+    // Sell hides the app top bar entirely to give the cart the full height.
+    await expect(page.getByTestId('screen-title-bar')).toHaveCount(0);
+    await expect(page.getByTestId('sync-badge')).toHaveCount(0);
+    // Scan instead of clicking tiles: the grid re-sorts after every add.
+    for (const [i, code] of codes.entries()) {
+      await scan(page, code);
+      await expect(page.getByTestId('cart-line')).toHaveCount(i + 1);
+    }
+    await showCart(page);
+    const measured = await page.evaluate(() => {
+      const lines = [...document.querySelectorAll('[data-testid="cart-line"]')];
+      const list = lines[0]?.parentElement;
+      return {
+        count: lines.length,
+        scrollHeight: list?.scrollHeight ?? 0,
+        clientHeight: list?.clientHeight ?? 0,
+      };
+    });
+    expect(measured.count).toBe(14);
+    expect(measured.scrollHeight).toBeLessThanOrEqual(
+      measured.clientHeight + 1,
+    );
+    await expectNoHorizontalScroll(page);
+  });
+
+  test('a typed search stays after adding; a barcode scan starts fresh', async ({
+    page,
+  }) => {
+    await openSell(page, [
+      {
+        name: 'Cable short',
+        price: 50000,
+        stock: 10,
+        barcode: '8800000000201',
+      },
+      {
+        name: 'Cable long',
+        price: 80000,
+        stock: 10,
+        barcode: '8800000000202',
+      },
+      {
+        name: 'Charger',
+        price: 150000,
+        stock: 10,
+        barcode: '8800000000203',
+      },
+    ]);
+    const search = page.getByRole('combobox', { name: /Search or scan/ });
+    await search.fill('Cable');
+    await expect(page.getByTestId('sell-tile')).toHaveCount(2);
+    await search.press('Enter');
+    await expect(page.getByTestId('cart-line')).toHaveCount(1);
+    await expect(search).toHaveValue('Cable');
+
+    // Click the *other* matching result so a second line is added, not merged.
+    const first = await page.getByTestId('line-name').first().textContent();
+    await tile(
+      page,
+      first === 'Cable long' ? 'Cable short' : 'Cable long',
+    ).click();
+    await expect(page.getByTestId('cart-line')).toHaveCount(2);
+    await expect(search).toHaveValue('Cable');
+
+    // The preserved query is selected, so a scanner replaces it; the scan then clears.
+    await scan(page, '8800000000203');
+    await expect(page.getByTestId('cart-line')).toHaveCount(3);
+    await expect(search).toHaveValue('');
+  });
+
+  test('the active line edits price inline; More options holds the discount', async ({
     page,
   }) => {
     await openSell(page, [
@@ -389,29 +498,12 @@ test.describe('Sell (T-016)', () => {
       .getByTestId('cart-line')
       .filter({ hasText: 'Galaxy A15' });
     await expect(line.getByLabel('Unit price')).toBeVisible();
-    await expect(line.getByLabel('Discount', { exact: true })).toBeVisible();
-    if (!isPhone(page)) {
-      const price = await line
-        .getByLabel('Unit price')
-        .locator('..')
-        .boundingBox();
-      const discount = await line
-        .getByLabel('Discount', { exact: true })
-        .locator('..')
-        .boundingBox();
-      expect(
-        Math.abs((price?.y ?? 0) - (discount?.y ?? 0)),
-      ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs((price?.width ?? 0) - (discount?.width ?? 0)),
-      ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs((price?.height ?? 0) - (discount?.height ?? 0)),
-      ).toBeLessThanOrEqual(1);
-    }
+    await expect(line.getByLabel('Discount', { exact: true })).toHaveCount(0);
     await line.getByLabel('Unit price').fill('43000');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 43,000');
+    await line.getByRole('button', { name: 'More options' }).click();
+    await expect(line.getByLabel('Discount', { exact: true })).toBeVisible();
     await line.getByLabel('Discount', { exact: true }).fill('500');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 42,500');
     await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 500');

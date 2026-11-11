@@ -53,6 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const selling = isSellingRoute(pathname);
   const toast = useToast();
   const { updateReady, applyUpdate } = useUpdateReady();
   usePrintService();
@@ -67,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     [],
   );
   // Mask until the stored preference is known, so a reload can never flash a real amount.
-  const privacyActive = (privacyEnabled ?? true) && !isSellingRoute(pathname);
+  const privacyActive = (privacyEnabled ?? true) && !selling;
   const togglePrivacy = () => {
     void togglePrivacyMode(getDb())
       .then((next) => {
@@ -218,35 +219,37 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t('shell.skip_content')}
       </a>
-      <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
-        <span
-          className="min-w-0 flex-1 truncate font-semibold lg:hidden"
-          data-testid="screen-title-bar"
-        >
-          {screenTitle ?? shopName ?? t('common.app_name')}
-        </span>
-        <Breadcrumbs current={screenTitle} />
-        <div className="flex shrink-0 items-center gap-1 lg:gap-2">
-          <GlobalSearch />
-          {updateReady ? (
-            <button
-              type="button"
-              className={buttonPrimary}
-              disabled={updating}
-              aria-busy={updating}
-              onClick={startUpdate}
-            >
-              {updating ? t('shell.updating') : t('shell.update_ready')}
-            </button>
-          ) : null}
-          <PrivacyToggle
-            enabled={privacyEnabled ?? false}
-            onToggle={togglePrivacy}
-          />
-          <SyncBadge />
-          <StaffMenu shopName={shopName} />
-        </div>
-      </header>
+      {selling ? null : (
+        <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
+          <span
+            className="min-w-0 flex-1 truncate font-semibold lg:hidden"
+            data-testid="screen-title-bar"
+          >
+            {screenTitle ?? shopName ?? t('common.app_name')}
+          </span>
+          <Breadcrumbs current={screenTitle} />
+          <div className="flex shrink-0 items-center gap-1 lg:gap-2">
+            <GlobalSearch />
+            {updateReady ? (
+              <button
+                type="button"
+                className={buttonPrimary}
+                disabled={updating}
+                aria-busy={updating}
+                onClick={startUpdate}
+              >
+                {updating ? t('shell.updating') : t('shell.update_ready')}
+              </button>
+            ) : null}
+            <PrivacyToggle
+              enabled={privacyEnabled ?? false}
+              onToggle={togglePrivacy}
+            />
+            <SyncBadge />
+            <StaffMenu shopName={shopName} />
+          </div>
+        </header>
+      )}
       <nav
         aria-label={t('nav.rail')}
         className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
@@ -352,7 +355,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
       <main
         id="main-content"
-        className="pt-topbar pb-tabbar lg:ps-rail lg:pb-0"
+        className={`${selling ? 'pt-0' : 'pt-topbar'} pb-tabbar lg:ps-rail lg:pb-0`}
       >
         <PrivacyProvider active={privacyActive}>
           <Banners />

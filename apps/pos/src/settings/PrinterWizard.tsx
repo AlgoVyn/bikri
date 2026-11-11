@@ -31,6 +31,10 @@ const BAUDS = [9600, 19200, 38400, 115200] as const;
 const choice = (on: boolean) =>
   `flex min-h-14 flex-1 flex-col items-start justify-center rounded-card border-2 p-3 text-start ${on ? 'border-primary bg-primary-subtle' : 'border-border bg-surface'}`;
 
+/** Compact radio choice for options nested under a paper width. */
+const charsChoice = (on: boolean) =>
+  `flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-control border px-3 text-small ${on ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`;
+
 function YesNo({
   label,
   value,
@@ -99,20 +103,25 @@ export function PrinterWizard({
     typeof navigator === 'undefined' ||
     !/Mobi|Android/iu.test(navigator.userAgent);
   const [step, setStep] = useState<Step>('paper');
-  const [draft, setDraft] = useState<PrinterKv>(() => ({
-    auto_print: true,
-    copies: 1,
-    print_logo: true,
-    qr: false,
-    drawer: true,
-    drawer_pin: 2,
-    cut: 'partial',
-    ...current,
-    paper_mm: current?.paper_mm ?? 80,
-    transport:
-      current?.transport ??
-      (deps.usb ? 'usb' : deps.serial ? 'serial' : 'system'),
-  }));
+  const [draft, setDraft] = useState<PrinterKv>(() => {
+    const paperMm = current?.paper_mm ?? 80;
+    return {
+      auto_print: true,
+      copies: 1,
+      print_logo: true,
+      qr: false,
+      drawer: true,
+      drawer_pin: 2,
+      cut: 'partial',
+      ...current,
+      paper_mm: paperMm,
+      chars_per_line: current?.chars_per_line ?? (paperMm === 58 ? 32 : 48),
+      dots: current?.dots ?? (paperMm === 58 ? 384 : 576),
+      transport:
+        current?.transport ??
+        (deps.usb ? 'usb' : deps.serial ? 'serial' : 'system'),
+    };
+  });
   const [error, setError] = useState<PrintErrorCode | null>(null);
   const [busy, setBusy] = useState(false);
   const [tested, setTested] = useState(false);
@@ -370,41 +379,53 @@ export function PrinterWizard({
       </h2>
 
       {step === 'paper' ? (
-        <fieldset className="flex flex-col gap-2 sm:flex-row">
+        <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 font-medium">{t('printer.paper')}</legend>
-          {([80, 58] as const).map((mm) => (
-            <label key={mm} className={choice(draft.paper_mm === mm)}>
-              <span className="flex items-center gap-2 font-medium">
-                <input
-                  type="radio"
-                  name="paper"
-                  checked={draft.paper_mm === mm}
-                  onChange={() => paper(mm)}
-                />
-                {t(mm === 80 ? 'printer.paper_80' : 'printer.paper_58')}
-              </span>
-              <span className="text-small text-text-muted">
-                {t('printer.paper_hint', { chars: mm === 80 ? 48 : 32 })}
-              </span>
-            </label>
-          ))}
-          {draft.paper_mm === 80 && draft.chars_per_line !== 42 ? (
-            <button
-              type="button"
-              className={`${buttonQuiet} self-center`}
-              onClick={() => paper(80, true)}
-            >
-              {t('printer.use_42')}
-            </button>
-          ) : null}
-          {draft.paper_mm === 80 && draft.chars_per_line !== 48 ? (
-            <button
-              type="button"
-              className={`${buttonQuiet} self-center`}
-              onClick={() => paper(80)}
-            >
-              {t('printer.use_48')}
-            </button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {([80, 58] as const).map((mm) => (
+              <label key={mm} className={choice(draft.paper_mm === mm)}>
+                <span className="flex items-center gap-2 font-medium">
+                  <input
+                    type="radio"
+                    name="paper"
+                    checked={draft.paper_mm === mm}
+                    onChange={() => paper(mm)}
+                  />
+                  {t(mm === 80 ? 'printer.paper_80' : 'printer.paper_58')}
+                </span>
+                <span className="text-small text-text-muted">
+                  {t('printer.paper_hint', {
+                    chars: mm === 58 ? 32 : draft.chars_per_line,
+                  })}
+                </span>
+              </label>
+            ))}
+          </div>
+          {draft.paper_mm === 80 ? (
+            <fieldset className="rounded-card border border-border bg-surface-2/40 p-3">
+              <legend className="px-1 text-small font-medium">
+                {t('printer.chars_per_line')}
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {([48, 42] as const).map((chars) => (
+                  <label
+                    key={chars}
+                    className={charsChoice(draft.chars_per_line === chars)}
+                  >
+                    <input
+                      type="radio"
+                      name="chars_per_line"
+                      checked={draft.chars_per_line === chars}
+                      onChange={() => paper(80, chars === 42)}
+                    />
+                    {t(chars === 48 ? 'printer.chars_48' : 'printer.chars_42')}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-small text-text-muted">
+                {t('printer.chars_hint')}
+              </p>
+            </fieldset>
           ) : null}
         </fieldset>
       ) : null}

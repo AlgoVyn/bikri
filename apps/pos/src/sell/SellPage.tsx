@@ -139,25 +139,46 @@ export function SellPage() {
   }, [searching, results.length]);
 
   const mutate = (fn: (c: Cart) => Cart) =>
-    mutateCart(active, fn).catch((err: unknown) => {
-      if (err instanceof CartFullError)
+    mutateCart(active, fn).catch((err: unknown): Cart | undefined => {
+      if (err instanceof CartFullError) {
         toast.push(t('sell.cart_full'), 'error');
-      else throw err;
+        return undefined;
+      }
+      throw err;
     });
 
-  const focusSearch = () => searchRef.current?.focus();
+  /**
+   * Focus the scan box and select its text: a preserved search stays visible, while a
+   * scanner's first character replaces it instead of appending to the query.
+   */
+  const focusSearch = () => {
+    const input = searchRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+  };
 
   const add = (product: MasterRow, qty?: number) => {
     const qtyMilli = qty ?? nextQty ?? 1000;
     setNextQty(null);
     beep();
-    void mutate((c) => addProduct(c, product, qtyMilli, money.cost_method));
+    void mutate((c) =>
+      addProduct(c, product, qtyMilli, money.cost_method),
+    ).then((next) => {
+      // The line just added or merged (new lines go first); show its editor so the
+      // cashier can adjust qty/price straight away, while the other lines stay compact.
+      const line = next?.lines.find((l) => l.product_id === product.id);
+      if (line) {
+        setSelected(line.key);
+        setExpanded(line.key);
+      }
+    });
     focusSearch();
   };
 
   const addRow = (row: SellRow) => {
+    // Keep the query: a cashier adds several matching products without retyping.
     add(row.product);
-    setQuery('');
   };
 
   const unknownBarcode = (code: string) => {
@@ -214,7 +235,7 @@ export function SellPage() {
           ? list[highlight]
           : undefined;
     if (pick && !rapid) {
-      consumed(value);
+      // Keep a typed search so Enter can add another match; a scan still clears below.
       add(pick.product, qty);
       return;
     }
@@ -394,6 +415,13 @@ export function SellPage() {
     apply();
   };
 
+  const removeLineByKey = (key: string) => {
+    void mutate((c) => removeLine(c, key)).then(() => {
+      setSelected((current) => (current === key ? null : current));
+      setExpanded((current) => (current === key ? null : current));
+    });
+  };
+
   const clearCart = () => {
     void mutate((c) => emptyCart(c.id as CartId));
     setSelected(null);
@@ -443,6 +471,8 @@ export function SellPage() {
     const current = (await getDb().carts.get(active)) ?? cart;
     await holdCart(getDb(), current, { label, staffId: staff?.id ?? '' });
     toast.push(t('sell.held_done', { label }));
+    setSelected(null);
+    setExpanded(null);
     focusSearch();
   };
 
@@ -452,6 +482,8 @@ export function SellPage() {
       await cartsSettled();
       await resumeHeld(getDb(), held.id, target);
       setActive(target);
+      setSelected(null);
+      setExpanded(null);
       setDialog(null);
     } catch (err) {
       if (err instanceof CartNotEmptyError)
@@ -569,7 +601,10 @@ export function SellPage() {
         cart.lines.length - 1,
         Math.max(0, idx + (e.key === 'ArrowDown' ? 1 : -1)),
       );
-      setSelected(cart.lines[next]?.key ?? null);
+      const key = cart.lines[next]?.key ?? null;
+      setSelected(key);
+      // Keep one active line: the editor follows the ↑/↓ selection.
+      setExpanded(key);
     },
     { enabled: ready && cart.lines.length > 0 },
   );
@@ -591,8 +626,7 @@ export function SellPage() {
   useHotkey(
     (e) => e.key === 'Delete',
     () => {
-      if (selectedLine) void mutate((c) => removeLine(c, selectedLine.key));
-      setSelected(null);
+      if (selectedLine) removeLineByKey(selectedLine.key);
     },
     { enabled: ready && selectedLine !== undefined },
   );
@@ -608,7 +642,7 @@ export function SellPage() {
 
   return (
     <div
-      className={`fixed inset-x-0 top-topbar bottom-tabbar flex lg:start-rail lg:bottom-0 ${sheet ? 'z-40' : ''}`}
+      className={`fixed inset-x-0 top-0 bottom-tabbar flex lg:start-rail lg:bottom-0 ${sheet ? 'z-40' : ''}`}
     >
       <section
         aria-label={t('sell.find_products')}
@@ -698,7 +732,7 @@ export function SellPage() {
                 <ProductsIcon />
               </span>
               <p className="text-title">{t('sell.no_products')}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {can('catalog.edit') ? (
                   <button
                     type="button"
@@ -715,6 +749,15 @@ export function SellPage() {
                 >
                   {t('sell.quick_sale')}
                 </button>
+                {import.meta.env.DEV ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    onClick={() => void navigate({ to: '/dev/demo' })}
+                  >
+                    {t('dev.seed')}
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : searching && results.length === 0 ? (
@@ -741,18 +784,6 @@ export function SellPage() {
             />
           )}
         </div>
-        <div className="flex gap-2 max-lg:hidden">
-          <button
-            type="button"
-            className={buttonQuiet}
-            onClick={() => {
-              setQuickName('');
-              setDialog('quick');
-            }}
-          >
-            {t('sell.quick_sale')}
-          </button>
-        </div>
         {cart.lines.length > 0 ? (
           <button
             type="button"
@@ -772,7 +803,7 @@ export function SellPage() {
       </section>
       <aside
         aria-label={t('sell.cart')}
-        className={`flex-col border-border bg-surface p-3 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
+        className={`flex-col border-border bg-surface p-2 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
       >
         {sheet ? (
           <button
@@ -828,7 +859,7 @@ export function SellPage() {
             onChangeLine={(key, patch) =>
               void mutate((c) => updateLine(c, key, patch))
             }
-            onRemoveLine={(key) => void mutate((c) => removeLine(c, key))}
+            onRemoveLine={removeLineByKey}
             onPriceChange={onPriceChange}
             showCost={money.show_cost_on_till && can('cost.view')}
             onCustomer={() => setDialog('customer')}
@@ -851,7 +882,13 @@ export function SellPage() {
         onOpenChange={(o) => setDialog(o ? 'quick' : null)}
         initialName={quickName}
         onAdd={(input) => {
-          void mutate((c) => addQuickSale(c, input));
+          void mutate((c) => addQuickSale(c, input)).then((next) => {
+            const line = next?.lines[0];
+            if (line) {
+              setSelected(line.key);
+              setExpanded(line.key);
+            }
+          });
           setQuery('');
           setTimeout(focusSearch, 0);
         }}

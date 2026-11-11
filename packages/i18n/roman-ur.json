@@ -96,6 +96,10 @@
     "zero_uncounted": "Na gine hue ko 0 karein",
     "save_failed": "Ginti save nahin ho saki. Ek waqt mein kam products try karein."
   },
+  "dev": {
+    "seed": "Demo data load karein",
+    "seeding": "Demo data load ho raha hai…"
+  },
   "done": {
     "download_pdf": "PDF download karein",
     "image_saved": "Raseed ki tasveer save ho gayi. WhatsApp mein laga dein.",
@@ -572,6 +576,10 @@
     "none": "Is device par koi printer set nahin.",
     "open_drawer": "Daraz kholein",
     "options": "Ikhtiyarat",
+    "chars_42": "42 huroof (wide)",
+    "chars_48": "48 huroof (standard)",
+    "chars_hint": "Zyada tar 80 mm printers mein 48 huroof aate hain. Agar test print ki line kat rahi ho to 42 chunein.",
+    "chars_per_line": "Har line mein huroof",
     "paper": "Kaghaz ki chaurai",
     "paper_58": "58 mm",
     "paper_80": "80 mm (tajweez karda)",
@@ -626,8 +634,7 @@
     "agent_download_all": "Tamam downloads",
     "agent_download_sha": "SHA-256 checksums",
     "agent_download_hint": "Unsigned builds: SHA-256 check karein; Windows SmartScreen dikha sakta hai.",
-    "agent_checking": "Print service dhoondi ja rahi hai…",
-    "use_48": "48 huroof istemal karein"
+    "agent_checking": "Print service dhoondhi ja rahi hai…"
   },
   "privacy": {
     "title": "Raqam chhupayein",
@@ -777,6 +784,7 @@
     "line_discount": "Discount (Rs)",
     "line_discount_pct": "Discount (%)",
     "line_note": "Note (serial no / IMEI)",
+    "more_options": "Mazeed options",
     "new_customer": "+ Naya gahak",
     "no_branch": "Maalik se kahein ke is device ko branch dein",
     "no_free_cart": "Sab cart istemal mein hain. Pehle aik mukammal karein ya rokein.",
@@ -1170,6 +1178,9 @@
     "locked_for": "{{time}} ke liye lock",
     "clear": "Saaf karein",
     "backspace": "Aakhri hindsa mitayein",
+    "keypad": "Keypad",
+    "keypad_computer": "Computer keypad (7 8 9 on top)",
+    "keypad_phone": "Phone keypad (1 2 3 on top)",
     "forgot": "PIN bhool gaye?",
     "forgot_staff": "Maalik se kahein ke Settings → Cashiers mein isay dobara set kare.",
     "forgot_owner": "Aap ki dukaan ka koi aur maalik Settings → Cashiers mein isay dobara set kar sakta hai. Agar aap akele maalik hain to Algovyn se raabta karein, woh tasdeeq ke baad isay set karega.",
