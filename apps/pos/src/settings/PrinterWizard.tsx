@@ -124,6 +124,7 @@ export function PrinterWizard({
   const [agentCode, setAgentCode] = useState('');
   const [agentError, setAgentError] = useState<string | null>(null);
   const [agentBusy, setAgentBusy] = useState(false);
+  const [agentChecking, setAgentChecking] = useState(true);
   const patch = (p: Partial<PrinterKv>) => setDraft((d) => ({ ...d, ...p }));
   const patchAgent = (p: Partial<NonNullable<PrinterKv['agent']>>) =>
     setDraft((d) =>
@@ -135,15 +136,20 @@ export function PrinterWizard({
     let cancelled = false;
     void (async () => {
       const url = current?.agent?.url ?? AGENT_URL;
+      setAgentChecking(true);
       let health: AgentHealth;
       try {
         health = await agent.health(url);
       } catch {
-        if (!cancelled) setAgentHealth(null);
+        if (!cancelled) {
+          setAgentHealth(null);
+          setAgentChecking(false);
+        }
         return;
       }
       if (cancelled) return;
       setAgentHealth(health);
+      setAgentChecking(false);
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
       if (health.paired && current?.agent?.token) {
@@ -162,11 +168,13 @@ export function PrinterWizard({
 
   const checkAgent = async () => {
     setAgentBusy(true);
+    setAgentChecking(true);
     setAgentError(null);
     try {
       const url = draft.agent?.url ?? AGENT_URL;
       const health = await agent.health(url);
       setAgentHealth(health);
+      setAgentChecking(false);
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
       if (health.paired) {
@@ -183,6 +191,7 @@ export function PrinterWizard({
       }
     } catch {
       setAgentHealth(null);
+      setAgentChecking(false);
       setAgentError('agent_unreachable');
     } finally {
       setAgentBusy(false);
@@ -397,7 +406,7 @@ export function PrinterWizard({
             <legend className="mb-2 font-medium">
               {t('printer.connection')}
             </legend>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(['agent', 'usb', 'serial', 'system'] as const)
                 .filter((tr) => tr !== 'agent' || desktop)
                 .map((tr) => {
@@ -410,7 +419,11 @@ export function PrinterWizard({
                     <label
                       key={tr}
                       className={`${choice(draft.transport === tr)} ${
-                        tr === 'agent' ? 'sm:col-span-3' : ''
+                        tr === 'agent'
+                          ? 'sm:col-span-2 lg:col-span-3'
+                          : tr === 'system'
+                            ? 'sm:col-span-2 lg:col-span-1'
+                            : ''
                       } ${supported ? '' : 'opacity-60'}`}
                     >
                       <span className="flex items-center gap-2 font-medium">
@@ -503,7 +516,11 @@ export function PrinterWizard({
           ) : null}
           {draft.transport === 'agent' ? (
             <div className="flex flex-col gap-3 rounded-card border border-border bg-surface-2 p-3">
-              {agentHealth === null ? (
+              {agentChecking ? (
+                <p className="text-small text-text-muted">
+                  {t('printer.agent_checking')}
+                </p>
+              ) : agentHealth === null ? (
                 <>
                   <p className="text-small">{t('printer.agent_not_found')}</p>
                   <p className="text-small font-medium">
@@ -683,19 +700,6 @@ export function PrinterWizard({
                       onClick={() => void checkAgent()}
                     >
                       {t('printer.agent_recheck')}
-                    </button>
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      onClick={() =>
-                        window.open(
-                          draft.agent?.url ?? AGENT_URL,
-                          '_blank',
-                          'noopener',
-                        )
-                      }
-                    >
-                      {t('printer.agent_open')}
                     </button>
                     <button
                       type="button"

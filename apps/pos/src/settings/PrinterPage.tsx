@@ -194,20 +194,6 @@ export function PrinterPage() {
             {agentHealth
               ? ` · ${t('printer.agent_version', { version: agentHealth.version })}`
               : ''}
-            {' · '}
-            <button
-              type="button"
-              className="underline"
-              onClick={() =>
-                window.open(
-                  printer.agent?.url ?? AGENT_URL,
-                  '_blank',
-                  'noopener',
-                )
-              }
-            >
-              {t('printer.agent_open')}
-            </button>
           </p>
         ) : null}
         <p className="text-small text-text-muted">{t('printer.never_loses')}</p>

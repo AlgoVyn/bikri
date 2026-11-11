@@ -360,7 +360,7 @@ type PrinterKv = {
 
 - New connection option **"Print service (recommended)"** in `PrinterWizard`, visible on Windows/Linux/macOS.
 - Flow: detect `/health` → install link if missing → pair (code from agent UI) → choose printer from `/printers` → choose raw/driver → test print → save.
-- Settings → Printer shows agent status, version, selected queue, last job status, "Open agent" (fallback page) and "Copy diagnostics".
+- Settings → Printer shows agent status, version, selected queue and last job status; the separate agent page is only a fallback for recovery.
 - Fallback message and a one-click "Switch to system printing" if the agent is unavailable.
 - i18n keys in `en.json`, `ur.json`, `roman-ur.json`; unit tests with a fake agent; Playwright test against a mock agent; docs 06/17 updated.
 

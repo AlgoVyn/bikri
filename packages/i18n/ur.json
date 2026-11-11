@@ -625,7 +625,8 @@
     "agent_download_macosArm": "میک او ایس (ایپل سلکان)",
     "agent_download_all": "تمام ڈاؤن لوڈز",
     "agent_download_sha": "SHA-256 چیک سمز",
-    "agent_download_hint": "غیر دستخط شدہ بلڈز: SHA-256 چیک کریں؛ ونڈوز SmartScreen دکھا سکتا ہے۔"
+    "agent_download_hint": "غیر دستخط شدہ بلڈز: SHA-256 چیک کریں؛ ونڈوز SmartScreen دکھا سکتا ہے۔",
+    "agent_checking": "پرنٹ سروس تلاش کی جا رہی ہے…"
   },
   "privacy": {
     "title": "رقم چھپائیں",
