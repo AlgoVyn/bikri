@@ -88,7 +88,7 @@ test.describe('shell and languages (T-006, T-007)', () => {
     await expect(page).toHaveURL(/\/bikri\/products$/);
   });
 
-  test('the top-bar search keeps its Home size on every screen', async ({
+  test('the top-bar search keeps its Home size on back-office screens', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop top bar');
@@ -98,8 +98,13 @@ test.describe('shell and languages (T-006, T-007)', () => {
     const homeWidth = (await search.boundingBox())?.width;
     expect(homeWidth).toBeGreaterThan(0);
 
+    // Sell is the exception: it hides the top bar and uses its own scan box.
+    await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+    await expect(page).toHaveURL(/\/bikri\/sell$/);
+    await expect(page.locator('#global-search')).toHaveCount(0);
+    await expect(page.locator('#sell-search')).toBeVisible();
+
     for (const path of [
-      '/sell',
       '/products',
       '/sales',
       '/udhaar',

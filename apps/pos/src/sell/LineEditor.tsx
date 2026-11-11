@@ -74,8 +74,7 @@ export function LineEditor({
         type="button"
         aria-expanded={moreOpen}
         aria-controls={moreId}
-        // The visual row stays compact; the pseudo-element keeps a ~44 px hit area.
-        className="relative min-h-6 self-start text-small text-primary underline underline-offset-2 after:absolute after:-inset-2.5 after:content-['']"
+        className="inline-flex min-h-11 items-center self-start text-small text-primary underline underline-offset-2"
         onClick={() => setMoreOpen((open) => !open)}
       >
         {t('sell.more_options')}

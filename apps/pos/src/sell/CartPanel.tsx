@@ -215,7 +215,7 @@ export function CartPanel(p: CartPanelProps) {
             {totals.bill_discount > 0 ? (
               <button
                 type="button"
-                className="text-primary underline"
+                className="inline-flex min-h-11 items-center text-primary underline"
                 onClick={p.onBillDiscount}
               >
                 {t('sell.discount')}
@@ -223,7 +223,7 @@ export function CartPanel(p: CartPanelProps) {
             ) : (
               <button
                 type="button"
-                className="relative text-primary underline underline-offset-2 after:absolute after:-inset-2.5 after:content-[''] disabled:pointer-events-none disabled:text-text-muted disabled:no-underline"
+                className="inline-flex min-h-11 items-center text-primary underline underline-offset-2 disabled:pointer-events-none disabled:text-text-muted disabled:no-underline"
                 disabled={cart.lines.length === 0}
                 onClick={p.onBillDiscount}
               >

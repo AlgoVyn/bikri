@@ -355,7 +355,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
       <main
         id="main-content"
-        className={`${selling ? 'pt-0' : 'pt-topbar'} pb-tabbar lg:ps-rail lg:pb-0`}
+        className={`${selling ? 'h-dvh pt-0' : 'pt-topbar'} pb-tabbar lg:ps-rail lg:pb-0`}
       >
         <PrivacyProvider active={privacyActive}>
           <Banners />
