@@ -618,7 +618,7 @@
     "cancelled": "Print cancelled.",
     "cancel_waiting": "Cancel waiting ({{count}})",
     "cancelled_many": "{{count}} waiting prints cancelled.",
-    "agent_download_windows": "Windows 10/11 (x64)",
+    "agent_download_windows": "Windows 10/11 (installer)",
     "agent_download_linux": "Linux (x64)",
     "agent_download_linuxArm": "Linux (ARM64)",
     "agent_download_macos": "macOS (Intel)",

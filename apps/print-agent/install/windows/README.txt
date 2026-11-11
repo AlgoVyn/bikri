@@ -1,21 +1,32 @@
-# Bikri Print Agent — Windows installer (per-user)
+# Bikri Print Agent — Windows
 
-This is a portable installer. It copies the agent to
-`%LOCALAPPDATA%\Bikri\PrintAgent`, adds a Start Menu shortcut, starts it at
-sign-in (HKCU Run) and launches it now.
+## Installer
+
+Run `bikri-print-agent-setup.exe` as your normal Windows user (no administrator
+required). It installs under `%LOCALAPPDATA%\Bikri\PrintAgent`, creates Start
+Menu shortcuts (including the log folder), starts the agent and adds the
+sign-in autostart entry. Use **Apps & features** to uninstall it.
+
+## Portable ZIP
+
+If you downloaded the portable ZIP instead, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-Then open <http://127.0.0.1:17890/> to see the pairing code and printers.
+Remove it with `uninstall.ps1`.
+
+## Logs
+
+```text
+%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log
+%LOCALAPPDATA%\Bikri\PrintAgent\logs\crash.log
+```
+
+`agent.log` is JSON, rotated at 5 MB with one previous file. `crash.log`
+contains fatal Go panics. The agent page also shows the exact log path.
 
 The build is **not Authenticode-signed** yet. Windows SmartScreen may warn the
-first time you run the executable. Verify the download against `SHA256SUMS` and
-only run builds downloaded from the official Algovyn/Bikri release page.
-
-To remove it:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
-```
+first time. Verify the download against `SHA256SUMS` and only use builds from
+the official Algovyn/Bikri release page.

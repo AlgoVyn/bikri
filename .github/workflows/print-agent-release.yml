@@ -11,7 +11,47 @@ on:
 permissions:
   contents: write
 jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/print-agent
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: apps/print-agent/go.mod
+      - name: Test
+        run: go test ./...
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^print-agent-v', ''
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags "-s -w -X main.version=$version -H=windowsgui" -o dist/bikri-print-agent.exe ./cmd/bikri-print-agent
+      - name: Build Inno Setup installer
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^print-agent-v', ''
+          $iscc = @(
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc "/DMyAppVersion=$version" "install\windows\bikri-print-agent.iss"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-installer
+          path: apps/print-agent/dist/bikri-print-agent-setup.exe
+          if-no-files-found: error
+
   release:
+    needs: windows-installer
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -29,12 +69,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           VERSION="${VERSION#print-agent-v}" ./scripts/build.sh
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-installer
+          path: apps/print-agent/dist
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
           gh release create "${GITHUB_REF_NAME}" \
+            apps/print-agent/dist/bikri-print-agent-setup.exe \
             apps/print-agent/dist/bikri-print-agent-windows-amd64.zip \
             apps/print-agent/dist/bikri-print-agent-linux-amd64.tar.gz \
             apps/print-agent/dist/bikri-print-agent-linux-arm64.tar.gz \

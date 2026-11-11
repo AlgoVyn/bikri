@@ -3,4 +3,4 @@
 package backend
 
 // New returns the Windows spooler backend.
-func New() (Backend, error) { return &windowsBackend{}, nil }
+func New() (Backend, error) { return &windowsBackend{rawUnsupported: map[string]bool{}}, nil }

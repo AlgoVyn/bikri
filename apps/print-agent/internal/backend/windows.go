@@ -5,14 +5,18 @@ package backend
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
+	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -40,17 +44,15 @@ var (
 	winspool = syscall.NewLazyDLL("winspool.drv")
 	gdi32    = syscall.NewLazyDLL("gdi32.dll")
 
-	procOpenPrinterW       = winspool.NewProc("OpenPrinterW")
-	procClosePrinter       = winspool.NewProc("ClosePrinter")
-	procStartDocPrinterW   = winspool.NewProc("StartDocPrinterW")
-	procStartPagePrinter   = winspool.NewProc("StartPagePrinter")
-	procWritePrinter       = winspool.NewProc("WritePrinter")
-	procEndPagePrinter     = winspool.NewProc("EndPagePrinter")
-	procEndDocPrinter      = winspool.NewProc("EndDocPrinter")
-	procEnumPrintersW      = winspool.NewProc("EnumPrintersW")
-	procGetDefaultPrinterW = winspool.NewProc("GetDefaultPrinterW")
-	procGetJobW            = winspool.NewProc("GetJobW")
-	procSetJobW            = winspool.NewProc("SetJobW")
+	procOpenPrinterW     = winspool.NewProc("OpenPrinterW")
+	procClosePrinter     = winspool.NewProc("ClosePrinter")
+	procStartDocPrinterW = winspool.NewProc("StartDocPrinterW")
+	procStartPagePrinter = winspool.NewProc("StartPagePrinter")
+	procWritePrinter     = winspool.NewProc("WritePrinter")
+	procEndPagePrinter   = winspool.NewProc("EndPagePrinter")
+	procEndDocPrinter    = winspool.NewProc("EndDocPrinter")
+	procGetJobW          = winspool.NewProc("GetJobW")
+	procSetJobW          = winspool.NewProc("SetJobW")
 
 	procCreateDCW     = gdi32.NewProc("CreateDCW")
 	procDeleteDC      = gdi32.NewProc("DeleteDC")
@@ -65,17 +67,16 @@ var (
 type windowsBackend struct {
 	mu             sync.Mutex
 	rawUnsupported map[string]bool
+
+	printersMu sync.Mutex
+	printers   []Printer
+	printersAt time.Time
 }
 
 type docInfo1 struct {
 	pDocName    *uint16
 	pOutputFile *uint16
 	pDatatype   *uint16
-}
-
-type printerInfo4 struct {
-	pPrinterName *uint16
-	pServerName  *uint16
 }
 
 type systemTime struct {
@@ -121,47 +122,76 @@ type bitmapInfoHeader struct {
 }
 
 func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
-	var needed, returned uint32
-	_, _, _ = procEnumPrintersW.Call(
-		printerEnumLocal|printerEnumConnections,
-		0,
-		4,
-		0,
-		0,
-		uintptr(unsafe.Pointer(&needed)),
-		uintptr(unsafe.Pointer(&returned)),
+	b.printersMu.Lock()
+	if b.printers != nil && time.Since(b.printersAt) < 10*time.Second {
+		list := append([]Printer(nil), b.printers...)
+		b.printersMu.Unlock()
+		return list, nil
+	}
+	b.printersMu.Unlock()
+
+	list, err := listWindowsPrinters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b.printersMu.Lock()
+	b.printers = append([]Printer(nil), list...)
+	b.printersAt = time.Now()
+	b.printersMu.Unlock()
+	return list, nil
+}
+
+// listWindowsPrinters asks the OS through CIM instead of parsing EnumPrinters
+// buffers with unsafe pointers. Printer enumeration must never be able to take
+// the agent down; a crashed health check on Windows is worse than a slow one.
+func listWindowsPrinters(ctx context.Context) ([]Printer, error) {
+	const script = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; ConvertTo-Json -Compress -InputObject @(Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default)`
+	cmd := exec.CommandContext(
+		ctx,
+		"powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-Command",
+		script,
 	)
-	if needed == 0 {
+	// The agent is a GUI-subsystem process; do not flash a console window for
+	// every printer-list refresh.
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
+	if err != nil {
+		detail := err.Error()
+		if exit, ok := err.(*exec.ExitError); ok && len(exit.Stderr) > 0 {
+			detail = strings.TrimSpace(string(exit.Stderr))
+		}
+		return nil, &Error{Code: "SPOOL_ERROR", Message: detail}
+	}
+	text := strings.TrimSpace(string(out))
+	text = strings.TrimPrefix(text, "\ufeff")
+	if text == "" || text == "null" {
 		return []Printer{}, nil
 	}
-	buf := make([]byte, needed)
-	r1, _, err := procEnumPrintersW.Call(
-		printerEnumLocal|printerEnumConnections,
-		0,
-		4,
-		uintptr(unsafe.Pointer(&buf[0])),
-		uintptr(needed),
-		uintptr(unsafe.Pointer(&needed)),
-		uintptr(unsafe.Pointer(&returned)),
-	)
-	if r1 == 0 {
-		return nil, &Error{Code: "SPOOL_ERROR", Message: lastError(err)}
+	var rows []struct {
+		Name    string `json:"Name"`
+		Default bool   `json:"Default"`
 	}
-	if returned == 0 {
-		return []Printer{}, nil
+	if err := json.Unmarshal([]byte(text), &rows); err != nil {
+		// ConvertTo-Json emits a single object if a future PowerShell version
+		// ignores the array wrapper.
+		var one struct {
+			Name    string `json:"Name"`
+			Default bool   `json:"Default"`
+		}
+		if json.Unmarshal([]byte(text), &one) != nil {
+			return nil, &Error{Code: "SPOOL_ERROR", Message: "could not read the printer list"}
+		}
+		rows = append(rows, one)
 	}
-	rows := unsafe.Slice((*printerInfo4)(unsafe.Pointer(&buf[0])), returned)
-	defaultName := defaultPrinter()
 	printers := make([]Printer, 0, len(rows))
 	for _, row := range rows {
-		name := utf16PtrString(row.pPrinterName)
-		if name == "" {
+		if strings.TrimSpace(row.Name) == "" {
 			continue
 		}
-		printers = append(printers, Printer{
-			Name:      name,
-			IsDefault: name == defaultName,
-		})
+		printers = append(printers, Printer{Name: row.Name, IsDefault: row.Default})
 	}
 	return printers, nil
 }
@@ -416,23 +446,6 @@ func openPrinter(name string) (syscall.Handle, error) {
 		return 0, &Error{Code: "UNKNOWN_PRINTER", Message: lastError(callErr)}
 	}
 	return handle, nil
-}
-
-func defaultPrinter() string {
-	var size uint32
-	_, _, _ = procGetDefaultPrinterW.Call(0, uintptr(unsafe.Pointer(&size)))
-	if size == 0 {
-		return ""
-	}
-	buf := make([]uint16, size)
-	r1, _, _ := procGetDefaultPrinterW.Call(
-		uintptr(unsafe.Pointer(&buf[0])),
-		uintptr(unsafe.Pointer(&size)),
-	)
-	if r1 == 0 {
-		return ""
-	}
-	return syscall.UTF16ToString(buf)
 }
 
 func utf16PtrString(p *uint16) string {

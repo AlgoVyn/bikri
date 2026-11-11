@@ -31,7 +31,7 @@ func testServer(t *testing.T) (*Server, *fakeBackend) {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auth := NewAuth(cfg)
-	return NewServer(cfg, path, auth, NewManager(fake), fake, log, "test"), fake
+	return NewServer(cfg, path, auth, NewManager(fake), fake, log, "test", "/tmp/agent.log"), fake
 }
 
 func TestHealthAndUI(t *testing.T) {

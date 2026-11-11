@@ -397,10 +397,10 @@ No changes to `apps/api`, D1, sync, auth or tenancy. The agent is per-till infra
 ## 12. Operations
 
 - **Config:** `%LOCALAPPDATA%\Bikri\PrintAgent\agent.json` (per-user Windows) or `%ProgramData%\Bikri\PrintAgent\agent.json` (service), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/BikriPrintAgent/config.json` (macOS). Token stored as a hash; file permissions restricted.
-- **Logs:** `%LOCALAPPDATA%\Bikri\PrintAgent\logs`, Linux `~/.local/state/bikri-print-agent/logs`; JSON lines, 10 MB rotation, 7-day retention; no receipt payloads.
+- **Logs:** Windows `%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log` (plus `crash.log` for fatal panics), Linux `~/.local/state/bikri-print-agent/logs/agent.log`, macOS `~/Library/Logs/BikriPrintAgent/agent.log`; JSON lines, 5 MB rotation with one previous file; no receipt payloads.
 - **Health:** `/health` and `/diagnostics` (token required). Bikri's "Copy printer info" combines agent version, platform, queues and last error.
 - **Update:** signed `latest.json` with version, SHA-256 and minimum protocol; v1 notifies and links to the installer; auto-update only after signature verification is implemented.
-- **Uninstall:** removes autostart, config and logs; leaves OS queues and drivers untouched.
+- **Uninstall:** removes the app, autostart, shortcuts, logs and the per-user config; leaves OS queues and drivers untouched.
 - **Support bundle:** metadata only; explicitly excludes receipt data, tokens and customer information.
 
 ## 13. Testing
@@ -524,7 +524,7 @@ GET /v1/health
 ```json
 {
   "app": "bikri-print-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "protocol": 1,
   "platform": "windows/amd64",
   "paired": true,

@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-version="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.1.0)}"
+version="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.1.1)}"
 mkdir -p dist
 rm -rf dist/windows-amd64 dist/linux-amd64 dist/linux-arm64 \
   dist/darwin-amd64 dist/darwin-arm64

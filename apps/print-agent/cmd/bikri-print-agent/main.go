@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -55,8 +56,13 @@ func main() {
 		cfg.Port = *portFlag
 	}
 
-	logger, closeLog := newLogger()
+	logPath := agent.DefaultLogPath()
+	logger, closeLog := newLogger(logPath)
 	defer closeLog()
+	if crash, err := os.OpenFile(agent.CrashLogPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600); err == nil {
+		_ = debug.SetCrashOutput(crash, debug.CrashOptions{})
+		_ = crash.Close()
+	}
 
 	printBackend, err := backend.New()
 	if err != nil {
@@ -65,7 +71,7 @@ func main() {
 	}
 	auth := agent.NewAuth(cfg)
 	jobs := agent.NewManager(printBackend)
-	server := agent.NewServer(cfg, configPath, auth, jobs, printBackend, logger, version)
+	server := agent.NewServer(cfg, configPath, auth, jobs, printBackend, logger, version, logPath)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
 	listener, err := net.Listen("tcp", addr)
@@ -83,7 +89,7 @@ func main() {
 	go func() {
 		done <- httpServer.Serve(listener)
 	}()
-	logger.Info("Bikri Print Agent started", "url", "http://"+addr, "config", configPath, "paired", cfg.Paired)
+	logger.Info("Bikri Print Agent started", "url", "http://"+addr, "config", configPath, "log", logPath, "paired", cfg.Paired)
 	if !cfg.Paired {
 		logger.Info("pairing required", "open", "http://"+addr)
 	}
@@ -103,17 +109,20 @@ func main() {
 	}
 }
 
-func newLogger() (*slog.Logger, func()) {
+func newLogger(logPath string) (*slog.Logger, func()) {
 	var writers []io.Writer
 	writers = append(writers, os.Stderr)
 	var file *os.File
-	if dir, err := os.UserConfigDir(); err == nil {
-		logDir := filepath.Join(dir, "bikri-print-agent")
-		if err := os.MkdirAll(logDir, 0o700); err == nil {
-			if f, err := os.OpenFile(filepath.Join(logDir, "agent.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
-				file = f
-				writers = append(writers, f)
-			}
+	logDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logDir, 0o700); err == nil {
+		// Keep one previous file; this is a diagnostic log, not an audit trail.
+		if info, err := os.Stat(logPath); err == nil && info.Size() > 5<<20 {
+			_ = os.Remove(logPath + ".1")
+			_ = os.Rename(logPath, logPath+".1")
+		}
+		if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			file = f
+			writers = append(writers, f)
 		}
 	}
 	handler := slog.NewJSONHandler(io.MultiWriter(writers...), &slog.HandlerOptions{Level: slog.LevelInfo})

@@ -618,7 +618,7 @@
     "cancelled": "پرنٹ منسوخ ہو گیا۔",
     "cancel_waiting": "انتظار والے منسوخ کریں ({{count}})",
     "cancelled_many": "{{count}} انتظار والے پرنٹ منسوخ ہو گئے۔",
-    "agent_download_windows": "ونڈوز 10/11 (x64)",
+    "agent_download_windows": "ونڈوز 10/11 (انسٹالر)",
     "agent_download_linux": "لینکس (x64)",
     "agent_download_linuxArm": "لینکس (ARM64)",
     "agent_download_macos": "میک او ایس (انٹیل)",

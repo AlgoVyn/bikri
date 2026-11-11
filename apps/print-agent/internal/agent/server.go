@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -30,11 +31,12 @@ type Server struct {
 	backend backend.Backend
 	log     *slog.Logger
 	version string
+	logPath string
 	started time.Time
 }
 
 // NewServer wires the agent dependencies.
-func NewServer(cfg *Config, cfgPath string, auth *Auth, jobs *Manager, b backend.Backend, log *slog.Logger, version string) *Server {
+func NewServer(cfg *Config, cfgPath string, auth *Auth, jobs *Manager, b backend.Backend, log *slog.Logger, version, logPath string) *Server {
 	return &Server{
 		cfg:     cfg,
 		cfgPath: cfgPath,
@@ -43,6 +45,7 @@ func NewServer(cfg *Config, cfgPath string, auth *Auth, jobs *Manager, b backend
 		backend: b,
 		log:     log,
 		version: version,
+		logPath: logPath,
 		started: time.Now(),
 	}
 }
@@ -65,6 +68,12 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) security(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if value := recover(); value != nil {
+				s.log.Error("panic", "value", value, "stack", string(debug.Stack()))
+				writeError(w, http.StatusInternalServerError, "INTERNAL", "the print service hit an internal error")
+			}
+		}()
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		if !validHost(r.Host) {
@@ -272,6 +281,7 @@ type diagnostics struct {
 	Platform  string            `json:"platform"`
 	AgentID   string            `json:"agentId"`
 	Paired    bool              `json:"paired"`
+	LogPath   string            `json:"logPath,omitempty"`
 	UptimeSec int64             `json:"uptimeSeconds"`
 	Printers  []backend.Printer `json:"printers"`
 	Jobs      []JobStatus       `json:"recentJobs"`
@@ -288,6 +298,7 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		Platform:  platformName(),
 		AgentID:   s.cfg.AgentID,
 		Paired:    s.cfg.Paired,
+		LogPath:   s.logPath,
 		UptimeSec: int64(time.Since(s.started).Seconds()),
 		Printers:  list,
 		Jobs:      s.jobs.Recent(20),
@@ -300,12 +311,13 @@ type uiData struct {
 	Version      string
 	Protocol     int
 	Platform     string
+	LogPath      string
 	Printers     []backend.Printer
 	PrinterError string
 }
 
 func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
 	list, err := s.backend.ListPrinters(ctx)
 	printerErr := ""
@@ -321,6 +333,7 @@ func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
 		Version:      s.version,
 		Protocol:     Protocol,
 		Platform:     platformName(),
+		LogPath:      s.logPath,
 		Printers:     list,
 		PrinterError: printerErr,
 	}

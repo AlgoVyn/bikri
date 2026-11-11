@@ -25,20 +25,19 @@ GOOS=linux   GOARCH=arm64 go build ./...
 
 ## Packages
 
-`scripts/build.sh` creates one archive per platform in `dist/`:
+`scripts/build.sh` creates the portable archives and `SHA256SUMS` in `dist/`.
+The release workflow also builds a proper per-user Windows installer
+(`bikri-print-agent-setup.exe`) with Inno Setup and publishes it alongside:
 
-- `bikri-print-agent-windows-amd64.zip` — `bikri-print-agent.exe`, `install.ps1`, `uninstall.ps1`;
+- `bikri-print-agent-setup.exe` — Windows installer, start-menu and log shortcuts, uninstaller;
+- `bikri-print-agent-windows-amd64.zip` — portable Windows build (`install.ps1`/`uninstall.ps1`);
 - `bikri-print-agent-linux-{amd64,arm64}.tar.gz` — binary, `install.sh`, systemd user unit;
 - `bikri-print-agent-darwin-{amd64,arm64}.tar.gz` — binary, `install.sh`;
 - `SHA256SUMS`.
 
-The wizard links directly to the GitHub release assets; there is no separate download page. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, builds the archives and publishes the release.
+The wizard links directly to the GitHub release assets; there is no separate download page. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, which builds the Windows installer on `windows-latest`, builds the archives on Ubuntu and publishes the release.
 
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-```
+Windows: run `bikri-print-agent-setup.exe` (per-user, no admin). The portable ZIP is still available for advanced use.
 
 Linux/macOS:
 
@@ -47,8 +46,7 @@ tar -xzf bikri-print-agent-*.tar.gz
 ./install.sh
 ```
 
-The archives are unsigned until the Authenticode/notarization certificate is added; verify `SHA256SUMS` and expect a SmartScreen/Gatekeeper warning.
-The script writes binaries to `dist/` and a `SHA256SUMS` file. Windows builds hide the console window (`-H=windowsgui`); logs go to the config directory.
+The binaries are unsigned until the Authenticode/notarization certificate is added; verify `SHA256SUMS` and expect a SmartScreen/Gatekeeper warning. Windows builds hide the console window (`-H=windowsgui`); logs go to the log directory below.
 
 ## Run (development)
 
@@ -69,6 +67,12 @@ The config file lives in the OS user config directory:
 - Windows: `%AppData%\bikri-print-agent\config.json`
 - Linux: `~/.config/bikri-print-agent/config.json`
 - macOS: `~/Library/Application Support/bikri-print-agent/config.json`
+
+Logs (JSON, rotated at 5 MB, one previous file; `crash.log` holds fatal panics):
+
+- Windows: `%LocalAppData%\Bikri\PrintAgent\logs\agent.log`
+- Linux: `~/.local/state/bikri-print-agent/logs/agent.log`
+- macOS: `~/Library/Logs/BikriPrintAgent/agent.log`
 
 The pairing token is stored only as a SHA-256 hash. The agent does not persist receipt data; jobs are kept in memory for 24 hours for idempotency/status. If the Bikri-side token is lost, open the local page and use **Unpair this computer** to start a new pairing window.
 
@@ -136,7 +140,7 @@ The user must be allowed to print by CUPS policy; no udev rule or root is needed
 - Origin allowlist (`https://algovyn.com` plus local development), Host check for DNS rebinding, CORS/PNA preflight headers.
 - 6-digit pairing code with a 2-minute TTL and 5 attempts; 32-byte bearer token stored hashed.
 - 5 MiB body limit, job timeout, idempotency and in-memory retention.
-- No receipt contents in logs. Logs go to the config directory (`agent.log`), metadata only.
+- No receipt contents in logs. Logs go to the log directory (`agent.log`, plus `crash.log`), metadata only.
 
 ## Tests
 
