@@ -16,6 +16,7 @@ import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
+import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import {
@@ -29,10 +30,12 @@ import {
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
+import { printA4HtmlViaSystem } from '../print/systemPrint.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
+import { creditListHtml } from './creditListFile.ts';
 import {
   ageLabel,
   balanceLabel,
@@ -63,6 +66,7 @@ export function UdhaarList({
 }) {
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
+  const toast = useToast();
   const { can, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
   const canEditPromises = can('party.edit');
@@ -92,6 +96,7 @@ export function UdhaarList({
     const db = getDb();
     const tz = await shopTimeZone(db);
     const today = businessDate(Date.now(), tz);
+    const shop = await db.shop.get('shop');
     return {
       ...(await customerList(db, {
         query: deferredQuery,
@@ -101,8 +106,25 @@ export function UdhaarList({
         today,
       })),
       tz,
+      shopName: String(shop?.name ?? ''),
     };
   }, [deferredQuery, filter, sort, direction]);
+
+  const printList = async () => {
+    if (!data) return;
+    const result = await printA4HtmlViaSystem(
+      creditListHtml({
+        shopName: data.shopName,
+        rows: data.rows,
+        totalOwed: data.totalOwed,
+        owingCount: data.owingCount,
+        tz: data.tz,
+        lang: i18n.language,
+        t,
+      }),
+    );
+    if (!result.ok) toast.push(t('errors.generic'), 'error');
+  };
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
@@ -177,20 +199,30 @@ export function UdhaarList({
               {t('office.udhaar.chase_list')}
             </Link>
             {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText(
-                    'bikri-udhaar.csv',
-                    customersCsv(data.rows, data.tz),
-                  )
-                }
-              >
-                {t('office.udhaar.export_csv')}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  disabled={!data || data.rows.length === 0}
+                  onClick={() =>
+                    data &&
+                    downloadText(
+                      'bikri-udhaar.csv',
+                      customersCsv(data.rows, data.tz),
+                    )
+                  }
+                >
+                  {t('office.udhaar.export_csv')}
+                </button>
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  disabled={!data || data.rows.length === 0}
+                  onClick={() => void printList()}
+                >
+                  {t('office.udhaar.print')}
+                </button>
+              </>
             ) : null}
             {can('party.edit') &&
             !detailOpen &&

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatBusinessDate } from '../lib/date.ts';
 import { CalendarIcon } from './icons.tsx';
@@ -7,6 +7,7 @@ import { CalendarIcon } from './icons.tsx';
  * A labelled date control with the app's own chrome. The native date input stays underneath
  * (so the platform picker and keyboard input still work) but is transparent; the visible
  * value uses the shared business-date format instead of the browser's `dd/mm/yyyy`.
+ * Clicking anywhere in the field opens the picker, not only the native calendar indicator.
  */
 export function DateField({
   label,
@@ -29,7 +30,17 @@ export function DateField({
 }) {
   const { i18n } = useTranslation();
   const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const display = value ? formatBusinessDate(value, i18n.language) : '—';
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input || disabled || typeof input.showPicker !== 'function') return;
+    try {
+      input.showPicker();
+    } catch {
+      // Some browsers throw when the picker is already open; the field still works.
+    }
+  };
   return (
     <label
       htmlFor={id}
@@ -51,6 +62,7 @@ export function DateField({
         <CalendarIcon className="size-4 shrink-0 text-text-muted" />
         <input
           id={id}
+          ref={inputRef}
           type="date"
           aria-label={label}
           value={value}
@@ -58,6 +70,7 @@ export function DateField({
           max={max}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
+          onClick={openPicker}
           className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
         />
       </span>

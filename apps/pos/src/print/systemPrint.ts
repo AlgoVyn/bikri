@@ -11,10 +11,11 @@ export type SystemPrintResult =
 
 const LOAD_TIMEOUT_MS = 8000;
 
-export async function printHtmlViaSystem(
+async function printFrame(
   html: string,
-  widthMm: 58 | 80,
-  doc: Document = document,
+  pageWidthMm: 58 | 80 | 210,
+  doc: Document,
+  fixedPageCss?: string,
 ): Promise<SystemPrintResult> {
   const frame = doc.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -65,17 +66,50 @@ export async function printHtmlViaSystem(
     }
     // Noto Naskh Arabic UI / JetBrains Mono must be ready before the driver rasterises.
     await win.document.fonts?.ready;
-    // One page as long as the receipt (06 §5.3 / D-087).
+    // One page as long as the receipt (06 §5.3 / D-087), or a fixed A4 page.
     const style = win.document.createElement('style');
-    style.textContent = fitPageCss(
-      widthMm,
-      win.document.documentElement.scrollHeight,
-    );
+    style.textContent =
+      fixedPageCss ??
+      fitPageCss(
+        pageWidthMm as 58 | 80,
+        win.document.documentElement.scrollHeight,
+      );
     win.document.head.append(style);
     win.focus();
     win.print(); // blocks until the dialog closes in Chromium
     return { ok: true };
   } finally {
     frame.remove();
+  }
+}
+
+/** Prints a receipt on its 58/80 mm page through the OS print dialog. */
+export function printHtmlViaSystem(
+  html: string,
+  widthMm: 58 | 80,
+  doc: Document = document,
+): Promise<SystemPrintResult> {
+  return printFrame(html, widthMm, doc);
+}
+
+/** Prints a report on a standard A4 page through the OS print dialog. */
+export function printA4HtmlViaSystem(
+  html: string,
+  doc: Document = document,
+): Promise<SystemPrintResult> {
+  return printFrame(html, 210, doc, '@page { size: A4; margin: 8mm }');
+}
+
+/** Prints a rendered report image on a standard A4 page. */
+export async function printImageViaSystem(
+  image: Blob,
+  doc: Document = document,
+): Promise<SystemPrintResult> {
+  const url = URL.createObjectURL(image);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0}img{display:block;width:100%;height:auto}</style></head><body><img src="${url}" alt=""></body></html>`;
+  try {
+    return await printA4HtmlViaSystem(html, doc);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }

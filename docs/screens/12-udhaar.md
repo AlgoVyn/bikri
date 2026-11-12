@@ -17,7 +17,7 @@
 
 ## Customers list
 
-Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`, `Credit limit`, `Promise`) with a direction button, `+ New customer` (N), `Chase list`, `Export CSV`. Every table header also sorts: the first click uses the column's natural order (Balance highest, Oldest unpaid first, names A–Z, Credit limit highest, Promise earliest) and clicking it again reverses it; the arrow shows the direction.
+Header cards: **Total owed to you** Rs 1,24,500 (Σ positive balances), customers owing (count), received this month. Toolbar: search (name/phone), filter `All / Owes / Over limit / In credit / Promise due`, sort (`Balance`, `Oldest unpaid`, `Name`, `Last activity`, `Credit limit`, `Promise`) with a direction button, `+ New customer` (N), `Chase list`, `Export CSV`, `Print` (A4 customer-credit list). Every table header also sorts: the first click uses the column's natural order (Balance highest, Oldest unpaid first, names A–Z, Credit limit highest, Promise earliest) and clicking it again reverses it; the arrow shows the direction.
 
 Rows use one table header (`Customer`, `Balance`, `Oldest unpaid`, `Credit limit`, `Promise`) and compact cells: name and phone; the balance amount only (green `In credit` for a negative balance; a zero balance shows only grey `Settled`, never `Rs 0`; screen readers still hear "Owes you Rs …" for positive balances); oldest unpaid age (`Today`, `1 day`, `45 days`); credit-limit bar with percent and limit (or `No limit`); next promise date as a pill (amber when due). Below 640 px the row stacks into a compact card with the same information. Click → statement.
 
@@ -39,7 +39,7 @@ Changing the limit writes `audit_log credit_limit_change`. Delete: only when bal
 
 Header: name, phone (tap → `tel:`), balance (large), limit, oldest unpaid, promise. Buttons: `Receive money` (R), `Send reminder` (WhatsApp), `Share statement` (PDF / PNG + wa.me), `Add promise`, `Edit`, `Sell to {name}` (opens Sell with customer).
 
-Table (oldest → newest, with "Jump to latest"): date, description ("Bill INV-A-1042 (3 items)" link / "Payment received · Cash" / "Refund on INV-A-1042" / "Opening balance"), debit (gave), credit (got), **balance after each entry**. Date range filter, `Export CSV`, `Print` (80 mm or A4).
+Table (oldest → newest, with "Jump to latest"): date, description ("Bill INV-A-1042 (3 items)" link / "Payment received · Cash" / "Refund on INV-A-1042" / "Opening balance"), debit (gave), credit (got), **balance after each entry**. Date range filter (the selected date is shown only inside the field, with no separate hint line), `Export CSV`, `Print` (A4 statement).
 
 ### Reminder message (REQ-B04)
 

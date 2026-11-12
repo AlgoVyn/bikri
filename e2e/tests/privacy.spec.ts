@@ -27,8 +27,11 @@ test.describe('Privacy mode (screens/04)', () => {
     );
     await expect(page.getByTestId('today-sold')).toContainText('Rs ••••');
     await expect(page.getByTestId('today-sold')).not.toContainText('1,000');
-    await expect(page.getByTestId('today-udhaar')).toContainText(
-      'Given Rs ••••',
+    await expect(page.getByTestId('today-udhaar-given')).toContainText(
+      'Rs ••••',
+    );
+    await expect(page.getByTestId('today-udhaar-received')).toContainText(
+      'Rs ••••',
     );
     await expectNoSeriousAxe(page);
 

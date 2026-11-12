@@ -9,10 +9,12 @@ export function ExportMenu({
   onCsv,
   onPdf,
   onShare,
+  onPrint,
 }: {
   onCsv: () => void;
   onPdf: () => void;
   onShare: () => void;
+  onPrint?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -29,6 +31,11 @@ export function ExportMenu({
           <Dropdown.Item className={itemClass} onSelect={onCsv}>
             {t('ui.export_csv')}
           </Dropdown.Item>
+          {onPrint ? (
+            <Dropdown.Item className={itemClass} onSelect={onPrint}>
+              {t('ui.print')}
+            </Dropdown.Item>
+          ) : null}
           <Dropdown.Item className={itemClass} onSelect={onPdf}>
             {t('ui.export_pdf')}
           </Dropdown.Item>

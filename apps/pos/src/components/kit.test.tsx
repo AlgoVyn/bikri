@@ -4,6 +4,7 @@ import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initI18n } from '../i18n/i18n.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
+import { DateField } from './DateField.tsx';
 import { EmptyState } from './EmptyState.tsx';
 import { ExportMenu } from './ExportMenu.tsx';
 import { KeyBadge } from './KeyBadge.tsx';
@@ -170,6 +171,19 @@ describe('past date picker', () => {
       (screen.getByTestId('backdate-day-2026-10-28') as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+});
+
+describe('date field', () => {
+  it('opens the native picker from anywhere in the field', () => {
+    const showPicker = vi.fn();
+    Object.defineProperty(HTMLInputElement.prototype, 'showPicker', {
+      configurable: true,
+      value: showPicker,
+    });
+    render(<DateField label="Date" value="2026-11-13" onChange={() => {}} />);
+    fireEvent.click(screen.getByLabelText('Date'));
+    expect(showPicker).toHaveBeenCalledOnce();
   });
 });
 

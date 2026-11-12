@@ -29,11 +29,9 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByTestId('today-sold')).toContainText('2 bills');
     await expect(page.getByTestId('today-profit')).toContainText('400');
     await expect(page.getByTestId('today-cash')).toContainText('750');
-    await expect(page.getByTestId('today-udhaar')).toContainText(
-      'Given Rs 300',
-    );
-    await expect(page.getByTestId('today-udhaar')).toContainText(
-      'Received Rs 100',
+    await expect(page.getByTestId('today-udhaar-given')).toHaveText('Rs 300');
+    await expect(page.getByTestId('today-udhaar-received')).toHaveText(
+      'Rs 100',
     );
     const recent = page.getByRole('region', { name: 'Recent bills' });
     await expect(

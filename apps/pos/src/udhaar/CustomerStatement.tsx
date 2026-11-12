@@ -28,6 +28,7 @@ import {
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
+import { printImageViaSystem } from '../print/systemPrint.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -181,6 +182,10 @@ export function CustomerStatement({
       `statement-${name.replace(/\s+/gu, '-')}.pdf`,
     );
   };
+  const printStatement = async () => {
+    const result = await printImageViaSystem(await statementPng(meta));
+    if (!result.ok) toast.push(t('errors.generic'), 'error');
+  };
   const share = async () => {
     try {
       const png = await statementPng(meta);
@@ -277,6 +282,7 @@ export function CustomerStatement({
                     onCsv={exportCsv}
                     onPdf={() => void exportPdf()}
                     onShare={() => void share()}
+                    onPrint={() => void printStatement()}
                   />
                 ) : null}
               </>
@@ -382,7 +388,6 @@ export function CustomerStatement({
           value={from}
           max={to}
           onChange={setFrom}
-          hint={from ? dateText(from, i18n.language, tz) : undefined}
         />
         <DateField
           className="w-[9.5rem]"
@@ -390,7 +395,6 @@ export function CustomerStatement({
           value={to}
           min={from}
           onChange={setTo}
-          hint={to ? dateText(to, i18n.language, tz) : undefined}
         />
         {from || to ? (
           <button

@@ -19,7 +19,7 @@ import {
   SearchIcon,
   SellIcon,
 } from '../components/icons.tsx';
-import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -743,7 +743,6 @@ function RegisterCard({
   timeText: (at: number) => string;
 }) {
   const { t, i18n } = useTranslation();
-  const money = useDisplayMoney();
   const last = data.recent[0]?.sale.created_at;
   return (
     <section
@@ -801,16 +800,21 @@ function RegisterCard({
           <dt className="text-small text-text-muted">
             {t('home.udhaar_today')}
           </dt>
-          <dd className="mt-0.5 flex flex-col gap-0.5 text-body font-medium">
-            <span>
-              {t('home.udhaar_given', {
-                amount: money(data.today.udhaarGiven),
-              })}
+          <dd className="mt-0.5 flex flex-col gap-1 text-body font-medium">
+            <span className="flex items-baseline justify-between gap-3">
+              <span>{t('home.udhaar_given')}</span>
+              <span className="font-semibold" data-testid="today-udhaar-given">
+                <MoneyText paisa={data.today.udhaarGiven} />
+              </span>
             </span>
-            <span>
-              {t('home.udhaar_received', {
-                amount: money(data.today.udhaarReceived),
-              })}
+            <span className="flex items-baseline justify-between gap-3">
+              <span>{t('home.udhaar_received')}</span>
+              <span
+                className="font-semibold"
+                data-testid="today-udhaar-received"
+              >
+                <MoneyText paisa={data.today.udhaarReceived} />
+              </span>
             </span>
           </dd>
         </div>
