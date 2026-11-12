@@ -5,7 +5,7 @@ import {
   saleBasicInput,
 } from '@bikri/printer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { printA4HtmlViaSystem, printHtmlViaSystem } from './systemPrint.ts';
+import { printHtmlViaSystem } from './systemPrint.ts';
 
 function receiptHtml(): string {
   const paper = resolvePaper({ paperMm: 80 });
@@ -40,26 +40,6 @@ describe('printHtmlViaSystem', () => {
     expect(
       document.querySelector('[data-testid="system-print-frame"]'),
     ).toBeNull();
-  });
-
-  it('uses an A4 page for reports', async () => {
-    let head = '';
-    const append = document.body.append.bind(document.body);
-    vi.spyOn(document.body, 'append').mockImplementation((...nodes) => {
-      append(...nodes);
-      const frame = nodes[0] as HTMLIFrameElement;
-      const win = frame.contentWindow as Window;
-      win.print = () => {
-        head = frame.contentDocument?.head.textContent ?? '';
-      };
-      frame.dispatchEvent(new Event('load'));
-    });
-    expect(
-      await printA4HtmlViaSystem('<table><tr><td>x</td></tr></table>'),
-    ).toEqual({
-      ok: true,
-    });
-    expect(head).toContain('size: A4');
   });
 
   it('reports NO_PRINT when the frame has no print function', async () => {

@@ -30,12 +30,12 @@ import {
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
-import { printA4HtmlViaSystem } from '../print/systemPrint.ts';
+import { errorCode } from '../print/printService.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
-import { creditListHtml } from './creditListFile.ts';
+import { printCreditList } from './creditPrint.ts';
 import {
   ageLabel,
   balanceLabel,
@@ -112,8 +112,8 @@ export function UdhaarList({
 
   const printList = async () => {
     if (!data) return;
-    const result = await printA4HtmlViaSystem(
-      creditListHtml({
+    try {
+      await printCreditList(getDb(), {
         shopName: data.shopName,
         rows: data.rows,
         totalOwed: data.totalOwed,
@@ -121,9 +121,10 @@ export function UdhaarList({
         tz: data.tz,
         lang: i18n.language,
         t,
-      }),
-    );
-    if (!result.ok) toast.push(t('errors.generic'), 'error');
+      });
+    } catch (err) {
+      toast.push(t(`print.err_${errorCode(err)}`), 'error');
+    }
   };
 
   const [shown, setShown] = useState(PAGE);

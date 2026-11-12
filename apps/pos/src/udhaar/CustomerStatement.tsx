@@ -27,13 +27,14 @@ import {
   statementCsv,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
+import { errorCode } from '../print/printService.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
-import { printImageViaSystem } from '../print/systemPrint.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
+import { printCustomerStatement } from './creditPrint.ts';
 import {
   ageLabel,
   balanceTone,
@@ -183,8 +184,11 @@ export function CustomerStatement({
     );
   };
   const printStatement = async () => {
-    const result = await printImageViaSystem(await statementPng(meta));
-    if (!result.ok) toast.push(t('errors.generic'), 'error');
+    try {
+      await printCustomerStatement(getDb(), meta);
+    } catch (err) {
+      toast.push(t(`print.err_${errorCode(err)}`), 'error');
+    }
   };
   const share = async () => {
     try {
