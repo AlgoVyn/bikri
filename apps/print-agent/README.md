@@ -106,7 +106,7 @@ Job body:
 }
 ```
 
-`mode` is `raw` (with `encoding: "escpos"`) or `driver` (with `encoding: "png"`). `jobId` is the idempotency key. The agent returns a job with `status` (`received`, `spooled`, `printing`, `done`, `failed`, `canceled`) and an error code such as `PAPER_OUT` or `RAW_UNSUPPORTED`.
+`mode` is `raw` (with `encoding: "escpos"`) or `driver` (with `encoding: "png"`). `paperMm` is the physical paper width; `widthDots` is the ESC/POS print area for raw jobs and the PNG canvas width for driver jobs. `jobId` is the idempotency key: a duplicate of a done job returns the stored result, while a failed or canceled job may be retried with the same id. The agent returns a job with `status` (`received`, `spooled`, `printing`, `done`, `failed`, `canceled`) and an error code such as `PAPER_OUT` or `RAW_UNSUPPORTED`.
 
 ## Windows notes
 

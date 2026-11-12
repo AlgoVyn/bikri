@@ -86,11 +86,31 @@ func (a *Auth) Pair(code string) (string, error) {
 
 // Verify checks a bearer token without leaking timing information.
 func (a *Auth) Verify(token string) bool {
-	if token == "" || a.cfg.TokenHash == "" {
+	if token == "" {
+		return false
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cfg.TokenHash == "" {
 		return false
 	}
 	got := hashToken(token)
 	return subtle.ConstantTimeCompare([]byte(got), []byte(a.cfg.TokenHash)) == 1
+}
+
+// Paired reports the pairing state under the same lock as Pair/Unpair.
+func (a *Auth) Paired() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg.Paired
+}
+
+// Persist writes the current config while holding the auth lock, so a
+// concurrent pair/unpair cannot marshal a partially updated file.
+func (a *Auth) Persist(path string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return SaveConfig(path, a.cfg)
 }
 
 // Unpair revokes the token and starts a new pairing window.

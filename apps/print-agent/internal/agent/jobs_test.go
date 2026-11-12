@@ -92,6 +92,31 @@ func TestManagerStoresBackendFailure(t *testing.T) {
 	}
 }
 
+func TestManagerRetryAfterFailure(t *testing.T) {
+	fake := &fakeBackend{spoolID: "42", printErr: &backend.Error{Code: "PAPER_OUT", Message: "load paper"}}
+	manager := NewManager(fake)
+	first, err := manager.Submit(context.Background(), validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Status != "failed" || first.Error != "PAPER_OUT" {
+		t.Fatalf("first = %+v", first)
+	}
+	fake.mu.Lock()
+	fake.printErr = nil
+	fake.mu.Unlock()
+	second, err := manager.Submit(context.Background(), validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Status != "spooled" {
+		t.Fatalf("retry = %+v", second)
+	}
+	if fake.printCalls != 2 {
+		t.Fatalf("retry printed %d times, want 2", fake.printCalls)
+	}
+}
+
 func TestManagerRejectsBadRequest(t *testing.T) {
 	manager := NewManager(&fakeBackend{})
 	req := validRequest()

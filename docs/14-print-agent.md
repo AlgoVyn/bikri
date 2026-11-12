@@ -117,7 +117,7 @@ Bikri sends the exact bytes it already produces in `packages/printer` — text, 
 
 ### 5.2 Driver-rendered image (compatibility fallback)
 
-Bikri renders the receipt to a PNG at the printer's dot width (the existing `renderReceiptBitmap` path used for Urdu) and sends it with `paperMm` and `widthDots`. The agent prints it 1:1 through the OS driver.
+Bikri renders the receipt to a PNG at the **full paper/head dot width** (576 dots for 80 mm, 384 for 58 mm) and centres a narrower print profile inside it: for 80 mm paper with a printer still set to 58 mm, the 384-dot content sits in a 576-dot canvas with 96 white dots on each side. It sends `paperMm` (physical paper) and `widthDots` (the PNG width). The agent prints it 1:1 through the OS driver.
 
 **Windows**
 
@@ -193,8 +193,10 @@ Base URL: `http://127.0.0.1:17890/v1`. JSON is UTF-8; binary payloads are base64
 - `encoding`: `"escpos"` (raw) or `"png"` (driver).
 - `data`: complete document. For raw, Bikri already includes cut/drawer commands; the agent must not append its own.
 - `printer`: exact name returned by `/printers`.
+- `paperMm`: physical paper width (58 or 80).
+- `widthDots`: raw jobs = ESC/POS print-area dots (384 for 58 mm, 512 for 80 mm/42, 576 for 80 mm/48); driver jobs = PNG canvas width (the full paper/head width, e.g. 576).
 - `copies`: 1–3; the agent repeats the job, not Bikri.
-- `jobId` is the idempotency key. The agent remembers recent ids for 24 h and returns the same result on a duplicate without printing again.
+- `jobId` is the idempotency key. The agent remembers recent ids for 24 h and returns the same result on a duplicate without printing again. A duplicate of a **done** job returns the stored success; a duplicate of a **failed** or **canceled** job starts a new attempt so the till's Retry works.
 
 ### Job response and states
 

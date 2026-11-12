@@ -70,9 +70,14 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 	}
 	m.mu.Lock()
 	if existing := m.jobs[req.JobID]; existing != nil {
-		copy := existing.JobStatus
-		m.mu.Unlock()
-		return &copy, nil
+		// A finished job is truly idempotent; a failed or canceled job may be
+		// retried with the same print-job id, so replace it and print again.
+		if !isTerminal(existing.Status) || existing.Status == "done" {
+			copy := existing.JobStatus
+			m.mu.Unlock()
+			return &copy, nil
+		}
+		delete(m.jobs, req.JobID)
 	}
 	m.cleanupLocked()
 	now := m.now().UnixMilli()

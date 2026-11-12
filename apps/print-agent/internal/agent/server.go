@@ -148,7 +148,9 @@ type healthResponse struct {
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	// Health must answer even when a slow Windows printer enumeration is still
+	// running; the wizard has a short timeout and only needs the pairing state.
+	ctx, cancel := context.WithTimeout(r.Context(), 300*time.Millisecond)
 	defer cancel()
 	printers := 0
 	if list, err := s.backend.ListPrinters(ctx); err == nil {
@@ -159,7 +161,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		Version:     s.version,
 		Protocol:    Protocol,
 		Platform:    platformName(),
-		Paired:      s.cfg.Paired,
+		Paired:      s.auth.Paired(),
 		Printers:    printers,
 		PairingCode: s.auth.PairingCode(),
 	})
@@ -187,7 +189,7 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if err := SaveConfig(s.cfgPath, s.cfg); err != nil {
+	if err := s.auth.Persist(s.cfgPath); err != nil {
 		s.auth.Unpair()
 		writeError(w, http.StatusInternalServerError, "CONFIG_ERROR", err.Error())
 		return
@@ -201,7 +203,7 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) unpair(w http.ResponseWriter, r *http.Request) {
 	s.auth.Unpair()
-	if err := SaveConfig(s.cfgPath, s.cfg); err != nil {
+	if err := s.auth.Persist(s.cfgPath); err != nil {
 		writeError(w, http.StatusInternalServerError, "CONFIG_ERROR", err.Error())
 		return
 	}
@@ -213,7 +215,7 @@ func (s *Server) unpair(w http.ResponseWriter, r *http.Request) {
 // lost the Bikri-side token can pair the till again.
 func (s *Server) uiUnpair(w http.ResponseWriter, r *http.Request) {
 	s.auth.Unpair()
-	if err := SaveConfig(s.cfgPath, s.cfg); err != nil {
+	if err := s.auth.Persist(s.cfgPath); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -297,7 +299,7 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		Protocol:  Protocol,
 		Platform:  platformName(),
 		AgentID:   s.cfg.AgentID,
-		Paired:    s.cfg.Paired,
+		Paired:    s.auth.Paired(),
 		LogPath:   s.logPath,
 		UptimeSec: int64(time.Since(s.started).Seconds()),
 		Printers:  list,
@@ -328,7 +330,7 @@ func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
 	w.Header().Set("X-Frame-Options", "DENY")
 	data := uiData{
-		Paired:       s.cfg.Paired,
+		Paired:       s.auth.Paired(),
 		Code:         s.auth.PairingCode(),
 		Version:      s.version,
 		Protocol:     Protocol,

@@ -79,6 +79,10 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	}
 	if job.Mode == "raw" {
 		args = append(args, "-o", "raw")
+	} else {
+		// The PNG already includes the paper-width padding; do not let CUPS
+		// fit-to-page it (which would ignore the 1:1 dot width).
+		args = append(args, "-o", "scaling=100")
 	}
 	args = append(args, path)
 	out, err := run(ctx, "lp", args...)

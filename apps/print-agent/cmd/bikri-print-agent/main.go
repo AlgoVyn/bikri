@@ -59,10 +59,21 @@ func main() {
 	logPath := agent.DefaultLogPath()
 	logger, closeLog := newLogger(logPath)
 	defer closeLog()
+	var crashLog *os.File
 	if crash, err := os.OpenFile(agent.CrashLogPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600); err == nil {
-		_ = debug.SetCrashOutput(crash, debug.CrashOptions{})
-		_ = crash.Close()
+		// Keep the file open for the process lifetime; the runtime writes to
+		// this descriptor on a fatal error and does not own/close it.
+		if err := debug.SetCrashOutput(crash, debug.CrashOptions{}); err == nil {
+			crashLog = crash
+		} else {
+			_ = crash.Close()
+		}
 	}
+	defer func() {
+		if crashLog != nil {
+			_ = crashLog.Close()
+		}
+	}()
 
 	printBackend, err := backend.New()
 	if err != nil {
