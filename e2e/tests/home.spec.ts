@@ -250,7 +250,10 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByTestId('permission-no-access')).toBeVisible();
   });
 
-  test('read-only and support banners; offline stays in the top bar', async ({ page, context }) => {
+  test('read-only and support banners; offline stays in the top bar', async ({
+    page,
+    context,
+  }) => {
     await openReadyShop(page, '/bikri/');
     await page.evaluate(async () => {
       await window.__bikriTest?.setKv('tenant_status', {
