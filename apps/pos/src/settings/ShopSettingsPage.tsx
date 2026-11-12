@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import { defaultBranch } from '../data/localTenant.ts';
+import { type PrinterKv, receiptPaper } from '../data/receipt.ts';
 import {
   type BranchSettings,
   BUSINESS_TYPES,
@@ -58,7 +59,7 @@ function ShopForm() {
       shop: await db.shop.get('shop'),
       branch: await defaultBranch(db),
       logo: await getKv<LogoData | null>(db, 'logo_bitmap', null),
-      printer: await getKv<{ paper_mm?: number } | null>(db, 'printer', null),
+      printer: await getKv<PrinterKv | null>(db, 'printer', null),
     };
   }, []);
   const [form, setForm] = useState<ShopSettings>(() => shopSettings(undefined));
@@ -189,6 +190,7 @@ function ShopForm() {
   };
 
   if (!data) return <PageLoading compact />;
+  const previewPaper = receiptPaper(data.printer);
 
   return (
     <SettingsPageLayout title={t('office.settings.title')} icon={<StoreIcon />}>
@@ -552,7 +554,8 @@ function ShopForm() {
         <ReceiptPreview
           shop={preview}
           logoUrl={logoUrl}
-          paperMm={data?.printer?.paper_mm === 58 ? 58 : 80}
+          paperMm={previewPaper.paperMm}
+          charsPerLine={previewPaper.charsPerLine}
         />
         <button
           type="button"

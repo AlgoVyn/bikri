@@ -67,6 +67,7 @@ export type AgentPrintRequest = {
   printer: string;
   mode: AgentMode;
   paperMm: 58 | 80;
+  /** Raw: ESC/POS print-area dots. Driver: PNG canvas width in dots. */
   widthDots?: number;
   copies?: number;
   encoding: 'escpos' | 'png';
@@ -123,7 +124,7 @@ export class AgentRequestError extends Error {
   }
 }
 
-const HEALTH_TIMEOUT_MS = 1200;
+const HEALTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
 const STATUS_TIMEOUT_MS = 3000;
 

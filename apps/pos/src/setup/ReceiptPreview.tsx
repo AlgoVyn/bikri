@@ -115,16 +115,19 @@ export function ReceiptPreview({
   shop,
   logoUrl,
   paperMm = 80,
+  charsPerLine,
 }: {
   shop: PreviewShop;
   logoUrl: string | null;
   paperMm?: 58 | 80;
+  /** Printer's current line width; defaults to the paper's full width. */
+  charsPerLine?: number;
 }) {
   const { t, i18n } = useTranslation();
-  const charsPerLine = paperMm === 58 ? 32 : 48;
+  const chars = charsPerLine ?? (paperMm === 58 ? 32 : 48);
   const text = renderReceiptText(previewBlocks(shop, i18n.language), {
-    charsPerLine,
-    itemLayout: itemLayoutFor(charsPerLine, paperMm),
+    charsPerLine: chars,
+    itemLayout: itemLayoutFor(chars, paperMm),
   });
   return (
     <figure
