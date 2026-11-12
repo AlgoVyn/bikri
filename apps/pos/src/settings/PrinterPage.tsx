@@ -179,6 +179,14 @@ export function PrinterPage() {
               })
             : t('printer.none')}
         </p>
+        {printer?.paper_mm === 80 && printer.chars_per_line === 42 ? (
+          <p
+            className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+            data-testid="printer-narrow-warning"
+          >
+            {t('printer.narrow_42')}
+          </p>
+        ) : null}
         {lastFailed ? (
           <p className="text-small text-danger">
             {t('printer.last_error', {

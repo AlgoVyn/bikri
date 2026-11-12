@@ -77,14 +77,18 @@ The same model feeds every output, and the Settings live preview renders it with
 
 Stored per device in `kv.printer.paper_mm`; `chars_per_line` and `dots` can be overridden (some 80 mm printers print 42 chars / 512 dots). Defaults: 80 mm → 48 / 576, 58 mm → 32 / 384. 44/76/112 mm are advanced presets, not tested in v1.
 
+Every ESC/POS job starts with `GS L 0 0` and `GS W <configured dots>`, so the receipt uses the **Bikri paper profile** even when the printer's own memory switch still says 58 mm. This is why a Windows test page can be full width while raw ESC/POS was narrow: the Windows driver sets the page itself, while raw output otherwise inherits the printer default. Bikri still never writes the printer's NVRAM (D-206).
+
 ## 3. ESC/POS command reference
 
 All bytes hex. `n` etc. are single bytes.
 
 | Purpose | Bytes | Notes |
 |---|---|---|
-| Initialise | `1B 40` | Start of every job |
+| Initialise | `1B 40` | Start of every job; also resets `GS L`/`GS W` |
 | Code page | `1B 74 n` | `n=0` PC437 (default); Bikri sends ASCII only in text mode |
+| Left margin | `1D 4C 00 00` | Reset to 0 at the start of every job |
+| Print area width | `1D 57 nL nH` | Set to the configured dots at the start of every job (`576` = `40 02`, `512` = `00 02`, `384` = `80 01`); do not inherit the printer's NVRAM paper width |
 | Align | `1B 61 n` | 0 left, 1 centre, 2 right |
 | Bold on/off | `1B 45 01` / `1B 45 00` | |
 | Size | `1D 21 n` | `00` normal, `11` double width+height, `01` double height |

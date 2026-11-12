@@ -209,8 +209,14 @@ function requireRenderer(renderer: RasterRenderer | undefined): RasterRenderer {
 
 /**
  * Encode blocks to ESC/POS. Every job starts with `1B 40` and code page
- * PC437 `1B 74 00`. Align, bold, and size are sent only when they change.
- * Raster rows use `GS v 0` (`1D 76 30 00`).
+ * PC437 `1B 74 00`, then resets the left margin and sets the printing area
+ * width to the configured dots. Align, bold, and size are sent only when they
+ * change. Raster rows use `GS v 0` (`1D 76 30 00`).
+ *
+ * `GS L` / `GS W` matter for printers whose NVRAM paper width is still 58 mm
+ * (384 dots): the Windows test page is full width because the driver sets the
+ * page itself, while raw ESC/POS otherwise inherits the 58 mm default and
+ * prints only the left part of an 80 mm roll.
  */
 export function encodeEscPos(
   blocks: Block[],
@@ -218,6 +224,9 @@ export function encodeEscPos(
 ): Uint8Array {
   if (!Number.isInteger(options.dots) || options.dots < 1) {
     throw new Error('dots must be a positive integer');
+  }
+  if (options.dots > 0xffff) {
+    throw new Error('dots must fit in two bytes');
   }
   const pin = (options.drawerPin ?? 2) as number;
   if (pin !== 2 && pin !== 5) {
@@ -255,6 +264,10 @@ function encodeCommands(
 ): Uint8Array {
   const buf = new ByteBuf();
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
+  // 06 §3: zero the left margin and use the full configured width, so a
+  // printer still configured for 58 mm paper does not clip an 80 mm receipt.
+  buf.push(0x1d, 0x4c, 0x00, 0x00);
+  buf.push(0x1d, 0x57, state.dots & 0xff, (state.dots >> 8) & 0xff);
   let style = { ...INITIAL_STYLE };
 
   const applyFont = (next: Style): void => {
