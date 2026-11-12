@@ -78,6 +78,7 @@ function encodeSale(
   return encodeEscPos(blocks, {
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
+    leftMarginDots: paper.leftMarginDots,
     itemLayout: paper.itemLayout,
     logo: testLogo(),
     renderer: createFakeRasterRenderer(),
@@ -161,10 +162,35 @@ describe('ESC/POS goldens', () => {
 describe('ESC/POS commands (06 §3)', () => {
   const sale80 = encodeSale(80);
 
-  it('starts with initialise, PC437 and the configured width, without a left-margin reset', () => {
-    expect(hex(sale80.subarray(0, 9))).toBe('1b 40 1b 74 00 1d 57 40 02');
-    expect(hex(encodeSale(58).subarray(0, 9))).toBe(
-      '1b 40 1b 74 00 1d 57 80 01',
+  it('starts with initialise, PC437, the centred margin and the configured width', () => {
+    expect(hex(sale80.subarray(0, 13))).toBe(
+      '1b 40 1b 74 00 1d 4c 00 00 1d 57 40 02',
+    );
+    expect(hex(encodeSale(58).subarray(0, 13))).toBe(
+      '1b 40 1b 74 00 1d 4c 00 00 1d 57 80 01',
+    );
+  });
+
+  it('centres a 58 mm print area on 80 mm paper with a 96-dot margin', () => {
+    const paper = resolvePaper({ paperMm: 80, charsPerLine: 32, dots: 384 });
+    expect(paper.paperDots).toBe(576);
+    expect(paper.leftMarginDots).toBe(96);
+    const bytes = encodeEscPos(
+      buildSaleReceipt(saleBasicInput(), {
+        paperMm: 80,
+        charsPerLine: 32,
+        dots: 384,
+      }),
+      {
+        charsPerLine: 32,
+        dots: 384,
+        leftMarginDots: paper.leftMarginDots,
+        itemLayout: paper.itemLayout,
+        renderer: createFakeRasterRenderer(),
+      },
+    );
+    expect(hex(bytes.subarray(0, 13))).toBe(
+      '1b 40 1b 74 00 1d 4c 60 00 1d 57 80 01',
     );
   });
 
@@ -250,7 +276,7 @@ describe('ESC/POS commands (06 §3)', () => {
       charsPerLine: 48,
       dots: 576,
     });
-    expect(hex(bytes.subarray(9))).toBe(
+    expect(hex(bytes.subarray(13))).toBe(
       [
         '1b 61 01',
         '1d 28 6b 04 00 31 41 32 00',
@@ -277,7 +303,7 @@ describe('ESC/POS commands (06 §3)', () => {
     ];
     const bytes = encodeEscPos(blocks, { charsPerLine: 48, dots: 576 });
     expect(hex(bytes)).toBe(
-      '1b 40 1b 74 00 1d 57 40 02 1b 61 01 1b 45 01 1d 21 11 41 0a 42 0a 1b 61 00 1b 45 00 1d 21 00 43 0a',
+      '1b 40 1b 74 00 1d 4c 00 00 1d 57 40 02 1b 61 01 1b 45 01 1d 21 11 41 0a 42 0a 1b 61 00 1b 45 00 1d 21 00 43 0a',
     );
   });
 
@@ -291,7 +317,7 @@ describe('ESC/POS commands (06 §3)', () => {
       dots: 576,
       renderer: createFakeRasterRenderer(),
     });
-    expect(indexOf(bytes, [0x1d, 0x76, 0x30, 0x00, 72, 0, 8, 0])).toBe(9);
+    expect(indexOf(bytes, [0x1d, 0x76, 0x30, 0x00, 72, 0, 8, 0])).toBe(13);
   });
 
   it('builds a refund receipt without money-back rows when nothing is paid back', () => {

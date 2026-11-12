@@ -30,6 +30,8 @@ export type EncodeOptions = {
    * Pass `resolvePaper().itemLayout` so 58 mm stays stacked even if chars are overridden.
    */
   itemLayout?: ItemLayout;
+  /** Default 0. Left margin that centres a narrower print area on the paper. */
+  leftMarginDots?: number;
   /** Default partial (`1D 56 42 00`). `none` drops the cut command. */
   cut?: CutMode;
   /** Default pin 2 (`1B 70 00 19 FA`). */
@@ -209,13 +211,13 @@ function requireRenderer(renderer: RasterRenderer | undefined): RasterRenderer {
 
 /**
  * Encode blocks to ESC/POS. Every job starts with `1B 40` and code page
- * PC437 `1B 74 00`, then sets the printing area width to the configured dots.
- * Align, bold, and size are sent only when they change. Raster rows use
- * `GS v 0` (`1D 76 30 00`).
+ * PC437 `1B 74 00`, then sets the left margin and printing area width so a
+ * narrower print profile is centred on the paper. Align, bold, and size are
+ * sent only when they change. Raster rows use `GS v 0` (`1D 76 30 00`).
  *
- * `GS W` keeps the configured width, but the left margin is left alone: a
- * printer set to 58 mm paper on an 80 mm head may centre that narrower print
- * area, and a `GS L 0` reset would force the receipt to the left edge.
+ * `leftMarginDots` is derived from the paper width and the printer's current
+ * character width: 80 mm paper with a 58 mm printer setting gets a 96-dot
+ * margin (576 - 384)/2, while a full-width profile gets 0.
  */
 export function encodeEscPos(
   blocks: Block[],
@@ -231,6 +233,13 @@ export function encodeEscPos(
   if (pin !== 2 && pin !== 5) {
     throw new Error('drawer pin must be 2 or 5');
   }
+  const leftMarginDots = options.leftMarginDots ?? 0;
+  if (!Number.isInteger(leftMarginDots) || leftMarginDots < 0) {
+    throw new Error('leftMarginDots must be a non-negative integer');
+  }
+  if (leftMarginDots > 0xffff) {
+    throw new Error('leftMarginDots must fit in two bytes');
+  }
   const commands = layOut(blocks, {
     charsPerLine: options.charsPerLine,
     itemLayout:
@@ -238,6 +247,7 @@ export function encodeEscPos(
   });
   return encodeCommands(commands, {
     dots: options.dots,
+    leftMarginDots,
     cut: options.cut ?? 'partial',
     pin,
     imageMode: (options.language ?? 'en') === 'ur',
@@ -249,6 +259,7 @@ export function encodeEscPos(
 
 type EncodeState = {
   dots: number;
+  leftMarginDots: number;
   cut: CutMode;
   pin: 2 | 5;
   imageMode: boolean;
@@ -263,9 +274,15 @@ function encodeCommands(
 ): Uint8Array {
   const buf = new ByteBuf();
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
-  // 06 §3: keep the configured print width. Do not send GS L: a printer set
-  // to 58 mm paper on an 80 mm head may centre the narrower print area, and
-  // forcing the left margin to zero would pin the receipt to the left edge.
+  // 06 §3: set the left margin first, then the print width. A 58 mm printer
+  // setting on an 80 mm head gets a 96-dot margin so the 384-dot area is
+  // centred; a full-width profile gets 0.
+  buf.push(
+    0x1d,
+    0x4c,
+    state.leftMarginDots & 0xff,
+    (state.leftMarginDots >> 8) & 0xff,
+  );
   buf.push(0x1d, 0x57, state.dots & 0xff, (state.dots >> 8) & 0xff);
   let style = { ...INITIAL_STYLE };
 

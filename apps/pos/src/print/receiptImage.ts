@@ -17,6 +17,8 @@ import { prepareRasterFonts } from './canvasRaster.ts';
 
 export type ImageOptions = {
   dots: number;
+  /** Full paper/head width; defaults to `dots`. Use a wider value to centre the receipt. */
+  paperDots?: number;
   charsPerLine: number;
   itemLayout: ItemLayout;
   logo: RasterSource | null;
@@ -114,7 +116,7 @@ function toImageData(
   return out;
 }
 
-/** Draws the receipt; the canvas is `dots + 32` px wide. */
+/** Draws the receipt; the canvas is `paperDots + 32` px wide. */
 export async function renderReceiptCanvas(
   blocks: Block[],
   options: ImageOptions,
@@ -127,8 +129,10 @@ export async function renderReceiptCanvas(
   const rows = receiptRows(blocks, options);
   const font = options.dots / (options.charsPerLine * 0.6);
   const pad = options.padding ?? PAD;
+  const paperDots = Math.max(options.dots, options.paperDots ?? options.dots);
+  const leftPad = pad + Math.floor((paperDots - options.dots) / 2);
   const canvas = doc.createElement('canvas');
-  canvas.width = options.dots + pad * 2;
+  canvas.width = paperDots + pad * 2;
   canvas.height = rows.reduce((h, r) => h + r.height, 0) + pad * 2;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas unavailable');
@@ -140,7 +144,8 @@ export async function renderReceiptCanvas(
   for (const row of rows) {
     if (row.kind === 'raster') {
       const x =
-        pad + Math.max(0, Math.floor((options.dots - row.source.width) / 2));
+        leftPad +
+        Math.max(0, Math.floor((options.dots - row.source.width) / 2));
       ctx.putImageData(toImageData(ctx, row.source), x, y);
     } else if (row.kind === 'qr') {
       const qr = qrcode(0, 'M');
@@ -150,7 +155,7 @@ export async function renderReceiptCanvas(
       const quiet = 4;
       const unit = Math.max(1, Math.floor(row.size / (modules + quiet * 2)));
       const drawSize = unit * (modules + quiet * 2);
-      const left = pad + Math.floor((options.dots - drawSize) / 2);
+      const left = leftPad + Math.floor((options.dots - drawSize) / 2);
       ctx.fillStyle = '#fff';
       ctx.fillRect(left, y, drawSize, drawSize);
       ctx.fillStyle = '#000';
@@ -178,10 +183,10 @@ export async function renderReceiptCanvas(
             : 'left';
       const x =
         row.align === 'center'
-          ? pad + options.dots / 2
+          ? leftPad + options.dots / 2
           : row.align === 'right'
-            ? pad + options.dots
-            : pad;
+            ? leftPad + options.dots
+            : leftPad;
       if (row.size === 'double-height') {
         ctx.translate(0, y);
         ctx.scale(1, 2);

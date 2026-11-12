@@ -24,6 +24,10 @@ export type ResolvedPaper = {
   paperMm: PaperMm;
   charsPerLine: number;
   dots: number;
+  /** Full width of the paper/head, before any narrower printer setting. */
+  paperDots: number;
+  /** Left margin that centres the print area on the paper (0 for full width). */
+  leftMarginDots: number;
   bytesPerRow: number;
   itemLayout: ItemLayout;
 };
@@ -46,6 +50,19 @@ export function itemLayoutFor(
   return 'columns';
 }
 
+/**
+ * Full paper/head width in dots. On 80 mm paper the 42-character profile is
+ * the 180 dpi / 512-dot printer; 48 and 32 use the 203 dpi / 576-dot head.
+ * A 32-character profile on 80 mm paper is a 58 mm print area that must be
+ * centred inside the 576-dot head.
+ */
+function paperDotsFor(paperMm: PaperMm, printDots: number): number {
+  if (paperMm === 80 && printDots === 512) {
+    return 512;
+  }
+  return PAPER_PRESETS[paperMm].dots;
+}
+
 export function resolvePaper(
   input: { paperMm?: PaperMm; charsPerLine?: number; dots?: number } = {},
 ): ResolvedPaper {
@@ -59,10 +76,14 @@ export function resolvePaper(
   if (!Number.isInteger(dots) || dots < 1) {
     throw new Error('dots must be a positive integer');
   }
+  const paperDots = paperDotsFor(paperMm, dots);
+  const leftMarginDots = Math.max(0, Math.floor((paperDots - dots) / 2));
   return {
     paperMm,
     charsPerLine,
     dots,
+    paperDots,
+    leftMarginDots,
     bytesPerRow: Math.ceil(dots / 8),
     itemLayout: itemLayoutFor(charsPerLine, paperMm),
   };

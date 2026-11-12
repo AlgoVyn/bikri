@@ -134,7 +134,7 @@ test.describe('Printer (T-020)', () => {
       .getByLabel('No')
       .check();
     await expect(
-      page.getByRole('button', { name: 'Use 42 characters' }),
+      page.getByRole('button', { name: /Use 42 characters/ }),
     ).toHaveCount(0);
     await answerYes(page);
     await page.getByRole('button', { name: 'Save printer' }).click();
@@ -156,13 +156,40 @@ test.describe('Printer (T-020)', () => {
       .getByRole('group', { name: 'Did the ruler fit on one line?' })
       .getByLabel('No')
       .check();
-    await page.getByRole('button', { name: 'Use 42 characters' }).click();
+    await page.getByRole('button', { name: /Use 42 characters/ }).click();
     await page.getByRole('button', { name: 'Test print' }).click();
     await expect.poll(() => printedText(page, 'serial')).toContain(ruler(42));
     await answerYes(page);
     await page.getByRole('button', { name: 'Save printer' }).click();
     await expect(page.getByTestId('printer-summary')).toHaveText(
       'Serial / COM port · 80 mm · 42 characters',
+    );
+  });
+
+  test('wizard: 80 mm paper with 32 characters centres a 58 mm print area', async ({
+    page,
+  }) => {
+    await start(page);
+    await page.getByRole('button', { name: 'Set up printer' }).click();
+    await page.getByLabel('80 mm (recommended)').check();
+    await page.getByLabel('32 characters (48 mm print)').check();
+    await expect(
+      page.getByText(
+        'The printer is set to 58 mm. Bikri will print 48 mm wide and centre it on the 80 mm paper.',
+      ),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Connect printer' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Test print' }).click();
+    await expect(
+      page.getByText('Test page sent to the printer.'),
+    ).toBeVisible();
+    await expect.poll(() => printedText(page, 'usb')).toContain(ruler(32));
+    await answerYes(page);
+    await page.getByRole('button', { name: 'Save printer' }).click();
+    await expect(page.getByTestId('printer-summary')).toHaveText(
+      'POS-80 · 80 mm paper · 58 mm print · 32 characters',
     );
   });
 

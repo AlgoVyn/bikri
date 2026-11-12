@@ -75,9 +75,18 @@ The same model feeds every output, and the Settings live preview renders it with
 | **80 mm (default)** | 48 | 576 | 72 | recommended counter printer |
 | 112 mm | 69 | 832 | 104 | wide receipt printers |
 
-Stored per device in `kv.printer.paper_mm`; `chars_per_line` and `dots` can be overridden (some 80 mm printers print 42 chars / 512 dots). Defaults: 80 mm → 48 / 576, 58 mm → 32 / 384. 44/76/112 mm are advanced presets, not tested in v1.
+Stored per device in `kv.printer`: `paper_mm` is the **physical paper/head width** and `chars_per_line` is the **printer's current printable line width**. They are not the same when an 80 mm printer is still set to 58 mm: `paper_mm = 80`, `chars_per_line = 32`, `dots = 384`. `chars_per_line` and `dots` can also be overridden for 180 dpi heads (42 characters / 512 dots). Defaults: 80 mm → 48 / 576, 58 mm → 32 / 384. 44/76/112 mm are advanced presets, not tested in v1.
 
-Every ESC/POS job starts with `GS W <configured dots>`, so the receipt uses the **Bikri paper profile** even when the printer's default width differs. The left margin is deliberately **not** reset: a printer set to 58 mm paper on an 80 mm head may centre the narrower print area, and `GS L 0` would pin it to the left edge. This is why a Windows test page can be centred while raw ESC/POS was left-aligned. Bikri never writes the printer's NVRAM (D-206).
+Bikri derives the full head width (`paperDots`) and centres the print area on it:
+
+| Paper | Characters | Print dots | Left margin | Use |
+|---|---|---|---|---|
+| 80 mm / 203 dpi | 48 | 576 | 0 | full 72 mm receipt |
+| 80 mm / 180 dpi | 42 | 512 | 0 | full 64 mm receipt |
+| **80 mm** | **32** | **384** | **96** | **printer still set to 58 mm; centred 48 mm receipt** |
+| 58 mm | 32 | 384 | 0 | true 58 mm printer |
+
+Every ESC/POS job sends `GS L <left margin>` and then `GS W <print dots>`, so the narrower 58 mm print area sits in the middle of the 80 mm paper instead of against the left edge. Bikri never writes the printer's NVRAM: to use the full 72 mm, set the printer's own **Printing Width Selection** to 80 mm and choose 48 characters in Bikri (D-207).
 
 ## 3. ESC/POS command reference
 
@@ -85,9 +94,10 @@ All bytes hex. `n` etc. are single bytes.
 
 | Purpose | Bytes | Notes |
 |---|---|---|
-| Initialise | `1B 40` | Start of every job; also resets `GS W` |
+| Initialise | `1B 40` | Start of every job; also resets `GS L`/`GS W` |
 | Code page | `1B 74 n` | `n=0` PC437 (default); Bikri sends ASCII only in text mode |
-| Print area width | `1D 57 nL nH` | Set to the configured dots at the start of every job (`576` = `40 02`, `512` = `00 02`, `384` = `80 01`); the left margin is left to the printer so a 58 mm print area can stay centred |
+| Left margin | `1D 4C nL nH` | `(paperDots - dots) / 2`; `96` = `60 00` for an 80 mm head with a 58 mm print area, otherwise 0 |
+| Print area width | `1D 57 nL nH` | Configured print dots (`576` = `40 02`, `512` = `00 02`, `384` = `80 01`); set after `GS L` |
 | Align | `1B 61 n` | 0 left, 1 centre, 2 right |
 | Bold on/off | `1B 45 01` / `1B 45 00` | |
 | Size | `1D 21 n` | `00` normal, `11` double width+height, `01` double height |

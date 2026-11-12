@@ -63,7 +63,7 @@ Printer-agnostic ([06 §0](../06-printing.md#0-printer-agnostic-design-decision-
 - Serial: `Choose port` (Web Serial), baud rate (9600 / 19200 / 38400 / 115200; default 9600).
 - System: uses `window.print()` with the 58 mm or 80 mm receipt CSS ([06 §5.3](../06-printing.md#53-system-printing-fallback-also-for-a4office-printers)); tip to set the printer's margins to none. Always available, also as the fallback when USB/Serial is unavailable.
 - A4: for invoices/statements on an office printer.
-- Common: paper width (58 / 80 mm; advanced 44/76/112), characters per line (default 32 / 48; the wizard shows a 48/42 choice inside the selected 80 mm option), raster width in dots (default 384 / 576), auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with all character widths, Urdu raster line and logo), `Open drawer`.
+- Common: **paper width** (58 / 80 mm; advanced 44/76/112) and **characters per line** (48 / 42 / 32) are separate. 48 is the full 72 mm on a 203 dpi 80 mm printer, 42 the full 64 mm on a 180 dpi printer, and 32 is a printer still set to 58 mm — Bikri centres that 48 mm print area on 80 mm paper instead of printing it against the left edge. Raster width follows the character choice (576 / 512 / 384 dots). Also auto-print after sale (on), copies 1–3, print logo, print QR (bill ID) (off), open drawer on cash sale (on), drawer pin (2/5), cut type (partial/full/none), `Test print` (prints a sample with the chosen character width, an Urdu raster line and logo), `Open drawer`.
 - Status: connected / not connected / last error. "A failed print never loses the bill" note (REQ-B15).
 - Recent prints: each **Waiting** job has `Cancel print`, and when any are waiting the heading offers `Cancel waiting (N)`; jobs already printing are not cancelled. A job left in `printing` by a closed tab becomes `INTERRUPTED` on the next start and can be retried.
 
@@ -118,7 +118,7 @@ Version, build hash, check for update, a "Terms of use" card ([09 §6.1](../09-b
 1. Changing tax to 17% updates the receipt preview and the next sale's totals; earlier sales are unchanged.
 2. A cashier sees only Printer and Scanner & display (which also holds Language), Sync and About ([05 §6](../05-auth-and-roles.md#6-permission-matrix) `settings.device`).
 3. Removing the last active owner is impossible ("At least one owner is needed").
-4. Test print at 80 mm prints 48 characters per line exactly (32 at 58 mm), the logo and an Urdu line, over USB and over Serial; with no WebUSB/Web Serial (Firefox) only System printing is offered.
+4. Test print at 80 mm prints 48 characters per line exactly (42 on a 180 dpi printer, 32 at 58 mm); with 80 mm paper and 32 characters the receipt is centred with a 96-dot left margin, and the logo and Urdu line still print, over USB and over Serial; with no WebUSB/Web Serial (Firefox) only System printing is offered.
 5. The `Set up printer` wizard completes with paper width + transport + test print answers and saves `kv.printer`; a failed USB claim offers Serial/System instead of an error dead end.
 6. `Download full export` works offline and contains every table with row counts matching the device.
 7. The `#printer` link opens the Printer section directly.

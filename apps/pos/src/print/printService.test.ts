@@ -394,6 +394,29 @@ describe('print agent transport (docs/14)', () => {
     expect(hex(bytes)).toContain(DRAWER);
   });
 
+  it('centres a 58 mm print area on 80 mm paper', async () => {
+    const { db } = await soldShop('psAgentCentre');
+    await db.kv.put({
+      key: 'printer',
+      value: agentPrinter({ paper_mm: 80, chars_per_line: 32, dots: 384 }),
+    });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const requests: AgentPrintRequest[] = [];
+    const agent = fakeAgent({}, requests);
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'done' });
+    expect(requests[0]).toMatchObject({
+      paperMm: 80,
+      widthDots: 384,
+    });
+    const bytes = Uint8Array.from(atob(requests[0]?.data ?? ''), (c) =>
+      c.charCodeAt(0),
+    );
+    expect(hex(bytes)).toContain('1d 4c 60 00 1d 57 80 01');
+  });
+
   it('maps an agent failure to the print job error', async () => {
     const { db } = await soldShop('psAgentFail');
     await db.kv.put({ key: 'printer', value: agentPrinter() });

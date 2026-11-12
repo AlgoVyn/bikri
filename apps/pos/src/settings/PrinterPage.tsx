@@ -15,6 +15,7 @@ import {
   retryPrintJob,
 } from '../data/printJobs.ts';
 import type { PrinterKv } from '../data/receipt.ts';
+import { receiptPaper } from '../data/receipt.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import {
   AGENT_URL,
@@ -160,6 +161,7 @@ export function PrinterPage() {
           ? (printer.agent?.printerName ?? t('printer.transport_agent'))
           : t('printer.transport_system');
 
+  const paper = receiptPaper(printer);
   return (
     <SettingsPageLayout title={t('printer.title')} icon={<PrinterIcon />}>
       <section
@@ -171,22 +173,20 @@ export function PrinterPage() {
         </h2>
         <p data-testid="printer-summary">
           {printer?.transport
-            ? t('printer.summary', {
-                where,
-                mm: printer.paper_mm ?? 80,
-                chars:
-                  printer.chars_per_line ?? (printer.paper_mm === 58 ? 32 : 48),
-              })
+            ? paper.paperMm !== paper.printMm
+              ? t('printer.summary_narrow', {
+                  where,
+                  paper: paper.paperMm,
+                  print: paper.printMm,
+                  chars: paper.charsPerLine,
+                })
+              : t('printer.summary', {
+                  where,
+                  mm: paper.paperMm,
+                  chars: paper.charsPerLine,
+                })
             : t('printer.none')}
         </p>
-        {printer?.paper_mm === 80 && printer.chars_per_line === 42 ? (
-          <p
-            className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink"
-            data-testid="printer-narrow-warning"
-          >
-            {t('printer.narrow_42')}
-          </p>
-        ) : null}
         {lastFailed ? (
           <p className="text-small text-danger">
             {t('printer.last_error', {

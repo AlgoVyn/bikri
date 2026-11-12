@@ -40,33 +40,40 @@ describe('encoder guards', () => {
     ).toThrow(/too long/);
   });
 
-  it('sets the printing area width per job without touching the left margin', () => {
+  it('sets the centred left margin and printing area width per job', () => {
     const wide = encodeEscPos([], opts);
     expect([...wide]).toEqual([
-      0x1b, 0x40, 0x1b, 0x74, 0x00, 0x1d, 0x57, 0x40, 0x02,
+      0x1b, 0x40, 0x1b, 0x74, 0x00, 0x1d, 0x4c, 0x00, 0x00, 0x1d, 0x57, 0x40,
+      0x02,
     ]);
-    expect([...wide]).not.toContain(0x4c);
-    const narrow = encodeEscPos([], { charsPerLine: 32, dots: 384 });
-    expect([...narrow.subarray(5, 9)]).toEqual([0x1d, 0x57, 0x80, 0x01]);
+    const narrow = encodeEscPos([], {
+      charsPerLine: 32,
+      dots: 384,
+      leftMarginDots: 96,
+    });
+    expect([...narrow.subarray(5, 13)]).toEqual([
+      0x1d, 0x4c, 0x60, 0x00, 0x1d, 0x57, 0x80, 0x01,
+    ]);
   });
 
   it('skips the logo when no bitmap is given and an empty QR', () => {
     const bytes = encodeEscPos([{ t: 'logo' }, { t: 'qr', data: '' }], opts);
     expect([...bytes]).toEqual([
-      0x1b, 0x40, 0x1b, 0x74, 0x00, 0x1d, 0x57, 0x40, 0x02,
+      0x1b, 0x40, 0x1b, 0x74, 0x00, 0x1d, 0x4c, 0x00, 0x00, 0x1d, 0x57, 0x40,
+      0x02,
     ]);
   });
 
   it('fits an explicit image block to the paper (scaled down, left-aligned, dithered on request)', () => {
     const wide = encodeEscPos([{ t: 'image', source: gray(1000, 10) }], opts);
-    expect([...wide.subarray(9, 17)]).toEqual([
+    expect([...wide.subarray(13, 21)]).toEqual([
       0x1d, 0x76, 0x30, 0x00, 72, 0, 6, 0,
     ]);
     const narrow = encodeEscPos(
       [{ t: 'image', source: gray(8, 2, 128), dither: true }],
-      { charsPerLine: 32, dots: 384 },
+      { charsPerLine: 32, dots: 384, leftMarginDots: 96 },
     );
-    expect([...narrow.subarray(9, 17)]).toEqual([
+    expect([...narrow.subarray(13, 21)]).toEqual([
       0x1d, 0x76, 0x30, 0x00, 48, 0, 2, 0,
     ]);
   });
@@ -79,7 +86,7 @@ describe('encoder guards', () => {
       ...opts,
       renderer: createFakeRasterRenderer(),
     });
-    expect([...bytes.subarray(9, 17)]).toEqual([
+    expect([...bytes.subarray(13, 21)]).toEqual([
       0x1d, 0x76, 0x30, 0x00, 72, 0, 16, 0,
     ]);
   });

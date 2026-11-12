@@ -89,6 +89,7 @@ export function encodeFor(
   return encodeEscPos(blocks, {
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
+    leftMarginDots: paper.leftMarginDots,
     itemLayout: paper.itemLayout,
     cut: printer.cut ?? 'partial',
     drawerPin: printer.drawer_pin ?? 2,
@@ -114,6 +115,7 @@ export async function printBlocks(
   if (printer.transport === 'agent' && printer.agent?.mode === 'driver') {
     const canvas = await renderReceiptCanvas(blocks, {
       dots: paper.dots,
+      paperDots: paper.paperDots,
       charsPerLine: paper.charsPerLine,
       itemLayout: paper.itemLayout,
       logo: printer.print_logo === false ? null : logo,
@@ -140,7 +142,7 @@ export async function printBlocks(
     throw new PrintError('NO_PRINTER');
   if (printer.transport === 'system') {
     const html = renderReceiptHtml(blocks, {
-      widthMm: paper.paperMm,
+      widthMm: paper.printMm,
       charsPerLine: paper.charsPerLine,
       itemLayout: paper.itemLayout,
       logoUrl:
@@ -150,7 +152,7 @@ export async function printBlocks(
     });
     const system = deps.system ?? printHtmlViaSystem;
     for (let i = 0; i < copies; i += 1) {
-      const result = await system(html, paper.paperMm);
+      const result = await system(html, paper.printMm);
       if (!result.ok)
         throw new PrintError(
           result.code === 'TIMEOUT' ? 'TIMEOUT' : 'UNSUPPORTED',

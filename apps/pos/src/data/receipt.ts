@@ -9,9 +9,9 @@ import {
   formatReceiptDate,
   formatReceiptMoney,
   type ItemLayout,
-  itemLayoutFor,
   type ReceiptPayment,
   receiptLabelsFor,
+  resolvePaper,
   type SaleReceiptInput,
 } from '@bikri/printer';
 import { readStoredLanguage } from '../i18n/i18n.ts';
@@ -21,8 +21,11 @@ import { writeAction } from './write.ts';
 /** `kv.printer` (06 §8, screens/17 Printer). Missing fields take the defaults noted. */
 export type PrinterKv = {
   transport?: 'usb' | 'serial' | 'system' | 'agent';
+  /** Physical paper/head width. Default 80. */
   paper_mm?: 58 | 80;
+  /** Printer's current printable line width. 32 = a 58 mm printer setting. */
   chars_per_line?: number;
+  /** Print area width in dots. 384 = 58 mm print, 512/576 = 80 mm print. */
   dots?: number;
   usb?: {
     vendorId: number;
@@ -62,9 +65,16 @@ export type PrinterKv = {
 };
 
 export type ReceiptPaper = {
+  /** Physical paper/head width. */
   paperMm: 58 | 80;
+  /** Width the printer is currently configured to print (58 or 80 mm). */
+  printMm: 58 | 80;
   charsPerLine: number;
   dots: number;
+  /** Full paper/head width in dots. */
+  paperDots: number;
+  /** Left margin that centres the print area on the paper. */
+  leftMarginDots: number;
   itemLayout: ItemLayout;
   qr: boolean;
 };
@@ -75,13 +85,25 @@ export function receiptPaper(
 ): ReceiptPaper {
   const paperMm = printer?.paper_mm === 58 ? 58 : 80;
   const charsPerLine = printer?.chars_per_line ?? (paperMm === 58 ? 32 : 48);
+  const dots = printer?.dots ?? dotsForChars(charsPerLine);
+  const resolved = resolvePaper({ paperMm, charsPerLine, dots });
   return {
     paperMm,
+    printMm: dots <= 384 ? 58 : 80,
     charsPerLine,
-    dots: printer?.dots ?? (paperMm === 58 ? 384 : 576),
-    itemLayout: itemLayoutFor(charsPerLine, paperMm),
+    dots,
+    paperDots: resolved.paperDots,
+    leftMarginDots: resolved.leftMarginDots,
+    itemLayout: resolved.itemLayout,
     qr: printer?.qr === true,
   };
+}
+
+/** Default print-area dots for the wizard's character choices. */
+function dotsForChars(chars: number): number {
+  if (chars <= 32) return 384;
+  if (chars === 42) return 512;
+  return 576;
 }
 
 const PAY_METHODS = new Set(['cash', 'card', 'bank_wallet']);

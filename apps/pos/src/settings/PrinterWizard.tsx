@@ -292,12 +292,24 @@ export function PrinterWizard({
     }
   };
 
-  const paper = (mm: 58 | 80, wide = false) =>
+  const setChars = (chars: 48 | 42 | 32) =>
     patch({
-      paper_mm: mm,
-      chars_per_line: mm === 58 ? 32 : wide ? 42 : 48,
-      dots: mm === 58 ? 384 : wide ? 512 : 576,
+      chars_per_line: chars,
+      dots: chars === 32 ? 384 : chars === 42 ? 512 : 576,
     });
+
+  const paper = (mm: 58 | 80) => {
+    if (mm === 58) {
+      patch({ paper_mm: 58, chars_per_line: 32, dots: 384 });
+      return;
+    }
+    const chars = draft.chars_per_line ?? 48;
+    patch({
+      paper_mm: 80,
+      chars_per_line: chars,
+      dots: chars === 32 ? 384 : chars === 42 ? 512 : 576,
+    });
+  };
 
   const connectUsb = async (all: boolean) => {
     setError(null);
@@ -407,7 +419,7 @@ export function PrinterWizard({
                 {t('printer.chars_per_line')}
               </legend>
               <div className="flex flex-wrap gap-2">
-                {([48, 42] as const).map((chars) => (
+                {([48, 42, 32] as const).map((chars) => (
                   <label
                     key={chars}
                     className={charsChoice(draft.chars_per_line === chars)}
@@ -416,17 +428,32 @@ export function PrinterWizard({
                       type="radio"
                       name="chars_per_line"
                       checked={draft.chars_per_line === chars}
-                      onChange={() => paper(80, chars === 42)}
+                      onChange={() => setChars(chars)}
                     />
-                    {t(chars === 48 ? 'printer.chars_48' : 'printer.chars_42')}
+                    {t(
+                      chars === 48
+                        ? 'printer.chars_48'
+                        : chars === 42
+                          ? 'printer.chars_42'
+                          : 'printer.chars_32',
+                    )}
                   </label>
                 ))}
               </div>
               <p className="mt-2 text-small text-text-muted">
                 {t('printer.chars_hint')}
               </p>
+              {draft.chars_per_line === 32 ? (
+                <p className="mt-1 text-small text-text-muted">
+                  {t('printer.centered_hint')}
+                </p>
+              ) : null}
             </fieldset>
-          ) : null}
+          ) : (
+            <p className="text-small text-text-muted">
+              {t('printer.paper_58_hint')}
+            </p>
+          )}
         </fieldset>
       ) : null}
 
@@ -791,12 +818,25 @@ export function PrinterWizard({
               />
               {ruler === 'no' ? (
                 <div className="flex flex-wrap gap-2">
+                  {draft.paper_mm === 80 && draft.chars_per_line !== 32 ? (
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() => {
+                        setChars(32);
+                        setTested(false);
+                        setRuler(null);
+                      }}
+                    >
+                      {t('printer.use_32')}
+                    </button>
+                  ) : null}
                   {draft.paper_mm === 80 && draft.chars_per_line !== 42 ? (
                     <button
                       type="button"
                       className={buttonQuiet}
                       onClick={() => {
-                        paper(80, true);
+                        setChars(42);
                         setTested(false);
                         setRuler(null);
                       }}
@@ -895,8 +935,7 @@ export function PrinterWizard({
             className={buttonPrimary}
             disabled={step === 'connection' && !connected}
             onClick={() => {
-              if (step === 'paper' && !draft.chars_per_line)
-                paper(draft.paper_mm ?? 80);
+              if (step === 'paper' && !draft.chars_per_line) setChars(48);
               setStep(step === 'paper' ? 'connection' : 'test');
             }}
           >
