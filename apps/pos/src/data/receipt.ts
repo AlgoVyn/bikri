@@ -77,6 +77,8 @@ export type ReceiptPaper = {
   paperDots: number;
   /** Left margin that centres the print area on the paper. */
   leftMarginDots: number;
+  /** True only when Bikri must override the printer's native width/margin. */
+  sendWidth: boolean;
   itemLayout: ItemLayout;
   qr: boolean;
 };
@@ -97,6 +99,7 @@ export function receiptPaper(
     dots,
     paperDots: resolved.paperDots,
     leftMarginDots: resolved.leftMarginDots,
+    sendWidth: paperMm !== (dots <= 384 ? 58 : 80),
     itemLayout: resolved.itemLayout,
     qr: printer?.qr === true,
   };

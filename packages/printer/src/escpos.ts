@@ -32,6 +32,8 @@ export type EncodeOptions = {
   itemLayout?: ItemLayout;
   /** Default 0. Left margin that centres a narrower print area on the paper. */
   leftMarginDots?: number;
+  /** Default true. False leaves the printer's native width/margin untouched. */
+  sendWidth?: boolean;
   /** Default partial (`1D 56 42 00`). `none` drops the cut command. */
   cut?: CutMode;
   /** Default pin 2 (`1B 70 00 19 FA`). */
@@ -248,6 +250,7 @@ export function encodeEscPos(
   return encodeCommands(commands, {
     dots: options.dots,
     leftMarginDots,
+    sendWidth: options.sendWidth !== false,
     cut: options.cut ?? 'partial',
     pin,
     imageMode: (options.language ?? 'en') === 'ur',
@@ -260,6 +263,7 @@ export function encodeEscPos(
 type EncodeState = {
   dots: number;
   leftMarginDots: number;
+  sendWidth: boolean;
   cut: CutMode;
   pin: 2 | 5;
   imageMode: boolean;
@@ -274,16 +278,18 @@ function encodeCommands(
 ): Uint8Array {
   const buf = new ByteBuf();
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
-  // 06 §3: set the left margin first, then the print width. A 58 mm printer
-  // setting on an 80 mm head gets a 96-dot margin so the 384-dot area is
-  // centred; a full-width profile gets 0.
-  buf.push(
-    0x1d,
-    0x4c,
-    state.leftMarginDots & 0xff,
-    (state.leftMarginDots >> 8) & 0xff,
-  );
-  buf.push(0x1d, 0x57, state.dots & 0xff, (state.dots >> 8) & 0xff);
+  // 06 §3: only override the printer's native geometry when the print area is
+  // narrower than the paper. A true 58 mm profile and a full-width 80 mm
+  // profile must keep the printer's own width/margin.
+  if (state.sendWidth) {
+    buf.push(
+      0x1d,
+      0x4c,
+      state.leftMarginDots & 0xff,
+      (state.leftMarginDots >> 8) & 0xff,
+    );
+    buf.push(0x1d, 0x57, state.dots & 0xff, (state.dots >> 8) & 0xff);
+  }
   let style = { ...INITIAL_STYLE };
 
   const applyFont = (next: Style): void => {

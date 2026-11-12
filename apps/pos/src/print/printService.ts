@@ -90,6 +90,7 @@ export function encodeFor(
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
     leftMarginDots: paper.leftMarginDots,
+    sendWidth: paper.sendWidth,
     itemLayout: paper.itemLayout,
     cut: printer.cut ?? 'partial',
     drawerPin: printer.drawer_pin ?? 2,

@@ -195,6 +195,7 @@ describe('share helpers', () => {
       charsPerLine: 32,
       dots: 384,
       itemLayout: 'stacked',
+      sendWidth: false,
       qr: true,
     });
     expect(
@@ -207,6 +208,7 @@ describe('share helpers', () => {
       dots: 384,
       paperDots: 576,
       leftMarginDots: 96,
+      sendWidth: true,
       itemLayout: 'stacked',
     });
     expect(
@@ -219,6 +221,7 @@ describe('share helpers', () => {
       dots: 288,
       paperDots: 576,
       leftMarginDots: 144,
+      sendWidth: true,
       itemLayout: 'stacked',
     });
   });

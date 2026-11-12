@@ -56,6 +56,11 @@ describe('encoder guards', () => {
     ]);
   });
 
+  it('skips the width override when the printer keeps its native geometry', () => {
+    const bytes = encodeEscPos([], { ...opts, sendWidth: false });
+    expect([...bytes]).toEqual([0x1b, 0x40, 0x1b, 0x74, 0x00]);
+  });
+
   it('skips the logo when no bitmap is given and an empty QR', () => {
     const bytes = encodeEscPos([{ t: 'logo' }, { t: 'qr', data: '' }], opts);
     expect([...bytes]).toEqual([
