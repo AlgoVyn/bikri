@@ -6,7 +6,7 @@
 
 export const AGENT_URL = 'http://127.0.0.1:17890';
 /** Update this tag when publishing a new print-agent release. */
-export const AGENT_RELEASE_TAG = 'print-agent-v0.1.1';
+export const AGENT_RELEASE_TAG = 'print-agent-v0.1.2';
 export const AGENT_RELEASE_URL = `https://github.com/AlgoVyn/bikri/releases/tag/${AGENT_RELEASE_TAG}`;
 const releaseAsset = (name: string) =>
   `https://github.com/AlgoVyn/bikri/releases/download/${AGENT_RELEASE_TAG}/${name}`;
