@@ -209,14 +209,13 @@ function requireRenderer(renderer: RasterRenderer | undefined): RasterRenderer {
 
 /**
  * Encode blocks to ESC/POS. Every job starts with `1B 40` and code page
- * PC437 `1B 74 00`, then resets the left margin and sets the printing area
- * width to the configured dots. Align, bold, and size are sent only when they
- * change. Raster rows use `GS v 0` (`1D 76 30 00`).
+ * PC437 `1B 74 00`, then sets the printing area width to the configured dots.
+ * Align, bold, and size are sent only when they change. Raster rows use
+ * `GS v 0` (`1D 76 30 00`).
  *
- * `GS L` / `GS W` matter for printers whose NVRAM paper width is still 58 mm
- * (384 dots): the Windows test page is full width because the driver sets the
- * page itself, while raw ESC/POS otherwise inherits the 58 mm default and
- * prints only the left part of an 80 mm roll.
+ * `GS W` keeps the configured width, but the left margin is left alone: a
+ * printer set to 58 mm paper on an 80 mm head may centre that narrower print
+ * area, and a `GS L 0` reset would force the receipt to the left edge.
  */
 export function encodeEscPos(
   blocks: Block[],
@@ -264,9 +263,9 @@ function encodeCommands(
 ): Uint8Array {
   const buf = new ByteBuf();
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
-  // 06 §3: zero the left margin and use the full configured width, so a
-  // printer still configured for 58 mm paper does not clip an 80 mm receipt.
-  buf.push(0x1d, 0x4c, 0x00, 0x00);
+  // 06 §3: keep the configured print width. Do not send GS L: a printer set
+  // to 58 mm paper on an 80 mm head may centre the narrower print area, and
+  // forcing the left margin to zero would pin the receipt to the left edge.
   buf.push(0x1d, 0x57, state.dots & 0xff, (state.dots >> 8) & 0xff);
   let style = { ...INITIAL_STYLE };
 
