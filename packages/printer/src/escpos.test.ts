@@ -194,6 +194,29 @@ describe('ESC/POS commands (06 §3)', () => {
     );
   });
 
+  it('centres a 24-column print area on 80 mm paper with a 144-dot margin', () => {
+    const paper = resolvePaper({ paperMm: 80, charsPerLine: 24, dots: 288 });
+    expect(paper.paperDots).toBe(576);
+    expect(paper.leftMarginDots).toBe(144);
+    const bytes = encodeEscPos(
+      buildSaleReceipt(saleBasicInput(), {
+        paperMm: 80,
+        charsPerLine: 24,
+        dots: 288,
+      }),
+      {
+        charsPerLine: 24,
+        dots: 288,
+        leftMarginDots: paper.leftMarginDots,
+        itemLayout: paper.itemLayout,
+        renderer: createFakeRasterRenderer(),
+      },
+    );
+    expect(hex(bytes.subarray(0, 13))).toBe(
+      '1b 40 1b 74 00 1d 4c 90 00 1d 57 20 01',
+    );
+  });
+
   it('prints "Powered by AlgoVyn" small (Font B), centred, last, then Font A and left (06 §4.4)', () => {
     for (const bytes of [sale80, encodeSale(58)]) {
       const text = [...'Powered by AlgoVyn'].map((c) => c.charCodeAt(0));

@@ -177,7 +177,7 @@ export function PrinterPage() {
               ? t('printer.summary_narrow', {
                   where,
                   paper: paper.paperMm,
-                  print: paper.printMm,
+                  print: paper.printWidthMm,
                   chars: paper.charsPerLine,
                 })
               : t('printer.summary', {

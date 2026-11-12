@@ -197,5 +197,29 @@ describe('share helpers', () => {
       itemLayout: 'stacked',
       qr: true,
     });
+    expect(
+      receiptPaper({ paper_mm: 80, chars_per_line: 32, dots: 384 }),
+    ).toMatchObject({
+      paperMm: 80,
+      printMm: 58,
+      printWidthMm: 48,
+      charsPerLine: 32,
+      dots: 384,
+      paperDots: 576,
+      leftMarginDots: 96,
+      itemLayout: 'stacked',
+    });
+    expect(
+      receiptPaper({ paper_mm: 80, chars_per_line: 24, dots: 288 }),
+    ).toMatchObject({
+      paperMm: 80,
+      printMm: 58,
+      printWidthMm: 36,
+      charsPerLine: 24,
+      dots: 288,
+      paperDots: 576,
+      leftMarginDots: 144,
+      itemLayout: 'stacked',
+    });
   });
 });

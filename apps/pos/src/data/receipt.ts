@@ -69,6 +69,8 @@ export type ReceiptPaper = {
   paperMm: 58 | 80;
   /** Width the printer is currently configured to print (58 or 80 mm). */
   printMm: 58 | 80;
+  /** Physical print width in mm at 203 dpi (24 chars → 36 mm, 32 → 48, 48 → 72). */
+  printWidthMm: number;
   charsPerLine: number;
   dots: number;
   /** Full paper/head width in dots. */
@@ -90,6 +92,7 @@ export function receiptPaper(
   return {
     paperMm,
     printMm: dots <= 384 ? 58 : 80,
+    printWidthMm: Math.round(dots / 8),
     charsPerLine,
     dots,
     paperDots: resolved.paperDots,
@@ -101,6 +104,7 @@ export function receiptPaper(
 
 /** Default print-area dots for the wizard's character choices. */
 function dotsForChars(chars: number): number {
+  if (chars <= 24) return 288;
   if (chars <= 32) return 384;
   if (chars === 42) return 512;
   return 576;

@@ -84,6 +84,7 @@ Bikri derives the full head width (`paperDots`) and centres the print area on it
 | 80 mm / 203 dpi | 48 | 576 | 0 | full 72 mm receipt |
 | 80 mm / 180 dpi | 42 | 512 | 0 | full 64 mm receipt |
 | **80 mm** | **32** | **384** | **96** | **printer still set to 58 mm; centred 48 mm receipt** |
+| **80 mm** | **24** | **288** | **144** | **printer column setting is 24; centred 36 mm receipt** |
 | 58 mm | 32 | 384 | 0 | true 58 mm printer |
 
 Every ESC/POS job sends `GS L <left margin>` and then `GS W <print dots>`, so the narrower 58 mm print area sits in the middle of the 80 mm paper instead of against the left edge. Bikri never writes the printer's NVRAM: to use the full 72 mm, set the printer's own **Printing Width Selection** to 80 mm and choose 48 characters in Bikri (D-207).
@@ -96,7 +97,7 @@ All bytes hex. `n` etc. are single bytes.
 |---|---|---|
 | Initialise | `1B 40` | Start of every job; also resets `GS L`/`GS W` |
 | Code page | `1B 74 n` | `n=0` PC437 (default); Bikri sends ASCII only in text mode |
-| Left margin | `1D 4C nL nH` | `(paperDots - dots) / 2`; `96` = `60 00` for an 80 mm head with a 58 mm print area, otherwise 0 |
+| Left margin | `1D 4C nL nH` | `(paperDots - dots) / 2`; `96` = `60 00` for an 80 mm head with a 58 mm/32-column area, `144` = `90 00` for 24 columns, otherwise 0 |
 | Print area width | `1D 57 nL nH` | Configured print dots (`576` = `40 02`, `512` = `00 02`, `384` = `80 01`); set after `GS L` |
 | Align | `1B 61 n` | 0 left, 1 centre, 2 right |
 | Bold on/off | `1B 45 01` / `1B 45 00` | |

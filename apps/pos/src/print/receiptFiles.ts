@@ -221,6 +221,11 @@ export async function receiptPdf(r: ReceiptLayout): Promise<Blob> {
   const jpeg = new Uint8Array(
     await (await canvasBlob(canvas, 'image/jpeg', 0.92)).arrayBuffer(),
   );
-  const pdf = jpegToPdf(jpeg, canvas.width, canvas.height, r.paper.printMm);
+  const pdf = jpegToPdf(
+    jpeg,
+    canvas.width,
+    canvas.height,
+    r.paper.printWidthMm,
+  );
   return new Blob([pdf as BlobPart], { type: 'application/pdf' });
 }

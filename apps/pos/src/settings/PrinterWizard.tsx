@@ -292,11 +292,11 @@ export function PrinterWizard({
     }
   };
 
-  const setChars = (chars: 48 | 42 | 32) =>
-    patch({
-      chars_per_line: chars,
-      dots: chars === 32 ? 384 : chars === 42 ? 512 : 576,
-    });
+  const dotsFor = (chars: number) =>
+    chars <= 24 ? 288 : chars <= 32 ? 384 : chars === 42 ? 512 : 576;
+
+  const setChars = (chars: 48 | 42 | 32 | 24) =>
+    patch({ chars_per_line: chars, dots: dotsFor(chars) });
 
   const paper = (mm: 58 | 80) => {
     if (mm === 58) {
@@ -304,11 +304,7 @@ export function PrinterWizard({
       return;
     }
     const chars = draft.chars_per_line ?? 48;
-    patch({
-      paper_mm: 80,
-      chars_per_line: chars,
-      dots: chars === 32 ? 384 : chars === 42 ? 512 : 576,
-    });
+    patch({ paper_mm: 80, chars_per_line: chars, dots: dotsFor(chars) });
   };
 
   const connectUsb = async (all: boolean) => {
@@ -419,7 +415,7 @@ export function PrinterWizard({
                 {t('printer.chars_per_line')}
               </legend>
               <div className="flex flex-wrap gap-2">
-                {([48, 42, 32] as const).map((chars) => (
+                {([48, 42, 32, 24] as const).map((chars) => (
                   <label
                     key={chars}
                     className={charsChoice(draft.chars_per_line === chars)}
@@ -435,7 +431,9 @@ export function PrinterWizard({
                         ? 'printer.chars_48'
                         : chars === 42
                           ? 'printer.chars_42'
-                          : 'printer.chars_32',
+                          : chars === 32
+                            ? 'printer.chars_32'
+                            : 'printer.chars_24',
                     )}
                   </label>
                 ))}
@@ -443,9 +441,11 @@ export function PrinterWizard({
               <p className="mt-2 text-small text-text-muted">
                 {t('printer.chars_hint')}
               </p>
-              {draft.chars_per_line === 32 ? (
+              {draft.chars_per_line === 32 || draft.chars_per_line === 24 ? (
                 <p className="mt-1 text-small text-text-muted">
-                  {t('printer.centered_hint')}
+                  {t('printer.centered_hint', {
+                    mm: Math.round((draft.dots ?? 384) / 8),
+                  })}
                 </p>
               ) : null}
             </fieldset>
@@ -818,6 +818,19 @@ export function PrinterWizard({
               />
               {ruler === 'no' ? (
                 <div className="flex flex-wrap gap-2">
+                  {draft.paper_mm === 80 && draft.chars_per_line !== 24 ? (
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() => {
+                        setChars(24);
+                        setTested(false);
+                        setRuler(null);
+                      }}
+                    >
+                      {t('printer.use_24')}
+                    </button>
+                  ) : null}
                   {draft.paper_mm === 80 && draft.chars_per_line !== 32 ? (
                     <button
                       type="button"
