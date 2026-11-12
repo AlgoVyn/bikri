@@ -6,16 +6,14 @@ import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { useOnline } from './TopBarParts.tsx';
 
 type TenantStatus = { status: string; since?: number; learned_at?: number };
 type Support = { until: number; reason: string };
 
-/** Offline, read-only (13 §7.2) and support-access (13 §7.5) banners on every screen. */
+/** Read-only (13 §7.2) and support-access (13 §7.5) banners on every screen. */
 export function Banners() {
   const { t, i18n } = useTranslation();
   const timeZone = useShopTimeZone();
-  const online = useOnline();
   const { staff, role } = useCurrentStaff();
   const toast = useToast();
   const state = useLiveQuery(async () => {
@@ -57,7 +55,7 @@ export function Banners() {
   const readOnly = state?.status?.status === 'read_only';
   const support =
     state?.support && state.support.until > Date.now() ? state.support : null;
-  if (online && !readOnly && !support) return null;
+  if (!readOnly && !support) return null;
   const time = support
     ? new Intl.DateTimeFormat(i18n.language === 'ur' ? 'ur-PK' : 'en-PK', {
         dateStyle: 'medium',
@@ -76,9 +74,7 @@ export function Banners() {
           <span aria-hidden="true" className="shrink-0">
             <LockIcon />
           </span>
-          {online
-            ? t('tenant.readOnly.banner')
-            : `${t('shell.offline')} ${t('tenant.readOnly.banner')}`}
+          {t('tenant.readOnly.banner')}
         </p>
       ) : null}
       {support ? (
@@ -102,18 +98,6 @@ export function Banners() {
           ) : null}
         </p>
       ) : null}
-      {online || readOnly ? null : (
-        <p
-          role="status"
-          data-testid="banner-offline"
-          className="flex min-h-11 items-center gap-2 bg-warning-subtle px-4 py-2 text-small text-warning-subtle-ink"
-        >
-          <span aria-hidden="true" className="shrink-0">
-            <InfoIcon />
-          </span>
-          {t('shell.offline')}
-        </p>
-      )}
     </div>
   );
 }
