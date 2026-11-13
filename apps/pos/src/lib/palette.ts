@@ -15,5 +15,5 @@ export const CANVAS = {
 
 export const BROWSER_CHROME = {
   light: '#006bb3',
-  dark: '#0f172a',
+  dark: '#0e1014',
 } as const;

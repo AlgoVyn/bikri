@@ -22,7 +22,7 @@ const NAV = [
 ] as const;
 
 const navLink =
-  'relative flex min-h-11 items-center gap-3 rounded-control px-3 text-small text-text-muted hover:bg-surface-2 aria-[current=page]:bg-primary-subtle aria-[current=page]:font-medium aria-[current=page]:text-primary-subtle-ink lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink lg:aria-[current=page]:bg-white/10 lg:aria-[current=page]:text-white';
+  'relative flex min-h-11 items-center gap-3 rounded-control px-3 text-small text-text-muted hover:bg-surface-2 aria-[current=page]:bg-primary-subtle aria-[current=page]:font-medium aria-[current=page]:text-primary-subtle-ink lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink lg:aria-[current=page]:bg-rail-active-bg lg:aria-[current=page]:text-rail-active-ink';
 
 export function AdminShell() {
   const { t } = useTranslation();
@@ -57,10 +57,10 @@ export function AdminShell() {
         {t('admin.skip_content')}
       </a>
       <div className="lg:grid lg:min-h-dvh lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <aside className="hidden border-e border-white/10 bg-rail lg:flex lg:flex-col">
+        <aside className="hidden border-e border-rail-border bg-rail lg:flex lg:flex-col">
           <Link
             to="/admin"
-            className="flex h-topbar shrink-0 items-center gap-2.5 border-b border-white/10 px-4"
+            className="flex h-topbar shrink-0 items-center gap-2.5 border-b border-rail-border px-4"
           >
             <BikriMark className="size-8" tone="reversed" />
             <span className="min-w-0">
@@ -88,7 +88,7 @@ export function AdminShell() {
               </Link>
             ))}
           </nav>
-          <p className="flex items-center gap-2 border-t border-white/10 px-4 py-3 text-caption text-rail-muted">
+          <p className="flex items-center gap-2 border-t border-rail-border px-4 py-3 text-caption text-rail-muted">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-accent"

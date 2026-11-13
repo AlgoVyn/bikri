@@ -54,6 +54,8 @@
   --shadow-card-hover: 0 4px 12px rgb(15 23 42 / 0.08);
   --shadow-topbar: 0 1px 2px rgb(15 23 42 / 0.04);
   --shadow-modal: 0 12px 32px rgb(15 23 42 / 0.18);
+  /* Phone tab bar: same weight as the top bar, flipped upward. */
+  --shadow-tabbar: 0 -1px 2px rgb(15 23 42 / 0.04);
   --color-bg: #f1f5f9;
   --color-surface: #ffffff;
   --color-surface-2: #f1f5f9;
@@ -61,6 +63,7 @@
   --color-border-strong: #64748b;
   --color-text: #0f172a;
   --color-text-muted: #475569;
+  --color-text-secondary: #334155;
   --color-primary: #006bb3;
   --color-primary-hover: #005a96;
   --color-primary-ink: #ffffff;
@@ -73,6 +76,12 @@
   --color-rail-ink: #f1f5f9;
   --color-rail-muted: #b8c6db;
   --color-rail-active: #4bc2bf;
+  /* Overlays and the active label on the always-navy rail. Light values match the
+     previous hard-coded white/10, white/5 and #fff so the light theme does not shift. */
+  --color-rail-border: rgb(255 255 255 / 0.1);
+  --color-rail-hover: rgb(255 255 255 / 0.05);
+  --color-rail-active-bg: rgb(255 255 255 / 0.1);
+  --color-rail-active-ink: #ffffff;
   --color-accent: #4bc2bf;
   --color-accent-ink: #182e55;
   --color-danger: #b91c1c;
@@ -88,6 +97,7 @@
   --color-info: #005a96;
   --color-info-subtle: #f0f9ff;
   --color-info-subtle-ink: #00497a;
+  --color-focus: #006bb3;
   --color-tile-ink: #ffffff;
   --color-t1: #006bb3;
   --color-t2: #182e55;
@@ -111,37 +121,53 @@
   --z-toast: 60;
 }
 
-/* Dark palette values, referenced by both dark selectors below. */
+/* Dark palette values (Graphite, D-217), referenced by both dark selectors below. */
 :root {
-  --dark-rail: #1d3357;
+  --dark-bg: #0e1014;
+  --dark-surface: #1c2027;
+  --dark-surface-2: #2e333e;
+  --dark-border: #656b7b;
+  --dark-border-strong: #8f95a3;
+  --dark-text: #e6e8ed;
+  --dark-text-secondary: #c2c6ce;
+  --dark-text-muted: #9ba1ac;
+  --dark-primary: #5ea5d4;
+  --dark-primary-hover: #7eb7dd;
+  --dark-primary-ink: #0b283c;
+  --dark-primary-subtle: #143044;
+  --dark-primary-subtle-ink: #d6eaf8;
+  --dark-accent: #4bc2bf;
+  --dark-accent-ink: #0e1014;
+  --dark-success: #4bc2bf;
+  --dark-success-subtle: #0c2e2d;
+  --dark-success-subtle-ink: #b7ebe9;
+  --dark-warning: #d9ae4a;
+  --dark-warning-subtle: #2a2108;
+  --dark-warning-subtle-ink: #f3e0a8;
+  --dark-danger: #e89090;
+  --dark-danger-ink: #3a1010;
+  --dark-danger-subtle: #3a1414;
+  --dark-danger-subtle-ink: #f5c8c8;
+  --dark-info: #7eb7dd;
+  --dark-info-subtle: #102a3c;
+  --dark-info-subtle-ink: #d6eaf8;
+  --dark-rail: #182e55;
+  --dark-rail-ink: #e8eef6;
   --dark-rail-muted: #a9b8ce;
-  --dark-brand-mark: #f1f5f9;
-  --dark-bg: #0f172a;
-  --dark-surface: #1e293b;
-  --dark-surface-2: #273449;
-  --dark-border: #334155;
-  --dark-text: #f1f5f9;
-  --dark-text-muted: #94a3b8;
-  --dark-primary: #4da6ff;
-  --dark-primary-hover: #7dd3fc;
-  --dark-primary-ink: #00385d;
-  --dark-primary-subtle: #00385d;
-  --dark-primary-subtle-ink: #e0f2fe;
-  --dark-accent-ink: #0f172a;
-  --dark-danger: #f87171;
-  --dark-danger-ink: #450a0a;
-  --dark-danger-subtle: #450a0a;
-  --dark-danger-subtle-ink: #fecaca;
-  --dark-warning: #fbbf24;
-  --dark-warning-subtle: #451a03;
-  --dark-warning-subtle-ink: #fde68a;
-  --dark-success: #34d399;
-  --dark-success-subtle: #022c22;
-  --dark-success-subtle-ink: #a7f3d0;
-  --dark-info: #7dd3fc;
-  --dark-info-subtle: #0c2a44;
-  --dark-info-subtle-ink: #e0f2fe;
+  --dark-rail-active: #4bc2bf;
+  --dark-rail-border: rgb(255 255 255 / 0.1);
+  --dark-rail-hover: rgb(255 255 255 / 0.05);
+  --dark-rail-active-bg: rgb(255 255 255 / 0.1);
+  --dark-rail-active-ink: #e8eef6;
+  --dark-brand-mark: #e8eef6;
   --dark-chart-udhaar: #4bc2bf;
+  --dark-focus: #5ea5d4;
+  /* Elevation in dark comes from lighter surfaces; drop shadows only stay on modals. */
+  --dark-shadow-card: none;
+  --dark-shadow-card-hover: none;
+  --dark-shadow-topbar: none;
+  --dark-shadow-tabbar: none;
+  --dark-shadow-modal: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
 :root,
@@ -152,19 +178,28 @@
 [data-theme="dark"] {
   color-scheme: dark;
   --color-rail: var(--dark-rail);
+  --color-rail-ink: var(--dark-rail-ink);
   --color-rail-muted: var(--dark-rail-muted);
+  --color-rail-active: var(--dark-rail-active);
+  --color-rail-border: var(--dark-rail-border);
+  --color-rail-hover: var(--dark-rail-hover);
+  --color-rail-active-bg: var(--dark-rail-active-bg);
+  --color-rail-active-ink: var(--dark-rail-active-ink);
   --color-brand-mark: var(--dark-brand-mark);
   --color-bg: var(--dark-bg);
   --color-surface: var(--dark-surface);
   --color-surface-2: var(--dark-surface-2);
   --color-border: var(--dark-border);
+  --color-border-strong: var(--dark-border-strong);
   --color-text: var(--dark-text);
+  --color-text-secondary: var(--dark-text-secondary);
   --color-text-muted: var(--dark-text-muted);
   --color-primary: var(--dark-primary);
   --color-primary-hover: var(--dark-primary-hover);
   --color-primary-ink: var(--dark-primary-ink);
   --color-primary-subtle: var(--dark-primary-subtle);
   --color-primary-subtle-ink: var(--dark-primary-subtle-ink);
+  --color-accent: var(--dark-accent);
   --color-accent-ink: var(--dark-accent-ink);
   --color-danger: var(--dark-danger);
   --color-danger-ink: var(--dark-danger-ink);
@@ -180,25 +215,40 @@
   --color-info-subtle: var(--dark-info-subtle);
   --color-info-subtle-ink: var(--dark-info-subtle-ink);
   --color-chart-udhaar: var(--dark-chart-udhaar);
+  --color-focus: var(--dark-focus);
+  --shadow-card: var(--dark-shadow-card);
+  --shadow-card-hover: var(--dark-shadow-card-hover);
+  --shadow-topbar: var(--dark-shadow-topbar);
+  --shadow-tabbar: var(--dark-shadow-tabbar);
+  --shadow-modal: var(--dark-shadow-modal);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --color-rail: var(--dark-rail);
+    --color-rail-ink: var(--dark-rail-ink);
     --color-rail-muted: var(--dark-rail-muted);
+    --color-rail-active: var(--dark-rail-active);
+    --color-rail-border: var(--dark-rail-border);
+    --color-rail-hover: var(--dark-rail-hover);
+    --color-rail-active-bg: var(--dark-rail-active-bg);
+    --color-rail-active-ink: var(--dark-rail-active-ink);
     --color-brand-mark: var(--dark-brand-mark);
     --color-bg: var(--dark-bg);
     --color-surface: var(--dark-surface);
     --color-surface-2: var(--dark-surface-2);
     --color-border: var(--dark-border);
+    --color-border-strong: var(--dark-border-strong);
     --color-text: var(--dark-text);
+    --color-text-secondary: var(--dark-text-secondary);
     --color-text-muted: var(--dark-text-muted);
     --color-primary: var(--dark-primary);
     --color-primary-hover: var(--dark-primary-hover);
     --color-primary-ink: var(--dark-primary-ink);
     --color-primary-subtle: var(--dark-primary-subtle);
     --color-primary-subtle-ink: var(--dark-primary-subtle-ink);
+    --color-accent: var(--dark-accent);
     --color-accent-ink: var(--dark-accent-ink);
     --color-danger: var(--dark-danger);
     --color-danger-ink: var(--dark-danger-ink);
@@ -214,6 +264,12 @@
     --color-info-subtle: var(--dark-info-subtle);
     --color-info-subtle-ink: var(--dark-info-subtle-ink);
     --color-chart-udhaar: var(--dark-chart-udhaar);
+    --color-focus: var(--dark-focus);
+    --shadow-card: var(--dark-shadow-card);
+    --shadow-card-hover: var(--dark-shadow-card-hover);
+    --shadow-topbar: var(--dark-shadow-topbar);
+    --shadow-tabbar: var(--dark-shadow-tabbar);
+    --shadow-modal: var(--dark-shadow-modal);
   }
 }
 
@@ -267,7 +323,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 

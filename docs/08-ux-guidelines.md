@@ -34,47 +34,47 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 
 1. **Live site `https://algovyn.com`** — `<meta name="theme-color" content="#006bb3">`; Tailwind config in the page overrides `blue` with the brand scale `50 #f0f9ff · 100 #e0f2fe · 200 #bae6fd · 300 #7dd3fc · 400 #4da6ff · 500 #2389d9 · 600 #006bb3 · 700 #005a96 · 800 #00497a · 900 #00385d`; focus ring `2px solid #006bb3`; neutrals are Tailwind **slate** (`#0f172a #1e293b #334155 #475569 #64748b #94a3b8 #cbd5e1 #e2e8f0 #f1f5f9 #f8fafc`); status colours used on the page: emerald `#059669/#047857`, red `#dc2626`, amber notice `#f59e0b` / `#fef3c7` / `#92400e`; font Inter. The same scale is in the `AlgoVyn/website` repo (`tailwind.config.cjs`) and its `site.webmanifest` (`theme_color #006bb3`).
 2. **Algovyn logo** (`company-logo-only.png`, the "A" mark) — sampled median colours: navy **`#182E55`** and teal **`#4BC2BF`**.
-3. The site has **no dark theme**; dark values below are **derived** (brand 400/900 + slate), as are the warning/success shades chosen for text contrast. SmartGrind (another Algovyn product) also uses brand blue `#006bb3` and an amber accent, consistent with this.
+3. The site has **no dark theme**. Bikri's dark theme is the **Graphite** palette (D-217): a neutral near-black canvas with a desaturated brand-blue primary, brand-turquoise success/accent, and the brand-navy rail (`#182E55`). It replaces the earlier slate + electric-blue derivation. SmartGrind (another Algovyn product) also uses brand blue `#006bb3` and an amber accent, consistent with the light theme.
 
 | Token | Light | Dark | Use | Origin |
 |---|---|---|---|---|
-| `--color-bg` | `#F1F5F9` | `#0F172A` | App background | slate-100 / slate-900 (site) |
-| `--color-surface` | `#FFFFFF` | `#1E293B` | Cards, modals | site / slate-800 (site) |
-| `--color-surface-2` | `#F1F5F9` | `#273449` | Inputs, hover | slate-100 (site) / derived |
-| `--color-border` | `#E2E8F0` | `#334155` | Dividers (decorative) | slate-200 / slate-700 (site) |
-| `--color-border-strong` | `#64748B` | `#64748B` | Input outlines, controls (≥ 3:1) | slate-500 (site) |
-| `--color-text` | `#0F172A` | `#F1F5F9` | Body | slate-900 / slate-100 (site) |
-| `--color-text-muted` | `#475569` | `#94A3B8` | Secondary | slate-600 / slate-400 (site) |
-| `--color-primary` | `#006BB3` (Algovyn blue) | `#4DA6FF` | Primary buttons, links, focus ring | brand 600 / brand 400 (site) |
-| `--color-primary-hover` | `#005A96` | `#7DD3FC` | Hover/pressed | brand 700 / brand 300 (site) |
-| `--color-primary-ink` | `#FFFFFF` | `#00385D` | Text on primary | white / brand 900 (site) |
-| `--color-primary-subtle` | `#E0F2FE` | `#00385D` | Selected rows, active rail item | brand 100 / brand 900 |
-| `--color-primary-subtle-ink` | `#00497A` | `#E0F2FE` | Text on primary-subtle | brand 800 / brand 100 |
+| `--color-bg` | `#F1F5F9` | `#0E1014` | App background | slate-100 (site) / Graphite near-black (D-217) |
+| `--color-surface` | `#FFFFFF` | `#1C2027` | Cards, modals | site / Graphite surface (D-217) |
+| `--color-surface-2` | `#F1F5F9` | `#2E333E` | Inputs, hover, elevated surfaces | slate-100 (site) / Graphite elevated (D-217) |
+| `--color-border` | `#E2E8F0` | `#656B7B` | Dividers (decorative; ≥ 3:1 on Graphite surfaces) | slate-200 / Graphite (D-217) |
+| `--color-border-strong` | `#64748B` | `#8F95A3` | Input outlines, controls (≥ 3:1) | slate-500 (site) / Graphite (D-217) |
+| `--color-text` | `#0F172A` | `#E6E8ED` | Body | slate-900 / Graphite off-white (D-217; avoids pure white) |
+| `--color-text-muted` | `#475569` | `#9BA1AC` | Secondary / muted | slate-600 / Graphite muted (D-217) |
+| `--color-primary` | `#006BB3` (Algovyn blue) | `#5EA5D4` | Primary buttons, links, focus ring | brand 600 / desaturated brand blue (D-217) |
+| `--color-primary-hover` | `#005A96` | `#7EB7DD` | Hover/pressed | brand 700 / same-hue lightening (D-217) |
+| `--color-primary-ink` | `#FFFFFF` | `#0B283C` | Text on primary | white / Graphite primary ink (D-217) |
+| `--color-primary-subtle` | `#E0F2FE` | `#143044` | Selected rows | brand 100 / Graphite (D-217) |
+| `--color-primary-subtle-ink` | `#00497A` | `#D6EAF8` | Text on primary-subtle | brand 800 / Graphite (D-217) |
 | `--color-brand-navy` | `#182E55` | `#182E55` | Logo, receipt preview header | logo |
-| `--color-brand-mark` | `#182E55` | `#F1F5F9` | The book of the Bikri mark on theme surfaces (D-216) | logo navy / slate-100 |
-| `--color-rail` | `#182E55` | `#1D3357` | Desktop rail background | logo navy / lighter navy so the rail stays distinct from the dark page |
-| `--color-rail-ink` | `#F1F5F9` | `#F1F5F9` | Active rail label and icon | slate-100 (site) |
+| `--color-brand-mark` | `#182E55` | `#E8EEF6` | The book of the Bikri mark on theme surfaces (D-216) | logo navy / Graphite rail ink (D-217) |
+| `--color-rail` | `#182E55` | `#182E55` | Desktop rail background | logo navy in both themes; in dark it sits on the Graphite canvas (D-217) |
+| `--color-rail-ink` | `#F1F5F9` | `#E8EEF6` | Rail wordmark and book fill (`tone="reversed"`) | slate-100 / Graphite off-white (D-217) |
 | `--color-rail-muted` | `#B8C6DB` | `#A9B8CE` | Inactive rail labels and brand wordmark | derived |
 | `--color-rail-active` | `#4BC2BF` | `#4BC2BF` | Active rail indicator | logo teal |
 | `--color-accent` | `#4BC2BF` (Algovyn teal) | `#4BC2BF` | Highlights, "Held" badges, charts accent | logo |
-| `--color-accent-ink` | `#182E55` | `#0F172A` | Text on accent | logo navy / slate-900 |
-| `--color-danger` | `#B91C1C` | `#F87171` | Below cost, refunds, destructive | red-700 (site scale; red-600 fails 4.5:1 on the slate-100 page) / red-400 derived |
-| `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#450A0A` / `#FECACA` | Error banners | derived (Tailwind red) |
-| `--color-warning` | `#B45309` | `#FBBF24` | Low stock, over limit, short | derived (amber-700 / amber-400; site's `#f59e0b` fails text contrast on white) |
-| `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#451A03` / `#FDE68A` | Warning banners | site notice colours / derived |
-| `--color-success` | `#047857` | `#34D399` | Synced, drawer correct | emerald-700 (site) / emerald-400 derived |
-| `--color-success-subtle` / ink | `#D1FAE5` / `#065F46` | `#022C22` / `#A7F3D0` | Success banners | emerald-100 (site) / derived |
-| `--color-info` | `#005A96` | `#7DD3FC` | Neutral notices | brand 700 / brand 300 |
-| `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#0C2A44` / `#E0F2FE` | Info banners | brand 50 / derived |
+| `--color-accent-ink` | `#182E55` | `#0E1014` | Text on accent | logo navy / Graphite canvas (D-217) |
+| `--color-danger` | `#B91C1C` | `#E89090` | Below cost, refunds, destructive | red-700 (site scale; red-600 fails 4.5:1 on the slate-100 page) / calmer Graphite red (D-217) |
+| `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#3A1414` / `#F5C8C8` | Error banners | derived (Tailwind red) / Graphite (D-217) |
+| `--color-warning` | `#B45309` | `#D9AE4A` | Low stock, over limit, short | derived (amber-700; site's `#f59e0b` fails text contrast on white) / Graphite amber (D-217) |
+| `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#2A2108` / `#F3E0A8` | Warning banners | site notice colours / Graphite (D-217) |
+| `--color-success` | `#047857` | `#4BC2BF` | Synced, drawer correct | emerald-700 (site) / brand turquoise (D-217) |
+| `--color-success-subtle` / ink | `#D1FAE5` / `#065F46` | `#0C2E2D` / `#B7EBE9` | Success banners | emerald-100 (site) / turquoise tint (D-217) |
+| `--color-info` | `#005A96` | `#7EB7DD` | Neutral notices | brand 700 / Graphite info (D-217) |
+| `--color-info-subtle` / ink | `#F0F9FF` / `#00497A` | `#102A3C` / `#D6EAF8` | Info banners | brand 50 / Graphite (D-217) |
 
-`theme-color` meta and manifest `theme_color`: `#006BB3`. The desktop rail is brand navy in light mode and a lighter navy (`#1D3357`) in dark mode, so it keeps a clear step from the `#0F172A` page like the light rail does. It carries the Bikri mark (reversed) and the Bikri wordmark, `--color-rail-ink` labels and a 4 px teal active indicator; the active item also gets a white/10 background. The phone bottom bar stays `--color-surface` so it reads as part of the page.
+`theme-color` meta is `#006BB3` in light and `#0E1014` in dark (the Graphite canvas); the manifest `theme_color` stays `#006BB3` (D-025). The desktop rail is brand navy `#182E55` in both themes: in dark it sits on the Graphite canvas, so the column stays branded without a second navy. It carries the Bikri mark (reversed) and the Bikri wordmark, `--color-rail-ink` labels and a 4 px teal active indicator; the active item uses `--color-rail-active-bg` / `--color-rail-active-ink` (white/10 and `#FFFFFF` in light, the same overlay and `#E8EEF6` in dark). Rail edges and hover use `--color-rail-border` and `--color-rail-hover` rather than hard-coded `white/10` and `white/5`. The phone bottom bar stays `--color-surface` so it reads as part of the page.
 
 #### Bikri mark and wordmark (D-216)
 
 The Bikri mark is an **open ledger** with a **tick cut through both pages** and a **turquoise total line** under the book: a sale recorded, a book that balances. The tick is deliberately smaller than the book (brand set v6) and its point sits on the left page, off the spine, so the ledger reads first. The wordmark is **Bikri** in Inter semibold with −1.2% tracking (`tracking-wordmark`), sentence case. Masters: `apps/pos/scripts/brand/` (icons) and [docs/brand/](brand/bikri-horizontal-fullcolour-light.svg) (lockups for docs and the README).
 
 - **UI:** `components/BikriMark.tsx`, an inline SVG drawn from the small-size master (wider tick, heavier total line) so it stays clear at 24–40 px. No tile behind it. The tick is a real cut-out, so it shows the surface behind it.
-  - `tone="auto"` (theme surfaces: lock, enrol, setup card, shop request, operator top bar): book `--color-brand-mark`, navy in light and slate-100 in dark.
+  - `tone="auto"` (theme surfaces: lock, enrol, setup card, shop request, operator top bar): book `--color-brand-mark`, navy in light and `#E8EEF6` in dark.
   - `tone="reversed"` (the always-navy rail, operator sidebar and setup brand panel): book `--color-rail-ink`.
   - The total line is always `--color-accent` (`#4BC2BF`).
 - **Icons** (`apps/pos/public/`, generated by `node scripts/generate-icons.ts`): navy tile, white book, turquoise total line, tick cut through to navy. `icons/app-icon-{192,512}.png` (rounded, purpose `any`), `icons/maskable-{192,512}.png` (full bleed, book inside the 80% safe circle), `icons/apple-touch-icon.png` (180, full bleed; iOS rounds it), `favicon.svg` and `favicon.ico` (16/32/48) from the small-size master.
@@ -84,7 +84,7 @@ Category tile colours (8, white initials on each): `#006BB3 #182E55 #0F766E #047
 
 #### Contrast check (WCAG 2.2 AA: 4.5:1 body text, 3:1 large text / UI components)
 
-Computed with the WCAG relative-luminance formula on 27–28 Oct 2026. CI repeats this with `tools/contrast-check.ts` over the token pairs below and fails on any regression.
+Computed with the WCAG relative-luminance formula (light pairs 27–28 Oct 2026; Graphite dark pairs 13 Nov 2026, D-217). CI repeats this with `tools/contrast-check.ts` over the token pairs below and fails on any regression.
 
 | Mode | Pair | Ratio | Needed | Result |
 |---|---|---|---|---|
@@ -110,30 +110,30 @@ Computed with the WCAG relative-luminance formula on 27–28 Oct 2026. CI repeat
 | Light | info ink `#00497A` on `#F0F9FF` | 8.82 | 4.5 | pass |
 | Light | border-strong `#64748B` on surface-2 `#F1F5F9` | 4.34 | 3.0 | pass |
 | Light | focus `#006BB3` on white | 5.59 | 3.0 | pass |
-| Dark | text `#F1F5F9` on bg `#0F172A` | 16.30 | 4.5 | pass |
-| Dark | text `#F1F5F9` on surface `#1E293B` | 13.35 | 4.5 | pass |
-| Dark | text-muted `#94A3B8` on surface-2 `#273449` | 4.89 | 4.5 | pass |
-| Dark | primary-ink `#00385D` on primary `#4DA6FF` | 4.77 | 4.5 | pass |
-| Dark | primary `#4DA6FF` (links) on surface `#1E293B` | 5.72 | 4.5 | pass |
-| Dark | accent-ink `#0F172A` on accent `#4BC2BF` | 8.30 | 4.5 | pass |
-| Dark | danger `#F87171` on surface `#1E293B` | 5.29 | 4.5 | pass |
-| Dark | warning `#FBBF24` on surface | 8.76 | 4.5 | pass |
-| Dark | success `#34D399` on surface | 7.61 | 4.5 | pass |
-| Dark | info `#7DD3FC` on surface | 8.77 | 4.5 | pass |
-| Dark | border-strong `#64748B` on surface | 3.07 | 3.0 | pass |
-| Dark | primary-ink `#00385D` on primary-hover `#7DD3FC` | 7.31 | 4.5 | pass |
-| Dark | rail-ink `#F1F5F9` on rail `#1D3357` | 11.52 | 4.5 | pass |
-| Dark | rail-muted `#A9B8CE` on rail `#1D3357` | 6.27 | 4.5 | pass |
-| Dark | rail-active `#4BC2BF` on rail `#1D3357` | 5.87 | 4.5 | pass |
-| Dark | primary-subtle-ink `#E0F2FE` on `#00385D` | 10.62 | 4.5 | pass |
-| Dark | banner inks on danger/warning/success/info subtle | 11.16 / 12.03 / 11.81 / 12.80 | 4.5 | pass |
+| Dark | text `#E6E8ED` on bg `#0E1014` | 15.53 | 4.5 | pass |
+| Dark | text `#E6E8ED` on surface `#1C2027` | 13.33 | 4.5 | pass |
+| Dark | text-muted `#9BA1AC` on surface-2 `#2E333E` | 4.87 | 4.5 | pass |
+| Dark | primary-ink `#0B283C` on primary `#5EA5D4` | 5.65 | 4.5 | pass |
+| Dark | primary `#5EA5D4` (links) on surface `#1C2027` | 6.08 | 4.5 | pass |
+| Dark | accent-ink `#0E1014` on accent `#4BC2BF` | 8.86 | 4.5 | pass |
+| Dark | danger `#E89090` on surface `#1C2027` | 6.86 | 4.5 | pass |
+| Dark | warning `#D9AE4A` on surface `#1C2027` | 7.86 | 4.5 | pass |
+| Dark | success `#4BC2BF` on surface `#1C2027` | 7.60 | 4.5 | pass |
+| Dark | info `#7EB7DD` on surface `#1C2027` | 7.55 | 4.5 | pass |
+| Dark | border-strong `#8F95A3` on surface `#1C2027` | 5.44 | 3.0 | pass |
+| Dark | primary-ink `#0B283C` on primary-hover `#7EB7DD` | 7.02 | 4.5 | pass |
+| Dark | rail-ink `#E8EEF6` on rail `#182E55` | 11.53 | 4.5 | pass |
+| Dark | rail-muted `#A9B8CE` on rail `#182E55` | 6.69 | 4.5 | pass |
+| Dark | rail-active `#4BC2BF` on rail `#182E55` | 6.26 | 4.5 | pass |
+| Dark | primary-subtle-ink `#D6EAF8` on `#143044` | 11.06 | 4.5 | pass |
+| Dark | banner inks on danger/warning/success/info subtle | 10.84 / 12.16 / 11.13 / 11.97 | 4.5 | pass |
 | Tiles | white on each of the 8 tile colours | 5.02 – 13.45 | 4.5 | pass |
 
 Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `#94A3B8` as text in light mode; site amber `#F59E0B` or emerald `#059669` as text on white (2.15 / 3.77:1; teal `#4BC2BF` is 2.15:1 and `#4DA6FF` 2.56:1) — use the warning/success tokens instead. Receipts are always black on white and are unaffected by the theme.
 
 ### Spacing, radius, elevation
 
-4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows: one soft two-layer level for cards (`0 1px 2px rgb(15 23 42 / .04), 0 1px 3px rgb(15 23 42 / .06)`), a top-bar shadow (`0 1px 2px rgb(15 23 42 / .04)`) and one for modals (`0 12px 32px rgb(15 23 42 / .18)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
+4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows (light): one soft two-layer level for cards (`0 1px 2px rgb(15 23 42 / .04), 0 1px 3px rgb(15 23 42 / .06)`), a top-bar shadow (`0 1px 2px rgb(15 23 42 / .04)`), a matching upward tab-bar shadow, and one for modals (`0 12px 32px rgb(15 23 42 / .18)`). In Graphite dark, card and bar shadows are none — elevation comes from lighter surfaces and the 3:1 border; modals keep a darker shadow (`0 12px 32px rgb(0 0 0 / 0.5)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
 
 ### Typography
 
