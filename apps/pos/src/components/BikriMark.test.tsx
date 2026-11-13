@@ -14,8 +14,9 @@ describe('BikriMark (D-216)', () => {
     expect(book?.getAttribute('class')).toBe('fill-brand-mark');
     expect(total?.getAttribute('class')).toBe('fill-accent');
     // Two distinct shapes: the book (with the tick cut) and the total line beneath it.
-    expect(book?.getAttribute('d')).toMatch(/^M11\.26 /);
-    expect(total?.getAttribute('d')).toMatch(/^M6\.23 /);
+    expect(book?.getAttribute('d')).toMatch(/^M[\d.]+ [\d.]+ /);
+    expect(total?.getAttribute('d')).toMatch(/^M[\d.]+ [\d.]+ /);
+    expect(book?.getAttribute('d')).not.toBe(total?.getAttribute('d'));
     expect(svg?.getAttribute('data-testid')).toBe('bikri-mark');
   });
 

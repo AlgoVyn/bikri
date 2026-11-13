@@ -71,7 +71,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 
 #### Bikri mark and wordmark (D-216)
 
-The Bikri mark is an **open ledger** with a **tick cut through both pages** and a **turquoise total line** under the book: a sale recorded, a book that balances. The wordmark is **Bikri** in Inter semibold with −1.2% tracking (`tracking-wordmark`), sentence case. Masters: `apps/pos/scripts/brand/` (icons) and [docs/brand/](brand/bikri-horizontal-fullcolour-light.svg) (lockups for docs and the README).
+The Bikri mark is an **open ledger** with a **tick cut through both pages** and a **turquoise total line** under the book: a sale recorded, a book that balances. The tick is deliberately smaller than the book (brand set v6) and its point sits on the left page, off the spine, so the ledger reads first. The wordmark is **Bikri** in Inter semibold with −1.2% tracking (`tracking-wordmark`), sentence case. Masters: `apps/pos/scripts/brand/` (icons) and [docs/brand/](brand/bikri-horizontal-fullcolour-light.svg) (lockups for docs and the README).
 
 - **UI:** `components/BikriMark.tsx`, an inline SVG drawn from the small-size master (wider tick, heavier total line) so it stays clear at 24–40 px. No tile behind it. The tick is a real cut-out, so it shows the surface behind it.
   - `tone="auto"` (theme surfaces: lock, enrol, setup card, shop request, operator top bar): book `--color-brand-mark`, navy in light and slate-100 in dark.
