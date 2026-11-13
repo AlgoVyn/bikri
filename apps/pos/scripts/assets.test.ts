@@ -50,24 +50,39 @@ describe('self-hosted PWA assets', () => {
     }
   });
 
-  it('ships an original B mark at the manifest sizes', async () => {
-    expect(
-      pngSize(await readFile(join(publicDir, 'icons/icon-192.png'))),
-    ).toEqual({
-      width: 192,
-      height: 192,
-    });
-    expect(
-      pngSize(await readFile(join(publicDir, 'icons/icon-512.png'))),
-    ).toEqual({
-      width: 512,
-      height: 512,
-    });
-    expect(
-      pngSize(await readFile(join(publicDir, 'icons/icon-maskable-512.png'))),
-    ).toEqual({
-      width: 512,
-      height: 512,
-    });
+  it('ships the ledger mark at the manifest and Apple touch sizes (D-216)', async () => {
+    for (const [name, size] of [
+      ['icons/app-icon-192.png', 192],
+      ['icons/app-icon-512.png', 512],
+      ['icons/maskable-192.png', 192],
+      ['icons/maskable-512.png', 512],
+      ['icons/apple-touch-icon.png', 180],
+    ] as const) {
+      expect(pngSize(await readFile(join(publicDir, name)))).toEqual({
+        width: size,
+        height: size,
+      });
+    }
+  });
+
+  it('ships an SVG favicon and a 16/32/48 .ico linked from index.html', async () => {
+    const svg = await readFile(join(publicDir, 'favicon.svg'), 'utf8');
+    expect(svg).toContain('<svg');
+    expect(svg).not.toMatch(/<script|<text|href="http/i);
+    const ico = await readFile(join(publicDir, 'favicon.ico'));
+    expect(ico.readUInt16LE(0)).toBe(0);
+    expect(ico.readUInt16LE(2)).toBe(1);
+    const count = ico.readUInt16LE(4);
+    const sizes = Array.from({ length: count }, (_, i) =>
+      ico.readUInt8(6 + 16 * i),
+    );
+    expect(sizes).toEqual([16, 32, 48]);
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+    const html = await readFile(join(root, 'index.html'), 'utf8');
+    expect(html).toContain('href="/favicon.ico"');
+    expect(html).toContain('href="/favicon.svg" type="image/svg+xml"');
+    expect(html).toContain(
+      '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />',
+    );
   });
 });

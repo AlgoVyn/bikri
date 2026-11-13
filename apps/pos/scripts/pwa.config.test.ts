@@ -48,7 +48,12 @@ describe('pwa options', () => {
     const icons = pwaOptions.manifest?.icons ?? [];
     expect(
       icons.map((icon) => `${icon.sizes ?? ''} ${icon.purpose ?? ''}`),
-    ).toEqual(['192x192 any', '512x512 any', '512x512 maskable']);
+    ).toEqual([
+      '192x192 any',
+      '512x512 any',
+      '192x192 maskable',
+      '512x512 maskable',
+    ]);
     for (const icon of icons) {
       expect(icon.src.startsWith('/bikri/icons/')).toBe(true);
     }

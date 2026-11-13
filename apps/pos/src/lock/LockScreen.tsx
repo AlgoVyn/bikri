@@ -178,14 +178,9 @@ export function LockScreen() {
           className="flex min-w-0 items-center gap-2"
           data-testid="brand-lock"
         >
-          <span
-            aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
-          >
-            <BikriMark className="size-5" />
-          </span>
+          <BikriMark className="size-9" />
           <div className="min-w-0">
-            <p className="text-small font-semibold uppercase tracking-[0.14em] text-text-muted">
+            <p className="text-body font-semibold tracking-wordmark">
               {t('common.app_name')}
             </p>
             <p className="truncate font-medium">

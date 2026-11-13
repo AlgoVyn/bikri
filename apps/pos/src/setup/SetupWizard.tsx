@@ -329,13 +329,8 @@ export function SetupWizard() {
         <aside className="hidden flex-col justify-between gap-8 rounded-card bg-rail p-6 text-rail-ink shadow-card lg:flex">
           <div>
             <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="flex size-10 items-center justify-center rounded-control bg-accent text-accent-ink"
-              >
-                <BikriMark className="size-5" />
-              </span>
-              <span className="text-caption font-semibold uppercase tracking-[0.18em]">
+              <BikriMark className="size-10" tone="reversed" />
+              <span className="text-h2 font-semibold tracking-wordmark">
                 {t('common.app_name')}
               </span>
             </div>
@@ -367,13 +362,8 @@ export function SetupWizard() {
           className="w-full rounded-card border border-border bg-surface p-5 shadow-card"
         >
           <header className="mb-4 flex items-center gap-2.5">
-            <span
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
-            >
-              <BikriMark className="size-5" />
-            </span>
-            <span className="text-caption font-semibold uppercase tracking-[0.18em]">
+            <BikriMark className="size-8" />
+            <span className="text-h2 font-semibold tracking-wordmark">
               {t('common.app_name')}
             </span>
             {step > 0 ? (

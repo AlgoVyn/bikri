@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/bikri-horizontal-white.svg">
+    <img src="docs/brand/bikri-horizontal-fullcolour-light.svg" alt="Bikri" width="240">
+  </picture>
+</p>
+
 # Bikri POS
 
 Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale PWA. It runs many independent shops on one Cloudflare deployment; every shop's data is isolated and can be exported at any time.
