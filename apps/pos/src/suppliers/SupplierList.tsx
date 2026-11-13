@@ -255,7 +255,6 @@ export function SupplierList({
                 active={sort === 'balance'}
                 direction={direction}
                 onClick={() => applySort('balance')}
-                align="end"
               />
               <SortHeader
                 label={t('office.suppliers.col_last_delivery')}
@@ -287,7 +286,7 @@ export function SupplierList({
                       {String(row.supplier.phone ?? '')}
                     </span>
                   </span>
-                  <span className="min-w-0 text-end">
+                  <span className="min-w-0 text-start">
                     {row.balance === 0 ? (
                       <span className="block whitespace-nowrap font-semibold text-text-muted">
                         {t('office.suppliers.settled')}

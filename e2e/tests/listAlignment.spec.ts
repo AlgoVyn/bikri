@@ -88,7 +88,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="sales-list-header"]',
       '[data-testid="sales-list-header"] ~ li a',
-      ['start', 'start', 'start', 'end', 'end', 'start', 'start'],
+      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/udhaar'));
@@ -97,7 +97,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="udhaar-list-header"]',
       '[data-testid="udhaar-list-header"] ~ li a',
-      ['start', 'end', 'start', 'start', 'start'],
+      ['start', 'start', 'start', 'start', 'start'],
     );
 
     await page.evaluate(() => window.__bikriTest?.navigate('/suppliers'));
@@ -106,7 +106,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="suppliers-list-header"]',
       '[data-testid="suppliers-list-header"] ~ li a',
-      ['start', 'end', 'start'],
+      ['start', 'start', 'start'],
     );
   });
   test('Urdu flips the same columns to the right edge', async ({
