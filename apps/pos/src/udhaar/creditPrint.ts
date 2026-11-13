@@ -56,7 +56,7 @@ export function statementBlocks(meta: StatementFileMeta): Block[] {
     const delta = row.debit - row.credit;
     blocks.push({
       t: 'pair',
-      left: `${row.date} · ${row.description}`,
+      left: `${row.dateShort ?? row.date} · ${row.descriptionShort ?? row.description}`,
       right: signed(delta),
     });
   }

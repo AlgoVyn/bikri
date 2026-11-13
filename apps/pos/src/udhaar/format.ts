@@ -6,7 +6,23 @@ export function localeOf(lang: string): string {
 }
 
 const DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
+const SHORT_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
 const TIME_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
+/** Compact `DD/MM/YY` date for the thermal statement; leaves room for description and amount. */
+export function shortDateText(date: string, timeZone: string): string {
+  let formatter = SHORT_DATE_FORMATS.get(timeZone);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      timeZone,
+    });
+    SHORT_DATE_FORMATS.set(timeZone, formatter);
+  }
+  return formatter.format(new Date(`${date}T12:00:00Z`));
+}
 
 export function dateText(date: string, lang: string, timeZone: string): string {
   const locale = localeOf(lang);
@@ -105,6 +121,27 @@ export function entryDescription(t: TFunction, row: StatementEntry): string {
     return t('office.udhaar.entry_void', { invoice: row.invoiceNo ?? '' });
   if (row.kind === 'opening') return t('office.udhaar.entry_opening');
   return row.note || t('office.udhaar.entry_adjustment');
+}
+
+/** Shorter description for the thermal statement; the PDF keeps the full wording. */
+export function entryDescriptionShort(
+  t: TFunction,
+  row: StatementEntry,
+): string {
+  if (row.kind === 'sale')
+    return t('office.udhaar.short_sale', {
+      invoice: row.invoiceNo ?? '',
+    });
+  if (row.kind === 'payment')
+    return t('office.udhaar.short_payment', {
+      method: row.method ? t(`payment.${row.method}`) : '',
+    });
+  if (row.kind === 'refund')
+    return t('office.udhaar.short_refund', { invoice: row.invoiceNo ?? '' });
+  if (row.kind === 'void')
+    return t('office.udhaar.short_void', { invoice: row.invoiceNo ?? '' });
+  if (row.kind === 'opening') return t('office.udhaar.short_opening');
+  return row.note || t('office.udhaar.short_adjustment');
 }
 
 export function groupLabel(t: TFunction, key: string): string {

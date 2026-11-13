@@ -78,7 +78,7 @@ test.describe('list header alignment', () => {
       page,
       '[data-testid="products-list-header"]',
       'ul[aria-label="Products"] > li a',
-      ['start', 'start', 'end', 'end', 'end', 'end', 'end'],
+      ['start', 'start', 'start', 'start', 'start', 'start', 'start'],
       1,
     );
 

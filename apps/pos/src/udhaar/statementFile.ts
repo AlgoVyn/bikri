@@ -5,6 +5,10 @@ import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
 
 export type StatementFileRow = {
   date: string;
+  /** Compact DD/MM/YY date for the thermal print. */
+  dateShort?: string;
+  /** Shorter description for the thermal print. */
+  descriptionShort?: string;
   description: string;
   debit: number;
   credit: number;

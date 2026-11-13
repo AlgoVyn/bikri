@@ -40,7 +40,9 @@ import {
   balanceTone,
   dateText,
   entryDescription,
+  entryDescriptionShort,
   limitPercent,
+  shortDateText,
 } from './format.ts';
 import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
@@ -141,7 +143,9 @@ export function CustomerStatement({
   );
   const rows = statement.rows.map((row) => ({
     date: dateText(String(row.entry.business_date), i18n.language, tz),
+    dateShort: shortDateText(String(row.entry.business_date), tz),
     description: entryDescription(t, row),
+    descriptionShort: entryDescriptionShort(t, row),
     debit: row.debit,
     credit: row.credit,
     balance: row.balance,

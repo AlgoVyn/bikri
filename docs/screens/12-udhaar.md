@@ -39,7 +39,7 @@ Changing the limit writes `audit_log credit_limit_change`. Delete: only when bal
 
 Header: name, phone (tap → `tel:`), balance (large), limit, oldest unpaid, promise. Buttons: `Receive money` (R), `Send reminder` (WhatsApp), `Share statement` (PDF / PNG + wa.me), `Add promise`, `Edit`, `Sell to {name}` (opens Sell with customer).
 
-Table (oldest → newest, with "Jump to latest"): date, description ("Bill INV-A-1042 (3 items)" link / "Payment received · Cash" / "Refund on INV-A-1042" / "Opening balance"), debit (gave), credit (got), **balance after each entry**. Date range filter (the selected date is shown only inside the field, with no separate hint line), `Export CSV`, `Print` (thermal statement).
+Table (oldest → newest, with "Jump to latest"): date, description ("Bill INV-A-1042 (3 items)" link / "Payment received · Cash" / "Refund on INV-A-1042" / "Opening balance"), debit (gave), credit (got), **balance after each entry**. Date range filter (the selected date is shown only inside the field, with no separate hint line), `Export CSV`, `Print` (thermal statement; each entry is `DD/MM/YY · short description` with one signed amount, and the total is the ending balance).
 
 ### Reminder message (REQ-B04)
 

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { statementBlocks } from './creditPrint.ts';
+import { shortDateText } from './format.ts';
 
 describe('customer statement print blocks', () => {
+  it('uses a compact DD/MM/YY date', () => {
+    expect(shortDateText('2026-11-13', 'Asia/Karachi')).toBe('13/11/26');
+  });
+
   it('prints one signed amount per entry and the ending balance as total', () => {
     const blocks = statementBlocks({
       shopName: 'Supreme Electronics',
@@ -13,14 +18,18 @@ describe('customer statement print blocks', () => {
       rows: [
         {
           date: '13 Nov 2026',
-          description: 'Bill INV-1',
+          dateShort: '13/11/26',
+          description: 'Bill INV-1 (1 item)',
+          descriptionShort: 'Bill INV-1',
           debit: 150000,
           credit: 0,
           balance: 150000,
         },
         {
           date: '13 Nov 2026',
-          description: 'Payment received',
+          dateShort: '13/11/26',
+          description: 'Payment received · Cash',
+          descriptionShort: 'Payment · Cash',
           debit: 0,
           credit: 25000,
           balance: 125000,
@@ -45,12 +54,12 @@ describe('customer statement print blocks', () => {
     expect(blocks.at(-1)).toEqual({ t: 'cut' });
     expect(blocks).toContainEqual({
       t: 'pair',
-      left: '13 Nov 2026 · Bill INV-1',
+      left: '13/11/26 · Bill INV-1',
       right: '+Rs 1,500',
     });
     expect(blocks).toContainEqual({
       t: 'pair',
-      left: '13 Nov 2026 · Payment received',
+      left: '13/11/26 · Payment · Cash',
       right: '-Rs 250',
     });
     expect(blocks).not.toContainEqual(
