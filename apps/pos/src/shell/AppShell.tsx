@@ -258,13 +258,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
           data-testid="brand-rail"
         >
-          <span
-            aria-hidden="true"
-            className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
-          >
-            <BikriMark className="size-5" />
-          </span>
-          <span className="text-micro font-semibold uppercase tracking-[0.18em] text-rail-muted">
+          <BikriMark className="size-8" tone="reversed" />
+          <span className="text-small font-semibold tracking-wordmark text-rail-ink">
             {t('common.app_name')}
           </span>
         </div>

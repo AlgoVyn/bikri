@@ -1,55 +1,77 @@
-import { mkdir } from 'node:fs/promises';
+// Rasterises the Bikri brand mark (ledger with a cut-out tick, D-216) into the PWA icons,
+// favicons and Apple touch icon under public/. The vector masters live in scripts/brand/:
+//   app-icon.svg  rounded navy tile, for manifest purpose "any"
+//   maskable.svg  full-bleed tile with the book inside the 80% safe circle (also the Apple
+//                 touch icon, which iOS rounds itself)
+//   favicon.svg   small-size master: a wider tick cut and heavier total line for 16-48 px
+// Run with `node scripts/generate-icons.ts` from apps/pos after changing a master.
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
-const outDir = join(dirname(fileURLToPath(import.meta.url)), '../public/icons');
+const here = dirname(fileURLToPath(import.meta.url));
+const brandDir = join(here, 'brand');
+const publicDir = join(here, '../public');
+const iconsDir = join(publicDir, 'icons');
 
-const letterB = `
-  <path fill="#FFFFFF" fill-rule="evenodd" d="
-    M148 88
-    H270
-    C348 88 400 132 400 188
-    C400 234 360 270 300 278
-    C368 288 414 332 414 392
-    C414 456 352 496 260 496
-    H148 Z
-    M212 148
-    H262
-    C304 148 336 164 336 190
-    C336 216 304 232 262 232
-    H212 Z
-    M212 332
-    H270
-    C320 332 352 350 352 384
-    C352 418 320 436 270 436
-    H212 Z"/>
-`;
-
-function icon(inner: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  ${inner}
-</svg>`;
+async function master(name: string): Promise<Buffer> {
+  return readFile(join(brandDir, name));
 }
 
-const anySvg = icon(`
-  <rect width="512" height="512" rx="96" fill="#006BB3"/>
-  <g transform="translate(0 -8)">${letterB}</g>
-`);
+async function png(svg: Buffer, size: number): Promise<Buffer> {
+  return sharp(svg, { density: 300 })
+    .resize(size, size)
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
 
-const maskableSvg = icon(`
-  <rect width="512" height="512" fill="#006BB3"/>
-  <g transform="translate(256 256) scale(0.68) translate(-256 -256)">
-    ${letterB}
-  </g>
-`);
+/** A PNG-compressed .ico (Vista+ format): ICONDIR + one ICONDIRENTRY per image + the PNGs. */
+function ico(images: { size: number; data: Buffer }[]): Buffer {
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(images.length, 4);
+  const entries: Buffer[] = [];
+  let offset = 6 + 16 * images.length;
+  for (const { size, data } of images) {
+    const entry = Buffer.alloc(16);
+    entry.writeUInt8(size >= 256 ? 0 : size, 0);
+    entry.writeUInt8(size >= 256 ? 0 : size, 1);
+    entry.writeUInt8(0, 2);
+    entry.writeUInt8(0, 3);
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
+    entry.writeUInt32LE(data.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    offset += data.length;
+    entries.push(entry);
+  }
+  return Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
+}
 
-await mkdir(outDir, { recursive: true });
-const anyPng = await sharp(Buffer.from(anySvg)).png().toBuffer();
-await sharp(anyPng).resize(512, 512).png().toFile(join(outDir, 'icon-512.png'));
-await sharp(anyPng).resize(192, 192).png().toFile(join(outDir, 'icon-192.png'));
-await sharp(Buffer.from(maskableSvg))
-  .resize(512, 512)
-  .png()
-  .toFile(join(outDir, 'icon-maskable-512.png'));
+await mkdir(iconsDir, { recursive: true });
+const appIcon = await master('app-icon.svg');
+const maskable = await master('maskable.svg');
+const favicon = await master('favicon.svg');
+
+await writeFile(join(iconsDir, 'app-icon-192.png'), await png(appIcon, 192));
+await writeFile(join(iconsDir, 'app-icon-512.png'), await png(appIcon, 512));
+await writeFile(join(iconsDir, 'maskable-192.png'), await png(maskable, 192));
+await writeFile(join(iconsDir, 'maskable-512.png'), await png(maskable, 512));
+await writeFile(
+  join(iconsDir, 'apple-touch-icon.png'),
+  await png(maskable, 180),
+);
+await copyFile(join(brandDir, 'favicon.svg'), join(publicDir, 'favicon.svg'));
+await writeFile(
+  join(publicDir, 'favicon.ico'),
+  ico(
+    await Promise.all(
+      [16, 32, 48].map(async (size) => ({
+        size,
+        data: await png(favicon, size),
+      })),
+    ),
+  ),
+);

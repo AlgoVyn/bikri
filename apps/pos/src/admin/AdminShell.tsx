@@ -62,14 +62,9 @@ export function AdminShell() {
             to="/admin"
             className="flex h-topbar shrink-0 items-center gap-2.5 border-b border-white/10 px-4"
           >
-            <span
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink"
-            >
-              <BikriMark className="size-5" />
-            </span>
+            <BikriMark className="size-8" tone="reversed" />
             <span className="min-w-0">
-              <span className="block text-caption font-semibold uppercase tracking-[0.18em] text-rail-ink">
+              <span className="block text-body font-semibold tracking-wordmark text-rail-ink">
                 {t('common.app_name')}
               </span>
               <span className="block truncate text-caption text-rail-muted">
@@ -105,13 +100,8 @@ export function AdminShell() {
           <header className="sticky top-0 z-30 border-b border-border bg-surface shadow-topbar">
             <div className="flex h-topbar items-center gap-2 px-4">
               <Link to="/admin" className="flex items-center gap-2 lg:hidden">
-                <span
-                  aria-hidden="true"
-                  className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
-                >
-                  <BikriMark className="size-5" />
-                </span>
-                <span className="text-small font-semibold uppercase tracking-[0.16em]">
+                <BikriMark className="size-8" />
+                <span className="text-h2 font-semibold tracking-wordmark">
                   {t('common.app_name')}
                 </span>
               </Link>

@@ -244,11 +244,9 @@ function Brand() {
   const { t } = useTranslation();
   return (
     <header className="flex items-center gap-3">
-      <span className="flex size-10 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-        <BikriMark className="size-6" />
-      </span>
+      <BikriMark className="size-10" />
       <div className="min-w-0 flex-1">
-        <p className="text-small font-semibold uppercase tracking-[0.14em] text-text-muted">
+        <p className="text-h2 font-semibold tracking-wordmark">
           {t('common.app_name')}
         </p>
         <p className="flex items-center gap-1.5 text-small text-text-muted">

@@ -226,13 +226,8 @@ export function EnrolPage({
       <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span
-              aria-hidden="true"
-              className="flex size-8 items-center justify-center rounded-control bg-accent text-accent-ink"
-            >
-              <BikriMark className="size-5" />
-            </span>
-            <p className="text-caption font-semibold uppercase tracking-[0.18em]">
+            <BikriMark className="size-8" />
+            <p className="text-h2 font-semibold tracking-wordmark">
               {t('common.app_name')}
             </p>
           </div>

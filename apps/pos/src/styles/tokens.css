@@ -44,6 +44,8 @@
   --text-price: calc(44 / 15 * 1rem);
   --text-price--line-height: 1.15;
   --tracking-brand: 0.18em;
+  /* The Bikri wordmark: Inter with -1.2% tracking, as in the brand lockups (D-216). */
+  --tracking-wordmark: -0.012em;
   --radius-control: 10px;
   --radius-card: 14px;
   --radius-modal: 18px;
@@ -65,6 +67,8 @@
   --color-primary-subtle: #e0f2fe;
   --color-primary-subtle-ink: #00497a;
   --color-brand-navy: #182e55;
+  /* The Bikri mark's book: navy on light surfaces, near-white on dark ones (D-216). */
+  --color-brand-mark: #182e55;
   --color-rail: #182e55;
   --color-rail-ink: #f1f5f9;
   --color-rail-muted: #b8c6db;
@@ -111,6 +115,7 @@
 :root {
   --dark-rail: #1d3357;
   --dark-rail-muted: #a9b8ce;
+  --dark-brand-mark: #f1f5f9;
   --dark-bg: #0f172a;
   --dark-surface: #1e293b;
   --dark-surface-2: #273449;
@@ -148,6 +153,7 @@
   color-scheme: dark;
   --color-rail: var(--dark-rail);
   --color-rail-muted: var(--dark-rail-muted);
+  --color-brand-mark: var(--dark-brand-mark);
   --color-bg: var(--dark-bg);
   --color-surface: var(--dark-surface);
   --color-surface-2: var(--dark-surface-2);
@@ -181,6 +187,7 @@
     color-scheme: dark;
     --color-rail: var(--dark-rail);
     --color-rail-muted: var(--dark-rail-muted);
+    --color-brand-mark: var(--dark-brand-mark);
     --color-bg: var(--dark-bg);
     --color-surface: var(--dark-surface);
     --color-surface-2: var(--dark-surface-2);

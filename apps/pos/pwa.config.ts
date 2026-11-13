@@ -28,21 +28,28 @@ export const pwaOptions = {
     theme_color: '#006BB3',
     background_color: '#F1F5F9',
     orientation: 'any',
+    /* The ledger-and-tick mark (D-216); masters and generator in scripts/. */
     icons: [
       {
-        src: `${scope}icons/icon-192.png`,
+        src: `${scope}icons/app-icon-192.png`,
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: `${scope}icons/icon-512.png`,
+        src: `${scope}icons/app-icon-512.png`,
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: `${scope}icons/icon-maskable-512.png`,
+        src: `${scope}icons/maskable-192.png`,
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: `${scope}icons/maskable-512.png`,
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',

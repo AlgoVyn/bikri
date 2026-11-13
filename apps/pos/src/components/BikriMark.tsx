@@ -1,21 +1,34 @@
-/** The Bikri mark: a receipt with a B notch. Decorative beside the wordmark. */
-export function BikriMark({ className = 'size-5' }: { className?: string }) {
+/**
+ * The Bikri mark (D-216): an open ledger with a tick cut through both pages and a turquoise
+ * total line beneath. Decorative beside the wordmark. The tick is a real cut-out, so it shows
+ * whatever surface is behind the mark. Drawn from the small-size master (wider tick, heavier
+ * total line) because the UI shows it at 24-40 px.
+ *
+ * `tone="auto"` follows the theme (navy book on light surfaces, near-white in dark mode);
+ * `tone="reversed"` is for the always-navy rail and brand panels.
+ */
+export function BikriMark({
+  className = 'size-7',
+  tone = 'auto',
+}: {
+  className?: string;
+  tone?: 'auto' | 'reversed';
+}) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
+      focusable="false"
+      viewBox="0 -4 128 128.4"
+      className={`${className} shrink-0`}
+      data-testid="bikri-mark"
     >
       <path
-        d="M5 3h14v18l-2.8-1.8L13.4 21 12 19.6 10.6 21 7.8 19.2 5 21V3Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
+        className={tone === 'reversed' ? 'fill-rail-ink' : 'fill-brand-mark'}
+        d="M11.26 0.13 55.26 9.55C58.03 10.15 60 12.59 60 15.42V42.24L53.97 48.93L42.4 37.14C37.19 31.84 28.67 31.77 23.37 36.97C18.07 42.18 17.99 50.7 23.2 56L44.8 78C47.4 80.65 50.98 82.11 54.69 82.03C56.55 81.99 58.35 81.57 60 80.81V91.15C60 92.97 59.18 94.68 57.77 95.82C56.36 96.95 54.51 97.39 52.74 97.01L8.74 87.59C5.97 87 4 84.55 4 81.72V5.99C4 4.18 4.82 2.47 6.23 1.33C7.64 0.19 9.49 -0.25 11.26 0.13ZM72.74 9.55 116.74 0.13C118.51 -0.25 120.36 0.19 121.77 1.33C123.18 2.47 124 4.18 124 5.99V81.72C124 84.55 122.03 87 119.26 87.59L75.26 97.01C73.49 97.39 71.64 96.95 70.23 95.82C68.82 94.68 68 92.97 68 91.15V73.57L107.6 29.57C112.57 24.05 112.12 15.54 106.6 10.57C101.08 5.6 92.57 6.05 87.6 11.57L68 33.35V15.42C68 12.59 69.97 10.15 72.74 9.55Z"
       />
       <path
-        d="M9 7h4.2a2.4 2.4 0 0 1 0 4.8H9V7Zm0 4.8h4.8a2.4 2.4 0 0 1 0 4.8H9v-4.8Z"
-        fill="currentColor"
+        className="fill-accent"
+        d="M6.23 95.05 63.79 107.38C63.93 107.41 64.07 107.41 64.21 107.38L121.77 95.05C123.29 94.73 124.88 95.11 126.09 96.08C127.29 97.06 128 98.53 128 100.08V101.46C128 104.53 125.86 107.17 122.86 107.81L64.21 120.38C64.07 120.41 63.93 120.41 63.79 120.38L5.14 107.81C2.14 107.17 0 104.53 0 101.46V100.08C0 98.53 0.71 97.06 1.91 96.08C3.12 95.11 4.71 94.73 6.23 95.05Z"
       />
     </svg>
   );
