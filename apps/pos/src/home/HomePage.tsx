@@ -761,19 +761,21 @@ function RegisterCard({
           </p>
         ) : null}
       </div>
-      <div className="mt-3" data-testid="today-sold">
-        <p className="text-small text-text-muted">{t('home.sold_today')}</p>
-        <p className="mt-0.5 text-total font-semibold">
-          <MoneyText paisa={data.today.sold} />
-        </p>
-        <p className="text-small text-text-muted">
-          {t('home.bills_count', { count: data.today.bills })}
-        </p>
-        {data.today.bills === 0 ? (
-          <p className="text-small text-text-muted">
-            {t('home.no_sales_today')}
-          </p>
-        ) : null}
+      <div className="mt-4" data-testid="today-sold">
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <p className="text-small text-text-muted">{t('home.sold_today')}</p>
+            <p className="mt-1 text-total font-semibold tabular-nums leading-none">
+              <MoneyText paisa={data.today.sold} />
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
+            <span aria-hidden="true" className="[&>svg]:size-3.5">
+              <SalesIcon />
+            </span>
+            {t('home.bills_count', { count: data.today.bills })}
+          </span>
+        </div>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
         {showCash ? (
