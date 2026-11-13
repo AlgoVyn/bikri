@@ -252,7 +252,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
       <nav
         aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-[0_-1px_2px_rgb(15_23_42/0.04)] lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-white/10 lg:bg-rail lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
+        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-tabbar lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-rail-border lg:bg-rail lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
       >
         <div
           className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
@@ -273,8 +273,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeOptions={{ exact: item.to === '/' }}
               className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
                 active
-                  ? 'text-primary lg:bg-white/10 lg:text-white'
-                  : 'lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink'
+                  ? 'text-primary lg:bg-rail-active-bg lg:text-rail-active-ink'
+                  : 'lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink'
               }`}
             >
               {active ? (
@@ -292,7 +292,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         })}
         <button
           type="button"
-          className={`${navLink} max-lg:hidden lg:text-rail-muted lg:hover:bg-white/5 lg:hover:text-rail-ink`}
+          className={`${navLink} max-lg:hidden lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink`}
           title={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
           onClick={() => openPriceCheck(true)}
         >
