@@ -50,8 +50,11 @@ test.describe('Products (T-014)', () => {
     );
     // Stock history: balance after the latest row equals on hand.
     await expect(page.getByTestId('history-balance').first()).toHaveText('20');
+    // The history is a table on desktop and a card list on phones.
     await expect(
-      page.getByRole('cell', { name: 'Opening stock' }),
+      page
+        .getByText('Opening stock', { exact: true })
+        .filter({ visible: true }),
     ).toBeVisible();
     await expectNoSeriousAxe(page);
     await expectNoHorizontalScroll(page);

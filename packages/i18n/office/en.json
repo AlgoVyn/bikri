@@ -145,6 +145,8 @@
     },
     "refund": {
       "selected": "{{count}} items selected",
+      "selected_one": "{{count}} item selected",
+      "selected_other": "{{count}} items selected",
       "already": "already refunded {{qty}}",
       "button": "Refund {{amount}}",
       "button_empty": "Refund",
@@ -563,6 +565,7 @@
       "next": "Next",
       "subtitle": "Count the drawer and close the day",
       "column_note": "Note",
+      "column_coin": "Coin",
       "column_count": "Count",
       "column_amount": "Amount"
     },
@@ -999,7 +1002,7 @@
       "theme_dark": "Dark",
       "theme_light": "Light",
       "theme_system": "System",
-      "title": "Language & display"
+      "title": "Scanner & display"
     },
     "backdate": {
       "title": "Record a past sale",

@@ -256,9 +256,6 @@ export function SyncBadge({ compact = false }: { compact?: boolean } = {}) {
           </Link>
           <p className="text-small text-text-muted">{detail}</p>
         </div>
-        <div className="border-t border-border pt-2">
-          <PrinterDot onClick={() => setOpen(false)} />
-        </div>
       </div>
     </div>
   );

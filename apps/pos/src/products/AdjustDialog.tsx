@@ -114,8 +114,11 @@ export function AdjustDialog({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title={t('adjust.title', { name: String(product.name_en) })}
-      description={t('adjust.on_hand', { qty: qtyWithUnit(t, onHand, unit) })}
+      title={t('adjust.title')}
+      description={t('adjust.subtitle', {
+        name: String(product.name_en),
+        qty: qtyWithUnit(t, onHand, unit),
+      })}
     >
       <form
         className="flex flex-col gap-3"

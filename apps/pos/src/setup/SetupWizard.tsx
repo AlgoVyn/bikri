@@ -325,7 +325,7 @@ export function SetupWizard() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-bg px-3 py-6 text-text">
-      <div className="grid w-full max-w-[896px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+      <div className="grid w-full max-w-[896px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-stretch">
         <aside className="hidden flex-col justify-between gap-8 rounded-card bg-rail p-6 text-rail-ink shadow-card lg:flex">
           <div>
             <div className="flex items-center gap-2">

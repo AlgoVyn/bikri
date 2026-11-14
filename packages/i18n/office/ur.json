@@ -145,6 +145,8 @@
     },
     "refund": {
       "selected": "{{count}} اشیاء منتخب",
+      "selected_one": "{{count}} چیز منتخب",
+      "selected_other": "{{count}} اشیاء منتخب",
       "already": "پہلے {{qty}} واپس",
       "button": "{{amount}} واپس کریں",
       "button_empty": "رقم واپس",
@@ -563,6 +565,7 @@
       "next": "آگے",
       "subtitle": "دراز گنیں اور دن بند کریں",
       "column_note": "نوٹ",
+      "column_coin": "سکہ",
       "column_count": "گنتی",
       "column_amount": "رقم"
     },
@@ -999,7 +1002,7 @@
       "theme_dark": "گہرا",
       "theme_light": "روشن",
       "theme_system": "سسٹم",
-      "title": "زبان اور ڈسپلے"
+      "title": "اسکینر اور ڈسپلے"
     },
     "backdate": {
       "title": "پرانی فروخت درج کریں",

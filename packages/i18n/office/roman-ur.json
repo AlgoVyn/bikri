@@ -145,6 +145,8 @@
     },
     "refund": {
       "selected": "{{count}} items muntakhab",
+      "selected_one": "{{count}} item muntakhab",
+      "selected_other": "{{count}} items muntakhab",
       "already": "pehle {{qty}} wapas",
       "button": "{{amount}} wapas karein",
       "button_empty": "Raqam wapas",
@@ -563,6 +565,7 @@
       "next": "Aage",
       "subtitle": "Daraz ginein aur din band karein",
       "column_note": "Note",
+      "column_coin": "Sikka",
       "column_count": "Count",
       "column_amount": "Raqam"
     },
@@ -999,7 +1002,7 @@
       "theme_dark": "Dark",
       "theme_light": "Light",
       "theme_system": "System",
-      "title": "Language aur display"
+      "title": "Scanner aur display"
     },
     "backdate": {
       "title": "Purani sale darj karein",

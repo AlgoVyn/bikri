@@ -18,13 +18,13 @@
     "no_change": "Ginti mojood ke barabar hai — kuch nahin badla.",
     "note": "Note (ikhtiyari)",
     "note_required": "Note (zaroori)",
-    "on_hand": "Mojood {{qty}}",
+    "subtitle": "{{name}} · Mojood {{qty}}",
     "qty": "Miqdar",
     "reason": "Wajah",
     "record_delivery": "Delivery darj karein",
     "remove": "Kam karein",
     "saved": "Stock save. Ab mojood {{qty}}.",
-    "title": "Stock durust karein — {{name}}",
+    "title": "Stock durust karein",
     "unit_cost": "Fi cheez laagat"
   },
   "categories": {

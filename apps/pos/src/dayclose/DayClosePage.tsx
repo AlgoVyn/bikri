@@ -329,7 +329,13 @@ export function DayClosePage() {
                   }
                 >
                   <div className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2 text-small text-text-muted">
-                    <span>{t('office.dayclose.column_note')}</span>
+                    <span>
+                      {t(
+                        index === 0
+                          ? 'office.dayclose.column_note'
+                          : 'office.dayclose.column_coin',
+                      )}
+                    </span>
                     <span className="text-center">
                       {t('office.dayclose.column_count')}
                     </span>
@@ -397,15 +403,16 @@ export function DayClosePage() {
             <MoneyText paisa={counted} />
           </span>
         </div>
+        {data.firstClose ? (
+          <div className="border-t border-border pt-2">
+            <MoneyInput
+              label={t('office.dayclose.opening_float')}
+              value={opening}
+              onChange={(value) => setOpening(value ?? 0)}
+            />
+          </div>
+        ) : null}
       </section>
-
-      {data.firstClose ? (
-        <MoneyInput
-          label={t('office.dayclose.opening_float')}
-          value={opening}
-          onChange={(value) => setOpening(value ?? 0)}
-        />
-      ) : null}
 
       {blind ? (
         <button

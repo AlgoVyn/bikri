@@ -3,7 +3,11 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonQuiet, pageClass } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  buttonQuiet,
+  pageClass,
+} from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { PrinterIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
@@ -262,7 +266,7 @@ export function SalesList({
             {!readOnly && can('sale.backdate') ? (
               <button
                 type="button"
-                className={buttonQuiet}
+                className={buttonPrimary}
                 data-testid="record-past-sale"
                 onClick={() => setBackdateOpen(true)}
               >

@@ -10,11 +10,12 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
-import { ChevronLeftIcon, CloseIcon } from '../components/icons.tsx';
+import { CloseIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -210,25 +211,15 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
   if (!data) return <PageLoading compact />;
 
   return (
-    <div className={pageClass('focused')}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          aria-label={t('office.suppliers.back')}
-          title={t('office.suppliers.back')}
-          className={`${buttonQuiet} gap-1 px-2`}
-        >
-          <ChevronLeftIcon className="size-5 rtl:rotate-180" />
-          <span>{t('common.back')}</span>
-        </Link>
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.suppliers.delivery_title')}
-        </h1>
-        <p className="text-small text-text-muted">
-          {String(data.supplier.name)} · {money(data.balance)}
-        </p>
-      </div>
+    <div className={`${pageClass('standard')} pb-28`}>
+      <SubpageHeader
+        backTo="/suppliers/$supplierId"
+        backParams={{ supplierId }}
+        backLabel={t('office.suppliers.back')}
+        icon={<SuppliersIcon />}
+        title={t('office.suppliers.delivery_title')}
+        subtitle={`${String(data.supplier.name)} · ${money(data.balance)}`}
+      />
 
       <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-small">
@@ -433,15 +424,15 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
           </ul>
         )}
 
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-40">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="w-full sm:w-64">
             <MoneyInput
               label={t('office.suppliers.other_charges')}
               value={otherCharges}
               onChange={setOtherCharges}
             />
           </div>
-          <p className="ms-auto text-small">
+          <p className="text-small">
             {t('office.suppliers.total')}:{' '}
             <span className="text-title font-semibold">
               <MoneyText paisa={total} />
@@ -485,28 +476,31 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         </label>
       </section>
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          className={buttonQuiet}
-        >
-          {t('common.cancel')}
-        </Link>
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={valid.length === 0 || pending || paid > total}
-          onClick={() => void save()}
-        >
-          {t('office.suppliers.save_delivery')}
-        </button>
-      </div>
       {paid > total ? (
         <p className="text-small text-danger">
           {t('office.suppliers.delivery_error_paid')}
         </p>
       ) : null}
+
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+        <div className="mx-auto flex w-full max-w-[1152px] flex-wrap justify-end gap-2">
+          <Link
+            to="/suppliers/$supplierId"
+            params={{ supplierId }}
+            className={buttonQuiet}
+          >
+            {t('common.cancel')}
+          </Link>
+          <button
+            type="button"
+            className={buttonPrimary}
+            disabled={valid.length === 0 || pending || paid > total}
+            onClick={() => void save()}
+          >
+            {t('office.suppliers.save_delivery')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

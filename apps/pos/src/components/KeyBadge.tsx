@@ -57,7 +57,7 @@ export function KeyBadge({
   }
 
   return (
-    <kbd className="inline-flex items-center rounded-control bg-surface-2 px-1 font-mono text-small text-text-muted">
+    <kbd className="inline-flex items-center rounded-control border border-border bg-surface-2 px-1.5 font-mono text-small text-text-muted">
       {keys}
     </kbd>
   );

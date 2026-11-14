@@ -214,7 +214,7 @@ export function ProductDetailPage({
             can('sale.create') && !readOnly ? (
               <button
                 type="button"
-                className={buttonPrimary}
+                className={`${buttonPrimary} w-full 2xl:w-auto`}
                 onClick={() => void addToSale()}
               >
                 {t('products.sell')}
@@ -298,6 +298,7 @@ export function ProductDetailPage({
               testId="detail-on-hand"
               emphasize
               tone={stockTone}
+              className={showCost ? 'col-span-2 sm:col-span-1' : undefined}
             >
               {qtyWithUnit(t, detail.onHand, unit)}
               {stockLabel !== null ? (
@@ -434,67 +435,115 @@ export function ProductDetailPage({
         {detail.history.length === 0 ? (
           <p className="text-text-muted">{t('products.history_empty')}</p>
         ) : (
-          <div className="overflow-x-auto rounded-card border border-border bg-surface">
-            <table className="w-full text-start">
-              <thead className="text-small text-text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-start font-normal">
-                    {t('products.history_when')}
-                  </th>
-                  <th className="px-3 py-2 text-start font-normal">
-                    {t('products.history_reason')}
-                  </th>
-                  <th className="px-3 py-2 text-start font-normal">
-                    {t('products.history_qty')}
-                  </th>
-                  <th className="px-3 py-2 text-start font-normal">
-                    {t('products.history_balance')}
-                  </th>
-                  <th className="px-3 py-2 text-start font-normal max-sm:hidden">
-                    {t('products.history_by')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.history.map((h) => {
-                  const delta = Number(h.movement.qty_delta_milli);
-                  return (
-                    <tr key={h.movement.id} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <bdi dir="ltr" className="text-small">
-                          {formatTimestamp(
-                            Number(h.movement.created_at),
-                            i18n.language,
-                            timeZone,
-                          )}
-                        </bdi>
-                      </td>
-                      <td className="px-3 py-2">
+          <>
+            <div className="hidden overflow-x-auto rounded-card border border-border bg-surface sm:block">
+              <table className="w-full text-start">
+                <thead className="text-small text-text-muted">
+                  <tr>
+                    <th className="px-3 py-2 text-start font-normal">
+                      {t('products.history_when')}
+                    </th>
+                    <th className="px-3 py-2 text-start font-normal">
+                      {t('products.history_reason')}
+                    </th>
+                    <th className="px-3 py-2 text-start font-normal">
+                      {t('products.history_qty')}
+                    </th>
+                    <th className="px-3 py-2 text-start font-normal">
+                      {t('products.history_balance')}
+                    </th>
+                    <th className="px-3 py-2 text-start font-normal">
+                      {t('products.history_by')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.history.map((h) => {
+                    const delta = Number(h.movement.qty_delta_milli);
+                    return (
+                      <tr
+                        key={h.movement.id}
+                        className="border-t border-border"
+                      >
+                        <td className="px-3 py-2">
+                          <bdi dir="ltr" className="text-small">
+                            {formatTimestamp(
+                              Number(h.movement.created_at),
+                              i18n.language,
+                              timeZone,
+                            )}
+                          </bdi>
+                        </td>
+                        <td className="px-3 py-2">
+                          {t(`stock.reason.${String(h.movement.reason_code)}`)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-start ${delta < 0 ? 'text-danger' : 'text-success'}`}
+                        >
+                          <bdi dir="ltr">
+                            {delta > 0 ? '+' : '−'}
+                            {formatQtyFromMilli(Math.abs(delta), unit)}
+                          </bdi>
+                        </td>
+                        <td
+                          className="px-3 py-2 text-start"
+                          data-testid="history-balance"
+                        >
+                          <bdi dir="ltr">
+                            {formatQtyFromMilli(h.balanceAfter, unit)}
+                          </bdi>
+                        </td>
+                        <td className="px-3 py-2">{h.staffName}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <ul className="flex flex-col rounded-card border border-border bg-surface sm:hidden">
+              {detail.history.map((h) => {
+                const delta = Number(h.movement.qty_delta_milli);
+                return (
+                  <li
+                    key={h.movement.id}
+                    className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 font-medium">
                         {t(`stock.reason.${String(h.movement.reason_code)}`)}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-start ${delta < 0 ? 'text-danger' : 'text-success'}`}
+                      </span>
+                      <span
+                        className={`shrink-0 tabular-nums ${delta < 0 ? 'text-danger' : 'text-success'}`}
                       >
                         <bdi dir="ltr">
                           {delta > 0 ? '+' : '−'}
                           {formatQtyFromMilli(Math.abs(delta), unit)}
                         </bdi>
-                      </td>
-                      <td
-                        className="px-3 py-2 text-start"
-                        data-testid="history-balance"
-                      >
-                        <bdi dir="ltr">
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-small text-text-muted">
+                      <bdi dir="ltr">
+                        {formatTimestamp(
+                          Number(h.movement.created_at),
+                          i18n.language,
+                          timeZone,
+                        )}
+                      </bdi>
+                      <span>
+                        {t('products.history_balance')}:{' '}
+                        <bdi dir="ltr" data-testid="history-balance">
                           {formatQtyFromMilli(h.balanceAfter, unit)}
                         </bdi>
-                      </td>
-                      <td className="px-3 py-2 max-sm:hidden">{h.staffName}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                      {h.staffName ? (
+                        <span className="basis-full">{h.staffName}</span>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </section>
 
@@ -553,12 +602,14 @@ function Figure({
   children,
   emphasize = false,
   tone = 'default',
+  className = '',
 }: {
   label: string;
   testId: string;
   children: React.ReactNode;
   emphasize?: boolean;
   tone?: 'default' | 'warning' | 'danger';
+  className?: string;
 }) {
   const toneClass =
     tone === 'danger'
@@ -568,7 +619,7 @@ function Figure({
         : 'border-primary/20 bg-primary-subtle text-primary-subtle-ink';
   return (
     <div
-      className={emphasize ? `rounded-card border p-3 ${toneClass}` : 'p-0'}
+      className={`${emphasize ? `rounded-card border p-3 ${toneClass}` : 'p-0'} ${className}`}
       data-testid={testId}
     >
       <p className="text-small text-text-muted">{label}</p>

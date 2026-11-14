@@ -27,6 +27,7 @@ import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
 import {
+  PrinterDot,
   PrivacyToggle,
   StaffMenu,
   SyncBadge,
@@ -40,12 +41,13 @@ function isSellingRoute(pathname: string): boolean {
 }
 
 const navLink =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small text-text-muted transition-colors duration-150 lg:flex-none lg:py-1.5';
+  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small transition-colors duration-150 lg:flex-none lg:py-1.5';
 
 /** Shell pages that are not rail items still need a title on a phone. */
 const EXTRA_TITLES: Record<string, string> = {
   '/day-close': 'home.day_close',
-  '/stock/count': 'count.title',
+  // The page has its own "Stock count" header; the bar shows the parent section.
+  '/stock/count': 'nav.products',
   '/labels': 'products.print_label',
 };
 
@@ -210,6 +212,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
 
   const more = visible.filter((item) => !item.bar);
+  const moreActive = more.some((item) => item.to === current?.to);
 
   return (
     <div className="min-h-dvh bg-bg text-text">
@@ -246,6 +249,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onToggle={togglePrivacy}
             />
             <SyncBadge />
+            <PrinterDot />
             <StaffMenu shopName={shopName} />
           </div>
         </header>
@@ -274,14 +278,20 @@ export function AppShell({ children }: { children: ReactNode }) {
               className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
                 active
                   ? 'text-primary lg:bg-rail-active-bg lg:text-rail-active-ink'
-                  : 'lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink'
+                  : 'text-text-muted lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink'
               }`}
             >
               {active ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
-                />
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary lg:hidden"
+                  />
+                </>
               ) : null}
               <item.Icon />
               <span className="max-w-full truncate leading-tight">
@@ -305,11 +315,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="relative flex min-w-0 flex-1 lg:hidden">
             <button
               type="button"
-              className={navLink}
+              className={`${navLink} ${
+                moreActive ? 'text-primary' : 'text-text-muted'
+              }`}
               aria-expanded={moreOpen}
               aria-controls="more-menu"
               onClick={() => setMoreOpen((open) => !open)}
             >
+              {moreActive ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary"
+                />
+              ) : null}
               <MoreIcon />
               <span className="max-w-full truncate">{t('nav.more')}</span>
             </button>

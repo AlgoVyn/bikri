@@ -8,10 +8,12 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { SuppliersIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
+import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -262,22 +264,19 @@ export function SupplierReturnPage({
   if (!data) return <PageLoading compact />;
 
   return (
-    <div className={pageClass('focused')}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          className={buttonQuiet}
-        >
-          {t('office.suppliers.back')}
-        </Link>
-        <h1 className="me-auto text-h1 font-semibold">
-          {t('office.suppliers.return_title')}
-        </h1>
-        <p className="text-small text-text-muted">
-          {String(data.supplier.name)} · <MoneyText paisa={data.balance} />
-        </p>
-      </div>
+    <div className={`${pageClass('standard')} pb-28`}>
+      <SubpageHeader
+        backTo="/suppliers/$supplierId"
+        backParams={{ supplierId }}
+        backLabel={t('office.suppliers.back')}
+        icon={<SuppliersIcon />}
+        title={t('office.suppliers.return_title')}
+        subtitle={
+          <>
+            {String(data.supplier.name)} · <MoneyText paisa={data.balance} />
+          </>
+        }
+      />
 
       <label className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3 text-small">
         {t('office.suppliers.return_linked')}
@@ -514,28 +513,31 @@ export function SupplierReturnPage({
           onChange={(event) => setNote(event.target.value)}
         />
       </label>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={buttonPrimary}
-          disabled={!canSave}
-          onClick={() => void save()}
-        >
-          {t('office.suppliers.return_save')}
-        </button>
-        <Link
-          to="/suppliers/$supplierId"
-          params={{ supplierId }}
-          className={buttonQuiet}
-        >
-          {t('common.cancel')}
-        </Link>
-      </div>
       {refundReceived !== null && refundReceived > 0 ? (
         <p className="text-small text-text-muted">
           {t('office.suppliers.return_refund_hint')}
         </p>
       ) : null}
+
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+        <div className="mx-auto flex w-full max-w-[1152px] flex-wrap justify-end gap-2">
+          <Link
+            to="/suppliers/$supplierId"
+            params={{ supplierId }}
+            className={buttonQuiet}
+          >
+            {t('common.cancel')}
+          </Link>
+          <button
+            type="button"
+            className={buttonPrimary}
+            disabled={!canSave}
+            onClick={() => void save()}
+          >
+            {t('office.suppliers.return_save')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

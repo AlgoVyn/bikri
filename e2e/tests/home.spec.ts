@@ -56,8 +56,12 @@ test.describe('Home and shell (T-013)', () => {
 
     const nav = page.getByRole('navigation', { name: 'Main' });
     if (isPhone(page)) {
+      const homeTab = nav.getByRole('link', { name: /Home/ });
+      const moreTab = nav.getByRole('button', { name: 'More' });
+      await expect(homeTab).toHaveCSS('color', 'rgb(0, 107, 179)');
+      await expect(moreTab).toHaveCSS('color', 'rgb(71, 85, 105)');
       await expect(nav.getByRole('link', { name: /Suppliers/ })).toBeHidden();
-      await nav.getByRole('button', { name: 'More' }).click();
+      await moreTab.click();
       await expect(
         page.locator('#more-menu').getByRole('link', { name: 'Suppliers' }),
       ).toBeVisible();
@@ -66,8 +70,11 @@ test.describe('Home and shell (T-013)', () => {
         .getByRole('link', { name: 'Reports' })
         .click();
       await expect(page).toHaveURL(/\/bikri\/reports$/);
-      await nav.getByRole('link', { name: /Home/ }).click();
+      await expect(moreTab).toHaveCSS('color', 'rgb(0, 107, 179)');
+      await homeTab.click();
+      await expect(homeTab).toHaveCSS('color', 'rgb(0, 107, 179)');
     } else {
+      await expect(page.getByTestId('printer-dot')).toBeVisible();
       await expect(page.getByTestId('brand-rail')).toContainText('Bikri');
       await expect(page.getByTestId('rail-shop-name')).toHaveCount(0);
       for (const name of [

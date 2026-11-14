@@ -185,7 +185,10 @@ export function ProductList({
 
   const primary =
     canEdit && !selecting && !detailOpen && total !== 0 ? (
-      <Link to="/products/new" className={`${buttonPrimary} gap-2`}>
+      <Link
+        to="/products/new"
+        className={`${buttonPrimary} gap-2 max-sm:order-first`}
+      >
         {t('products.add')}
       </Link>
     ) : undefined;

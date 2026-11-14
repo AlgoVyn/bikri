@@ -197,7 +197,7 @@ export function UdhaarList({
             (Boolean(readOnly) || !data || data.rows.length > 0) ? (
               <button
                 type="button"
-                className={`${buttonPrimary} gap-2`}
+                className={`${buttonPrimary} gap-2 max-sm:order-first`}
                 disabled={readOnly}
                 onClick={() => setNewOpen(true)}
               >

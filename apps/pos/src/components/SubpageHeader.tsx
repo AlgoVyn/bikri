@@ -9,6 +9,7 @@ export type SubpageParent =
   | '/products/$id'
   | '/settings'
   | '/suppliers'
+  | '/suppliers/$supplierId'
   | '/udhaar';
 
 /**
@@ -31,7 +32,7 @@ export function SubpageHeader({
 }: {
   backTo: SubpageParent;
   /** Params when the parent is a dynamic detail route, e.g. `/products/$id`. */
-  backParams?: { id: string };
+  backParams?: { id: string } | { supplierId: string };
   /** Accessible name of the back link (the destination, not just "Back"). */
   backLabel: string;
   /** Intercept the back link, e.g. to confirm unsaved changes before leaving. */

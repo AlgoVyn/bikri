@@ -18,13 +18,13 @@
     "no_change": "Count matches on hand — nothing to change.",
     "note": "Note (optional)",
     "note_required": "Note (required)",
-    "on_hand": "On hand {{qty}}",
+    "subtitle": "{{name}} · On hand {{qty}}",
     "qty": "Quantity",
     "reason": "Reason",
     "record_delivery": "Record a delivery",
     "remove": "Remove",
     "saved": "Stock saved. On hand now {{qty}}.",
-    "title": "Adjust stock — {{name}}",
+    "title": "Adjust stock",
     "unit_cost": "Cost per item"
   },
   "categories": {

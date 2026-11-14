@@ -13,7 +13,6 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
-import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { scrollStrip } from '../components/ScrollStrip.tsx';
@@ -180,7 +179,7 @@ export function ExpensesPage() {
             (Boolean(readOnly) || !data || data.rows.length > 0) ? (
               <button
                 type="button"
-                className={`${buttonPrimary} gap-2`}
+                className={`${buttonPrimary} gap-2 max-sm:order-first`}
                 disabled={readOnly}
                 onClick={() => setNewOpen(true)}
               >
@@ -204,36 +203,28 @@ export function ExpensesPage() {
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        {preset === 'custom' ? (
-          <div className="flex flex-wrap items-end gap-2">
-            <DateField
-              className="w-[9.5rem]"
-              label={t('office.expenses.from')}
-              value={custom.from}
-              max={custom.to}
-              onChange={(value) =>
-                setCustom((current) => ({ ...current, from: value }))
-              }
-            />
-            <DateField
-              className="w-[9.5rem]"
-              label={t('office.expenses.to')}
-              value={custom.to}
-              min={custom.from}
-              onChange={(value) =>
-                setCustom((current) => ({ ...current, to: value }))
-              }
-            />
-          </div>
-        ) : null}
-        <div className="ms-auto rounded-card border border-border bg-surface px-4 py-2 shadow-card">
-          <Metric
-            label={t('office.expenses.total')}
-            value={<MoneyText paisa={data?.total ?? 0} />}
+      {preset === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.expenses.from')}
+            value={custom.from}
+            max={custom.to}
+            onChange={(value) =>
+              setCustom((current) => ({ ...current, from: value }))
+            }
+          />
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.expenses.to')}
+            value={custom.to}
+            min={custom.from}
+            onChange={(value) =>
+              setCustom((current) => ({ ...current, to: value }))
+            }
           />
         </div>
-      </div>
+      ) : null}
       {preset === 'custom' && !customValid ? (
         <p role="alert" className="text-small text-danger">
           {t('office.expenses.range_invalid')}
@@ -242,40 +233,56 @@ export function ExpensesPage() {
 
       <ListSurface
         summary={
-          data && data.byCategory.length > 0 ? (
-            <div className="flex flex-col gap-1 py-1">
-              <p className="text-small font-medium text-text-muted">
-                {t('office.expenses.by_category')}
-              </p>
-              {data.byCategory.map((row) => {
-                const percent = Math.round((row.net / max) * 100);
-                return (
-                  <div
-                    key={row.category?.id ?? 'none'}
-                    className="flex items-center gap-3 text-small"
-                  >
-                    <span className="min-w-32 truncate">
-                      {categoryName(row.category, i18n.language)}
-                    </span>
-                    <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2">
-                      <span
-                        className={`block h-full ${
-                          row.category?.color
-                            ? tileBg(row.category.color)
-                            : 'bg-primary'
-                        }`}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </span>
-                    <span className="w-10 text-start tabular-nums text-text-muted">
-                      {percent}%
-                    </span>
-                    <span className="w-20 text-start">
-                      <MoneyText paisa={row.net} />
-                    </span>
-                  </div>
-                );
-              })}
+          data ? (
+            <div className="flex flex-wrap items-start justify-between gap-4 py-1">
+              <div className="min-w-0 flex-1">
+                {data.byCategory.length > 0 ? (
+                  <>
+                    <p className="text-small font-medium text-text-muted">
+                      {t('office.expenses.by_category')}
+                    </p>
+                    <div className="mt-1 flex flex-col gap-1">
+                      {data.byCategory.map((row) => {
+                        const percent = Math.round((row.net / max) * 100);
+                        return (
+                          <div
+                            key={row.category?.id ?? 'none'}
+                            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small"
+                          >
+                            <span className="min-w-0 flex-1 truncate sm:min-w-32">
+                              {categoryName(row.category, i18n.language)}
+                            </span>
+                            <span className="order-last h-2.5 w-full overflow-hidden rounded-full bg-surface-2 sm:order-none sm:w-auto sm:flex-1">
+                              <span
+                                className={`block h-full ${
+                                  row.category?.color
+                                    ? tileBg(row.category.color)
+                                    : 'bg-primary'
+                                }`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            </span>
+                            <span className="w-10 text-start tabular-nums text-text-muted">
+                              {percent}%
+                            </span>
+                            <span className="w-20 text-start">
+                              <MoneyText paisa={row.net} />
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+              <div className="ms-auto shrink-0 text-end">
+                <p className="text-small font-medium text-text-muted">
+                  {t('office.expenses.total')}
+                </p>
+                <p className="text-title font-semibold">
+                  <MoneyText paisa={data.total} />
+                </p>
+              </div>
             </div>
           ) : undefined
         }
