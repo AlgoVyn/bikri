@@ -213,6 +213,7 @@
     "skip_content": "Skip to content",
     "access_note": "Protected by Cloudflare Access",
     "operator_label": "Platform operator",
+    "operator_short": "Operator",
     "overview_subtitle": "Platform health at a glance",
     "stat_shops": "Shops",
     "stat_active": "Active",

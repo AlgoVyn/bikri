@@ -213,6 +213,7 @@
     "skip_content": "مواد پر جائیں",
     "access_note": "Cloudflare Access سے محفوظ",
     "operator_label": "پلیٹ فارم آپریٹر",
+    "operator_short": "آپریٹر",
     "overview_subtitle": "پلیٹ فارم کی مجموعی حالت ایک نظر میں",
     "stat_shops": "دکانیں",
     "stat_active": "فعال",

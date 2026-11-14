@@ -66,10 +66,40 @@ test('operator console follows the language switcher and RTL direction', async (
   page,
 }) => {
   await page.goto('/bikri/admin');
-  await page.getByLabel('Language').selectOption('ur');
+  await page.getByTestId('admin-operator-menu').click();
+  await page.getByRole('radio', { name: 'اردو' }).locator('..').click();
   await expect(page.getByRole('heading', { name: 'جائزہ' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('link', { name: 'دکانیں' })).toBeVisible();
+});
+
+test('operator rail compacts from the brand; the operator menu holds the account, language and Access note', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/bikri/admin');
+  const rail = page.getByTestId('admin-rail');
+  const brand = page.getByTestId('admin-brand-rail');
+  await expect(rail).toHaveCSS('width', '88px');
+  await expect(brand).toHaveAttribute('aria-pressed', 'false');
+  await brand.click();
+  await expect(rail).toHaveCSS('width', '64px');
+  await expect(brand).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('nav .rail-label').first()).toBeHidden();
+
+  await page.getByTestId('admin-operator-menu').click();
+  const panel = page.getByTestId('admin-operator-panel');
+  await expect(panel).toContainText('operator@example.com');
+  await expect(panel).toContainText('Protected by Cloudflare Access');
+  await expect(panel.getByRole('radio', { name: 'English' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+
+  await page.reload();
+  await expect(rail).toHaveCSS('width', '64px');
+  await brand.click();
+  await expect(rail).toHaveCSS('width', '88px');
+  await expect(page.locator('nav .rail-label').first()).toBeVisible();
 });
 
 test('operator console has no serious axe violations', async ({ page }) => {
@@ -83,11 +113,12 @@ test('operator console has no serious axe violations', async ({ page }) => {
     await expect(page.locator('main')).not.toBeEmpty();
     await expectNoSeriousAxe(page);
   }
-  // The identity chip is the operator's Access email, and it stays LTR in Urdu.
+  // The operator trigger carries the Access email, and it stays LTR in Urdu.
   await page.goto('/bikri/admin');
-  await expect(
-    page.getByTitle('Signed in as operator@example.com'),
-  ).toBeVisible();
+  await expect(page.getByTestId('admin-operator-menu')).toHaveAttribute(
+    'title',
+    'Signed in as operator@example.com',
+  );
 });
 
 test('tenant header pluralizes devices and the file pickers are localized', async ({

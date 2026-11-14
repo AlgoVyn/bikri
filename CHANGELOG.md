@@ -5,6 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased] — 1.0.0 release candidate
 
 ### Design
+- Operator console refresh: rail-only desktop shell with the same 88/64 px brand rail, a bottom operator menu for the Access email, languages and Access note, a wider 1440 px content column, and a compact mobile brand header with four fitted tabs (D-222).
 - Rail-only desktop shell with a compact 64 px mode toggled from the Bikri mark, Search at the foot of the rail, Settings in the staff menu, selling prices in global search, a Today-card privacy eye, roomier nav spacing and a phone page-actions menu that stays on-screen (D-220, D-221).
 - Graphite dark theme: near-black canvas `#0E1014`, calmer surfaces, 3:1 borders, desaturated primary `#5EA5D4`, brand-turquoise success, and the brand-navy rail `#182E55`. Rail overlays move onto tokens so dark labels are not pure white; light theme is unchanged (D-217).
 - New Bikri brand mark: an open ledger with a tick cut through both pages and a turquoise total line, with a sentence-case Bikri wordmark, in the rail, operator console, lock, enrol, setup and shop-request screens (theme-aware, reversed on navy). New PWA icons (rounded, 192/512 maskable), a 180 px Apple touch icon, and SVG + ICO favicons (D-216).

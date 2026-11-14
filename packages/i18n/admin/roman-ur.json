@@ -213,6 +213,7 @@
     "skip_content": "Content par jayen",
     "access_note": "Cloudflare Access se mehfooz",
     "operator_label": "Platform operator",
+    "operator_short": "Operator",
     "overview_subtitle": "Platform ki kul halat ek nazar mein",
     "stat_shops": "Dukanein",
     "stat_active": "Active",
