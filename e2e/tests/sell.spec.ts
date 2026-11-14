@@ -409,9 +409,9 @@ test.describe('Sell (T-016)', () => {
         barcode: codes[i],
       })),
     );
-    // Sell hides the app top bar entirely to give the cart the full height.
+    // Desktop is rail-only: the app top bar is gone on every screen.
     await expect(page.getByTestId('screen-title-bar')).toHaveCount(0);
-    await expect(page.getByTestId('sync-badge')).toHaveCount(0);
+    await expect(page.getByTestId('rail-search')).toBeVisible();
     // Scan instead of clicking tiles: the grid re-sorts after every add.
     for (const [i, code] of codes.entries()) {
       await scan(page, code);
@@ -432,6 +432,16 @@ test.describe('Sell (T-016)', () => {
       measured.clientHeight + 1,
     );
     await expectNoHorizontalScroll(page);
+  });
+
+  test('phone: Sell keeps the app top bar', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'phone top bar');
+    await openSell(page, [
+      { name: 'Cable', price: 50000, stock: 10, barcode: '9900000000301' },
+    ]);
+    await expect(page.getByTestId('screen-title-bar')).toHaveText('Sell');
+    await expect(page.getByTestId('global-search-trigger')).toBeVisible();
+    await expect(page.getByTestId('staff-menu')).toBeVisible();
   });
 
   test('a typed search stays after adding; a barcode scan starts fresh', async ({

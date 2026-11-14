@@ -1,10 +1,10 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon, SearchIcon } from '../components/icons.tsx';
+import { MoreIcon, RefreshIcon } from '../components/icons.tsx';
 import { PrivacyProvider } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -14,25 +14,19 @@ import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { Banners } from './Banners.tsx';
-import { Breadcrumbs } from './Breadcrumbs.tsx';
 import { CommandPalette } from './CommandPalette.tsx';
 import {
   applyDevicePrefs,
   loadDevicePrefs,
   togglePrivacyMode,
 } from './devicePrefs.ts';
-import { GlobalSearch } from './GlobalSearch.tsx';
+import { GlobalSearchHost, GlobalSearchTrigger } from './GlobalSearch.tsx';
 import { dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
-import {
-  PrinterDot,
-  PrivacyToggle,
-  StaffMenu,
-  SyncBadge,
-  useShopName,
-} from './TopBarParts.tsx';
+import { StaffMenu, useShopName } from './TopBarParts.tsx';
+import { useIsDesktop } from './useIsDesktop.ts';
 
 /** `/sell` and its completion/dialog state: the cashier needs every price, always. */
 function isSellingRoute(pathname: string): boolean {
@@ -41,7 +35,17 @@ function isSellingRoute(pathname: string): boolean {
 }
 
 const navLink =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small transition-colors duration-150 lg:flex-none lg:py-1.5';
+  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small transition-colors duration-150 lg:flex-none lg:py-2';
+
+const RAIL_COMPACT_KEY = 'bikri.rail_compact';
+
+function readCompactRail(): boolean {
+  try {
+    return localStorage.getItem(RAIL_COMPACT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** Shell pages that are not rail items still need a title on a phone. */
 const EXTRA_TITLES: Record<string, string> = {
@@ -62,6 +66,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const shopName = useShopName();
+  const desktop = useIsDesktop();
+  const [compactRail, setCompactRail] = useState(readCompactRail);
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
@@ -101,6 +107,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     // If the browser never fires the controller change, let the button retry
     // instead of leaving it disabled forever.
     window.setTimeout(() => setUpdating(false), 10_000);
+  };
+  const toggleCompactRail = () => {
+    setCompactRail((value) => {
+      const next = !value;
+      try {
+        localStorage.setItem(RAIL_COMPACT_KEY, next ? '1' : '0');
+      } catch {
+        // Storage can be disabled; the current session still changes width.
+      }
+      return next;
+    });
   };
   const current = navItemFor(pathname);
   const extraTitle = EXTRA_TITLES[pathname.replace(/\/+$/u, '')];
@@ -211,28 +228,36 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const more = visible.filter((item) => !item.bar);
+  const navItems = visible.filter((item) => !item.hideInNav);
+  const more = navItems.filter((item) => !item.bar);
   const moreActive = more.some((item) => item.to === current?.to);
 
   return (
-    <div className="min-h-dvh bg-bg text-text">
+    <div
+      className="min-h-dvh bg-bg text-text"
+      data-rail-compact={compactRail ? 'true' : undefined}
+      style={
+        {
+          '--spacing-rail': compactRail ? '64px' : '88px',
+        } as CSSProperties
+      }
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-ink"
       >
         {t('shell.skip_content')}
       </a>
-      {selling ? null : (
-        <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar lg:start-rail">
+      {!desktop ? (
+        <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar">
           <span
-            className="min-w-0 flex-1 truncate font-semibold lg:hidden"
+            className="min-w-0 flex-1 truncate font-semibold"
             data-testid="screen-title-bar"
           >
             {screenTitle ?? shopName ?? t('common.app_name')}
           </span>
-          <Breadcrumbs current={screenTitle} />
-          <div className="flex shrink-0 items-center gap-1 lg:gap-2">
-            <GlobalSearch />
+          <div className="flex shrink-0 items-center gap-1">
+            <GlobalSearchTrigger variant="topbar" />
             {updateReady ? (
               <button
                 type="button"
@@ -244,73 +269,67 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {updating ? t('shell.updating') : t('shell.update_ready')}
               </button>
             ) : null}
-            <PrivacyToggle
-              enabled={privacyEnabled ?? false}
-              onToggle={togglePrivacy}
-            />
-            <SyncBadge />
-            <PrinterDot />
-            <StaffMenu shopName={shopName} />
+            <StaffMenu shopName={shopName} variant="topbar" />
           </div>
         </header>
-      )}
+      ) : null}
       <nav
         aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-tabbar lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:overflow-y-auto lg:border-e lg:border-rail-border lg:bg-rail lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
+        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-tabbar lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:border-e lg:border-rail-border lg:bg-rail"
       >
-        <div
-          className="hidden min-h-topbar shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 lg:flex"
-          data-testid="brand-rail"
-        >
-          <BikriMark className="size-8" tone="reversed" />
-          <span className="text-small font-semibold tracking-wordmark text-rail-ink">
-            {t('common.app_name')}
-          </span>
-        </div>
-        {visible.map((item) => {
-          const active = current?.to === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              title={`${t(item.label)} (${item.keys})`}
-              activeOptions={{ exact: item.to === '/' }}
-              className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
-                active
-                  ? 'text-primary lg:bg-rail-active-bg lg:text-rail-active-ink'
-                  : 'text-text-muted lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink'
-              }`}
-            >
-              {active ? (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary lg:hidden"
-                  />
-                </>
-              ) : null}
-              <item.Icon />
-              <span className="max-w-full truncate leading-tight">
-                {t(item.label)}
-              </span>
-            </Link>
-          );
-        })}
         <button
           type="button"
-          className={`${navLink} max-lg:hidden lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink`}
-          title={`${t('pricecheck.title')} (Ctrl+Shift+P)`}
-          onClick={() => openPriceCheck(true)}
+          className="hidden min-h-topbar w-full shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-2 text-rail-ink transition-colors duration-150 hover:bg-rail-hover lg:flex"
+          data-testid="brand-rail"
+          title={compactRail ? t('shell.expand_rail') : t('shell.compact_rail')}
+          aria-label={`${t('common.app_name')} — ${t('shell.compact_rail')}`}
+          aria-pressed={compactRail}
+          onClick={toggleCompactRail}
         >
-          <SearchIcon />
-          <span className="max-w-full truncate leading-tight">
-            {t('pricecheck.title')}
+          <BikriMark className="size-8" tone="reversed" />
+          <span className="rail-label text-small font-semibold tracking-wordmark text-rail-ink">
+            {t('common.app_name')}
           </span>
         </button>
+        <div
+          className="contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
+          data-testid="rail-scroll"
+        >
+          {navItems.map((item) => {
+            const active = current?.to === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                title={`${t(item.label)} (${item.keys})`}
+                aria-label={`${t(item.label)} (${item.keys})`}
+                activeOptions={{ exact: item.to === '/' }}
+                className={`${navLink} ${item.bar ? '' : 'max-lg:hidden'} ${
+                  active
+                    ? 'text-primary lg:bg-rail-active-bg lg:text-rail-active-ink'
+                    : 'text-text-muted lg:text-rail-muted lg:hover:bg-rail-hover lg:hover:text-rail-ink'
+                }`}
+              >
+                {active ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="absolute start-0 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-rail-active lg:block"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary lg:hidden"
+                    />
+                  </>
+                ) : null}
+                <item.Icon />
+                <span className="rail-label max-w-full truncate leading-tight">
+                  {t(item.label)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
         {more.length > 0 ? (
           <div className="relative flex min-w-0 flex-1 lg:hidden">
             <button
@@ -348,27 +367,42 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </Link>
                   </li>
                 ))}
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      openPriceCheck(true);
-                    }}
-                    className="flex min-h-11 w-full items-center gap-3 px-3 text-text"
-                  >
-                    <SearchIcon />
-                    {t('pricecheck.title')}
-                  </button>
-                </li>
               </ul>
             ) : null}
+          </div>
+        ) : null}
+        {desktop ? (
+          <div className="hidden w-full shrink-0 flex-col border-t border-rail-border lg:flex">
+            <GlobalSearchTrigger variant="rail" />
+            {updateReady ? (
+              <button
+                type="button"
+                disabled={updating}
+                aria-busy={updating}
+                title={t('shell.update_ready')}
+                aria-label={
+                  updating ? t('shell.updating') : t('shell.update_ready')
+                }
+                onClick={startUpdate}
+                className={`${navLink} text-rail-active hover:bg-rail-hover`}
+              >
+                <RefreshIcon />
+                <span className="rail-label max-w-full truncate leading-tight">
+                  {updating ? t('shell.updating') : t('shell.update_ready')}
+                </span>
+              </button>
+            ) : null}
+            <div className="mt-1 border-t border-rail-border pt-2">
+              <StaffMenu shopName={shopName} variant="rail" />
+            </div>
           </div>
         ) : null}
       </nav>
       <main
         id="main-content"
-        className={`${selling ? 'h-dvh pt-0' : 'pt-topbar'} pb-tabbar lg:ps-rail lg:pb-0`}
+        className={`${
+          selling ? 'h-dvh pt-0 pb-0' : 'pt-topbar pb-tabbar'
+        } lg:ps-rail lg:pt-0 lg:pb-0`}
       >
         <PrivacyProvider active={privacyActive}>
           <Banners />
@@ -378,6 +412,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <PrivacyProvider active={false}>
         <PriceCheck />
       </PrivacyProvider>
+      <GlobalSearchHost />
       <CommandPalette />
     </div>
   );

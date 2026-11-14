@@ -76,9 +76,9 @@ export function UdhaarIcon() {
   );
 }
 
-export function SettingsIcon() {
+export function SettingsIcon(props?: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <path d="M6 4v6M6 14v6M12 4v10M12 18v2M18 4v2M18 10v10" />
       <circle cx="6" cy="12" r="2" />
       <circle cx="12" cy="16" r="2" />
@@ -155,27 +155,27 @@ export function FilterIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function SearchIcon() {
+export function SearchIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <circle cx="11" cy="11" r="6" />
       <path d="M15.5 15.5 20 20" />
     </Svg>
   );
 }
 
-export function EyeIcon() {
+export function EyeIcon(props?: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
       <circle cx="12" cy="12" r="2.5" />
     </Svg>
   );
 }
 
-export function EyeOffIcon() {
+export function EyeOffIcon(props?: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <path d="M4.2 7.3C3.1 8.8 2.5 10.2 2.5 12c0 0 3.5 6 9.5 6 1.7 0 3.2-.4 4.5-1" />
       <path d="M9.8 6.3A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a12.8 12.8 0 0 1-2.2 2.9" />
       <path d="M9.9 9.9A3 3 0 0 0 14.1 14" />
@@ -303,6 +303,15 @@ export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function RefreshIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg {...props}>
+      <path d="M20 12a8 8 0 1 1-2.3-5.7" />
+      <path d="M20 4v5h-5" />
+    </Svg>
+  );
+}
+
 export function GlobeIcon() {
   return (
     <Svg>
@@ -329,18 +338,18 @@ export function DeviceIcon() {
   );
 }
 
-export function InfoIcon() {
+export function InfoIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <circle cx="12" cy="12" r="8" />
       <path d="M12 11v5M12 8h.01" />
     </Svg>
   );
 }
 
-export function LockIcon() {
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <rect x="5" y="10" width="14" height="10" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
       <path d="M12 14v2" />
@@ -358,9 +367,9 @@ export function UploadIcon() {
   );
 }
 
-export function UserIcon() {
+export function UserIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <Svg>
+    <Svg {...props}>
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5.5 20c.8-3.4 3-5.1 6.5-5.1s5.7 1.7 6.5 5.1" />
     </Svg>

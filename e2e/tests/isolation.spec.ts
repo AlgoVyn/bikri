@@ -40,8 +40,8 @@ async function setUpTill(
     [product, price] as const,
   );
   await syncNow(page);
-  await expect(page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
 }
@@ -138,14 +138,14 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
   );
   expect(saved).toHaveLength(1);
   await syncNow(a.page);
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'quota',
   );
-  // The badge is a dot: the reason lives in its accessible name, not its text.
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
+  // The avatar dot is a summary: the reason lives in the accessible name and menu.
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
     'aria-label',
-    'Daily sync limit reached',
+    /Daily sync limit reached/,
   );
   // Shop B keeps syncing.
   await b.page.evaluate(() =>
@@ -154,8 +154,8 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
     ]),
   );
   await syncNow(b.page);
-  await expect(b.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(b.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
 

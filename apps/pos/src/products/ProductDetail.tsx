@@ -214,7 +214,7 @@ export function ProductDetailPage({
             can('sale.create') && !readOnly ? (
               <button
                 type="button"
-                className={`${buttonPrimary} w-full 2xl:w-auto`}
+                className={buttonPrimary}
                 onClick={() => void addToSale()}
               >
                 {t('products.sell')}

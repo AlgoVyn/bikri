@@ -22,6 +22,8 @@ export type NavItem = {
   permAny?: readonly Permission[];
   /** Shown in the phone bottom bar; the rest live under More. */
   bar: boolean;
+  /** Kept in `NAV` for routing/permissions but reached from the staff menu instead. */
+  hideInNav?: boolean;
 };
 
 export const NAV: readonly NavItem[] = [
@@ -97,6 +99,7 @@ export const NAV: readonly NavItem[] = [
     Icon: SettingsIcon,
     perm: null,
     bar: false,
+    hideInNav: true,
   },
 ];
 

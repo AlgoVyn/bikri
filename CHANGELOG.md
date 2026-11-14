@@ -5,6 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased] — 1.0.0 release candidate
 
 ### Design
+- Rail-only desktop shell with a compact 64 px mode toggled from the Bikri mark, Search at the foot of the rail, Settings in the staff menu, selling prices in global search, a Today-card privacy eye, roomier nav spacing and a phone page-actions menu that stays on-screen (D-220, D-221).
 - Graphite dark theme: near-black canvas `#0E1014`, calmer surfaces, 3:1 borders, desaturated primary `#5EA5D4`, brand-turquoise success, and the brand-navy rail `#182E55`. Rail overlays move onto tokens so dark labels are not pure white; light theme is unchanged (D-217).
 - New Bikri brand mark: an open ledger with a tick cut through both pages and a turquoise total line, with a sentence-case Bikri wordmark, in the rail, operator console, lock, enrol, setup and shop-request screens (theme-aware, reversed on navy). New PWA icons (rounded, 192/512 maskable), a 180 px Apple touch icon, and SVG + ICO favicons (D-216).
 - The Udhaar khata and supplier ledger use the shared subpage header and a compact balance card (20 px amount on phones, 32 px from 640 px, with limit bar, age and promise). Party actions are one primary plus a More menu. Receive money, Pay supplier, Promise and the customer/supplier editors open as bottom sheets on phones and 32 rem dialogs on desktop, with a slim balance line, a three-up method control and a sticky footer (D-160).

@@ -1,5 +1,12 @@
 @import "./styles/tokens.css";
 
+/* The desktop rail can be icon-only; the bottom bar keeps its labels. */
+@media (min-width: 1024px) {
+  [data-rail-compact="true"] .rail-label {
+    display: none;
+  }
+}
+
 @keyframes shake {
   0%,
   100% {

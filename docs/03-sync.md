@@ -36,7 +36,7 @@ type Op =
 - Several edits of the same master row while still pending are **coalesced**: the newer op replaces the older pending op's `row`, unions `changed_fields`, keeps the older `base_rev`. An op that has **ever been sent** (`sent_at` set) is never coalesced again: a lost response may have left its `op_id` in `applied_ops`, so the newer edit gets a fresh op id and `base_rev`. A later pull applies or merges it normally.
 - Every entry carries `tx_id` (one ULID per Dexie transaction, i.e. per user action). Entries are pushed in `seq` order, in batches of up to **200 ops** and **512 KB** of JSON, and a batch is only cut **between** transactions, so all rows of one action (a refund with its payment and ledger entry, an override with its audit row) always arrive in the same push. To guarantee that, no transaction may write more than 200 ops: bills, refunds, deliveries and supplier returns are limited to **60 lines** (≤ ~190 ops), product import writes chunks of 50 rows and bulk price update chunks of 100 products per transaction. The repository layer asserts this limit in tests.
 - After a successful push, acknowledged entries are deleted (not kept) and `kv.last_push_at` is set.
-- An entry rejected by the server (`result: 'rejected'`) stays with `status: 'failed'` and `last_error`; the rail sync badge turns red and Settings → Sync lists failed ops with the error and a "Discard" (owner only) or "Retry" action. Failed ops do not block later ops.
+- An entry rejected by the server (`result: 'rejected'`) stays with `status: 'failed'` and `last_error`; the avatar status dot turns red and Settings → Sync lists failed ops with the error and a "Discard" (owner only) or "Retry" action. Failed ops do not block later ops.
 
 ## 4. Protocol
 
@@ -195,28 +195,28 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 | `online` event | push then pull |
 | `visibilitychange` → visible | pull |
 | Day close saved | push + pull immediately; show result in the day-close success view |
-| Manual "Sync now" (rail badge menu) | push + pull |
+| Manual "Sync now" (staff menu → Sync / Settings → Sync) | push + pull |
 | Push/pull HTTP error | exponential backoff: 5 s, 15 s, 60 s, 5 min (max); reset on success |
 
 No Background Sync in v1: pushes happen only while the app is open (the counter PC keeps Bikri open all day).
 
-**Clock check:** every response carries `server_time`. If `|device clock − server_time| > 5 min`, the rail shows "This PC's clock is wrong — fix the date/time" (amber) and Home shows an attention card. Ledger rows still use the device clock (`created_at`, `business_date` in `shop.timezone`), because selling must work offline; the warning stops a wrong clock from silently putting bills on the wrong business date.
+**Clock check:** every response carries `server_time`. If `|device clock − server_time| > 5 min`, the avatar status shows an amber warning and its menu explains "This PC's clock is wrong — fix the date/time"; Home also shows an attention card. Ledger rows still use the device clock (`created_at`, `business_date` in `shop.timezone`), because selling must work offline; the warning stops a wrong clock from silently putting bills on the wrong business date.
 
 **Pending report:** every till request sends `X-Bikri-Pending: <pending_op_count>;<oldest_pending_created_at or 0>`; the Worker stores it in `devices.pending_ops` / `devices.oldest_pending_at` together with `last_seen_at` (at most once per 5 minutes) for Settings → Devices and the operator console.
 
 ## 7. Status shown to the user
 
-The rail badge (bottom of the rail) shows one of:
+The staff/status avatar (bottom of the desktop rail, top bar on phones/tablets) carries the status dot and its menu shows the same state in words:
 
-| State | Badge | Detail on hover/tap |
+| State | Dot | Detail in the staff menu |
 |---|---|---|
 | synced | green dot | "Synced 2 min ago · 0 waiting" |
 | pending | amber dot + count | "12 changes waiting · last sync 14 min ago" |
-| offline | grey cloud-off | "Offline · 12 changes saved on this device" |
+| offline | grey dot | "Offline · 12 changes saved on this device" |
 | error | red dot | "Sync problem: <message> · Open details" |
-| outdated | blue arrow | "Update the app to keep syncing" (on `SCHEMA_OUTDATED`) |
-| downloading | blue spinner + % | "Downloading shop data… 45%" (snapshot running, §4.3) |
-| read-only | grey lock | "This shop is read-only · n changes waiting" (`tenant_status = read_only`; pulls continue, new changes are blocked, [13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
+| outdated | blue dot | "Update the app to keep syncing" (on `SCHEMA_OUTDATED`) |
+| downloading | blue dot + % | "Downloading shop data… 45%" (snapshot running, §4.3) |
+| read-only | grey dot | "This shop is read-only · n changes waiting" (`tenant_status = read_only`; pulls continue, new changes are blocked, [13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 
 If pending ops are older than 24 h, Home shows a warning card: "This till hasn't synced since <time>. Connect to the internet so your data is backed up."
 

@@ -40,18 +40,17 @@ test.describe('Home and shell (T-013)', () => {
     await expect(
       page.getByRole('heading', { name: 'Needs attention' }),
     ).toHaveCount(0);
-    await expect(page.getByTestId('sync-badge')).toHaveAttribute(
-      'data-state',
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+      'data-sync-state',
       'pending',
     );
-    await expect(page.getByTestId('printer-dot')).toHaveAttribute(
-      'aria-label',
-      'No printer. Printer not set up',
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+      'data-printer-state',
+      'none',
     );
-    await expect(page.getByTestId('printer-dot')).toHaveText('No printer');
-    await expect(page.getByTestId('printer-dot')).toHaveClass(/bg-surface-2/);
-    await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /text-text-muted/,
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+      'aria-label',
+      /No printer/,
     );
 
     const nav = page.getByRole('navigation', { name: 'Main' });
@@ -65,6 +64,9 @@ test.describe('Home and shell (T-013)', () => {
       await expect(
         page.locator('#more-menu').getByRole('link', { name: 'Suppliers' }),
       ).toBeVisible();
+      await expect(
+        page.locator('#more-menu').getByRole('link', { name: 'Settings' }),
+      ).toHaveCount(0);
       await page
         .locator('#more-menu')
         .getByRole('link', { name: 'Reports' })
@@ -74,7 +76,8 @@ test.describe('Home and shell (T-013)', () => {
       await homeTab.click();
       await expect(homeTab).toHaveCSS('color', 'rgb(0, 107, 179)');
     } else {
-      await expect(page.getByTestId('printer-dot')).toBeVisible();
+      await expect(page.getByTestId('staff-menu')).toBeVisible();
+      await expect(page.getByTestId('rail-search')).toBeVisible();
       await expect(page.getByTestId('brand-rail')).toContainText('Bikri');
       await expect(page.getByTestId('rail-shop-name')).toHaveCount(0);
       for (const name of [
@@ -86,12 +89,12 @@ test.describe('Home and shell (T-013)', () => {
         'Suppliers',
         'Expenses',
         'Reports',
-        'Settings',
       ]) {
         await expect(
           nav.getByRole('link', { name: new RegExp(`^${name}`) }),
         ).toBeVisible();
       }
+      await expect(nav.getByRole('link', { name: /^Settings/ })).toHaveCount(0);
       await page.keyboard.press('Control+Shift+Digit8');
       await expect(page).toHaveURL(/\/bikri\/reports$/);
       await page.keyboard.press('Control+Shift+Digit1');
@@ -206,19 +209,34 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   });
 
-  test('the status popover links sync and printer to settings', async ({
+  test('Settings opens from the staff menu, never from the rail', async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== 'desktop',
-      'the full status trigger is desktop-only',
-    );
+  }) => {
     await openReadyShop(page, '/bikri/');
-    await page.getByTestId('sync-badge').click();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Main' })
+        .getByRole('link', { name: /^Settings/ }),
+    ).toHaveCount(0);
+    await page.getByTestId('staff-menu').click();
+    await page.getByTestId('staff-menu-settings').click();
+    await expect(page).toHaveURL(/\/bikri\/settings$/);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Settings' }),
+    ).toBeVisible();
+  });
+
+  test('the account menu links sync and printer to settings', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    await page.getByTestId('staff-menu').click();
     await expectNoSeriousAxe(page);
-    const pill = page.getByTestId('sync-pill');
-    await expect(pill).toBeVisible();
-    await pill.click();
+    await expect(page.getByTestId('sync-status')).toBeVisible();
+    await expect(page.getByTestId('printer-status')).toContainText(
+      'No printer',
+    );
+    await page.getByTestId('sync-status').click();
     await expect(page).toHaveURL(/\/bikri\/settings\/sync$/);
   });
 
@@ -309,21 +327,23 @@ test.describe('Home and shell (T-013)', () => {
     ).toHaveCount(1);
   });
 
-  test('printer pill turns green when a printer is configured', async ({
+  test('the avatar status turns ready when a printer is configured', async ({
     page,
   }) => {
     await openReadyShop(page, '/bikri/');
     await page.evaluate(async () => {
       await window.__bikriTest?.setKv('printer', { transport: 'system' });
     });
-    await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /bg-success-subtle/,
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+      'data-printer-state',
+      'ready',
     );
-    await expect(page.getByTestId('printer-dot')).toHaveClass(
-      /text-success-subtle-ink/,
-    );
-    await expect(page.getByTestId('printer-dot')).toHaveAttribute(
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
       'aria-label',
+      /Printer ready/,
+    );
+    await page.getByTestId('staff-menu').click();
+    await expect(page.getByTestId('printer-status')).toContainText(
       'Printer ready',
     );
   });

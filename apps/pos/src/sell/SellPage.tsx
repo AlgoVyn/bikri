@@ -638,7 +638,7 @@ export function SellPage() {
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 bottom-tabbar flex lg:start-rail lg:bottom-0 ${sheet ? 'z-40' : ''}`}
+      className={`fixed inset-x-0 top-topbar bottom-tabbar flex lg:start-rail lg:top-0 lg:bottom-0 ${sheet ? 'z-40' : ''}`}
     >
       <section
         aria-label={t('sell.find_products')}

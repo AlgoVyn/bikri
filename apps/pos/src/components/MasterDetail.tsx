@@ -70,7 +70,7 @@ export function MasterDetail({
       </div>
       {showDetail ? (
         <div
-          className="min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]"
+          className="min-w-0 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]"
           data-testid={detailTestId}
         >
           {detail}

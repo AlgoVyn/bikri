@@ -74,8 +74,8 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
     ]),
   );
   await syncNow(a.page);
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
   // Let the service worker take control so the app reloads offline.
@@ -88,8 +88,8 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
   await a.ctx.setOffline(true);
   // Sell hides the app header, so check the badge on Home.
   await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'offline',
   );
   await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
@@ -101,8 +101,8 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
   await a.ctx.setOffline(false);
   await syncNow(a.page);
   await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(5);
@@ -198,8 +198,8 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
   await syncNow(a.page);
   // Sell hides the app header, so check the badge on Home.
   await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'paused',
   );
   await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
@@ -211,8 +211,8 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
   expect(re.status(), await re.text()).toBe(200);
   await syncNow(a.page);
   await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(3);

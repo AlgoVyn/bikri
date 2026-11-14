@@ -46,8 +46,8 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   await a.page.keyboard.type('4826');
   await expect(a.page.getByRole('navigation', { name: 'Main' })).toBeVisible();
   await syncNow(a.page);
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
 
@@ -238,8 +238,8 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     a.page.getByRole('heading', { name: 'Earbuds Pro' }),
   ).toBeVisible();
   await syncNow(a.page);
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'synced',
   );
 
@@ -311,8 +311,8 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
   expect(ro.status(), await ro.text()).toBe(200);
   await syncNow(a.page);
   await expect(a.page.getByTestId('banner-read-only')).toBeVisible();
-  await expect(a.page.getByTestId('sync-badge')).toHaveAttribute(
-    'data-state',
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
     'read-only',
   );
   await a.page.evaluate(() => {

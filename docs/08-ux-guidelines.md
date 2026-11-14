@@ -151,7 +151,7 @@ All fonts self-hosted in `apps/pos/public/fonts` (woff2), precached; no Google F
 
 ### Layout containers and page anatomy
 
-Shop screens use one of the four widths below through `pageClass()`; `MasterDetail` owns the workspace width directly, and setup/enrol/lock use the focused width. A screen never invents its own `max-w-*`. On list-only screens the page header and its actions span the container. On a master–detail workspace at ≥1280 px the list column keeps the page header and the detail pane has its own record header (back control, icon, record name), so the two panes read as list and record; page actions stay with the column they act on (D-219).
+Shop screens use one of the four widths below through `pageClass()`; `MasterDetail` owns the workspace width directly, and setup/enrol/lock use the focused width. A screen never invents its own `max-w-*`. At ≥1024 px the shell is **rail-only** (D-220): the 88 px brand rail carries brand, navigation, Search and the staff/status avatar, with Settings inside the avatar menu and comfortable spacing between nav items; the 56 px top bar exists only on phones and tablets (including Sell). On list-only screens the page header and its actions span the container. On a master–detail workspace at ≥1280 px the list column keeps the page header and the detail pane has its own record header (back control, icon, record name), so the two panes read as list and record; page actions stay with the column they act on (D-219).
 
 | Width | Class | Used by |
 |---|---|---|

@@ -1,6 +1,6 @@
 # 18 — Price
 
-Modal from Home / rail / hotkey `Ctrl+Shift+P`. Everyone. Customers often ask "how much is this?" without buying.
+Modal from hotkey `Ctrl+Shift+P` (and the command palette). Everyone. Customers often ask "how much is this?" without buying. Product hits in the global search overlay (`/` or the rail/phone Search control) also show the selling price, so the shell no longer has a separate Price button.
 
 ## Reference
 

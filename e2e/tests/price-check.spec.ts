@@ -71,15 +71,12 @@ async function timedScan(page: Page, code: string): Promise<number> {
 }
 
 test.describe('Price check (T-022)', () => {
-  test('AC 1, 2: Home tile, scan shows the card fast, offline, nothing written; Enter adds to the cart', async ({
+  test('AC 1, 2: hotkey opens it, scan shows the card fast, offline, nothing written; Enter adds to the cart', async ({
     page,
   }) => {
     await shop(page);
     await page.context().setOffline(true);
-    await page
-      .getByRole('main')
-      .getByRole('button', { name: /^Price/u })
-      .click();
+    await page.keyboard.press('Control+Shift+KeyP');
     await expect(field(page)).toBeFocused();
     const before = await writes(page);
     const ms = await timedScan(page, '8901111111111');
@@ -171,22 +168,40 @@ test.describe('Price check (T-022)', () => {
     await expect(dialog(page)).not.toContainText('Margin');
   });
 
-  test('phone opens it from More; desktop from the rail', async ({
+  test('search shows the product price; the shell has no separate Price entry', async ({
     page,
-  }, info) => {
+  }) => {
     await shop(page);
-    if (info.project.name === 'phone') {
+
+    // Search is the price lookup: product hits carry the selling price.
+    await page.keyboard.press('/');
+    const search = page.locator('#global-search');
+    await expect(search).toBeFocused();
+    await search.fill('Type-C');
+    const option = page.getByRole('option', { name: /Type-C cable 1 m/u });
+    await expect(option).toContainText('Rs 450');
+    await search.press('Escape');
+    await expect(page.locator('#global-search')).toHaveCount(0);
+
+    // No Price button remains in the rail, the More menu or Home's actions.
+    await expect(
+      page.getByRole('navigation', { name: 'Main' }).getByRole('button', {
+        name: /Price/u,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('main').getByRole('button', { name: /^Price/u }),
+    ).toHaveCount(0);
+    if ((await page.getByRole('button', { name: 'More' }).count()) > 0) {
       await page.getByRole('button', { name: 'More' }).click();
-      await page
-        .locator('#more-menu')
-        .getByRole('button', { name: 'Price' })
-        .click();
-    } else {
-      await page
-        .getByRole('navigation')
-        .getByRole('button', { name: /Price/u })
-        .click();
+      await expect(
+        page.locator('#more-menu').getByRole('button', { name: 'Price' }),
+      ).toHaveCount(0);
+      await page.keyboard.press('Escape');
     }
+
+    // The hotkey remains the price-check entry point everywhere.
+    await page.keyboard.press('Control+Shift+KeyP');
     await expect(field(page)).toBeFocused();
   });
 

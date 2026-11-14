@@ -32,7 +32,6 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useSession } from '../state/session.ts';
 import { loadDevicePrefs, togglePrivacyMode } from './devicePrefs.ts';
 import { ignoresHotkey } from './hotkeys.ts';
-import { usePriceCheck } from './priceCheckStore.ts';
 
 const RECENT_KEY = 'bikri.recent_commands';
 
@@ -64,7 +63,6 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
   const lock = useSession((state) => state.lock);
-  const openPriceCheck = usePriceCheck((state) => state.setOpen);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'commands' | 'shortcuts'>('commands');
   const [query, setQuery] = useState('');
@@ -172,17 +170,6 @@ export function CommandPalette() {
         run: go('/settings/cashiers'),
       },
       {
-        id: 'price-check',
-        label: t('home.price_check'),
-        hint: t('home.desc_price_check'),
-        keys: 'Ctrl+Shift+P',
-        icon: <SearchIcon />,
-        run: () => {
-          setOpen(false);
-          openPriceCheck(true);
-        },
-      },
-      {
         id: 'privacy',
         label: privacyEnabled ? t('privacy.show') : t('privacy.hide'),
         hint: t('privacy.command_hint'),
@@ -215,7 +202,7 @@ export function CommandPalette() {
       if (item.id === 'cashiers') return can('settings.staff');
       return true;
     });
-  }, [can, lock, navigate, openPriceCheck, privacyEnabled, t]);
+  }, [can, lock, navigate, privacyEnabled, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

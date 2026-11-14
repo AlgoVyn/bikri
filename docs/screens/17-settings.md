@@ -73,7 +73,7 @@ Label size (50×25 mm roll, 38×25 mm roll, 40×30 mm roll, A4 sheet 3×8), show
 
 ## Scanner and display (`settings.device`)
 
-Scanner: test field showing keystroke timing; "suffix Enter" check; camera scanning on/off for phones. Display: theme (Light / Dark / System), text size (100/115/130%), **Hide amounts** (the top-bar eye; stored in `kv.ui.prefs.privacyMode`, masks figures on browsing/reporting screens but never in Sell, Pay, Price check or printed/exported output), lock-screen keypad (Phone: 1 2 3 on top, or Computer: 7 8 9 on top; stored in `kv.ui.prefs.keypad`), cart order (newest on top/bottom), auto-close sale complete, sounds on/off, auto-lock minutes.
+Scanner: test field showing keystroke timing; "suffix Enter" check; camera scanning on/off for phones. Display: theme (Light / Dark / System), text size (100/115/130%), **Hide amounts** (device-wide privacy stored in `kv.ui.prefs.privacyMode`, also `Ctrl+Shift+H`; it masks figures on browsing/reporting screens but never in Sell, Pay, Price check or printed/exported output — Home's Today card has its own local eye as well), lock-screen keypad (Phone: 1 2 3 on top, or Computer: 7 8 9 on top; stored in `kv.ui.prefs.keypad`), cart order (newest on top/bottom), auto-close sale complete, sounds on/off, auto-lock minutes.
 
 ## Language (inside Scanner & display)
 

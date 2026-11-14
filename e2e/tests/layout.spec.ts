@@ -142,21 +142,24 @@ test.describe('design layout invariants', () => {
     await page.setViewportSize({ width: 1024, height: 700 });
     await seedVisualShop(page);
     const nav = page.getByTestId('brand-rail').locator('..');
-    const metrics = await nav.evaluate((element) => {
+    const rail = page.getByTestId('rail-scroll');
+    const metrics = await nav.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      labels: Array.from(
+        element.querySelectorAll<HTMLElement>('a > span:last-child'),
+      ).map((label) => getComputedStyle(label).whiteSpace),
+    }));
+    const scroll = await rail.evaluate((element) => {
       const style = getComputedStyle(element);
       return {
-        width: element.getBoundingClientRect().width,
         scrollbarWidth: style.scrollbarWidth,
         overflowY: style.overflowY,
-        labels: Array.from(
-          element.querySelectorAll<HTMLElement>('a > span:last-child'),
-        ).map((label) => getComputedStyle(label).whiteSpace),
       };
     });
     expect(metrics.width).toBeGreaterThanOrEqual(88);
-    expect(metrics.scrollbarWidth).toBe('none');
-    expect(metrics.overflowY).toBe('auto');
-    expect(metrics.labels.length).toBeGreaterThanOrEqual(9);
+    expect(scroll.scrollbarWidth).toBe('none');
+    expect(scroll.overflowY).toBe('auto');
+    expect(metrics.labels.length).toBeGreaterThanOrEqual(8);
     expect(metrics.labels.every((whiteSpace) => whiteSpace === 'nowrap')).toBe(
       true,
     );
@@ -169,6 +172,82 @@ test.describe('design layout invariants', () => {
         .map((label) => label.textContent),
     );
     expect(overflowed).toEqual([]);
+    await setLanguage(page, 'en');
+  });
+
+  test('desktop rail compacts from the brand and remembers it', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openReadyShop(page, '/bikri/');
+    const nav = page.getByTestId('brand-rail').locator('..');
+    await expect(nav).toHaveCSS('width', '88px');
+    await expect(page.getByTestId('brand-rail')).toHaveAttribute(
+      'aria-label',
+      'Bikri — Compact',
+    );
+    await expect(page.getByTestId('brand-rail')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    await page.getByTestId('brand-rail').click();
+    await expect(nav).toHaveCSS('width', '64px');
+    await expect(page.locator('main')).toHaveCSS('padding-left', '64px');
+    await expect(page.locator('nav .rail-label').first()).toBeHidden();
+    await expect(page.getByTestId('brand-rail')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByTestId('brand-rail')).toHaveAttribute(
+      'title',
+      'Expand',
+    );
+    await page.reload();
+    await expect(nav).toHaveCSS('width', '64px');
+    await page.getByTestId('brand-rail').click();
+    await expect(nav).toHaveCSS('width', '88px');
+    await expect(page.locator('nav .rail-label').first()).toBeVisible();
+  });
+
+  test('desktop rail spaces nav items and keeps search at the bottom', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openReadyShop(page, '/bikri/');
+    const links = page.getByTestId('rail-scroll').locator('a');
+    const boxes = await links.evaluateAll((elements) =>
+      elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, height: rect.height };
+      }),
+    );
+    expect(boxes).toHaveLength(8);
+    expect(Math.min(...boxes.map((box) => box.height))).toBeGreaterThanOrEqual(
+      56,
+    );
+    const search = await page.getByTestId('rail-search').boundingBox();
+    const lastNavBottom = Math.max(...boxes.map((box) => box.bottom));
+    expect(search?.y ?? 0).toBeGreaterThan(lastNavBottom);
+    const staff = await page.getByTestId('staff-menu').boundingBox();
+    expect(staff?.y ?? 0).toBeGreaterThan(search?.y ?? 0);
+  });
+
+  test('the page More menu stays inside the phone viewport in both directions', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openReadyShop(page, '/bikri/products');
+    for (const language of ['en', 'ur'] as const) {
+      await setLanguage(page, language);
+      await page.getByTestId('page-actions-more').click();
+      const menu = page.locator('.bikri-menu');
+      await expect(menu).toBeVisible();
+      const box = await menu.boundingBox();
+      expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? 999)).toBeLessThanOrEqual(390);
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+    }
     await setLanguage(page, 'en');
   });
 

@@ -267,7 +267,9 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await page.getByRole('link', { name: 'Record delivery' }).click();
     for (const name of ['A', 'B']) {
       await page.getByLabel('Add a product').fill(name);
+      // Scope to the delivery search; the staff-menu avatar also starts with a name.
       await page
+        .locator('search')
         .getByRole('button', { name: new RegExp(`^${name}`) })
         .first()
         .click();

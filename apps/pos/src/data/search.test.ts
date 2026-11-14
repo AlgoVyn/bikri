@@ -118,6 +118,7 @@ describe('searchAll (screens/04)', () => {
     const charger = await searchAll(db, 'charger');
     expect(charger.filter((hit) => hit.kind === 'product')).toHaveLength(1);
     expect(charger[0]?.id).toBe('p-charger');
+    expect(charger[0]?.price).toBe(100000);
     const ali = (await searchAll(db, 'ali')).filter(
       (hit) => hit.kind === 'customer',
     );

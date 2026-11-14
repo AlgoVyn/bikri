@@ -6,6 +6,8 @@ export type SearchHit = {
   id: string;
   title: string;
   detail: string;
+  /** Product selling price in paisa; the search overlay shows it for price lookups. */
+  price?: number;
 };
 
 const PER_GROUP = 5;
@@ -18,6 +20,7 @@ type ProductRow = {
   name_ur?: unknown;
   brand?: unknown;
   sku?: unknown;
+  price?: unknown;
   deleted_at?: unknown;
 };
 
@@ -127,6 +130,7 @@ export async function searchAll(
         id: String(p.id),
         title: name,
         detail: sku,
+        price: Number(p.price ?? 0),
       });
       if (products.length === PER_GROUP) break;
     }

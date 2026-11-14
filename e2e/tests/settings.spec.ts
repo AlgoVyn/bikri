@@ -65,7 +65,12 @@ test.describe('Settings (T-050)', () => {
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings/cashiers');
-    await page.getByRole('button', { name: /Adnan/ }).first().click();
+    // The staff-menu avatar is also named Adnan; the cashier row is in main.
+    await page
+      .locator('main')
+      .getByRole('button', { name: /Adnan/ })
+      .first()
+      .click();
     const ownerDialog = page.getByRole('dialog', { name: 'Edit cashier' });
     await expect(ownerDialog.getByText('Last owner')).toBeVisible();
     await expect(ownerDialog.getByLabel('Active')).toBeDisabled();

@@ -13,13 +13,15 @@ import {
   ClockIcon,
   CloseIcon,
   CountIcon,
+  EyeIcon,
+  EyeOffIcon,
   LockIcon,
   ProductsIcon,
   SalesIcon,
-  SearchIcon,
   SellIcon,
 } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PrivacyProvider, usePrivacyActive } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -34,7 +36,6 @@ import { shopTimeZone } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { formatTimestamp } from '../lib/date';
 import { NAV } from '../shell/nav.ts';
-import { usePriceCheck } from '../shell/priceCheckStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { useSession } from '../state/session.ts';
@@ -73,6 +74,15 @@ const QUICK_DESC: Record<string, string> = {
 
 /** Home groups its actions by the job the cashier is doing (screens/04). */
 const RUN_ROUTES = new Set(['/day-close', '/sales', '/udhaar']);
+const TODAY_HIDDEN_KEY = 'bikri.home_today_hidden';
+
+function readTodayHidden(): boolean {
+  try {
+    return localStorage.getItem(TODAY_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const ATTENTION_LINK: Record<string, string> = {
   low_stock: '/products',
@@ -104,6 +114,17 @@ export function HomePage() {
       return false;
     }
   });
+  const [todayHidden, setTodayHidden] = useState(readTodayHidden);
+  const toggleTodayHidden = () =>
+    setTodayHidden((hidden) => {
+      const next = !hidden;
+      try {
+        localStorage.setItem(TODAY_HIDDEN_KEY, next ? '1' : '0');
+      } catch {
+        // Storage can be disabled; the current session still hides the amounts.
+      }
+      return next;
+    });
   const timeZone =
     useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
   const { today, yesterday, now } = useBusinessDates(timeZone);
@@ -159,15 +180,17 @@ export function HomePage() {
       Icon: ClockIcon,
       perm: 'dayclose.create' as const,
     },
-    ...NAV.slice(2, 3).map((item) => ({
-      to: item.to,
-      label: item.label,
-      desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
-      keys: item.keys,
-      Icon: item.Icon,
-      perm: item.perm,
-      ...(item.permAny ? { permAny: item.permAny } : {}),
-    })),
+    ...NAV.slice(2, 3)
+      .filter((item) => !item.hideInNav)
+      .map((item) => ({
+        to: item.to,
+        label: item.label,
+        desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
+        keys: item.keys,
+        Icon: item.Icon,
+        perm: item.perm,
+        ...(item.permAny ? { permAny: item.permAny } : {}),
+      })),
     {
       to: '/stock/count',
       label: 'count.title',
@@ -176,15 +199,17 @@ export function HomePage() {
       Icon: CountIcon,
       perm: 'stock.adjust' as const,
     },
-    ...NAV.slice(3).map((item) => ({
-      to: item.to,
-      label: item.label,
-      desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
-      keys: item.keys,
-      Icon: item.Icon,
-      perm: item.perm,
-      ...(item.permAny ? { permAny: item.permAny } : {}),
-    })),
+    ...NAV.slice(3)
+      .filter((item) => !item.hideInNav)
+      .map((item) => ({
+        to: item.to,
+        label: item.label,
+        desc: QUICK_DESC[item.to] ?? 'home.quick_actions',
+        keys: item.keys,
+        Icon: item.Icon,
+        perm: item.perm,
+        ...(item.permAny ? { permAny: item.permAny } : {}),
+      })),
   ].filter((tile) =>
     !readOnly || tile.to !== '/day-close'
       ? tile.permAny !== undefined
@@ -311,12 +336,7 @@ export function HomePage() {
             </div>
           </section>
           <div className="flex flex-col gap-6">
-            <QuickActions
-              tiles={runTiles}
-              label="home.run_till"
-              showPriceCheck
-              columns={2}
-            />
+            <QuickActions tiles={runTiles} label="home.run_till" columns={2} />
             <QuickActions tiles={manageTiles} label="home.manage" />
           </div>
           <RecentBillsCard data={data} timeText={timeText} />
@@ -389,7 +409,6 @@ export function HomePage() {
               <QuickActions
                 tiles={runTiles}
                 label="home.run_till"
-                showPriceCheck
                 columns={2}
               />
               <QuickActions tiles={manageTiles} label="home.manage" />
@@ -436,6 +455,8 @@ export function HomePage() {
                   showProfit={can('cost.view')}
                   canClose={can('dayclose.create') && !readOnly}
                   timeText={timeText}
+                  hidden={todayHidden}
+                  onToggleHidden={toggleTodayHidden}
                 />
               ) : null}
             </div>
@@ -659,16 +680,13 @@ function GettingStarted({
 function QuickActions({
   tiles,
   label,
-  showPriceCheck = false,
   columns = 3,
 }: {
   tiles: readonly QuickTile[];
   label: string;
-  showPriceCheck?: boolean;
   columns?: 2 | 3;
 }) {
   const { t, i18n } = useTranslation();
-  const openPriceCheck = usePriceCheck((s) => s.setOpen);
   const grid =
     columns === 2
       ? 'grid gap-2 sm:grid-cols-2 xl:grid-cols-2'
@@ -704,29 +722,6 @@ function QuickActions({
             </Link>
           </li>
         ))}
-        {showPriceCheck ? (
-          <li>
-            <button
-              type="button"
-              title={`${t('home.price_check')} (Ctrl+Shift+P)`}
-              onClick={() => openPriceCheck(true)}
-              className="group flex min-h-20 w-full items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2 hover:shadow-card-hover"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
-                <SearchIcon />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-body font-medium">
-                  {t('home.price_check')}
-                </span>
-                <span className="mt-0.5 block text-small text-text-muted">
-                  {t('home.desc_price_check')}
-                </span>
-              </span>
-              <ChevronRightIcon className="size-4 text-title text-text-muted rtl:rotate-180" />
-            </button>
-          </li>
-        ) : null}
       </ul>
     </section>
   );
@@ -738,92 +733,119 @@ function RegisterCard({
   showProfit,
   canClose,
   timeText,
+  hidden,
+  onToggleHidden,
 }: {
   data: HomeData;
   showCash: boolean;
   showProfit: boolean;
   canClose: boolean;
   timeText: (at: number) => string;
+  hidden: boolean;
+  onToggleHidden: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const globalPrivacy = usePrivacyActive();
   const last = data.recent[0]?.sale.created_at;
   return (
     <section
       aria-labelledby="register-heading"
       className="rounded-card border border-border bg-surface p-4 shadow-card"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center gap-2">
         <h2 id="register-heading" className={sectionLabel(i18n.language)}>
           {t('home.todays_register')}
         </h2>
+        <button
+          type="button"
+          data-testid="today-privacy-toggle"
+          aria-label={hidden ? t('privacy.show') : t('privacy.hide')}
+          aria-pressed={hidden}
+          title={hidden ? t('privacy.show') : t('privacy.hide')}
+          onClick={onToggleHidden}
+          className="relative flex size-9 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 hover:text-text aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink"
+        >
+          {hidden ? (
+            <EyeOffIcon className="size-5" />
+          ) : (
+            <EyeIcon className="size-5" />
+          )}
+        </button>
         {last ? (
-          <p className="text-small text-text-muted">
+          <p className="ms-auto min-w-0 truncate text-small text-text-muted">
             {t('home.last_bill', {
               time: timeText(Number(last)),
             })}
           </p>
         ) : null}
       </div>
-      <div className="mt-4" data-testid="today-sold">
-        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
-            <p className="text-small text-text-muted">{t('home.sold_today')}</p>
-            <p className="mt-1 text-total font-semibold tabular-nums leading-none">
-              <MoneyText paisa={data.today.sold} />
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
-            <span aria-hidden="true" className="[&>svg]:size-3.5">
-              <SalesIcon />
+      <PrivacyProvider active={globalPrivacy || hidden}>
+        <div className="mt-4" data-testid="today-sold">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
+              <p className="text-small text-text-muted">
+                {t('home.sold_today')}
+              </p>
+              <p className="mt-1 text-total font-semibold tabular-nums leading-none">
+                <MoneyText paisa={data.today.sold} />
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
+              <span aria-hidden="true" className="[&>svg]:size-3.5">
+                <SalesIcon />
+              </span>
+              {t('home.bills_count', { count: data.today.bills })}
             </span>
-            {t('home.bills_count', { count: data.today.bills })}
-          </span>
+          </div>
         </div>
-      </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
-        {showCash ? (
-          <div data-testid="today-cash">
+        <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
+          {showCash ? (
+            <div data-testid="today-cash">
+              <dt className="text-small text-text-muted">
+                {t('home.cash_drawer')}
+              </dt>
+              <dd className="mt-0.5 text-body font-semibold">
+                <MoneyText paisa={data.cash} />
+              </dd>
+            </div>
+          ) : null}
+          {showProfit ? (
+            <div data-testid="today-profit">
+              <dt className="text-small text-text-muted">
+                {t('home.profit_today')}
+              </dt>
+              <dd className="mt-0.5 text-body font-semibold">
+                <MoneyText paisa={data.today.grossProfit} />
+              </dd>
+            </div>
+          ) : null}
+          <div data-testid="today-udhaar" className="col-span-2">
             <dt className="text-small text-text-muted">
-              {t('home.cash_drawer')}
+              {t('home.udhaar_today')}
             </dt>
-            <dd className="mt-0.5 text-body font-semibold">
-              <MoneyText paisa={data.cash} />
+            <dd className="mt-0.5 flex flex-col gap-1 text-body font-medium">
+              <span className="flex items-baseline justify-between gap-3">
+                <span>{t('home.udhaar_given')}</span>
+                <span
+                  className="font-semibold"
+                  data-testid="today-udhaar-given"
+                >
+                  <MoneyText paisa={data.today.udhaarGiven} />
+                </span>
+              </span>
+              <span className="flex items-baseline justify-between gap-3">
+                <span>{t('home.udhaar_received')}</span>
+                <span
+                  className="font-semibold"
+                  data-testid="today-udhaar-received"
+                >
+                  <MoneyText paisa={data.today.udhaarReceived} />
+                </span>
+              </span>
             </dd>
           </div>
-        ) : null}
-        {showProfit ? (
-          <div data-testid="today-profit">
-            <dt className="text-small text-text-muted">
-              {t('home.profit_today')}
-            </dt>
-            <dd className="mt-0.5 text-body font-semibold">
-              <MoneyText paisa={data.today.grossProfit} />
-            </dd>
-          </div>
-        ) : null}
-        <div data-testid="today-udhaar" className="col-span-2">
-          <dt className="text-small text-text-muted">
-            {t('home.udhaar_today')}
-          </dt>
-          <dd className="mt-0.5 flex flex-col gap-1 text-body font-medium">
-            <span className="flex items-baseline justify-between gap-3">
-              <span>{t('home.udhaar_given')}</span>
-              <span className="font-semibold" data-testid="today-udhaar-given">
-                <MoneyText paisa={data.today.udhaarGiven} />
-              </span>
-            </span>
-            <span className="flex items-baseline justify-between gap-3">
-              <span>{t('home.udhaar_received')}</span>
-              <span
-                className="font-semibold"
-                data-testid="today-udhaar-received"
-              >
-                <MoneyText paisa={data.today.udhaarReceived} />
-              </span>
-            </span>
-          </dd>
-        </div>
-      </dl>
+        </dl>
+      </PrivacyProvider>
       {canClose ? (
         <div className="mt-3 flex justify-end border-t border-border pt-1">
           <Link

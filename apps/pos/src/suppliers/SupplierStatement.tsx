@@ -180,7 +180,7 @@ export function SupplierStatement({
                 <Link
                   to="/suppliers/$supplierId/delivery/new"
                   params={{ supplierId }}
-                  className={`${buttonPrimary} max-md:w-full ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
+                  className={`${buttonPrimary} ${readOnly ? 'pointer-events-none bg-surface-2 text-text-muted' : ''}`}
                   aria-disabled={readOnly}
                   onClick={(event) => {
                     if (readOnly) event.preventDefault();

@@ -262,7 +262,7 @@ export function CustomerStatement({
               can('payment.receive') ? (
                 <button
                   type="button"
-                  className={`${buttonPrimary} max-md:w-full`}
+                  className={buttonPrimary}
                   disabled={readOnly}
                   onClick={() => setReceiveOpen(true)}
                 >

@@ -106,10 +106,13 @@ export function PageActions({
   }
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
+    <div className="relative flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
+      {primary !== undefined ? (
+        <div className="order-first md:order-last">{primary}</div>
+      ) : null}
       {secondary}
       {more.length > 0 ? (
-        <div className="relative" ref={ref}>
+        <div ref={ref}>
           <button
             ref={triggerRef}
             type="button"
@@ -135,7 +138,7 @@ export function PageActions({
               role="toolbar"
               aria-orientation="vertical"
               aria-label={label}
-              className="bikri-menu absolute end-0 top-12 z-30 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
+              className="bikri-menu absolute end-0 top-full z-30 mt-2 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
               onKeyDown={onMenuKeyDown}
             >
               {more.map((item, index) =>
@@ -186,7 +189,6 @@ export function PageActions({
           ) : null}
         </div>
       ) : null}
-      {primary}
     </div>
   );
 }

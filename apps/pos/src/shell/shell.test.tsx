@@ -4,7 +4,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import i18n from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -111,7 +111,7 @@ describe('app shell', () => {
     await setLanguage('en');
   });
 
-  it('shows all nine rail items to the owner, with the Bikri brand', async () => {
+  it('shows all eight rail items to the owner, with the Bikri brand', async () => {
     await renderAt(`${BASE_PATH}/`);
     const rail = await screen.findByRole('navigation', { name: 'Main' });
     expect(screen.getByTestId('brand-rail').textContent).toContain('Bikri');
@@ -125,10 +125,10 @@ describe('app shell', () => {
       'Suppliers',
       'Expenses',
       'Reports',
-      'Settings',
     ]) {
       expect(rail.querySelector(`a[title^="${name} ("]`)).not.toBeNull();
     }
+    expect(rail.querySelector('a[title^="Settings ("]')).toBeNull();
   });
 
   it('shows the shop name in the staff menu, not the rail', async () => {
@@ -184,14 +184,17 @@ describe('app shell', () => {
     expect(document.activeElement?.id).toBe('global-search');
     await user.keyboard('A-A');
     (document.activeElement as HTMLElement).blur();
+    // The search is a modal; close it before the global N shortcut.
+    await user.keyboard('{Escape}');
     await user.keyboard('n');
     expect(await screen.findByRole('heading', { name: 'Sell' })).toBeTruthy();
   });
 
-  it('finds bills from the top bar search', async () => {
+  it('finds bills from the global search overlay', async () => {
     const user = userEvent.setup();
     await seedTodaySales();
     await renderAt(`${BASE_PATH}/`);
+    await user.click(await screen.findByTestId('global-search-trigger'));
     await user.type(
       await screen.findByRole('combobox', { name: /Search/ }),
       'A-A-1',
@@ -218,10 +221,12 @@ describe('app shell', () => {
     );
   });
 
-  it('counts waiting outbox ops in the sync badge', async () => {
+  it('counts waiting outbox ops on the avatar status', async () => {
     await renderAt(`${BASE_PATH}/`);
-    const badge = await screen.findByTestId('sync-badge');
-    expect(badge.getAttribute('data-state')).toBe('pending');
-    expect(badge.getAttribute('aria-label')).toBe('On device');
+    const avatar = await screen.findByTestId('staff-menu');
+    await waitFor(() =>
+      expect(avatar.getAttribute('data-sync-state')).toBe('pending'),
+    );
+    expect(avatar.getAttribute('aria-label')).toContain('On device');
   });
 });

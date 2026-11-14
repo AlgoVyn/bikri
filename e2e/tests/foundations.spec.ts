@@ -88,21 +88,19 @@ test.describe('shell and languages (T-006, T-007)', () => {
     await expect(page).toHaveURL(/\/bikri\/products$/);
   });
 
-  test('the top-bar search keeps its Home size on back-office screens', async ({
+  test('the rail search opens the same overlay on every desktop screen', async ({
     page,
   }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'desktop top bar');
+    test.skip(testInfo.project.name !== 'desktop', 'desktop rail');
     await openReadyShop(page, '/bikri/');
-    const search = page.locator('#global-search');
-    await expect(search).toBeVisible();
-    const homeWidth = (await search.boundingBox())?.width;
-    expect(homeWidth).toBeGreaterThan(0);
-
-    // Sell is the exception: it hides the top bar and uses its own scan box.
-    await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
-    await expect(page).toHaveURL(/\/bikri\/sell$/);
     await expect(page.locator('#global-search')).toHaveCount(0);
-    await expect(page.locator('#sell-search')).toBeVisible();
+    await page.getByTestId('rail-search').click();
+    const search = page.locator('#global-search');
+    await expect(search).toBeFocused();
+    const homeWidth = (await search.boundingBox())?.width;
+    expect(homeWidth ?? 0).toBeGreaterThan(400);
+    await search.press('Escape');
+    await expect(page.locator('#global-search')).toHaveCount(0);
 
     for (const path of [
       '/products',
@@ -110,14 +108,17 @@ test.describe('shell and languages (T-006, T-007)', () => {
       '/udhaar',
       '/suppliers',
       '/settings',
+      '/sell',
     ]) {
       await page.evaluate((to) => window.__bikriTest?.navigate(to), path);
       await expect(page).toHaveURL(new RegExp(`${path}$`));
-      await expect(search).toBeVisible();
+      await page.getByTestId('rail-search').click();
+      await expect(search).toBeFocused();
       expect((await search.boundingBox())?.width).toBeCloseTo(
         homeWidth ?? 0,
         0,
       );
+      await search.press('Escape');
     }
   });
 });

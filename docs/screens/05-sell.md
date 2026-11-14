@@ -14,7 +14,7 @@ Bikri differences: product photos on tiles (REQ-B10), "Below cost" flag (REQ-B14
 
 ## Layout (≥ 1024 px: two columns; < 1024 px: product area full screen with a sticky cart bar that expands into a sheet)
 
-Sell is the one screen without the global app top bar (breadcrumbs, global search, privacy, sync badge, staff menu), so the search box and cart start at the top of the viewport. Staff, sync and privacy controls stay available on every other screen through the rail/bottom navigation.
+On desktop (≥ 1024 px) Sell has no global top bar because the rail-only shell has none on any screen; its own search box and cart start at the top of the content area, with Search, account and status available from the rail. On phones and tablets the standard top bar stays above Sell (and every other screen), so the Sell search and cart start below it.
 
 **Start column (≈ 60%) — find products**
 1. Search box (autofocus; placeholder "Search or scan — name, barcode, SKU"; shortcut F2 (shown in the `?` shortcut sheet)). Results replace the grid as you type. It is 40 px tall on desktop (48 px on touch), matching the cart tab height; there is no category filter row.
