@@ -88,9 +88,10 @@ describe('app shell', () => {
     setUpdateReady(true, apply);
     await renderAt(`${BASE_PATH}/`);
     expect(apply).not.toHaveBeenCalled();
-    await user.click(
-      await screen.findByRole('button', { name: 'Update ready' }),
-    );
+    const button = await screen.findByRole('button', { name: 'Update ready' });
+    expect(button.textContent).toBe('Update');
+    expect(button.getAttribute('title')).toBe('Update ready');
+    await user.click(button);
     expect(apply).toHaveBeenCalledOnce();
   });
 

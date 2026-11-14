@@ -127,6 +127,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       ? t(extraTitle)
       : null;
   const blocked = current !== undefined && !allowed(current);
+  const updateLabel = updating
+    ? `${t('shell.update')} (${t('shell.updating')})`
+    : t('shell.update_ready');
 
   useEffect(() => {
     document.title = t('common.app_title');
@@ -264,9 +267,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={buttonPrimary}
                 disabled={updating}
                 aria-busy={updating}
+                title={updateLabel}
+                aria-label={updateLabel}
                 onClick={startUpdate}
               >
-                {updating ? t('shell.updating') : t('shell.update_ready')}
+                {t('shell.update')}
               </button>
             ) : null}
             <StaffMenu shopName={shopName} variant="topbar" />
@@ -379,16 +384,26 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 disabled={updating}
                 aria-busy={updating}
-                title={t('shell.update_ready')}
-                aria-label={
-                  updating ? t('shell.updating') : t('shell.update_ready')
-                }
+                title={updateLabel}
+                aria-label={updateLabel}
                 onClick={startUpdate}
                 className={`${navLink} text-rail-active hover:bg-rail-hover`}
               >
-                <RefreshIcon />
+                <span className="relative inline-flex">
+                  <RefreshIcon
+                    className={
+                      updating ? 'motion-safe:animate-spin' : undefined
+                    }
+                  />
+                  {updating ? null : (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -end-1 -top-0.5 size-2 rounded-full border-2 border-rail bg-accent"
+                    />
+                  )}
+                </span>
                 <span className="rail-label max-w-full truncate leading-tight">
-                  {updating ? t('shell.updating') : t('shell.update_ready')}
+                  {t('shell.update')}
                 </span>
               </button>
             ) : null}

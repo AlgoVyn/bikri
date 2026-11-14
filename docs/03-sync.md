@@ -162,7 +162,7 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 6. Set `meta.last_prune_at`; log counts per tenant (Workers Logs). The cron uses only I/O (no CPU-heavy work), within the 10 ms CPU limit; rows deleted count as D1 rows written and are charged to the account's shared budget, not to a tenant's `daily_write_budget`.
 
 **A till offline for more than 30 days** keeps selling normally (everything is local). When it comes back online:
-1. If the server answers `409 SCHEMA_OUTDATED`, the PWA update is applied first (the rail already shows "Update ready"; it reloads when no cart is open).
+1. If the server answers `409 SCHEMA_OUTDATED`, the PWA update is applied first (the rail already shows **Update**; it reloads when no cart is open).
 2. It **pushes its outbox first** (push never depends on the pull cursor), so its own sales reach the server.
 3. Its pull gets `410 SNAPSHOT_REQUIRED` → it runs the snapshot (§4.3) as a background banner ("Bringing this till up to date… 45%") and then continues pulling. No local data is cleared; pending local edits are protected exactly as in a pull.
 4. Home warns early: no successful pull for **7 days** → amber card "This till hasn't received updates for 7 days"; for **25 days** → red card "Connect to the internet within 5 days to avoid a full re-download". These are warnings only; nothing stops working.

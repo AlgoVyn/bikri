@@ -5,6 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased] — 1.0.0 release candidate
 
 ### Design
+- The update prompt in the rail and phone top bar now reads **Update** (the full "Update ready" stays in the tooltip and accessible name) with a teal dot on the refresh icon, so translated text no longer overflows the 88 px rail.
 - Operator console refresh: rail-only desktop shell with the same 88/64 px brand rail, a bottom operator menu for the Access email, languages and Access note, a wider 1440 px content column, and a compact mobile brand header with four fitted tabs (D-222).
 - Rail-only desktop shell with a compact 64 px mode toggled from the Bikri mark, Search at the foot of the rail, Settings in the staff menu, selling prices in global search, a Today-card privacy eye, roomier nav spacing and a phone page-actions menu that stays on-screen (D-220, D-221).
 - Graphite dark theme: near-black canvas `#0E1014`, calmer surfaces, 3:1 borders, desaturated primary `#5EA5D4`, brand-turquoise success, and the brand-navy rail `#182E55`. Rail overlays move onto tokens so dark labels are not pure white; light theme is unchanged (D-217).
