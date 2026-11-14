@@ -122,7 +122,7 @@ CREATE TABLE devices (
 ) STRICT;
 
 CREATE TABLE enrolment_codes (
-  code_hash         TEXT PRIMARY KEY,               -- SHA-256 of the 8-char code; globally unique, identifies the tenant
+  code_hash         TEXT PRIMARY KEY,               -- HMAC-SHA256(OWNER_CODE_KEY, 'enrol:' || code) for new codes, legacy SHA-256 until expiry; globally unique, identifies the tenant
   tenant_id         TEXT NOT NULL REFERENCES tenants(id),
   device_name       TEXT NOT NULL,
   branch_id         TEXT NOT NULL,

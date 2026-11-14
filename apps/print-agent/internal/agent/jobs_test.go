@@ -10,17 +10,24 @@ import (
 )
 
 type fakeBackend struct {
-	mu         sync.Mutex
-	printCalls int
-	printErr   error
-	spoolID    string
-	status     backend.Status
-	statusErr  error
-	cancelErr  error
-	printers   []backend.Printer
+	mu          sync.Mutex
+	printCalls  int
+	printErr    error
+	spoolID     string
+	status      backend.Status
+	statusErr   error
+	cancelErr   error
+	printers    []backend.Printer
+	printersErr error
 }
 
 func (f *fakeBackend) ListPrinters(context.Context) ([]backend.Printer, error) {
+	if f.printersErr != nil {
+		return nil, f.printersErr
+	}
+	if f.printers == nil {
+		return []backend.Printer{{Name: "Bixolon", IsDefault: true}}, nil
+	}
 	return f.printers, nil
 }
 
@@ -45,7 +52,7 @@ func (f *fakeBackend) Cancel(context.Context, string, string) error {
 func validRequest() JobRequest {
 	return JobRequest{
 		JobID:    "job-1",
-		Printer:  "Test",
+		Printer:  "Bixolon",
 		Mode:     "raw",
 		PaperMM:  80,
 		Copies:   1,
@@ -89,6 +96,39 @@ func TestManagerStoresBackendFailure(t *testing.T) {
 	}
 	if job.Status != "failed" || job.Error != "RAW_UNSUPPORTED" {
 		t.Fatalf("job = %+v", job)
+	}
+}
+
+func TestManagerRejectsUnknownPrinter(t *testing.T) {
+	fake := &fakeBackend{
+		spoolID:  "42",
+		printers: []backend.Printer{{Name: "Office"}},
+	}
+	manager := NewManager(fake)
+	job, err := manager.Submit(context.Background(), validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "failed" || job.Error != "UNKNOWN_PRINTER" {
+		t.Fatalf("job = %+v", job)
+	}
+	if fake.printCalls != 0 {
+		t.Fatalf("unknown printer printed %d times", fake.printCalls)
+	}
+}
+
+func TestManagerPrintsWhenEnumerationFails(t *testing.T) {
+	fake := &fakeBackend{
+		spoolID:     "42",
+		printersErr: errors.New("cups unavailable"),
+	}
+	manager := NewManager(fake)
+	job, err := manager.Submit(context.Background(), validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "spooled" || fake.printCalls != 1 {
+		t.Fatalf("job = %+v, print calls = %d", job, fake.printCalls)
 	}
 }
 

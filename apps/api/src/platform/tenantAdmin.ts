@@ -255,6 +255,20 @@ export function claimOwnerExportStatement(
   ).bind(tenantId, now, now - every);
 }
 
+/**
+ * Release a start that failed after claiming the 24 h slot. Only the exact claim time is
+ * cleared, so a concurrent successful start is never unlocked by this request (13 §7.3).
+ */
+export function releaseOwnerExportStatement(
+  env: Env,
+  tenantId: string,
+  claimedAt: number,
+) {
+  return env.DB.prepare(
+    'UPDATE tenants SET last_owner_export_at = NULL WHERE id = ?1 AND last_owner_export_at = ?2',
+  ).bind(tenantId, claimedAt);
+}
+
 export async function tenantBySlug(
   env: Env,
   slug: string,

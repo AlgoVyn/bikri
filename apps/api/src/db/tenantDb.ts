@@ -70,6 +70,14 @@ const TABLE_REF =
 const TENANT_PREDICATE = /\b(?:[a-z_][a-z0-9_]*\.)?tenant_id\s*=\s*\?1\b/gi;
 const TENANT_INSERT =
   /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+[a-z_][a-z0-9_]*\s*\(\s*tenant_id\s*,[^)]*\)\s*(?:VALUES\s*\(\s*\?1\s*,|SELECT\s+\?1\s*,)/i;
+/**
+ * A CTE or derived table can hide a tenant table behind a predicate on its alias
+ * (`WITH x AS (SELECT * FROM sales) … WHERE x.tenant_id = ?1`), which the global
+ * predicate count would accept. No tenant statement needs either construct, so refuse
+ * them when a tenant table is named (13 §5).
+ */
+const CTE = /\bWITH\s+(?:RECURSIVE\s+)?[a-z_][a-z0-9_]*\s+AS\b/i;
+const DERIVED_TABLE = /\b(?:FROM|JOIN)\s*\(\s*(?:SELECT|WITH)\b/i;
 const COLUMN = /^[a-z_][a-z0-9_]*$/;
 
 export class TenantScopeError extends Error {
@@ -106,6 +114,12 @@ export function assertTenantScoped(sql: string): void {
   if (refs === 0) {
     rememberScoped(sql);
     return;
+  }
+  if (CTE.test(sql) || DERIVED_TABLE.test(sql)) {
+    throw new TenantScopeError(
+      'tenant SQL must not use CTEs or derived tables',
+      sql,
+    );
   }
   let scoped = [...sql.matchAll(TENANT_PREDICATE)].length;
   if (/^\s*INSERT\b/i.test(sql)) {
