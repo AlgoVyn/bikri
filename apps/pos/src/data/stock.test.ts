@@ -313,6 +313,21 @@ describe('stock count (screens/09)', () => {
     await discardCount(db);
   });
 
+  it('derives a count delta from the movements when the cache is incomplete', async () => {
+    const { db, ctx, p } = await shop('cnt-cache');
+    const draft = await startCount(db, { kind: 'all' }, NOW);
+    draft.counted[p.id] = 10000;
+    await saveCountDraft(db, draft);
+    // A restore/initial snapshot clears the cache and rebuilds it at the end; a count
+    // taken in that window must still use the real on hand (12,000 here), not 0.
+    await db.stock_levels.clear();
+    const r = await finishCount(db, draft, { zeroUncounted: false }, ctx, NOW);
+    expect(r).toEqual({ movements: 1, counted: 1, valueDiff: -220000 });
+    expect(
+      (await movements(db, 'count')).map((m) => m.qty_delta_milli),
+    ).toEqual([-2000]);
+  });
+
   it('skips chunks already applied before a partial count retry', async () => {
     const { db, ctx, p } = await shop('stk-applied');
     const draft = await startCount(db, { kind: 'all' }, NOW);

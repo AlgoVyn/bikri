@@ -177,22 +177,20 @@ export function UdhaarList({
               {t('office.udhaar.chase_list')}
             </Link>
             {can('export.data') ? (
-              <>
-                <button
-                  type="button"
-                  className={buttonQuiet}
-                  disabled={!data || data.rows.length === 0}
-                  onClick={() =>
-                    data &&
-                    downloadText(
-                      'bikri-udhaar.csv',
-                      customersCsv(data.rows, data.tz),
-                    )
-                  }
-                >
-                  {t('office.udhaar.export_csv')}
-                </button>
-              </>
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!data || data.rows.length === 0}
+                onClick={() =>
+                  data &&
+                  downloadText(
+                    'bikri-udhaar.csv',
+                    customersCsv(data.rows, data.tz),
+                  )
+                }
+              >
+                {t('office.udhaar.export_csv')}
+              </button>
             ) : null}
             {can('party.edit') &&
             !detailOpen &&

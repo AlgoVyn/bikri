@@ -13,9 +13,11 @@ import {
 export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
   const token = await deviceToken(db);
   if (!token) return 0;
-  const pending = (
-    await db.file_queue.where('status').equals('pending').toArray()
-  ).slice(0, max);
+  const pending = await db.file_queue
+    .where('status')
+    .equals('pending')
+    .limit(max)
+    .toArray();
   let done = 0;
   for (const e of pending) {
     if (e.id === undefined) continue;

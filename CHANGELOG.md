@@ -97,6 +97,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - UI/print: privacy covers payment mix and expense shares; PNG/PDF receipts load the Urdu font; `Ctrl+Shift+H` is exact; reissue approvals are cart-bound; the WhatsApp toggle, auto-close, printer error and share text work.
 - Platform/schema: restore confirmation and insert-only ledger import; operator audit for settings/creation/purge; migration `0010` adds append-only triggers and day-close snapshot columns; streaming body caps, cached health, no-store enrolment tokens, error-status logs, tenant-deletion PII cleanup and platform tables in the backup gate.
 
+### Eighth review remediation (2026-11-14)
+- Sync ordering: transactions are planned in outbox order again, so a sale that follows an offline delivery (or the first sale after setup's opening stock) passes its cost check; statements still apply parents-first.
+- Lost responses: a replayed op answers with the row's current `rev`, and an edit of a `rev = 0` row keeps a restore point, so Discard never deletes a row the server has.
+- Pull/restore: a pulled sale row cannot roll a local refund/void status backwards; restore recovery keeps a failed transaction's rows and restore point.
+- Counts: a stock count derives its delta from the product's movements and snapshots update the stock cache per page, so an interrupted snapshot cannot double-apply a count.
+- Guards: a malformed PIN verifier can never crash unlock, an unknown shop time zone falls back to `Asia/Karachi`, and push/import plus migration `0012` reject both.
+- Performance/robustness: Dexie V4 indexes `stock_movements` by `[ref_type+ref_id]`; Home uses index counts; `pending` reports `sending` ops; a debounced push is not dropped during a running push; blobs are limited before deserialising; the tenant-scope guard catches `FROM(table)`; `isUlid`/`newId`/`lineRevenue` validate their inputs; the request log reports the thrown status.
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

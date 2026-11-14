@@ -67,6 +67,30 @@ export async function onHand(
   return (await table.get(productId))?.on_hand_milli ?? 0;
 }
 
+/**
+ * On hand computed from the product's movements (02 §3.1). A stock count is an absolute
+ * write, so its delta must not depend on a cache that may still be rebuilding after a
+ * restore/initial snapshot (the snapshot clears `stock_levels` and rebuilds it at the end).
+ * Only the counted product's movements are read, so this stays bounded.
+ */
+export async function onHandExact(
+  db: BikriDb | Writer,
+  productId: string,
+): Promise<number> {
+  const table = (db as Writer).table<
+    { product_id: string; qty_delta_milli: number },
+    string
+  >('stock_movements');
+  let total = 0;
+  await table
+    .where('[product_id+created_at]')
+    .between([productId, -Infinity], [productId, Infinity])
+    .each((row) => {
+      total += Number(row.qty_delta_milli ?? 0);
+    });
+  return total;
+}
+
 /** Signed delta an adjustment would write (for the live "New on hand"). */
 export function adjustDelta(
   kind: AdjustKind,
@@ -154,7 +178,13 @@ export async function adjustStock(
         .get(input.productId);
       if (!product || product.deleted_at || product.track_stock !== 1)
         throw new StockAdjustError('product');
-      const current = await onHand(w, product.id);
+      // A count is absolute: derive the delta from the movements, not from a cache that a
+      // restore/snapshot may still be rebuilding. Other kinds are relative and need only
+      // the current level for the weighted-average update.
+      const current =
+        input.kind === 'count'
+          ? await onHandExact(w, product.id)
+          : await onHand(w, product.id);
       const delta = adjustDelta(input.kind, input.qtyMilli, current);
       if (delta === 0) return null;
       if (costed && unitCost != null) {
@@ -332,7 +362,7 @@ export async function finishCount(
           const product = await w.table<MasterRow, string>('products').get(id);
           if (!product || product.deleted_at || product.track_stock !== 1)
             continue;
-          const delta = qty - (await onHand(w, id));
+          const delta = qty - (await onHandExact(w, id));
           if (delta === 0) continue;
           await insertMovement(w, product, delta, 'count', ctx, {
             unitCost: null,

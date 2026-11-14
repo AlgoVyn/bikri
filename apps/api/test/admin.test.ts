@@ -566,8 +566,9 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     }
     expect(
       await n(
-        "SELECT pin_hash = 'h' AS n FROM staff WHERE tenant_id = ?1 AND id = '01JB0000000000000000000001'",
+        "SELECT COUNT(*) AS n FROM staff WHERE tenant_id = ?1 AND id = '01JB0000000000000000000001' AND pin_hash = ?2",
         b.tenantId,
+        'a'.repeat(44),
       ),
     ).toBe(1);
   });

@@ -225,6 +225,107 @@ describe('M3 server rules', () => {
     expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
   });
 
+  // A delivery recorded before a sale is a later `tx_id` but ranks before `sales` when the
+  // transactions are ordered by table. Reordering them made the Worker check the sale
+  // against the pre-delivery average cost and reject it (review P1-1).
+  it('keeps a sale that follows a delivery in the same push', async () => {
+    const shop = await seedShop('Delivery then sale');
+    const saleAt = Date.now();
+    // A live till has talked to the server recently; the Worker uses this to decide whether
+    // the sale could have pulled the delivery's cost change.
+    await env.DB.prepare(
+      'UPDATE devices SET last_seen_at = ?1 WHERE tenant_id = ?2 AND id = ?3',
+    )
+      .bind(saleAt, shop.tenantId, shop.till.id)
+      .run();
+    const buy = purchase(shop, IDS.product, 1000, 100000);
+    const buyTx = newId(now);
+    const sale = saleOps(shop, shop.till, 2, { now: saleAt }).map((entry) => {
+      if (entry.tbl === 'sale_lines' && entry.row)
+        entry.row.unit_cost_snapshot = 100000;
+      return entry;
+    });
+    const res = await pushOk(shop.till, [
+      op('purchases', 'insert', buy.rows[0] as Record<string, unknown>, {
+        tx_id: buyTx,
+      }),
+      op('purchase_lines', 'insert', buy.line, { tx_id: buyTx }),
+      op('ledger_entries', 'insert', buy.ledger, { tx_id: buyTx }),
+      op(
+        'stock_movements',
+        'insert',
+        movement(shop, IDS.product, 'purchase', 1000, 100000, buy.id),
+        { tx_id: buyTx },
+      ),
+      ...sale,
+    ]);
+    expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
+  });
+
+  it('keeps a sale rung before a later delivery at the old cost', async () => {
+    const shop = await seedShop('Sale then delivery');
+    const saleAt = Date.now();
+    await env.DB.prepare(
+      'UPDATE devices SET last_seen_at = ?1 WHERE tenant_id = ?2 AND id = ?3',
+    )
+      .bind(saleAt, shop.tenantId, shop.till.id)
+      .run();
+    const sale = saleOps(shop, shop.till, 1, { now: saleAt });
+    const buy = purchase(shop, IDS.product, 1000, 100000);
+    const buyTx = newId(now);
+    const res = await pushOk(shop.till, [
+      ...sale,
+      op('purchases', 'insert', buy.rows[0] as Record<string, unknown>, {
+        tx_id: buyTx,
+      }),
+      op('purchase_lines', 'insert', buy.line, { tx_id: buyTx }),
+      op('ledger_entries', 'insert', buy.ledger, { tx_id: buyTx }),
+      op(
+        'stock_movements',
+        'insert',
+        movement(shop, IDS.product, 'purchase', 1000, 100000, buy.id),
+        { tx_id: buyTx },
+      ),
+    ]);
+    expect(codes(res)).toEqual([null, null, null, null, null, null, null]);
+  });
+
+  it('answers a replayed master op with the current revision', async () => {
+    const shop = await seedShop('Replay rev');
+    const id = newId(now);
+    const create = op(
+      'products',
+      'upsert',
+      productRow(id, { sku: 'REPLAY-1' }),
+    );
+    const first = await pushOk(shop.till, [create]);
+    expect(first.results[0]).toMatchObject({ result: 'applied' });
+    // The response was lost; the till resends the same op id.
+    const replay = await pushOk(shop.till, [create]);
+    expect(replay.results[0]).toMatchObject({
+      result: 'applied',
+      server_rev: 1,
+    });
+    const edit = op(
+      'products',
+      'upsert',
+      productRow(id, { sku: 'REPLAY-1', price: 60_000 }),
+      { base_rev: 1, changed_fields: ['price'] },
+    );
+    const second = await pushOk(shop.till, [edit]);
+    expect(second.results[0]).toMatchObject({
+      result: 'applied',
+      server_rev: 2,
+    });
+    // The old op is still in applied_ops; a replay must report the *current* row revision
+    // so a till that never saw the first answer can adopt it instead of keeping rev 0.
+    const stale = await pushOk(shop.till, [create]);
+    expect(stale.results[0]).toMatchObject({
+      result: 'applied',
+      server_rev: 2,
+    });
+  });
+
   it('enforces purchase, cash move and supplier payment permissions (05 §6)', async () => {
     const shop = await seedShop('Perms');
     const buy = purchase(shop, IDS.product, 1000, 5000, IDS.cashier);

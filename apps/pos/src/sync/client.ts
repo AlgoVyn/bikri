@@ -1,6 +1,6 @@
 /** Till HTTP client (03 §4, 04 §2): bearer token from kv, pending report header, typed errors. */
 import { API_BASE, CLIENT_SCHEMA_VERSION } from '@bikri/core';
-import type { BikriDb } from '@bikri/db';
+import type { BikriDb, OutboxEntry } from '@bikri/db';
 import { getKv } from '../data/kv.ts';
 
 export class SyncHttpError extends Error {
@@ -47,12 +47,16 @@ export async function pendingHeader(db: BikriDb): Promise<string> {
   const cached = pendingCache.get(db);
   if (cached !== undefined && Date.now() - cached.at < PENDING_TTL_MS)
     return cached.value;
-  const pending = db.outbox.where('status').equals('pending');
-  const count = await pending.count();
-  const first =
-    count > 0
-      ? await db.outbox.where('status').equals('pending').first()
-      : undefined;
+  // `sending` ops are still unpublished: reporting only `pending` would understate the
+  // device's backlog exactly while a push is in flight (03 §6).
+  const [count, firstPending, firstSending] = await Promise.all([
+    db.outbox.where('status').anyOf('pending', 'sending').count(),
+    db.outbox.where('status').equals('pending').first(),
+    db.outbox.where('status').equals('sending').first(),
+  ]);
+  const first = [firstPending, firstSending]
+    .filter((entry): entry is OutboxEntry => entry !== undefined)
+    .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))[0];
   const value = `${count};${first?.created_at ?? 0}`;
   pendingCache.set(db, { at: Date.now(), value });
   return value;

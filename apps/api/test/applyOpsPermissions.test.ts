@@ -469,3 +469,71 @@ describe('derived-ledger permissions (05 §5, 07 §5)', () => {
     ).toBe(true);
   });
 });
+
+describe('verifier and time-zone guards (05 §4, 02 §2)', () => {
+  it('rejects a staff verifier the tills cannot use', async () => {
+    const shop = await seedShop('Verifier shape');
+    const now = Date.now();
+    const base = {
+      name: 'Bad PIN',
+      role: 'cashier',
+      pin_hash: 'a'.repeat(44),
+      pin_salt: 'a'.repeat(24),
+      pin_iterations: 150000,
+      pin_length: 4,
+      active: 1,
+      created_at: now,
+      updated_at: now,
+      updated_by: IDS.owner,
+    };
+    for (const broken of [
+      { ...base, pin_iterations: 0 },
+      { ...base, pin_salt: 'x' },
+      { ...base, pin_hash: '!' },
+      { ...base, pin_length: 9 },
+    ]) {
+      const res = await pushOk(shop.admin, [
+        op('staff', 'upsert', { ...broken, id: newId() }),
+      ]);
+      expect(res.results[0]).toMatchObject({
+        result: 'rejected',
+        error_code: 'CONSTRAINT_FAILED',
+      });
+    }
+    const valid = await pushOk(shop.admin, [
+      op('staff', 'upsert', { ...base, id: newId() }),
+    ]);
+    expect(valid.results[0]).toMatchObject({ result: 'applied' });
+  });
+
+  it('rejects an unknown shop time zone but accepts a known one', async () => {
+    const shop = await seedShop('Timezone guard');
+    const rev =
+      (
+        await env.DB.prepare('SELECT rev FROM shop WHERE tenant_id = ?1')
+          .bind(shop.tenantId)
+          .first<{ rev: number }>()
+      )?.rev ?? 1;
+    const bad = await pushOk(shop.admin, [
+      op(
+        'shop',
+        'upsert',
+        { id: 'shop', timezone: 'Asia/Karach', updated_by: IDS.owner },
+        { base_rev: rev, changed_fields: ['timezone'] },
+      ),
+    ]);
+    expect(bad.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+    const good = await pushOk(shop.admin, [
+      op(
+        'shop',
+        'upsert',
+        { id: 'shop', timezone: 'Asia/Dubai', updated_by: IDS.owner },
+        { base_rev: rev, changed_fields: ['timezone'] },
+      ),
+    ]);
+    expect(good.results[0]).toMatchObject({ result: 'applied' });
+  });
+});

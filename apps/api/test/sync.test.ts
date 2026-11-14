@@ -458,9 +458,9 @@ describe('void rules (05 §5, D-044)', () => {
     const shop = await seedShop('Voids');
     const manager = newId();
     await env.DB.prepare(
-      `INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, 'Manager', 'manager', 'h', 's', ?3, ?3)`,
+      `INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, 'Manager', 'manager', ?3, ?4, ?5, ?5)`,
     )
-      .bind(shop.tenantId, manager, Date.now())
+      .bind(shop.tenantId, manager, 'a'.repeat(44), 'a'.repeat(24), Date.now())
       .run();
     const sales = [1, 2].map((seq) => saleOps(shop, shop.till, seq));
     await pushOk(shop.till, sales.flat());

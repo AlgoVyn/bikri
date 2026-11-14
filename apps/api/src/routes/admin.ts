@@ -1,5 +1,5 @@
 /** Operator endpoints behind Cloudflare Access (04 §3.7, screens/19). */
-import { isLedgerTable } from '@bikri/core';
+import { isLedgerTable, isPinVerifierValid, isTimeZone } from '@bikri/core';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
@@ -623,7 +623,7 @@ admin.get('/tenants/:id/devices', async (c) => {
   const rows = await c.var.db.select<
     DeviceRow & { branch_name: string | null }
   >(
-    'SELECT d.*, b.name AS branch_name FROM devices d LEFT JOIN branches b ON b.tenant_id = d.tenant_id AND b.id = d.branch_id WHERE d.tenant_id = ?1 AND b.tenant_id = ?1 ORDER BY d.revoked_at IS NOT NULL, d.enrolled_at',
+    'SELECT d.*, b.name AS branch_name FROM devices d LEFT JOIN branches b ON b.tenant_id = ?1 AND b.id = d.branch_id WHERE d.tenant_id = ?1 ORDER BY d.revoked_at IS NOT NULL, d.enrolled_at',
   );
   return c.json({
     devices: rows.map(({ token_hash: _hidden, ...d }) => ({
@@ -695,6 +695,12 @@ admin.post('/tenants/:id/reset-owner-pin', async (c) => {
       pin_length: z.number().int().min(4).max(6),
     })
     .parse(await readJsonBody(c, 64 * 1024));
+  if (!isPinVerifierValid(body))
+    throw new ApiError(
+      'VALIDATION_FAILED',
+      400,
+      'The PIN verifier is malformed',
+    );
   const now = Date.now();
   const res = await db.batch([
     db.prepare(
@@ -947,6 +953,45 @@ admin.post('/tenants/:id/import', async (c) => {
     }
     if (typeof row.id !== 'string' || row.id.length === 0 || row.id.length > 64)
       throw new ApiError('VALIDATION_FAILED', 400, 'Every row needs an id');
+    // A restore is an operator action, but it must not smuggle a verifier or a time zone
+    // that breaks every till in the shop. The same rules as the push path apply.
+    if (tbl === 'staff') {
+      if (row.pin_hash !== undefined || row.pin_salt !== undefined) {
+        if (
+          !isPinVerifierValid({
+            pin_hash: row.pin_hash,
+            pin_salt: row.pin_salt,
+            pin_iterations: row.pin_iterations,
+          })
+        )
+          throw new ApiError(
+            'VALIDATION_FAILED',
+            400,
+            'The staff PIN verifier is malformed',
+          );
+      } else if (row.pin_iterations !== undefined) {
+        if (
+          !Number.isSafeInteger(row.pin_iterations) ||
+          Number(row.pin_iterations) < 100_000 ||
+          Number(row.pin_iterations) > 1_000_000
+        )
+          throw new ApiError(
+            'VALIDATION_FAILED',
+            400,
+            'The staff PIN iteration count is out of range',
+          );
+      }
+    }
+    if (
+      tbl === 'shop' &&
+      row.timezone !== undefined &&
+      !isTimeZone(row.timezone)
+    )
+      throw new ApiError(
+        'VALIDATION_FAILED',
+        400,
+        'The shop time zone is not a known IANA zone',
+      );
     for (const [k, value] of Object.entries(row)) {
       if (typeof value === 'string' && value.length > 4_000)
         throw new ApiError(

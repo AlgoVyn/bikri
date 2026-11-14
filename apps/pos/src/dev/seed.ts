@@ -42,7 +42,7 @@ export async function finishSetupHere(db = getDb()): Promise<void> {
       },
       product: null,
     },
-    { pinHash: await hashPin('4826', 1000) },
+    { pinHash: await hashPin('4826') },
   );
 }
 

@@ -105,6 +105,25 @@ describe('client', () => {
         .code,
     ).toBe('UNAUTHENTICATED');
   });
+
+  it('counts sending ops in the pending report', async () => {
+    const db = await enrolled('cl-sending');
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Y' }), {
+      now: 100,
+    });
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Z' }), {
+      now: 200,
+    });
+    const entries = await db.outbox.toArray();
+    expect(entries).toHaveLength(2);
+    await db.outbox.update(entries[0]?.seq as number, {
+      status: 'sending',
+      sending_at: Date.now(),
+      sent_at: Date.now(),
+    });
+    // Both `pending` and `sending` count; the oldest entry is the pending one.
+    expect(await pendingHeader(db)).toBe('2;100');
+  });
 });
 
 describe('push (03 §3, §4.1)', () => {
@@ -590,6 +609,44 @@ describe('pull (03 §4.2)', () => {
     expect(await getKv(db, 'restore_epoch', null)).toBe('1');
   });
 
+  it('keeps the local refund status when a pulled sale row is older', async () => {
+    const db = await enrolled('pull-status');
+    const sale = {
+      id: 's-status',
+      total: 100,
+      status: 'part_refunded',
+      business_date: '2026-10-27',
+      created_at: 1,
+    };
+    await db.sales.put(sale);
+    server.changes = [
+      {
+        seq: 1,
+        tbl: 'sales',
+        op: 'upsert',
+        row: { ...sale, status: 'paid' },
+      },
+    ];
+    await pullAll(db);
+    expect((await db.sales.get('s-status'))?.status).toBe('part_refunded');
+    server.changes = [
+      { seq: 2, tbl: 'sales', op: 'upsert', row: { ...sale, status: 'void' } },
+    ];
+    await pullAll(db);
+    expect((await db.sales.get('s-status'))?.status).toBe('void');
+    // A new sale row keeps the server status.
+    server.changes = [
+      {
+        seq: 3,
+        tbl: 'sales',
+        op: 'upsert',
+        row: { ...sale, id: 's-new', status: 'refunded' },
+      },
+    ];
+    await pullAll(db);
+    expect((await db.sales.get('s-new'))?.status).toBe('refunded');
+  });
+
   it('quarantines a malformed row and a unique collision without wedging the cursor', async () => {
     const db = await enrolled('pull-bad');
     server.changes = [
@@ -853,6 +910,43 @@ describe('pull (03 §4.2)', () => {
     );
     expect(queued).toHaveLength(1);
     expect(queued[0]?.recovery).not.toBe(true);
+  });
+
+  it('keeps a failed transaction locally and does not re-queue it during restore recovery', async () => {
+    const db = await enrolled('restore-failed');
+    await setKv(db, 'restore_epoch', '1');
+    const row = {
+      id: 's-failed',
+      device_id: 'dev-1',
+      invoice_seq: 4,
+      invoice_no: 'A-A-4',
+      created_at: NOW + 1000,
+    };
+    await db.sales.add(row);
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'sales',
+      kind: 'insert',
+      row_id: 's-failed',
+      row,
+      status: 'failed',
+      last_error: 'CONSTRAINT_FAILED',
+      attempts: 1,
+      created_at: NOW + 1000,
+    });
+    server.restoreEpoch = '99';
+    server.restorePointAt = NOW + 1;
+    server.tables = { sales: [] };
+    await pullAll(db);
+    // The rejected sale is still visible (and discardable) after the restore.
+    expect(await db.sales.get('s-failed')).toMatchObject(row);
+    const failed = (await db.outbox.toArray()).filter(
+      (entry) => entry.row_id === 's-failed',
+    );
+    expect(failed).toHaveLength(1);
+    expect(failed[0]?.status).toBe('failed');
+    expect(failed[0]?.recovery).not.toBe(true);
   });
 
   it('groups restore recovery by document and keeps the snapshot state', async () => {
@@ -1530,6 +1624,39 @@ describe('status, me and engine (03 §6–7)', () => {
       code: 'C',
       branch_id: 'br-2',
     });
+  });
+
+  it('chains a push and a full sync requested while another cycle is running', async () => {
+    const db = await enrolled('eng-chain');
+    const original = server.fetch;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let blocked = false;
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (!blocked && String(input).includes('/sync/pull')) {
+          blocked = true;
+          await gate;
+        }
+        return original(input, init);
+      },
+    );
+    const engine = new SyncEngine(db);
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Chain' }));
+    const first = engine.run('pull');
+    await vi.waitFor(() => expect(blocked).toBe(true));
+    const pushed = engine.run('push');
+    const full = engine.run('full');
+    release();
+    await Promise.all([first, pushed, full]);
+    expect(server.log.some((l) => l.path === '/sync/push')).toBe(true);
+    expect(
+      server.log.filter((l) => l.path === '/sync/pull').length,
+    ).toBeGreaterThan(1);
+    engine.stop();
   });
 
   it('engine: first run syncs, revoked stops, quota waits, offline backs off', async () => {

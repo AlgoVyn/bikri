@@ -1600,6 +1600,61 @@ async function alreadyApplied(
       });
     }
   }
+  // A replayed `applied` op is what a till gets after a lost response. It must still learn
+  // the row's current revision: otherwise it keeps `base_rev = 0`, and a later rejected edit
+  // discarded in Settings → Sync would delete a row the server already has (03 §3, §5).
+  const byTable = new Map<string, Set<string>>();
+  for (const op of ops) {
+    const answer = out.get(op.op_id);
+    if (!answer || answer.result === 'rejected' || !isMasterTable(op.tbl))
+      continue;
+    const id =
+      op.kind === 'delete' ? op.row_id : (op.row?.id as string | undefined);
+    if (typeof id !== 'string' || id.length === 0) continue;
+    const set = byTable.get(op.tbl) ?? new Set<string>();
+    set.add(id);
+    byTable.set(op.tbl, set);
+  }
+  if (byTable.size > 0) {
+    const revStatements: D1PreparedStatement[] = [];
+    const plans: Array<{ tbl: string; chunk: string[] }> = [];
+    for (const [tbl, set] of byTable) {
+      const list = [...set];
+      for (let i = 0; i < list.length; i += 90) {
+        const chunk = list.slice(i, i + 90);
+        revStatements.push(
+          ctx.db.prepare(
+            `SELECT id, rev FROM ${tbl} WHERE tenant_id = ?1 AND id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
+            ...chunk,
+          ),
+        );
+        plans.push({ tbl, chunk });
+      }
+    }
+    ctx.budget.take();
+    const revs = await ctx.db.batch(revStatements);
+    const revOf = new Map<string, number>();
+    revs.forEach((result, index) => {
+      const plan = plans[index];
+      if (!plan) return;
+      for (const row of (result.results ?? []) as Array<{
+        id: string;
+        rev: number;
+      }>)
+        revOf.set(`${plan.tbl}:${row.id}`, Number(row.rev));
+    });
+    for (const op of ops) {
+      const answer = out.get(op.op_id);
+      if (!answer || answer.result === 'rejected' || !isMasterTable(op.tbl))
+        continue;
+      const id =
+        op.kind === 'delete' ? op.row_id : (op.row?.id as string | undefined);
+      if (typeof id !== 'string') continue;
+      const rev = revOf.get(`${op.tbl}:${id}`);
+      if (typeof rev === 'number' && Number.isSafeInteger(rev))
+        out.set(op.op_id, { ...answer, server_rev: rev });
+    }
+  }
   return out;
 }
 
@@ -1765,11 +1820,13 @@ export async function applyOps(
   }
 
   let pending = groupByTx(fresh);
-  // Plan parents before the rows that reference them. A shop or staff change in an
-  // earlier transaction must be visible to a sale in a later one.
-  const groupRank = (group: PushOp[]): number =>
-    Math.min(...group.map((op) => applyRank(op.tbl)));
-  pending = [...pending].sort((a, b) => groupRank(a) - groupRank(b));
+  // Transactions are planned and applied in push order (the outbox's `seq`). The till
+  // writes a parent before any child that references it, so this is already parents-first
+  // for the cases that matter (setup, restore recovery, a cashier created before selling).
+  // Reordering whole transactions by table rank would break chronological cost validation:
+  // a delivery rung before a sale is a later `tx_id`, but `purchases` ranks after `sales`,
+  // so the sale would be checked against the pre-delivery average cost and rejected.
+  // Foreign-key safety inside one request is provided by the statement sort in `run()` below.
   for (let round = 0; round < 2 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     const look = await loadLookups(ctx, pending.flat());

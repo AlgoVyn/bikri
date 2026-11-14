@@ -1,5 +1,5 @@
 export { contrastRatio } from './contrast.ts';
-export { businessDate } from './dates.ts';
+export { businessDate, DEFAULT_TIME_ZONE, isTimeZone } from './dates.ts';
 export { normaliseDigits, normaliseNumericText } from './digits.ts';
 export { isUlid, newId } from './ids.ts';
 export type { AvgCostInput } from './money/cost.ts';
@@ -73,7 +73,13 @@ export { can, PERMISSIONS, roleAllows } from './permissions.ts';
 export type { ParsedPhone, PhoneKind } from './phone.ts';
 export { parsePkPhone, whatsAppUrl } from './phone.ts';
 export type { PinHash } from './pin.ts';
-export { hashPin, isWeakPin, PIN_ITERATIONS, verifyPin } from './pin.ts';
+export {
+  hashPin,
+  isPinVerifierValid,
+  isWeakPin,
+  PIN_ITERATIONS,
+  verifyPin,
+} from './pin.ts';
 export type { QtyUnit } from './qty.ts';
 export {
   DECIMAL_QTY_UNITS,

@@ -132,10 +132,12 @@ export async function seedShop(
     [IDS.cashier, 'cashier'],
   ] as const) {
     await run(
-      `INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'h', 's', ?5, ?5)`,
+      `INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`,
       id,
       role === 'owner' ? 'Owner' : 'Cashier',
       role,
+      'a'.repeat(44),
+      'a'.repeat(24),
       now,
     );
   }

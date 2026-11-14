@@ -33,9 +33,11 @@ Common columns on every synced row: `id`, `created_at` (plus `tenant_id` in D1 o
 
 **Primary-key exceptions:** `change_log` is keyed by its global `seq`, `applied_ops` by `(tenant_id, op_id)`, and the enrolment/owner-email code tables by their unique hash keys; these are the exceptions listed in [10 §8 I20](10-testing.md#8-cross-tenant-isolation-suite-mandatory).
 
+`shop.timezone` is an IANA zone. The setup wizard writes the default `Asia/Karachi`, and v1 has no per-shop picker; the Worker validates the value on push and import and the client falls back to the default if a stored value is unknown, so a typo cannot block selling (D-218).
+
 ## 2. D1 schema (migration `0001_init.sql`)
 
-Run with `PRAGMA foreign_keys = ON` (D1 default). Composite foreign keys make SQLite itself reject a row that references another tenant's row (`FOREIGN KEY constraint failed` → op `rejected` / `FOREIGN_KEY`). Platform tables come first because tenant tables reference `tenants`. The push handler runs `PRAGMA defer_foreign_keys = ON` at the start of each batch so rows can arrive in any order within one batch.
+Run with `PRAGMA foreign_keys = ON` (D1 default). Composite foreign keys make SQLite itself reject a row that references another tenant's row (`FOREIGN KEY constraint failed` → op `rejected` / `FOREIGN_KEY`). Platform tables come first because tenant tables reference `tenants`. The push handler does not defer foreign keys (D-104): it sorts the statements of one push parents-first ([03 §4.1](03-sync.md#41-push--post-apisyncpush)), and the tills queue a parent row before any child that references it.
 
 ```sql
 -- ============ platform (not tenant-scoped; primary database only; never pulled by tills, 13 §5) ============
@@ -1000,6 +1002,35 @@ ALTER TABLE day_closes ADD COLUMN udhaar_given INTEGER;
 ALTER TABLE day_closes ADD COLUMN bills INTEGER;
 ALTER TABLE day_closes ADD COLUMN refunds INTEGER;
 
+-- A pre-0010 database could hold two closes for the same drawer period (two concurrent
+-- first closes). The unique indexes below are the fix, but CREATE UNIQUE INDEX aborts on
+-- an existing duplicate, which would block every later migration and the deploy. Keep one
+-- deterministic survivor per key first: the earliest inserted row for each period_start,
+-- then the earliest for each period_end. This is the only DELETE allowed here; the
+-- append-only triggers are created later in this same migration.
+DELETE FROM day_closes
+WHERE rowid IN (
+  SELECT d.rowid FROM day_closes d
+  WHERE EXISTS (
+    SELECT 1 FROM day_closes e
+    WHERE e.tenant_id = d.tenant_id
+      AND e.device_id = d.device_id
+      AND e.period_start = d.period_start
+      AND e.rowid < d.rowid
+  )
+);
+DELETE FROM day_closes
+WHERE rowid IN (
+  SELECT d.rowid FROM day_closes d
+  WHERE EXISTS (
+    SELECT 1 FROM day_closes e
+    WHERE e.tenant_id = d.tenant_id
+      AND e.device_id = d.device_id
+      AND e.period_end = d.period_end
+      AND e.rowid < d.rowid
+  )
+);
+
 DROP INDEX day_closes_device;
 CREATE UNIQUE INDEX day_closes_device ON day_closes (tenant_id, device_id, period_end);
 CREATE UNIQUE INDEX day_closes_device_start ON day_closes (tenant_id, device_id, period_start);
@@ -1239,6 +1270,62 @@ CREATE INDEX expenses_device_created ON expenses (tenant_id, device_id, created_
 CREATE INDEX cash_moves_device_created ON cash_moves (tenant_id, device_id, created_at);
 ```
 
+### 2.11 Verifier and time-zone guards (migration `0012_verifier_guards.sql`)
+
+A staff row with an unusable PIN verifier (empty salt, zero PBKDF2 iterations) used to
+make PIN unlock throw on every till, and an unknown `shop.timezone` made the sale write
+throw. `packages/core` now treats a bad verifier as a wrong PIN, falls back to
+`Asia/Karachi` for an unknown zone, and the push/import paths validate both. These
+triggers keep a row written by any other path (operator import, manual SQL) usable.
+
+```sql
+-- Verifier and time-zone guards (review hardening).
+--
+-- A malformed staff verifier (empty salt, zero PBKDF2 iterations) used to make every
+-- PIN unlock throw on every till of the shop, and an unknown `shop.timezone` made
+-- `Intl.DateTimeFormat` throw inside the sale write. The app now treats a bad verifier as
+-- a wrong PIN and falls back to the documented time zone, and the push/import paths
+-- validate both. These triggers keep a server-owned row from ever storing a value that
+-- the tills cannot use, including through an operator import.
+CREATE TRIGGER staff_pin_shape_insert
+BEFORE INSERT ON staff
+WHEN NEW.pin_iterations < 100000
+  OR NEW.pin_iterations > 1000000
+  OR length(NEW.pin_salt) < 16
+  OR length(NEW.pin_salt) > 200
+  OR length(NEW.pin_hash) < 16
+  OR length(NEW.pin_hash) > 200
+BEGIN
+  SELECT RAISE(ABORT, 'staff pin verifier is malformed');
+END;
+
+CREATE TRIGGER staff_pin_shape_update
+BEFORE UPDATE OF pin_hash, pin_salt, pin_iterations ON staff
+WHEN NEW.pin_iterations < 100000
+  OR NEW.pin_iterations > 1000000
+  OR length(NEW.pin_salt) < 16
+  OR length(NEW.pin_salt) > 200
+  OR length(NEW.pin_hash) < 16
+  OR length(NEW.pin_hash) > 200
+BEGIN
+  SELECT RAISE(ABORT, 'staff pin verifier is malformed');
+END;
+
+CREATE TRIGGER shop_timezone_shape_insert
+BEFORE INSERT ON shop
+WHEN length(NEW.timezone) < 1 OR length(NEW.timezone) > 64
+BEGIN
+  SELECT RAISE(ABORT, 'shop timezone is malformed');
+END;
+
+CREATE TRIGGER shop_timezone_shape_update
+BEFORE UPDATE OF timezone ON shop
+WHEN length(NEW.timezone) < 1 OR length(NEW.timezone) > 64
+BEGIN
+  SELECT RAISE(ABORT, 'shop timezone is malformed');
+END;
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1267,7 +1354,7 @@ export const DEXIE_SCHEMA_V1 = {
   refund_lines: 'id, refund_id, sale_line_id',
   sale_voids: 'id, &sale_id',
   ledger_entries: 'id, [party_type+party_id+created_at], source_id',
-  stock_movements: 'id, [product_id+created_at], business_date',
+  stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date', // V4 adds [ref_type+ref_id] (refund/void restock)
   purchases: 'id, [supplier_id+created_at], business_date',
   purchase_lines: 'id, purchase_id, product_id',
   supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date',
@@ -1293,7 +1380,7 @@ export const DEXIE_SCHEMA_V1 = {
 
 | Table | Shape | Purpose |
 |---|---|---|
-| `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
+| `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'sending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
 | `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |

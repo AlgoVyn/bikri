@@ -157,6 +157,10 @@ async function applyPage(
  * advances, so a single unique collision can never wedge initial sync forever. A
  * `sale_voids` collision means another till already voided the same sale: the server's
  * void is the winner, so the local pending/failed void and its outbox entry are dropped.
+ *
+ * Stock levels are updated per row even during a snapshot: the table is cleared before a
+ * restore and rebuilt only at the end, and selling/counting keeps working meanwhile.
+ * Party balances stay off the hot path and are rebuilt with everything else at the end.
  */
 async function mergeSnapshotPage(
   db: BikriDb,
@@ -164,12 +168,13 @@ async function mergeSnapshotPage(
   rows: SyncedRow[],
   next: SnapshotState,
 ): Promise<void> {
+  const caches = tbl === 'stock_movements';
   try {
     await db.transaction('rw', mergeScope([tbl]), async (tx) => {
       await mergeRows(
         tx,
         rows.map((row) => ({ tbl, row })),
-        { caches: false },
+        { caches },
       );
       await tx.table('kv').put({ key: 'snapshot_state', value: next });
     });
@@ -181,7 +186,7 @@ async function mergeSnapshotPage(
   for (const row of rows) {
     try {
       await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-        await mergeRows(tx, [{ tbl, row }], { caches: false });
+        await mergeRows(tx, [{ tbl, row }], { caches });
       });
     } catch (error) {
       if (!isRowError(error)) throw error;
@@ -211,7 +216,7 @@ async function mergeSnapshotPage(
           );
           try {
             await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-              await mergeRows(tx, [{ tbl, row }], { caches: false });
+              await mergeRows(tx, [{ tbl, row }], { caches });
             });
             continue;
           } catch (retryError) {
@@ -659,13 +664,30 @@ export async function restoreRecovery(
   try {
     await db.transaction('rw', db.tables, async () => {
       const recoveredRows: RecoveredOp[] = [];
+      const outbox = await db.outbox.toArray();
       // A row that is still queued will be pushed by its original op. Re-enqueueing it
       // here would put the same ledger id in one push twice, and the Worker rejects
-      // both transactions. Failed rows stay hidden until the user retries or discards.
+      // both transactions.
       const queued = new Set(
-        (await db.outbox.toArray()).map(
-          (entry) => `${entry.tbl}:${entry.row_id}`,
-        ),
+        outbox
+          .filter(
+            (entry) => entry.status === 'pending' || entry.status === 'sending',
+          )
+          .map((entry) => `${entry.tbl}:${entry.row_id}`),
+      );
+      // A failed transaction was rejected and must not be re-sent automatically, but its
+      // local rows must survive the clear below: the user still has to Retry or Discard it
+      // (Settings → Sync). Keep the whole transaction (a document plus its lines) and any
+      // pre-edit restore point, and leave it out of recovery.
+      const failedTx = new Set(
+        outbox
+          .filter((entry) => entry.status === 'failed')
+          .map((entry) => entry.tx_id),
+      );
+      const failedKeys = new Set(
+        outbox
+          .filter((entry) => failedTx.has(entry.tx_id))
+          .map((entry) => `${entry.tbl}:${entry.row_id}`),
       );
       if (device) {
         const recovered = new Map<string, Set<string>>();
@@ -690,7 +712,8 @@ export async function restoreRecovery(
             if (
               !mine ||
               (!parent && Number(row.created_at ?? 0) < restorePointAt) ||
-              queued.has(`${tbl}:${row.id}`)
+              queued.has(`${tbl}:${row.id}`) ||
+              failedKeys.has(`${tbl}:${row.id}`)
             )
               continue;
             if (!parent) {
@@ -719,6 +742,7 @@ export async function restoreRecovery(
           // Staff rows are included even when an outbox entry exists so a new cashier can
           // be placed in the same transaction as the rows they created. Other rows already
           // queued keep their original transaction.
+          if (failedKeys.has(`${tbl}:${row.id}`)) continue;
           if (tbl !== 'staff' && queued.has(`${tbl}:${row.id}`)) continue;
           masterRows.push({
             tbl: tbl as MasterTable,
@@ -857,10 +881,28 @@ export async function restoreRecovery(
           });
         }
       }
+      // Capture the failed transactions' local rows and restore points before the clear.
+      const pulled = new Set<string>(PULLED_TABLES);
+      const preserved: { tbl: string; row: SyncedRow }[] = [];
+      for (const key of failedKeys) {
+        const at = key.indexOf(':');
+        const tbl = key.slice(0, at);
+        const id = key.slice(at + 1);
+        if (at < 0 || id === '' || !pulled.has(tbl)) continue;
+        const row = (await db.table(tbl).get(id)) as SyncedRow | undefined;
+        if (row) preserved.push({ tbl, row });
+      }
+      const preservedShadows = (await db.pull_shadow.toArray()).filter(
+        (shadow) => failedKeys.has(`${shadow.tbl}:${shadow.id}`),
+      );
       for (const tbl of PULLED_TABLES) await db.table(tbl).clear();
       await db.stock_levels.clear();
       await db.party_balances.clear();
       await db.pull_shadow.clear();
+      // A failed action stays visible and discardable after the restore, instead of being
+      // silently deleted from the till while its outbox entry survives.
+      for (const { tbl, row } of preserved) await db.table(tbl).put(row);
+      for (const shadow of preservedShadows) await db.pull_shadow.put(shadow);
       await db.kv.put({ key: 'pull_cursor', value: 0 });
       await db.kv.put({ key: 'restore_epoch', value: restoreEpoch });
     });

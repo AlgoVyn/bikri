@@ -16,6 +16,35 @@ ALTER TABLE day_closes ADD COLUMN udhaar_given INTEGER;
 ALTER TABLE day_closes ADD COLUMN bills INTEGER;
 ALTER TABLE day_closes ADD COLUMN refunds INTEGER;
 
+-- A pre-0010 database could hold two closes for the same drawer period (two concurrent
+-- first closes). The unique indexes below are the fix, but CREATE UNIQUE INDEX aborts on
+-- an existing duplicate, which would block every later migration and the deploy. Keep one
+-- deterministic survivor per key first: the earliest inserted row for each period_start,
+-- then the earliest for each period_end. This is the only DELETE allowed here; the
+-- append-only triggers are created later in this same migration.
+DELETE FROM day_closes
+WHERE rowid IN (
+  SELECT d.rowid FROM day_closes d
+  WHERE EXISTS (
+    SELECT 1 FROM day_closes e
+    WHERE e.tenant_id = d.tenant_id
+      AND e.device_id = d.device_id
+      AND e.period_start = d.period_start
+      AND e.rowid < d.rowid
+  )
+);
+DELETE FROM day_closes
+WHERE rowid IN (
+  SELECT d.rowid FROM day_closes d
+  WHERE EXISTS (
+    SELECT 1 FROM day_closes e
+    WHERE e.tenant_id = d.tenant_id
+      AND e.device_id = d.device_id
+      AND e.period_end = d.period_end
+      AND e.rowid < d.rowid
+  )
+);
+
 DROP INDEX day_closes_device;
 CREATE UNIQUE INDEX day_closes_device ON day_closes (tenant_id, device_id, period_end);
 CREATE UNIQUE INDEX day_closes_device_start ON day_closes (tenant_id, device_id, period_start);

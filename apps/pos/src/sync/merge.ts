@@ -51,6 +51,31 @@ function assertServerRow(tbl: string, row: SyncedRow): void {
   }
 }
 
+/** `paid` < `part_refunded` < `refunded` < `void` (02 §4); a local document is never less refunded. */
+const STATUS_RANK: Record<string, number> = {
+  paid: 0,
+  part_refunded: 1,
+  refunded: 2,
+  void: 3,
+};
+
+/**
+ * A local refund or void updates `sales.status` without an outbox op (the server derives it),
+ * so a pull can deliver the server's older status while the refund is still unsynced. Keep the
+ * local status when it is further along; the server's newer status wins once it catches up.
+ */
+function keepLocalSaleStatus(
+  server: SyncedRow,
+  local: SyncedRow | undefined,
+): SyncedRow {
+  if (local === undefined) return server;
+  const serverStatus = String(server.status ?? '');
+  const localStatus = String(local.status ?? '');
+  return (STATUS_RANK[localStatus] ?? 0) > (STATUS_RANK[serverStatus] ?? 0)
+    ? { ...server, status: localStatus }
+    : server;
+}
+
 /** Must run inside a rw transaction over the touched tables, outbox, pull_shadow and caches. */
 export async function mergeRows(
   tx: Transaction,
@@ -86,9 +111,13 @@ export async function mergeRows(
       continue;
     }
     const ledger = isLedgerTable(tbl);
-    const had =
-      ledger && opts.caches ? (await table.get(row.id)) !== undefined : true;
-    await table.put(row);
+    // A sale is fetched even during a snapshot because its status is derived locally.
+    const local =
+      ledger && (opts.caches || tbl === 'sales')
+        ? ((await table.get(row.id)) as SyncedRow | undefined)
+        : undefined;
+    const had = ledger && opts.caches ? local !== undefined : true;
+    await table.put(tbl === 'sales' ? keepLocalSaleStatus(row, local) : row);
     // A device moved to another branch (or renamed) keeps its local identity; the
     // next invoice must use the new code, not the one stored at enrolment.
     if (tbl === 'devices') {

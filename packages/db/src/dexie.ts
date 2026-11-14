@@ -67,6 +67,17 @@ export const DEXIE_SCHEMA_V3 = {
 
 export type DexieTableName = keyof typeof DEXIE_SCHEMA_V1;
 
+/**
+ * V4 indexes `stock_movements` by its document. A refund/void asks "which products did this
+ * sale move?"; without the index that scan reads every movement the shop has ever written
+ * while the write transaction holds 14+ stores.
+ */
+export const DEXIE_SCHEMA_V4 = {
+  ...DEXIE_SCHEMA_V3,
+  stock_movements:
+    'id, [product_id+created_at], [ref_type+ref_id], business_date',
+} as const;
+
 export const LOCAL_ONLY_TABLES = [
   'outbox',
   'kv',
@@ -296,6 +307,7 @@ export class BikriDb extends Dexie {
     this.version(1).stores(DEXIE_SCHEMA_V1);
     this.version(2).stores(DEXIE_SCHEMA_V2);
     this.version(3).stores(DEXIE_SCHEMA_V3);
+    this.version(4).stores(DEXIE_SCHEMA_V4);
   }
 }
 

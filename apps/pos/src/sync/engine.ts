@@ -92,15 +92,14 @@ export class SyncEngine {
 
   run(kind: 'first' | 'full' | 'push' | 'pull'): Promise<void> {
     if (this.running) {
-      // A write-debounced push must not be dropped just because a pull is in flight.
-      // Chain one after it so the caller (and the 5 s debounce) still sees the ops sent.
-      if (
-        (kind === 'push' || kind === 'full') &&
-        this.runningKind !== 'first' &&
-        this.runningKind !== 'full' &&
-        this.runningKind !== 'push'
-      )
+      // A write-debounced push must not be dropped because a pull (or another push) is in
+      // flight, and a manual full sync requested during one must still pull afterwards.
+      // `first`/`full` already push and pull, so chaining onto them would only duplicate work.
+      const busy = this.runningKind !== 'first' && this.runningKind !== 'full';
+      if (kind === 'push' && busy)
         return this.running.then(() => this.run('push'));
+      if (kind === 'full' && busy)
+        return this.running.then(() => this.run('full'));
       return this.running;
     }
     this.runningKind = kind;

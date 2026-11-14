@@ -115,9 +115,12 @@ export function HomePage() {
     const deviceId = device?.id ?? '';
     return {
       branchName: String(branch?.name ?? ''),
-      products: await db.products.filter((p) => !p.deleted_at).count(),
+      products:
+        (await db.products.count()) -
+        (await db.products.where('deleted_at').above(0).count()),
       printer: Boolean((await db.kv.get('printer'))?.value),
-      salesCount: await db.sales.filter((s) => s.status !== 'void').count(),
+      // Index-only count: `status` is indexed, so this does not read every bill row.
+      salesCount: await db.sales.where('status').noneOf(['void']).count(),
       today: await summary(db, { from: today, to: today }),
       cash: await expectedCash(db, deviceId),
       attention: await attentionItems(db, {

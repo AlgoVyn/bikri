@@ -10,6 +10,8 @@ import {
   isBelowCost,
   isLedgerTable,
   isMasterTable,
+  isPinVerifierValid,
+  isTimeZone,
   mulDivRound,
   type Permission,
   roundTo,
@@ -1856,6 +1858,42 @@ export function checkOp(
       Number(row.setup_completed_at) !== Number(cur.setup_completed_at)
     )
       throw new Reject('CONSTRAINT_FAILED');
+  }
+  // A value the op will actually write (an insert, or an edit that lists the field).
+  // `planOp` writes only `changed_fields` for an existing master row.
+  const writesColumn = (tbl: string, id: string, field: string): boolean =>
+    !look.current.has(key(tbl, id)) ||
+    (op.changed_fields ?? []).includes(field);
+  if (
+    op.tbl === 'shop' &&
+    row.timezone !== undefined &&
+    writesColumn('shop', 'shop', 'timezone') &&
+    !isTimeZone(row.timezone)
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+  if (op.tbl === 'staff') {
+    const pinFields = ['pin_hash', 'pin_salt', 'pin_iterations', 'pin_length'];
+    if (
+      pinFields.some((field) => writesColumn('staff', String(row.id), field))
+    ) {
+      if (
+        typeof row.pin_hash !== 'string' ||
+        typeof row.pin_salt !== 'string' ||
+        !isPinVerifierValid({
+          pin_hash: row.pin_hash,
+          pin_salt: row.pin_salt,
+          pin_iterations: row.pin_iterations,
+        })
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+      if (
+        row.pin_length !== undefined &&
+        (!Number.isSafeInteger(row.pin_length) ||
+          Number(row.pin_length) < 4 ||
+          Number(row.pin_length) > 6)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+    }
   }
   if (
     op.tbl === 'products' ||

@@ -75,12 +75,11 @@ export async function attentionItems(
   const items: AttentionItem[] = await syncAttention(db, opts.now);
   const low = await lowStockCount(db);
   if (low > 0) items.push({ kind: 'low_stock', count: low });
-  const promises = (await db.promises.toArray()).filter(
-    (p) =>
-      !p.deleted_at &&
-      p.status === 'open' &&
-      String(p.promised_on) === opts.today,
-  ).length;
+  const promises = await db.promises
+    .where('[status+promised_on]')
+    .equals(['open', opts.today])
+    .filter((p) => !p.deleted_at)
+    .count();
   if (promises > 0) items.push({ kind: 'promises_due', count: promises });
   const customers = (await db.customers.toArray()).filter(
     (c) =>

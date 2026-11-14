@@ -166,12 +166,13 @@ export async function writeAction<T>(
     >;
     // Keep the pre-edit copy until the server answers. A rejected action is discarded by
     // restoring this row, so local-only changes such as a delivery's avg/last cost never
-    // survive a server refusal.
+    // survive a server refusal. A `rev = 0` row can still exist on the server when the
+    // response to its create was lost, so keep the restore point for it too: Discard must
+    // never delete a row the server has (03 §3, §5).
     const rememberBeforeEdit = async (
       tbl: MasterTable,
       row: MasterRow,
     ): Promise<void> => {
-      if (row.rev === 0) return;
       if (await shadows.get([tbl, row.id])) return;
       await shadows.put({ tbl, id: row.id, row });
     };

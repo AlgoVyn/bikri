@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { businessDate } from './dates.ts';
+import { businessDate, DEFAULT_TIME_ZONE, isTimeZone } from './dates.ts';
 import { generateSku } from './sku.ts';
 
 describe('businessDate', () => {
@@ -9,6 +9,22 @@ describe('businessDate', () => {
     expect(businessDate(Date.UTC(2026, 9, 27, 19, 0), 'UTC')).toBe(
       '2026-10-27',
     );
+  });
+
+  it('falls back to the documented zone for a typo instead of throwing', () => {
+    expect(businessDate(Date.UTC(2026, 9, 27, 19, 0), 'Asia/Karach')).toBe(
+      '2026-10-28',
+    );
+    expect(businessDate(Date.UTC(2026, 9, 27, 19, 0), '')).toBe('2026-10-28');
+  });
+
+  it('recognises IANA zones and rejects junk', () => {
+    expect(isTimeZone(DEFAULT_TIME_ZONE)).toBe(true);
+    expect(isTimeZone('Asia/Dubai')).toBe(true);
+    expect(isTimeZone('Asia/Karach')).toBe(false);
+    expect(isTimeZone('')).toBe(false);
+    expect(isTimeZone('x'.repeat(65))).toBe(false);
+    expect(isTimeZone(42)).toBe(false);
   });
 });
 

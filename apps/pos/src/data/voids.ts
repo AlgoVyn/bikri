@@ -155,12 +155,9 @@ export async function computeVoid(
   const tracked = new Set(
     (
       await (src.table('stock_movements') as Table<SyncedRow>)
-        .filter(
-          (row) =>
-            row.ref_type === 'sale' &&
-            String(row.ref_id) === saleId &&
-            n(row.qty_delta_milli) < 0,
-        )
+        .where('[ref_type+ref_id]')
+        .equals(['sale', saleId])
+        .filter((row) => n(row.qty_delta_milli) < 0)
         .toArray()
     ).map((row) => String(row.product_id)),
   );

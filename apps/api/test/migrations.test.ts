@@ -88,8 +88,8 @@ function validRows(t: TenantFixture): ReadonlyArray<readonly [string, Row]> {
         id: 'st1',
         name: 'Adnan',
         role: 'owner',
-        pin_hash: 'aGFzaA==',
-        pin_salt: 'c2FsdA==',
+        pin_hash: 'a'.repeat(44),
+        pin_salt: 'a'.repeat(24),
         ...master,
       },
     ],
@@ -875,6 +875,39 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
         .bind(T, B.id, 'p1')
         .run();
       await insert('products', { ...row, id: 'p4' }).run();
+    });
+
+    it('rejects a malformed staff verifier and an empty shop time zone (0012)', async () => {
+      const staff = {
+        tenant_id: A.id,
+        name: 'Bad PIN',
+        role: 'cashier',
+        pin_hash: 'a'.repeat(44),
+        pin_salt: 'a'.repeat(24),
+        pin_iterations: 150_000,
+        ...master,
+      };
+      await expectRejected(
+        insert('staff', { ...staff, id: 'st-bad', pin_iterations: 0 }),
+        /pin verifier is malformed/,
+      );
+      await expectRejected(
+        insert('staff', { ...staff, id: 'st-bad2', pin_salt: 'short' }),
+        /pin verifier is malformed/,
+      );
+      await expectRejected(
+        insert('shop', {
+          tenant_id: A.id,
+          id: 'shop-bad',
+          name: 'Bad zone',
+          business_type: 'mobile',
+          phone: '',
+          address: '',
+          timezone: '',
+          ...master,
+        }),
+        /timezone is malformed/,
+      );
     });
   });
 });
