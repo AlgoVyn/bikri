@@ -20,19 +20,100 @@ export type DeviceWithTenant = {
   tenant: TenantRow;
 };
 
-/** The device holding this token hash (token hashes are globally unique) and its tenant. */
+type TenantJoin = {
+  tenant_slug: string;
+  tenant_display_name: string;
+  tenant_status: TenantRow['status'];
+  tenant_status_reason: string;
+  tenant_status_changed_at: number | null;
+  tenant_status_changed_by: string | null;
+  tenant_db_shard: string;
+  tenant_daily_write_budget: number;
+  tenant_poll_after_ms: number;
+  tenant_restore_epoch: string;
+  tenant_restore_point_at: number;
+  tenant_change_log_floor: number;
+  tenant_note: string;
+  tenant_owner_email: string | null;
+  tenant_last_owner_export_at: number | null;
+  tenant_support_until: number | null;
+  tenant_support_reason: string;
+  tenant_created_by_email: string;
+  tenant_created_at: number;
+  tenant_updated_at: number;
+  tenant_deleted_at: number | null;
+};
+
+/**
+ * The device holding this token hash (token hashes are globally unique) and its tenant.
+ *
+ * One join, not two sequential D1 round trips: every device request pays this before it
+ * can run, and the token hash alone decides the tenant. The join is tenant-safe because
+ * `devices.token_hash` is globally unique; it never accepts a tenant from the client.
+ */
 export async function deviceByTokenHash(
   env: Env,
   tokenHash: string,
 ): Promise<DeviceWithTenant | null> {
-  const device = await env.DB.prepare(
-    'SELECT * FROM devices WHERE token_hash = ?1',
+  const row = await env.DB.prepare(
+    `SELECT d.*,
+       t.slug AS tenant_slug,
+       t.display_name AS tenant_display_name,
+       t.status AS tenant_status,
+       t.status_reason AS tenant_status_reason,
+       t.status_changed_at AS tenant_status_changed_at,
+       t.status_changed_by AS tenant_status_changed_by,
+       t.db_shard AS tenant_db_shard,
+       t.daily_write_budget AS tenant_daily_write_budget,
+       t.poll_after_ms AS tenant_poll_after_ms,
+       t.restore_epoch AS tenant_restore_epoch,
+       t.restore_point_at AS tenant_restore_point_at,
+       t.change_log_floor AS tenant_change_log_floor,
+       t.note AS tenant_note,
+       t.owner_email AS tenant_owner_email,
+       t.last_owner_export_at AS tenant_last_owner_export_at,
+       t.support_until AS tenant_support_until,
+       t.support_reason AS tenant_support_reason,
+       t.created_by_email AS tenant_created_by_email,
+       t.created_at AS tenant_created_at,
+       t.updated_at AS tenant_updated_at,
+       t.deleted_at AS tenant_deleted_at
+     FROM devices d
+     JOIN tenants t ON t.id = d.tenant_id
+     WHERE d.token_hash = ?1`,
   )
     .bind(tokenHash)
-    .first<DeviceRow & { tenant_id: string }>();
-  if (!device) return null;
-  const tenant = await getTenant(env, device.tenant_id);
-  return tenant ? { device, tenant } : null;
+    .first<DeviceRow & { tenant_id: string } & TenantJoin>();
+  if (!row) return null;
+  const { tenant_slug, tenant_display_name, ...rest } = row;
+  const tenant: TenantRow = {
+    id: rest.tenant_id,
+    slug: tenant_slug,
+    display_name: tenant_display_name,
+    status: rest.tenant_status,
+    status_reason: rest.tenant_status_reason,
+    status_changed_at: rest.tenant_status_changed_at,
+    status_changed_by: rest.tenant_status_changed_by,
+    db_shard: rest.tenant_db_shard,
+    daily_write_budget: rest.tenant_daily_write_budget,
+    poll_after_ms: rest.tenant_poll_after_ms,
+    restore_epoch: rest.tenant_restore_epoch,
+    restore_point_at: rest.tenant_restore_point_at,
+    change_log_floor: rest.tenant_change_log_floor,
+    note: rest.tenant_note,
+    owner_email: rest.tenant_owner_email,
+    last_owner_export_at: rest.tenant_last_owner_export_at,
+    support_until: rest.tenant_support_until,
+    support_reason: rest.tenant_support_reason,
+    created_by_email: rest.tenant_created_by_email,
+    created_at: rest.tenant_created_at,
+    updated_at: rest.tenant_updated_at,
+    deleted_at: rest.tenant_deleted_at,
+  };
+  const device = { ...rest } as Record<string, unknown>;
+  for (const key of Object.keys(device))
+    if (key.startsWith('tenant_')) delete device[key];
+  return { device: device as DeviceRow & { tenant_id: string }, tenant };
 }
 
 export type EnrolmentCodeRow = {

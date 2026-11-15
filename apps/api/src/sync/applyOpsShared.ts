@@ -85,7 +85,7 @@ export const CLIENT_AUDIT_ACTIONS = new Set([
   'void',
 ]);
 export const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {
-  products: new Set(['avg_cost']),
+  products: new Set(['avg_cost', 'on_hand_milli', 'cost_changed_at']),
   sales: new Set(['status']),
 };
 export const DAY_MS = 86_400_000;
@@ -231,6 +231,8 @@ export type Lookups = {
   closePayments: Map<string, ClosePayment>;
   closeCashMoves: Map<string, CloseCashMove>;
   closeExpenses: Map<string, CloseExpense>;
+  /** Rows read by this lookup batch, added to the push's usage accounting. */
+  rowsRead: number;
 };
 
 export type ClosePayment = {
@@ -309,11 +311,16 @@ export function sqlValue(v: unknown): SqlValue {
 }
 
 /** Columns of `row` the server writes: known columns, minus tenant_id, rev and server-managed. */
+const KNOWN_COLUMNS = new Map<string, ReadonlySet<string>>();
 export function writableColumns(
   tbl: D1Table,
   row: Record<string, unknown>,
 ): string[] {
-  const known = new Set(columnsOf(tbl));
+  let known = KNOWN_COLUMNS.get(tbl);
+  if (known === undefined) {
+    known = new Set(columnsOf(tbl));
+    KNOWN_COLUMNS.set(tbl, known);
+  }
   const managed = SERVER_MANAGED[tbl];
   return Object.keys(row).filter(
     (c) =>

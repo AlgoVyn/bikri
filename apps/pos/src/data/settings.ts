@@ -9,7 +9,7 @@ import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import { csvCell } from '../lib/csv.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LogoData } from './setup.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (value: unknown): number => Number(value ?? 0);
 
@@ -202,7 +202,7 @@ export async function updateShopSettings(
       });
       return updated;
     },
-    { now, actor },
+    { now, actor, tables: writeScope('shop', 'audit_log') },
   );
 }
 
@@ -254,7 +254,7 @@ export async function updateBranchSettings(
       });
       return updated;
     },
-    { now, actor },
+    { now, actor, tables: writeScope('branches', 'audit_log') },
   );
 }
 
@@ -387,7 +387,7 @@ export async function saveStaff(
       });
       return row;
     },
-    { now, actor },
+    { now, actor, tables: writeScope('staff', 'audit_log') },
   );
 }
 
@@ -647,6 +647,6 @@ export async function updateShopLogo(
         created_at: now,
       });
     },
-    { now, actor },
+    { now, actor, tables: writeScope('shop', 'file_queue', 'audit_log') },
   );
 }

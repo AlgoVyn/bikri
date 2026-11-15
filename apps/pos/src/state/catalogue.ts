@@ -92,9 +92,20 @@ export function clearSoldCache(): void {
   soldCache = null;
 }
 
+const SOLD_TABLES = new Set([
+  'sales',
+  'sale_lines',
+  'refunds',
+  'refund_lines',
+  'sale_voids',
+]);
+
 // A sale or refund invalidates the snapshot for the next screen that opens; the Sell
 // grid keeps its current order until it remounts, so the counter never waits for this.
-onLocalWrite(() => clearSoldCache());
+// A product edit or a settings write no longer throws the snapshot away.
+onLocalWrite((_count, tables) => {
+  if (tables.some((table) => SOLD_TABLES.has(table))) clearSoldCache();
+});
 
 export function useSold30(): Map<string, number> | undefined {
   const [sold, setSold] = useState<Map<string, number> | undefined>(undefined);

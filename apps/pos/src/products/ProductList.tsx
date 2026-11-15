@@ -59,6 +59,7 @@ const LabelsDialog = lazy(() =>
 
 const ROW_PX = 56;
 const OVERSCAN = 8;
+const EMPTY_SOLD = new Map<string, number>();
 
 const selectClass =
   'h-11 rounded-control border border-border-strong bg-surface px-2 text-text';
@@ -97,16 +98,18 @@ export function ProductList({
   const levels = useStockLevels();
   const sold = useSold30();
   const rows = useMemo(() => {
-    if (master === undefined || levels === undefined || sold === undefined)
-      return undefined;
-    return filterAndSortProducts(buildProductRows(master, levels, sold), {
-      query: deferredQuery,
-      categoryId: categoryId || null,
-      stock,
-      sort,
-      direction,
-      language: i18n.language,
-    });
+    if (master === undefined || levels === undefined) return undefined;
+    return filterAndSortProducts(
+      buildProductRows(master, levels, sold ?? EMPTY_SOLD),
+      {
+        query: deferredQuery,
+        categoryId: categoryId || null,
+        stock,
+        sort,
+        direction,
+        language: i18n.language,
+      },
+    );
   }, [
     master,
     levels,

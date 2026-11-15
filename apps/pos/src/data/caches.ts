@@ -35,6 +35,35 @@ export async function applyStockMovement(
   });
 }
 
+/**
+ * Applies a page of movements with two requests per product instead of two per row.
+ * Pull/snapshot pages are up to 500 rows; a sale page can contain many movements for
+ * the same product, and the old loop held the writer transaction open for each one.
+ */
+export async function applyStockMovements(
+  src: TableSource,
+  rows: readonly SyncedRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const deltas = new Map<string, number>();
+  for (const row of rows) {
+    const productId = String(row.product_id);
+    deltas.set(
+      productId,
+      (deltas.get(productId) ?? 0) + Number(row.qty_delta_milli),
+    );
+  }
+  const ids = [...deltas.keys()];
+  const levels = await stockLevels(src).bulkGet(ids);
+  await stockLevels(src).bulkPut(
+    ids.map((productId, index) => ({
+      product_id: productId,
+      on_hand_milli:
+        (levels[index]?.on_hand_milli ?? 0) + (deltas.get(productId) ?? 0),
+    })),
+  );
+}
+
 async function partyEntries(src: TableSource, type: PartyType, id: string) {
   return ledgerEntries(src)
     .where('[party_type+party_id+created_at]')

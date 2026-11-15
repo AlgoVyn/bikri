@@ -6,7 +6,7 @@ import type { SortDirection } from '../lib/sort.ts';
 import type { TableSource } from './caches.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
 
@@ -214,7 +214,11 @@ export async function createSupplier(
         });
       return row;
     },
-    { now, actor },
+    {
+      now,
+      actor,
+      tables: writeScope('suppliers', 'ledger_entries', 'party_balances'),
+    },
   );
 }
 
@@ -232,6 +236,7 @@ export async function updateSupplier(
   return writeAction(db, (w) => w.update('suppliers', id, fields), {
     now,
     actor,
+    tables: writeScope('suppliers'),
   });
 }
 
@@ -263,7 +268,7 @@ export async function deleteSupplier(
         created_at: now,
       });
     },
-    { now, actor },
+    { now, actor, tables: writeScope('suppliers', 'audit_log') },
   );
 }
 
@@ -304,27 +309,25 @@ export async function supplierStatement(
       n(a.created_at) - n(b.created_at) ||
       String(a.id).localeCompare(String(b.id)),
   );
-  const purchases = new Map<string, SyncedRow>();
-  const payments = new Map<string, SyncedRow>();
-  const returns = new Map<string, SyncedRow>();
-  for (const entry of entries) {
-    const id = entry.source_id ? String(entry.source_id) : '';
-    if (!id) continue;
-    if (entry.source_type === 'purchase' && !purchases.has(id)) {
-      const row = await (src.table('purchases') as Table<SyncedRow>).get(id);
-      if (row) purchases.set(id, row);
-    }
-    if (entry.source_type === 'payment' && !payments.has(id)) {
-      const row = await (src.table('payments') as Table<SyncedRow>).get(id);
-      if (row) payments.set(id, row);
-    }
-    if (entry.source_type === 'supplier_return' && !returns.has(id)) {
-      const row = await (src.table('supplier_returns') as Table<SyncedRow>).get(
-        id,
-      );
-      if (row) returns.set(id, row);
-    }
-  }
+  const idsFor = (type: string): string[] => [
+    ...new Set(
+      entries
+        .filter((entry) => entry.source_type === type && entry.source_id)
+        .map((entry) => String(entry.source_id)),
+    ),
+  ];
+  const load = async (
+    table: string,
+    ids: string[],
+  ): Promise<Map<string, SyncedRow>> =>
+    new Map(
+      (await (src.table(table) as Table<SyncedRow, string>).bulkGet(ids))
+        .filter((row): row is SyncedRow => row !== undefined)
+        .map((row) => [String(row.id), row]),
+    );
+  const purchases = await load('purchases', idsFor('purchase'));
+  const payments = await load('payments', idsFor('payment'));
+  const returns = await load('supplier_returns', idsFor('supplier_return'));
   const all: SupplierStatementEntry[] = [];
   let running = 0;
   for (const entry of entries) {

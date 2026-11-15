@@ -45,7 +45,7 @@ describe('worker', () => {
     expect(body).toMatchObject({
       ok: true,
       app_version: '1.0.0',
-      schema_version: 2,
+      schema_version: 3,
       min_client_schema: 1,
       db: 'ok',
     });

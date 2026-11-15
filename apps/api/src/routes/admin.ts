@@ -124,7 +124,7 @@ admin.post('/tenants', async (c) => {
       slug: Slug,
       display_name: z.string().trim().min(1).max(60),
       owner_email: Email.nullish(),
-      daily_write_budget: BUDGET.default(18_000),
+      daily_write_budget: BUDGET.default(19_000),
       note: z.string().max(500).default(''),
     })
     .parse(await readJsonBody(c, 64 * 1024));

@@ -1,8 +1,8 @@
 import { businessDate, newId } from '@bikri/core';
-import type { BikriDb, MasterRow } from '@bikri/db';
+import type { BikriDb, MasterRow, PartyBalance } from '@bikri/db';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 export type CustomerHit = { customer: MasterRow; balance: number };
 
@@ -42,39 +42,64 @@ export async function customerBalance(
   return row?.balance ?? 0;
 }
 
-/** Customers by name words or phone digits (leading 0 ignored), most recently active first. */
+export type CustomerDirectory = {
+  customers: MasterRow[];
+  balances: Map<string, PartyBalance>;
+};
+
+/** Every live customer and their cached balance, loaded once for a picker. */
+export async function loadCustomerDirectory(
+  db: BikriDb,
+): Promise<CustomerDirectory> {
+  const [customers, balances] = await Promise.all([
+    db.customers.toArray(),
+    db.party_balances
+      .where('[party_type+party_id]')
+      .between(['customer', ''], ['customer', '\uffff'])
+      .toArray(),
+  ]);
+  return {
+    customers: customers.filter((customer) => !customer.deleted_at),
+    balances: new Map(balances.map((balance) => [balance.party_id, balance])),
+  };
+}
+
+/** Name words or phone digits (leading 0 ignored), most recently active first. */
+export function filterCustomers(
+  directory: CustomerDirectory,
+  query: string,
+  limit = 20,
+): CustomerHit[] {
+  const q = query.trim().toLowerCase();
+  const digits = q.replace(/\D/gu, '').replace(/^0+/u, '');
+  const hits: CustomerHit[] = [];
+  for (const customer of directory.customers) {
+    const name = String(customer.name ?? '').toLowerCase();
+    const phone = String(customer.phone ?? '').replace(/\D/gu, '');
+    const byName = q !== '' && q.split(/\s+/u).every((w) => name.includes(w));
+    const byPhone = digits.length >= 3 && phone.includes(digits);
+    if (q === '' || byName || byPhone)
+      hits.push({
+        customer,
+        balance: directory.balances.get(customer.id)?.balance ?? 0,
+      });
+  }
+  hits.sort(
+    (a, b) =>
+      (directory.balances.get(b.customer.id)?.last_activity_at ?? 0) -
+        (directory.balances.get(a.customer.id)?.last_activity_at ?? 0) ||
+      String(a.customer.name).localeCompare(String(b.customer.name)),
+  );
+  return hits.slice(0, limit);
+}
+
+/** Convenience wrapper for callers that do not already hold the directory. */
 export async function findCustomers(
   db: BikriDb,
   query: string,
   limit = 20,
 ): Promise<CustomerHit[]> {
-  const q = query.trim().toLowerCase();
-  const digits = q.replace(/\D/gu, '').replace(/^0+/u, '');
-  const balances = new Map(
-    (
-      await db.party_balances
-        .where('[party_type+party_id]')
-        .between(['customer', ''], ['customer', '\uffff'])
-        .toArray()
-    ).map((b) => [b.party_id, b]),
-  );
-  const hits: CustomerHit[] = [];
-  for (const c of await db.customers.toArray()) {
-    if (c.deleted_at) continue;
-    const name = String(c.name ?? '').toLowerCase();
-    const phone = String(c.phone ?? '').replace(/\D/gu, '');
-    const byName = q !== '' && q.split(/\s+/u).every((w) => name.includes(w));
-    const byPhone = digits.length >= 3 && phone.includes(digits);
-    if (q === '' || byName || byPhone)
-      hits.push({ customer: c, balance: balances.get(c.id)?.balance ?? 0 });
-  }
-  hits.sort(
-    (a, b) =>
-      (balances.get(b.customer.id)?.last_activity_at ?? 0) -
-        (balances.get(a.customer.id)?.last_activity_at ?? 0) ||
-      String(a.customer.name).localeCompare(String(b.customer.name)),
-  );
-  return hits.slice(0, limit);
+  return filterCustomers(await loadCustomerDirectory(db), query, limit);
 }
 
 async function assertPhoneFree(
@@ -123,6 +148,7 @@ export async function createCustomer(
   return writeAction(db, (w) => w.create('customers', fields), {
     now,
     actor,
+    tables: writeScope('customers'),
   });
 }
 
@@ -173,7 +199,11 @@ export async function createCustomerAccount(
       }
       return row;
     },
-    { now, actor },
+    {
+      now,
+      actor,
+      tables: writeScope('customers', 'ledger_entries', 'party_balances'),
+    },
   );
 }
 
@@ -216,7 +246,11 @@ export async function updateCustomer(
       }
       return row;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope('customers', 'audit_log'),
+    },
   );
 }
 
@@ -248,6 +282,6 @@ export async function deleteCustomer(
         created_at: now,
       });
     },
-    { now, actor },
+    { now, actor, tables: writeScope('customers', 'audit_log') },
   );
 }

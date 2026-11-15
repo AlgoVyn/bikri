@@ -4,8 +4,8 @@
  */
 import type { SyncedRow } from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
-import { applyLedgerEntry, applyStockMovement } from '../data/caches.ts';
-import { isLedgerTable, isPulledTable } from './tables.ts';
+import { applyLedgerEntry, applyStockMovements } from '../data/caches.ts';
+import { isPulledTable } from './tables.ts';
 
 export type ServerRow = { tbl: string; row: SyncedRow };
 
@@ -82,69 +82,133 @@ export async function mergeRows(
   rows: ServerRow[],
   opts: { caches: boolean },
 ): Promise<number> {
-  let applied = 0;
-  const pendingKeys = new Set<string>();
+  if (rows.length === 0) return 0;
+  const outbox = tx.table('outbox') as Table<
+    { tbl: string; row_id: string; status?: string },
+    number
+  >;
   const ids = rows.map((r) => [r.tbl, r.row.id] as [string, string]);
-  if (ids.length > 0) {
-    const pending = await tx
-      .table('outbox')
-      .where('[tbl+row_id]')
-      .anyOf(ids)
-      .toArray();
-    for (const p of pending as {
-      tbl: string;
-      row_id: string;
-      status?: string;
-    }[]) {
-      // A failed op will not be pushed until the user retries it, so it must not hide
-      // every later server change for the same row.
-      if (p.status !== 'pending' && p.status !== 'sending') continue;
-      pendingKeys.add(`${p.tbl}\u0000${p.row_id}`);
-    }
+  let pending: { tbl: string; row_id: string; status?: string }[];
+  if (ids.length <= 200) {
+    pending = await outbox.where('[tbl+row_id]').anyOf(ids).toArray();
+  } else {
+    // A page is up to 500 rows; one probe per row is the wrong shape (one index range
+    // per key). A small outbox is cheaper to scan once. If the outbox is itself a large
+    // offline backlog, keep the keyed probe: reading thousands of full op payloads for
+    // every page would be worse.
+    const count = await outbox
+      .where('status')
+      .anyOf('pending', 'sending')
+      .count();
+    pending =
+      count <= 2_000
+        ? await outbox.where('status').anyOf('pending', 'sending').toArray()
+        : await outbox.where('[tbl+row_id]').anyOf(ids).toArray();
   }
+  const pendingKeys = new Set<string>();
+  for (const p of pending) {
+    // A failed op will not be pushed until the user retries it, so it must not hide
+    // every later server change for the same row.
+    if (p.status !== 'pending' && p.status !== 'sending') continue;
+    pendingKeys.add(`${p.tbl}\u0000${p.row_id}`);
+  }
+
+  const applied: ServerRow[] = [];
+  const shadows: { tbl: string; id: string; row: SyncedRow }[] = [];
   for (const { tbl, row } of rows) {
     if (!isPulledTable(tbl)) continue;
     assertServerRow(tbl, row);
-    const table = tx.table(tbl) as Table<SyncedRow, string>;
     if (pendingKeys.has(`${tbl}\u0000${row.id}`)) {
-      await tx.table('pull_shadow').put({ tbl, id: row.id, row });
+      shadows.push({ tbl, id: row.id, row });
       continue;
     }
-    const ledger = isLedgerTable(tbl);
-    // A sale is fetched even during a snapshot because its status is derived locally.
-    const local =
-      ledger && (opts.caches || tbl === 'sales')
-        ? ((await table.get(row.id)) as SyncedRow | undefined)
-        : undefined;
-    const had = ledger && opts.caches ? local !== undefined : true;
-    await table.put(tbl === 'sales' ? keepLocalSaleStatus(row, local) : row);
+    applied.push({ tbl, row });
+  }
+  if (shadows.length > 0) {
+    const shadowTable = tx.table('pull_shadow') as Table<
+      { tbl: string; id: string; row: SyncedRow },
+      [string, string]
+    >;
+    if (shadows.length === 1)
+      await shadowTable.put(shadows[0] as (typeof shadows)[number]);
+    else await shadowTable.bulkPut(shadows);
+  }
+
+  const byTable = new Map<string, SyncedRow[]>();
+  for (const { tbl, row } of applied) {
+    const list = byTable.get(tbl) ?? [];
+    list.push(row);
+    byTable.set(tbl, list);
+  }
+
+  for (const [tbl, list] of byTable) {
+    const table = tx.table(tbl) as Table<SyncedRow, string>;
+    // A single row uses put() so the row-by-row quarantine path still sees the real
+    // ConstraintError (bulkPut wraps it in a BulkError, which hides a sale_voids
+    // sale_id collision from the recovery logic).
+    const write = async (rows: SyncedRow[]) => {
+      if (rows.length === 1) await table.put(rows[0] as SyncedRow);
+      else await table.bulkPut(rows);
+    };
+    let had: boolean[] | null = null;
+    if (
+      opts.caches &&
+      (tbl === 'stock_movements' || tbl === 'ledger_entries')
+    ) {
+      const existing = await table.bulkGet(list.map((row) => row.id));
+      had = existing.map((row) => row !== undefined);
+    }
+    if (tbl === 'sales') {
+      // A sale is fetched even during a snapshot because its status is derived locally.
+      const locals = await table.bulkGet(list.map((row) => row.id));
+      await write(
+        list.map((row, index) => keepLocalSaleStatus(row, locals[index])),
+      );
+    } else {
+      await write(list);
+    }
+
     // A device moved to another branch (or renamed) keeps its local identity; the
     // next invoice must use the new code, not the one stored at enrolment.
     if (tbl === 'devices') {
       const stored = (await tx.table('kv').get('device')) as
         | { value?: { id?: string } }
         | undefined;
-      if (stored?.value?.id === row.id) {
+      const local = stored?.value?.id
+        ? list.find((row) => row.id === stored.value?.id)
+        : undefined;
+      if (stored?.value?.id && local) {
         await tx.table('kv').put({
           key: 'device',
           value: {
             ...stored.value,
-            name: row.name,
-            code: row.device_code,
-            branch_id: row.branch_id,
-            is_admin: row.is_admin === 1,
+            name: local.name,
+            code: local.device_code,
+            branch_id: local.branch_id,
+            is_admin: local.is_admin === 1,
           },
         });
       }
     }
-    if (ledger && opts.caches && !had) {
-      const src = { table: (name: string) => tx.table(name) };
-      if (tbl === 'stock_movements') await applyStockMovement(src, row);
-      if (tbl === 'ledger_entries') await applyLedgerEntry(src, row);
+
+    if (opts.caches && tbl === 'stock_movements') {
+      // Only newly stored movements move the cache; a replayed row must not double-count.
+      const fresh = list.filter((_, index) => !had?.[index]);
+      await applyStockMovements({ table: (name) => tx.table(name) }, fresh);
     }
-    applied += 1;
+    if (opts.caches && tbl === 'ledger_entries') {
+      const fresh = list.filter((_, index) => !had?.[index]);
+      // Chronological order lets the cache take the incremental path for new debits.
+      const ordered = [...fresh].sort(
+        (a, b) =>
+          Number(a.created_at ?? 0) - Number(b.created_at ?? 0) ||
+          String(a.id).localeCompare(String(b.id)),
+      );
+      for (const row of ordered)
+        await applyLedgerEntry({ table: (name) => tx.table(name) }, row);
+    }
   }
-  return applied;
+  return applied.length;
 }
 
 /** Table names a merge transaction needs (plus kv for the cursor). */

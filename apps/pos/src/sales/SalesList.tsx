@@ -169,7 +169,17 @@ export function SalesList({
     if (!limited) rememberDateFilter('sales', preset, custom.from, custom.to);
   }, [preset, custom.from, custom.to, limited]);
 
+  const customDays =
+    (Date.parse(`${custom.to}T00:00:00Z`) -
+      Date.parse(`${custom.from}T00:00:00Z`)) /
+      86_400_000 +
+    1;
+  const rangeError =
+    preset === 'custom' &&
+    (!Number.isFinite(customDays) || customDays < 1 || customDays > 366);
+
   const data = useLiveQuery(async () => {
+    if (rangeError) return null;
     const db = getDb();
     const range = limited
       ? rangeFor('today', Date.now(), timeZone)
@@ -190,6 +200,7 @@ export function SalesList({
     preset,
     custom.from,
     custom.to,
+    rangeError,
     deferredQuery,
     method,
     status,
@@ -338,6 +349,11 @@ export function SalesList({
             onChange={(value) => setCustom((c) => ({ ...c, to: value }))}
           />
         </div>
+      ) : null}
+      {rangeError ? (
+        <p role="alert" className="text-small text-danger">
+          {t('office.sales.range_too_long')}
+        </p>
       ) : null}
 
       <ListSurface

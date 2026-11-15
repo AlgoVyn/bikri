@@ -10,7 +10,7 @@ import type { Table, Transaction } from 'dexie';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
-import { jsonBytes, nextTxBatch } from './chunk.ts';
+import { jsonBytes, MAX_BATCH_OPS, nextTxBatch } from './chunk.ts';
 import { tillRequest } from './client.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 
@@ -144,10 +144,14 @@ async function pushAllUnlocked(
     // Read, choose the batch and claim it in one transaction. A later edit must see
     // `sending` and create a fresh op instead of coalescing into the payload we send.
     await db.transaction('rw', db.outbox, async () => {
+      // [status+seq] keeps this bounded: an offline backlog used to load and sort every
+      // pending row (full payloads) on every round, even though one batch sends at most
+      // 200 ops. The extra window covers transaction boundaries.
       const pending = await db.outbox
-        .where('status')
-        .equals('pending')
-        .sortBy('seq');
+        .where('[status+seq]')
+        .between(['pending', -Infinity], ['pending', Infinity])
+        .limit(MAX_BATCH_OPS + 200)
+        .toArray();
       if (pending.length === 0) return;
       batch = nextBatch(pending);
       seqs = batch

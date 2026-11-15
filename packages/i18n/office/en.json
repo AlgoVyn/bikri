@@ -23,6 +23,7 @@
       "range_7d": "7 days",
       "range_custom": "Custom",
       "range_month": "This month",
+      "range_too_long": "Choose a range of 366 days or less.",
       "range_today": "Today",
       "range_yesterday": "Yesterday",
       "search": "Search bills",

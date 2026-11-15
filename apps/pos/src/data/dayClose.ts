@@ -10,7 +10,7 @@ import type { Table } from 'dexie';
 import { csvCell, rupeesCsv2 } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
 const TEN_MIN = 10 * 60 * 1000;
@@ -290,7 +290,21 @@ export async function closeDay(
         });
       return dayClose;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope(
+        'day_closes',
+        'devices',
+        'payments',
+        'cash_moves',
+        'expenses',
+        'sales',
+        'refunds',
+        'shop',
+        'audit_log',
+      ),
+    },
   );
   // The close is committed; a print-queue failure must not make the caller retry with a
   // new dayCloseId and create a second close.

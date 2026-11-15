@@ -978,6 +978,7 @@
     "sync_failed_ops": "{{count}} qabool nahin huin",
     "sync_outdated": "Sync jari rakhne ke liye app update karein",
     "sync_downloading": "Dukaan ka data download ho raha hai… {{pct}}%",
+    "sync_downloading_rows": "Dukaan ka data download ho raha hai… {{rows}} rows",
     "sync_read_only": "Sirf dekhne ke liye",
     "sync_detail_read_only": "Yeh dukaan sirf dekhne ke liye hai · {{count}} tabdeeliyan baqi",
     "sync_quota": "Rozana sync ki had poori",

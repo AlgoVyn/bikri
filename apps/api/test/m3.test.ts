@@ -22,6 +22,17 @@ async function product(shop: Awaited<ReturnType<typeof seedShop>>, id: string) {
     .first<{ avg_cost: number; last_cost: number }>();
 }
 
+async function stockCache(
+  shop: Awaited<ReturnType<typeof seedShop>>,
+  id: string,
+) {
+  return env.DB.prepare(
+    'SELECT on_hand_milli, cost_changed_at FROM products WHERE tenant_id = ?1 AND id = ?2',
+  )
+    .bind(shop.tenantId, id)
+    .first<{ on_hand_milli: number; cost_changed_at: number }>();
+}
+
 function movement(
   shop: Awaited<ReturnType<typeof seedShop>>,
   productId: string,
@@ -194,6 +205,54 @@ describe('M3 server rules', () => {
     expect(await product(shop, id)).toEqual({
       avg_cost: 13333,
       last_cost: 20000,
+    });
+    expect(await stockCache(shop, id)).toMatchObject({
+      on_hand_milli: 3000,
+      cost_changed_at: now,
+    });
+  });
+
+  it('keeps the server stock cache in step with movements, including direct inserts', async () => {
+    const shop = await seedShop('Stock cache');
+    const id = newId(now);
+    const opening = movement(shop, id, 'opening', 2000, 10000);
+    await pushOk(shop.till, [
+      op('products', 'upsert', productRow(id, { sku: 'CACHE-1' })),
+      op('stock_movements', 'insert', opening),
+    ]);
+    expect(await stockCache(shop, id)).toMatchObject({
+      on_hand_milli: 2000,
+      cost_changed_at: opening.created_at,
+    });
+
+    // A direct SQL insert (operator import, test fixture) must move the same cache via
+    // the trigger; no application-side bookkeeping is required.
+    const direct = movement(shop, id, 'purchase', 500, 12000);
+    await env.DB.prepare(
+      `INSERT INTO stock_movements
+       (tenant_id, id, product_id, qty_delta_milli, reason_code, ref_type, ref_id, unit_cost, note, branch_id, device_id, staff_id, business_date, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
+    )
+      .bind(
+        shop.tenantId,
+        direct.id,
+        id,
+        direct.qty_delta_milli,
+        direct.reason_code,
+        direct.ref_type,
+        direct.ref_id,
+        direct.unit_cost,
+        direct.note,
+        direct.branch_id,
+        direct.device_id,
+        direct.staff_id,
+        direct.business_date,
+        direct.created_at,
+      )
+      .run();
+    expect(await stockCache(shop, id)).toMatchObject({
+      on_hand_milli: 2500,
+      cost_changed_at: direct.created_at,
     });
   });
 

@@ -1,11 +1,11 @@
 # Nightly whole-database backup (docs/09 §2): D1 export -> R2 + age-encrypted artifact.
-# Schedule 21:30 UTC = 02:30 Asia/Karachi, while the shops are closed.
+# Schedule 00:05 UTC = 05:05 Asia/Karachi, after the D1 daily reset and before the shops open.
 # Required secrets: CLOUDFLARE_API_TOKEN (D1 + R2), CLOUDFLARE_ACCOUNT_ID,
 # BACKUP_AGE_RECIPIENT (the operator's age public key). Never upload the plain dump.
 name: backup
 on:
   schedule:
-    - cron: "30 21 * * *"
+    - cron: "5 0 * * *"
   workflow_dispatch:
     inputs:
       overwrite:

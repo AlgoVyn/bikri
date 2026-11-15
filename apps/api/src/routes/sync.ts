@@ -153,11 +153,18 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
       rows_read: outcome.rowsRead + takeRowsRead(tenant.id),
     }),
   );
-  await db.batch(tail);
+  // Read the latest seq in the same batch instead of a second round trip.
+  tail.push(
+    db.prepare('SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?1'),
+  );
+  const tailResults = await db.batch(tail);
+  const latest =
+    (tailResults.at(-1)?.results?.[0] as { seq?: number | null } | undefined)
+      ?.seq ?? tenant.change_log_floor;
   return c.json({
     results: outcome.results,
     server_time: now,
-    latest_seq: await latestSeq(db, tenant.change_log_floor),
+    latest_seq: latest,
     tenant_status: tenantStatusPayload(tenant),
     support: supportPayload(tenant, now),
   });
@@ -267,28 +274,14 @@ export async function snapshotPayload(
         : null;
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
-    const res = await db.batch(
-      SNAPSHOT_TABLES.map((tbl) => {
-        const column = q.before === undefined ? null : cutoffColumn(tbl);
-        return db.prepare(
-          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${column ? ` AND ${column} <= ?2` : ''}`,
-          ...(column ? [q.before as number] : []),
-        );
-      }),
-    );
-    const tables = SNAPSHOT_TABLES.map((tbl, i) => ({
-      tbl,
-      rows: Number(
-        (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
-      ),
-    }));
-    // The start runs one COUNT(*) per table; charge those reads so a device cannot
-    // loop the endpoint without ever advancing the per-shop read budget.
-    addRowsRead(
-      tenant.id,
-      tables.reduce((sum, table) => sum + table.rows, 0),
-    );
-    return { snapshot_seq: seq, tables };
+    // Do not run one COUNT(*) per table here. It scans every row in the shop, is
+    // charged to the same read budget as the pages that follow, and makes a large
+    // snapshot (or the owner export) block itself before the first page. Progress is
+    // reported as rows downloaded; the per-table row total is not needed to page.
+    return {
+      snapshot_seq: seq,
+      tables: SNAPSHOT_TABLES.map((tbl) => ({ tbl, rows: 0 })),
+    };
   }
   const limit = Math.min(q.limit, maxLimit);
   const column = q.before === undefined ? null : cutoffColumn(q.tbl);

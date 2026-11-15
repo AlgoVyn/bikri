@@ -18,7 +18,12 @@ import {
   type NewProduct,
 } from './products.ts';
 import { lineRevenue } from './reports.ts';
-import { type WriteOptions, type Writer, writeAction } from './write.ts';
+import {
+  type WriteOptions,
+  type Writer,
+  writeAction,
+  writeScope,
+} from './write.ts';
 
 const DAY_MS = 86_400_000;
 /** Reused for every product sort; creating a collator per comparison is measurably slower. */
@@ -601,7 +606,17 @@ export async function saveNewProduct(
       if (photo) await queuePhoto(w, id, photo, ctx.staff_id);
       return created;
     },
-    { actor: ctx.staff_id, ...opts },
+    {
+      actor: ctx.staff_id,
+      ...opts,
+      tables: writeScope(
+        'products',
+        'product_barcodes',
+        'stock_movements',
+        'stock_levels',
+        'file_queue',
+      ),
+    },
   );
   return product;
 }
@@ -691,7 +706,16 @@ export async function saveProductEdit(
       }
       return after;
     },
-    { actor: ctx.staff_id, ...opts },
+    {
+      actor: ctx.staff_id,
+      ...opts,
+      tables: writeScope(
+        'products',
+        'product_barcodes',
+        'audit_log',
+        'file_queue',
+      ),
+    },
   );
 }
 
@@ -743,7 +767,11 @@ export async function removeProduct(
         null,
       );
     },
-    { actor: ctx.staff_id, ...opts },
+    {
+      actor: ctx.staff_id,
+      ...opts,
+      tables: writeScope('products', 'product_barcodes', 'audit_log'),
+    },
   );
 }
 
@@ -810,7 +838,7 @@ export async function addCategory(
         sort_order: next,
       });
     },
-    opts,
+    { ...opts, tables: writeScope('categories') },
   );
 }
 
@@ -826,7 +854,10 @@ export async function updateCategory(
   if (patch.name_ur !== undefined)
     clean.name_ur = patch.name_ur.trim().slice(0, 40);
   if (patch.color !== undefined) clean.color = patch.color;
-  await writeAction(db, (w) => w.update('categories', id, clean), opts);
+  await writeAction(db, (w) => w.update('categories', id, clean), {
+    ...opts,
+    tables: writeScope('categories'),
+  });
 }
 
 /** Moves a category one place up (-1) or down (+1); rewrites sort_order 1..n where it changed. */
@@ -852,7 +883,7 @@ export async function moveCategory(
       await w.update('categories', a.id, { sort_order: Number(b.sort_order) });
       await w.update('categories', b.id, { sort_order: Number(a.sort_order) });
     },
-    opts,
+    { ...opts, tables: writeScope('categories') },
   );
 }
 
@@ -865,7 +896,10 @@ export async function removeCategory(
     await db.products.where('category_id').equals(id).toArray(),
   ).length;
   if (used > 0) throw new CategoryInUseError(used);
-  await writeAction(db, (w) => w.remove('categories', id), opts);
+  await writeAction(db, (w) => w.remove('categories', id), {
+    ...opts,
+    tables: writeScope('categories'),
+  });
 }
 
 // CSV export (REQ-B02); cost columns only with cost.view (AC 4).
@@ -982,6 +1016,6 @@ export async function addProductBarcode(
         product_id: productId,
         barcode,
       }),
-    { now, actor },
+    { now, actor, tables: writeScope('product_barcodes') },
   );
 }

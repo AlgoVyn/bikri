@@ -104,7 +104,7 @@ function BackupContent() {
         const result = await buildServerExport(db, staff.id, {
           onProgress: (progress) =>
             setServerProgress(
-              `${progress.table} (${progress.done}/${progress.rows})`,
+              `${progress.table} (${progress.rows > 0 ? `${progress.done}/${progress.rows}` : progress.done})`,
             ),
         });
         downloadBlob(

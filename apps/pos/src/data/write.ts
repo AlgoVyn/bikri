@@ -35,7 +35,10 @@ export class ReadOnlyError extends Error {
   }
 }
 
-type WriteListener = (opCount: number) => void;
+type WriteListener = (
+  opCount: number,
+  tables: readonly DexieTableName[],
+) => void;
 const listeners = new Set<WriteListener>();
 
 /** Called after every committed write that queued ops; the sync engine debounces a push. */
@@ -92,6 +95,16 @@ export type WriteOptions = {
    */
   tables?: readonly DexieTableName[];
 };
+
+/** Stores every writeAction needs, whatever the business action touches. */
+export const WRITE_SCOPE_BASE = ['outbox', 'pull_shadow', 'kv'] as const;
+
+/** A narrow writeAction scope: the bookkeeping stores plus the action's own tables. */
+export function writeScope(
+  ...tables: readonly DexieTableName[]
+): DexieTableName[] {
+  return [...WRITE_SCOPE_BASE, ...tables];
+}
 
 const SYSTEM_FIELDS = new Set([
   'id',
@@ -307,6 +320,11 @@ export async function writeAction<T>(
     const inner = (e as { inner?: unknown }).inner;
     throw inner instanceof ReadOnlyError ? inner : e;
   }
-  if (opCount > 0) for (const fn of listeners) fn(opCount);
+  if (opCount > 0) {
+    const touched =
+      options.tables ??
+      (db.tables.map((table) => table.name) as DexieTableName[]);
+    for (const fn of listeners) fn(opCount, touched);
+  }
   return result;
 }

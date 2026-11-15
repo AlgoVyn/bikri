@@ -23,6 +23,7 @@
       "range_7d": "7 din",
       "range_custom": "Apni marzi",
       "range_month": "Is mahine",
+      "range_too_long": "366 din ya us se kam ki muddat chunein.",
       "range_today": "Aaj",
       "range_yesterday": "Kal",
       "search": "Bill talash karein",

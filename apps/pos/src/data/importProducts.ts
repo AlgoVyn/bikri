@@ -7,7 +7,7 @@ import {
 import type { BikriDb, MasterRow } from '@bikri/db';
 import { productAudit } from './catalog.ts';
 import { createProduct, type LedgerContext } from './products.ts';
-import { type WriteOptions, writeAction } from './write.ts';
+import { type WriteOptions, writeAction, writeScope } from './write.ts';
 
 // Import spreadsheet (screens/08 § Import spreadsheet). Parsing of CSV / XLSX files happens in
 // the UI (papaparse / read-excel-file, loaded on demand); this module works on a grid of strings.
@@ -602,7 +602,18 @@ export async function runImport(
           result.updated += 1;
         }
       },
-      { actor: ctx.staff_id, ...opts },
+      {
+        actor: ctx.staff_id,
+        ...opts,
+        tables: writeScope(
+          'categories',
+          'products',
+          'product_barcodes',
+          'stock_movements',
+          'stock_levels',
+          'audit_log',
+        ),
+      },
     );
     opts.onProgress?.(index, valid.length);
   }

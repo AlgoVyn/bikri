@@ -2,6 +2,10 @@
  * Reports run in a worker (08 §7): a year of sales, payments and stock movements must not
  * block the counter's main thread. The worker opens the same tenant Dexie database and
  * returns a structured-cloneable bundle.
+ *
+ * Requests are serialised: a live-query change (for example a sync page) can send several
+ * while one bundle is running, and running them concurrently multiplied CPU and IndexedDB
+ * connections. Each request still gets its response, so the page's promise chain settles.
  */
 import { openTenantDb } from '@bikri/db';
 import {
@@ -31,24 +35,29 @@ const scope = self as unknown as {
   postMessage: (message: Response) => void;
 };
 
-scope.onmessage = (event: MessageEvent<Request>) => {
-  const { id, tenantId, range, previousRange, options } = event.data;
+async function run(request: Request): Promise<void> {
+  const { id, tenantId, range, previousRange, options } = request;
   const db = openTenantDb(tenantId);
-  void (async () => {
-    try {
-      const bundle = await reportBundle(db, range, options);
-      const previous =
-        previousRange === undefined
-          ? undefined
-          : (await reportBundle(db, previousRange, options)).summary;
-      scope.postMessage({ id, bundle, previous });
-    } catch (error) {
-      scope.postMessage({
-        id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      db.close();
-    }
-  })();
+  try {
+    const bundle = await reportBundle(db, range, options);
+    const previous =
+      previousRange === undefined
+        ? undefined
+        : (await reportBundle(db, previousRange, options)).summary;
+    scope.postMessage({ id, bundle, previous });
+  } catch (error) {
+    scope.postMessage({
+      id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    db.close();
+  }
+}
+
+let queue: Promise<void> = Promise.resolve();
+
+scope.onmessage = (event: MessageEvent<Request>) => {
+  const request = event.data;
+  queue = queue.then(() => run(request)).catch(() => undefined);
 };

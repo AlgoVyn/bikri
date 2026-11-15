@@ -250,7 +250,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   ],
   "vars": {
     "APP_VERSION": "1.0.0",
-    "SCHEMA_VERSION": "2",
+    "SCHEMA_VERSION": "3",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain
@@ -367,7 +367,7 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 | Worker requests | 100,000/day per account (reset 00:00 UTC) | ~1,560 pulls (60 s × 2 tills × 13 h) + ~300 pushes + ~200 file/other ≈ 2,100/day | ≈ 33 shops at 70 % of the limit |
 | Worker CPU | 10 ms per request | push of 200 ops ≈ 2–5 ms | watch |
 | Worker subrequests | 50/request (1,000 to internal services) | 1 D1 batch + ≤ 2 R2 calls | fine |
-| D1 rows written | 100,000/day per account | ≈ 17,550/day (T-062 measured 117/bill for 150 reference bills incl. indexes and sync) | **≈ 4 shops** at the 70 % share |
+| D1 rows written | 100,000/day per account | ≈ 18,150/day (T-062 measured 121/bill after the D-225 stock-cache trigger, for 150 reference bills incl. indexes and sync) | **≈ 4 shops** at the 70 % share |
 | D1 rows read | 5,000,000/day per account | indexed pulls ≈ 25,000/day | > 100 shops |
 | D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 153 MB/year (T-062 measured 1.9 KB/bill) | ≈ 3.3 shop-years per database, then a shard or Workers Paid |
 | D1 queries per Worker invocation | 50 | `db.batch()` counts as 1 | fine |

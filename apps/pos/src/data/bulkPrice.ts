@@ -2,7 +2,7 @@ import { mulDivRound, roundTo } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
 import { productAudit } from './catalog.ts';
 import type { LedgerContext } from './products.ts';
-import { type WriteOptions, writeAction } from './write.ts';
+import { type WriteOptions, writeAction, writeScope } from './write.ts';
 
 // Update prices (bulk), screens/08.
 
@@ -97,7 +97,11 @@ export async function applyPrices(
           );
         }
       },
-      { actor: ctx.staff_id, ...opts },
+      {
+        actor: ctx.staff_id,
+        ...opts,
+        tables: writeScope('products', 'audit_log'),
+      },
     );
   }
   return changed.length;

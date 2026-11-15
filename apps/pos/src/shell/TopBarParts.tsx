@@ -84,12 +84,15 @@ export function useSyncStatus() {
   });
   let state = 'synced';
   if (sync.phase === 'downloading') {
-    const pct =
-      sync.progress && sync.progress.total > 0
-        ? Math.round((sync.progress.done / sync.progress.total) * 100)
-        : 0;
+    const total = sync.progress?.total ?? 0;
+    const done = sync.progress?.done ?? 0;
     state = 'downloading';
-    label = t('shell.sync_downloading', { pct });
+    label =
+      total > 0
+        ? t('shell.sync_downloading', {
+            pct: Math.round((done / total) * 100),
+          })
+        : t('shell.sync_downloading_rows', { rows: done });
     detail = label;
   } else if (sync.phase === 'outdated') {
     state = 'outdated';

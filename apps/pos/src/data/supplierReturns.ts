@@ -8,7 +8,7 @@ import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (value: unknown): number => Number(value ?? 0);
 
@@ -453,6 +453,23 @@ export async function createSupplierReturn(
       });
       return row;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope(
+        'suppliers',
+        'purchases',
+        'purchase_lines',
+        'products',
+        'party_balances',
+        'supplier_returns',
+        'supplier_return_lines',
+        'stock_movements',
+        'stock_levels',
+        'ledger_entries',
+        'payments',
+        'audit_log',
+      ),
+    },
   );
 }

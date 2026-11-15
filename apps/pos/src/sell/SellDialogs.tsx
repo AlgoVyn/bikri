@@ -7,6 +7,7 @@ import {
   useDeferredValue,
   useEffect,
   useId,
+  useMemo,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +31,8 @@ import {
 import {
   createCustomer,
   DuplicatePhoneError,
-  findCustomers,
+  filterCustomers,
+  loadCustomerDirectory,
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
@@ -391,11 +393,11 @@ export function CustomerDialog({
     setPhone(null);
     setError(null);
   }, [open]);
-  const hits =
-    useLiveQuery(
-      () => findCustomers(getDb(), deferredQuery),
-      [deferredQuery],
-    ) ?? [];
+  const directory = useLiveQuery(() => loadCustomerDirectory(getDb()), []);
+  const hits = useMemo(
+    () => (directory ? filterCustomers(directory, deferredQuery) : []),
+    [directory, deferredQuery],
+  );
   const pick = (id: string | null) => {
     onPick(id);
     onOpenChange(false);

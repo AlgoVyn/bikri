@@ -442,7 +442,10 @@ function sideEffects(
           throw new Reject('CONSTRAINT_FAILED');
         }
         state.last_cost = Number(row.unit_cost);
-        state.cost_changed_at = Number(row.created_at ?? now);
+        state.cost_changed_at = Math.max(
+          state.cost_changed_at,
+          Number(row.created_at ?? now),
+        );
         state.pushed = true;
         out.push(
           db.prepare(
@@ -454,6 +457,9 @@ function sideEffects(
           changeLog(db, 'products', row.product_id, 'upsert', null, now, true),
         );
       }
+      // on_hand_milli and cost_changed_at are maintained by the
+      // products_stock_after_movement trigger, so this path never bumps rev or writes a
+      // change_log row for a sale.
       state.on_hand += qty;
     }
   }
@@ -1146,8 +1152,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     stmts.push(
       db.prepare(
         `SELECT p.id AS id, p.avg_cost AS avg_cost, p.last_cost AS last_cost,
-          COALESCE((SELECT SUM(m.qty_delta_milli) FROM stock_movements m WHERE m.tenant_id = ?1 AND m.product_id = p.id), 0) AS on_hand,
-          COALESCE((SELECT MAX(m.created_at) FROM stock_movements m WHERE m.tenant_id = ?1 AND m.product_id = p.id AND m.qty_delta_milli > 0 AND m.unit_cost IS NOT NULL), 0) AS cost_changed_at
+          p.on_hand_milli AS on_hand, p.cost_changed_at AS cost_changed_at
          FROM products p WHERE p.tenant_id = ?1 AND p.id IN (${params})`,
         ...chunk,
       ),
@@ -1362,6 +1367,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     closePayments: new Map(pushedClosePayments),
     closeCashMoves: new Map(pushedCloseCashMoves),
     closeExpenses: new Map(pushedCloseExpenses),
+    rowsRead: res.reduce(
+      (sum, result) => sum + (result.meta.rows_read ?? 0),
+      0,
+    ),
   };
   for (const s of (res[0]?.results ?? []) as StaffRow[])
     look.staff.set(s.id, s);
@@ -1591,7 +1600,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
 async function alreadyApplied(
   ctx: ApplyContext,
   ops: PushOp[],
-): Promise<Map<string, OpResult>> {
+): Promise<{ seen: Map<string, OpResult>; rowsRead: number }> {
   const ids = ops.map((o) => o.op_id);
   const stmts: D1PreparedStatement[] = [];
   for (let i = 0; i < ids.length; i += 99) {
@@ -1605,6 +1614,10 @@ async function alreadyApplied(
   }
   ctx.budget.take();
   const res = await ctx.db.batch(stmts);
+  let rowsRead = res.reduce(
+    (sum, result) => sum + (result.meta.rows_read ?? 0),
+    0,
+  );
   const out = new Map<string, OpResult>();
   for (const r of res) {
     for (const row of (r.results ?? []) as Array<{
@@ -1652,6 +1665,10 @@ async function alreadyApplied(
     }
     ctx.budget.take();
     const revs = await ctx.db.batch(revStatements);
+    rowsRead += revs.reduce(
+      (sum, result) => sum + (result.meta.rows_read ?? 0),
+      0,
+    );
     const revOf = new Map<string, number>();
     revs.forEach((result, index) => {
       const plan = plans[index];
@@ -1674,7 +1691,7 @@ async function alreadyApplied(
         out.set(op.op_id, { ...answer, server_rev: rev });
     }
   }
-  return out;
+  return { seen: out, rowsRead };
 }
 
 function groupByTx(ops: PushOp[]): PushOp[][] {
@@ -1820,9 +1837,10 @@ export async function applyOps(
   let rowsWritten = 0;
   let rowsRead = 0;
 
-  const seen = await alreadyApplied(ctx, ops);
-  for (const [id, r] of seen) final.set(id, r);
-  const fresh = ops.filter((o) => !seen.has(o.op_id));
+  const applied = await alreadyApplied(ctx, ops);
+  for (const [id, r] of applied.seen) final.set(id, r);
+  rowsRead += applied.rowsRead;
+  const fresh = ops.filter((o) => !applied.seen.has(o.op_id));
   const rejected: Array<{ op: PushOp; code: string }> = [];
   // Two inserts for the same ledger row id must never be summed by the document checks
   // while only one row is stored (a payment, line or stock movement could then be
@@ -1849,6 +1867,7 @@ export async function applyOps(
   for (let round = 0; round < 2 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     const look = await loadLookups(ctx, pending.flat());
+    rowsRead += look.rowsRead;
     const avg = new Map<string, CostState>();
     for (const [id, v] of look.onHand) avg.set(id, { ...v });
     // Products created by this push are not in D1 yet, but their opening/purchase movements

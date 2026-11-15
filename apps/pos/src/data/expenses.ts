@@ -5,7 +5,7 @@ import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
 import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
 export const CASHIER_EXPENSE_LIMIT = 200_000;
@@ -264,7 +264,7 @@ export async function createExpense(
         });
       return row;
     },
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: writeScope('expenses', 'audit_log') },
   );
 }
 
@@ -315,7 +315,7 @@ export async function reverseExpense(
         created_at: now,
       });
     },
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: writeScope('expenses') },
   );
 }
 
@@ -354,7 +354,7 @@ export async function cashMove(
         business_date: businessDate(now, ctx.timeZone),
         created_at: now,
       }),
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: writeScope('cash_moves') },
   );
 }
 
@@ -395,7 +395,7 @@ export async function createExpenseCategory(
         is_system: 0,
         sort_order: 50,
       }),
-    { now, actor },
+    { now, actor, tables: writeScope('expense_categories') },
   );
 }
 

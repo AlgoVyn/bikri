@@ -12,7 +12,17 @@ if (import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev') {
   const { installTestHooks } = await import('./dev/testHooks.ts');
   installTestHooks();
 }
-registerAppUpdate();
+// Register on load/idle: the service worker precaches ~2.4 MB, and the first visit should
+// not compete with the shell, the locale chunk and the first sync for bandwidth.
+const registerWhenIdle = () => {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => registerAppUpdate(), { timeout: 3_000 });
+  } else {
+    window.setTimeout(registerAppUpdate, 1_500);
+  }
+};
+if (document.readyState === 'complete') registerWhenIdle();
+else window.addEventListener('load', registerWhenIdle, { once: true });
 void rememberPersistentStorage();
 
 const rootElement = document.getElementById('root');

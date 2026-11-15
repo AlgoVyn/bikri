@@ -9,7 +9,7 @@ import type { TableSource } from './caches.ts';
 import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
 import { waLink } from './receipt.ts';
-import { type Writer, writeAction } from './write.ts';
+import { type Writer, writeAction, writeScope } from './write.ts';
 
 const DAY = 86_400_000;
 const n = (v: unknown): number => Number(v ?? 0);
@@ -574,7 +574,16 @@ export async function receivePayment(
       await keepPromises(w, input.customerId);
       return payment;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope(
+        'payments',
+        'ledger_entries',
+        'party_balances',
+        'promises',
+      ),
+    },
   );
 }
 
@@ -645,7 +654,7 @@ export async function createPromise(
         status: 'open',
         note: (input.note ?? '').trim().slice(0, 120),
       }),
-    { now, actor },
+    { now, actor, tables: writeScope('promises') },
   );
 }
 
@@ -675,18 +684,24 @@ export async function refreshPromises(
     list.push(promise);
     byCustomer.set(key, list);
   }
-  // One ledger read per customer, not one per promise.
+  // One bounded ledger read per customer, not one per promise and not the customer's
+  // whole history: the balance is already cached and only payments since the earliest
+  // open promise can have kept it.
   for (const [customerId, customerPromises] of byCustomer) {
+    const since = Math.min(
+      ...customerPromises.map((promise) => n(promise.created_at)),
+    );
     const entries = await db.ledger_entries
       .where('[party_type+party_id+created_at]')
       .between(
-        ['customer', customerId, -Infinity],
+        ['customer', customerId, since],
         ['customer', customerId, Infinity],
       )
       .toArray();
-    const balance = entries.reduce((sum, e) => sum + n(e.amount), 0);
+    const balance =
+      (await db.party_balances.get(['customer', customerId]))?.balance ?? 0;
     for (const promise of customerPromises) {
-      const since = entries
+      const paid = entries
         .filter(
           (e) =>
             e.source_type === 'payment' &&
@@ -695,7 +710,7 @@ export async function refreshPromises(
         .reduce((sum, e) => sum - n(e.amount), 0);
       const amount =
         promise.amount === null ? null : Number(promise.amount ?? 0);
-      if (balance <= 0 || (amount !== null && since >= amount))
+      if (balance <= 0 || (amount !== null && paid >= amount))
         updates.push({ id: promise.id, status: 'kept' });
       else if (options.today > String(promise.promised_on))
         updates.push({ id: promise.id, status: 'broken' });
@@ -748,16 +763,22 @@ export async function chaseList(
   // Only the owing customers' payments: loading the whole payments table on a
   // multi-year shop is needless and slows the chase list.
   const owingIds = [...new Set(owing.map((row) => String(row.customer.id)))];
+  const owingSet = new Set(owingIds);
+  // One range scan, not one composite key per owing customer. A shop with thousands of
+  // udhaar customers made the old anyOf open thousands of index ranges (D-119).
   const payments =
     owingIds.length === 0
       ? []
       : (
           await (src.table('payments') as Table<SyncedRow>)
             .where('[party_type+party_id]')
-            .anyOf(owingIds.map((id) => ['customer', id]))
+            .between(['customer', ''], ['customer', '\uffff'])
             .toArray()
         ).filter(
-          (p) => p.direction === 'in' && p.purpose === 'customer_payment',
+          (p) =>
+            p.direction === 'in' &&
+            p.purpose === 'customer_payment' &&
+            owingSet.has(String(p.party_id)),
         );
   const lastPayment = new Map<string, number>();
   for (const p of payments) {

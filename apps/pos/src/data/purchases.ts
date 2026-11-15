@@ -10,7 +10,7 @@ import {
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 export type DeliveryLineInput = {
   productId: string;
@@ -304,7 +304,21 @@ export async function saveDelivery(
       }
       return purchase;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope(
+        'purchases',
+        'purchase_lines',
+        'products',
+        'stock_movements',
+        'stock_levels',
+        'audit_log',
+        'ledger_entries',
+        'party_balances',
+        'payments',
+      ),
+    },
   );
 }
 
@@ -385,6 +399,10 @@ export async function paySupplier(
       });
       return payment;
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope('payments', 'ledger_entries', 'party_balances'),
+    },
   );
 }

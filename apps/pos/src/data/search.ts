@@ -70,6 +70,9 @@ async function searchCache(db: BikriDb): Promise<SearchCache> {
   return cache;
 }
 
+/** A substring search falls back to this many recent bills, not the whole shop's history. */
+const INVOICE_FALLBACK_LIMIT = 2_000;
+
 async function invoicesFor(db: BikriDb): Promise<InvoiceRow[]> {
   if (
     invoiceCache !== null &&
@@ -77,7 +80,13 @@ async function invoicesFor(db: BikriDb): Promise<InvoiceRow[]> {
     Date.now() - invoiceCache.at < CACHE_TTL_MS
   )
     return invoiceCache.rows;
-  const rows = (await db.sales.toArray()).map((row) => ({
+  const rows = (
+    await db.sales
+      .orderBy('created_at')
+      .reverse()
+      .limit(INVOICE_FALLBACK_LIMIT)
+      .toArray()
+  ).map((row) => ({
     id: String(row.id),
     invoice_no: row.invoice_no,
     business_date: row.business_date,
@@ -94,8 +103,20 @@ export function clearSearchCache(): void {
   invoiceCache = null;
 }
 
-// A product/customer/sale written on this device must be searchable immediately.
-onLocalWrite(() => clearSearchCache());
+const SEARCH_TABLES = new Set([
+  'products',
+  'product_barcodes',
+  'customers',
+  'sales',
+  'refunds',
+  'sale_voids',
+]);
+
+// A product/customer/sale written on this device must be searchable immediately. Other
+// writes (an expense, a stock count, a setting) no longer evict the whole cache.
+onLocalWrite((_count, tables) => {
+  if (tables.some((table) => SEARCH_TABLES.has(table))) clearSearchCache();
+});
 
 /** Top-bar search (screens/04): name, SKU, barcode, phone or bill number; 5 hits per group. */
 export async function searchAll(

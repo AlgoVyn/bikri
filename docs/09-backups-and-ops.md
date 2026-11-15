@@ -19,7 +19,7 @@ There is still **one** nightly backup of the whole database (all tenants): a pri
 
 ## 2. Nightly backup workflow (`.github/workflows/backup.yml`)
 
-Schedule `cron: "30 21 * * *"` (UTC) = **02:30 Asia/Karachi** daily; also `workflow_dispatch`.
+Schedule `cron: "5 0 * * *"` (UTC) = **05:05 Asia/Karachi** daily, after the D1 daily reset and before the shops open; also `workflow_dispatch`.
 
 Steps:
 1. Checkout, setup Node 24, `pnpm i --filter tools`.
@@ -32,7 +32,7 @@ Steps:
 
 Free-tier impact: one export per night is a few hundred thousand rows read (≪ 5 M/day) and ~3 Class A R2 ops.
 
-A running `wrangler d1 export` **blocks all other queries on the database** (Cloudflare D1 import/export docs), so it runs at 02:30 PKT when the shop is closed; a till that pushes during the export gets an error and simply retries with backoff. D1 cannot export databases that contain virtual tables (e.g. FTS5), so **never add virtual tables** to the schema (product search is done on the till in Dexie).
+A running `wrangler d1 export` **blocks all other queries on the database** (Cloudflare D1 import/export docs), so it runs at 05:05 PKT when the shop is closed; a till that pushes during the export gets an error and simply retries with backoff. D1 cannot export databases that contain virtual tables (e.g. FTS5), so **never add virtual tables** to the schema (product search is done on the till in Dexie).
 
 The repo is public, so GitHub Actions artifacts can be downloaded by other GitHub users: that is why the off-Cloudflare copy is always `age`-encrypted before upload; never upload the plain `.sql.gz` as an artifact.
 
@@ -90,7 +90,7 @@ If `migrations apply` succeeds and `wrangler deploy` then fails, the previous Wo
 
 1. `wrangler d1 create bikri-restore`; `gunzip`; `wrangler d1 execute bikri-restore --remote --file=bikri-YYYY-MM-DD.sql`.
 2. Verify counts against `manifest.json`.
-3. Point the `DB` binding to the new database ID in `wrangler.jsonc`, deploy, then set `restore_epoch` / `restore_point_at` for every tenant exactly as in §3.1 step 5 (restore point = the backup's `manifest.json` `date` at 02:30 PKT).
+3. Point the `DB` binding to the new database ID in `wrangler.jsonc`, deploy, then set `restore_epoch` / `restore_point_at` for every tenant exactly as in §3.1 step 5 (restore point = the backup's `manifest.json` `date` at 05:05 PKT).
 4. **Restore drill:** before v1.0.0 and then every 3 months, restore last night's backup into `bikri-restore` and compare `manifest.json` counts (checklist item in [10 §6](10-testing.md#6-manual-hardware-checklist-before-each-release)); delete the drill DB afterwards.
 
 ### 3.3 Restore from the owner's JSON export (operator action in v1)
@@ -105,7 +105,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 2. Console → tenant → `Restore` → `maintenance on` (only this shop's tills get `503 MAINTENANCE` and keep selling offline).
 3. `purge` until nothing is left (≤ 5,000 rows per call; deletes count as rows written, so a large shop may take several calls and should be restored outside the shop's busy hours). `audit_log` is never purged: it is append-only, and `maintenance off` uses its last `tenant_status_change` to return the shop to `read_only`/`suspended`.
 4. `import` the zip (≤ 500 rows per call, parents first; known columns, scalar/safe-integer values, D1 constraints and insert-only ledger writes; `change_log` written; `audit_log` is retained, not imported).
-5. `restore-epoch` with the restore point (the export's `exported_at` or the backup's date at 02:30 PKT) → the shop's tills run restore recovery ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) and re-send their own newer ledger rows.
+5. `restore-epoch` with the restore point (the export's `exported_at` or the backup's date at 05:05 PKT) → the shop's tills run restore recovery ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)) and re-send their own newer ledger rows.
 6. `maintenance off`. Audit `tenant_restore` in the tenant. Other shops are never touched.
 
 ### 3.5 Delete one tenant

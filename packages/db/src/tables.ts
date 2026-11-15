@@ -221,6 +221,8 @@ export const TABLE_COLUMNS = {
     'deleted_at',
     'rev',
     'updated_by',
+    'on_hand_milli',
+    'cost_changed_at',
   ],
   product_barcodes: [
     'tenant_id',

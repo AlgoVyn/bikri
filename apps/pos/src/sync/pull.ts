@@ -12,6 +12,8 @@ import type { BikriDb, SyncedRow } from '@bikri/db';
 import { rebuildCaches } from '../data/caches.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { clearSearchCache } from '../data/search.ts';
+import { clearSoldCache } from '../state/catalogue.ts';
 import { SyncHttpError, tillRequest } from './client.ts';
 import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
@@ -90,6 +92,33 @@ export async function pullAll(
   return serverTime;
 }
 
+/** A pulled row can change what search and the 30-day "best sellers" cache return. */
+const SOLD_SOURCE_TABLES = new Set([
+  'sales',
+  'sale_lines',
+  'refunds',
+  'refund_lines',
+  'sale_voids',
+]);
+const SEARCH_SOURCE_TABLES = new Set([
+  'products',
+  'product_barcodes',
+  'customers',
+  'sales',
+  'refunds',
+  'sale_voids',
+]);
+function clearReaderCaches(tables: Iterable<string>): void {
+  let sold = false;
+  let search = false;
+  for (const table of tables) {
+    if (SOLD_SOURCE_TABLES.has(table)) sold = true;
+    if (SEARCH_SOURCE_TABLES.has(table)) search = true;
+  }
+  if (sold) clearSoldCache();
+  if (search) clearSearchCache();
+}
+
 /**
  * Applies one pull page. If one malformed row aborts the page, retry row-by-row, quarantine the
  * bad rows under kv.pull_errors and advance the cursor so sync can continue.
@@ -119,6 +148,7 @@ async function applyPage(
       await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
       await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
     });
+    clearReaderCaches(tbls);
     return;
   } catch (error) {
     if (!isRowError(error)) throw error;
@@ -150,6 +180,7 @@ async function applyPage(
     await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
     await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
   });
+  clearReaderCaches(tbls);
 }
 
 /**
@@ -178,6 +209,7 @@ async function mergeSnapshotPage(
       );
       await tx.table('kv').put({ key: 'snapshot_state', value: next });
     });
+    clearReaderCaches([tbl]);
     return;
   } catch (error) {
     if (!isRowError(error)) throw error;
@@ -242,6 +274,7 @@ async function mergeSnapshotPage(
     });
     await tx.table('kv').put({ key: 'snapshot_state', value: next });
   });
+  clearReaderCaches([tbl]);
 }
 
 /**

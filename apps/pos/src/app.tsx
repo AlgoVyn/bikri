@@ -6,6 +6,7 @@ import { routeTree } from './routeTree.gen.ts';
 export const router = createRouter({
   routeTree,
   basepath: BASE_PATH,
+  defaultPreload: 'intent',
   defaultErrorComponent: RouteError,
 });
 

@@ -5,7 +5,7 @@
 import { businessDate, mulDivRound, newId, nextAvgCost } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
 import type { LedgerContext } from './products.ts';
-import { type Writer, writeAction } from './write.ts';
+import { type Writer, writeAction, writeScope } from './write.ts';
 
 export type AdjustKind = 'in' | 'out' | 'count' | 'fix';
 export const IN_REASONS = [
@@ -205,7 +205,11 @@ export async function adjustStock(
         id: input.adjustmentId,
       });
     },
-    { now, actor: ctx.staff_id },
+    {
+      now,
+      actor: ctx.staff_id,
+      tables: writeScope('products', 'stock_movements', 'stock_levels'),
+    },
   );
 }
 
@@ -380,7 +384,10 @@ export async function finishCount(
           .put({ key: DRAFT_KEY, value: { ...source, applied: nextApplied } });
         return { movements, counted, valueDiff };
       },
-      { now },
+      {
+        now,
+        tables: writeScope('products', 'stock_movements', 'stock_levels', 'kv'),
+      },
     );
     result.movements += part.movements;
     result.counted += part.counted;
@@ -407,7 +414,7 @@ export async function finishCount(
         staff_id: ctx.staff_id,
         created_at: now,
       }),
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: writeScope('audit_log') },
   );
   await discardCount(db);
   return result;

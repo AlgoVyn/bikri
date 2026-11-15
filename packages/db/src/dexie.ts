@@ -78,6 +78,15 @@ export const DEXIE_SCHEMA_V4 = {
     'id, [product_id+created_at], [ref_type+ref_id], business_date',
 } as const;
 
+/**
+ * V5 adds the outbox scan index. `pushAll` needs the oldest pending ops; without
+ * `[status+seq]` it loads and sorts every pending row (full payloads) on every round.
+ */
+export const DEXIE_SCHEMA_V5 = {
+  ...DEXIE_SCHEMA_V4,
+  outbox: '++seq, &op_id, status, [status+seq], created_at, [tbl+row_id]',
+} as const;
+
 export const LOCAL_ONLY_TABLES = [
   'outbox',
   'kv',
@@ -308,6 +317,7 @@ export class BikriDb extends Dexie {
     this.version(2).stores(DEXIE_SCHEMA_V2);
     this.version(3).stores(DEXIE_SCHEMA_V3);
     this.version(4).stores(DEXIE_SCHEMA_V4);
+    this.version(5).stores(DEXIE_SCHEMA_V5);
   }
 }
 

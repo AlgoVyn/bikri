@@ -134,7 +134,7 @@ export const SERVER_MANAGED_COLUMNS: Readonly<
   Record<string, readonly string[]>
 > = {
   '*': ['tenant_id', 'rev'],
-  products: ['avg_cost'],
+  products: ['avg_cost', 'on_hand_milli', 'cost_changed_at'],
   sales: ['status'],
 };
 

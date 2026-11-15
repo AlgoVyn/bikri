@@ -16,7 +16,7 @@ import {
 } from '@bikri/printer';
 import { readStoredLanguage } from '../i18n/i18n.ts';
 import { customerBalance } from './customers.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 /** `kv.printer` (06 §8, screens/17 Printer). Missing fields take the defaults noted. */
 export type PrinterKv = {
@@ -340,6 +340,6 @@ export async function logDrawerOpen(
         staff_id: ctx.staff_id,
         created_at: now,
       }),
-    { now, actor: ctx.staff_id },
+    { now, actor: ctx.staff_id, tables: writeScope('audit_log') },
   );
 }

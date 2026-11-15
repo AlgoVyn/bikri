@@ -978,6 +978,7 @@
     "sync_failed_ops": "{{count}} قبول نہیں ہوئیں",
     "sync_outdated": "سنک جاری رکھنے کے لیے ایپ اپڈیٹ کریں",
     "sync_downloading": "دکان کا ڈیٹا ڈاؤن لوڈ ہو رہا ہے… {{pct}}%",
+    "sync_downloading_rows": "دکان کا ڈیٹا ڈاؤن لوڈ ہو رہا ہے… {{rows}} قطاریں",
     "sync_read_only": "صرف دیکھنے کے لیے",
     "sync_detail_read_only": "یہ دکان صرف دیکھنے کے لیے ہے · {{count}} تبدیلیاں باقی",
     "sync_quota": "روزانہ سنک کی حد پوری",

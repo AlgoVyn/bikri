@@ -978,6 +978,7 @@
     "sync_failed_ops": "{{count}} not accepted",
     "sync_outdated": "Update the app to keep syncing",
     "sync_downloading": "Downloading shop data… {{pct}}%",
+    "sync_downloading_rows": "Downloading shop data… {{rows}} rows",
     "sync_read_only": "Read-only",
     "sync_detail_read_only": "This shop is read-only · {{count}} changes waiting",
     "sync_quota": "Daily sync limit reached",

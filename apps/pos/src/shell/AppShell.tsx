@@ -154,6 +154,30 @@ export function AppShell({ children }: { children: ReactNode }) {
     void import('../sell/SaleComplete.tsx').catch(() => undefined);
   }, []);
 
+  // The Sell route is lazy (the first paint is Home/Lock). Warm it and the active
+  // language's back-office strings when the browser is idle, so PIN -> Sell and the
+  // first Sales/Reports/Udhaar navigation do not wait for a chunk.
+  useEffect(() => {
+    const language =
+      i18n.language === 'ur'
+        ? 'ur'
+        : i18n.language.toLowerCase().startsWith('roman')
+          ? 'roman-ur'
+          : 'en';
+    const warm = () => {
+      void import('../sell/SellPage.tsx').catch(() => undefined);
+      void import('@bikri/i18n')
+        .then((module) => module.loadAreaCatalog('office', language))
+        .catch(() => undefined);
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 2_000 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const timer = window.setTimeout(warm, 500);
+    return () => window.clearTimeout(timer);
+  }, [i18n.language]);
+
   // T-027: a write attempted in a read-only shop shows one toast instead of a generic failure.
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {

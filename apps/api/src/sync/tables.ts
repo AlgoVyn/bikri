@@ -17,12 +17,19 @@ export type SnapshotTable = (typeof SNAPSHOT_TABLES)[number];
 const HIDDEN: Partial<Record<D1Table, readonly string[]>> = {
   // `enrolled_by` can contain `operator:<email>`; tills only need the device fields.
   devices: ['token_hash', 'enrolled_by'],
+  // Server-only derived cache; tills keep their own `stock_levels`.
+  products: ['on_hand_milli', 'cost_changed_at'],
 };
 
 /** The columns of a row as a till sees it: every column except tenant_id and hidden ones. */
+const CLIENT_COLUMNS = new Map<D1Table, readonly string[]>();
 export function clientColumns(tbl: D1Table): readonly string[] {
+  const cached = CLIENT_COLUMNS.get(tbl);
+  if (cached !== undefined) return cached;
   const hidden = new Set(['tenant_id', ...(HIDDEN[tbl] ?? [])]);
-  return TABLE_COLUMNS[tbl].filter((c) => !hidden.has(c));
+  const cols = TABLE_COLUMNS[tbl].filter((c) => !hidden.has(c));
+  CLIENT_COLUMNS.set(tbl, cols);
+  return cols;
 }
 
 export function columnsOf(tbl: D1Table): readonly string[] {
@@ -38,12 +45,17 @@ export function isSyncedTable(tbl: string): tbl is SyncedTable {
 
 /** D1 allows 32 arguments per SQL function call. */
 const MAX_FN_ARGS = 32;
+const ROW_JSON = new Map<string, string>();
 
 /**
  * `json_object(...)` of a table's client columns, nested with `json_insert` when it would pass
  * D1's 32-argument limit. (`json_patch` would drop null values, so it is not used: D-103.)
+ * Cached: the same table is serialised for every op of a push.
  */
 export function rowJsonExpr(tbl: D1Table, alias = ''): string {
+  const key = `${tbl}\u0000${alias}`;
+  const cached = ROW_JSON.get(key);
+  if (cached !== undefined) return cached;
   const cols = clientColumns(tbl);
   const ref = (c: string) => (alias ? `${alias}.${c}` : c);
   const first = cols.slice(0, MAX_FN_ARGS / 2);
@@ -54,12 +66,18 @@ export function rowJsonExpr(tbl: D1Table, alias = ''): string {
     const part = rest.slice(i, i + perInsert);
     expr = `json_insert(${expr}, ${part.map((c) => `'$.${c}', ${ref(c)}`).join(', ')})`;
   }
+  ROW_JSON.set(key, expr);
   return expr;
 }
 
 /** A SELECT list of the client columns. */
+const SELECT_LISTS = new Map<D1Table, string>();
 export function selectList(tbl: D1Table): string {
-  return clientColumns(tbl).join(', ');
+  const cached = SELECT_LISTS.get(tbl);
+  if (cached !== undefined) return cached;
+  const list = clientColumns(tbl).join(', ');
+  SELECT_LISTS.set(tbl, list);
+  return list;
 }
 
 /**

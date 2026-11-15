@@ -7,7 +7,7 @@ import {
 import { getKv, setKv } from './kv.ts';
 import { defaultBranch, deviceInfo } from './localTenant.ts';
 import { createProduct, type NewProduct } from './products.ts';
-import { writeAction } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 export const BUSINESS_TYPES = [
   'electronics',
@@ -187,7 +187,22 @@ export async function finishSetup(
       await w.table('kv').delete('setup_draft');
       return { owner, product };
     },
-    { now, actor: ownerId },
+    {
+      now,
+      actor: ownerId,
+      tables: writeScope(
+        'staff',
+        'shop',
+        'branches',
+        'expense_categories',
+        'products',
+        'product_barcodes',
+        'stock_movements',
+        'stock_levels',
+        'file_queue',
+        'kv',
+      ),
+    },
   );
   return result;
 }

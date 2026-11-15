@@ -868,14 +868,16 @@ describe('pull and snapshot', () => {
     expect(all.at(-1)?.seq).toBe(max);
   });
 
-  it('snapshot lists counts and pages rows without tenant_id or token_hash', async () => {
+  it('snapshot starts without counting every table and pages rows without tenant_id or token_hash', async () => {
     const shop = await seedShop('Snap');
     const start = await json<{
       snapshot_seq: number;
       tables: Array<{ tbl: string; rows: number }>;
     }>(await api('/sync/snapshot', { token: shop.till.token }));
     expect(start.tables[0]?.tbl).toBe('shop');
-    expect(start.tables.find((t) => t.tbl === 'devices')?.rows).toBe(2);
+    // Row totals are not computed at the start: the COUNT(*) pass read every row and
+    // was charged to the same budget as the pages, so a large snapshot blocked itself.
+    expect(start.tables.find((t) => t.tbl === 'devices')?.rows).toBe(0);
     const devices = await json<{
       rows: Array<Record<string, unknown>>;
       has_more: boolean;

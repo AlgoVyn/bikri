@@ -3,6 +3,7 @@ import type { MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import type { SortDirection } from '../lib/sort.ts';
+import { rowsAnyOf } from './bulk.ts';
 import type { TableSource } from './caches.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
@@ -256,15 +257,21 @@ async function matchingSaleIds(
       if (sale.customer_id && customerIds.has(String(sale.customer_id)))
         ids.add(sale.id);
 
-  const lines = (src.table('sale_lines') as Table<SyncedRow>).filter((l) => {
-    const name = String(l.name_snapshot ?? '').toLowerCase();
-    const sku = String(l.sku_snapshot ?? '').toLowerCase();
-    return (
-      words.every((w) => name.includes(w)) || (q.length >= 3 && sku.includes(q))
-    );
-  });
-  for (const line of await lines.toArray())
-    if (inRange.has(String(line.sale_id))) ids.add(String(line.sale_id));
+  const lines = await rowsAnyOf<SyncedRow>(
+    src.table('sale_lines') as Table<SyncedRow>,
+    'sale_id',
+    sales.map((sale) => String(sale.id)),
+    (line) => String(line.sale_id),
+  );
+  for (const line of lines) {
+    if (!inRange.has(String(line.sale_id))) continue;
+    const name = String(line.name_snapshot ?? '').toLowerCase();
+    const sku = String(line.sku_snapshot ?? '').toLowerCase();
+    const matches =
+      words.every((w) => name.includes(w)) ||
+      (q.length >= 3 && sku.includes(q));
+    if (matches) ids.add(String(line.sale_id));
+  }
   return ids;
 }
 
@@ -288,12 +295,17 @@ export async function salesHistory(
   if (matched) sales = sales.filter((s) => matched.has(s.id));
 
   const ids = sales.map((s) => s.id);
+  const saleIdSet = new Set(ids);
   const paymentsById = new Map<string, SyncedRow[]>();
   if (ids.length > 0) {
-    const pays = await (src.table('payments') as Table<SyncedRow>)
-      .where('sale_id')
-      .anyOf(ids)
-      .toArray();
+    // A sale payment carries the sale's business date, so the range index reads only
+    // the selected days instead of opening one index range per bill (D-119).
+    const pays = (
+      await (src.table('payments') as Table<SyncedRow>)
+        .where('business_date')
+        .between(filter.from, filter.to, true, true)
+        .toArray()
+    ).filter((p) => p.sale_id !== null && saleIdSet.has(String(p.sale_id)));
     for (const p of pays) {
       const key = String(p.sale_id);
       const list = paymentsById.get(key) ?? [];
@@ -304,10 +316,12 @@ export async function salesHistory(
 
   const refundsById = new Map<string, SyncedRow[]>();
   if (ids.length > 0) {
-    const refunds = await (src.table('refunds') as Table<SyncedRow>)
-      .where('sale_id')
-      .anyOf(ids)
-      .toArray();
+    const refunds = await rowsAnyOf<SyncedRow>(
+      src.table('refunds') as Table<SyncedRow>,
+      'sale_id',
+      ids,
+      (refund) => String(refund.sale_id),
+    );
     for (const r of refunds) {
       const key = String(r.sale_id);
       const list = refundsById.get(key) ?? [];
@@ -319,10 +333,12 @@ export async function salesHistory(
   const jobs =
     ids.length === 0
       ? []
-      : await (src.table('print_jobs') as Table<PrintJobLite>)
-          .where('sale_id')
-          .anyOf(ids)
-          .toArray();
+      : await rowsAnyOf<PrintJobLite>(
+          src.table('print_jobs') as Table<PrintJobLite>,
+          'sale_id',
+          ids,
+          (job) => String(job.sale_id ?? ''),
+        );
 
   const customerIds = [
     ...new Set(
