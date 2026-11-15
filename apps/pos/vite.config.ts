@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { API_BASE, BASE_PATH } from '@bikri/core';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
@@ -53,10 +54,21 @@ function localePreload(): Plugin {
       }
       const html = bundle['index.html'];
       if (html?.type !== 'asset' || typeof html.source !== 'string') return;
-      const placeholder = '<script id="bikri-locale-preload"></script>';
-      if (!html.source.includes(placeholder)) return;
-      const script = `<script id="bikri-locale-preload">try{var l=localStorage.getItem('bikri.language')||'en';var m=${JSON.stringify(locales)};var f=m[l];if(f){var k=document.createElement('link');k.rel='modulepreload';k.crossOrigin='';k.href='${BASE_PATH}/'+f;document.head.appendChild(k)}}catch(e){}</script>`;
-      html.source = html.source.replace(placeholder, script);
+      const placeholder = /<meta name="bikri-locale-preload"[^>]*>/u;
+      if (!placeholder.test(html.source)) return;
+      // The strict script CSP allows external scripts only. Emit a hashed file and
+      // reference it from the document; the map still points at the language chunks.
+      const source = `try{var l=localStorage.getItem('bikri.language')||'en';var m=${JSON.stringify(locales)};var f=m[l];if(f){var k=document.createElement('link');k.rel='modulepreload';k.crossOrigin='';k.href='${BASE_PATH}/'+f;document.head.appendChild(k)}}catch(e){}`;
+      const hash = createHash('sha256')
+        .update(source)
+        .digest('hex')
+        .slice(0, 12);
+      const fileName = `assets/locale-preload-${hash}.js`;
+      this.emitFile({ type: 'asset', fileName, source });
+      html.source = html.source.replace(
+        placeholder,
+        `<script src="${BASE_PATH}/${fileName}"></script>`,
+      );
     },
   };
 }
