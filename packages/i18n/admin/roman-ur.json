@@ -9,6 +9,7 @@
     "backups_hint": "Raat ka database. Abhi ke liye: GitHub → Actions → backup → Run workflow.",
     "backups_title": "Backup",
     "budget": "Rozana likhne ka budget",
+    "budget_hint": "Is dukan ke liye rozana ki ijazat-shuda likhawat.",
     "by_status": "Halat ke hisaab se dukanein",
     "col_admin": "Admin",
     "col_branch": "Branch",

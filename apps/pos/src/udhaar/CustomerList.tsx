@@ -106,6 +106,7 @@ export function UdhaarList({
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   // A new filter starts from the first page again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the filter changes
   useEffect(() => setShown(PAGE), [deferredQuery, filter, sort, direction]);
@@ -126,6 +127,13 @@ export function UdhaarList({
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
   });
+  useHotkey(
+    (event) =>
+      event.key === 'F2' ||
+      ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f'),
+    () => searchRef.current?.focus(),
+    { inFields: true },
+  );
   const today = data ? businessDate(Date.now(), data.tz) : '';
 
   const activeFilterCount =
@@ -239,6 +247,7 @@ export function UdhaarList({
               <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
+                  ref={searchRef}
                   type="search"
                   autoComplete="off"
                   className={searchInputClass}
@@ -459,12 +468,21 @@ export function UdhaarList({
                               style={{ width: `${percent}%` }}
                             />
                           </span>
-                          <span className="flex items-center gap-1 text-small text-text-muted">
+                          <span className="flex flex-wrap items-center gap-1 text-small text-text-muted">
                             <span className="tabular-nums">{percent}%</span>
                             <span aria-hidden="true">·</span>
                             <MoneyText
                               paisa={Number(row.customer.credit_limit ?? 0)}
                             />
+                            {percent >= 100 ? (
+                              <span className="text-danger">
+                                · {t('office.udhaar.over_limit')}
+                              </span>
+                            ) : percent >= 80 ? (
+                              <span className="text-warning">
+                                · {t('office.udhaar.near_limit')}
+                              </span>
+                            ) : null}
                           </span>
                         </>
                       ) : (

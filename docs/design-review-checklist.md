@@ -5,7 +5,7 @@ Run this on every PR that adds or changes a screen. A **no** is a blocker unless
 1. **One primary action.** Is there exactly one filled primary button, and is it the next action? Are destructive actions outlined and behind a confirm?
 2. **One surface per job.** Is the toolbar, summary and row list inside one surface (or a flat context strip), rather than three stacked cards?
 3. **The frame holds.** Does the page use `pageClass()` (`focused`, `standard`, `wide` or `workspace`) and does the header align with the content at 1280?
-4. **Numbers are sacred.** Is every amount right-aligned, tabular, never truncated, and in Inter (mono only for invoice numbers, SKUs and barcodes)?
+4. **Numbers are sacred.** Does every table use one alignment direction for headers and data (`start`: left in English/Roman Urdu, right in Urdu, D-214), with tabular figures, no truncation, and Inter (mono only for invoice numbers, SKUs and barcodes)? Amounts inside prose or a label/value row still end-align to their label.
 5. **Red means one thing.** Is red used only for destructive, error, overdue or below-cost states — not normal debt or a missing printer?
 6. **Every state exists.** Empty, loading, offline, read-only, error, permission-denied and no-match each look intentional and offer the next action.
 7. **Urdu is first-class.** Does the screen work at 390 and 1280 in `ur` with no clipped names, pills or money, and are numbers still Western digits inside `<bdi>`? Check 200% zoom and Windows High Contrast/forced colours, and have a native Urdu speaker sign off new copy.

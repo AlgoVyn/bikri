@@ -23,6 +23,7 @@ import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { isLatinName } from '../products/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Line = {
@@ -280,7 +281,10 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                     className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-start text-small hover:bg-surface-2"
                     onClick={() => add(p)}
                   >
-                    <span className="ltr-name font-medium">
+                    <span
+                      className={`data-name font-medium ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''}`}
+                      title={String(p.name_en)}
+                    >
                       {String(p.name_en)}
                     </span>
                     <span className="text-text-muted">{String(p.sku)}</span>

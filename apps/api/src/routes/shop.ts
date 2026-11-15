@@ -29,6 +29,7 @@ import {
 import {
   claimOwnerExportStatement,
   maskEmail,
+  releaseOwnerExportStatement,
   supportStatement,
 } from '../platform/tenantAdmin.ts';
 import { usageToday } from '../platform/tenants.ts';
@@ -670,21 +671,29 @@ async function startOwnerExport(c: Context<AppEnv>) {
   ]);
   if ((claimed?.meta.changes ?? 0) !== 1)
     throw rateLimited('One server export per day', EXPORT_EVERY / 1000);
-  const start = await snapshotPayload(
-    (k) => (k === 'before' ? String(now) : undefined),
-    db,
-    tenant,
-    500,
-  );
-  const token = await signToken(ownerSessionKey(c.env), {
-    kind: 'export',
-    tenant_id: tenant.id,
-    device_id: device.id,
-    exp: now + EXPORT_TTL,
-    before: now,
-  } satisfies ExportToken);
-  await db.batch(audit(c, 'owner_export'));
-  return c.json({ export_id: token, exported_at: now, ...start });
+  try {
+    const start = await snapshotPayload(
+      (k) => (k === 'before' ? String(now) : undefined),
+      db,
+      tenant,
+      500,
+    );
+    const token = await signToken(ownerSessionKey(c.env), {
+      kind: 'export',
+      tenant_id: tenant.id,
+      device_id: device.id,
+      exp: now + EXPORT_TTL,
+      before: now,
+    } satisfies ExportToken);
+    await db.batch(audit(c, 'owner_export'));
+    return c.json({ export_id: token, exported_at: now, ...start });
+  } catch (error) {
+    // A failed start keeps the slot otherwise and the owner cannot retry for 24 h.
+    await db
+      .batch([releaseOwnerExportStatement(c.env, tenant.id, now)])
+      .catch(() => undefined);
+    throw error;
+  }
 }
 
 shop.post('/export', (c) => startOwnerExport(c));

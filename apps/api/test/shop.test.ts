@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { testMail, testOutbox } from '../src/auth/mailer.ts';
+import { releaseOwnerExportStatement } from '../src/platform/tenantAdmin.ts';
 import {
   addSupportDevice,
   api,
@@ -390,6 +391,29 @@ describe('shop admin (T-038, 04 §3.8)', () => {
     expect(cross.status).toBe(400);
     expect(await auditCount(b.tenantId, 'owner_export')).toBe(1);
     expect(await auditCount(a.tenantId, 'owner_export')).toBe(1);
+  });
+
+  it('a failed export start releases only its own 24 h claim', async () => {
+    const a = await seedShop('Export release');
+    const now = Date.now();
+    const stored = async () =>
+      (
+        await env.DB.prepare(
+          'SELECT last_owner_export_at FROM tenants WHERE id = ?1',
+        )
+          .bind(a.tenantId)
+          .first<{ last_owner_export_at: number | null }>()
+      )?.last_owner_export_at ?? null;
+    await env.DB.prepare(
+      'UPDATE tenants SET last_owner_export_at = ?2 WHERE id = ?1',
+    )
+      .bind(a.tenantId, now)
+      .run();
+    // A newer successful claim must not be cleared by an older failed start.
+    await releaseOwnerExportStatement(env, a.tenantId, now - 1).run();
+    expect(await stored()).toBe(now);
+    await releaseOwnerExportStatement(env, a.tenantId, now).run();
+    expect(await stored()).toBeNull();
   });
 
   it('read-only shop: import and acknowledge 403 TENANT_READ_ONLY; device list still works', async () => {

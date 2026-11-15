@@ -16,3 +16,8 @@ e2e/fixtures/large.json
 
 # Review artifacts are local working notes, not shipped docs.
 docs/reviews/
+
+# Local E2E screenshot/debug scripts; the suite lives in e2e/tests/*.spec.ts.
+e2e/*.mjs
+# Temporary local tests, never committed.
+**/*.tmp.test.ts

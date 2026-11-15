@@ -28,6 +28,7 @@ describe('assertTenantScoped', () => {
     'INSERT INTO change_log (tenant_id, tbl) SELECT ?1, tbl FROM sales WHERE tenant_id = ?1',
     'SELECT * FROM tenants WHERE id = ?1',
     'SELECT value FROM meta',
+    'WITH x AS (SELECT 1 AS n) SELECT n FROM x',
   ])('accepts %s', (sql) => {
     expect(() => assertTenantScoped(sql)).not.toThrow();
   });
@@ -44,6 +45,13 @@ describe('assertTenantScoped', () => {
     'DELETE FROM products',
     'INSERT INTO products (id, tenant_id) VALUES (?2, ?1)',
     'INSERT INTO products (tenant_id, id) VALUES (?2, ?1)',
+    // A CTE/derived table can satisfy the predicate count with its outer alias while
+    // the inner tenant table is unscoped.
+    'WITH x AS (SELECT * FROM products) SELECT * FROM x WHERE x.tenant_id = ?1',
+    'WITH x AS MATERIALIZED (SELECT * FROM products) SELECT * FROM x WHERE x.tenant_id = ?1',
+    'WITH x AS (SELECT * FROM products WHERE tenant_id = ?1) SELECT * FROM x WHERE x.tenant_id = ?1',
+    'SELECT * FROM (SELECT * FROM products) p WHERE p.tenant_id = ?1',
+    'SELECT * FROM (SELECT * FROM products WHERE tenant_id = ?1) p WHERE p.tenant_id = ?1',
   ])('refuses %s', (sql) => {
     expect(() => assertTenantScoped(sql)).toThrow(TenantScopeError);
   });

@@ -1,5 +1,30 @@
-import { type ReactNode, useLayoutEffect, useRef } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { takeListScroll } from '../lib/listScroll.ts';
+
+/** True while the two-column master–detail workspace is showing (≥1280 px). */
+export function useMasterDetailWide(): boolean {
+  const [wide, setWide] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(min-width: 1280px)').matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia('(min-width: 1280px)');
+    const update = () => setWide(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return wide;
+}
 
 /**
  * Master–detail workspace (screens 08/10/12/13). Until a row is selected the list uses the

@@ -12,7 +12,7 @@ import {
   priceCard,
   priceCheck,
 } from '../data/priceCheck.ts';
-import { marginText, qtyWithUnit } from '../products/format.ts';
+import { isLatinName, marginText, qtyWithUnit } from '../products/format.ts';
 import { ProductThumb } from '../products/ProductThumb.tsx';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
@@ -194,7 +194,12 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
                 className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-border px-3 text-start"
                 onClick={() => void pick(p)}
               >
-                <span className="ltr-name">{String(p.name_en)}</span>
+                <span
+                  className={`data-name ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''}`}
+                  title={String(p.name_en)}
+                >
+                  {String(p.name_en)}
+                </span>
                 <MoneyText paisa={Number(p.price ?? 0)} />
               </button>
             </li>
@@ -215,7 +220,10 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
             size="lg"
           />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-title font-semibold">
+            <p
+              className={`data-name text-title font-semibold ${isLatinName(String(product.name_en)) ? 'ltr-name' : ''}`}
+              title={String(product.name_en)}
+            >
               {String(product.name_en)}
             </p>
             {product.name_ur ? (

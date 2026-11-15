@@ -1,6 +1,7 @@
 import { formatQtyFromMilli } from '@bikri/core';
 import type { TFunction } from 'i18next';
 import type { SaleMethod, SaleStatus } from '../data/salesHistory.ts';
+import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 
 export const METHOD_KEYS: Record<SaleMethod, string> = {
   cash: 'payment.cash',
@@ -30,45 +31,12 @@ export const METHOD_TONE: Record<SaleMethod, string> = {
   udhaar: 'border-warning text-warning-subtle-ink',
 };
 
-export function localeOf(lang: string): string {
-  return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
-}
-
-const TIME_FORMATS = new Map<string, Intl.DateTimeFormat>();
-const DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
-
 export function timeText(at: number, lang: string, timeZone: string): string {
-  const locale = localeOf(lang);
-  const key = `${locale}\u0000${timeZone}`;
-  let formatter = TIME_FORMATS.get(key);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone,
-    });
-    TIME_FORMATS.set(key, formatter);
-  }
-  return formatter.format(at);
+  return formatTimestamp(at, lang, timeZone, 'time');
 }
 
 export function dateText(date: string, lang: string, timeZone: string): string {
-  const locale = localeOf(lang);
-  const key = `${locale}\u0000${timeZone}`;
-  let formatter = DATE_FORMATS.get(key);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone,
-    });
-    DATE_FORMATS.set(key, formatter);
-  }
-  const at = Date.parse(`${date}T12:00:00Z`);
-  return formatter.format(at);
+  return formatBusinessDate(date, lang, timeZone, 'weekday');
 }
 
 /** "Today" / "Yesterday" for the day group headings, else the formatted date. */

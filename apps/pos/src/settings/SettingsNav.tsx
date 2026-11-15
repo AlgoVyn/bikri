@@ -210,7 +210,7 @@ function SettingsNavContent({
         aria-labelledby="data-safety"
         className="rounded-card border border-border bg-surface p-3"
       >
-        <h2 id="data-safety" className="text-h2 font-semibold">
+        <h2 id="data-safety" className="text-title font-semibold">
           {t('office.settings.health_title')}
         </h2>
         {healthy ? (

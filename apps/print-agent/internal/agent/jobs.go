@@ -94,6 +94,16 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 	m.jobs[req.JobID] = rec
 	m.mu.Unlock()
 
+	// Only print to a queue the agent has enumerated. A stale or hand-written client
+	// could otherwise select any queue on the machine. If enumeration itself fails, keep
+	// the old behaviour and let the backend report the real spool error: a transient
+	// `lpstat` failure must not block printing.
+	if printers, err := m.backend.ListPrinters(ctx); err == nil &&
+		!installedPrinter(printers, req.Printer) {
+		m.update(rec, "failed", "UNKNOWN_PRINTER", "the printer is not installed")
+		return m.copy(rec), nil
+	}
+
 	data, err := decodeData(req.Data)
 	if err != nil {
 		m.update(rec, "failed", "PAYLOAD_INVALID", err.Error())
@@ -283,6 +293,15 @@ func validateRequest(req JobRequest) error {
 		return errors.New("data is required")
 	}
 	return nil
+}
+
+func installedPrinter(printers []backend.Printer, name string) bool {
+	for _, printer := range printers {
+		if printer.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeData(text string) ([]byte, error) {

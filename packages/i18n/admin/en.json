@@ -9,6 +9,7 @@
     "backups_hint": "Nightly copies of the database. For one now: GitHub → Actions → backup → Run workflow.",
     "backups_title": "Backups",
     "budget": "Daily write budget",
+    "budget_hint": "Writes allowed per day for this shop.",
     "by_status": "Shops by status",
     "col_admin": "Admin",
     "col_branch": "Branch",

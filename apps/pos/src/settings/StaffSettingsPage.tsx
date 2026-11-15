@@ -62,8 +62,10 @@ function StaffList() {
   const [adding, setAdding] = useState(false);
   const rows = useLiveQuery(() => staffList(getDb()), []) ?? [];
   return (
-    <SettingsPageLayout title={t('office.staff.title')} icon={<UsersIcon />}>
-      <div className="flex justify-end">
+    <SettingsPageLayout
+      title={t('office.staff.title')}
+      icon={<UsersIcon />}
+      actions={
         <button
           type="button"
           className={buttonPrimary}
@@ -72,7 +74,8 @@ function StaffList() {
         >
           {t('office.staff.add')}
         </button>
-      </div>
+      }
+    >
       {rows.length === 0 ? (
         <EmptyState message={t('office.staff.empty')} />
       ) : (

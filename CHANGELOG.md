@@ -108,6 +108,22 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Guards: a malformed PIN verifier can never crash unlock, an unknown shop time zone falls back to `Asia/Karachi`, and push/import plus migration `0012` reject both.
 - Performance/robustness: Dexie V4 indexes `stock_movements` by `[ref_type+ref_id]`; Home uses index counts; `pending` reports `sending` ops; a debounced push is not dropped during a running push; blobs are limited before deserialising; the tenant-scope guard catches `FROM(table)`; `isUlid`/`newId`/`lineRevenue` validate their inputs; the request log reports the thrown status.
 
+### Ninth review remediation (2026-11-15)
+- Cost: the server shop lookup now loads `cost_method`, so a shop using last cost validates each sale against `last_cost` instead of rejecting every sale as `CONSTRAINT_FAILED`.
+- Refunds: `sales.status` is recomputed from the last refund line rather than the refund header, so a full refund is stored as `refunded` (not `part_refunded`) on the server and in later snapshots.
+- Tenancy: the `tenantDb` guard rejects CTEs and derived tables when a tenant table is named, closing the alias-predicate bypass.
+- Print agent: a job must name an enumerated OS queue; if queue enumeration fails, printing still falls back to the spooler error.
+- Owner export: a failed start releases only its own 24-hour claim, so a transient failure does not block the next attempt.
+- Docs/hygiene: the enrolment-code hash comment now describes the keyed HMAC and legacy fallback; local scratch E2E scripts and temporary tests are gitignored.
+
+### Visual review remediation (2026-11-15)
+- Names: product and line names use `unicode-bidi: plaintext`, so Urdu/mixed names keep their bidi order in both interfaces; `.ltr-name` now only selects the Latin face.
+- Frames and lists: the 404 uses the focused page frame, admin request rows no longer collapse on phones, Activity is one surface with Clear filters, and the not-enrolled Devices state offers Enrol.
+- Dates: all shop date/time output goes through `lib/date.ts`; 12-hour times use uppercase AM/PM on every screen, including list columns.
+- Tables: list and report columns stay start-aligned per D-214; the dead alignment branch is removed and docs/08, the review checklist and screen 16 now state the rule.
+- Actions and overlays: the embedded bill Print is quiet at ≥1280 px while the phone detail keeps it primary; Sales has one filled primary; global search and the command palette share their shape and close affordance; the shortcut sheet is complete and lists F2/Ctrl+F, and the four main lists bind it.
+- Settings and selling: Add cashier sits in the record header; cart order is a device preference; credit-limit bars label Near limit/Over limit; the Rs 75 note is ordered and labelled; the Home hero has real hover/press feedback; card titles use one scale.
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

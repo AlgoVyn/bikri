@@ -167,7 +167,7 @@ export function GlobalSearchHost() {
         role="dialog"
         aria-modal="true"
         aria-label={t('shell.search_label')}
-        className="relative flex h-fit max-h-[calc(100dvh-7rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card border border-border bg-surface shadow-modal"
+        className="relative flex h-fit max-h-[calc(100dvh-7rem)] w-full max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface shadow-modal"
       >
         <div className="flex min-h-14 items-center gap-2 border-b border-border px-3">
           <SearchIcon className="shrink-0 text-text-muted" />
@@ -185,7 +185,7 @@ export function GlobalSearchHost() {
             aria-autocomplete="list"
             autoComplete="off"
             placeholder={t('shell.search_label')}
-            className="bikri-focus-wrapper h-12 min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-muted"
+            className="bikri-focus-wrapper search-no-cancel h-12 min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-muted"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

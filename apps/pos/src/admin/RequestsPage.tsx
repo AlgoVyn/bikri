@@ -131,7 +131,7 @@ export function RequestsPage() {
                       href={adminHref(`/admin/requests/${row.id}`)}
                       className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-surface-2"
                     >
-                      <span className="min-w-0 flex-1">
+                      <span className="min-w-0 flex-1 max-sm:basis-full">
                         <span className="block truncate font-medium">
                           {row.shop_name}
                         </span>
@@ -139,10 +139,12 @@ export function RequestsPage() {
                           {row.owner_name} · {row.email}
                         </span>
                       </span>
-                      <EmailBadge state={email} label={emailState(row, t)} />
-                      <RequestStatus status={row.status} />
-                      <span className="w-36 text-end text-small text-text-muted">
-                        {formatWhen(row.created_at, i18n.language)}
+                      <span className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-between">
+                        <EmailBadge state={email} label={emailState(row, t)} />
+                        <RequestStatus status={row.status} />
+                        <span className="w-36 text-end text-small text-text-muted max-sm:w-auto">
+                          {formatWhen(row.created_at, i18n.language)}
+                        </span>
                       </span>
                     </a>
                   </li>

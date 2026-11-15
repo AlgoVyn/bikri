@@ -17,6 +17,7 @@ import {
 import type { PrinterKv } from '../data/receipt.ts';
 import { receiptPaper } from '../data/receipt.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import {
   AGENT_URL,
   type AgentHealth,
@@ -57,13 +58,7 @@ function Toggle({
 }
 
 function timeOf(ms: number, lang: string, timeZone = 'Asia/Karachi'): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-GB', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone,
-  }).format(ms);
+  return formatTimestamp(ms, lang, timeZone, 'datetime');
 }
 
 /** Settings → Printer (screens/17, this device only). */

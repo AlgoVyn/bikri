@@ -160,7 +160,7 @@ function planOp(
       ),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
       appliedOp(db, op, deviceId, now, 'applied', null, false),
-      ...sideEffects(ctx, tbl, row, avg),
+      ...sideEffects(ctx, tbl, row, avg, group),
     ];
     if (
       tbl === 'sales' ||
@@ -281,6 +281,7 @@ function sideEffects(
   tbl: D1Table,
   row: Record<string, unknown>,
   avg: Map<string, CostState>,
+  group: PushOp[],
 ): D1PreparedStatement[] {
   const { db, now } = ctx;
   const out: D1PreparedStatement[] = [];
@@ -323,7 +324,6 @@ function sideEffects(
       ),
     );
     out.push(conflictLog(conflictId));
-    out.push(...saleStatus(String(row.sale_id)));
   }
   if (tbl === 'sale_voids') {
     // The reverse race (a refund already left the shop when this void arrives) is the
@@ -379,6 +379,25 @@ function sideEffects(
       ),
     );
     out.push(conflictLog(conflictId));
+    // `sales.status` must be recomputed after every refund line is stored. The header's
+    // status UPDATE would run before `refund_lines` (apply rank 12 < 13) and would see no
+    // refunded quantity, so a full refund would stay `part_refunded`. Run it once, from
+    // the last line of the refund, after that line is inserted.
+    const refundId = String(row.refund_id);
+    const saleId = group.find(
+      (candidate) =>
+        candidate.tbl === 'refunds' &&
+        candidate.kind !== 'delete' &&
+        candidate.row?.id === refundId,
+    )?.row?.sale_id;
+    const lastLine = linkedInGroup(
+      group,
+      'refund_lines',
+      'refund_id',
+      refundId,
+    ).at(-1);
+    if (typeof saleId === 'string' && String(lastLine?.id) === String(row.id))
+      out.push(...saleStatus(saleId));
   }
   if (
     tbl === 'supplier_return_lines' &&
@@ -677,7 +696,7 @@ function stockRepairStatements(
       unitCost !== null &&
       Number.isSafeInteger(unitCost)
     )
-      out.push(...sideEffects(ctx, 'stock_movements', movement, avg));
+      out.push(...sideEffects(ctx, 'stock_movements', movement, avg, group));
   };
   const grouped = (
     lines: Record<string, unknown>[],
@@ -1307,7 +1326,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const res = await db.batch(stmts);
   ctx.budget.take();
   const shop = await db.first<ShopRules>(
-    'SELECT tax_rate_bp, tax_mode, round_total_to, default_credit_limit, timezone, updated_at FROM shop WHERE tenant_id = ?1',
+    'SELECT tax_rate_bp, tax_mode, cost_method, round_total_to, default_credit_limit, timezone, updated_at FROM shop WHERE tenant_id = ?1',
   );
   const look: Lookups = {
     sales: new Map(),

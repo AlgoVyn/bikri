@@ -48,7 +48,7 @@ import {
   useStockLevels,
 } from '../state/catalogue.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { marginText, qtyWithUnit } from './format.ts';
+import { isLatinName, marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
 const LabelsDialog = lazy(() =>
@@ -76,6 +76,7 @@ export function ProductList({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [stock, setStock] = useState<StockFilter>('all');
@@ -147,6 +148,13 @@ export function ProductList({
   useHotkey(plainKey('n'), () => void navigate({ to: '/products/new' }), {
     enabled: canEdit,
   });
+  useHotkey(
+    (event) =>
+      event.key === 'F2' ||
+      ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f'),
+    () => searchRef.current?.focus(),
+    { inFields: true },
+  );
 
   const more: PageActionItem[] = [];
   if (canLabel) {
@@ -258,6 +266,7 @@ export function ProductList({
                 <span className={searchWrapperClass}>
                   <SearchIcon />
                   <input
+                    ref={searchRef}
                     type="search"
                     autoComplete="off"
                     className={searchInputClass}
@@ -641,7 +650,10 @@ function ProductRow({
             {selected ? '✓' : ''}
           </span>
           <span className="min-w-0">
-            <span className="ltr-name line-clamp-2 font-medium leading-tight! max-lg:text-small">
+            <span
+              className={`data-name ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''} line-clamp-2 font-medium leading-tight! max-lg:text-small`}
+              title={String(p.name_en)}
+            >
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
@@ -708,7 +720,10 @@ function ProductRow({
             color={row.category?.color}
           />
           <span className="min-w-0">
-            <span className="ltr-name line-clamp-2 font-medium leading-tight! max-lg:text-small">
+            <span
+              className={`data-name ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''} line-clamp-2 font-medium leading-tight! max-lg:text-small`}
+              title={String(p.name_en)}
+            >
               {String(p.name_en)}
             </span>
             <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">

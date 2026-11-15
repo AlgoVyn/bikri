@@ -6,6 +6,7 @@ import { buttonQuiet } from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { formatTimestamp } from '../lib/date.ts';
 
 type Status =
   | 'pending'
@@ -143,15 +144,12 @@ function RequestStatus() {
             ) : null}
             <p className="mt-2 text-small text-text-muted">
               {t('register.status_created', {
-                date: new Intl.DateTimeFormat(
-                  i18n.language === 'ur' ? 'ur-PK' : 'en-GB',
-                  {
-                    timeZone: 'Asia/Karachi',
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  },
-                ).format(state.data.created_at),
+                date: formatTimestamp(
+                  state.data.created_at,
+                  i18n.language,
+                  'Asia/Karachi',
+                  'date',
+                ),
               })}
             </p>
           </div>

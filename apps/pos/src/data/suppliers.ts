@@ -43,6 +43,8 @@ export function defaultSupplierSortDirection(
 export type SupplierList = {
   rows: SupplierRow[];
   totalOwed: number;
+  /** Shop-wide supplier count, independent of the search/filter. */
+  totalCount: number;
 };
 
 export class SupplierBalanceError extends Error {
@@ -164,6 +166,7 @@ export async function supplierList(
     // screens/13: "total you owe suppliers" is a shop total, not a search result
     // (same rule as the customer list, D-126).
     totalOwed: all.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
+    totalCount: all.length,
   };
 }
 
