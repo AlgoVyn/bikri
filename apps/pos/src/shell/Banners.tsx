@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type TenantStatus = { status: string; since?: number; learned_at?: number };
@@ -57,11 +58,7 @@ export function Banners() {
     state?.support && state.support.until > Date.now() ? state.support : null;
   if (!readOnly && !support) return null;
   const time = support
-    ? new Intl.DateTimeFormat(i18n.language === 'ur' ? 'ur-PK' : 'en-PK', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone,
-      }).format(support.until)
+    ? formatTimestamp(support.until, i18n.language, timeZone, 'datetime')
     : '';
   return (
     <div className="flex flex-col">

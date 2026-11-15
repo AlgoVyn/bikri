@@ -6,6 +6,8 @@ export type ThemePref = 'system' | 'light' | 'dark';
 export type TextSizePref = '100' | '115' | '130';
 /** Lock-screen keypad: phone (1-2-3 top) or computer numpad (7-8-9 top). */
 export type KeypadLayout = 'phone' | 'computer';
+/** Which end of the cart a newly added line appears on (screens/17). */
+export type CartOrder = 'newest_first' | 'newest_last';
 
 export type DevicePrefs = {
   theme: ThemePref;
@@ -19,6 +21,7 @@ export type DevicePrefs = {
   /** Hide amounts on this device (shoulder-surfing privacy, docs/screens/04). */
   privacyMode: boolean;
   keypad: KeypadLayout;
+  cartOrder: CartOrder;
 };
 
 export const THEME_STORAGE_KEY = 'bikri.theme';
@@ -33,6 +36,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   autoClose: false,
   privacyMode: false,
   keypad: 'phone',
+  cartOrder: 'newest_first',
 };
 
 export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
@@ -50,6 +54,8 @@ export async function loadDevicePrefs(db: BikriDb): Promise<DevicePrefs> {
     ),
     privacyMode: stored.privacyMode === true,
     keypad: stored.keypad === 'computer' ? 'computer' : 'phone',
+    cartOrder:
+      stored.cartOrder === 'newest_last' ? 'newest_last' : 'newest_first',
   };
 }
 
@@ -67,6 +73,7 @@ export async function saveDevicePrefs(
     autoClose: prefs.autoClose,
     privacyMode: prefs.privacyMode,
     keypad: prefs.keypad,
+    cartOrder: prefs.cartOrder,
   });
   await setKv(db, 'auto_lock_minutes', prefs.autoLockMinutes);
 }

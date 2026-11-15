@@ -37,6 +37,7 @@ import {
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -84,6 +85,7 @@ export function SellPage() {
   const rows = useSellProducts();
   const carts = useCarts();
   const device = useLiveQuery(() => deviceInfo(getDb()), []);
+  const prefs = useLiveQuery(() => loadDevicePrefs(getDb()), []);
   const heldCount = useLiveQuery(() => getDb().held_bills.count(), []) ?? 0;
   const allStaff = useLiveQuery(() => getDb().staff.toArray(), []) ?? [];
   const active = useSellStore((s) => s.active);
@@ -866,6 +868,7 @@ export function SellPage() {
             backdate={cart.backdate ?? null}
             backdateStaffName={backdateStaffName}
             onCancelBackdate={askClear}
+            cartOrder={prefs?.cartOrder ?? 'newest_first'}
           />
         ) : null}
       </aside>

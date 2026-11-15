@@ -100,122 +100,132 @@ function ActivityContent() {
   }, [rows, shown]);
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
-      <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5">
-        <DateField
-          label={t('office.activity.from')}
-          value={filters.from}
-          max={filters.to}
-          onChange={(value) => update({ from: value })}
-        />
-        <DateField
-          label={t('office.activity.to')}
-          value={filters.to}
-          min={filters.from}
-          max={today}
-          onChange={(value) => update({ to: value })}
-        />
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.action')}
-          <select
-            className={field}
-            value={filters.action ?? ''}
-            onChange={(event) =>
-              update({ action: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_actions')}</option>
-            {AUDIT_ACTIONS.map((action) => (
-              <option key={action} value={action}>
-                {t(`office.activity.action_${action}`, {
-                  defaultValue: action,
-                })}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.staff')}
-          <select
-            className={field}
-            value={filters.staffId ?? ''}
-            onChange={(event) =>
-              update({ staffId: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_staff')}</option>
-            {options?.staff.map((row) => (
-              <option key={row.id} value={row.id}>
-                {String(row.name)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.activity.device')}
-          <select
-            className={field}
-            value={filters.deviceId ?? ''}
-            onChange={(event) =>
-              update({ deviceId: event.target.value || undefined })
-            }
-          >
-            <option value="">{t('office.activity.all_devices')}</option>
-            {options?.devices.map((row) => (
-              <option key={row.id} value={row.id}>
-                {String(row.name ?? row.code ?? '')}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {can('export.data') ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={buttonQuiet}
-            disabled={!rows || rows.length === 0}
-            onClick={() =>
-              rows &&
-              downloadText('bikri-activity.csv', auditCsv(rows, timeZone))
-            }
-          >
-            {t('office.activity.export_csv')}
-          </button>
+      <div className="rounded-card border border-border bg-surface">
+        <div className="border-b border-border p-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <DateField
+              label={t('office.activity.from')}
+              value={filters.from}
+              max={filters.to}
+              onChange={(value) => update({ from: value })}
+            />
+            <DateField
+              label={t('office.activity.to')}
+              value={filters.to}
+              min={filters.from}
+              max={today}
+              onChange={(value) => update({ to: value })}
+            />
+            <label className="flex flex-col gap-1 text-small">
+              {t('office.activity.action')}
+              <select
+                className={field}
+                value={filters.action ?? ''}
+                onChange={(event) =>
+                  update({ action: event.target.value || undefined })
+                }
+              >
+                <option value="">{t('office.activity.all_actions')}</option>
+                {AUDIT_ACTIONS.map((action) => (
+                  <option key={action} value={action}>
+                    {t(`office.activity.action_${action}`, {
+                      defaultValue: action,
+                    })}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-small">
+              {t('office.activity.staff')}
+              <select
+                className={field}
+                value={filters.staffId ?? ''}
+                onChange={(event) =>
+                  update({ staffId: event.target.value || undefined })
+                }
+              >
+                <option value="">{t('office.activity.all_staff')}</option>
+                {options?.staff.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {String(row.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-small">
+              {t('office.activity.device')}
+              <select
+                className={field}
+                value={filters.deviceId ?? ''}
+                onChange={(event) =>
+                  update({ deviceId: event.target.value || undefined })
+                }
+              >
+                <option value="">{t('office.activity.all_devices')}</option>
+                {options?.devices.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {String(row.name ?? row.code ?? '')}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {can('export.data') ? (
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={!rows || rows.length === 0}
+                onClick={() =>
+                  rows &&
+                  downloadText('bikri-activity.csv', auditCsv(rows, timeZone))
+                }
+              >
+                {t('office.activity.export_csv')}
+              </button>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      {rows && rows.length === 0 ? (
-        <EmptyState icon={<ClockIcon />} message={t('office.activity.empty')} />
-      ) : null}
-      {rows && rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full min-w-[44rem] border-collapse text-small">
-            <thead>
-              <tr className="border-b border-border bg-surface-2">
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.time')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.staff')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.device')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.action')}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t('office.activity.summary')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, shown).map((entry) => (
-                <tr
-                  key={String(entry.row.id)}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <bdi dir="ltr">
+        {rows && rows.length === 0 ? (
+          <EmptyState
+            variant="plain"
+            icon={<ClockIcon />}
+            message={t('office.activity.empty')}
+            actionLabel={t('common.clear_filters')}
+            onAction={() =>
+              setFilters({ from: addDays(today, -29), to: today })
+            }
+          />
+        ) : null}
+        {rows && rows.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[44rem] border-collapse text-small">
+              <thead>
+                <tr className="border-b border-border bg-surface-2">
+                  <th className="px-3 py-2 text-start">
+                    {t('office.activity.time')}
+                  </th>
+                  <th className="px-3 py-2 text-start">
+                    {t('office.activity.staff')}
+                  </th>
+                  <th className="px-3 py-2 text-start">
+                    {t('office.activity.device')}
+                  </th>
+                  <th className="px-3 py-2 text-start">
+                    {t('office.activity.action')}
+                  </th>
+                  <th className="px-3 py-2 text-start">
+                    {t('office.activity.summary')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, shown).map((entry) => (
+                  <tr
+                    key={String(entry.row.id)}
+                    className="border-b border-border last:border-0"
+                  >
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {longDate(
                         businessDate(Number(entry.row.created_at), timeZone),
                         i18n.language,
@@ -225,31 +235,33 @@ function ActivityContent() {
                         i18n.language,
                         timeZone,
                       )}
-                    </bdi>
-                  </td>
-                  <td className="px-3 py-2">
-                    {entry.staffName || String(entry.row.staff_id ?? '—')}
-                  </td>
-                  <td className="px-3 py-2">
-                    {entry.deviceName || String(entry.row.device_id ?? '—')}
-                  </td>
-                  <td className="px-3 py-2">
-                    {t(`office.activity.action_${String(entry.row.action)}`, {
-                      defaultValue: String(entry.row.action),
-                    })}
-                  </td>
-                  <td className="px-3 py-2 text-text-muted">{entry.summary}</td>
-                </tr>
-              ))}
-              {shown < rows.length ? (
-                <tr ref={sentinel}>
-                  <td colSpan={5} className="h-px" />
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      {entry.staffName || String(entry.row.staff_id ?? '—')}
+                    </td>
+                    <td className="px-3 py-2">
+                      {entry.deviceName || String(entry.row.device_id ?? '—')}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t(`office.activity.action_${String(entry.row.action)}`, {
+                        defaultValue: String(entry.row.action),
+                      })}
+                    </td>
+                    <td className="px-3 py-2 text-text-muted">
+                      {entry.summary}
+                    </td>
+                  </tr>
+                ))}
+                {shown < rows.length ? (
+                  <tr ref={sentinel}>
+                    <td colSpan={5} className="h-px" />
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </div>
     </SettingsPageLayout>
   );
 }

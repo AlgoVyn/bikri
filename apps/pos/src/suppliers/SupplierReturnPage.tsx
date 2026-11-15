@@ -29,6 +29,7 @@ import {
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
+import { isLatinName } from '../products/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Unlinked = {
@@ -315,7 +316,9 @@ export function SupplierReturnPage({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="ltr-name font-medium">
+                      <p
+                        className={`data-name font-medium ${isLatinName(String(line.product.name_en)) ? 'ltr-name' : ''}`}
+                      >
                         {String(line.product.name_en)}
                       </p>
                       <p className="text-small text-text-muted">
@@ -397,7 +400,11 @@ export function SupplierReturnPage({
             <ul className="flex flex-col gap-2">
               {unlinked.map((line) => (
                 <li key={line.key} className="flex flex-wrap items-end gap-2">
-                  <span className="ltr-name min-w-32 flex-1">{line.name}</span>
+                  <span
+                    className={`data-name min-w-32 flex-1 ${isLatinName(line.name) ? 'ltr-name' : ''}`}
+                  >
+                    {line.name}
+                  </span>
                   <div className="w-32">
                     <QtyInput
                       label={`${t('office.suppliers.return_qty')} ${line.name}`}

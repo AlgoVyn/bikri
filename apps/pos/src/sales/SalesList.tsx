@@ -41,6 +41,7 @@ import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
 import { useSellStore } from '../sell/sellStore.ts';
+import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { cashierTodayOnly } from '../state/reportScope.ts';
@@ -67,7 +68,7 @@ const SALE_GRID_FULL =
   'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[4rem_minmax(0,1.2fr)_minmax(0,1.4fr)_3.5rem_6rem_minmax(0,1.4fr)_7.5rem]';
 /** The master–detail pane is ~500 px: keep the four columns that matter, not seven. */
 const SALE_GRID_EMBEDDED =
-  'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[3.5rem_minmax(0,1.5fr)_5.5rem_6.5rem]';
+  'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[4rem_minmax(0,1.5fr)_5.5rem_6.5rem]';
 
 const PRESETS: { id: SalesPreset; key: string }[] = [
   { id: 'today', key: 'office.sales.range_today' },
@@ -132,6 +133,7 @@ export function SalesList({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const readOnly = useReadOnly();
   const setActive = useSellStore((s) => s.setActive);
@@ -139,6 +141,13 @@ export function SalesList({
   const activeFilters =
     [method, status, staffId, deviceId].filter(Boolean).length +
     (sort === 'time' && direction === 'desc' ? 0 : 1);
+  useHotkey(
+    (event) =>
+      event.key === 'F2' ||
+      ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f'),
+    () => searchRef.current?.focus(),
+    { inFields: true },
+  );
   const applySort = (next: SaleSort) => {
     if (next === sort) {
       setDirection(toggleSortDirection);
@@ -341,6 +350,7 @@ export function SalesList({
               <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
+                  ref={searchRef}
                   type="search"
                   autoComplete="off"
                   className={searchInputClass}

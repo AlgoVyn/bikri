@@ -25,7 +25,8 @@ import {
 } from '../data/cart.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
-import { qtyWithUnit } from '../products/format.ts';
+import { isLatinName, qtyWithUnit } from '../products/format.ts';
+import type { CartOrder } from '../shell/devicePrefs.ts';
 import { LineEditor } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
 
@@ -56,6 +57,7 @@ export type CartPanelProps = {
   backdate?: CartBackdate | null;
   backdateStaffName?: string;
   onCancelBackdate: () => void;
+  cartOrder: CartOrder;
 };
 
 function itemCount(lines: readonly CartLine[]): number {
@@ -69,6 +71,9 @@ export function CartPanel(p: CartPanelProps) {
   const { t, i18n } = useTranslation();
   const customer = useCustomer(p.cart.customer_id);
   const { totals, cart, money } = p;
+  // The cart keeps newest first in memory, so only the "bottom" preference reverses.
+  const displayLines = cart.lines.map((line, index) => ({ line, index }));
+  if (p.cartOrder === 'newest_last') displayLines.reverse();
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
       {p.backdate ? (
@@ -181,11 +186,11 @@ export function CartPanel(p: CartPanelProps) {
             <p className="text-small text-text-muted">{t('sell.cart_empty')}</p>
           </li>
         ) : null}
-        {cart.lines.map((line, i) => (
+        {displayLines.map(({ line, index }) => (
           <LineRow
             key={line.key}
             line={line}
-            result={totals.lines[i]}
+            result={totals.lines[index]}
             onHand={line.product_id ? p.stock.get(line.product_id) : undefined}
             isSelected={p.selected === line.key}
             isExpanded={p.expanded === line.key}
@@ -379,7 +384,8 @@ function LineRow({
           />
           <span className="min-w-0 flex-1">
             <span
-              className="ltr-name block truncate font-medium"
+              className={`data-name block truncate font-medium ${isLatinName(line.name) ? 'ltr-name' : ''}`}
+              title={line.name}
               data-testid="line-name"
             >
               {line.name}
@@ -486,6 +492,7 @@ function InlinePrice({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: commits the price when focus leaves the field
     <div
+      title={t('sell.unit_price')}
       onBlur={commit}
       onKeyDown={(event) => {
         if (event.key !== 'Enter') return;

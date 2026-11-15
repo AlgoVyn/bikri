@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   ClockIcon,
+  CloseIcon,
   ExpensesIcon,
   EyeIcon,
   EyeOffIcon,
@@ -319,7 +320,7 @@ export function CommandPalette() {
         <Dialog.Overlay className="bikri-overlay fixed inset-0 z-50 bg-text/40" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal"
+          className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal"
         >
           <Dialog.Title className="sr-only">
             {mode === 'commands' ? t('shell.commands') : t('shell.shortcuts')}
@@ -359,6 +360,15 @@ export function CommandPalette() {
                   className="h-14 min-w-0 flex-1 bg-transparent text-title outline-none!"
                 />
                 <KeyBadge keys="Esc" />
+                <Dialog.Close asChild>
+                  <button
+                    type="button"
+                    aria-label={t('common.close')}
+                    className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
+                  >
+                    <CloseIcon className="size-5" />
+                  </button>
+                </Dialog.Close>
               </div>
               <div
                 id={listId}
@@ -403,7 +413,18 @@ export function CommandPalette() {
                 <p className="text-title font-semibold">
                   {t('shell.shortcuts')}
                 </p>
-                <KeyBadge keys="Esc" />
+                <div className="flex items-center gap-1">
+                  <KeyBadge keys="Esc" />
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      aria-label={t('common.close')}
+                      className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
+                    >
+                      <CloseIcon className="size-5" />
+                    </button>
+                  </Dialog.Close>
+                </div>
               </div>
               {[
                 {
@@ -413,6 +434,7 @@ export function CommandPalette() {
                     ['?', t('shell.shortcuts')],
                     ['/', t('shell.search_label')],
                     ['N', t('home.new_sale')],
+                    ['Ctrl+Shift+1…9', t('shell.rail_items')],
                     ['Ctrl+Shift+H', t('privacy.title')],
                     ['Ctrl+Shift+P', t('home.price_check')],
                     ['Ctrl+L', t('shell.lock')],
@@ -421,7 +443,7 @@ export function CommandPalette() {
                 {
                   title: t('shell.shortcuts_sell'),
                   rows: [
-                    ['F2', t('sell.search_label')],
+                    ['F2 / Ctrl+F', t('sell.search_label')],
                     ['Ctrl+1/2/3', t('sell.carts')],
                     ['F3', t('sell.add_discount')],
                     ['F4', t('sell.hold')],
@@ -449,7 +471,10 @@ export function CommandPalette() {
                   </h3>
                   <ul className="flex flex-col gap-1 text-small">
                     {group.rows.map(([keys = '', label = '']) => (
-                      <li key={keys} className="flex items-center gap-3">
+                      <li
+                        key={keys}
+                        className="grid grid-cols-[9rem_1fr] items-center gap-3"
+                      >
                         <KeyBadge keys={keys} always />
                         <span>{label}</span>
                       </li>

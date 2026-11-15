@@ -1,6 +1,7 @@
 import { formatQtyFromMilli } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import type { TFunction } from 'i18next';
+import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 
 export const DAY = 86_400_000;
 
@@ -40,58 +41,16 @@ export function groupName(
   return row.name;
 }
 
-const SHORT_DATE = new Map<string, Intl.DateTimeFormat>();
-const LONG_DATE = new Map<string, Intl.DateTimeFormat>();
-const TIME = new Map<string, Intl.DateTimeFormat>();
-
-function localeOf(lang: string): string {
-  return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
-}
-
 export function shortDate(date: string, lang: string): string {
-  const locale = localeOf(lang);
-  let formatter = SHORT_DATE.get(locale);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      day: 'numeric',
-      month: 'short',
-      timeZone: 'UTC',
-    });
-    SHORT_DATE.set(locale, formatter);
-  }
-  return formatter.format(new Date(`${date}T12:00:00Z`));
+  return formatBusinessDate(date, lang, 'UTC', 'dateShort');
 }
 
 export function longDate(date: string, lang: string): string {
-  const locale = localeOf(lang);
-  let formatter = LONG_DATE.get(locale);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-    LONG_DATE.set(locale, formatter);
-  }
-  return formatter.format(new Date(`${date}T12:00:00Z`));
+  return formatBusinessDate(date, lang, 'UTC', 'weekday');
 }
 
 export function timeText(at: number, lang: string, timeZone: string): string {
-  const locale = localeOf(lang);
-  const key = `${locale}\u0000${timeZone}`;
-  let formatter = TIME.get(key);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone,
-    });
-    TIME.set(key, formatter);
-  }
-  return formatter.format(at);
+  return formatTimestamp(at, lang, timeZone, 'time');
 }
 
 export function bucketLabel(t: TFunction, bucket: string): string {

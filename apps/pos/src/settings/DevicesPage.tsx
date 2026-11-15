@@ -1,5 +1,6 @@
 /** Settings → Devices on an admin device (screens/17, T-038): codes, devices, import unsynced ops. */
 
+import { BASE_PATH } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,6 +20,7 @@ import { getDb } from '../data/db.ts';
 import { formatCode } from '../data/enrol.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { useOnline } from '../shell/TopBarParts.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { chunkOpsByTx, MAX_BATCH_OPS } from '../sync/chunk.ts';
@@ -144,11 +146,7 @@ function timeText(
   timeZone = 'Asia/Karachi',
 ): string {
   if (!at) return '—';
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone,
-  }).format(at);
+  return formatTimestamp(at, lang, timeZone, 'datetime');
 }
 
 export function DevicesPage() {
@@ -277,11 +275,16 @@ export function DevicesPage() {
         </p>
       ) : null}
       {enrolled === false ? (
-        <EmptyState icon={<DeviceIcon />} message={t('owner.not_enrolled')} />
+        <EmptyState
+          icon={<DeviceIcon />}
+          message={t('owner.not_enrolled')}
+          actionLabel={t('enrol.connect')}
+          onAction={() => window.location.assign(`${BASE_PATH}enrol`)}
+        />
       ) : null}
       {enrolled === false ? null : (
         <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <h2 className="text-h2 font-semibold">{t('devices.add_title')}</h2>
+          <h2 className="text-title font-semibold">{t('devices.add_title')}</h2>
           <form
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -411,7 +414,9 @@ export function DevicesPage() {
       {enrolled === false ? null : (
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-h2 font-semibold">{t('devices.list_title')}</h2>
+            <h2 className="text-title font-semibold">
+              {t('devices.list_title')}
+            </h2>
             <button
               type="button"
               className={buttonQuiet}
@@ -596,7 +601,9 @@ export function DevicesPage() {
       )}
 
       <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-h2 font-semibold">{t('devices.import_title')}</h2>
+        <h2 className="text-title font-semibold">
+          {t('devices.import_title')}
+        </h2>
         <p className="text-small text-text-muted">{t('devices.import_help')}</p>
         <div className="flex flex-wrap items-center gap-3">
           <input

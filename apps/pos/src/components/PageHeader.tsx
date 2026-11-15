@@ -12,6 +12,7 @@ export function PageHeader({
   tone = 'bg-primary-subtle text-primary-subtle-ink',
   headingLevel = 'h1',
   hideTitleOnPhone = false,
+  subtitleOnPhone = false,
 }: {
   icon?: ReactNode;
   title: string;
@@ -21,6 +22,8 @@ export function PageHeader({
   headingLevel?: 'h1' | 'h2';
   /** Shop list pages already show this title in the phone top bar. */
   hideTitleOnPhone?: boolean;
+  /** Keep the subtitle below the phone top bar even when the title is hidden. */
+  subtitleOnPhone?: boolean;
 }) {
   const Heading = headingLevel;
   const titleSize =
@@ -46,7 +49,7 @@ export function PageHeader({
           </Heading>
           {subtitle ? (
             <p
-              className={`${hideTitleOnPhone ? 'max-lg:hidden ' : ''}mt-1 max-w-2xl text-small text-text-muted`}
+              className={`${hideTitleOnPhone && !subtitleOnPhone ? 'max-lg:hidden ' : ''}mt-1 max-w-2xl text-small text-text-muted`}
             >
               {subtitle}
             </p>

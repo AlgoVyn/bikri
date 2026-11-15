@@ -41,6 +41,7 @@ import {
   navigateShareWindow,
   openShareWindow,
 } from '../print/shareWindow.ts';
+import { isLatinName } from '../products/format.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
@@ -429,7 +430,7 @@ export function BillDetail({
         primary={
           <button
             type="button"
-            className={buttonPrimary}
+            className={embedded ? buttonQuiet : buttonPrimary}
             onClick={() => void print()}
           >
             {t('office.bill.print')}
@@ -584,7 +585,9 @@ export function BillDetail({
                   className="border-b border-border last:border-0"
                 >
                   <td className="p-2">
-                    <span className="ltr-name block">
+                    <span
+                      className={`data-name block ${isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''}`}
+                    >
                       {String(line.name_snapshot)}
                     </span>
                     <span

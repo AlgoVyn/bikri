@@ -116,6 +116,25 @@ function DisplayContent() {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-small">
+          {t('office.display.cart_order')}
+          <select
+            className={field}
+            value={form.cartOrder}
+            onChange={(event) =>
+              change({
+                cartOrder: event.target.value as DevicePrefs['cartOrder'],
+              })
+            }
+          >
+            <option value="newest_first">
+              {t('office.display.cart_order_first')}
+            </option>
+            <option value="newest_last">
+              {t('office.display.cart_order_last')}
+            </option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-small">
           {t('office.display.keypad')}
           <select
             className={field}

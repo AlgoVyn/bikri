@@ -26,6 +26,7 @@ import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { downloadText } from '../lib/download.ts';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
@@ -115,17 +116,7 @@ export function DayClosePage() {
   const noteNeeded =
     !blind && Math.abs(result.difference) >= 10_000 && note.trim() === '';
   const period = (at: number) =>
-    new Intl.DateTimeFormat(
-      i18n.language === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK',
-      {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: data.tz,
-      },
-    ).format(at);
+    formatTimestamp(at, i18n.language, data.tz, 'weekdayTime');
 
   const close = async (force = false) => {
     if (pending || noteNeeded) return;
@@ -283,11 +274,12 @@ export function DayClosePage() {
         icon={<ClockIcon />}
         title={t('office.dayclose.title')}
         hideTitleOnPhone
+        subtitleOnPhone
         subtitle={`${data.deviceName} · ${t('office.dayclose.period')} ${
           data.firstClose
             ? t('office.dayclose.since_start')
             : period(data.periodStart)
-        } → ${period(data.periodEnd)}`}
+        } – ${period(data.periodEnd)}`}
       />
 
       <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
@@ -318,7 +310,7 @@ export function DayClosePage() {
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                [5000, ...(show75 ? [COMMEMORATIVE] : []), 1000, 500, 100, 50],
+                [5000, 1000, 500, 100, ...(show75 ? [COMMEMORATIVE] : []), 50],
                 [20, 10, 5, 2, 1],
               ].map((values, index) => (
                 <section

@@ -29,6 +29,7 @@ import {
 import { beep } from '../sell/beep.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { isLatinName } from './format.ts';
 
 /** Stock count (screens/09): scope → counted list → Finish count. */
 export function StockCountPage() {
@@ -201,7 +202,11 @@ export function StockCountPage() {
               data-testid="count-row"
               className="flex flex-col gap-2 p-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem_minmax(11rem,13rem)_6rem] sm:items-start sm:gap-3"
             >
-              <span className="font-medium">{String(p.name_en)}</span>
+              <span
+                className={`data-name font-medium ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''}`}
+              >
+                {String(p.name_en)}
+              </span>
               <span className="flex items-baseline gap-2 text-small sm:block">
                 <span className="text-text-muted sm:mb-1 sm:block">
                   {t('count.expected')}

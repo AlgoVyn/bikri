@@ -1,13 +1,8 @@
 import type { TFunction } from 'i18next';
 import type { StatementEntry } from '../data/udhaar.ts';
+import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 
-export function localeOf(lang: string): string {
-  return lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK';
-}
-
-const DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
 const SHORT_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
-const TIME_FORMATS = new Map<string, Intl.DateTimeFormat>();
 
 /** Compact `DD/MM/YY` date for the thermal statement; leaves room for description and amount. */
 export function shortDateText(date: string, timeZone: string): string {
@@ -25,36 +20,11 @@ export function shortDateText(date: string, timeZone: string): string {
 }
 
 export function dateText(date: string, lang: string, timeZone: string): string {
-  const locale = localeOf(lang);
-  const key = `${locale}\u0000${timeZone}`;
-  let formatter = DATE_FORMATS.get(key);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone,
-    });
-    DATE_FORMATS.set(key, formatter);
-  }
-  return formatter.format(new Date(`${date}T12:00:00Z`));
+  return formatBusinessDate(date, lang, timeZone, 'date');
 }
 
 export function timeText(at: number, lang: string, timeZone: string): string {
-  const locale = localeOf(lang);
-  const key = `${locale}\u0000${timeZone}`;
-  let formatter = TIME_FORMATS.get(key);
-  if (formatter === undefined) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone,
-    });
-    TIME_FORMATS.set(key, formatter);
-  }
-  return formatter.format(at);
+  return formatTimestamp(at, lang, timeZone, 'datetimeShort');
 }
 
 export function balanceTone(balance: number): string {

@@ -113,11 +113,6 @@ export function BackupsPage() {
               ? t('admin.never')
               : formatWhen(latest.uploaded, lang)
           }
-          hint={
-            latest === undefined
-              ? t('admin.backups_empty')
-              : formatBytes(latest.size, lang)
-          }
           compact
         />
         <StatCard

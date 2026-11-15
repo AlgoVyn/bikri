@@ -8,7 +8,7 @@ Bikri has its **own** visual identity. Dukaan screenshots show behaviour only; d
 2. **Never lose money data.** Save first, then print/share. Show what was saved.
 3. **Warn, don't block** (stock, credit limit) — block only for permissions and invalid money.
 4. **Plain words** in the three languages; no accounting jargon ("Owes you", "You owe", "Paid to suppliers").
-5. **Numbers are sacred**: right-aligned, tabular figures, always `Rs` prefix, never truncated.
+5. **Numbers are sacred**: tabular figures, always `Rs` prefix, never truncated. Table columns and their data share one alignment direction — `start` in every table (left in English and Roman Urdu, right in Urdu), per D-214; amounts inside prose and summary rows stay right-aligned against their label.
 
 ### 1.1 Reference-derived patterns (desktop app only; not its visual identity)
 
