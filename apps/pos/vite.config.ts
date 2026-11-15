@@ -31,10 +31,41 @@ function rewriteFontBase(): Plugin {
   };
 }
 
+/**
+ * Preload the active language catalog. `initI18n` awaits a dynamic import before the
+ * first render, so without this the browser pays a serial round trip after the entry
+ * chunk executes. The hash of each catalog is only known after bundling, so inject a
+ * tiny language-aware modulepreload into index.html.
+ */
+function localePreload(): Plugin {
+  return {
+    name: 'bikri-locale-preload',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const locales: Record<string, string> = {};
+      for (const [file, item] of Object.entries(bundle)) {
+        if (item.type !== 'chunk') continue;
+        const id = item.facadeModuleId ?? '';
+        for (const locale of ['en', 'ur', 'roman-ur']) {
+          if (id.endsWith(`/packages/i18n/${locale}.json`))
+            locales[locale] = file;
+        }
+      }
+      const html = bundle['index.html'];
+      if (html?.type !== 'asset' || typeof html.source !== 'string') return;
+      const placeholder = '<script id="bikri-locale-preload"></script>';
+      if (!html.source.includes(placeholder)) return;
+      const script = `<script id="bikri-locale-preload">try{var l=localStorage.getItem('bikri.language')||'en';var m=${JSON.stringify(locales)};var f=m[l];if(f){var k=document.createElement('link');k.rel='modulepreload';k.crossOrigin='';k.href='${BASE_PATH}/'+f;document.head.appendChild(k)}}catch(e){}</script>`;
+      html.source = html.source.replace(placeholder, script);
+    },
+  };
+}
+
 export default defineConfig({
   base: `${BASE_PATH}/`,
   plugins: [
     rewriteFontBase(),
+    localePreload(),
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: false,

@@ -23,6 +23,9 @@ import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
 import {
   defaultSaleSortDirection,
+  filterSalesHistory,
+  loadSalesHistory,
+  loadSalesLineText,
   type MethodFilter,
   rangeFor,
   type SaleListRow,
@@ -32,7 +35,6 @@ import {
   type SalesPreset,
   salesCsv,
   salesFilterOptions,
-  salesHistory,
   shopTimeZone,
 } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
@@ -178,29 +180,52 @@ export function SalesList({
     preset === 'custom' &&
     (!Number.isFinite(customDays) || customDays < 1 || customDays > 366);
 
-  const data = useLiveQuery(async () => {
-    if (rangeError) return null;
-    const db = getDb();
-    const range = limited
-      ? rangeFor('today', Date.now(), timeZone)
-      : rangeFor(preset, Date.now(), timeZone, custom);
-    const history = await salesHistory(db, {
-      ...range,
-      query: deferredQuery,
-      method: method || null,
-      status: status || null,
-      staffId: staffId || null,
-      deviceId: deviceId || null,
-      branchId: limited ? branchId : null,
-      sort,
-      direction,
-    });
-    return { ...history, timeZone, range };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `today` changes at midnight and must rebuild the range
+  const range = useMemo(
+    () =>
+      limited
+        ? rangeFor('today', Date.now(), timeZone)
+        : rangeFor(preset, Date.now(), timeZone, custom),
+    [limited, preset, custom.from, custom.to, timeZone, today],
+  );
+  const history = useLiveQuery(
+    () => (rangeError ? null : loadSalesHistory(getDb(), range)),
+    [range.from, range.to, rangeError],
+  );
+  const hasQuery = deferredQuery.trim() !== '';
+  // Only a typed search needs line names/SKUs; the normal list does not read lines.
+  const lineText = useLiveQuery(
+    () =>
+      hasQuery
+        ? loadSalesLineText(getDb(), range)
+        : Promise.resolve(new Map<string, string>()),
+    [range.from, range.to, hasQuery],
+  );
+  const data = useMemo(() => {
+    if (history === null || history === undefined) return history;
+    return {
+      ...filterSalesHistory(
+        history,
+        {
+          ...range,
+          query: deferredQuery,
+          method: method || null,
+          status: status || null,
+          staffId: staffId || null,
+          deviceId: deviceId || null,
+          branchId: limited ? branchId : null,
+          sort,
+          direction,
+        },
+        lineText,
+      ),
+      timeZone,
+      range,
+    };
   }, [
-    preset,
-    custom.from,
-    custom.to,
-    rangeError,
+    history,
+    lineText,
+    range,
     deferredQuery,
     method,
     status,
@@ -211,7 +236,6 @@ export function SalesList({
     limited,
     branchId,
     timeZone,
-    today,
   ]);
   const options = useLiveQuery(() => salesFilterOptions(getDb()), []) ?? {
     staff: [],

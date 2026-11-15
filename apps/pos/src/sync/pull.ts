@@ -88,6 +88,9 @@ export async function pullAll(
     );
     if (!res.has_more) break;
   }
+  // One signal per completed pull, not one per page: Home's attention refresh and the
+  // "last pull" card must not re-run while a 200-page backlog is still downloading.
+  await setKv(db, 'last_pull_at', Date.now());
   await settleRecovery(db);
   return serverTime;
 }
@@ -146,7 +149,6 @@ async function applyPage(
     await db.transaction('rw', mergeScope(tbls), async (tx) => {
       await mergeRows(tx, rows, { caches: true });
       await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
-      await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
     });
     clearReaderCaches(tbls);
     return;
@@ -178,7 +180,6 @@ async function applyPage(
       value: [...(stored?.value ?? []), ...errors].slice(-50),
     });
     await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
-    await tx.table('kv').put({ key: 'last_pull_at', value: Date.now() });
   });
   clearReaderCaches(tbls);
 }

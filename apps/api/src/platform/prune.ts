@@ -59,18 +59,41 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const cutoff = now - 30 * DAY;
 
   // 1–2. change_log older than 30 days, per tenant, round-robin from meta.prune_cursor.
-  const [targets, cursorRow] = await calls.run(() =>
+  // One indexed `MAX(seq)` per tenant through `change_log_prune (tenant_id, at, seq)`,
+  // not a full scan of every old row to group by tenant.
+  const [tenantRows, cursorRow] = await calls.run(() =>
     DB.batch([
       DB.prepare(
-        'SELECT tenant_id, MAX(seq) AS target FROM change_log WHERE at < ?1 GROUP BY tenant_id ORDER BY tenant_id',
-      ).bind(cutoff),
+        "SELECT id FROM tenants WHERE status <> 'deleted' ORDER BY id",
+      ),
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
     ]),
   );
-  const list = (targets?.results ?? []) as Array<{
-    tenant_id: string;
-    target: number;
-  }>;
+  const tenantIds = ((tenantRows?.results ?? []) as Array<{ id: string }>).map(
+    (row) => String(row.id),
+  );
+  const targetResults = tenantIds.length
+    ? await calls.run(() =>
+        DB.batch(
+          tenantIds.map((id) =>
+            DB.prepare(
+              'SELECT MAX(seq) AS target FROM change_log WHERE tenant_id = ?1 AND at < ?2',
+            ).bind(id, cutoff),
+          ),
+        ),
+      )
+    : [];
+  const list = tenantIds
+    .map((tenantId, index) => {
+      const targetRow = targetResults[index]?.results?.[0] as
+        | { target?: number | null }
+        | undefined;
+      return {
+        tenant_id: tenantId,
+        target: Number(targetRow?.target ?? 0),
+      };
+    })
+    .filter((row) => row.target > 0);
   const cursor = String(
     (cursorRow?.results?.[0] as { value?: string } | undefined)?.value ?? '',
   );

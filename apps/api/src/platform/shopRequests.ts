@@ -699,7 +699,7 @@ export async function approveShopRequest(
           slug,
           display_name: row.shop_name,
           owner_email: row.email,
-          daily_write_budget: input.daily_write_budget ?? 18_000,
+          daily_write_budget: input.daily_write_budget ?? 19_500,
           note: [
             `Shop request from ${row.owner_name}`,
             row.phone,

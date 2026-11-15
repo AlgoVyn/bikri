@@ -5,6 +5,7 @@ import type { OutboxEntry, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
   buttonDangerQuiet,
@@ -43,7 +44,14 @@ export function SyncPage() {
   const { staff, role } = useCurrentStaff();
   const staffId = staff ? String(staff.id) : null;
   const { run, dialog } = useShopAdmin(db, staffId);
-  const sync = useSyncState();
+  const sync = useSyncState(
+    useShallow((state) => ({
+      phase: state.phase,
+      lastSyncAt: state.lastSyncAt,
+      quotaUntil: state.quotaUntil,
+      error: state.error,
+    })),
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState<{

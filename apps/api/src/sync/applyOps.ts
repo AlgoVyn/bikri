@@ -116,6 +116,26 @@ function planOp(
 
   const row = op.row ?? {};
   const id = String(row.id);
+  // Older tills do not send the denormalised date; derive it from the parent sale so
+  // their lines still join date-range reports after they update (D-228).
+  if (
+    tbl === 'sale_lines' &&
+    op.kind === 'insert' &&
+    (typeof row.business_date !== 'string' || row.business_date === '')
+  ) {
+    const saleId = typeof row.sale_id === 'string' ? row.sale_id : '';
+    const parent =
+      group.find(
+        (candidate) =>
+          candidate.tbl === 'sales' &&
+          candidate.kind !== 'delete' &&
+          candidate.row?.id === saleId,
+      )?.row ??
+      look.sales.get(saleId) ??
+      look.pushedSales.get(saleId);
+    if (parent && typeof parent.business_date === 'string')
+      row.business_date = parent.business_date;
+  }
   const cols = writableColumns(tbl, row).filter((c) => c !== 'id');
 
   if (op.kind === 'insert') {

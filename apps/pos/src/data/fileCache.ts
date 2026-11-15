@@ -8,6 +8,16 @@ import { BASE_PATH } from '@bikri/core';
 export const FILE_CACHE = 'bikri-files';
 export const FILE_CACHE_MAX = 2000;
 
+/** `cache.keys()` walks every entry; prune once per session and then every 50 puts. */
+let putsSincePrune = 0;
+const PRUNE_EVERY = 50;
+
+async function pruneFileCache(cache: Cache): Promise<void> {
+  const keys = await cache.keys();
+  for (const old of keys.slice(0, Math.max(0, keys.length - FILE_CACHE_MAX)))
+    await cache.delete(old);
+}
+
 /** Synthetic request URL for a tenant's relative key (never fetched from the network). */
 export function fileCacheUrl(tenantId: string, key: string): string {
   const path = key
@@ -42,9 +52,10 @@ export async function putFile(
       headers: { 'content-type': blob.type || 'application/octet-stream' },
     }),
   );
-  const keys = await cache.keys();
-  for (const old of keys.slice(0, Math.max(0, keys.length - FILE_CACHE_MAX)))
-    await cache.delete(old);
+  // Listing the cache on every image put is O(n) per image; at 2,000 entries a
+  // 1,000-photo import walked the whole cache 1,000 times. Prune periodically.
+  if (putsSincePrune % PRUNE_EVERY === 0) await pruneFileCache(cache);
+  putsSincePrune += 1;
 }
 
 export async function getFile(

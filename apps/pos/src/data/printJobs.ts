@@ -91,12 +91,13 @@ export function latestUnresolvedFailed(
 
 /** Failed jobs that a later successful job for the same document has not superseded. */
 export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
-  // One scan, not one indexed query per failed document. A failed print is rare,
-  // but a misconfigured printer can leave thousands and the shell reads this on
-  // every print_jobs change; opening a query per document made that path 1 s+.
-  const jobs = await db.print_jobs
-    .where('status')
-    .anyOf('failed', 'done')
-    .toArray();
-  return unresolvedFailed(jobs).length;
+  // Two native index reads, not `anyOf('failed', 'done')`. Dexie's anyOf adds a
+  // cursor algorithm, so count/toArray fall back to one request per row; on a
+  // status index with thousands of duplicates that is quadratic and made the
+  // shell's printer dot slower than the old per-document query (D-228).
+  const [failed, done] = await Promise.all([
+    db.print_jobs.where('status').equals('failed').toArray(),
+    db.print_jobs.where('status').equals('done').toArray(),
+  ]);
+  return unresolvedFailed([...failed, ...done]).length;
 }

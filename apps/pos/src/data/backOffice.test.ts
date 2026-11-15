@@ -62,6 +62,7 @@ function lineRow(
     sale_id: saleId,
     line_no: 1,
     product_id: null,
+    business_date: '2026-10-27',
     name_snapshot: 'Item',
     sku_snapshot: '',
     qty_milli: 1000,

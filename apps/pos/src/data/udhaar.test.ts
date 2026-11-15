@@ -222,6 +222,113 @@ describe('udhaar data', () => {
     expect(op?.row?.updated_by).toBe('staff-1');
   });
 
+  it('refreshes promises at most once per business day', async () => {
+    const { db, ctx } = await setup('promise-gate');
+    const ali = await customer(db);
+    await udhaarSale(db, ctx, ali.id, 100000);
+    await createPromise(
+      db,
+      { customerId: ali.id, promisedOn: '2026-10-26', amount: null },
+      'st-1',
+      { today: '2026-10-25', now: NOW },
+    );
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+    ).toBe(1);
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+    ).toBe(0);
+  });
+
+  it('pages a long statement and keeps every row for an export', async () => {
+    const { db } = await setup('statement-page');
+    const customerId = 'long-customer';
+    await db.ledger_entries.bulkAdd(
+      Array.from({ length: 250 }, (_, i) => ({
+        id: `entry-${i}`,
+        party_type: 'customer',
+        party_id: customerId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW + i,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      })) as never,
+    );
+    const page = await customerStatement(db, customerId, undefined, 100);
+    expect(page.rows).toHaveLength(100);
+    expect(page.hasMore).toBe(true);
+    expect(page.rows.at(-1)?.balance).toBe(250_000);
+    expect(page.openingBalance).toBe(150_000);
+    const full = await customerStatement(
+      db,
+      customerId,
+      undefined,
+      Number.POSITIVE_INFINITY,
+    );
+    expect(full.rows).toHaveLength(250);
+    expect(full.hasMore).toBe(false);
+  });
+
+  it('uses the cached balance for a short statement page', async () => {
+    const { db } = await setup('statement-cache');
+    const customerId = 'short-customer';
+    await db.ledger_entries.bulkAdd([
+      {
+        id: 'short-1',
+        party_type: 'customer',
+        party_id: customerId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      },
+      {
+        id: 'short-2',
+        party_type: 'customer',
+        party_id: customerId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW + 1,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      },
+    ] as never);
+    await db.party_balances.put({
+      party_type: 'customer',
+      party_id: customerId,
+      balance: 2000,
+      last_activity_at: NOW,
+      oldest_unpaid_at: NOW,
+    });
+    const page = await customerStatement(db, customerId, undefined, 100);
+    expect(page.hasMore).toBe(false);
+    expect(page.balance).toBe(2000);
+    expect(page.openingBalance).toBe(0);
+  });
+
   it('AC 5: chase groups sum to the total, promises due at the top', async () => {
     const { db, ctx } = await setup('chase');
     const a = await customer(db, 'A', '');
@@ -768,5 +875,16 @@ describe('udhaar branch coverage', () => {
       'group,name,phone,balance,age_days,last_payment',
     );
     expect(reminderLink('not-a-phone', 'x')).toBeNull();
+  });
+
+  it('returns an empty statement for a customer with no ledger', async () => {
+    const { db } = await setup('statement-empty');
+    expect(await customerStatement(db, 'missing')).toEqual({
+      rows: [],
+      openingBalance: 0,
+      balance: 0,
+      lastPaymentAt: null,
+      hasMore: false,
+    });
   });
 });

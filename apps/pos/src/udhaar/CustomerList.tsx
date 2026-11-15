@@ -1,7 +1,6 @@
-import { businessDate } from '@bikri/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -17,15 +16,17 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
 import {
   type CustomerFilter,
   type CustomerSort,
-  customerList,
   customersCsv,
   defaultCustomerSortDirection,
+  filterCustomerList,
+  loadCustomerListData,
   refreshPromises,
 } from '../data/udhaar.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
@@ -76,33 +77,34 @@ export function UdhaarList({
   const [newOpen, setNewOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const timeZone = useShopTimeZone();
+  const { today } = useBusinessDates(timeZone);
   useEffect(() => {
     if (!canEditPromises) return;
-    void (async () => {
-      const db = getDb();
-      const tz = await shopTimeZone(db);
-      await refreshPromises(db, {
-        today: businessDate(Date.now(), tz),
-        actor: staff?.id ?? null,
-      });
-    })().catch(() => undefined);
-  }, [canEditPromises, staff?.id]);
+    void refreshPromises(getDb(), {
+      today,
+      actor: staff?.id ?? null,
+    }).catch(() => undefined);
+  }, [canEditPromises, staff?.id, today]);
 
-  const data = useLiveQuery(async () => {
-    const db = getDb();
-    const tz = await shopTimeZone(db);
-    const today = businessDate(Date.now(), tz);
-    return {
-      ...(await customerList(db, {
-        query: deferredQuery,
-        filter,
-        sort,
-        direction,
-        today,
-      })),
-      tz,
-    };
-  }, [deferredQuery, filter, sort, direction]);
+  // Load the directory once per change; a keystroke only filters/sorts in memory.
+  const directory = useLiveQuery(
+    () => loadCustomerListData(getDb(), today),
+    [today],
+  );
+  const data = useMemo(
+    () =>
+      directory
+        ? filterCustomerList(directory, {
+            query: deferredQuery,
+            filter,
+            sort,
+            direction,
+            today,
+          })
+        : undefined,
+    [directory, deferredQuery, filter, sort, direction, today],
+  );
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
@@ -134,8 +136,6 @@ export function UdhaarList({
     () => searchRef.current?.focus(),
     { inFields: true },
   );
-  const today = data ? businessDate(Date.now(), data.tz) : '';
-
   const activeFilterCount =
     (filter === 'all' ? 0 : 1) +
     (sort === 'balance' && direction === 'desc' ? 0 : 1);
@@ -193,7 +193,7 @@ export function UdhaarList({
                   data &&
                   downloadText(
                     'bikri-udhaar.csv',
-                    customersCsv(data.rows, data.tz),
+                    customersCsv(data.rows, timeZone),
                   )
                 }
               >
@@ -504,7 +504,7 @@ export function UdhaarList({
                             {dateText(
                               String(row.promise.promised_on),
                               i18n.language,
-                              data.tz,
+                              timeZone,
                             )}
                           </span>
                         </span>

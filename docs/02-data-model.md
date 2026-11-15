@@ -1395,6 +1395,68 @@ ALTER TABLE tenants ADD COLUMN file_bytes INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE tenants ADD COLUMN files_initialized INTEGER NOT NULL DEFAULT 0;
 ```
 
+### 2.14 Sale-line business date (migration `0015_sale_line_business_date.sql`)
+
+Home's today summary, the 30-day best sellers, Sales search and product detail need the
+lines of a business-date range. Without a date on `sale_lines`, those reads fell back to
+every line the shop had ever written once a range crossed 100 bills. The column is derived
+from the parent sale; the till sends it and `applyOps` fills it from the parent when an
+older client omits it. The one-time backfill temporarily drops the append-only UPDATE
+trigger, updates every line from its sale, and recreates the trigger before the migration
+ends. D1 only stores the column (the server never queries lines by product or date); the till's Dexie V7 index serves the range and product screens. The migration also drops the unused `sale_lines_product` D1 index. Additive only; `SCHEMA_VERSION` is unchanged.
+
+```sql
+-- D-228: denormalise the sale's business date onto each sale line.
+--
+-- The till's Sales list, Home summary, 30-day best sellers and product detail all
+-- needed lines for a business-date range, but sale_lines had no date column. They
+-- therefore scanned every line the shop had ever written once a range crossed 100
+-- bills. The column is derived from the parent sale; clients send it, and applyOps
+-- fills it from the parent when an older client omits it.
+--
+-- sale_lines is append-only. The one-time backfill needs the UPDATE trigger out of
+-- the way; it is recreated immediately below, before the migration ends.
+DROP TRIGGER IF EXISTS sale_lines_append_only_update;
+
+ALTER TABLE sale_lines ADD COLUMN business_date TEXT NOT NULL DEFAULT '';
+
+UPDATE sale_lines
+SET business_date = (
+  SELECT s.business_date
+  FROM sales s
+  WHERE s.tenant_id = sale_lines.tenant_id AND s.id = sale_lines.sale_id
+);
+
+CREATE TRIGGER sale_lines_append_only_update
+BEFORE UPDATE ON sale_lines
+BEGIN
+  SELECT RAISE(ABORT, 'sale_lines is append-only');
+END;
+
+-- The server never queries sale_lines by product or date (the till does, in Dexie);
+-- drop the unused product index and keep D1 writes low. The local V7 index
+-- [product_id+business_date] serves the product screen.
+DROP INDEX IF EXISTS sale_lines_product;
+```
+
+
+### 2.15 Change-log prune index (migration `0016_change_log_prune_index.sql`)
+
+The nightly prune groups old change rows by tenant and takes `MAX(seq)`. The old
+`change_log_at` index still had to look up each row's tenant and seq. A covering
+`(at, tenant_id, seq)` index answers the group and maximum from the index alone.
+Additive only; `SCHEMA_VERSION` is unchanged.
+
+```sql
+-- D-228: covering index for the nightly change_log prune.
+--
+-- The prune takes `MAX(seq)` for one tenant and `at < cutoff`. A tenant-leading
+-- covering index answers that from the index alone; the old `change_log_at` index
+-- still had to look up each row's tenant and seq. Additive only; SCHEMA_VERSION is
+-- unchanged.
+CREATE INDEX change_log_prune ON change_log (tenant_id, at, seq);
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1417,12 +1479,12 @@ export const DEXIE_SCHEMA_V1 = {
   sync_conflicts: 'id, row_id, at',   // pulled read-only
   // ledger
   sales: 'id, &invoice_no, business_date, customer_id, created_at, [device_id+invoice_seq], status',
-  sale_lines: 'id, sale_id, product_id',
-  payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at]',
+  sale_lines: 'id, sale_id, product_id, business_date, [product_id+business_date]', // V7 adds the sale's business date and its product index
+  payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
   refunds: 'id, sale_id, business_date, [device_id+created_at]',
   refund_lines: 'id, refund_id, sale_line_id',
   sale_voids: 'id, &sale_id',
-  ledger_entries: 'id, [party_type+party_id+created_at], source_id',
+  ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id', // V7 adds the business-date page index
   stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date', // V4 adds [ref_type+ref_id] (refund/void restock)
   purchases: 'id, [supplier_id+created_at], business_date',
   purchase_lines: 'id, purchase_id, product_id',

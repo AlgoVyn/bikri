@@ -520,24 +520,18 @@ function rangeEpochs(
   return { start, end };
 }
 
-export async function auditList(
+export async function loadAuditRows(
   db: BikriDb,
-  filters: AuditFilters,
+  from: string,
+  to: string,
 ): Promise<AuditRow[]> {
   const shop = await db.shop.get('shop');
   const timeZone = String(shop?.timezone ?? 'Asia/Karachi');
-  const { start, end } = rangeEpochs(filters, timeZone);
-  const rows = (
-    await db.audit_log
-      .where('created_at')
-      .between(start, end, true, true)
-      .toArray()
-  ).filter(
-    (row) =>
-      (!filters.action || row.action === filters.action) &&
-      (!filters.staffId || row.staff_id === filters.staffId) &&
-      (!filters.deviceId || row.device_id === filters.deviceId),
-  );
+  const { start, end } = rangeEpochs({ from, to }, timeZone);
+  const rows = await db.audit_log
+    .where('created_at')
+    .between(start, end, true, true)
+    .toArray();
   const staff = await db.staff.bulkGet([
     ...new Set(rows.map((row) => String(row.staff_id))),
   ]);
@@ -570,6 +564,29 @@ export async function auditList(
       ),
       summary: auditSummary(row),
     }));
+}
+
+/** Pure action/staff/device filter for an already loaded audit range. */
+export function filterAuditRows(
+  rows: readonly AuditRow[],
+  filters: AuditFilters,
+): AuditRow[] {
+  return rows.filter(
+    (entry) =>
+      (!filters.action || entry.row.action === filters.action) &&
+      (!filters.staffId || entry.row.staff_id === filters.staffId) &&
+      (!filters.deviceId || entry.row.device_id === filters.deviceId),
+  );
+}
+
+export async function auditList(
+  db: BikriDb,
+  filters: AuditFilters,
+): Promise<AuditRow[]> {
+  return filterAuditRows(
+    await loadAuditRows(db, filters.from, filters.to),
+    filters,
+  );
 }
 
 export function auditCsv(rows: readonly AuditRow[], timeZone: string): string {

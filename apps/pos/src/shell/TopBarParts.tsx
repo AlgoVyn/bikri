@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import {
   ChevronRightIcon,
   InfoIcon,
@@ -51,7 +52,13 @@ export function useOnline(): boolean {
 export function useSyncStatus() {
   const { t } = useTranslation();
   const online = useOnline();
-  const sync = useSyncState();
+  const sync = useSyncState(
+    useShallow((state) => ({
+      phase: state.phase,
+      progress: state.progress,
+      error: state.error,
+    })),
+  );
   const counts = useLiveQuery(async () => {
     const db = getDb();
     const [pending, failed, status, lastSync] = await Promise.all([

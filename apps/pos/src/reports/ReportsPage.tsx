@@ -171,6 +171,10 @@ export function ReportsPage() {
       db.products.count(),
       db.customers.count(),
     ]);
+    // Coalesce a burst of invalidations (a pull page, a sale, a settings write) before
+    // asking the worker. The worker keeps only the latest pending request, so a 200-page
+    // pull can no longer queue 200 full bundles.
+    await new Promise((resolve) => setTimeout(resolve, 250));
     const worker = workerRef.current;
     let bundle: ReportBundle;
     let previous: ReportSummary | undefined;

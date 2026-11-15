@@ -10,7 +10,7 @@ import {
 } from './client.ts';
 
 /** Uploads pending photos/logos; a 4xx marks the entry failed, network errors leave it pending. */
-export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
+export async function uploadQueued(db: BikriDb, max = 30): Promise<number> {
   const token = await deviceToken(db);
   if (!token) return 0;
   const pending = await db.file_queue
@@ -18,9 +18,8 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
     .equals('pending')
     .limit(max)
     .toArray();
-  let done = 0;
-  for (const e of pending) {
-    if (e.id === undefined) continue;
+  const uploadOne = async (e: (typeof pending)[number]): Promise<boolean> => {
+    if (e.id === undefined) return false;
     const id = e.kind === 'logo' ? 'shop' : e.target_id;
     let res: Response;
     try {
@@ -43,8 +42,7 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
     }
     if (res.ok) {
       await db.file_queue.delete(e.id);
-      done += 1;
-      continue;
+      return true;
     }
     const body = (await res.json().catch(() => null)) as {
       error?: { code?: string; message?: string };
@@ -67,6 +65,16 @@ export async function uploadQueued(db: BikriDb, max = 10): Promise<number> {
       );
     }
     await db.file_queue.update(e.id, { status: 'failed' });
+    return false;
+  };
+  // Three concurrent uploads: a 1,000-photo import used to take 100 sync cycles
+  // (10 serial files each). The server reserves R2 usage atomically, so parallel
+  // uploads cannot overrun the per-shop cap.
+  let done = 0;
+  for (let at = 0; at < pending.length; at += 3) {
+    const batch = pending.slice(at, at + 3);
+    const results = await Promise.all(batch.map((entry) => uploadOne(entry)));
+    done += results.filter(Boolean).length;
   }
   return done;
 }

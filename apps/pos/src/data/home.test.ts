@@ -96,4 +96,80 @@ describe('home attention data', () => {
     expect(items).toContainEqual({ kind: 'low_stock', count: 1 });
     expect(items).toContainEqual({ kind: 'over_limit', count: 1 });
   });
+
+  it('reports sync and clock attention for an enrolled till', async () => {
+    const db = await readyDb('home-sync');
+    await db.kv.put({ key: 'device_token', value: 'token' });
+    await db.kv.put({ key: 'clock_skew_ms', value: 10 * 60_000 });
+    await db.kv.put({ key: 'last_pull_at', value: NOW - 8 * 86_400_000 });
+    const items = await attentionItems(db, {
+      today: '2026-10-27',
+      yesterday: '2026-10-26',
+      deviceId: 'dev-1',
+      isOwner: true,
+      now: NOW,
+    });
+    expect(items).toContainEqual({ kind: 'clock_wrong' });
+    expect(items).toContainEqual({
+      kind: 'sync_stale',
+      days: 8,
+      severe: false,
+    });
+  });
+
+  it('only recomputes attention sections whose tables changed', async () => {
+    const db = await readyDb('home-scope');
+    await db.customers.add({
+      id: 'c-over',
+      name: 'Over',
+      credit_limit: 1000,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    });
+    await db.party_balances.put({
+      party_type: 'customer',
+      party_id: 'c-over',
+      balance: 2000,
+      last_activity_at: NOW,
+      oldest_unpaid_at: NOW,
+    });
+    await db.products.add({
+      id: 'p-low',
+      name_en: 'Low',
+      min_stock_milli: 5000,
+      track_stock: 1,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    });
+    await db.stock_levels.put({ product_id: 'p-low', on_hand_milli: 1000 });
+    const opts = {
+      today: '2026-10-27',
+      yesterday: '2026-10-26',
+      deviceId: 'dev-1',
+      isOwner: true,
+      now: NOW,
+    };
+    expect(
+      (await attentionItems(db, opts, new Set(['products']))).map(
+        (item) => item.kind,
+      ),
+    ).toEqual(['low_stock']);
+    expect(
+      (await attentionItems(db, opts, new Set(['customers']))).map(
+        (item) => item.kind,
+      ),
+    ).toEqual(['over_limit']);
+    expect(await attentionItems(db, opts, new Set(['print_jobs']))).toEqual([]);
+    expect(await attentionItems(db, opts, new Set(['promises']))).toEqual([]);
+    expect(await attentionItems(db, opts, new Set(['held_bills']))).toEqual([]);
+    expect(await attentionItems(db, opts, new Set(['sync_conflicts']))).toEqual(
+      [],
+    );
+    expect(await attentionItems(db, opts, new Set(['sales']))).toEqual([]);
+    expect(await attentionItems(db, opts, new Set(['outbox']))).toEqual([]);
+  });
 });

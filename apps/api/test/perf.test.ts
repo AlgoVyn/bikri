@@ -318,8 +318,8 @@ describe('T-062 performance', () => {
         .first<{ rows_written: number }>();
       // 150 reference bills incl. indexes and change_log must fit daily_write_budget (D-076).
       expect(usage, shop.slug).toBeDefined();
-      // T-062 measured ~117 rows/bill; the D-225 stock-cache trigger adds ~4 per bill.
-      // The default budget is 19,000, so a regression above 130 rows/bill must fail here.
+      // T-062 measured ~127 rows/bill including the D-225 stock-cache trigger.
+      // The default budget is 19,500, so a regression above 130 rows/bill must fail here.
       expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(16_000);
       expect(Number(usage?.rows_written ?? 0)).toBeLessThanOrEqual(19_500);
     }

@@ -35,6 +35,38 @@ describe('mergeRows', () => {
     expect(await db.sale_lines.count()).toBe(250);
   });
 
+  it('merges a 500-row page with a 2k backlog without a status anyOf cursor', {
+    timeout: 30_000,
+  }, async () => {
+    const db = await readyDb('merge-backlog');
+    await db.outbox.bulkAdd(
+      Array.from({ length: 2_000 }, (_, i) => ({
+        op_id: `op-${i}`,
+        tx_id: `tx-${i}`,
+        tbl: 'products',
+        kind: 'upsert',
+        row_id: `product-${i}`,
+        row: { id: `product-${i}` },
+        created_at: 1,
+        status: 'pending',
+        attempts: 0,
+      })) as never,
+    );
+    const rows = Array.from({ length: 500 }, (_, i) => ({
+      tbl: 'sale_lines',
+      row: row(`line-${i}`, {
+        sale_id: `sale-${i}`,
+        qty_milli: 1000,
+        created_at: 1,
+      }),
+    }));
+    const started = performance.now();
+    expect(await merge(db, rows, false)).toBe(500);
+    // anyOf('pending','sending') count + toArray took ~2.3 s here in fake-indexeddb.
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(await db.sale_lines.count()).toBe(500);
+  });
+
   it('keeps the local sale status and updates the local device row', async () => {
     const db = await readyDb('merge-status');
     await db.sales.put({

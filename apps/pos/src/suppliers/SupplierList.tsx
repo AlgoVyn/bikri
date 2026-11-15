@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -16,13 +16,14 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
 import {
   defaultSupplierSortDirection,
+  filterSupplierList,
+  loadSupplierListData,
   type SupplierSort,
-  supplierList,
   suppliersCsv,
 } from '../data/suppliers.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
@@ -62,18 +63,20 @@ export function SupplierList({
     defaultSupplierSortDirection('name'),
   );
   const [newOpen, setNewOpen] = useState(false);
-  const data = useLiveQuery(async () => {
-    const db = getDb();
-    const tz = await shopTimeZone(db);
-    return {
-      ...(await supplierList(db, {
-        query: deferredQuery,
-        sort,
-        direction,
-      })),
-      tz,
-    };
-  }, [deferredQuery, sort, direction]);
+  const timeZone = useShopTimeZone();
+  // Load the supplier directory once; a keystroke only filters/sorts in memory.
+  const directory = useLiveQuery(() => loadSupplierListData(getDb()), []);
+  const data = useMemo(
+    () =>
+      directory
+        ? filterSupplierList(directory, {
+            query: deferredQuery,
+            sort,
+            direction,
+          })
+        : undefined,
+    [directory, deferredQuery, sort, direction],
+  );
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
@@ -333,7 +336,7 @@ export function SupplierList({
                   </span>
                   <span className="min-w-0 text-start text-small text-text-muted sm:text-start">
                     {row.lastDeliveryDate
-                      ? dateText(row.lastDeliveryDate, i18n.language, data.tz)
+                      ? dateText(row.lastDeliveryDate, i18n.language, timeZone)
                       : '—'}
                   </span>
                 </Link>

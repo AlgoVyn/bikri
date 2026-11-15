@@ -349,6 +349,7 @@ export const TABLE_COLUMNS = {
     'serial',
     'warranty_until',
     'created_at',
+    'business_date',
   ],
   payments: [
     'tenant_id',

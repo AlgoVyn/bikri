@@ -24,6 +24,7 @@ import {
   refreshPromises,
   reminderLink,
   reminderMessage,
+  type Statement,
   statementCsv,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
@@ -84,6 +85,10 @@ export function CustomerStatement({
     })().catch(() => undefined);
   }, [canEditPromises, staff?.id]);
 
+  const range =
+    from || to
+      ? { from: from || '0000-01-01', to: to || '9999-12-31' }
+      : undefined;
   const data = useLiveQuery(async () => {
     const db = getDb();
     const customer = await db.customers.get(customerId);
@@ -93,9 +98,8 @@ export function CustomerStatement({
     const statement = await customerStatement(
       db,
       customerId,
-      from || to
-        ? { from: from || '0000-01-01', to: to || '9999-12-31' }
-        : undefined,
+      range,
+      visibleRows,
     );
     const balance = (await db.party_balances.get(['customer', customerId]))
       ?.balance;
@@ -118,7 +122,7 @@ export function CustomerStatement({
       promise: promise ?? null,
       shopName: String(shop?.name ?? ''),
     };
-  }, [customerId, from, to]);
+  }, [customerId, from, to, visibleRows]);
 
   // A new customer or date filter starts again at the newest page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter changes
@@ -148,24 +152,21 @@ export function CustomerStatement({
       date: dateText(today, i18n.language, tz),
     }),
   );
-  const rows = statement.rows.map((row) => ({
-    date: dateText(String(row.entry.business_date), i18n.language, tz),
-    dateShort: shortDateText(String(row.entry.business_date), tz),
-    description: entryDescription(t, row),
-    descriptionShort: entryDescriptionShort(t, row),
-    debit: row.debit,
-    credit: row.credit,
-    balance: row.balance,
-  }));
-  // A long khata renders its newest page first; the printed statement and CSV keep
-  // every row. `shownOpening` carries the balance before the first visible entry.
-  const firstShown = Math.max(0, statement.rows.length - visibleRows);
-  const shownRows =
-    firstShown > 0 ? statement.rows.slice(firstShown) : statement.rows;
-  const shownOpening =
-    firstShown > 0
-      ? (statement.rows[firstShown - 1]?.balance ?? 0)
-      : statement.openingBalance;
+  const mapRows = (value: Statement) =>
+    value.rows.map((row) => ({
+      date: dateText(String(row.entry.business_date), i18n.language, tz),
+      dateShort: shortDateText(String(row.entry.business_date), tz),
+      description: entryDescription(t, row),
+      descriptionShort: entryDescriptionShort(t, row),
+      debit: row.debit,
+      credit: row.credit,
+      balance: row.balance,
+    }));
+  const rows = mapRows(statement);
+  // The data layer returns the newest page; the printed statement and CSV load every
+  // row separately, so paging the screen does not truncate an export.
+  const shownRows = statement.rows;
+  const shownOpening = statement.openingBalance;
   const meta = {
     shopName,
     customerName: name,
@@ -190,29 +191,40 @@ export function CustomerStatement({
       }),
     },
   };
+  const fullStatement = () =>
+    customerStatement(getDb(), customerId, range, Number.POSITIVE_INFINITY);
+  const fullMeta = async () => {
+    const full = await fullStatement();
+    return {
+      ...meta,
+      rows: mapRows(full),
+      openingBalance: full.openingBalance,
+    };
+  };
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    const full = await fullStatement();
     downloadText(
       `statement-${name.replace(/\s+/gu, '-')}.csv`,
-      statementCsv(rows),
+      statementCsv(mapRows(full)),
     );
   };
   const exportPdf = async () => {
     downloadBlob(
-      await statementPdf(meta),
+      await statementPdf(await fullMeta()),
       `statement-${name.replace(/\s+/gu, '-')}.pdf`,
     );
   };
   const printStatement = async () => {
     try {
-      await printCustomerStatement(getDb(), meta);
+      await printCustomerStatement(getDb(), await fullMeta());
     } catch (err) {
       toast.push(t(`print.err_${errorCode(err)}`), 'error');
     }
   };
   const share = async () => {
     try {
-      const png = await statementPng(meta);
+      const png = await statementPng(await fullMeta());
       const file = new File([png], `statement-${name}.png`, {
         type: 'image/png',
       });
@@ -498,7 +510,7 @@ export function CustomerStatement({
                     params={{ id: row.saleId }}
                     className="underline"
                   >
-                    {rows[firstShown + index]?.description}
+                    {rows[index]?.description}
                   </Link>
                 ) : (
                   rows[index]?.description
@@ -581,7 +593,7 @@ export function CustomerStatement({
                         params={{ id: row.saleId }}
                         className="underline"
                       >
-                        {rows[firstShown + index]?.description}
+                        {rows[index]?.description}
                       </Link>
                     ) : (
                       rows[index]?.description
@@ -603,7 +615,7 @@ export function CustomerStatement({
         </table>
       </div>
 
-      {firstShown > 0 ? (
+      {statement.hasMore ? (
         <button
           type="button"
           className={buttonQuiet}

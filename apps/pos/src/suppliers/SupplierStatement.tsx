@@ -62,12 +62,12 @@ export function SupplierStatement({
     const shop = await db.shop.get('shop');
     return {
       supplier,
-      statement: await supplierStatement(db, supplierId),
+      statement: await supplierStatement(db, supplierId, visibleRows),
       balance: await supplierBalance(db, supplierId),
       tz,
       shopName: String(shop?.name ?? ''),
     };
-  }, [supplierId]);
+  }, [supplierId, visibleRows]);
 
   useHotkey(
     plainKey('d'),
@@ -92,17 +92,19 @@ export function SupplierStatement({
 
   const { supplier, statement, balance, tz, shopName } = data;
   const name = String(supplier.name);
-  const rows = statement.rows.map((row) => ({
-    date: dateText(String(row.entry.business_date), i18n.language, tz),
-    description: supplierEntryDescription(t, row),
-    got: row.got,
-    paid: row.paid,
-    balance: row.balance,
-  }));
-  // Render the newest page first; the printed statement and CSV keep every row.
-  const firstShown = Math.max(0, statement.rows.length - visibleRows);
-  const shownRows =
-    firstShown > 0 ? statement.rows.slice(firstShown) : statement.rows;
+  const mapRows = (value: typeof statement) =>
+    value.rows.map((row) => ({
+      date: dateText(String(row.entry.business_date), i18n.language, tz),
+      description: supplierEntryDescription(t, row),
+      got: row.got,
+      paid: row.paid,
+      debit: row.got,
+      credit: row.paid,
+      balance: row.balance,
+    }));
+  const rows = mapRows(statement);
+  // The data layer returns the newest page; CSV/PDF/share load every row separately.
+  const shownRows = statement.rows;
   const meta = {
     shopName,
     customerName: name,
@@ -133,15 +135,32 @@ export function SupplierStatement({
       }),
     },
   };
+  const fullStatement = () =>
+    supplierStatement(getDb(), supplierId, Number.POSITIVE_INFINITY);
+  const fullMeta = async () => {
+    const full = await fullStatement();
+    return {
+      ...meta,
+      rows: mapRows(full),
+      openingBalance: full.openingBalance,
+    };
+  };
+  const exportCsv = async () => {
+    const full = await fullStatement();
+    downloadText(
+      `supplier-${name.replace(/\s+/gu, '-')}.csv`,
+      supplierStatementCsv(mapRows(full)),
+    );
+  };
   const exportPdf = async () => {
     downloadBlob(
-      await statementPdf(meta),
+      await statementPdf(await fullMeta()),
       `supplier-${name.replace(/\s+/gu, '-')}.pdf`,
     );
   };
   const share = async () => {
     try {
-      const png = await statementPng(meta);
+      const png = await statementPng(await fullMeta());
       const file = new File([png], `supplier-${name}.png`, {
         type: 'image/png',
       });
@@ -211,12 +230,7 @@ export function SupplierStatement({
                 ) : null}
                 {can('export.data') && rows.length > 0 ? (
                   <ExportMenu
-                    onCsv={() =>
-                      downloadText(
-                        `supplier-${name.replace(/\s+/gu, '-')}.csv`,
-                        supplierStatementCsv(rows),
-                      )
-                    }
+                    onCsv={() => void exportCsv()}
                     onPdf={() => void exportPdf()}
                     onShare={() => void share()}
                   />
@@ -286,7 +300,7 @@ export function SupplierStatement({
                 </span>
               </div>
               <p className="mt-1">
-                {rows[firstShown + index]?.description}
+                {rows[index]?.description}
                 {row.kind === 'purchase' &&
                 row.entry.source_id &&
                 can('purchase.create') &&
@@ -364,7 +378,7 @@ export function SupplierStatement({
                     )}
                   </td>
                   <td className="p-2">
-                    {rows[firstShown + index]?.description}
+                    {rows[index]?.description}
                     {row.kind === 'purchase' &&
                     row.entry.source_id &&
                     can('purchase.create') &&
@@ -395,7 +409,7 @@ export function SupplierStatement({
         </table>
       </section>
 
-      {firstShown > 0 ? (
+      {statement.hasMore ? (
         <button
           type="button"
           className={buttonQuiet}

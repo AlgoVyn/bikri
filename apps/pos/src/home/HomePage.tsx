@@ -47,7 +47,6 @@ type HomeData = {
   printer: boolean;
   salesCount: number;
   today: Awaited<ReturnType<typeof summary>>;
-  cash: number;
   recent: Awaited<ReturnType<typeof recentBills>>;
 };
 
@@ -96,7 +95,15 @@ const ATTENTION_TABLES = new Set([
   'held_bills',
   'sales',
   'day_closes',
-  'outbox',
+]);
+
+/** Stores that can change the expected cash in this device's drawer. */
+const CASH_TABLES = new Set([
+  'payments',
+  'cash_moves',
+  'expenses',
+  'day_closes',
+  'devices',
 ]);
 
 const ATTENTION_LINK: Record<string, string> = {
@@ -146,22 +153,57 @@ export function HomePage() {
 
   const data = useLiveQuery(async (): Promise<HomeData> => {
     const db = getDb();
-    const device = await deviceInfo(db);
     const branch = await defaultBranch(db);
-    const deviceId = device?.id ?? '';
     return {
       branchName: String(branch?.name ?? ''),
       products:
         (await db.products.count()) -
         (await db.products.where('deleted_at').above(0).count()),
       printer: Boolean((await db.kv.get('printer'))?.value),
-      // Index-only count: `status` is indexed, so this does not read every bill row.
-      salesCount: await db.sales.where('status').noneOf(['void']).count(),
+      // Native counts: `noneOf` on the status index falls back to one cursor request
+      // per bill and is quadratic on a busy shop (D-228). The checklist only needs
+      // whether a non-void bill exists, so subtract the native void count.
+      salesCount:
+        (await db.sales.count()) -
+        (await db.sales.where('status').equals('void').count()),
       today: await summary(db, { from: today, to: today }),
-      cash: await expectedCash(db, deviceId),
       recent: await recentBills(db),
     };
   }, [today, yesterday, role]);
+
+  // Expected cash reads every payment/cash move/expense since the last close, so it
+  // is not part of the main live query: a sale re-renders Home but does not re-read a
+  // year of cash rows. It refreshes on a short debounce and once a minute.
+  const [cash, setCash] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const db = getDb();
+        const device = await deviceInfo(db);
+        const value = await expectedCash(db, device?.id ?? '');
+        if (alive) setCash(value);
+      } catch {
+        // The cash card is advisory; keep the last value on a read error.
+      }
+    };
+    const queue = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(), 1_500);
+    };
+    void load();
+    const stop = onLocalWrite((_count, tables) => {
+      if (tables.some((table) => CASH_TABLES.has(table))) queue();
+    });
+    const every = window.setInterval(() => void load(), 60_000);
+    return () => {
+      alive = false;
+      stop();
+      window.clearInterval(every);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   // The attention list needs products, stock levels, promises, balances and sync state,
   // not just today's report. Keeping it in the main live query made every sale re-read
@@ -181,28 +223,38 @@ export function HomePage() {
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const load = async () => {
+    let pendingTables: Set<string> | null = null;
+    const load = async (changed?: ReadonlySet<string>) => {
       try {
         const db = getDb();
         const device = await deviceInfo(db);
-        const items = await attentionItems(db, {
-          today,
-          yesterday,
-          deviceId: device?.id ?? '',
-          isOwner: role === 'owner',
-        });
+        const items = await attentionItems(
+          db,
+          {
+            today,
+            yesterday,
+            deviceId: device?.id ?? '',
+            isOwner: role === 'owner',
+          },
+          changed,
+        );
         if (alive) setAttention(items);
       } catch {
         // An attention row is advisory; a failed read must not break Home.
       }
     };
-    const queue = () => {
+    const queue = (tables: readonly string[]) => {
+      pendingTables = new Set([...(pendingTables ?? []), ...tables]);
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void load(), 250);
+      timer = setTimeout(() => {
+        const changed = pendingTables;
+        pendingTables = null;
+        void load(changed ?? undefined);
+      }, 250);
     };
     void load();
     const stop = onLocalWrite((_count, tables) => {
-      if (tables.some((table) => ATTENTION_TABLES.has(table))) queue();
+      if (tables.some((table) => ATTENTION_TABLES.has(table))) queue(tables);
     });
     const every = window.setInterval(() => void load(), 60_000);
     return () => {
@@ -510,6 +562,7 @@ export function HomePage() {
               {data ? (
                 <RegisterCard
                   data={data}
+                  cash={cash}
                   showCash={can('dayclose.view_expected')}
                   showProfit={can('cost.view')}
                   canClose={can('dayclose.create') && !readOnly}
@@ -788,6 +841,7 @@ function QuickActions({
 
 function RegisterCard({
   data,
+  cash,
   showCash,
   showProfit,
   canClose,
@@ -796,6 +850,7 @@ function RegisterCard({
   onToggleHidden,
 }: {
   data: HomeData;
+  cash: number;
   showCash: boolean;
   showProfit: boolean;
   canClose: boolean;
@@ -864,7 +919,7 @@ function RegisterCard({
                 {t('home.cash_drawer')}
               </dt>
               <dd className="mt-0.5 text-body font-semibold">
-                <MoneyText paisa={data.cash} />
+                <MoneyText paisa={cash} />
               </dd>
             </div>
           ) : null}

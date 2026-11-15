@@ -124,6 +124,29 @@ describe('client', () => {
     // Both `pending` and `sending` count; the oldest entry is the pending one.
     expect(await pendingHeader(db)).toBe('2;100');
   });
+
+  it('reports a 5k backlog with native counts, not an anyOf cursor', {
+    timeout: 30_000,
+  }, async () => {
+    const db = await enrolled('cl-many');
+    await db.outbox.bulkAdd(
+      Array.from({ length: 5_000 }, (_, i) => ({
+        op_id: `op-${i}`,
+        tx_id: `tx-${i}`,
+        tbl: 'categories',
+        kind: 'insert',
+        row_id: `row-${i}`,
+        row: {},
+        created_at: i,
+        status: 'pending',
+        attempts: 0,
+      })) as never,
+    );
+    const started = performance.now();
+    expect(await pendingHeader(db)).toBe('5000;0');
+    // anyOf('pending','sending').count() took ~7.7 s here in fake-indexeddb.
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
 });
 
 describe('push (03 §3, §4.1)', () => {

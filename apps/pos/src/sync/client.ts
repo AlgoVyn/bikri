@@ -49,11 +49,16 @@ export async function pendingHeader(db: BikriDb): Promise<string> {
     return cached.value;
   // `sending` ops are still unpublished: reporting only `pending` would understate the
   // device's backlog exactly while a push is in flight (03 §6).
-  const [count, firstPending, firstSending] = await Promise.all([
-    db.outbox.where('status').anyOf('pending', 'sending').count(),
-    db.outbox.where('status').equals('pending').first(),
-    db.outbox.where('status').equals('sending').first(),
-  ]);
+  // Two native `equals` counts: `anyOf` on a status index adds a cursor algorithm and
+  // becomes one request per row, which stalls every sync request during a backlog (D-228).
+  const [pendingCount, sendingCount, firstPending, firstSending] =
+    await Promise.all([
+      db.outbox.where('status').equals('pending').count(),
+      db.outbox.where('status').equals('sending').count(),
+      db.outbox.where('status').equals('pending').first(),
+      db.outbox.where('status').equals('sending').first(),
+    ]);
+  const count = pendingCount + sendingCount;
   const first = [firstPending, firstSending]
     .filter((entry): entry is OutboxEntry => entry !== undefined)
     .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))[0];

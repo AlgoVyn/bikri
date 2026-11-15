@@ -96,14 +96,22 @@ export async function mergeRows(
     // per key). A small outbox is cheaper to scan once. If the outbox is itself a large
     // offline backlog, keep the keyed probe: reading thousands of full op payloads for
     // every page would be worse.
-    const count = await outbox
-      .where('status')
-      .anyOf('pending', 'sending')
-      .count();
-    pending =
-      count <= 2_000
-        ? await outbox.where('status').anyOf('pending', 'sending').toArray()
-        : await outbox.where('[tbl+row_id]').anyOf(ids).toArray();
+    // Two native counts/reads, not `anyOf('pending','sending')`: Dexie's anyOf falls
+    // back to one cursor request per row on a duplicate-heavy status index (D-228).
+    const [pendingCount, sendingCount] = await Promise.all([
+      outbox.where('status').equals('pending').count(),
+      outbox.where('status').equals('sending').count(),
+    ]);
+    const total = pendingCount + sendingCount;
+    if (total <= 2_000) {
+      const [pendingRows, sendingRows] = await Promise.all([
+        outbox.where('status').equals('pending').toArray(),
+        outbox.where('status').equals('sending').toArray(),
+      ]);
+      pending = [...pendingRows, ...sendingRows];
+    } else {
+      pending = await outbox.where('[tbl+row_id]').anyOf(ids).toArray();
+    }
   }
   const pendingKeys = new Set<string>();
   for (const p of pending) {

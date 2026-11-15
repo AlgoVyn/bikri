@@ -130,6 +130,7 @@ export function saleRows(tenant, bill, products, customer, day) {
     sale_id: saleId,
     line_no: n + 1,
     product_id: products[(bill * 3 + n) % products.length],
+    business_date: isoDate(day),
     name_snapshot: `Product ${(bill * 3 + n) % products.length}`,
     sku_snapshot: `SKU-${tenant}-${(bill * 3 + n) % products.length}`,
     qty_milli: 1000,

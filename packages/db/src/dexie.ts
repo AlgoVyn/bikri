@@ -99,6 +99,25 @@ export const DEXIE_SCHEMA_V6 = {
     'id, sale_id, refund_id, day_close_id, supplier_return_id, status, [status+created_at], created_at',
 } as const;
 
+/**
+ * V7 denormalises the sale's business date onto its lines. Home's today summary, the
+ * 30-day best sellers, Sales search and product detail need lines for a date range;
+ * without this index they scanned every line the shop had ever written.
+ */
+export const DEXIE_SCHEMA_V7 = {
+  ...DEXIE_SCHEMA_V6,
+  sale_lines:
+    'id, sale_id, product_id, business_date, [product_id+business_date]',
+  // `refreshPromises` reads the customer payments since the earliest open promise in
+  // one range instead of one ledger query per customer.
+  payments:
+    'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at',
+  // Statement pages read the latest rows for one party by business date; the old
+  // index only ordered by created_at, so a range/page could not be pushed down.
+  ledger_entries:
+    'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id',
+} as const;
+
 export const LOCAL_ONLY_TABLES = [
   'outbox',
   'kv',
@@ -333,6 +352,35 @@ export class BikriDb extends Dexie {
     this.version(4).stores(DEXIE_SCHEMA_V4);
     this.version(5).stores(DEXIE_SCHEMA_V5);
     this.version(6).stores(DEXIE_SCHEMA_V6);
+    this.version(7)
+      .stores(DEXIE_SCHEMA_V7)
+      .upgrade(async (tx) => {
+        // One-time local backfill for a V6 database. New rows carry the date from the
+        // sale write; pulled rows carry it from the server.
+        const sales = (await tx.table('sales').toArray()) as Array<
+          Record<string, unknown>
+        >;
+        const dates = new Map<string, string>();
+        for (const sale of sales) {
+          const id = sale.id;
+          const date = sale.business_date;
+          if (typeof id === 'string' && typeof date === 'string')
+            dates.set(id, date);
+        }
+        const lines = tx.table('sale_lines') as Table<
+          Record<string, unknown>,
+          string
+        >;
+        await lines.toCollection().modify((line) => {
+          if (
+            typeof line.business_date === 'string' &&
+            line.business_date !== ''
+          )
+            return;
+          const date = dates.get(String(line.sale_id));
+          if (date !== undefined) line.business_date = date;
+        });
+      });
   }
 }
 

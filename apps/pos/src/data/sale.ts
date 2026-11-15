@@ -462,6 +462,7 @@ export async function completeSale(
           sale_id: input.saleId,
           line_no: lineNo,
           product_id: line.product_id,
+          business_date: date,
           name_snapshot: line.name,
           sku_snapshot: line.sku,
           qty_milli: line.qty_milli,

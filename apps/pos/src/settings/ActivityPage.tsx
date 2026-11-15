@@ -1,6 +1,6 @@
 import { businessDate } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -11,7 +11,8 @@ import {
   AUDIT_ACTIONS,
   type AuditFilters,
   auditCsv,
-  auditList,
+  filterAuditRows,
+  loadAuditRows,
 } from '../data/settings.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadText } from '../lib/download.ts';
@@ -55,15 +56,13 @@ function ActivityContent() {
       ),
     };
   }, []);
-  const rows = useLiveQuery(
-    () => auditList(getDb(), filters),
-    [
-      filters.from,
-      filters.to,
-      filters.action,
-      filters.staffId,
-      filters.deviceId,
-    ],
+  const auditRows = useLiveQuery(
+    () => loadAuditRows(getDb(), filters.from, filters.to),
+    [filters.from, filters.to],
+  );
+  const rows = useMemo(
+    () => (auditRows ? filterAuditRows(auditRows, filters) : undefined),
+    [auditRows, filters],
   );
   const update = (patch: Partial<AuditFilters>) =>
     setFilters((current) => ({ ...current, ...patch }));

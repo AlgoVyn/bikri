@@ -79,6 +79,8 @@ export type SupplierStatement = {
   rows: SupplierStatementEntry[];
   openingBalance: number;
   balance: number;
+  /** Older entries exist beyond the requested page. */
+  hasMore: boolean;
 };
 
 export function supplierBalance(db: BikriDb, id: string): Promise<number> {
@@ -97,18 +99,22 @@ async function balancesOf(
   return new Map(rows.map((row) => [row.party_id, row]));
 }
 
-/** Suppliers with balances and last delivery (screens/13). */
-export async function supplierList(
+export type SupplierListData = {
+  rows: SupplierRow[];
+  totalOwed: number;
+  totalCount: number;
+};
+
+export type SupplierListOptions = {
+  query?: string;
+  sort?: SupplierSort;
+  direction?: SortDirection;
+};
+
+/** Loads suppliers, balances and last-delivery dates once; filtering stays in memory. */
+export async function loadSupplierListData(
   src: TableSource,
-  options: {
-    query?: string;
-    sort?: SupplierSort;
-    direction?: SortDirection;
-  } = {},
-): Promise<SupplierList> {
-  const query = (options.query ?? '').trim().toLowerCase();
-  const words = query.split(/\s+/u).filter(Boolean);
-  const digits = query.replace(/\D/gu, '').replace(/^0+/u, '');
+): Promise<SupplierListData> {
   const balances = await balancesOf(src);
   const purchases = await (
     src.table('purchases') as Table<SyncedRow>
@@ -129,7 +135,24 @@ export async function supplierList(
       lastDeliveryDate: last.get(supplier.id) ?? null,
     });
   }
-  const rows = all.filter((row) => {
+  return {
+    rows: all,
+    // screens/13: "total you owe suppliers" is a shop total, not a search result
+    // (same rule as the customer list, D-126).
+    totalOwed: all.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
+    totalCount: all.length,
+  };
+}
+
+/** Pure filter/sort for the loaded supplier directory. */
+export function filterSupplierList(
+  data: SupplierListData,
+  options: SupplierListOptions = {},
+): SupplierList {
+  const query = (options.query ?? '').trim().toLowerCase();
+  const words = query.split(/\s+/u).filter(Boolean);
+  const digits = query.replace(/\D/gu, '').replace(/^0+/u, '');
+  const rows = data.rows.filter((row) => {
     if (query === '') return true;
     const name = String(row.supplier.name ?? '').toLowerCase();
     const phone = String(row.supplier.phone ?? '').replace(/\D/gu, '');
@@ -163,11 +186,17 @@ export async function supplierList(
   });
   return {
     rows,
-    // screens/13: "total you owe suppliers" is a shop total, not a search result
-    // (same rule as the customer list, D-126).
-    totalOwed: all.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
-    totalCount: all.length,
+    totalOwed: data.totalOwed,
+    totalCount: data.totalCount,
   };
+}
+
+/** Convenience wrapper for callers that do not already hold the directory. */
+export async function supplierList(
+  src: TableSource,
+  options: SupplierListOptions = {},
+): Promise<SupplierList> {
+  return filterSupplierList(await loadSupplierListData(src), options);
 }
 
 function clean(input: SupplierInput) {
@@ -294,21 +323,62 @@ export function suppliersCsv(rows: readonly SupplierRow[]): string {
 export async function supplierStatement(
   src: TableSource,
   supplierId: string,
+  limit = Number.POSITIVE_INFINITY,
 ): Promise<SupplierStatement> {
-  const entries = (
-    await (src.table('ledger_entries') as Table<SyncedRow>)
-      .where('[party_type+party_id+created_at]')
-      .between(
-        ['supplier', supplierId, -Infinity],
-        ['supplier', supplierId, Infinity],
-      )
-      .toArray()
-  ).sort(
-    (a, b) =>
-      String(a.business_date).localeCompare(String(b.business_date)) ||
-      n(a.created_at) - n(b.created_at) ||
-      String(a.id).localeCompare(String(b.id)),
+  const base = (src.table('ledger_entries') as Table<SyncedRow>).where(
+    '[party_type+party_id+business_date+created_at]',
   );
+  const page = Number.isFinite(limit)
+    ? await base
+        .between(
+          ['supplier', supplierId, '0000-01-01', 0],
+          ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
+        )
+        .reverse()
+        .limit(Math.max(1, Math.floor(limit)) + 1)
+        .toArray()
+    : await base
+        .between(
+          ['supplier', supplierId, '0000-01-01', 0],
+          ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
+        )
+        .toArray();
+  const hasMore = Number.isFinite(limit) && page.length > limit;
+  const entries = (hasMore ? page.slice(0, limit) : page)
+    .reverse()
+    .sort(
+      (a, b) =>
+        String(a.business_date).localeCompare(String(b.business_date)) ||
+        n(a.created_at) - n(b.created_at) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+  const cachedBalance = (
+    await (src.table('party_balances') as Table<PartyBalance>).get([
+      'supplier',
+      supplierId,
+    ])
+  )?.balance;
+  const balance =
+    cachedBalance ??
+    (hasMore
+      ? (
+          await base
+            .between(
+              ['supplier', supplierId, '0000-01-01', 0],
+              ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
+            )
+            .toArray()
+        ).reduce((sum, entry) => sum + n(entry.amount), 0)
+      : entries.reduce((sum, entry) => sum + n(entry.amount), 0));
+  // Start from the party's current balance and walk the page backwards, so a page
+  // shows the same running balances without reading every earlier entry.
+  const balances = new Array<number>(entries.length);
+  let running = balance;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    balances[index] = running;
+    running -= n(entries[index]?.amount);
+  }
+  const openingBalance = running;
   const idsFor = (type: string): string[] => [
     ...new Set(
       entries
@@ -329,10 +399,8 @@ export async function supplierStatement(
   const payments = await load('payments', idsFor('payment'));
   const returns = await load('supplier_returns', idsFor('supplier_return'));
   const all: SupplierStatementEntry[] = [];
-  let running = 0;
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     const amount = n(entry.amount);
-    running += amount;
     const id = entry.source_id ? String(entry.source_id) : '';
     let kind: SupplierStatementKind = 'adjustment';
     let invoiceNo: string | null = null;
@@ -367,10 +435,10 @@ export async function supplierStatement(
       note: String(entry.note ?? ''),
       got: Math.max(0, amount),
       paid: Math.max(0, -amount),
-      balance: running,
+      balance: balances[index] ?? 0,
     });
   }
-  return { rows: all, openingBalance: 0, balance: running };
+  return { rows: all, openingBalance, balance, hasMore };
 }
 
 export function supplierStatementCsv(

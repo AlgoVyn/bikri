@@ -105,12 +105,14 @@ export async function summary(
     udhaarReceived: 0,
   };
   const saleById = new Map(sales.map((sale) => [String(sale.id), sale]));
-  const saleLines = await rowsForIds(
-    db.sale_lines,
-    'sale_id',
-    (line: SyncedRow) => String(line.sale_id),
-    [...saleById.keys()],
-  );
+  // A sale line carries its sale's business date (D-228), so a range summary reads
+  // only the lines of the selected days instead of every line the shop ever wrote.
+  const saleLines = (
+    await db.sale_lines
+      .where('business_date')
+      .between(range.from, range.to, true, true)
+      .toArray()
+  ).filter((line) => saleById.has(String(line.sale_id)));
   for (const sale of sales) {
     out.sold += n(sale.total);
     out.udhaarGiven += n(sale.udhaar_amount);

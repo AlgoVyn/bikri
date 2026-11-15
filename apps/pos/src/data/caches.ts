@@ -128,12 +128,14 @@ export async function applyLedgerEntry(
 
 /** 02 §3.2: clear both caches and recompute them from movements and ledger entries. */
 export async function rebuildCaches(db: BikriDb): Promise<void> {
+  // Two transactions, not one over four stores: the stock cache and the party cache
+  // are independent and a large restore should not block both sets of live queries
+  // for the whole rebuild. The party pass keeps one party's entries, not every row.
   await db.transaction(
     'rw',
-    [db.stock_levels, db.party_balances, db.stock_movements, db.ledger_entries],
+    [db.stock_levels, db.stock_movements],
     async () => {
       await db.stock_levels.clear();
-      await db.party_balances.clear();
       const stock = new Map<string, number>();
       await db.stock_movements.each((m) => {
         const id = String(m.product_id);
@@ -145,19 +147,40 @@ export async function rebuildCaches(db: BikriDb): Promise<void> {
           on_hand_milli,
         })),
       );
-      const parties = new Map<string, SyncedRow[]>();
-      await db.ledger_entries.each((e) => {
-        const key = `${String(e.party_type)}\u0000${String(e.party_id)}`;
-        const list = parties.get(key) ?? [];
-        list.push(e);
-        parties.set(key, list);
-      });
-      await db.party_balances.bulkPut(
-        [...parties].map(([key, entries]) => {
-          const [type, id] = key.split('\u0000') as [PartyType, string];
-          return balanceOf(type, id, entries);
-        }),
-      );
+    },
+  );
+  // Let live queries and a sale written during a restore run between the two passes.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await db.transaction(
+    'rw',
+    [db.party_balances, db.ledger_entries],
+    async () => {
+      await db.party_balances.clear();
+      // The index is ordered by party then time, so a party's entries are contiguous.
+      // Flush one party at a time instead of retaining every ledger row in a Map.
+      const balances: PartyBalance[] = [];
+      let currentType: PartyType | null = null;
+      let currentId = '';
+      let current: SyncedRow[] = [];
+      const flush = () => {
+        if (currentType !== null && current.length > 0)
+          balances.push(balanceOf(currentType, currentId, current));
+      };
+      await db.ledger_entries
+        .orderBy('[party_type+party_id+created_at]')
+        .each((entry) => {
+          const type = entry.party_type as PartyType;
+          const id = String(entry.party_id);
+          if (type !== currentType || id !== currentId) {
+            flush();
+            currentType = type;
+            currentId = id;
+            current = [];
+          }
+          current.push(entry);
+        });
+      flush();
+      await db.party_balances.bulkPut(balances);
     },
   );
 }

@@ -71,49 +71,72 @@ export async function attentionItems(
     isOwner: boolean;
     now?: number;
   },
+  /** Tables changed by the write that triggered the refresh; undefined = all. */
+  changed?: ReadonlySet<string>,
 ): Promise<AttentionItem[]> {
-  const items: AttentionItem[] = await syncAttention(db, opts.now);
-  const low = await lowStockCount(db);
-  if (low > 0) items.push({ kind: 'low_stock', count: low });
-  const promises = await db.promises
-    .where('[status+promised_on]')
-    .equals(['open', opts.today])
-    .filter((p) => !p.deleted_at)
-    .count();
-  if (promises > 0) items.push({ kind: 'promises_due', count: promises });
-  const customers = (await db.customers.toArray()).filter(
-    (c) =>
-      !c.deleted_at && c.credit_limit !== null && c.credit_limit !== undefined,
-  );
-  const balances = await db.party_balances.bulkGet(
-    customers.map((c) => ['customer', c.id] as [PartyType, string]),
-  );
-  const over = balances.reduce(
-    (count, balance, index) =>
-      (balance?.balance ?? 0) > Number(customers[index]?.credit_limit ?? 0)
-        ? count + 1
-        : count,
-    0,
-  );
-  if (over > 0) items.push({ kind: 'over_limit', count: over });
-  const failed = await unresolvedFailedCount(db);
-  if (failed > 0) items.push({ kind: 'failed_prints', count: failed });
-  if (opts.isOwner) {
+  const wants = (...tables: string[]) =>
+    changed === undefined || tables.some((table) => changed.has(table));
+  const items: AttentionItem[] = wants('outbox', 'kv')
+    ? await syncAttention(db, opts.now)
+    : [];
+  if (wants('products', 'stock_levels')) {
+    const low = await lowStockCount(db);
+    if (low > 0) items.push({ kind: 'low_stock', count: low });
+  }
+  if (wants('promises')) {
+    const promises = await db.promises
+      .where('[status+promised_on]')
+      .equals(['open', opts.today])
+      .filter((p) => !p.deleted_at)
+      .count();
+    if (promises > 0) items.push({ kind: 'promises_due', count: promises });
+  }
+  if (wants('customers', 'party_balances')) {
+    const customers = (await db.customers.toArray()).filter(
+      (c) =>
+        !c.deleted_at &&
+        c.credit_limit !== null &&
+        c.credit_limit !== undefined,
+    );
+    const balances = await db.party_balances.bulkGet(
+      customers.map((c) => ['customer', c.id] as [PartyType, string]),
+    );
+    const over = balances.reduce(
+      (count, balance, index) =>
+        (balance?.balance ?? 0) > Number(customers[index]?.credit_limit ?? 0)
+          ? count + 1
+          : count,
+      0,
+    );
+    if (over > 0) items.push({ kind: 'over_limit', count: over });
+  }
+  if (wants('print_jobs')) {
+    const failed = await unresolvedFailedCount(db);
+    if (failed > 0) items.push({ kind: 'failed_prints', count: failed });
+  }
+  if (opts.isOwner && wants('sync_conflicts')) {
     const conflicts = (await db.sync_conflicts.toArray()).filter(
       (c) => c.resolution === 'needs_owner',
     ).length;
     if (conflicts > 0) items.push({ kind: 'conflicts', count: conflicts });
   }
-  const held = await heldExpiringCount(db, opts.now);
-  if (held > 0) items.push({ kind: 'held_expiring', count: held });
-  const soldYesterday = (
-    await db.sales.where('business_date').equals(opts.yesterday).toArray()
-  ).some((s) => s.device_id === opts.deviceId);
-  const closedYesterday = (
-    await db.day_closes.where('business_date').equals(opts.yesterday).toArray()
-  ).some((d) => d.device_id === opts.deviceId);
-  if (soldYesterday && !closedYesterday)
-    items.push({ kind: 'day_not_closed', date: opts.yesterday });
+  if (wants('held_bills')) {
+    const held = await heldExpiringCount(db, opts.now);
+    if (held > 0) items.push({ kind: 'held_expiring', count: held });
+  }
+  if (wants('sales', 'day_closes')) {
+    const soldYesterday = (
+      await db.sales.where('business_date').equals(opts.yesterday).toArray()
+    ).some((s) => s.device_id === opts.deviceId);
+    const closedYesterday = (
+      await db.day_closes
+        .where('business_date')
+        .equals(opts.yesterday)
+        .toArray()
+    ).some((d) => d.device_id === opts.deviceId);
+    if (soldYesterday && !closedYesterday)
+      items.push({ kind: 'day_not_closed', date: opts.yesterday });
+  }
   return items.slice(0, 5);
 }
 

@@ -8,6 +8,7 @@ import {
   takeRowsRead,
 } from '../platform/readCounter.ts';
 import {
+  invalidateUsage,
   pollAfterMs,
   secondsToUtcMidnight,
   usageStatement,
@@ -158,6 +159,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
     db.prepare('SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?1'),
   );
   const tailResults = await db.batch(tail);
+  invalidateUsage(tenant.id);
   const latest =
     (tailResults.at(-1)?.results?.[0] as { seq?: number | null } | undefined)
       ?.seq ?? tenant.change_log_floor;

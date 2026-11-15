@@ -87,6 +87,7 @@ export async function seedSampleDay(
         sale_id: saleId,
         line_no: 1,
         product_id: product.id,
+        business_date: date,
         name_snapshot: 'Charger',
         sku_snapshot: '',
         qty_milli: qty,

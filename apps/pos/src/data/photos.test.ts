@@ -115,6 +115,14 @@ describe('photo processing (screens/08)', () => {
 });
 
 describe('file cache (01 §PWA, D-092)', () => {
+  it('stores an untyped blob with the fallback content type', async () => {
+    await putFile('shop-a', 'products/P1/untyped.bin', new Blob(['x']));
+    expect((await getFile('shop-a', 'products/P1/untyped.bin'))?.type).toBe(
+      'application/octet-stream',
+    );
+    await deleteFile('shop-a', 'products/P1/untyped.bin');
+  });
+
   it('stores per tenant, so colliding keys in two shops never mix', async () => {
     await putFile('shop-a', 'products/P1/x.webp', blob(10));
     expect((await getFile('shop-a', 'products/P1/x.webp'))?.size).toBe(10);
@@ -128,11 +136,12 @@ describe('file cache (01 §PWA, D-092)', () => {
     expect(await getFile('shop-b', 'products/P1/x.webp')).toBeNull();
   });
 
-  it(`keeps at most ${FILE_CACHE_MAX} entries, dropping the oldest`, async () => {
+  it(`keeps the cache bounded, dropping the oldest`, async () => {
     for (let i = 0; i < FILE_CACHE_MAX + 2; i += 1)
       await cache.put(`u${i}`, new Response('x'));
-    await putFile('a', 'k', blob(1));
-    expect(cache.map.size).toBe(FILE_CACHE_MAX);
+    // The prune is periodic (once per session and every 50 puts), not on every put.
+    for (let i = 0; i < 60; i += 1) await putFile('a', `k${i}`, blob(1));
+    expect(cache.map.size).toBeLessThanOrEqual(FILE_CACHE_MAX + 60);
     expect(cache.map.has('u0')).toBe(false);
   });
 

@@ -164,13 +164,41 @@ export type UsageRow = {
   rows_read: number;
 };
 
+/**
+ * Pull/snapshot pages check the read cap before every page. A 200-page snapshot used
+ * to make 200 identical D1 reads. The value is best-effort across isolates (the quota
+ * already is), and a push clears its own entry.
+ */
+const USAGE_TTL_MS = 2_000;
+const usageCache = new Map<
+  string,
+  { at: number; day: string; value: UsageRow }
+>();
+
+export function invalidateUsage(tenantId: string): void {
+  for (const key of usageCache.keys())
+    if (key.startsWith(`${tenantId}\u0000`)) usageCache.delete(key);
+}
+
 export async function usageToday(
   env: Env,
   tenantId: string,
   now: number,
 ): Promise<UsageRow> {
+  const day = utcDay(now);
+  const key = `${tenantId}\u0000${day}`;
+  const cached = usageCache.get(key);
+  if (cached !== undefined && now - cached.at < USAGE_TTL_MS)
+    return cached.value;
   const row = await usageTodayStatement(env, tenantId, now).first<UsageRow>();
-  return row ?? { pushes: 0, rows_written: 0, rows_read: 0 };
+  const value = row ?? { pushes: 0, rows_written: 0, rows_read: 0 };
+  usageCache.set(key, { at: now, day, value });
+  if (usageCache.size > 1_000) {
+    // Bound the isolate cache on a many-tenant deployment.
+    for (const [oldKey, entry] of usageCache)
+      if (now - entry.at >= USAGE_TTL_MS) usageCache.delete(oldKey);
+  }
+  return value;
 }
 
 /** The same read as `usageToday`, prepared for a caller's batch. */

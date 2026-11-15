@@ -97,6 +97,8 @@ export type Statement = {
   /** Balance today (all entries, not only the range). */
   balance: number;
   lastPaymentAt: number | null;
+  /** Older entries exist beyond the requested page. */
+  hasMore: boolean;
 };
 
 export type StatementCsvRow = {
@@ -157,20 +159,23 @@ async function openPromises(
   return map;
 }
 
-/** Customers with balances, filters and the header cards (screens/12). */
-export async function customerList(
+export type CustomerListData = {
+  /** Every live customer with its cached balance and earliest open promise. */
+  rows: CustomerRow[];
+  /** Customer payments in the selected month (for the header card). */
+  payments: SyncedRow[];
+};
+
+/** Loads the customer directory once; filtering/sorting stays in memory. */
+export async function loadCustomerListData(
   src: TableSource,
-  options: CustomerListOptions,
-): Promise<CustomerList> {
-  const query = (options.query ?? '').trim().toLowerCase();
-  const words = query.split(/\s+/u).filter(Boolean);
-  const digits = query.replace(/\D/gu, '').replace(/^0+/u, '');
+  today: string,
+): Promise<CustomerListData> {
   const balances = await balancesOf(src);
   const promises = await openPromises(src);
   const customers = (
     await (src.table('customers') as Table<MasterRow>).toArray()
   ).filter((c) => !c.deleted_at);
-
   const rows: CustomerRow[] = customers.map((customer) => {
     const balance = balances.get(customer.id);
     const promise = promises.get(customer.id)?.[0] ?? null;
@@ -182,6 +187,30 @@ export async function customerList(
       promise,
     };
   });
+  const month = today.slice(0, 7);
+  const payments = (
+    await (src.table('payments') as Table<SyncedRow>)
+      .where('business_date')
+      .between(`${month}-01`, `${month}-31`, true, true)
+      .toArray()
+  ).filter(
+    (p) =>
+      p.direction === 'in' &&
+      p.purpose === 'customer_payment' &&
+      p.party_type === 'customer',
+  );
+  return { rows, payments };
+}
+
+/** Pure filter/sort for the loaded directory: a keystroke does not touch IndexedDB. */
+export function filterCustomerList(
+  data: CustomerListData,
+  options: CustomerListOptions,
+): CustomerList {
+  const query = (options.query ?? '').trim().toLowerCase();
+  const words = query.split(/\s+/u).filter(Boolean);
+  const digits = query.replace(/\D/gu, '').replace(/^0+/u, '');
+  const { rows, payments } = data;
   const matching = rows.filter((row) => {
     if (query === '') return true;
     const name = String(row.customer.name ?? '').toLowerCase();
@@ -254,25 +283,23 @@ export async function customerList(
     return value === 0 ? byName(a, b) : sign * value;
   });
 
-  const month = options.today.slice(0, 7);
-  const payments = (
-    await (src.table('payments') as Table<SyncedRow>)
-      .where('business_date')
-      .between(`${month}-01`, `${month}-31`, true, true)
-      .toArray()
-  ).filter(
-    (p) =>
-      p.direction === 'in' &&
-      p.purpose === 'customer_payment' &&
-      p.party_type === 'customer',
-  );
-
   return {
     rows: filtered,
     totalOwed: rows.reduce((sum, row) => sum + Math.max(0, row.balance), 0),
     owingCount: rows.filter((row) => row.balance > 0).length,
     receivedThisMonth: payments.reduce((sum, p) => sum + n(p.amount), 0),
   };
+}
+
+/** Convenience wrapper for callers that do not already hold the directory. */
+export async function customerList(
+  src: TableSource,
+  options: CustomerListOptions,
+): Promise<CustomerList> {
+  return filterCustomerList(
+    await loadCustomerListData(src, options.today),
+    options,
+  );
 }
 
 /** One row per customer for the list CSV. */
@@ -328,21 +355,52 @@ export async function customerStatement(
   src: TableSource,
   customerId: string,
   range?: { from: string; to: string },
+  limit = Number.POSITIVE_INFINITY,
 ): Promise<Statement> {
-  const entries = (
-    await (src.table('ledger_entries') as Table<SyncedRow>)
-      .where('[party_type+party_id+created_at]')
-      .between(
-        ['customer', customerId, -Infinity],
-        ['customer', customerId, Infinity],
-      )
-      .toArray()
-  ).sort(
-    (a, b) =>
-      String(a.business_date).localeCompare(String(b.business_date)) ||
-      n(a.created_at) - n(b.created_at) ||
-      String(a.id).localeCompare(String(b.id)),
+  const from = range?.from ?? '0000-01-01';
+  const to = range?.to ?? '9999-12-31';
+  const base = (src.table('ledger_entries') as Table<SyncedRow>).where(
+    '[party_type+party_id+business_date+created_at]',
   );
+  const bounds = [
+    ['customer', customerId, from, 0],
+    ['customer', customerId, to, Number.MAX_SAFE_INTEGER],
+  ] as const;
+  const paged = range === undefined && Number.isFinite(limit);
+  const page = paged
+    ? await base
+        .between(bounds[0], bounds[1])
+        .reverse()
+        .limit(Math.max(1, Math.floor(limit)) + 1)
+        .toArray()
+    : await base.between(bounds[0], bounds[1]).toArray();
+  const hasMore = paged && page.length > limit;
+  const entries = (hasMore ? page.slice(0, limit) : page)
+    .reverse()
+    .sort(
+      (a, b) =>
+        String(a.business_date).localeCompare(String(b.business_date)) ||
+        n(a.created_at) - n(b.created_at) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+  const cachedBalance = (
+    await (src.table('party_balances') as Table<PartyBalance>).get([
+      'customer',
+      customerId,
+    ])
+  )?.balance;
+  const allEntries = () =>
+    base
+      .between(
+        ['customer', customerId, '0000-01-01', 0],
+        ['customer', customerId, '9999-12-31', Number.MAX_SAFE_INTEGER],
+      )
+      .toArray();
+  const balance =
+    cachedBalance ??
+    (hasMore || range !== undefined
+      ? (await allEntries()).reduce((sum, entry) => sum + n(entry.amount), 0)
+      : entries.reduce((sum, entry) => sum + n(entry.amount), 0));
 
   const sourceIds = (type: string) =>
     entries
@@ -388,12 +446,37 @@ export async function customerStatement(
     return row;
   };
 
+  let openingBalance: number;
+  let balances: number[];
+  if (range !== undefined) {
+    // A historical range needs the balance before its first row. Reading the
+    // entries before `from` is bounded by the range the user chose.
+    openingBalance = (
+      await base
+        .between(
+          ['customer', customerId, '0000-01-01', 0],
+          ['customer', customerId, range.from, -1],
+        )
+        .toArray()
+    ).reduce((sum, entry) => sum + n(entry.amount), 0);
+    let running = openingBalance;
+    balances = entries.map((entry) => {
+      running += n(entry.amount);
+      return running;
+    });
+  } else {
+    balances = new Array<number>(entries.length);
+    let running = balance;
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      balances[index] = running;
+      running -= n(entries[index]?.amount);
+    }
+    openingBalance = running;
+  }
   const all: StatementEntry[] = [];
-  let running = 0;
   let lastPaymentAt: number | null = null;
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     const amount = n(entry.amount);
-    running += amount;
     const sourceId = entry.source_id ? String(entry.source_id) : '';
     let kind: StatementKind = 'adjustment';
     let invoiceNo: string | null = null;
@@ -443,27 +526,16 @@ export async function customerStatement(
       note: String(entry.note ?? ''),
       debit: Math.max(0, amount),
       credit: Math.max(0, -amount),
-      balance: running,
+      balance: balances[index] ?? 0,
     });
   }
 
-  const display = range
-    ? all.filter(
-        (row) =>
-          String(row.entry.business_date) >= range.from &&
-          String(row.entry.business_date) <= range.to,
-      )
-    : all;
-  const openingBalance = range
-    ? all
-        .filter((row) => String(row.entry.business_date) < range.from)
-        .reduce((sum, row) => sum + n(row.entry.amount), 0)
-    : 0;
   return {
-    rows: display,
+    rows: all,
     openingBalance,
-    balance: running,
+    balance,
     lastPaymentAt,
+    hasMore,
   };
 }
 
@@ -671,10 +743,19 @@ export async function refreshPromises(
   // Opening the chase list must never write in a read-only shop or on a support device.
   if (await isReadOnly(db)) return 0;
   if ((await db.kv.get('device_kind'))?.value === 'support') return 0;
+  // The docstring says once a day, but every Udhaar screen used to run it on mount.
+  // Gate on the business date before reading promises or payments.
+  const gate = (await db.kv.get('promises_refreshed_on'))?.value;
+  if (gate === options.today) return 0;
   const promises = (await db.promises.toArray()).filter(
     (p) => !p.deleted_at && p.status === 'open',
   );
-  if (promises.length === 0) return 0;
+  const markDone = () =>
+    db.kv.put({ key: 'promises_refreshed_on', value: options.today });
+  if (promises.length === 0) {
+    await markDone();
+    return 0;
+  }
   const now = options.now ?? Date.now();
   const updates: { id: string; status: 'kept' | 'broken' }[] = [];
   const byCustomer = new Map<string, typeof promises>();
@@ -684,30 +765,42 @@ export async function refreshPromises(
     list.push(promise);
     byCustomer.set(key, list);
   }
-  // One bounded ledger read per customer, not one per promise and not the customer's
-  // whole history: the balance is already cached and only payments since the earliest
-  // open promise can have kept it.
+  // One payments range scan, not one ledger query per customer. A customer payment is
+  // an `in` payment with purpose `customer_payment`; its `created_at` is the moment the
+  // promise can count it. Payments are much smaller than the full ledger.
+  const earliest = Math.min(
+    ...promises.map((promise) => n(promise.created_at) || 0),
+  );
+  const payments = await db.payments
+    .where('created_at')
+    .aboveOrEqual(earliest)
+    .toArray();
+  const paymentsByCustomer = new Map<
+    string,
+    { at: number; amount: number }[]
+  >();
+  for (const payment of payments) {
+    if (
+      payment.direction !== 'in' ||
+      payment.purpose !== 'customer_payment' ||
+      payment.party_type !== 'customer' ||
+      typeof payment.party_id !== 'string'
+    )
+      continue;
+    const key = String(payment.party_id);
+    const list = paymentsByCustomer.get(key) ?? [];
+    list.push({ at: n(payment.created_at), amount: n(payment.amount) });
+    paymentsByCustomer.set(key, list);
+  }
   for (const [customerId, customerPromises] of byCustomer) {
-    const since = Math.min(
-      ...customerPromises.map((promise) => n(promise.created_at)),
-    );
-    const entries = await db.ledger_entries
-      .where('[party_type+party_id+created_at]')
-      .between(
-        ['customer', customerId, since],
-        ['customer', customerId, Infinity],
-      )
-      .toArray();
+    const customerPayments = paymentsByCustomer.get(customerId) ?? [];
     const balance =
       (await db.party_balances.get(['customer', customerId]))?.balance ?? 0;
     for (const promise of customerPromises) {
-      const paid = entries
-        .filter(
-          (e) =>
-            e.source_type === 'payment' &&
-            n(e.created_at) >= n(promise.created_at),
-        )
-        .reduce((sum, e) => sum - n(e.amount), 0);
+      const since = n(promise.created_at);
+      const paid = customerPayments
+        .filter((payment) => payment.at >= since)
+        .reduce((sum, payment) => sum + payment.amount, 0);
       const amount =
         promise.amount === null ? null : Number(promise.amount ?? 0);
       if (balance <= 0 || (amount !== null && paid >= amount))
@@ -716,7 +809,10 @@ export async function refreshPromises(
         updates.push({ id: promise.id, status: 'broken' });
     }
   }
-  if (updates.length === 0) return 0;
+  if (updates.length === 0) {
+    await markDone();
+    return 0;
+  }
   // Keep every action under the 200-op limit even when a large shop has many
   // promises going due at once.
   for (let start = 0; start < updates.length; start += 100) {
@@ -734,6 +830,7 @@ export async function refreshPromises(
       },
     );
   }
+  await markDone();
   return updates.length;
 }
 

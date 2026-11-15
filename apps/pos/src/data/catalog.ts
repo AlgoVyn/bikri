@@ -159,14 +159,14 @@ export async function soldByProduct(
     .between(from, to, true, true)
     .toArray();
   const liveSales = sales.filter((sale) => sale.status !== 'void');
-  const saleIds = liveSales.map((sale) => String(sale.id));
-  for (const line of await rowsForIds(
-    db.sale_lines,
-    'sale_id',
-    (row: SyncedRow) => String(row.sale_id),
-    saleIds,
-  )) {
-    if (!line.product_id) continue;
+  const saleIds = new Set(liveSales.map((sale) => String(sale.id)));
+  // The line's own business date (D-228) bounds this to the 30-day window. The old
+  // sale-id list crossed 100 keys on a busy day and scanned every line ever written.
+  for (const line of await db.sale_lines
+    .where('business_date')
+    .between(from, to, true, true)
+    .toArray()) {
+    if (!line.product_id || !saleIds.has(String(line.sale_id))) continue;
     const id = String(line.product_id);
     sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
   }
@@ -519,8 +519,8 @@ export async function productDetail(
   // would make one round trip per chunk on a busy shop.
   const productLines: { line: SyncedRow; sale: SyncedRow }[] = [];
   for (const line of await db.sale_lines
-    .where('product_id')
-    .equals(id)
+    .where('[product_id+business_date]')
+    .between([id, first], [id, last], true, true)
     .toArray()) {
     const sale = byId.get(String(line.sale_id));
     if (!sale) continue;

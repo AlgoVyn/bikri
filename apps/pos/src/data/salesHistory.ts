@@ -78,6 +78,10 @@ export type SaleListRow = {
   refunded: number;
   printFailed: boolean;
   printJobId: string | null;
+  /** Lowercased invoice, customer and line names/SKUs for the in-memory search. */
+  searchText: string;
+  /** Customer phone digits, so "0300…" and "+92300…" both match. */
+  searchDigits: string;
 };
 
 export type SalesDay = {
@@ -182,13 +186,16 @@ function latestSaleJob(
 }
 
 /** A failed job stays red until a later job of the same bill succeeds (screens/10 AC 5). */
-function failedPrint(
-  jobs: readonly PrintJobLite[],
-  saleId: string,
-): { failed: boolean; jobId: string | null } {
+function failedPrintFor(jobs: readonly PrintJobLite[]): {
+  failed: boolean;
+  jobId: string | null;
+} {
   let failed = false;
   let jobId: string | null = null;
-  for (const job of saleJobs(jobs, saleId)) {
+  const ordered = [...jobs].sort(
+    (a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id),
+  );
+  for (const job of ordered) {
     if (job.status === 'failed') {
       failed = true;
       jobId = job.id;
@@ -225,77 +232,24 @@ export async function deviceNameOf(
 }
 
 /** Query text → the sale ids it matches by invoice, customer or product (screens/10). */
-async function matchingSaleIds(
+/** The selected range loaded once; filtering and sorting stay in memory. */
+export type SalesHistoryData = {
+  rows: SaleListRow[];
+  rangeRefunds: SyncedRow[];
+};
+
+/** Reads the selected range once, including the line names/SKUs for search. */
+export async function loadSalesHistory(
   src: TableSource,
-  sales: readonly SyncedRow[],
-  query: string,
-): Promise<Set<string> | null> {
-  const q = query.trim().toLowerCase();
-  if (q === '') return null;
-  const words = q.split(/\s+/u).filter(Boolean);
-  const inRange = new Set(sales.map((s) => s.id));
-  const ids = new Set<string>();
-  for (const sale of sales)
-    if (String(sale.invoice_no).toLowerCase().includes(q)) ids.add(sale.id);
-
-  const digits = q.replace(/\D/gu, '').replace(/^0+/u, '');
-  const customerIds = new Set<string>();
-  for (const c of await (
-    src.table('customers') as Table<MasterRow>
-  ).toArray()) {
-    if (c.deleted_at) continue;
-    const name = String(c.name ?? '').toLowerCase();
-    const phone = String(c.phone ?? '').replace(/\D/gu, '');
-    if (
-      words.every((w) => name.includes(w)) ||
-      (digits.length >= 3 && phone.includes(digits))
-    )
-      customerIds.add(c.id);
-  }
-  if (customerIds.size > 0)
-    for (const sale of sales)
-      if (sale.customer_id && customerIds.has(String(sale.customer_id)))
-        ids.add(sale.id);
-
-  const lines = await rowsAnyOf<SyncedRow>(
-    src.table('sale_lines') as Table<SyncedRow>,
-    'sale_id',
-    sales.map((sale) => String(sale.id)),
-    (line) => String(line.sale_id),
-  );
-  for (const line of lines) {
-    if (!inRange.has(String(line.sale_id))) continue;
-    const name = String(line.name_snapshot ?? '').toLowerCase();
-    const sku = String(line.sku_snapshot ?? '').toLowerCase();
-    const matches =
-      words.every((w) => name.includes(w)) ||
-      (q.length >= 3 && sku.includes(q));
-    if (matches) ids.add(String(line.sale_id));
-  }
-  return ids;
-}
-
-/** Sales list for one filter, newest first, grouped by business date (screens/10). */
-export async function salesHistory(
-  src: TableSource,
-  filter: SalesFilter,
-): Promise<SalesHistory> {
-  let sales = (
-    await (src.table('sales') as Table<SyncedRow>)
-      .where('business_date')
-      .between(filter.from, filter.to, true, true)
-      .toArray()
-  )
-    .filter((s) => !filter.branchId || s.branch_id === filter.branchId)
-    .filter((s) => !filter.staffId || s.staff_id === filter.staffId)
-    .filter((s) => !filter.deviceId || s.device_id === filter.deviceId)
-    .filter((s) => !filter.status || s.status === filter.status);
-
-  const matched = await matchingSaleIds(src, sales, filter.query ?? '');
-  if (matched) sales = sales.filter((s) => matched.has(s.id));
-
+  range: { from: string; to: string },
+): Promise<SalesHistoryData> {
+  const sales = await (src.table('sales') as Table<SyncedRow>)
+    .where('business_date')
+    .between(range.from, range.to, true, true)
+    .toArray();
   const ids = sales.map((s) => s.id);
   const saleIdSet = new Set(ids);
+
   const paymentsById = new Map<string, SyncedRow[]>();
   if (ids.length > 0) {
     // A sale payment carries the sale's business date, so the range index reads only
@@ -303,7 +257,7 @@ export async function salesHistory(
     const pays = (
       await (src.table('payments') as Table<SyncedRow>)
         .where('business_date')
-        .between(filter.from, filter.to, true, true)
+        .between(range.from, range.to, true, true)
         .toArray()
     ).filter((p) => p.sale_id !== null && saleIdSet.has(String(p.sale_id)));
     for (const p of pays) {
@@ -337,8 +291,16 @@ export async function salesHistory(
           src.table('print_jobs') as Table<PrintJobLite>,
           'sale_id',
           ids,
-          (job) => String(job.sale_id ?? ''),
+          (job) => String(job.sale_id),
         );
+  // Group once; `failedPrint` used to filter the whole job list for every bill.
+  const jobsBySale = new Map<string, PrintJobLite[]>();
+  for (const job of jobs) {
+    const key = String(job.sale_id ?? '');
+    const list = jobsBySale.get(key) ?? [];
+    list.push(job);
+    jobsBySale.set(key, list);
+  }
 
   const customerIds = [
     ...new Set(
@@ -367,7 +329,6 @@ export async function salesHistory(
   for (const sale of sales) {
     const pays = paymentsById.get(sale.id) ?? [];
     const methods = methodsOf(sale, pays);
-    if (filter.method && !matchesMethod(methods, filter.method)) continue;
     const refunded = (refundsById.get(sale.id) ?? []).reduce(
       (s, r) => s + n(r.amount) + n(r.udhaar_part),
       0,
@@ -382,20 +343,98 @@ export async function salesHistory(
       ? customers.get(String(sale.customer_id))
       : undefined;
     const seller = staff.get(String(sale.staff_id));
-    const print = failedPrint(jobs, sale.id);
+    const print = failedPrintFor(jobsBySale.get(String(sale.id)) ?? []);
+    const customerName = customer ? String(customer.name) : null;
+    const customerPhone = customer?.phone ? String(customer.phone) : null;
+    const searchableCustomer =
+      customer && !customer.deleted_at ? customer : undefined;
+    const searchText = [
+      String(sale.invoice_no),
+      searchableCustomer ? String(searchableCustomer.name) : '',
+    ]
+      .join(' ')
+      .toLowerCase();
+    const searchDigits = (
+      searchableCustomer?.phone ? String(searchableCustomer.phone) : ''
+    )
+      .replace(/\D/gu, '')
+      .replace(/^0+/u, '');
     rows.push({
       sale,
-      customerName: customer ? String(customer.name) : null,
-      customerPhone: customer?.phone ? String(customer.phone) : null,
+      customerName,
+      customerPhone,
       staffName: seller ? String(seller.name) : '',
-      deviceName: deviceNames.get(String(sale.device_id)) ?? '',
+      deviceName: deviceNames.get(String(sale.device_id)) as string,
       methods,
       applied,
       refunded,
       printFailed: print.failed,
       printJobId: print.jobId,
+      searchText,
+      searchDigits,
     });
   }
+
+  // Match reports: refunds count on the date they happen, not the original sale date.
+  const rangeRefunds = await (src.table('refunds') as Table<SyncedRow>)
+    .where('business_date')
+    .between(range.from, range.to, true, true)
+    .toArray();
+  return { rows, rangeRefunds };
+}
+
+/**
+ * Line names/SKUs for the selected range, loaded only when the user types a search.
+ * The date is denormalised (D-228), so this is bounded by the range, not the shop's age.
+ */
+export async function loadSalesLineText(
+  src: TableSource,
+  range: { from: string; to: string },
+): Promise<Map<string, string>> {
+  const lineText = new Map<string, string>();
+  const lines = await (src.table('sale_lines') as Table<SyncedRow>)
+    .where('business_date')
+    .between(range.from, range.to, true, true)
+    .toArray();
+  for (const line of lines) {
+    const saleId = String(line.sale_id);
+    const text =
+      `${String(line.name_snapshot ?? '')} ${String(line.sku_snapshot ?? '')}`
+        .trim()
+        .toLowerCase();
+    lineText.set(saleId, `${lineText.get(saleId) ?? ''} ${text}`.trim());
+  }
+  return lineText;
+}
+
+/** Pure filter/sort for the loaded range: a keystroke does not touch IndexedDB. */
+export function filterSalesHistory(
+  data: SalesHistoryData,
+  filter: SalesFilter,
+  lineText?: ReadonlyMap<string, string>,
+): SalesHistory {
+  const q = (filter.query ?? '').trim().toLowerCase();
+  const words = q.split(/\s+/u).filter(Boolean);
+  const digits = q.replace(/\D/gu, '').replace(/^0+/u, '');
+  let rows = data.rows
+    .filter((row) => !filter.branchId || row.sale.branch_id === filter.branchId)
+    .filter((row) => !filter.staffId || row.sale.staff_id === filter.staffId)
+    .filter((row) => !filter.deviceId || row.sale.device_id === filter.deviceId)
+    .filter((row) => !filter.status || row.sale.status === filter.status);
+  if (q !== '') {
+    rows = rows.filter((row) => {
+      const text = `${row.searchText} ${lineText?.get(String(row.sale.id)) ?? ''}`;
+      return (
+        text.includes(q) ||
+        (words.length > 1 && words.every((word) => text.includes(word))) ||
+        (digits.length >= 3 && row.searchDigits.includes(digits))
+      );
+    });
+  }
+  if (filter.method)
+    rows = rows.filter((row) =>
+      matchesMethod(row.methods, filter.method ?? 'cash'),
+    );
 
   const sort = filter.sort ?? 'time';
   const sign =
@@ -449,11 +488,6 @@ export async function salesHistory(
 
   const live = rows.filter((r) => r.sale.status !== 'void');
   const soldGross = live.reduce((s, r) => s + n(r.sale.total), 0);
-  // Match reports: refunds count on the date they happen, not the original sale date.
-  const rangeRefunds = await (src.table('refunds') as Table<SyncedRow>)
-    .where('business_date')
-    .between(filter.from, filter.to, true, true)
-    .toArray();
   // The summary describes the visible list: when the list is narrowed (cashier,
   // device, method, status or search), only refunds of those bills count.
   const narrowed =
@@ -463,7 +497,7 @@ export async function salesHistory(
     Boolean(filter.status) ||
     (filter.query ?? '').trim() !== '';
   const visible = new Set(live.map((row) => String(row.sale.id)));
-  const refunds = rangeRefunds
+  const refunds = data.rangeRefunds
     .filter((r) => !filter.branchId || r.branch_id === filter.branchId)
     .filter((r) => !narrowed || visible.has(String(r.sale_id)))
     .reduce((sum, r) => sum + n(r.amount) + n(r.udhaar_part), 0);
@@ -479,6 +513,19 @@ export async function salesHistory(
       avgBill: bills > 0 ? mulDivRound(sold, 1, bills) : 0,
     },
   };
+}
+
+/** Sales list for one filter, newest first, grouped by business date (screens/10). */
+export async function salesHistory(
+  src: TableSource,
+  filter: SalesFilter,
+): Promise<SalesHistory> {
+  const range = { from: filter.from, to: filter.to };
+  const data = await loadSalesHistory(src, range);
+  const lineText = (filter.query ?? '').trim()
+    ? await loadSalesLineText(src, range)
+    : undefined;
+  return filterSalesHistory(data, filter, lineText);
 }
 
 export async function salesFilterOptions(

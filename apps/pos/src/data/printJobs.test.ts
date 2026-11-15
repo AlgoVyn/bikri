@@ -159,4 +159,23 @@ describe('waiting print jobs', () => {
     await cancelPrintJob(db, 'q1');
     expect((await db.print_jobs.get('q1'))?.status).toBe('printing');
   });
+
+  it('counts 20k jobs with two native status reads, not a per-row cursor', {
+    timeout: 60_000,
+  }, async () => {
+    const db = await readyDb('print-many');
+    await db.print_jobs.bulkAdd(
+      Array.from({ length: 20_000 }, (_, i) => ({
+        id: `job-${i}`,
+        sale_id: `sale-${i}`,
+        kind: 'sale',
+        status: i % 20 === 0 ? 'failed' : 'done',
+        created_at: 1 + i,
+      })) as never,
+    );
+    const started = performance.now();
+    expect(await unresolvedFailedCount(db)).toBe(1_000);
+    // The old anyOf('failed','done') took ~181 s here in fake-indexeddb.
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
 });

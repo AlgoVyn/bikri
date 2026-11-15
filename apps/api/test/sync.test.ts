@@ -62,6 +62,25 @@ describe('push (03 §4.1, §9)', () => {
     expect(dev?.last_invoice_seq).toBe(1);
   });
 
+  it('1b: an older client line gets the parent sale business date', async () => {
+    const shop = await seedShop('Line date');
+    const ops = saleOps(shop, shop.till, 1);
+    const sale = ops.find((entry) => entry.tbl === 'sales');
+    const line = ops.find((entry) => entry.tbl === 'sale_lines');
+    const date = sale?.row?.business_date;
+    expect(typeof date).toBe('string');
+    expect(line?.row).toBeDefined();
+    // Simulate a client built before D-228.
+    if (line?.row) delete line.row.business_date;
+    await pushOk(shop.till, ops);
+    const row = await env.DB.prepare(
+      'SELECT business_date FROM sale_lines WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, String(line?.row?.id))
+      .first<{ business_date: string }>();
+    expect(row?.business_date).toBe(date);
+  });
+
   it('2 + 3: concurrent edits from rev 3 merge field by field with one sync_conflicts row each', async () => {
     const shop = await seedShop('Merge');
     const base = productRow(IDS.product, {

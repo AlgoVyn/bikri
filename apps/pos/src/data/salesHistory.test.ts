@@ -272,4 +272,39 @@ describe('sales history (screens/10)', () => {
       false,
     );
   });
+
+  it('returns an empty list for a range with no bills', async () => {
+    const { db } = await twoBills();
+    const empty = await salesHistory(db, {
+      from: '2020-01-01',
+      to: '2020-01-02',
+    });
+    expect(empty.rows).toEqual([]);
+    expect(empty.summary.bills).toBe(0);
+  });
+
+  it('uses the job id to order two prints created at the same time', async () => {
+    const { db, firstId } = await twoBills();
+    await db.print_jobs.bulkAdd([
+      {
+        id: 'job-a',
+        sale_id: firstId,
+        kind: 'sale',
+        status: 'failed',
+        created_at: NOW + 3000,
+      },
+      {
+        id: 'job-b',
+        sale_id: firstId,
+        kind: 'sale',
+        status: 'done',
+        created_at: NOW + 3000,
+      },
+    ]);
+    const day = rangeFor('today', NOW, 'Asia/Karachi');
+    const rows = await salesHistory(db, day);
+    expect(rows.rows.find((r) => r.sale.id === firstId)?.printFailed).toBe(
+      false,
+    );
+  });
 });

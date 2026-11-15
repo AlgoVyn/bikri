@@ -807,4 +807,102 @@ describe('supplier branches', () => {
     });
     expect(statement.rows[2]).toMatchObject({ kind: 'refund', got: 5000 });
   });
+
+  it('pages a long supplier statement and keeps every row for an export', async () => {
+    const db = await readyDb('supplier-page');
+    const supplierId = 'long-supplier';
+    await db.ledger_entries.bulkAdd(
+      Array.from({ length: 250 }, (_, i) => ({
+        id: `entry-${i}`,
+        party_type: 'supplier',
+        party_id: supplierId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW + i,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      })) as never,
+    );
+    const page = await supplierStatement(db, supplierId, 100);
+    expect(page.rows).toHaveLength(100);
+    expect(page.hasMore).toBe(true);
+    expect(page.rows.at(-1)?.balance).toBe(250_000);
+    expect(page.openingBalance).toBe(150_000);
+    const full = await supplierStatement(
+      db,
+      supplierId,
+      Number.POSITIVE_INFINITY,
+    );
+    expect(full.rows).toHaveLength(250);
+    expect(full.hasMore).toBe(false);
+  });
+
+  it('uses the cached balance for a short statement page', async () => {
+    const db = await readyDb('supplier-page-cache');
+    const supplierId = 'short-supplier';
+    await db.ledger_entries.bulkAdd([
+      {
+        id: 'short-1',
+        party_type: 'supplier',
+        party_id: supplierId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      },
+      {
+        id: 'short-2',
+        party_type: 'supplier',
+        party_id: supplierId,
+        amount: 1000,
+        source_type: 'adjustment',
+        source_id: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: TODAY,
+        created_at: NOW + 1,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      },
+    ] as never);
+    await db.party_balances.put({
+      party_type: 'supplier',
+      party_id: supplierId,
+      balance: 2000,
+      last_activity_at: NOW,
+      oldest_unpaid_at: NOW,
+    });
+    const page = await supplierStatement(db, supplierId, 100);
+    expect(page.hasMore).toBe(false);
+    expect(page.balance).toBe(2000);
+    expect(page.openingBalance).toBe(0);
+  });
+
+  it('returns an empty statement for a supplier with no ledger', async () => {
+    const db = await readyDb('supplier-empty');
+    expect(await supplierStatement(db, 'missing')).toEqual({
+      rows: [],
+      openingBalance: 0,
+      balance: 0,
+      hasMore: false,
+    });
+  });
 });

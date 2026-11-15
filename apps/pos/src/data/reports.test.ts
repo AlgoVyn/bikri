@@ -69,6 +69,19 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     ).toMatchObject({ sold: 0 });
   });
 
+  it('handles an empty range', async () => {
+    const db = await readyDb('rep-empty');
+    expect(await summary(db, { from: '2026-01-01', to: '2026-01-02' })).toEqual(
+      {
+        sold: 0,
+        bills: 0,
+        grossProfit: 0,
+        udhaarGiven: 0,
+        udhaarReceived: 0,
+      },
+    );
+  });
+
   it('handles a range with more than one index chunk', async () => {
     const db = await readyDb('rep-large');
     const sales = Array.from({ length: 101 }, (_, index) => ({
@@ -89,6 +102,7 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
         id: `line-${index}`,
         sale_id: sale.id,
         product_id: 'p1',
+        business_date: '2026-10-27',
         qty_milli: 1000,
         net: 10_000,
         bill_discount_alloc: 0,
