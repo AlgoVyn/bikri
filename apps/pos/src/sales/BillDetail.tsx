@@ -11,6 +11,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
+import { useMasterDetailWide } from '../components/MasterDetail.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -65,6 +66,7 @@ export function BillDetail({
   saleId: string;
   embedded?: boolean;
 }) {
+  const masterDetailWide = useMasterDetailWide();
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
   const navigate = useNavigate();
@@ -430,7 +432,9 @@ export function BillDetail({
         primary={
           <button
             type="button"
-            className={embedded ? buttonQuiet : buttonPrimary}
+            className={
+              embedded && masterDetailWide ? buttonQuiet : buttonPrimary
+            }
             onClick={() => void print()}
           >
             {t('office.bill.print')}
