@@ -1,12 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { lazy, Suspense } from 'react';
-import { PageLoading } from '../../components/PageLoading.tsx';
-
-const ProductFormPage = lazy(() =>
-  import('../../products/ProductForm.tsx').then((module) => ({
-    default: module.ProductFormPage,
-  })),
-);
+import { ProductFormPage } from '../../products/ProductForm.tsx';
 
 export const Route = createFileRoute('/products/new')({
   validateSearch: (
@@ -22,12 +15,10 @@ export const Route = createFileRoute('/products/new')({
 function NewProduct() {
   const { duplicate, barcode } = Route.useSearch();
   return (
-    <Suspense fallback={<PageLoading compact />}>
-      <ProductFormPage
-        key={duplicate ?? barcode ?? 'new'}
-        duplicateOf={duplicate}
-        barcode={barcode}
-      />
-    </Suspense>
+    <ProductFormPage
+      key={duplicate ?? barcode ?? 'new'}
+      duplicateOf={duplicate}
+      barcode={barcode}
+    />
   );
 }
