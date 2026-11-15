@@ -30,7 +30,9 @@ export function notifyLocalWrite(): void {
 
 /** Manual "Sync now" and day close. */
 export function syncNow(): Promise<void> {
-  return current ? current.run('full') : Promise.resolve();
+  // A manual sync must include every op queued before the call, even if an automatic
+  // cycle is already running. The follow-up cycle is cheap when there is nothing left.
+  return current ? current.run('full', true) : Promise.resolve();
 }
 
 let current: SyncEngine | null = null;
@@ -76,7 +78,10 @@ export class SyncEngine {
   schedulePush(): void {
     if (this.stopped) return;
     if (this.pushTimer) clearTimeout(this.pushTimer);
-    this.pushTimer = setTimeout(() => void this.run('push'), WRITE_DEBOUNCE_MS);
+    this.pushTimer = setTimeout(
+      () => void this.run('push', true),
+      WRITE_DEBOUNCE_MS,
+    );
   }
 
   private async scheduleNext(delay?: number): Promise<void> {
@@ -90,8 +95,12 @@ export class SyncEngine {
     }, poll);
   }
 
-  run(kind: 'first' | 'full' | 'push' | 'pull'): Promise<void> {
+  run(kind: 'first' | 'full' | 'push' | 'pull', force = false): Promise<void> {
     if (this.running) {
+      // A forced sync (manual "Sync now" or a write-debounced push) must not be dropped
+      // because an automatic cycle is in flight: the running cycle may have already
+      // passed its push, so its promise does not include the newest outbox rows.
+      if (force) return this.running.then(() => this.run(kind, true));
       // A write-debounced push must not be dropped because a pull (or another push) is in
       // flight, and a manual full sync requested during one must still pull afterwards.
       // `first`/`full` already push and pull, so chaining onto them would only duplicate work.
