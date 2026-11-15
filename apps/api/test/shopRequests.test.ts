@@ -301,7 +301,8 @@ describe('operator request review (D-175)', () => {
           return new Response(
             JSON.stringify({
               success: true,
-              result: { id: 'addr-1', email, verified: false },
+              // Real Cloudflare shape: null until the address owner clicks the link.
+              result: { id: 'addr-1', email, verified: null },
             }),
             { status: 200 },
           );
@@ -309,7 +310,8 @@ describe('operator request review (D-175)', () => {
           return new Response(
             JSON.stringify({
               success: true,
-              result: { id: 'addr-1', email, verified: true },
+              // Real Cloudflare shape: an RFC 3339 timestamp, not `true`.
+              result: { id: 'addr-1', email, verified: '2026-08-01T10:00:00Z' },
             }),
             { status: 200 },
           );
@@ -342,6 +344,59 @@ describe('operator request review (D-175)', () => {
       );
       expect(checked.verified).toBe(true);
       expect(checked.status).toBe('email_verified');
+      const approved = await admin(`/${created.id}/approve`, {
+        method: 'POST',
+        json: {},
+      });
+      expect(approved.status, await approved.clone().text()).toBe(200);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('treats a reused, already-verified Cloudflare address as verified', async () => {
+    const email = `cf-reuse-${Date.now()}@example.com`;
+    const created = await seedRequest(email);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input));
+        calls.push(`${init?.method ?? 'GET'} ${url.pathname}`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: [
+              {
+                id: 'addr-9',
+                email,
+                verified: '2026-08-01T10:00:00Z',
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    const proxied = new Proxy(env, {
+      get(target, prop, receiver) {
+        if (prop === 'EMAIL_ROUTING_TOKEN') return 'test-email-token';
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    try {
+      const added = await addRequestEmail(
+        proxied,
+        created.id,
+        'operator@example.com',
+      );
+      expect(added.verified).toBe(true);
+      expect(added.status).toBe('email_verified');
+      expect(added.already_added).toBe(false);
+      // The existing address must be reused, not created twice.
+      expect(calls).toEqual([
+        'GET /client/v4/accounts/e71e6ef868a1404888d1751c815913b5/email/routing/addresses',
+      ]);
       const approved = await admin(`/${created.id}/approve`, {
         method: 'POST',
         json: {},

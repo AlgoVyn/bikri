@@ -306,6 +306,17 @@ type CfResponse = {
   errors?: { code?: unknown; message?: unknown }[];
 };
 
+/**
+ * Cloudflare returns `verified` as an RFC 3339 timestamp when the destination
+ * address is verified and `null` when it is not — the API schema is
+ * `verified?: string`, never a boolean. Treat any non-empty string as verified
+ * and accept `true` only for compatibility with older recorded fixtures.
+ */
+function cfAddressVerified(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim() !== '';
+  return value === true;
+}
+
 function cloudflare(env: Env): { account: string; token: string } {
   const account = String(env.CLOUDFLARE_ACCOUNT_ID ?? '').trim();
   const token = String(env.EMAIL_ROUTING_TOKEN ?? '').trim();
@@ -403,7 +414,7 @@ export async function addRequestEmail(
       502,
       'Cloudflare did not return an address id',
     );
-  const verified = address.verified === true;
+  const verified = cfAddressVerified(address.verified);
   const status: ShopRequestStatus = verified
     ? 'email_verified'
     : 'awaiting_email';
@@ -462,7 +473,7 @@ export async function checkRequestEmail(
     `/addresses/${encodeURIComponent(row.cloudflare_address_id)}`,
     { method: 'GET' },
   )) as CfAddress;
-  const verified = address.verified === true;
+  const verified = cfAddressVerified(address.verified);
   const status: ShopRequestStatus =
     row.status === 'approved' || row.status === 'rejected'
       ? row.status
