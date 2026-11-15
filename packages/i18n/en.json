@@ -685,6 +685,7 @@
     "history_balance": "Balance",
     "history_by": "By",
     "history_empty": "No stock movements yet.",
+    "history_more": "Show older",
     "history_qty": "Qty",
     "history_reason": "Reason",
     "history_when": "Date",

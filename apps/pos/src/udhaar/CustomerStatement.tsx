@@ -48,6 +48,8 @@ import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 import { statementPdf, statementPng } from './statementFile.ts';
 
+const STATEMENT_PAGE = 200;
+
 /** Customer khata statement (screens/12). */
 export function CustomerStatement({
   customerId,
@@ -67,6 +69,7 @@ export function CustomerStatement({
   const [editOpen, setEditOpen] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
   const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,6 +120,10 @@ export function CustomerStatement({
     };
   }, [customerId, from, to]);
 
+  // A new customer or date filter starts again at the newest page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter changes
+  useEffect(() => setVisibleRows(STATEMENT_PAGE), [customerId, from, to]);
+
   useHotkey(plainKey('r'), () => setReceiveOpen(true), {
     enabled: can('payment.receive') && !readOnly,
   });
@@ -150,6 +157,15 @@ export function CustomerStatement({
     credit: row.credit,
     balance: row.balance,
   }));
+  // A long khata renders its newest page first; the printed statement and CSV keep
+  // every row. `shownOpening` carries the balance before the first visible entry.
+  const firstShown = Math.max(0, statement.rows.length - visibleRows);
+  const shownRows =
+    firstShown > 0 ? statement.rows.slice(firstShown) : statement.rows;
+  const shownOpening =
+    firstShown > 0
+      ? (statement.rows[firstShown - 1]?.balance ?? 0)
+      : statement.openingBalance;
   const meta = {
     shopName,
     customerName: name,
@@ -449,11 +465,11 @@ export function CustomerStatement({
       </div>
 
       <ul className="flex flex-col gap-2 sm:hidden">
-        {statement.openingBalance !== 0 ? (
+        {shownOpening !== 0 ? (
           <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
             <span>{t('office.udhaar.entry_opening')}</span>
             <span className="font-medium">
-              <MoneyText paisa={statement.openingBalance} />
+              <MoneyText paisa={shownOpening} />
             </span>
           </li>
         ) : null}
@@ -462,7 +478,7 @@ export function CustomerStatement({
             {t('office.udhaar.no_entries')}
           </li>
         ) : (
-          statement.rows.map((row, index) => (
+          shownRows.map((row, index) => (
             <li
               key={row.entry.id}
               className="rounded-card border border-border bg-surface p-3 text-small"
@@ -482,7 +498,7 @@ export function CustomerStatement({
                     params={{ id: row.saleId }}
                     className="underline"
                   >
-                    {rows[index]?.description}
+                    {rows[firstShown + index]?.description}
                   </Link>
                 ) : (
                   rows[index]?.description
@@ -528,14 +544,14 @@ export function CustomerStatement({
             </tr>
           </thead>
           <tbody>
-            {statement.openingBalance !== 0 ? (
+            {shownOpening !== 0 ? (
               <tr className="border-b border-border">
                 <td className="p-2" />
                 <td className="p-2">{t('office.udhaar.entry_opening')}</td>
                 <td className="p-2" />
                 <td className="p-2" />
                 <td className="p-2 text-start">
-                  <MoneyText paisa={statement.openingBalance} />
+                  <MoneyText paisa={shownOpening} />
                 </td>
               </tr>
             ) : null}
@@ -546,7 +562,7 @@ export function CustomerStatement({
                 </td>
               </tr>
             ) : (
-              statement.rows.map((row, index) => (
+              shownRows.map((row, index) => (
                 <tr
                   key={row.entry.id}
                   className="border-b border-border last:border-0"
@@ -565,7 +581,7 @@ export function CustomerStatement({
                         params={{ id: row.saleId }}
                         className="underline"
                       >
-                        {rows[index]?.description}
+                        {rows[firstShown + index]?.description}
                       </Link>
                     ) : (
                       rows[index]?.description
@@ -586,6 +602,16 @@ export function CustomerStatement({
           </tbody>
         </table>
       </div>
+
+      {firstShown > 0 ? (
+        <button
+          type="button"
+          className={buttonQuiet}
+          onClick={() => setVisibleRows((count) => count + STATEMENT_PAGE)}
+        >
+          {t('office.udhaar.show_older')}
+        </button>
+      ) : null}
 
       <p className="text-small text-text-muted">
         {t('office.udhaar.balance')}: <MoneyText paisa={balance} /> ·{' '}

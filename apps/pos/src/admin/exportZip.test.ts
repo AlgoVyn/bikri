@@ -36,7 +36,7 @@ describe('operator export', () => {
       }),
     );
     const built = await buildTenantExport('t1', () => undefined);
-    const files = await unzip(built.bytes);
+    const files = await unzip(new Uint8Array(await built.blob.arrayBuffer()));
     const names = files.map((file) => file.name);
     expect(names).toContain('manifest.json');
     expect(names).toContain('json/products.json');

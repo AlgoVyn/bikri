@@ -8,6 +8,7 @@ import { MoreIcon, RefreshIcon } from '../components/icons.tsx';
 import { PrivacyProvider } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
+import { pruneLocalHistoryIfDue } from '../data/retention.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
@@ -177,6 +178,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(warm, 500);
     return () => window.clearTimeout(timer);
   }, [i18n.language]);
+
+  // Local-only logs (completed print jobs, failed uploads, quarantined pull rows) are
+  // trimmed once a day after the shell is usable. Business records are never deleted.
+  useEffect(() => {
+    const run = () => {
+      void pruneLocalHistoryIfDue(getDb()).catch(() => undefined);
+    };
+    let timer: number | undefined;
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 5_000 });
+    } else {
+      timer = window.setTimeout(run, 3_000);
+    }
+    const daily = window.setInterval(run, 24 * 60 * 60 * 1_000);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      window.clearInterval(daily);
+    };
+  }, []);
 
   // T-027: a write attempted in a read-only shop shows one toast instead of a generic failure.
   useEffect(() => {

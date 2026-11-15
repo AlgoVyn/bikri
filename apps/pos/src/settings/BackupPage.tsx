@@ -80,10 +80,7 @@ function BackupContent() {
       const result = await buildShopExport(getDb(), {
         onProgress: setProgress,
       });
-      downloadBlob(
-        new Blob([result.bytes as BlobPart], { type: 'application/zip' }),
-        result.filename,
-      );
+      downloadBlob(result.blob, result.filename);
       setDone(result.filename);
       toast.push(t('office.backup.done'));
     } catch {
@@ -107,10 +104,7 @@ function BackupContent() {
               `${progress.table} (${progress.rows > 0 ? `${progress.done}/${progress.rows}` : progress.done})`,
             ),
         });
-        downloadBlob(
-          new Blob([result.bytes as BlobPart], { type: 'application/zip' }),
-          result.filename,
-        );
+        downloadBlob(result.blob, result.filename);
         clearServerExportSession();
         setServerDone(result.filename);
         toast.push(t('office.backup.server_done'));

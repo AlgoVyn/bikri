@@ -47,7 +47,9 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     }
     expect(progress).toEqual(SHOP_EXPORT_TABLES);
 
-    const entries = await unzip(exported.bytes);
+    const entries = await unzip(
+      new Uint8Array(await exported.blob.arrayBuffer()),
+    );
     const names = entries.map((entry) => entry.name);
     expect(names).toContain('manifest.json');
     expect(names).toContain('json/sales.json');
@@ -96,7 +98,9 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
       created_at: NOW + 2_000,
     } as never);
     const later = await buildShopExport(db, { now: NOW + 1_000 });
-    const laterEntries = await unzip(later.bytes);
+    const laterEntries = await unzip(
+      new Uint8Array(await later.blob.arrayBuffer()),
+    );
     const laterText = new TextDecoder();
     const laterSales = JSON.parse(
       laterText.decode(

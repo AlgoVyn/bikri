@@ -626,6 +626,7 @@ export async function updateShopLogo(
           sha256: logo.sha256,
           staff_id: actor,
           status: 'pending',
+          created_at: now,
         } as never);
         await w
           .table<{ key: string; value: unknown }, string>('kv')

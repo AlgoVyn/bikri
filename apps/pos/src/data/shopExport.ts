@@ -1,6 +1,6 @@
 import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
 import { type BikriDb, LOCAL_ONLY_TABLES } from '@bikri/db';
-import { zipStore } from '../admin/zip.ts';
+import { ZipStoreWriter } from '../admin/zip.ts';
 import { csvCell } from '../lib/csv.ts';
 import { tenantInfo } from './localTenant.ts';
 
@@ -100,7 +100,8 @@ export type ShopExportProgress = {
 };
 
 export type ShopExport = {
-  bytes: Uint8Array;
+  /** Blob parts are appended per table; no full-archive Uint8Array copy is made. */
+  blob: Blob;
   filename: string;
   manifest: ShopExportManifest;
 };
@@ -218,7 +219,7 @@ export async function buildShopExport(
     },
     tables: {},
   };
-  const files: { name: string; data: Uint8Array }[] = [];
+  const writer = new ZipStoreWriter(now);
   const encoder = new TextEncoder();
   for (const [index, table] of SHOP_EXPORT_TABLES.entries()) {
     const all = (await db.table(table).toArray()) as Record<string, unknown>[];
@@ -239,22 +240,17 @@ export async function buildShopExport(
       total: SHOP_EXPORT_TABLES.length,
       rows: clean.length,
     });
-    files.push({
-      name: `json/${table}.json`,
-      data: encoder.encode(JSON.stringify(clean)),
-    });
-    files.push({
-      name: `csv/${table}.csv`,
-      data: encoder.encode(tableCsv(clean)),
-    });
+    writer.add(`json/${table}.json`, encoder.encode(JSON.stringify(clean)));
+    writer.add(`csv/${table}.csv`, encoder.encode(tableCsv(clean)));
+    // Drop this table's rows before reading the next one; its bytes are already in parts.
     if (index % 4 === 3) await new Promise((resolve) => setTimeout(resolve, 0));
   }
-  files.unshift({
-    name: 'manifest.json',
-    data: encoder.encode(JSON.stringify(manifest, null, 2)),
-  });
+  writer.add(
+    'manifest.json',
+    encoder.encode(JSON.stringify(manifest, null, 2)),
+  );
   return {
-    bytes: zipStore(files, now),
+    blob: writer.finish(),
     filename: shopExportFilename(displayName, now),
     manifest,
   };

@@ -36,6 +36,8 @@ import {
 import { PaySupplierDialog } from './PaySupplierDialog.tsx';
 import { SupplierDialog } from './SupplierDialog.tsx';
 
+const STATEMENT_PAGE = 200;
+
 /** Supplier detail / ledger (screens/13). */
 export function SupplierStatement({
   supplierId,
@@ -51,6 +53,7 @@ export function SupplierStatement({
   const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
   const data = useLiveQuery(async () => {
     const db = getDb();
     const supplier = await db.suppliers.get(supplierId);
@@ -96,6 +99,10 @@ export function SupplierStatement({
     paid: row.paid,
     balance: row.balance,
   }));
+  // Render the newest page first; the printed statement and CSV keep every row.
+  const firstShown = Math.max(0, statement.rows.length - visibleRows);
+  const shownRows =
+    firstShown > 0 ? statement.rows.slice(firstShown) : statement.rows;
   const meta = {
     shopName,
     customerName: name,
@@ -265,7 +272,7 @@ export function SupplierStatement({
             {t('office.suppliers.no_entries')}
           </li>
         ) : (
-          statement.rows.map((row, index) => (
+          shownRows.map((row, index) => (
             <li
               key={row.entry.id}
               className="rounded-card border border-border bg-surface p-3 text-small"
@@ -279,7 +286,7 @@ export function SupplierStatement({
                 </span>
               </div>
               <p className="mt-1">
-                {rows[index]?.description}
+                {rows[firstShown + index]?.description}
                 {row.kind === 'purchase' &&
                 row.entry.source_id &&
                 can('purchase.create') &&
@@ -344,7 +351,7 @@ export function SupplierStatement({
                 </td>
               </tr>
             ) : (
-              statement.rows.map((row, index) => (
+              shownRows.map((row, index) => (
                 <tr
                   key={row.entry.id}
                   className="border-b border-border last:border-0"
@@ -357,7 +364,7 @@ export function SupplierStatement({
                     )}
                   </td>
                   <td className="p-2">
-                    {rows[index]?.description}
+                    {rows[firstShown + index]?.description}
                     {row.kind === 'purchase' &&
                     row.entry.source_id &&
                     can('purchase.create') &&
@@ -387,6 +394,16 @@ export function SupplierStatement({
           </tbody>
         </table>
       </section>
+
+      {firstShown > 0 ? (
+        <button
+          type="button"
+          className={buttonQuiet}
+          onClick={() => setVisibleRows((count) => count + STATEMENT_PAGE)}
+        >
+          {t('office.suppliers.show_older')}
+        </button>
+      ) : null}
 
       <PaySupplierDialog
         open={payOpen}

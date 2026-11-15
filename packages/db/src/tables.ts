@@ -25,6 +25,8 @@ export const TABLE_COLUMNS = {
     'created_at',
     'updated_at',
     'deleted_at',
+    'file_bytes',
+    'files_initialized',
   ],
   tenant_usage: ['tenant_id', 'day', 'pushes', 'rows_written', 'rows_read'],
   expense_category_templates: [

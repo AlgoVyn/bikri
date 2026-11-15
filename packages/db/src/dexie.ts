@@ -87,6 +87,18 @@ export const DEXIE_SCHEMA_V5 = {
   outbox: '++seq, &op_id, status, [status+seq], created_at, [tbl+row_id]',
 } as const;
 
+/**
+ * V6 indexes the local-only logs by age. The daily retention pass deletes completed print
+ * jobs and failed uploads older than their window; without these indexes it loaded every
+ * done job and every failed blob to filter in memory.
+ */
+export const DEXIE_SCHEMA_V6 = {
+  ...DEXIE_SCHEMA_V5,
+  file_queue: '++id, status, created_at',
+  print_jobs:
+    'id, sale_id, refund_id, day_close_id, supplier_return_id, status, [status+created_at], created_at',
+} as const;
+
 export const LOCAL_ONLY_TABLES = [
   'outbox',
   'kv',
@@ -263,6 +275,8 @@ export type FileQueueEntry = {
   /** The staff member who chose the file; the server checks their permission. */
   staff_id?: string | null;
   status: 'pending' | 'uploading' | 'failed';
+  /** When the file was queued; the daily retention pass trims old failures. */
+  created_at?: number;
 };
 
 type Rows<T> = Table<T, string>;
@@ -318,6 +332,7 @@ export class BikriDb extends Dexie {
     this.version(3).stores(DEXIE_SCHEMA_V3);
     this.version(4).stores(DEXIE_SCHEMA_V4);
     this.version(5).stores(DEXIE_SCHEMA_V5);
+    this.version(6).stores(DEXIE_SCHEMA_V6);
   }
 }
 

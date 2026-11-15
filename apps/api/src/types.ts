@@ -26,6 +26,10 @@ export type TenantRow = {
   note: string;
   owner_email: string | null;
   last_owner_export_at: number | null;
+  /** R2 bytes reserved by this shop's uploads (D-226). */
+  file_bytes: number;
+  /** 1 once `file_bytes` has been backfilled from the R2 prefix. */
+  files_initialized: number;
   support_until: number | null;
   support_reason: string;
   created_by_email: string;

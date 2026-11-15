@@ -32,7 +32,7 @@ Cards:
 1. **Price** Rs 1,499 · **Avg cost** Rs 1,120 · **Last cost** Rs 1,200 · **Profit per item** Rs 379 · **Margin** 25.3% (margin = (price − avg)/price; cost cards only with `cost.view`).
 2. **Stock**: on hand (derived from `stock_movements`), min stock, stock value (`cost.view`).
 3. **Last 14 days**: bar chart of qty sold per day (local data), total sold, revenue.
-4. **Stock history**: list of movements newest first — date/time, reason (localised), ± qty, balance after, by whom, link to bill/delivery. Export CSV.
+4. **Stock history**: list of movements newest first — date/time, reason (localised), ± qty, balance after, by whom, link to bill/delivery. The screen renders the newest 200 rows and appends older rows with `Show older`; Export CSV still writes the product's full history.
 
 ## Add / edit product
 

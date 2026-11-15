@@ -179,6 +179,7 @@ export async function finishSetup(
           sha256: logo.sha256,
           staff_id: ownerId,
           status: 'pending',
+          created_at: now,
         } as never);
         await w
           .table('kv')

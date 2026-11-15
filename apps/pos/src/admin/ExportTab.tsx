@@ -42,13 +42,7 @@ export function ExportTab({ tenantId }: { tenantId: string }) {
                 });
               })
                 .then((built) => {
-                  const blob = new Blob(
-                    [built.bytes as Uint8Array<ArrayBuffer>],
-                    {
-                      type: 'application/zip',
-                    },
-                  );
-                  downloadBlob(built.filename, blob);
+                  downloadBlob(built.filename, built.blob);
                   toast.push(t('admin.export_done'), 'info');
                 })
                 .catch((err: unknown) => {

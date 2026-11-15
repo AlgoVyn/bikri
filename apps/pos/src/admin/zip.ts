@@ -161,7 +161,7 @@ export function writeZip(
   return out;
 }
 
-/** STORE-method ZIP used for operator exports. */
+/** STORE-method ZIP used for small archives and tests. */
 export function zipStore(
   files: readonly ZipEntry[],
   now = Date.now(),
@@ -170,6 +170,121 @@ export function zipStore(
     files.map((file) => ({ name: file.name, data: file.data, method: 0 })),
     now,
   );
+}
+
+/**
+ * Builds a STORE-method ZIP as Blob parts instead of one contiguous output buffer.
+ *
+ * The full-shop and server exports add one table at a time. `writeZip` needed every
+ * table's bytes plus a second allocation the size of the whole archive; the writer keeps
+ * the same per-file bytes as Blob parts and appends the central directory at the end, so
+ * the peak is one table, not the whole shop twice.
+ */
+export class ZipStoreWriter {
+  private readonly parts: BlobPart[] = [];
+  private readonly central: {
+    name: Uint8Array;
+    crc: number;
+    size: number;
+    offset: number;
+  }[] = [];
+  private readonly stamp: { time: number; date: number };
+  private readonly encoder = new TextEncoder();
+  private offset = 0;
+  private finished = false;
+
+  constructor(now = Date.now()) {
+    this.stamp = dosTime(now);
+  }
+
+  add(name: string, data: Uint8Array): void {
+    if (this.finished) throw new ZipError('writer already finished');
+    if (this.central.length >= 0xffff) throw new ZipError('too many files');
+    if (data.length > 0xffffffff) throw new ZipError('file too large');
+    const nameBytes = this.encoder.encode(name);
+    if (nameBytes.length > 0xffff) throw new ZipError('name too long');
+    const crc = crc32(data);
+    const header = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(header.buffer);
+    let at = 0;
+    at = write32(view, at, SIG_LOCAL);
+    at = write16(view, at, VERSION);
+    at = write16(view, at, FLAG_UTF8);
+    at = write16(view, at, 0);
+    at = write16(view, at, this.stamp.time);
+    at = write16(view, at, this.stamp.date);
+    at = write32(view, at, crc);
+    at = write32(view, at, data.length);
+    at = write32(view, at, data.length);
+    at = write16(view, at, nameBytes.length);
+    write16(view, at, 0);
+    header.set(nameBytes, 30);
+    this.central.push({
+      name: nameBytes,
+      crc,
+      size: data.length,
+      offset: this.offset,
+    });
+    this.parts.push(header as BlobPart, data as BlobPart);
+    this.offset += header.length + data.length;
+  }
+
+  /** Appends the central directory and returns the downloadable archive. */
+  finish(): Blob {
+    if (this.finished) throw new ZipError('writer already finished');
+    this.finished = true;
+    const centralParts: BlobPart[] = [];
+    let centralSize = 0;
+    for (const file of this.central) {
+      const entry = new Uint8Array(46 + file.name.length);
+      const view = new DataView(entry.buffer);
+      let at = 0;
+      at = write32(view, at, SIG_CENTRAL);
+      at = write16(view, at, VERSION);
+      at = write16(view, at, VERSION);
+      at = write16(view, at, FLAG_UTF8);
+      at = write16(view, at, 0);
+      at = write16(view, at, this.stamp.time);
+      at = write16(view, at, this.stamp.date);
+      at = write32(view, at, file.crc);
+      at = write32(view, at, file.size);
+      at = write32(view, at, file.size);
+      at = write16(view, at, file.name.length);
+      at = write16(view, at, 0);
+      at = write16(view, at, 0);
+      at = write16(view, at, 0);
+      at = write16(view, at, 0);
+      at = write32(view, at, 0);
+      at = write32(view, at, file.offset);
+      entry.set(file.name, 46);
+      centralParts.push(entry as BlobPart);
+      centralSize += entry.length;
+    }
+    const eocd = new Uint8Array(22);
+    const view = new DataView(eocd.buffer);
+    let at = 0;
+    at = write32(view, at, SIG_EOCD);
+    at = write16(view, at, 0);
+    at = write16(view, at, 0);
+    at = write16(view, at, this.central.length);
+    at = write16(view, at, this.central.length);
+    at = write32(view, at, centralSize);
+    at = write32(view, at, this.offset);
+    write16(view, at, 0);
+    return new Blob([...this.parts, ...centralParts, eocd], {
+      type: 'application/zip',
+    });
+  }
+}
+
+/** STORE-method ZIP as a Blob, for the export path. */
+export function zipStoreBlob(
+  files: readonly ZipEntry[],
+  now = Date.now(),
+): Blob {
+  const writer = new ZipStoreWriter(now);
+  for (const file of files) writer.add(file.name, file.data);
+  return writer.finish();
 }
 
 function viewOf(bytes: Uint8Array): DataView {

@@ -325,20 +325,63 @@ export type HistoryRow = {
   staffName: string;
 };
 
+/** Stock-history rows shown before "Show older"; CSV export still reads them all. */
+export const PRODUCT_HISTORY_PAGE = 200;
+
 export type ProductDetail = {
   product: MasterRow;
   category: MasterRow | null;
   barcodes: MasterRow[];
   onHand: number;
   history: HistoryRow[];
+  /** True when older movements exist beyond the requested page. */
+  hasMoreHistory: boolean;
   /** Oldest first: 14 business days of qty sold. */
   last14: { date: string; qty: number; revenue: number }[];
 };
+
+/**
+ * One product's movements, newest first, with the running balance after each.
+ *
+ * A product can accumulate thousands of movements; the screen pages them. The balance
+ * starts at the cached on-hand so a page does not need to read the older history, then
+ * subtracts each newer delta as it walks back. `productStockHistory(db, id)` with no
+ * limit still returns everything for the CSV export.
+ */
+export async function productStockHistory(
+  db: BikriDb,
+  id: string,
+  limit = Number.POSITIVE_INFINITY,
+): Promise<HistoryRow[]> {
+  const base = db.stock_movements
+    .where('[product_id+created_at]')
+    .between([id, 0], [id, Infinity]);
+  const movements = Number.isFinite(limit)
+    ? await base
+        .reverse()
+        .limit(Math.max(1, Math.floor(limit)))
+        .toArray()
+    : await base.reverse().toArray();
+  let running = (await db.stock_levels.get(id))?.on_hand_milli ?? 0;
+  const staff = new Map(
+    (await db.staff.toArray()).map((s) => [s.id, String(s.name ?? '')]),
+  );
+  return movements.map((movement) => {
+    const row: HistoryRow = {
+      movement,
+      balanceAfter: running,
+      staffName: staff.get(String(movement.staff_id)) ?? '',
+    };
+    running -= Number(movement.qty_delta_milli);
+    return row;
+  });
+}
 
 export async function productDetail(
   db: BikriDb,
   id: string,
   now = Date.now(),
+  historyLimit = PRODUCT_HISTORY_PAGE,
 ): Promise<ProductDetail | null> {
   const product = await db.products.get(id);
   if (!product || product.deleted_at) return null;
@@ -348,23 +391,13 @@ export async function productDetail(
   const barcodes = live(
     await db.product_barcodes.where('product_id').equals(id).toArray(),
   );
-  const movements = await db.stock_movements
-    .where('[product_id+created_at]')
-    .between([id, 0], [id, Infinity])
-    .toArray();
-  const staff = new Map(
-    (await db.staff.toArray()).map((s) => [s.id, String(s.name ?? '')]),
-  );
-  let balance = 0;
-  const history: HistoryRow[] = movements.map((movement) => {
-    balance += Number(movement.qty_delta_milli);
-    return {
-      movement,
-      balanceAfter: balance,
-      staffName: staff.get(String(movement.staff_id)) ?? '',
-    };
-  });
-  history.reverse();
+  // Read one extra row to know whether "Show older" is needed, without a second
+  // index count over a long history.
+  const historyPlus = await productStockHistory(db, id, historyLimit + 1);
+  const hasMoreHistory = historyPlus.length > historyLimit;
+  const history = hasMoreHistory
+    ? historyPlus.slice(0, historyLimit)
+    : historyPlus;
   const days: ProductDetail['last14'] = [];
   for (let i = 13; i >= 0; i -= 1)
     days.push({ date: businessDate(now - i * DAY_MS), qty: 0, revenue: 0 });
@@ -456,6 +489,7 @@ export async function productDetail(
     barcodes,
     onHand: (await db.stock_levels.get(id))?.on_hand_milli ?? 0,
     history,
+    hasMoreHistory,
     last14: days,
   };
 }
@@ -543,6 +577,7 @@ async function queuePhoto(
     sha256: photo.sha256,
     staff_id: staffId,
     status: 'pending',
+    created_at: Date.now(),
   });
 }
 

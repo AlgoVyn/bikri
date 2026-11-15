@@ -1375,6 +1375,26 @@ BEGIN
 END;
 ```
 
+### 2.13 Tenant file-usage accounting (migration `0014_tenant_file_usage.sql`)
+
+Every upload used to list the whole `t/<tenant>/` R2 prefix to sum object sizes before
+checking the 1 GB cap: one Class A list per upload, slower as the photo library grows.
+`file_bytes` is now reserved atomically with a conditional `UPDATE` before the R2 PUT and
+released if the PUT fails; `files_initialized` makes the one-time prefix backfill run once
+per shop. File GC and tenant deletion reset the counter from their authoritative listing.
+Additive only; `SCHEMA_VERSION` is unchanged.
+
+```sql
+-- R2 usage accounting per shop (D-226). Additive only.
+--
+-- Every upload used to list the whole `t/<tenant>/` prefix to sum object sizes before
+-- checking the 1 GB cap. That cost one R2 Class A list per upload and got slower as the
+-- shop's photo library grew. `file_bytes` is now reserved atomically with a conditional
+-- UPDATE; `files_initialized` makes the one-time backfill run only once per shop.
+ALTER TABLE tenants ADD COLUMN file_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tenants ADD COLUMN files_initialized INTEGER NOT NULL DEFAULT 0;
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1417,8 +1437,8 @@ export const DEXIE_SCHEMA_V1 = {
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
-  file_queue: '++id, status',
-  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, status, created_at', // V1 'id, status, created_at'; V2 adds sale_id/refund_id; V3 adds day_close/supplier ids
+  file_queue: '++id, status, created_at', // V6 adds created_at for the retention pass
+  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, status, [status+created_at], created_at', // V1 'id, status, created_at'; V2 adds sale_id/refund_id; V3 adds day_close/supplier ids; V6 adds [status+created_at]
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at }
   pull_shadow: '[tbl+id]',        // server rows skipped while a local edit was pending (03 §4.2)
@@ -1433,12 +1453,14 @@ export const DEXIE_SCHEMA_V1 = {
 | `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
-| `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status }` | Images waiting for upload |
-| `print_jobs` | `{ id, sale_id?, refund_id?, kind, status: 'queued'|'printing'|'done'|'failed', error?, created_at }` | Print history and retry |
+| `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
+| `print_jobs` | `{ id, sale_id?, refund_id?, kind, status: 'queued'|'printing'|'done'|'failed', error?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
 | `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
 | `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at }` | Cache = Σ `ledger_entries.amount`; rebuildable |
 
 `CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key? }`.
+
+**Local retention (D-226).** A daily idle pass trims only local-only operational logs: completed `print_jobs` older than 90 days, failed `file_queue` uploads older than 30 days and `kv.pull_errors` older than 30 days. Business rows (sales, stock movements, ledger entries, refunds, day closes, audit) are never deleted on the till; the server backup and the shop export are the long-term record.
 
 ### 3.2 Rebuild
 

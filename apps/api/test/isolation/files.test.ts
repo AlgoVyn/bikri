@@ -238,5 +238,84 @@ describe('files (T-033, I7)', () => {
     expect(await env.FILES.head(`t/${a.tenantId}/${key}`)).not.toBeNull();
     expect(await env.FILES.head(`t/${a.tenantId}/${orphanA}`)).toBeNull();
     expect(await env.FILES.head(`t/${b.tenantId}/${orphanB}`)).not.toBeNull();
+    const usage = await env.DB.prepare(
+      'SELECT file_bytes, files_initialized FROM tenants WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .first<{ file_bytes: number; files_initialized: number }>();
+    expect(usage).toMatchObject({
+      file_bytes: IMG.byteLength,
+      files_initialized: 1,
+    });
+  });
+
+  it('accounts upload usage atomically and initializes once from the R2 prefix', async () => {
+    const a = await seedShop('Files usage');
+    const preexisting = `products/${IDS.product}/${'c'.repeat(64)}.webp`;
+    await env.FILES.put(`t/${a.tenantId}/${preexisting}`, IMG);
+    // Simulate a shop that predates migration 0014: the counter is uninitialized.
+    await env.DB.prepare(
+      'UPDATE tenants SET file_bytes = 0, files_initialized = 0 WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .run();
+    const digest = await sha(IMG);
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `product_image/${IDS.product}/${digest}`,
+          IMG,
+        )
+      ).status,
+    ).toBe(201);
+    const after = await env.DB.prepare(
+      'SELECT file_bytes, files_initialized FROM tenants WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .first<{ file_bytes: number; files_initialized: number }>();
+    expect(after).toMatchObject({
+      file_bytes: IMG.byteLength * 2,
+      files_initialized: 1,
+    });
+    // Re-uploading the same key is a no-op, not another reservation.
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `product_image/${IDS.product}/${digest}`,
+          IMG,
+        )
+      ).status,
+    ).toBe(200);
+    const same = await env.DB.prepare(
+      'SELECT file_bytes FROM tenants WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .first<{ file_bytes: number }>();
+    expect(same?.file_bytes).toBe(IMG.byteLength * 2);
+
+    // A shop at the cap is refused before the R2 PUT and keeps its counter.
+    await env.DB.prepare(
+      'UPDATE tenants SET file_bytes = 999999995, files_initialized = 1 WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .run();
+    const other = new Uint8Array([...IMG, 9]);
+    const full = await upload(
+      a.admin.token,
+      `product_image/${IDS.product}/${await sha(other)}`,
+      other,
+    );
+    expect(full.status).toBe(507);
+    expect((await json<{ error: { code: string } }>(full)).error.code).toBe(
+      'TENANT_STORAGE_FULL',
+    );
+    const capped = await env.DB.prepare(
+      'SELECT file_bytes FROM tenants WHERE id = ?1',
+    )
+      .bind(a.tenantId)
+      .first<{ file_bytes: number }>();
+    expect(capped?.file_bytes).toBe(999999995);
   });
 });

@@ -17,8 +17,10 @@ import { useToast } from '../components/Toast.tsx';
 import { addProduct, CartFullError } from '../data/cart.ts';
 import {
   ledgerContext,
+  PRODUCT_HISTORY_PAGE,
   ProductInUseError,
   productDetail,
+  productStockHistory,
   removeProduct,
   stockHistoryCsv,
 } from '../data/catalog.ts';
@@ -63,7 +65,11 @@ export function ProductDetailPage({
     useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
-  const detail = useLiveQuery(() => productDetail(getDb(), id), [id]);
+  const [historyLimit, setHistoryLimit] = useState(PRODUCT_HISTORY_PAGE);
+  const detail = useLiveQuery(
+    () => productDetail(getDb(), id, Date.now(), historyLimit),
+    [id, historyLimit],
+  );
   const readOnly = useReadOnly();
   const canEdit = can('catalog.edit') && !readOnly;
   const activeCart = useSellStore((state) => state.active);
@@ -129,11 +135,13 @@ export function ProductDetailPage({
     }
   };
 
-  const exportHistory = () => {
+  const exportHistory = async () => {
+    // The screen shows one page; the CSV keeps the full movement history.
+    const all = await productStockHistory(getDb(), id);
     downloadText(
       `stock-history-${String(p.sku)}.csv`,
       stockHistoryCsv(
-        detail.history.map((h) => ({
+        all.map((h) => ({
           at: Number(h.movement.created_at),
           reason: String(h.movement.reason_code),
           qty: formatQtyFromMilli(Number(h.movement.qty_delta_milli), unit),
@@ -429,7 +437,7 @@ export function ProductDetailPage({
             <button
               type="button"
               className={buttonQuiet}
-              onClick={exportHistory}
+              onClick={() => void exportHistory()}
             >
               {t('products.export_csv')}
             </button>
@@ -546,6 +554,17 @@ export function ProductDetailPage({
                 );
               })}
             </ul>
+            {detail.hasMoreHistory ? (
+              <button
+                type="button"
+                className={`${buttonQuiet} mt-3`}
+                onClick={() =>
+                  setHistoryLimit((limit) => limit + PRODUCT_HISTORY_PAGE)
+                }
+              >
+                {t('products.history_more')}
+              </button>
+            ) : null}
           </>
         )}
       </section>

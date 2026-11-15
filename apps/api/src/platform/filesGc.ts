@@ -62,6 +62,16 @@ export async function gcTenantFiles(
       await env.FILES.delete(
         stale.slice(at, at + DELETE_BATCH).map((o) => o.key),
       );
+    // The listing above is authoritative; reset the counter instead of decrementing it
+    // so a counter that was never initialized also becomes correct after a GC.
+    await env.DB.prepare(
+      'UPDATE tenants SET file_bytes = ?2, files_initialized = 1 WHERE id = ?1',
+    )
+      .bind(
+        tenant.id,
+        objects.reduce((sum, object) => sum + object.size, 0) - bytes,
+      )
+      .run();
   }
   return {
     examined: objects.length,

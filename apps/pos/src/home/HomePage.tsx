@@ -1,7 +1,7 @@
 import type { Permission } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -34,6 +34,7 @@ import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
 import { shopTimeZone } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { onLocalWrite } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date';
 import { NAV } from '../shell/nav.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -47,7 +48,6 @@ type HomeData = {
   salesCount: number;
   today: Awaited<ReturnType<typeof summary>>;
   cash: number;
-  attention: AttentionItem[];
   recent: Awaited<ReturnType<typeof recentBills>>;
 };
 
@@ -83,6 +83,21 @@ function readTodayHidden(): boolean {
     return false;
   }
 }
+
+/** Stores whose change can add or clear an attention row. */
+const ATTENTION_TABLES = new Set([
+  'products',
+  'stock_levels',
+  'promises',
+  'customers',
+  'party_balances',
+  'print_jobs',
+  'sync_conflicts',
+  'held_bills',
+  'sales',
+  'day_closes',
+  'outbox',
+]);
 
 const ATTENTION_LINK: Record<string, string> = {
   low_stock: '/products',
@@ -144,15 +159,59 @@ export function HomePage() {
       salesCount: await db.sales.where('status').noneOf(['void']).count(),
       today: await summary(db, { from: today, to: today }),
       cash: await expectedCash(db, deviceId),
-      attention: await attentionItems(db, {
-        today,
-        yesterday,
-        deviceId,
-        isOwner: role === 'owner',
-      }),
       recent: await recentBills(db),
     };
   }, [today, yesterday, role]);
+
+  // The attention list needs products, stock levels, promises, balances and sync state,
+  // not just today's report. Keeping it in the main live query made every sale re-read
+  // the whole catalogue; refreshing it separately still updates after a local write or a
+  // pull, and the minute interval covers printer state and a long-idle till.
+  const [attention, setAttention] = useState<AttentionItem[]>([]);
+  const lastPull = useLiveQuery(
+    () =>
+      getDb()
+        .kv.get('last_pull_at')
+        .then((row) => Number(row?.value ?? 0)),
+    [],
+  );
+  // `lastPull` is a trigger, not a value the effect reads: after a pull the attention
+  // rows (conflicts, stock, print failures) can change without a local write.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retrigger after each pull
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const db = getDb();
+        const device = await deviceInfo(db);
+        const items = await attentionItems(db, {
+          today,
+          yesterday,
+          deviceId: device?.id ?? '',
+          isOwner: role === 'owner',
+        });
+        if (alive) setAttention(items);
+      } catch {
+        // An attention row is advisory; a failed read must not break Home.
+      }
+    };
+    const queue = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(), 250);
+    };
+    void load();
+    const stop = onLocalWrite((_count, tables) => {
+      if (tables.some((table) => ATTENTION_TABLES.has(table))) queue();
+    });
+    const every = window.setInterval(() => void load(), 60_000);
+    return () => {
+      alive = false;
+      stop();
+      window.clearInterval(every);
+      if (timer) clearTimeout(timer);
+    };
+  }, [today, yesterday, role, lastPull]);
 
   const dateText = formatTimestamp(now, i18n.language, timeZone, 'weekdayLong');
   const timeText = (at: number) =>
@@ -414,7 +473,7 @@ export function HomePage() {
               <QuickActions tiles={manageTiles} label="home.manage" />
             </div>
 
-            {data && data.attention.length > 0 ? (
+            {data && attention.length > 0 ? (
               <section aria-labelledby="attention-heading" className="order-5">
                 <h2
                   id="attention-heading"
@@ -423,7 +482,7 @@ export function HomePage() {
                   {t('home.attention')}
                 </h2>
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
-                  {data.attention.map((item) => (
+                  {attention.map((item) => (
                     <li key={item.kind}>
                       <Link
                         to={ATTENTION_LINK[item.kind] ?? '/'}

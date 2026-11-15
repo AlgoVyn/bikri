@@ -3,7 +3,15 @@ import {
   DecompressionStream as NodeDecompressionStream,
 } from 'node:stream/web';
 import { describe, expect, it } from 'vitest';
-import { crc32, unzip, writeZip, ZipError, zipStore } from './zip.ts';
+import {
+  crc32,
+  unzip,
+  writeZip,
+  ZipError,
+  ZipStoreWriter,
+  zipStore,
+  zipStoreBlob,
+} from './zip.ts';
 
 if (typeof globalThis.CompressionStream === 'undefined') {
   Object.assign(globalThis, { CompressionStream: NodeCompressionStream });
@@ -49,6 +57,28 @@ describe('zip', () => {
 
   it('round-trips an empty archive', async () => {
     expect(await unzip(zipStore([]))).toEqual([]);
+  });
+
+  it('streams the same archive from Blob parts without a full buffer', async () => {
+    const now = Date.UTC(2026, 0, 2, 3, 4, 5);
+    const files = [
+      { name: 'manifest.json', data: text.encode('{"n":1}') },
+      { name: 'empty.json', data: new Uint8Array() },
+      { name: 'دکان.json', data: text.encode('دکان') },
+    ];
+    const writer = new ZipStoreWriter(now);
+    for (const file of files) writer.add(file.name, file.data);
+    const streamed = new Uint8Array(await writer.finish().arrayBuffer());
+    expect(Array.from(streamed)).toEqual(Array.from(zipStore(files, now)));
+    const byHelper = new Uint8Array(
+      await zipStoreBlob(files, now).arrayBuffer(),
+    );
+    expect(Array.from(byHelper)).toEqual(Array.from(streamed));
+    const back = await unzip(streamed);
+    expect(back.map((file) => file.name)).toEqual(
+      files.map((file) => file.name),
+    );
+    expect(writer.finish.bind(writer)).toThrow(ZipError);
   });
 
   it('inflates a deflate-raw entry', async () => {

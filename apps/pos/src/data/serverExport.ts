@@ -1,6 +1,6 @@
 import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
-import { zipStore } from '../admin/zip.ts';
+import { ZipStoreWriter } from '../admin/zip.ts';
 import { SyncHttpError } from '../sync/client.ts';
 import { shopRequest } from '../sync/shopApi.ts';
 import { tenantInfo } from './localTenant.ts';
@@ -101,7 +101,7 @@ async function buildOnce(
   staffId: string,
   options: { onProgress?: (progress: ServerExportProgress) => void },
 ): Promise<{
-  bytes: Uint8Array;
+  blob: Blob;
   filename: string;
   manifest: ShopExportManifest;
 }> {
@@ -138,7 +138,9 @@ async function buildOnce(
       (rank.get(left.tbl) ?? Number.MAX_SAFE_INTEGER) -
       (rank.get(right.tbl) ?? Number.MAX_SAFE_INTEGER),
   );
-  const collected: { tbl: string; rows: Record<string, unknown>[] }[] = [];
+  const writer = new ZipStoreWriter(session.exported_at);
+  const encoder = new TextEncoder();
+  const counts: { tbl: string; rows: number }[] = [];
   // A retry always starts every table from row zero. Persisting only a cursor/“done” flag
   // would make the resumed zip miss the rows fetched before the failure; re-reading with the
   // same export token is cheap enough and keeps the archive complete.
@@ -170,7 +172,9 @@ async function buildOnce(
       }
       after = result.next_after;
     }
-    collected.push({ tbl: table.tbl, rows });
+    writer.add(`json/${table.tbl}.json`, encoder.encode(JSON.stringify(rows)));
+    writer.add(`csv/${table.tbl}.csv`, encoder.encode(tableCsv(rows)));
+    counts.push({ tbl: table.tbl, rows: rows.length });
   }
   const tenant = await tenantInfo(db);
   const shop = await db.shop.get('shop');
@@ -183,31 +187,16 @@ async function buildOnce(
     exported_at: now,
     app_version: APP_VERSION,
     tenant: { id: tenant?.id ?? db.tenantId, display_name: displayName },
-    tables: Object.fromEntries(
-      collected.map((entry) => [entry.tbl, entry.rows.length]),
-    ),
+    tables: Object.fromEntries(counts.map((entry) => [entry.tbl, entry.rows])),
     source: 'server',
     snapshot_seq: session.snapshot_seq,
   };
-  const encoder = new TextEncoder();
-  const files: { name: string; data: Uint8Array }[] = [
-    {
-      name: 'manifest.json',
-      data: encoder.encode(JSON.stringify(manifest, null, 2)),
-    },
-  ];
-  for (const entry of collected) {
-    files.push({
-      name: `json/${entry.tbl}.json`,
-      data: encoder.encode(JSON.stringify(entry.rows)),
-    });
-    files.push({
-      name: `csv/${entry.tbl}.csv`,
-      data: encoder.encode(tableCsv(entry.rows)),
-    });
-  }
+  writer.add(
+    'manifest.json',
+    encoder.encode(JSON.stringify(manifest, null, 2)),
+  );
   return {
-    bytes: zipStore(files, now),
+    blob: writer.finish(),
     filename: shopExportFilename(displayName, now),
     manifest,
   };
@@ -219,7 +208,7 @@ export async function buildServerExport(
   staffId: string,
   options: { onProgress?: (progress: ServerExportProgress) => void } = {},
 ): Promise<{
-  bytes: Uint8Array;
+  blob: Blob;
   filename: string;
   manifest: ShopExportManifest;
 }> {

@@ -21,7 +21,7 @@ New supplier: name (1–60), phone (optional), address, note, opening balance ("
 
 ## Supplier detail
 
-Header: name, balance, buttons `Record delivery` (D), `Pay supplier` (P), `Return to supplier` (R), `Edit`. Ledger table like the customer khata: date, description ("Delivery #SUP-INV 552, 6 items" / "Paid · Cash" / "Returned 2 items · Faulty" / "Refund received · Cash"), you got (deliveries), you paid / returned, balance after. Each delivery row has `Return items` (opens the return form linked to that delivery). Export CSV / PDF.
+Header: name, balance, buttons `Record delivery` (D), `Pay supplier` (P), `Return to supplier` (R), `Edit`. Ledger table like the customer khata: date, description ("Delivery #SUP-INV 552, 6 items" / "Paid · Cash" / "Returned 2 items · Faulty" / "Refund received · Cash"), you got (deliveries), you paid / returned, balance after. A long ledger renders its newest 200 rows first and `Show older` appends the rest; CSV and PDF keep every row. Each delivery row has `Return items` (opens the return form linked to that delivery). Export CSV / PDF.
 
 ## Record delivery (purchase)
 

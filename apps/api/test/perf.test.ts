@@ -324,4 +324,65 @@ describe('T-062 performance', () => {
       expect(Number(usage?.rows_written ?? 0)).toBeLessThanOrEqual(19_500);
     }
   }, 60_000);
+
+  it('reads the server stock cache instead of a product’s whole movement history', async () => {
+    const shop = await seedShop('Perf history', { budget: 100_000 });
+    const now = Date.now();
+    const today = new Date(now).toISOString().slice(0, 10);
+    const day = businessDate(now);
+    // 20,000 stored movements for one product, written directly (operator import shape).
+    // The old push summed this history for every referenced product on every bill.
+    for (let chunk = 0; chunk < 10; chunk += 1) {
+      await env.DB.prepare(
+        `WITH RECURSIVE seq(n) AS (
+           SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 2000
+         )
+         INSERT INTO stock_movements
+           (tenant_id, id, product_id, qty_delta_milli, reason_code, ref_type, ref_id,
+            unit_cost, note, branch_id, device_id, staff_id, business_date, created_at)
+         SELECT ?1, printf('MV%06d', ?5 + n), ?3, 1, 'entry_fix', 'adjustment', NULL,
+           NULL, '', ?4, ?6, ?7, ?8, ?9
+         FROM seq`,
+      )
+        .bind(
+          shop.tenantId,
+          chunk,
+          IDS.product,
+          shop.branchId,
+          chunk * 2_000,
+          shop.till.id,
+          IDS.owner,
+          day,
+          now,
+        )
+        .run();
+    }
+    expect(
+      (
+        await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM stock_movements WHERE tenant_id = ?1 AND product_id = ?2',
+        )
+          .bind(shop.tenantId, IDS.product)
+          .first<{ n: number }>()
+      )?.n,
+    ).toBe(20_000);
+    // Measure only the push, not the fixture writes.
+    await env.DB.prepare(
+      'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .run();
+    const res = await pushOk(shop.till, referenceSaleOps(shop, 900));
+    expect(res.results.every((row) => row.result === 'applied')).toBe(true);
+    const usage = await env.DB.prepare(
+      'SELECT rows_read, rows_written FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .first<{ rows_read: number; rows_written: number }>();
+    // The old lookup read 20,000 movement rows for this one product. The cache lookup
+    // keeps a 9-op reference bill in the low hundreds even with that history.
+    expect(Number(usage?.rows_read ?? 0)).toBeGreaterThan(0);
+    expect(Number(usage?.rows_read ?? 0)).toBeLessThan(5_000);
+    expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(0);
+  }, 120_000);
 });

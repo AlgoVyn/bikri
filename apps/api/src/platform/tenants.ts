@@ -36,6 +36,8 @@ type TenantJoin = {
   tenant_note: string;
   tenant_owner_email: string | null;
   tenant_last_owner_export_at: number | null;
+  tenant_file_bytes: number;
+  tenant_files_initialized: number;
   tenant_support_until: number | null;
   tenant_support_reason: string;
   tenant_created_by_email: string;
@@ -72,6 +74,8 @@ export async function deviceByTokenHash(
        t.note AS tenant_note,
        t.owner_email AS tenant_owner_email,
        t.last_owner_export_at AS tenant_last_owner_export_at,
+       t.file_bytes AS tenant_file_bytes,
+       t.files_initialized AS tenant_files_initialized,
        t.support_until AS tenant_support_until,
        t.support_reason AS tenant_support_reason,
        t.created_by_email AS tenant_created_by_email,
@@ -103,6 +107,8 @@ export async function deviceByTokenHash(
     note: rest.tenant_note,
     owner_email: rest.tenant_owner_email,
     last_owner_export_at: rest.tenant_last_owner_export_at,
+    file_bytes: rest.tenant_file_bytes,
+    files_initialized: rest.tenant_files_initialized,
     support_until: rest.tenant_support_until,
     support_reason: rest.tenant_support_reason,
     created_by_email: rest.tenant_created_by_email,
@@ -163,12 +169,19 @@ export async function usageToday(
   tenantId: string,
   now: number,
 ): Promise<UsageRow> {
-  const row = await env.DB.prepare(
-    'SELECT pushes, rows_written, rows_read FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
-  )
-    .bind(tenantId, utcDay(now))
-    .first<UsageRow>();
+  const row = await usageTodayStatement(env, tenantId, now).first<UsageRow>();
   return row ?? { pushes: 0, rows_written: 0, rows_read: 0 };
+}
+
+/** The same read as `usageToday`, prepared for a caller's batch. */
+export function usageTodayStatement(
+  env: Env,
+  tenantId: string,
+  now: number,
+): D1PreparedStatement {
+  return env.DB.prepare(
+    'SELECT pushes, rows_written, rows_read FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+  ).bind(tenantId, utcDay(now));
 }
 
 /** The usage upsert that ends every push batch (03 §4.1 step 6). */

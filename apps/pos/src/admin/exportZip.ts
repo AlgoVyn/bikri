@@ -2,13 +2,14 @@ import { APP_VERSION } from '@bikri/core';
 import { type ShopExportManifest, tableCsv } from '../data/shopExport.ts';
 import { type ExportStart, exportPage, exportStart } from './api.ts';
 import { EXPORT_PAGE, exportFilename } from './format.ts';
-import { zipStore } from './zip.ts';
+import { ZipStoreWriter } from './zip.ts';
 
 export type ExportProgress = { tbl: string; done: number; total: number };
 
 export type BuiltExport = {
   filename: string;
-  bytes: Uint8Array;
+  /** Blob parts are appended per table; no full-archive Uint8Array copy is made. */
+  blob: Blob;
   tables: { tbl: string; rows: number }[];
 };
 
@@ -51,7 +52,8 @@ export async function buildTenantExport(
   // manifest whose table counts and pages disagree.
   const exportedAt = start.exported_at ?? Date.now();
   const encoder = new TextEncoder();
-  const collected: { tbl: string; rows: Record<string, unknown>[] }[] = [];
+  const writer = new ZipStoreWriter(exportedAt);
+  const tables: { tbl: string; rows: number }[] = [];
   for (const table of start.tables) {
     onProgress({ tbl: table.tbl, done: 0, total: table.rows });
     const rows = await readTable(
@@ -61,7 +63,9 @@ export async function buildTenantExport(
       onProgress,
       exportedAt,
     );
-    collected.push({ tbl: table.tbl, rows });
+    writer.add(`json/${table.tbl}.json`, encoder.encode(JSON.stringify(rows)));
+    writer.add(`csv/${table.tbl}.csv`, encoder.encode(tableCsv(rows)));
+    tables.push({ tbl: table.tbl, rows: rows.length });
   }
   const manifest: ShopExportManifest = {
     format: 'bikri-export',
@@ -73,32 +77,16 @@ export async function buildTenantExport(
       display_name: start.tenant.display_name,
     },
     snapshot_seq: start.snapshot_seq,
-    tables: Object.fromEntries(
-      collected.map((table) => [table.tbl, table.rows.length]),
-    ),
+    tables: Object.fromEntries(tables.map((table) => [table.tbl, table.rows])),
   };
-  const files = [
-    {
-      name: 'manifest.json',
-      data: encoder.encode(JSON.stringify(manifest, null, 2)),
-    },
-    ...collected.flatMap((table) => [
-      {
-        name: `json/${table.tbl}.json`,
-        data: encoder.encode(JSON.stringify(table.rows)),
-      },
-      {
-        name: `csv/${table.tbl}.csv`,
-        data: encoder.encode(tableCsv(table.rows)),
-      },
-    ]),
-  ];
+  // The manifest is appended last because its counts are only known after every page.
+  writer.add(
+    'manifest.json',
+    encoder.encode(JSON.stringify(manifest, null, 2)),
+  );
   return {
     filename: exportFilename(start.tenant.slug, exportedAt),
-    bytes: zipStore(files, exportedAt),
-    tables: collected.map((table) => ({
-      tbl: table.tbl,
-      rows: table.rows.length,
-    })),
+    blob: writer.finish(),
+    tables,
   };
 }

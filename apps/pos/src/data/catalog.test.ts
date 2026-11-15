@@ -19,6 +19,7 @@ import {
   type ProductListRow,
   type ProductSort,
   productDetail,
+  productStockHistory,
   productsCsv,
   removeCategory,
   removeProduct,
@@ -102,6 +103,48 @@ describe('products (screens/08)', () => {
       ]),
     ).toEqual([['opening', 20000, 'Adnan']]);
     expect(detail?.barcodes.map((b) => b.barcode)).toEqual(['8901234567890']);
+  });
+
+  it('pages a long stock history and keeps the full CSV source', async () => {
+    const db = await readyDb('cat-history');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, opening_milli: 20000, barcodes: [] },
+      ctx,
+      { now: NOW - 20_000 },
+    );
+    await db.stock_movements.bulkAdd(
+      Array.from({ length: 250 }, (_, index) => ({
+        id: `mv-${index}`,
+        product_id: p.id,
+        qty_delta_milli: 1,
+        reason_code: 'entry_fix',
+        ref_type: 'adjustment',
+        ref_id: null,
+        unit_cost: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: businessDate(NOW),
+        created_at: NOW - 250 + index,
+      })) as never,
+    );
+    await db.stock_levels.put({
+      product_id: p.id,
+      on_hand_milli: 20_250,
+    });
+    const first = await productDetail(db, p.id, NOW, 200);
+    expect(first?.history).toHaveLength(200);
+    expect(first?.hasMoreHistory).toBe(true);
+    expect(first?.history[0]?.movement.created_at).toBe(NOW - 1);
+    expect(first?.history[0]?.balanceAfter).toBe(20_250);
+    expect(first?.history[1]?.balanceAfter).toBe(20_249);
+    const all = await productDetail(db, p.id, NOW, 300);
+    expect(all?.history).toHaveLength(251);
+    expect(all?.hasMoreHistory).toBe(false);
+    expect(await productStockHistory(db, p.id)).toHaveLength(251);
   });
 
   it("uses each sale's tax snapshot in the 14-day revenue", async () => {

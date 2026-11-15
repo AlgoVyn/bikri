@@ -248,7 +248,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
             t.id,
           ),
           DB.prepare(
-            "UPDATE tenants SET status = 'deleted', deleted_at = ?2, owner_email = NULL, note = '', support_reason = '', support_until = NULL, status_reason = '', updated_at = ?2, status_changed_at = ?2, status_changed_by = 'cron' WHERE id = ?1",
+            "UPDATE tenants SET status = 'deleted', deleted_at = ?2, owner_email = NULL, note = '', support_reason = '', support_until = NULL, status_reason = '', file_bytes = 0, files_initialized = 1, updated_at = ?2, status_changed_at = ?2, status_changed_by = 'cron' WHERE id = ?1",
           ).bind(t.id, now),
         ]),
       );

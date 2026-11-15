@@ -78,7 +78,9 @@ describe('owner server export (T-053, 13 §7.3)', () => {
     });
     expect(progress).toContain('products:1');
     expect(progress).toContain('products:2');
-    const entries = await unzip(result.bytes);
+    const entries = await unzip(
+      new Uint8Array(await result.blob.arrayBuffer()),
+    );
     const names = entries.map((entry) => entry.name);
     expect(names).toContain('manifest.json');
     expect(names).toContain('json/products.json');
@@ -153,7 +155,9 @@ describe('owner server export (T-053, 13 §7.3)', () => {
     expect(resumed.manifest.snapshot_seq).toBe(7);
     // A resumed export must re-read every table; persisting only a “done” flag would drop
     // products, which had already been fetched before the failed sales page.
-    const entries = await unzip(resumed.bytes);
+    const entries = await unzip(
+      new Uint8Array(await resumed.blob.arrayBuffer()),
+    );
     const names = entries.map((entry) => entry.name);
     expect(names).toContain('json/products.json');
     expect(names).toContain('json/sales.json');
