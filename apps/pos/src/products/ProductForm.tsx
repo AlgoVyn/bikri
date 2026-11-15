@@ -37,6 +37,7 @@ import { categoryName } from '../lib/category.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { qtyWithUnit } from './format.ts';
 import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
 
@@ -138,15 +139,23 @@ export function ProductFormPage({
   const [errors, setErrors] = useState<Errors>({});
   const [confirmFree, setConfirmFree] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmUntrack, setConfirmUntrack] = useState(false);
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const pendingAnother = useRef(false);
+  const pendingFreeConfirmed = useRef(false);
+  const untrackDialogConfirmed = useRef(false);
   const pendingSave = useRef(false);
   const [existingKey, setExistingKey] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
   const existingUrl = useFileUrl(existingKey);
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
+  const onHand =
+    useLiveQuery(async () => {
+      if (!editId) return 0;
+      return (await getDb().stock_levels.get(editId))?.on_hand_milli ?? 0;
+    }, [editId]) ?? 0;
   const catalogue = useLiveQuery(async () => {
     const all = await getDb().products.toArray();
     const brands = new Set<string>();
@@ -176,6 +185,9 @@ export function ProductFormPage({
   const showCost = can('cost.view');
   const isEdit = editId !== undefined;
   const backId = editId ?? duplicateOf;
+  const wantsUntrack =
+    isEdit && initial.track_stock && draft?.track_stock === false;
+  const onHandQty = qtyWithUnit(t, onHand, draft?.unit ?? 'pc');
 
   useEffect(() => {
     const sourceId = editId ?? duplicateOf;
@@ -234,7 +246,8 @@ export function ProductFormPage({
     () => (dirty ? setConfirmDiscard(true) : leave()),
     {
       inFields: true,
-      enabled: draft !== null && !confirmFree && !confirmDiscard,
+      enabled:
+        draft !== null && !confirmFree && !confirmDiscard && !confirmUntrack,
     },
   );
 
@@ -301,7 +314,11 @@ export function ProductFormPage({
     }
   }
 
-  async function submit(another: boolean, freeConfirmed = false) {
+  async function submit(
+    another: boolean,
+    freeConfirmed = false,
+    untrackConfirmed = false,
+  ) {
     if (pendingSave.current || !draft) return;
     // Set synchronously: a double click must not start a second product (two ids).
     pendingSave.current = true;
@@ -316,6 +333,12 @@ export function ProductFormPage({
       if (draft.price === 0 && !freeConfirmed) {
         setConfirmFree(true);
         pendingAnother.current = another;
+        return;
+      }
+      if (wantsUntrack && !untrackConfirmed) {
+        setConfirmUntrack(true);
+        pendingAnother.current = another;
+        pendingFreeConfirmed.current = freeConfirmed;
         return;
       }
       const db = getDb();
@@ -795,9 +818,13 @@ export function ProductFormPage({
             </div>
             <label className="flex min-h-11 items-center gap-3 self-end">
               <input
+                id={fieldId('track_stock')}
                 type="checkbox"
                 role="switch"
                 aria-checked={draft.track_stock}
+                aria-describedby={
+                  wantsUntrack ? `${fieldId('track_stock')}-warn` : undefined
+                }
                 className="size-5"
                 checked={draft.track_stock}
                 onChange={(e) => set('track_stock', e.target.checked)}
@@ -805,6 +832,16 @@ export function ProductFormPage({
               {t('form.track_stock')}
             </label>
           </div>
+
+          {wantsUntrack ? (
+            <p
+              id={`${fieldId('track_stock')}-warn`}
+              role="status"
+              className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+            >
+              {t('form.track_off_warn', { qty: onHandQty })}
+            </p>
+          ) : null}
 
           {draft.track_stock ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -945,6 +982,30 @@ export function ProductFormPage({
         onConfirm={() => {
           setConfirmDiscard(false);
           leave();
+        }}
+      />
+      <ConfirmDialog
+        open={confirmUntrack}
+        onOpenChange={(open) => {
+          // Dismissing or "Keep tracking" restores the switch, so the form never
+          // stays in the untracked state after a cancelled save.
+          if (!open && !untrackDialogConfirmed.current)
+            set('track_stock', true);
+          untrackDialogConfirmed.current = false;
+          setConfirmUntrack(open);
+        }}
+        title={t('form.track_off_title', { name: draft.name_en })}
+        body={t('form.track_off_body', { qty: onHandQty })}
+        confirmLabel={t('form.track_off_confirm')}
+        cancelLabel={t('form.track_off_keep')}
+        onConfirm={() => {
+          untrackDialogConfirmed.current = true;
+          setConfirmUntrack(false);
+          void submit(
+            pendingAnother.current,
+            pendingFreeConfirmed.current,
+            true,
+          );
         }}
       />
     </form>

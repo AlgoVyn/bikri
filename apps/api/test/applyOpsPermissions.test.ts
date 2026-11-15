@@ -199,6 +199,25 @@ describe('derived-ledger permissions (05 §5, 07 §5)', () => {
     ]);
   });
 
+  it('accepts a product tracking-change audit from a till', async () => {
+    const shop = await seedShop('Track stock audit');
+    const now = Date.now();
+    const res = await pushOk(shop.admin, [
+      op('audit_log', 'insert', {
+        id: newId(),
+        action: 'track_stock_change',
+        entity: 'products',
+        entity_id: IDS.product,
+        before_json: '{"track_stock":1}',
+        after_json: '{"track_stock":0}',
+        device_id: shop.admin.id,
+        staff_id: IDS.owner,
+        created_at: now,
+      }),
+    ]);
+    expect(res.results[0]).toMatchObject({ result: 'applied' });
+  });
+
   it('accepts a costed stock-in with stock.adjust but without catalog.edit', async () => {
     const shop = await seedShop('Costed stock-in');
     await env.DB.prepare(

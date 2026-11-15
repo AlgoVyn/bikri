@@ -121,6 +121,50 @@ export function ProductDetailPage({
   const totalQty = detail.last14.reduce((s, d) => s + d.qty, 0);
   const totalRevenue = detail.last14.reduce((s, d) => s + d.revenue, 0);
 
+  const historyView = detail.history.map((h) => {
+    if (h.kind === 'movement') {
+      const delta = Number(h.movement.qty_delta_milli);
+      return {
+        key: `movement-${String(h.movement.id)}`,
+        at: Number(h.movement.created_at),
+        reason: t(`stock.reason.${String(h.movement.reason_code)}`),
+        note: null,
+        qty: `${delta > 0 ? '+' : '−'}${formatQtyFromMilli(Math.abs(delta), unit)}`,
+        tone: delta < 0 ? 'text-danger' : 'text-success',
+        balance: formatQtyFromMilli(h.balanceAfter, unit),
+        by: h.staffName,
+      };
+    }
+    const minChanged =
+      h.minStockBefore !== null &&
+      h.minStockAfter !== null &&
+      h.minStockBefore !== h.minStockAfter;
+    const minText = minChanged
+      ? t('products.track_min_change', {
+          from:
+            h.minStockBefore && h.minStockBefore > 0
+              ? qtyWithUnit(t, h.minStockBefore, unit)
+              : t('products.min_stock_off'),
+          to:
+            h.minStockAfter && h.minStockAfter > 0
+              ? qtyWithUnit(t, h.minStockAfter, unit)
+              : t('products.min_stock_off'),
+        })
+      : null;
+    return {
+      key: `tracking-${String(h.audit.id)}`,
+      at: Number(h.audit.created_at),
+      reason: t(
+        h.trackStock === 1 ? 'stock.reason.track_on' : 'stock.reason.track_off',
+      ),
+      note: minText,
+      qty: null,
+      tone: '',
+      balance: formatQtyFromMilli(h.balanceAfter, unit),
+      by: h.staffName,
+    };
+  });
+
   const addToSale = async () => {
     try {
       await mutateCart(activeCart, (cart) =>
@@ -141,13 +185,27 @@ export function ProductDetailPage({
     downloadText(
       `stock-history-${String(p.sku)}.csv`,
       stockHistoryCsv(
-        all.map((h) => ({
-          at: Number(h.movement.created_at),
-          reason: String(h.movement.reason_code),
-          qty: formatQtyFromMilli(Number(h.movement.qty_delta_milli), unit),
-          balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
-          by: h.staffName,
-        })),
+        all.map((h) =>
+          h.kind === 'movement'
+            ? {
+                at: Number(h.movement.created_at),
+                reason: String(h.movement.reason_code),
+                qty: formatQtyFromMilli(
+                  Number(h.movement.qty_delta_milli),
+                  unit,
+                ),
+                balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
+                by: h.staffName,
+              }
+            : {
+                at: Number(h.audit.created_at),
+                reason:
+                  h.trackStock === 1 ? 'track_stock_on' : 'track_stock_off',
+                qty: '',
+                balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
+                by: h.staffName,
+              },
+        ),
         timeZone,
       ),
     );
@@ -469,90 +527,87 @@ export function ProductDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.history.map((h) => {
-                    const delta = Number(h.movement.qty_delta_milli);
-                    return (
-                      <tr
-                        key={h.movement.id}
-                        className="border-t border-border"
+                  {historyView.map((h) => (
+                    <tr key={h.key} className="border-t border-border">
+                      <td className="px-3 py-2">
+                        <bdi dir="ltr" className="text-small">
+                          {formatTimestamp(h.at, i18n.language, timeZone)}
+                        </bdi>
+                      </td>
+                      <td className="px-3 py-2">
+                        {h.reason}
+                        {h.note ? (
+                          <span className="block text-small text-text-muted">
+                            {h.note}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-start ${h.tone}`}
+                        data-testid={
+                          h.qty === null ? 'history-change' : undefined
+                        }
                       >
-                        <td className="px-3 py-2">
-                          <bdi dir="ltr" className="text-small">
-                            {formatTimestamp(
-                              Number(h.movement.created_at),
-                              i18n.language,
-                              timeZone,
-                            )}
-                          </bdi>
-                        </td>
-                        <td className="px-3 py-2">
-                          {t(`stock.reason.${String(h.movement.reason_code)}`)}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-start ${delta < 0 ? 'text-danger' : 'text-success'}`}
-                        >
-                          <bdi dir="ltr">
-                            {delta > 0 ? '+' : '−'}
-                            {formatQtyFromMilli(Math.abs(delta), unit)}
-                          </bdi>
-                        </td>
-                        <td
-                          className="px-3 py-2 text-start"
-                          data-testid="history-balance"
-                        >
-                          <bdi dir="ltr">
-                            {formatQtyFromMilli(h.balanceAfter, unit)}
-                          </bdi>
-                        </td>
-                        <td className="px-3 py-2">{h.staffName}</td>
-                      </tr>
-                    );
-                  })}
+                        {h.qty === null ? (
+                          <span className="text-text-muted">—</span>
+                        ) : (
+                          <bdi dir="ltr">{h.qty}</bdi>
+                        )}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-start"
+                        data-testid="history-balance"
+                      >
+                        <bdi dir="ltr">{h.balance}</bdi>
+                      </td>
+                      <td className="px-3 py-2">{h.by}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <ul className="flex flex-col rounded-card border border-border bg-surface sm:hidden">
-              {detail.history.map((h) => {
-                const delta = Number(h.movement.qty_delta_milli);
-                return (
-                  <li
-                    key={h.movement.id}
-                    className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 font-medium">
-                        {t(`stock.reason.${String(h.movement.reason_code)}`)}
-                      </span>
-                      <span
-                        className={`shrink-0 tabular-nums ${delta < 0 ? 'text-danger' : 'text-success'}`}
-                      >
-                        <bdi dir="ltr">
-                          {delta > 0 ? '+' : '−'}
-                          {formatQtyFromMilli(Math.abs(delta), unit)}
-                        </bdi>
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-small text-text-muted">
-                      <bdi dir="ltr">
-                        {formatTimestamp(
-                          Number(h.movement.created_at),
-                          i18n.language,
-                          timeZone,
-                        )}
-                      </bdi>
-                      <span>
-                        {t('products.history_balance')}:{' '}
-                        <bdi dir="ltr" data-testid="history-balance">
-                          {formatQtyFromMilli(h.balanceAfter, unit)}
-                        </bdi>
-                      </span>
-                      {h.staffName ? (
-                        <span className="basis-full">{h.staffName}</span>
+              {historyView.map((h) => (
+                <li
+                  key={h.key}
+                  className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 font-medium">
+                      {h.reason}
+                      {h.note ? (
+                        <span className="block text-small font-normal text-text-muted">
+                          {h.note}
+                        </span>
                       ) : null}
-                    </div>
-                  </li>
-                );
-              })}
+                    </span>
+                    <span
+                      className={`shrink-0 tabular-nums ${h.tone}`}
+                      data-testid={
+                        h.qty === null ? 'history-change' : undefined
+                      }
+                    >
+                      {h.qty === null ? (
+                        <span className="text-text-muted">—</span>
+                      ) : (
+                        <bdi dir="ltr">{h.qty}</bdi>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-small text-text-muted">
+                    <bdi dir="ltr">
+                      {formatTimestamp(h.at, i18n.language, timeZone)}
+                    </bdi>
+                    <span>
+                      {t('products.history_balance')}:{' '}
+                      <bdi dir="ltr" data-testid="history-balance">
+                        {h.balance}
+                      </bdi>
+                    </span>
+                    {h.by ? <span className="basis-full">{h.by}</span> : null}
+                  </div>
+                </li>
+              ))}
             </ul>
             {detail.hasMoreHistory ? (
               <button

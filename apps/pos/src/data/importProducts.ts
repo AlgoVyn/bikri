@@ -506,7 +506,11 @@ export async function runImport(
       // product + its barcodes + an opening movement/category; a large barcode list
       // must shrink the chunk instead of overflowing the 200-op action limit.
       const rowCost =
-        2 + row.parsed.barcodes.length + (row.parsed.category ? 1 : 0);
+        // product + opening movement + any price/track-stock audit
+        2 +
+        (row.action === 'update' ? 2 : 0) +
+        row.parsed.barcodes.length +
+        (row.parsed.category ? 1 : 0);
       if (chunk.length > 0 && cost + rowCost > MAX_IMPORT_OPS) break;
       chunk.push(row);
       cost += rowCost;
@@ -579,6 +583,34 @@ export async function runImport(
               id,
               { price: before.price },
               { price: p.price },
+            );
+          }
+          const beforeTrack = Number(before.track_stock) === 1 ? 1 : 0;
+          const afterTrack =
+            p.track_stock === null ? beforeTrack : p.track_stock ? 1 : 0;
+          if (beforeTrack !== afterTrack) {
+            const minBefore = Number(before.min_stock_milli ?? 0);
+            const minAfter =
+              p.min_stock_milli !== null
+                ? p.min_stock_milli
+                : Number(before.min_stock_milli ?? 0);
+            const auditBefore: Record<string, number> = {
+              track_stock: beforeTrack,
+            };
+            const auditAfter: Record<string, number> = {
+              track_stock: afterTrack,
+            };
+            if (minBefore !== minAfter) {
+              auditBefore.min_stock_milli = minBefore;
+              auditAfter.min_stock_milli = minAfter;
+            }
+            await productAudit(
+              w,
+              ctx,
+              'track_stock_change',
+              id,
+              auditBefore,
+              auditAfter,
             );
           }
           const have = new Set(

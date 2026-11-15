@@ -32,7 +32,7 @@ Cards:
 1. **Price** Rs 1,499 · **Avg cost** Rs 1,120 · **Last cost** Rs 1,200 · **Profit per item** Rs 379 · **Margin** 25.3% (margin = (price − avg)/price; cost cards only with `cost.view`).
 2. **Stock**: on hand (derived from `stock_movements`), min stock, stock value (`cost.view`).
 3. **Last 14 days**: bar chart of qty sold per day (local data), total sold, revenue.
-4. **Stock history**: list of movements newest first — date/time, reason (localised), ± qty, balance after, by whom, link to bill/delivery. The screen renders the newest 200 rows and appends older rows with `Show older`; Export CSV still writes the product's full history.
+4. **Stock history**: list of movements and stock-tracking changes newest first — date/time, reason (localised), ± qty (`—` for a tracking change), balance after, by whom, link to bill/delivery. A tracking change row also shows the low-stock alert before → after when it changed. The screen renders the newest 200 movements plus any tracking changes in that time window and appends older rows with `Show older`; Export CSV still writes the product's full history (tracking rows use `track_stock_off` / `track_stock_on`).
 
 ## Add / edit product
 
@@ -51,12 +51,12 @@ Single page form (sheet on mobile). Sections:
 | Cost price | `MoneyInput` | `cost.view` only; on create becomes opening `unit_cost` |
 | Opening stock | `QtyInput` | create only; writes `stock_movements` `opening` with unit cost; later changes go through Adjust stock |
 | Unit | select pc, pair, set, box, pack, dozen, m, kg, g, l, ml | default pc |
-| Track stock | switch | default on; off hides stock fields (services, quick items) |
+| Track stock | switch | default on; off hides stock fields (services, quick items). Turning it off on a product that had it on shows an inline warning and asks for confirmation before saving: the current stock and history stay, sales/deliveries stop changing it and the low-stock alert is cleared. Cancelling the confirmation (or pressing Esc) puts the switch back on |
 | Low stock alert at | `QtyInput` | default 0 = off → `min_stock_milli` |
 | Warranty | select None / 7 days / 1 month / 3 / 6 / 12 months / custom days | printed on receipt line "Warranty till 26-04-2027" when > 0 |
 | Notes | textarea 0–500 | |
 
-Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price or cost change writes `audit_log` `price_change` / `cost_change`. Editing cost on an existing product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
+Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price or cost change writes `audit_log` `price_change` / `cost_change`. Turning tracking on or off writes `audit_log` `track_stock_change` (with the old/new low-stock alert when it changes); it never writes a stock movement, so existing stock stays but is frozen while untracked. Editing cost on an existing product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
 
 Delete: only if not referenced by an unsynced op; soft delete (`deleted_at`), product disappears from Sell, history remains. `audit_log product_delete`.
 
@@ -82,3 +82,4 @@ List with drag to reorder (`sort_order`), rename, colour (the 8 Algovyn-based ti
 6. Bulk +10% with Rs 10 rounding turns Rs 1,499 into Rs 1,650.
 7. `Duplicate` on "Type-C cable 1 m white" opens a new product with the same category, brand, price, cost, unit and warranty, and empty SKU, barcodes, photo and opening stock; saving creates a separate product.
 7. Stock history balance-after column matches on hand after the latest row.
+8. Turning `Track stock` off on a tracked product shows the warning and asks before saving; after confirming, no stock movement is written, the old on-hand and history stay, and Stock history gains a "Stock tracking turned off" row showing the on-hand balance at that moment.

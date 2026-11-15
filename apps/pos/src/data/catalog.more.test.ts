@@ -113,7 +113,15 @@ describe('catalog edge cases', () => {
       ctx,
     );
     expect((await db.products.get(cab.id))?.track_stock).toBe(0);
-    expect(await db.audit_log.count()).toBe(0);
+    const audits = await db.audit_log.toArray();
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'track_stock_change',
+      entity: 'products',
+      entity_id: cab.id,
+      before_json: '{"track_stock":1}',
+      after_json: '{"track_stock":0}',
+    });
     expect(
       (await listProducts(db, { sort: 'stock' })).map((r) => r.product.id),
     ).toEqual([svc.id, cab.id]);

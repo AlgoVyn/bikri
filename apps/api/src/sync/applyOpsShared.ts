@@ -82,6 +82,7 @@ export const CLIENT_AUDIT_ACTIONS = new Set([
   'stock_count',
   'supplier_return',
   'sync_ops_discarded',
+  'track_stock_change',
   'void',
 ]);
 export const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {

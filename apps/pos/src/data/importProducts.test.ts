@@ -177,6 +177,15 @@ describe('import spreadsheet (screens/08)', () => {
       .filter((r) => r.action === 'price_change')
       .toArray();
     expect(audit.map((r) => r.entity_id)).toEqual([a.id]);
+    const trackAudit = await db.audit_log
+      .filter((r) => r.action === 'track_stock_change')
+      .toArray();
+    expect(trackAudit).toHaveLength(1);
+    expect(trackAudit[0]).toMatchObject({
+      entity_id: b.id,
+      before_json: '{"track_stock":1}',
+      after_json: '{"track_stock":0}',
+    });
   });
 
   it('rejects names and categories over the D1 schema limits', async () => {

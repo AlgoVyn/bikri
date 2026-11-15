@@ -413,6 +413,7 @@ for (const action of [
   'branch_change',
   'price_change',
   'cost_change',
+  'track_stock_change',
   'credit_limit_change',
   'override',
   'void',

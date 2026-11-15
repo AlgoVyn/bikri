@@ -898,6 +898,7 @@
       "action_shop_change": "Shop settings",
       "action_staff_change": "Staff changes",
       "action_stock_count": "Stock count",
+      "action_track_stock_change": "Stock tracking change",
       "action_support_access_end": "Support access ended",
       "action_support_access_start": "Support access started",
       "action_sync_ops_discarded": "Sync ops discarded",

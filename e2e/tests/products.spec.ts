@@ -122,6 +122,52 @@ test.describe('Products (T-014)', () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test('turning stock tracking off warns before saving and appears in history', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    await addCable(page);
+    await page.getByRole('link', { name: 'Edit', exact: true }).click();
+    await page.getByRole('switch', { name: 'Track stock' }).click();
+    await expect(page.getByText(/Stock tracking will stop\./u)).toBeVisible();
+
+    // The save is blocked until the owner confirms the freeze.
+    await page.getByRole('button', { name: /^Save/ }).last().click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Stop tracking stock for Type-C cable 1 m white?',
+      }),
+    ).toBeVisible();
+    await expect(page.getByText(/Current stock: 20 pc\./u)).toBeVisible();
+    await page.getByRole('button', { name: 'Keep tracking' }).click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Stop tracking stock for Type-C cable 1 m white?',
+      }),
+    ).toBeHidden();
+    await expect(
+      page.getByRole('switch', { name: 'Track stock' }),
+    ).toBeChecked();
+
+    await page.getByRole('switch', { name: 'Track stock' }).click();
+    await page.getByRole('button', { name: /^Save/ }).last().click();
+    await page.getByRole('button', { name: 'Turn off tracking' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Type-C cable 1 m white' }),
+    ).toBeVisible();
+    await expect(page.getByTestId('detail-on-hand')).toHaveCount(0);
+    await expect(
+      page
+        .getByText('Stock tracking turned off', { exact: true })
+        .filter({ visible: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('history-change').filter({ visible: true }),
+    ).toContainText('—');
+    await expect(page.getByTestId('history-balance').first()).toHaveText('20');
+    await expectNoSeriousAxe(page);
+  });
+
   test('Urdu: RTL form and list', async ({ page }) => {
     await openReadyShop(page, '/bikri/products/new');
     await setLanguage(page, 'ur');
@@ -144,6 +190,26 @@ test.describe('Products (T-014)', () => {
     await expect(page.getByTestId('detail-on-hand')).toContainText('5 عدد');
     await expect(page.getByText('چارجر')).toBeVisible();
     await expectNoSeriousAxe(page);
+
+    // Turning tracking off warns in Urdu and can be cancelled before saving.
+    await page.getByRole('link', { name: 'تبدیل کریں' }).click();
+    await page.getByRole('switch', { name: 'اسٹاک ٹریک کریں' }).click();
+    await expect(page.getByText(/اسٹاک ٹریکنگ بند ہو جائے گی/u)).toBeVisible();
+    await page
+      .getByRole('button', { name: /^محفوظ کریں/ })
+      .last()
+      .click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Charger 20W کے لیے اسٹاک ٹریکنگ بند کریں؟',
+      }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'ٹریکنگ آن رکھیں' }).click();
+    await expect(
+      page.getByRole('switch', { name: 'اسٹاک ٹریک کریں' }),
+    ).toBeChecked();
+    await expectNoSeriousAxe(page);
+
     await page.goto('/bikri/products');
     await expect(page.getByText('1 مصنوع', { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page);

@@ -319,11 +319,25 @@ export async function listProducts(
   return filterAndSortProducts(rows, opts);
 }
 
-export type HistoryRow = {
+export type MovementHistoryRow = {
+  kind: 'movement';
   movement: SyncedRow;
   balanceAfter: number;
   staffName: string;
 };
+
+/** A tracking switch change has no quantity; its balance is the on-hand at that moment. */
+export type TrackingHistoryRow = {
+  kind: 'tracking';
+  audit: SyncedRow;
+  trackStock: 0 | 1;
+  minStockBefore: number | null;
+  minStockAfter: number | null;
+  balanceAfter: number;
+  staffName: string;
+};
+
+export type HistoryRow = MovementHistoryRow | TrackingHistoryRow;
 
 /** Stock-history rows shown before "Show older"; CSV export still reads them all. */
 export const PRODUCT_HISTORY_PAGE = 200;
@@ -340,41 +354,134 @@ export type ProductDetail = {
   last14: { date: string; qty: number; revenue: number }[];
 };
 
+function parsedHistoryJson(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed !== null && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function trackingHistoryRow(audit: SyncedRow): TrackingHistoryRow {
+  const before = parsedHistoryJson(audit.before_json);
+  const after = parsedHistoryJson(audit.after_json);
+  return {
+    kind: 'tracking',
+    audit,
+    trackStock: Number(after?.track_stock) === 1 ? 1 : 0,
+    minStockBefore:
+      before !== null && 'min_stock_milli' in before
+        ? Number(before.min_stock_milli)
+        : null,
+    minStockAfter:
+      after !== null && 'min_stock_milli' in after
+        ? Number(after.min_stock_milli)
+        : null,
+    balanceAfter: 0,
+    staffName: '',
+  };
+}
+
+function historyAt(row: HistoryRow): number {
+  return Number(
+    row.kind === 'movement' ? row.movement.created_at : row.audit.created_at,
+  );
+}
+
+function historyId(row: HistoryRow): string {
+  return String(row.kind === 'movement' ? row.movement.id : row.audit.id);
+}
+
+async function loadHistory(
+  db: BikriDb,
+  id: string,
+  limit: number,
+): Promise<{ rows: HistoryRow[]; hasMore: boolean }> {
+  const page = Number.isFinite(limit);
+  const wanted = page
+    ? Math.max(1, Math.floor(limit))
+    : Number.POSITIVE_INFINITY;
+  const base = db.stock_movements
+    .where('[product_id+created_at]')
+    .between([id, 0], [id, Infinity]);
+  const movements = page
+    ? await base
+        .reverse()
+        .limit(wanted + 1)
+        .toArray()
+    : await base.reverse().toArray();
+  const hasMore = page && movements.length > wanted;
+  const shownMovements = hasMore ? movements.slice(0, wanted) : movements;
+  const oldestShown = shownMovements.at(-1);
+  const audits = (
+    await db.audit_log
+      .where('[entity+entity_id]')
+      .equals(['products', id])
+      .toArray()
+  ).filter((audit) => audit.action === 'track_stock_change');
+  // A page of movements must not jump over a tracking change and show an old one
+  // next to newer movements; the event appears when "Show older" reaches it.
+  const shownAudits =
+    hasMore && oldestShown
+      ? audits.filter(
+          (audit) => Number(audit.created_at) >= Number(oldestShown.created_at),
+        )
+      : audits;
+  const staff = new Map(
+    (await db.staff.toArray()).map((s) => [s.id, String(s.name ?? '')]),
+  );
+  const rows = [
+    ...shownMovements.map(
+      (movement): HistoryRow => ({
+        kind: 'movement',
+        movement,
+        balanceAfter: 0,
+        staffName: staff.get(String(movement.staff_id)) ?? '',
+      }),
+    ),
+    ...shownAudits.map((audit): HistoryRow => {
+      const row = trackingHistoryRow(audit);
+      row.staffName = staff.get(String(audit.staff_id)) ?? '';
+      return row;
+    }),
+  ].sort(
+    (a, b) =>
+      historyAt(b) - historyAt(a) || historyId(b).localeCompare(historyId(a)),
+  );
+  let running = (await db.stock_levels.get(id))?.on_hand_milli ?? 0;
+  for (const row of rows) {
+    row.balanceAfter = running;
+    if (row.kind === 'movement')
+      running -= Number(row.movement.qty_delta_milli);
+  }
+  return { rows, hasMore };
+}
+
 /**
- * One product's movements, newest first, with the running balance after each.
- *
- * A product can accumulate thousands of movements; the screen pages them. The balance
- * starts at the cached on-hand so a page does not need to read the older history, then
- * subtracts each newer delta as it walks back. `productStockHistory(db, id)` with no
- * limit still returns everything for the CSV export.
+ * One product's movements and tracking changes, newest first, with the running balance
+ * after each. A product can accumulate thousands of movements; the screen pages them via
+ * `productStockHistoryPage`. `productStockHistory(db, id)` with no limit returns everything
+ * for the CSV export.
  */
 export async function productStockHistory(
   db: BikriDb,
   id: string,
   limit = Number.POSITIVE_INFINITY,
 ): Promise<HistoryRow[]> {
-  const base = db.stock_movements
-    .where('[product_id+created_at]')
-    .between([id, 0], [id, Infinity]);
-  const movements = Number.isFinite(limit)
-    ? await base
-        .reverse()
-        .limit(Math.max(1, Math.floor(limit)))
-        .toArray()
-    : await base.reverse().toArray();
-  let running = (await db.stock_levels.get(id))?.on_hand_milli ?? 0;
-  const staff = new Map(
-    (await db.staff.toArray()).map((s) => [s.id, String(s.name ?? '')]),
-  );
-  return movements.map((movement) => {
-    const row: HistoryRow = {
-      movement,
-      balanceAfter: running,
-      staffName: staff.get(String(movement.staff_id)) ?? '',
-    };
-    running -= Number(movement.qty_delta_milli);
-    return row;
-  });
+  return (await loadHistory(db, id, limit)).rows;
+}
+
+/** The screen's page: `limit` movements plus the tracking changes that fall in that window. */
+export async function productStockHistoryPage(
+  db: BikriDb,
+  id: string,
+  limit: number,
+): Promise<{ rows: HistoryRow[]; hasMore: boolean }> {
+  return loadHistory(db, id, limit);
 }
 
 export async function productDetail(
@@ -391,13 +498,9 @@ export async function productDetail(
   const barcodes = live(
     await db.product_barcodes.where('product_id').equals(id).toArray(),
   );
-  // Read one extra row to know whether "Show older" is needed, without a second
-  // index count over a long history.
-  const historyPlus = await productStockHistory(db, id, historyLimit + 1);
-  const hasMoreHistory = historyPlus.length > historyLimit;
-  const history = hasMoreHistory
-    ? historyPlus.slice(0, historyLimit)
-    : historyPlus;
+  // Read one extra movement to know whether "Show older" is needed, without a
+  // second index count over a long history.
+  const historyPage = await productStockHistoryPage(db, id, historyLimit);
   const days: ProductDetail['last14'] = [];
   for (let i = 13; i >= 0; i -= 1)
     days.push({ date: businessDate(now - i * DAY_MS), qty: 0, revenue: 0 });
@@ -488,8 +591,8 @@ export async function productDetail(
     category,
     barcodes,
     onHand: (await db.stock_levels.get(id))?.on_hand_milli ?? 0,
-    history,
-    hasMoreHistory,
+    history: historyPage.rows,
+    hasMoreHistory: historyPage.hasMore,
     last14: days,
   };
 }
@@ -659,7 +762,8 @@ export async function saveNewProduct(
 /**
  * Edits a product (screens/08): barcodes are added/removed as rows; a price change writes
  * `price_change`; a cost change sets `last_cost` only (avg cost history is untouched) and
- * writes `cost_change`.
+ * writes `cost_change`; turning tracking on/off writes `track_stock_change` (with the
+ * cleared low-stock alert when it changes).
  */
 export async function saveProductEdit(
   db: BikriDb,
@@ -718,6 +822,28 @@ export async function saveProductEdit(
           id,
           { last_cost: before.last_cost },
           { last_cost: input.cost },
+        );
+      }
+      const beforeTrack = Number(before.track_stock) === 1 ? 1 : 0;
+      const afterTrack = input.track_stock === false ? 0 : 1;
+      if (beforeTrack !== afterTrack) {
+        const minBefore = Number(before.min_stock_milli ?? 0);
+        const minAfter = Number(patch.min_stock_milli ?? 0);
+        const auditBefore: Record<string, number> = {
+          track_stock: beforeTrack,
+        };
+        const auditAfter: Record<string, number> = { track_stock: afterTrack };
+        if (minBefore !== minAfter) {
+          auditBefore.min_stock_milli = minBefore;
+          auditAfter.min_stock_milli = minAfter;
+        }
+        await productAudit(
+          w,
+          ctx,
+          'track_stock_change',
+          id,
+          auditBefore,
+          auditAfter,
         );
       }
       if (input.barcodes !== undefined) {

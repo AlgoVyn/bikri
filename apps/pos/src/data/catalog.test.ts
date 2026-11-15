@@ -96,11 +96,9 @@ describe('products (screens/08)', () => {
       sku: expect.stringMatching(/^TYP-/u),
     });
     expect(
-      detail?.history.map((h) => [
-        h.movement.reason_code,
-        h.balanceAfter,
-        h.staffName,
-      ]),
+      detail?.history
+        .filter((h) => h.kind === 'movement')
+        .map((h) => [h.movement.reason_code, h.balanceAfter, h.staffName]),
     ).toEqual([['opening', 20000, 'Adnan']]);
     expect(detail?.barcodes.map((b) => b.barcode)).toEqual(['8901234567890']);
   });
@@ -138,13 +136,152 @@ describe('products (screens/08)', () => {
     const first = await productDetail(db, p.id, NOW, 200);
     expect(first?.history).toHaveLength(200);
     expect(first?.hasMoreHistory).toBe(true);
-    expect(first?.history[0]?.movement.created_at).toBe(NOW - 1);
-    expect(first?.history[0]?.balanceAfter).toBe(20_250);
+    expect(first?.history[0]).toMatchObject({
+      kind: 'movement',
+      movement: { created_at: NOW - 1 },
+      balanceAfter: 20_250,
+    });
     expect(first?.history[1]?.balanceAfter).toBe(20_249);
     const all = await productDetail(db, p.id, NOW, 300);
     expect(all?.history).toHaveLength(251);
     expect(all?.hasMoreHistory).toBe(false);
     expect(await productStockHistory(db, p.id)).toHaveLength(251);
+  });
+
+  it('pages tracking changes with the movements in their time window', async () => {
+    const db = await readyDb('cat-track-page');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, opening_milli: 20000, barcodes: [] },
+      ctx,
+      { now: NOW - 20_000 },
+    );
+    await db.stock_movements.bulkAdd(
+      Array.from({ length: 250 }, (_, index) => ({
+        id: `mv-track-${index}`,
+        product_id: p.id,
+        qty_delta_milli: 1,
+        reason_code: 'entry_fix',
+        ref_type: 'adjustment',
+        ref_id: null,
+        unit_cost: null,
+        note: '',
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: businessDate(NOW),
+        created_at: NOW - 250 + index,
+      })) as never,
+    );
+    await db.stock_levels.put({
+      product_id: p.id,
+      on_hand_milli: 20_250,
+    });
+    const audit = (created_at: number, id: string) => ({
+      id,
+      action: 'track_stock_change',
+      entity: 'products',
+      entity_id: p.id,
+      before_json: '{"track_stock":1}',
+      after_json: '{"track_stock":0}',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      created_at,
+    });
+    await db.audit_log.bulkAdd([
+      audit(NOW - 10, 'audit-new'),
+      audit(NOW - 100_000, 'audit-old'),
+    ] as never);
+    const first = await productDetail(db, p.id, NOW, 200);
+    expect(first?.hasMoreHistory).toBe(true);
+    expect(first?.history.filter((h) => h.kind === 'tracking')).toHaveLength(1);
+    expect(
+      first?.history.some(
+        (h) => h.kind === 'tracking' && h.audit.id === 'audit-new',
+      ),
+    ).toBe(true);
+    expect(
+      first?.history.some(
+        (h) => h.kind === 'tracking' && h.audit.id === 'audit-old',
+      ),
+    ).toBe(false);
+    const all = await productDetail(db, p.id, NOW, 300);
+    expect(all?.hasMoreHistory).toBe(false);
+    expect(all?.history.filter((h) => h.kind === 'tracking')).toHaveLength(2);
+    expect(await productStockHistory(db, p.id)).toHaveLength(253);
+  });
+
+  it('keeps a malformed tracking audit out of the way', async () => {
+    const db = await readyDb('cat-track-bad');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, opening_milli: 1000, barcodes: [] },
+      ctx,
+      { now: NOW },
+    );
+    await db.audit_log.add({
+      id: 'audit-bad',
+      action: 'track_stock_change',
+      entity: 'products',
+      entity_id: p.id,
+      before_json: '{oops',
+      after_json: null,
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      created_at: NOW + 1,
+    } as never);
+    const detail = await productDetail(db, p.id, NOW + 2);
+    expect(detail?.history[0]).toMatchObject({
+      kind: 'tracking',
+      trackStock: 0,
+      minStockBefore: null,
+      minStockAfter: null,
+      balanceAfter: 1000,
+    });
+    expect(detail?.history[1]).toMatchObject({ kind: 'movement' });
+  });
+
+  it('shows a tracking-off change in stock history and keeps the old on-hand', async () => {
+    const db = await readyDb('cat-track-history');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, min_stock_milli: 10000 },
+      ctx,
+      { now: NOW },
+    );
+    await saveProductEdit(
+      db,
+      p.id,
+      { ...cable, track_stock: false, min_stock_milli: 0 },
+      ctx,
+      { now: NOW + 1 },
+    );
+    const detail = await productDetail(db, p.id, NOW + 2);
+    expect(detail?.product.track_stock).toBe(0);
+    expect(detail?.onHand).toBe(20000);
+    expect(detail?.history.map((h) => h.kind)).toEqual([
+      'tracking',
+      'movement',
+    ]);
+    expect(detail?.history[0]).toMatchObject({
+      kind: 'tracking',
+      trackStock: 0,
+      minStockBefore: 10000,
+      minStockAfter: 0,
+      balanceAfter: 20000,
+      staffName: 'Adnan',
+    });
+    expect(detail?.history[1]).toMatchObject({
+      kind: 'movement',
+      balanceAfter: 20000,
+    });
+    expect(await db.stock_movements.count()).toBe(1);
+    expect((await db.audit_log.toArray()).map((a) => a.action)).toEqual([
+      'track_stock_change',
+    ]);
   });
 
   it("uses each sale's tax snapshot in the 14-day revenue", async () => {
