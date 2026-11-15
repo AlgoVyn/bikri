@@ -258,6 +258,7 @@ export async function snapshotPayload(
   db: AppEnv['Variables']['db'],
   tenant: TenantRow,
   maxLimit = 1000,
+  counts = false,
 ): Promise<Record<string, unknown>> {
   const q = SnapshotQuery.parse({
     tbl: query('tbl') || undefined,
@@ -274,13 +275,35 @@ export async function snapshotPayload(
         : null;
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
-    // Do not run one COUNT(*) per table here. It scans every row in the shop, is
-    // charged to the same read budget as the pages that follow, and makes a large
-    // snapshot (or the owner export) block itself before the first page. Progress is
-    // reported as rows downloaded; the per-table row total is not needed to page.
+    if (!counts) {
+      // The till snapshot and the owner export do not run one COUNT(*) per table: it
+      // scans every row, is charged to the same read budget as the pages, and made a
+      // large snapshot block itself before the first page. Progress is rows downloaded.
+      return {
+        snapshot_seq: seq,
+        tables: SNAPSHOT_TABLES.map((tbl) => ({ tbl, rows: 0 })),
+      };
+    }
+    // The operator console's export tab needs per-table totals for its progress bars.
+    // It is Access-only and not on the till's read quota; do not charge these counts to
+    // the tenant's download budget, or a large operator export blocks itself.
+    const res = await db.batch(
+      SNAPSHOT_TABLES.map((tbl) => {
+        const column = q.before === undefined ? null : cutoffColumn(tbl);
+        return db.prepare(
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${column ? ` AND ${column} <= ?2` : ''}`,
+          ...(column ? [q.before as number] : []),
+        );
+      }),
+    );
     return {
       snapshot_seq: seq,
-      tables: SNAPSHOT_TABLES.map((tbl) => ({ tbl, rows: 0 })),
+      tables: SNAPSHOT_TABLES.map((tbl, i) => ({
+        tbl,
+        rows: Number(
+          (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
+        ),
+      })),
     };
   }
   const limit = Math.min(q.limit, maxLimit);

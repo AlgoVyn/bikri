@@ -755,6 +755,7 @@ admin.get('/tenants/:id/export', async (c) => {
     db,
     tenant,
     1000,
+    true,
   );
   if (!c.req.query('tbl')) {
     await db.batch(
