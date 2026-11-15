@@ -10,6 +10,7 @@ import {
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
@@ -76,6 +77,7 @@ export function SupplierList({
 
   const [shown, setShown] = useState(PAGE);
   const sentinel = useRef<HTMLLIElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the search changes
   useEffect(() => setShown(PAGE), [deferredQuery, sort, direction]);
   useEffect(() => {
@@ -108,6 +110,13 @@ export function SupplierList({
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
   });
+  useHotkey(
+    (event) =>
+      event.key === 'F2' ||
+      ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f'),
+    () => searchRef.current?.focus(),
+    { inFields: true },
+  );
 
   return (
     <div
@@ -162,6 +171,7 @@ export function SupplierList({
               <span className={searchWrapperClass}>
                 <SearchIcon />
                 <input
+                  ref={searchRef}
                   type="search"
                   autoComplete="off"
                   className={searchInputClass}
@@ -203,12 +213,18 @@ export function SupplierList({
         }
         summary={
           data ? (
-            <p className="text-small">
-              {t('office.suppliers.total_owed')}:{' '}
-              <span className="text-title font-semibold">
-                <MoneyText paisa={data.totalOwed} />
-              </span>
-            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Metric
+                testId="suppliers-total"
+                className="col-span-2 sm:col-span-1"
+                label={t('office.suppliers.total_owed')}
+                value={<MoneyText paisa={data.totalOwed} />}
+              />
+              <Metric
+                label={t('nav.suppliers')}
+                value={String(data.totalCount)}
+              />
+            </div>
           ) : undefined
         }
       >

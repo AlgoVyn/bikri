@@ -2,6 +2,7 @@ import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { isLatinName } from '../products/format.ts';
 import { ProductThumb } from '../products/ProductThumb.tsx';
 import type { SellRow } from './useSell.ts';
 
@@ -150,7 +151,7 @@ function Tile({
     i18n.language === 'ur' && p.name_ur
       ? String(p.name_ur)
       : String(p.name_en ?? '');
-  const latin = !/[\u0600-\u06ff]/u.test(name);
+  const latin = isLatinName(name);
   const unit = String(p.unit ?? 'pc') as QtyUnit;
   const pill =
     row.stockState === 'untracked'
@@ -173,6 +174,7 @@ function Tile({
       id={`sell-result-${index}`}
       data-index={index}
       data-testid="sell-tile"
+      title={name}
       aria-current={active || undefined}
       className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card transition-[border-color,box-shadow] duration-150 hover:border-border-strong active:scale-[0.995] ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
       onClick={() => onAdd(row)}
@@ -189,7 +191,7 @@ function Tile({
         size="md"
       />
       <span
-        className={`${latin ? 'ltr-name' : ''} line-clamp-2 w-full shrink-0 text-small font-medium`}
+        className={`data-name ${latin ? 'ltr-name' : ''} line-clamp-2 w-full shrink-0 text-small font-medium`}
       >
         {name}
       </span>

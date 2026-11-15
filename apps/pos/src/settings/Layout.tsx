@@ -25,10 +25,12 @@ export function SettingsIndex({ activePath }: { activePath?: string }) {
 export function SettingsPageLayout({
   title,
   icon,
+  actions,
   children,
 }: {
   title: string;
   icon?: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -47,6 +49,7 @@ export function SettingsPageLayout({
               backLabel={t('common.back')}
               icon={icon ?? <SettingsIcon />}
               title={title}
+              actions={actions}
             />
             {children}
           </div>

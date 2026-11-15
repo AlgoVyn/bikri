@@ -18,6 +18,7 @@ import { getKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { writeAction } from '../data/write.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { syncNow } from '../sync/engine.ts';
 import { discardFailed, retryFailed } from '../sync/push.ts';
@@ -32,11 +33,7 @@ export function formatWhen(
   timeZone = 'Asia/Karachi',
 ): string {
   if (!at) return '—';
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone,
-  }).format(at);
+  return formatTimestamp(at, lang, timeZone, 'datetime');
 }
 
 export function SyncPage() {
@@ -252,7 +249,7 @@ export function SyncPage() {
 
         {data.failed.length > 0 ? (
           <section className="flex flex-col gap-2">
-            <h2 className="text-h2 font-semibold">
+            <h2 className="text-title font-semibold">
               {t('syncpage.failed_title', { count: data.failed.length })}
             </h2>
             <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
@@ -292,7 +289,7 @@ export function SyncPage() {
 
         {data.failedFiles.length > 0 ? (
           <section className="flex flex-col gap-2" data-testid="failed-files">
-            <h2 className="text-h2 font-semibold">
+            <h2 className="text-title font-semibold">
               {t('syncpage.files_title', {
                 count: data.failedFiles.length,
               })}
@@ -346,7 +343,7 @@ export function SyncPage() {
         ) : null}
 
         <section className="overflow-hidden rounded-card border border-border bg-surface">
-          <h2 className="border-b border-border px-4 py-3 text-h2 font-semibold">
+          <h2 className="border-b border-border px-4 py-3 text-title font-semibold">
             {t('syncpage.conflicts_title')}
           </h2>
           {data.conflicts.length === 0 ? (

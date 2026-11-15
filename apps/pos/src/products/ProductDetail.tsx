@@ -35,7 +35,7 @@ import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
-import { marginText, qtyWithUnit } from './format.ts';
+import { isLatinName, marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
 const LabelsDialog = lazy(() =>
@@ -171,7 +171,10 @@ export function ProductDetailPage({
           size="header"
         />
         <div className="min-w-0 flex-1">
-          <h1 className="ltr-name text-h1 font-semibold break-words">
+          <h1
+            className={`data-name ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''} text-h1 font-semibold break-words`}
+            title={String(p.name_en)}
+          >
             {String(p.name_en)}
           </h1>
           {p.name_ur ? (
@@ -310,7 +313,7 @@ export function ProductDetailPage({
           ) : null}
         </div>
         {showCost || p.track_stock === 1 ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
             {showCost ? (
               <>
                 <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
@@ -368,7 +371,7 @@ export function ProductDetailPage({
           aria-labelledby="last14-heading"
           className="rounded-card border border-border bg-surface p-4"
         >
-          <h2 id="last14-heading" className="text-h2 font-semibold">
+          <h2 id="last14-heading" className="text-title font-semibold">
             {t('products.last14')}
           </h2>
           {totalQty > 0 ? (
@@ -419,7 +422,7 @@ export function ProductDetailPage({
 
       <section aria-labelledby="history-heading">
         <div className="mb-2 flex items-center gap-2">
-          <h2 id="history-heading" className="me-auto text-h2 font-semibold">
+          <h2 id="history-heading" className="me-auto text-title font-semibold">
             {t('products.history')}
           </h2>
           {detail.history.length > 0 && can('export.data') ? (

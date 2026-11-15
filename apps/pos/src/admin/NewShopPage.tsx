@@ -252,10 +252,17 @@ export function NewShopPage() {
                 inputMode="numeric"
                 className={`${inputClass} font-mono`}
                 value={budget}
+                aria-describedby="shop-budget-hint"
                 onChange={(event) => {
                   setBudget(event.target.value);
                 }}
               />
+              <p
+                id="shop-budget-hint"
+                className="mt-1 text-small text-text-muted"
+              >
+                {t('admin.budget_hint')}
+              </p>
             </Field>
             <div className="sm:col-span-2">
               <Field id="shop-note" label={t('admin.note')}>

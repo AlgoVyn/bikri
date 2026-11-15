@@ -11,6 +11,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
+import { useMasterDetailWide } from '../components/MasterDetail.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -41,6 +42,7 @@ import {
   navigateShareWindow,
   openShareWindow,
 } from '../print/shareWindow.ts';
+import { isLatinName } from '../products/format.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
@@ -64,6 +66,7 @@ export function BillDetail({
   saleId: string;
   embedded?: boolean;
 }) {
+  const masterDetailWide = useMasterDetailWide();
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
   const navigate = useNavigate();
@@ -429,7 +432,9 @@ export function BillDetail({
         primary={
           <button
             type="button"
-            className={buttonPrimary}
+            className={
+              embedded && masterDetailWide ? buttonQuiet : buttonPrimary
+            }
             onClick={() => void print()}
           >
             {t('office.bill.print')}
@@ -584,7 +589,9 @@ export function BillDetail({
                   className="border-b border-border last:border-0"
                 >
                   <td className="p-2">
-                    <span className="ltr-name block">
+                    <span
+                      className={`data-name block ${isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''}`}
+                    >
                       {String(line.name_snapshot)}
                     </span>
                     <span

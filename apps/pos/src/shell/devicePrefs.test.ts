@@ -29,12 +29,14 @@ describe('device preferences', () => {
       textSize: '115',
       autoLockMinutes: 2,
       keypad: 'computer',
+      cartOrder: 'newest_first',
     });
     expect(await loadDevicePrefs(db)).toMatchObject({
       theme: 'dark',
       textSize: '115',
       autoLockMinutes: 2,
       keypad: 'computer',
+      cartOrder: 'newest_first',
     });
     // Older builds stored only the separate key; an unknown keypad is a phone one.
     await setKv(db, 'ui.prefs', { theme: 'light', textSize: '130' });

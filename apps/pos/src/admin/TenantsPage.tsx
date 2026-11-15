@@ -156,14 +156,16 @@ export function TenantsPage() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
                       <span>
-                        {tenant.devices} {t('admin.col_devices')}
+                        {t('admin.col_devices')}: {tenant.devices}
                       </span>
                       <span>
+                        {t('admin.col_last_seen')}:{' '}
                         {tenant.last_seen_at === null
                           ? t('admin.never')
                           : formatWhen(tenant.last_seen_at, lang)}
                       </span>
                       <span>
+                        {t('admin.col_setup')}:{' '}
                         {tenant.setup_completed
                           ? t('admin.setup_done')
                           : t('admin.setup_pending')}

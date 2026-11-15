@@ -34,6 +34,7 @@ import {
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
 import { Modal } from './Modal.tsx';
@@ -245,12 +246,7 @@ export function timeOf(
   lang: string,
   timeZone = 'Asia/Karachi',
 ): string {
-  return new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(at);
+  return formatTimestamp(at, lang, timeZone, 'time');
 }
 
 /** F6: held bills on this device; resume into the active tab or an empty one. */

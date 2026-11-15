@@ -361,16 +361,34 @@ export function CustomerStatement({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-small">
           {percent !== null ? (
-            <span
-              className="h-2 w-40 overflow-hidden rounded-full bg-surface-2"
-              role="img"
-              aria-label={t('office.udhaar.limit_bar', { percent })}
-            >
+            <>
               <span
-                className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-                style={{ width: `${percent}%` }}
-              />
-            </span>
+                className="h-2 w-40 overflow-hidden rounded-full bg-surface-2"
+                role="img"
+                aria-label={t('office.udhaar.limit_bar', { percent })}
+              >
+                <span
+                  className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
+                  style={{ width: `${percent}%` }}
+                />
+              </span>
+              <span
+                className={
+                  percent >= 100
+                    ? 'text-danger'
+                    : percent >= 80
+                      ? 'text-warning'
+                      : 'text-text-muted'
+                }
+              >
+                {percent}%
+                {percent >= 100
+                  ? ` · ${t('office.udhaar.over_limit')}`
+                  : percent >= 80
+                    ? ` · ${t('office.udhaar.near_limit')}`
+                    : ''}
+              </span>
+            </>
           ) : null}
           <span className="text-text-muted">
             {ageLabel(t, data.oldest ?? null)}

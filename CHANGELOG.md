@@ -116,6 +116,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Owner export: a failed start releases only its own 24-hour claim, so a transient failure does not block the next attempt.
 - Docs/hygiene: the enrolment-code hash comment now describes the keyed HMAC and legacy fallback; local scratch E2E scripts and temporary tests are gitignored.
 
+### Visual review remediation (2026-11-15)
+- Names: product and line names use `unicode-bidi: plaintext`, so Urdu/mixed names keep their bidi order in both interfaces; `.ltr-name` now only selects the Latin face.
+- Frames and lists: the 404 uses the focused page frame, admin request rows no longer collapse on phones, Activity is one surface with Clear filters, and the not-enrolled Devices state offers Enrol.
+- Dates: all shop date/time output goes through `lib/date.ts`; 12-hour times use uppercase AM/PM on every screen, including list columns.
+- Tables: list and report columns stay start-aligned per D-214; the dead alignment branch is removed and docs/08, the review checklist and screen 16 now state the rule.
+- Actions and overlays: the embedded bill Print is quiet at ≥1280 px while the phone detail keeps it primary; Sales has one filled primary; global search and the command palette share their shape and close affordance; the shortcut sheet is complete and lists F2/Ctrl+F, and the four main lists bind it.
+- Settings and selling: Add cashier sits in the record header; cart order is a device preference; credit-limit bars label Near limit/Over limit; the Rs 75 note is ordered and labelled; the Home hero has real hover/press feedback; card titles use one scale.
+
 ### Security and data
 - Append-only sales, refunds, payments, ledger, stock, purchases, expenses and day closes; no hard deletes of master data.
 - Full local export is owner-only (PIN verifiers are not downloadable by other roles); server export needs an admin device and owner email sign-in.

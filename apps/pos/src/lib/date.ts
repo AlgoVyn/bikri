@@ -5,11 +5,15 @@
  */
 export type DateStyle =
   | 'date'
+  | 'dateShort'
   | 'long'
   | 'weekday'
   | 'weekdayLong'
+  | 'weekdayTime'
+  | 'weekdayLongTime'
   | 'time'
-  | 'datetime';
+  | 'datetime'
+  | 'datetimeShort';
 
 const LOCALE = { en: 'en-PK', ur: 'ur-PK-u-nu-latn' } as const;
 
@@ -28,24 +32,49 @@ function formatterFor(
       ? { hour: 'numeric', minute: '2-digit' }
       : style === 'date'
         ? { day: 'numeric', month: 'short', year: 'numeric' }
-        : style === 'long'
-          ? { day: 'numeric', month: 'long', year: 'numeric' }
-          : style === 'weekday'
-            ? {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              }
-            : style === 'weekdayLong'
-              ? { weekday: 'long', day: 'numeric', month: 'long' }
-              : {
+        : style === 'dateShort'
+          ? { day: 'numeric', month: 'short' }
+          : style === 'long'
+            ? { day: 'numeric', month: 'long', year: 'numeric' }
+            : style === 'weekday'
+              ? {
+                  weekday: 'short',
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                };
+                }
+              : style === 'weekdayLong'
+                ? { weekday: 'long', day: 'numeric', month: 'long' }
+                : style === 'weekdayTime'
+                  ? {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    }
+                  : style === 'weekdayLongTime'
+                    ? {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      }
+                    : style === 'datetimeShort'
+                      ? {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }
+                      : {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        };
   const formatter = new Intl.DateTimeFormat(locale, {
     ...options,
     timeZone,

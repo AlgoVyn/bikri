@@ -237,7 +237,7 @@ export function ReportsPage() {
   if (data === undefined) return <PageLoading compact />;
   if (data === null)
     return (
-      <div className={pageClass('focused')}>
+      <div className={pageClass('standard')}>
         <h1 className="text-h1 font-semibold">{t('office.reports.title')}</h1>
         <p className="mt-2 rounded-card bg-warning-subtle p-3 text-warning-subtle-ink">
           {t('office.reports.range_too_long')}
@@ -561,13 +561,11 @@ function ReportTable({
           <table className="w-full min-w-[36rem] border-collapse text-small">
             <thead>
               <tr className="border-b border-border bg-surface-2 text-start">
-                {headers.map((header, headerIndex) => (
+                {headers.map((header) => (
                   <th
                     key={header}
                     scope="col"
-                    className={`px-3 py-2 font-medium ${
-                      headerIndex === 0 ? 'text-start' : 'text-start'
-                    }`}
+                    className="px-3 py-2 text-start font-medium"
                   >
                     {header}
                   </th>
@@ -583,7 +581,7 @@ function ReportTable({
                   {row.map((cell, cellIndex) => (
                     <td
                       key={headers[cellIndex]}
-                      className={`px-3 py-2 ${cellIndex === 0 ? '' : 'text-start'}`}
+                      className="px-3 py-2 text-start"
                     >
                       {cell}
                     </td>

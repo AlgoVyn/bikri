@@ -243,7 +243,7 @@ export function HomePage() {
           className="rounded-card border border-border bg-surface p-4 shadow-card"
           aria-labelledby="ready-heading"
         >
-          <h2 id="ready-heading" className="text-h2 font-semibold">
+          <h2 id="ready-heading" className="text-title font-semibold">
             {t('setup.ready')}
           </h2>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -305,7 +305,7 @@ export function HomePage() {
                 <ProductsIcon />
               </span>
               <div className="min-w-0">
-                <h2 id="first-heading" className="text-h2 font-semibold">
+                <h2 id="first-heading" className="text-title font-semibold">
                   {t('home.first_products')}
                 </h2>
                 <p className="mt-1 text-text-muted">{t('home.no_products')}</p>
@@ -380,7 +380,7 @@ export function HomePage() {
             ) : (
               <Link
                 to="/sell"
-                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-colors duration-150 hover:border-accent"
+                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-[filter,box-shadow] duration-150 hover:brightness-105 hover:shadow-card-hover active:brightness-95"
               >
                 <span
                   aria-hidden="true"
@@ -401,7 +401,7 @@ export function HomePage() {
                     {t('home.new_sale_hint')}
                   </span>
                 </span>
-                <ChevronRightIcon className="size-4 relative text-title text-rail-active rtl:rotate-180" />
+                <ChevronRightIcon className="size-4 relative text-title text-rail-active transition-transform duration-150 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
               </Link>
             )}
 
@@ -623,7 +623,7 @@ function GettingStarted({
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
     >
       <div className="flex items-center gap-2 px-4 py-3">
-        <h2 id="getting-started" className="me-auto text-h2 font-semibold">
+        <h2 id="getting-started" className="me-auto text-title font-semibold">
           {t('home.get_started')}
         </h2>
         <span className="text-small text-text-muted tabular-nums">
@@ -876,7 +876,7 @@ function RecentBillsCard({
       className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <h2 id="recent-heading" className="me-auto text-h2 font-semibold">
+        <h2 id="recent-heading" className="me-auto text-title font-semibold">
           {t('home.recent_bills')}
         </h2>
         <Link
@@ -960,11 +960,7 @@ function attentionText(
         : t('home.attn_sync_stale', { days: item.days });
     case 'sync_pending_old':
       return t('home.attn_sync_pending_old', {
-        time: new Intl.DateTimeFormat(lang === 'ur' ? 'ur-PK' : 'en-PK', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-          timeZone,
-        }).format(item.since),
+        time: formatTimestamp(item.since, lang, timeZone, 'datetime'),
       });
     case 'clock_wrong':
       return t('home.attn_clock_wrong');

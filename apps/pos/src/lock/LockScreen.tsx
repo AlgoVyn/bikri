@@ -15,6 +15,7 @@ import {
   tryUnlock,
 } from '../data/pinLock.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { Banners } from '../shell/Banners.tsx';
 import {
   applyDevicePrefs,
@@ -154,16 +155,11 @@ export function LockScreen() {
   const length = chosen ? Number(chosen.pin_length ?? 4) || 4 : 4;
   const chosenLock = chosen ? locks[String(chosen.id)] : undefined;
   const isLocked = chosenLock !== undefined && chosenLock > now;
-  const fmt = new Intl.DateTimeFormat(
-    i18n.language === 'ur' ? 'ur-PK' : 'en-PK',
-    {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone,
-    },
+  const nowText = formatTimestamp(
+    now,
+    i18n.language,
+    timeZone,
+    'weekdayLongTime',
   );
   const key =
     'flex h-16 items-center justify-center rounded-card border border-border bg-surface text-h2 font-semibold transition-[background-color,transform] duration-150 hover:bg-surface-2 active:scale-[0.99] active:bg-surface-2';
@@ -348,7 +344,7 @@ export function LockScreen() {
         ) : null}
       </section>
       <footer className="text-center text-small text-text-muted">
-        <p>{fmt.format(now)}</p>
+        <p>{nowText}</p>
         <p>{t('lock.kept')}</p>
       </footer>
     </main>

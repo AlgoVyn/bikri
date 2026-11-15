@@ -20,23 +20,34 @@
   }
 }
 
-/* Latin data names stay LTR in Urdu: truncate and wrap at the end, but align
-   to the RTL start edge so they still sit next to their thumbnail. */
-.ltr-name {
-  direction: ltr;
-  text-align: start;
-  font-family: var(--font-sans);
+/* Product and line names may be Latin, Urdu or mixed (a shop can type an Urdu
+   name into the English field). `plaintext` resolves the bidi order of each name
+   from its first strong character, while the explicit alignment keeps the name on
+   the UI's start edge in both interfaces. Do not set `direction` here: forcing
+   LTR reorders parentheses and model numbers inside Urdu names. */
+.data-name {
+  unicode-bidi: plaintext;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
-[dir="rtl"] .ltr-name {
-  text-align: end;
-  /* Latin names do not need the Urdu line-height; the product list rows are compact. */
+[dir="rtl"] .data-name {
+  text-align: right;
+  /* Data names do not need the Urdu line-height; list rows are compact. */
   line-height: 1.35;
 }
 
-/* Latin names stay in the interface face even when the document is Urdu. */
-html:lang(ur) .ltr-name {
+/* Latin-only names stay in the interface face even when the document is Urdu. */
+.ltr-name {
   font-family: var(--font-sans);
+}
+
+/* The overlay search has its own Esc badge and close button; Chromium's native
+   search clear would be a third, unthemed dismiss control inside the field. */
+.search-no-cancel::-webkit-search-cancel-button,
+.search-no-cancel::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* Cards use one soft elevation level; dashed empty states stay flat. */

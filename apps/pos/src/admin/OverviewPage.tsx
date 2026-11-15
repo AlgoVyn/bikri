@@ -129,10 +129,6 @@ export function OverviewPage() {
         <StatCard
           label={t('admin.stat_setup')}
           value={formatCount(setup, lang)}
-          hint={t('admin.stat_setup_hint', {
-            done: formatCount(setup, lang),
-            total: formatCount(tenants.length, lang),
-          })}
         />
       </div>
 
