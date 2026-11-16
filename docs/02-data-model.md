@@ -1656,7 +1656,8 @@ UPDATE meta SET value = '7' WHERE key = 'schema_version';
 ```
 
 A separate migration is deliberate: editing `0022` would not update a database where
-it was already applied. Fresh databases run `0022` then `0023`, both ending at 7.
+it was already applied. Fresh databases run `0022` (the marker stays at 6) and then
+`0023` (7).
 
 ## 3. Dexie schema (till)
 
