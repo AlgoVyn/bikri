@@ -1,5 +1,6 @@
 import type { BikriDb } from '@bikri/db';
 import type { Block } from '@bikri/printer';
+import { qtyCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { printBlocks, readPrinter } from '../print/printService.ts';
@@ -25,6 +26,7 @@ async function printer(db: BikriDb) {
 
 /** Thermal receipt blocks for one customer statement. */
 export function statementBlocks(meta: StatementFileMeta): Block[] {
+  const closingBalance = meta.rows.at(-1)?.balance ?? meta.openingBalance;
   const blocks: Block[] = [
     { t: 'logo' },
     { t: 'text', text: meta.shopName, align: 'center', bold: true },
@@ -38,7 +40,7 @@ export function statementBlocks(meta: StatementFileMeta): Block[] {
     {
       t: 'pair',
       left: meta.labels.balance,
-      right: formatShopMoney(meta.balance),
+      right: formatShopMoney(closingBalance),
       bold: true,
     },
     { t: 'text', text: meta.labels.asOf, align: 'center', size: 'small' },
@@ -59,12 +61,19 @@ export function statementBlocks(meta: StatementFileMeta): Block[] {
       left: `${row.dateShort ?? row.date} · ${row.descriptionShort ?? row.description}`,
       right: signed(delta),
     });
+    for (const item of row.items ?? []) {
+      blocks.push({
+        t: 'text',
+        text: `  ${item.name} × ${qtyCsv(item.qtyMilli)} — ${formatShopMoney(item.amount)}`,
+        size: 'small',
+      });
+    }
   }
   blocks.push({ t: 'rule', char: '=' });
   blocks.push({
     t: 'pair',
     left: meta.labels.total,
-    right: formatShopMoney(meta.balance),
+    right: formatShopMoney(closingBalance),
     bold: true,
   });
   return finish(blocks);

@@ -218,6 +218,38 @@ test.describe('Credit (T-043, T-044)', () => {
     expect(ali).toBeTruthy();
   });
 
+  test('statement export can include the individual sale items', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/udhaar');
+    await page.evaluate(() => window.__bikriTest?.seedTodaySales());
+    await page.goto('/bikri/udhaar');
+    const customers = await idbAll<{ id: string; name: string }>(
+      page,
+      'customers',
+    );
+    const bilal = customers.find((customer) => customer.name === 'Bilal');
+    expect(bilal).toBeTruthy();
+    await page.goto(`/bikri/udhaar/${bilal?.id}`);
+    await expect(page.getByTestId('statement-balance')).toBeVisible();
+
+    const exportCsv = async () => {
+      await page
+        .getByTestId('udhaar-detail')
+        .getByRole('button', { name: 'Export', exact: true })
+        .click();
+      const [file] = await Promise.all([
+        page.waitForEvent('download'),
+        page.getByRole('menuitem', { name: 'CSV' }).click(),
+      ]);
+      return readFile((await file.path()) ?? '', 'utf8');
+    };
+    expect(await exportCsv()).not.toContain('Charger');
+    await page.getByTestId('statement-include-items').check();
+    const detailed = await exportCsv();
+    expect(detailed).toContain('Charger × 1 — Rs 500');
+  });
+
   test('AC 2/3/6: new customer with a limit and opening balance; no phone disables the reminder', async ({
     page,
   }) => {

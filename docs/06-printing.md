@@ -153,6 +153,7 @@ TOTAL                                  Rs 40,400  <- bold, double height
 Cash                                   Rs 40,400  <- one row per method (if show_payment_details)
 Amount tendered                        Rs 41,000
 Change                                    Rs 600
+         Remark: Deliver after 6 pm              <- sales.note, centred, wraps at 48
 ------------------------------------------------
 Warranty: Samsung A15 - 365 days (till            <- lines with sale_lines.warranty_until set,
 27-10-2027)                                       <- wrapped at 48 like any text block
@@ -178,7 +179,7 @@ Starter Pack               2      Rs 1,13,000
 - The bundle product itself is never printed as an item and never adds a separate amount. The totals block remains `Subtotal = Σ line.net`; the bundle header/component rows must not be summed again.
 - A bundle with zero tracked components still prints its component names; the stock warning is a UI concern, not a receipt line.
 
-Conditional rows: `Sales tax 17%` after Discount when `tax_rate_bp > 0` and the sale is tax-exclusive; for a tax-inclusive sale (`sales.tax_inclusive = 1`) no tax row is added, instead `Includes Sales tax 17%   Rs 1,700` is printed right after `TOTAL`; `Rounding` when `rounding ≠ 0`; `Udhaar (on khata)` plus `Khata balance now` when the bill has an udhaar part; `Card`/`Bank/wallet` rows with reference when used; `Customer` row only when a customer is attached; payment rows are hidden when `show_payment_details = 0`.
+Conditional rows: `Sales tax 17%` after Discount when `tax_rate_bp > 0` and the sale is tax-exclusive; for a tax-inclusive sale (`sales.tax_inclusive = 1`) no tax row is added, instead `Includes Sales tax 17%   Rs 1,700` is printed right after `TOTAL`; `Rounding` when `rounding ≠ 0`; `Udhaar (on khata)` plus `Khata balance now` when the bill has an udhaar part; `Remark: <text>` when the sale has a note; `Card`/`Bank/wallet` rows with reference when used; `Customer` row only when a customer is attached; payment rows are hidden when `show_payment_details = 0`.
 
 Column layout (48): item name cols 1–28 (wrap to further lines, max 2), qty cols 29–33 right-aligned, amount cols 34–48 right-aligned (the sample above follows it exactly; text before `<-` is the printed line, at most 48 columns). Detail line indented 2 spaces, max 46 chars. `pair` blocks: label left, value right, at least one space between; if too long, value on the next line right-aligned.
 

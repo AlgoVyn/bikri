@@ -8,6 +8,19 @@ async function navigate(page: Page, path: string) {
   await page.evaluate((to) => window.__bikriTest?.navigate(to), path);
 }
 
+async function logoPng(page: Page): Promise<Buffer> {
+  const dataUrl = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 100;
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 300, 100);
+    return canvas.toDataURL('image/png');
+  });
+  return Buffer.from(dataUrl.split(',')[1] ?? '', 'base64');
+}
+
 test.describe('Settings (T-050)', () => {
   test('AC 1, 8: tax 17 + inclusive updates the preview, saves and appears in Activity', async ({
     page,
@@ -59,6 +72,111 @@ test.describe('Settings (T-050)', () => {
     await expect(
       page.getByText('No analytics, ads or tracking scripts.'),
     ).toBeVisible();
+  });
+
+  test('the shop section Save stores the logo, and its preview survives navigation', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/settings/shop');
+    await expect(page.getByRole('button', { name: 'Save logo' })).toHaveCount(
+      0,
+    );
+
+    await page.getByTestId('logo-input').setInputFiles({
+      name: 'logo.png',
+      mimeType: 'image/png',
+      buffer: await logoPng(page),
+    });
+    const logoPreview = page.getByTestId('logo-preview');
+    await expect(logoPreview).toBeVisible();
+    const receiptLogo = page
+      .getByTestId('receipt-preview-card')
+      .getByAltText('Logo as the printer prints it');
+    await expect(receiptLogo).toBeVisible();
+    expect(
+      await receiptLogo.evaluate((img: HTMLImageElement) => img.naturalWidth),
+    ).toBe(576);
+    // The logo must not widen the preview: the paper follows the receipt text and
+    // the logo is centred over it.
+    const cardBox = await page
+      .getByTestId('receipt-preview-card')
+      .boundingBox();
+    const textBox = await page.getByTestId('receipt-preview').boundingBox();
+    const logoBox = await receiptLogo.boundingBox();
+    expect(cardBox?.width ?? 0).toBeLessThan(400);
+    expect(logoBox?.width ?? 0).toBeLessThanOrEqual((textBox?.width ?? 0) + 1);
+    expect(
+      Math.abs(
+        (logoBox?.x ?? 0) +
+          (logoBox?.width ?? 0) / 2 -
+          ((textBox?.x ?? 0) + (textBox?.width ?? 0) / 2),
+      ),
+    ).toBeLessThanOrEqual(1);
+    // Choosing is not saving: the section Save button persists it with the shop fields.
+    const beforeSave = await idbAll<{ key: string }>(page, 'kv');
+    expect(beforeSave.some((row) => row.key === 'logo_bitmap')).toBe(false);
+
+    await page
+      .getByRole('button', { name: 'Save', exact: true })
+      .first()
+      .click();
+    await expect(page.getByText('Settings saved.')).toBeVisible();
+    const [shop] = await idbAll<{ logo_key: string | null }>(page, 'shop');
+    expect(shop?.logo_key).toMatch(/^shop\/logo-[0-9a-f]{64}\.png$/u);
+    const saved = await idbAll<{ key: string }>(page, 'kv');
+    expect(saved.some((row) => row.key === 'logo_bitmap')).toBe(true);
+
+    await page.goto('/bikri/settings/activity');
+    await page.goto('/bikri/settings/shop');
+    await expect(logoPreview).toBeVisible();
+    await expect(receiptLogo).toBeVisible();
+    expect(
+      await receiptLogo.evaluate((img: HTMLImageElement) => img.naturalWidth),
+    ).toBe(576);
+
+    // Removing the logo is also saved by the same section button.
+    await page.getByRole('button', { name: 'Remove logo' }).click();
+    await expect(logoPreview).toHaveCount(0);
+    await page
+      .getByRole('button', { name: 'Save', exact: true })
+      .first()
+      .click();
+    await expect(page.getByText('Settings saved.')).toBeVisible();
+    const [cleared] = await idbAll<{ logo_key: string | null }>(page, 'shop');
+    expect(cleared?.logo_key).toBeNull();
+    await page.goto('/bikri/settings/activity');
+    await page.goto('/bikri/settings/shop');
+    await expect(logoPreview).toHaveCount(0);
+    await expect(receiptLogo).toHaveCount(0);
+  });
+
+  test('the shop name is bold in the preview and can be hidden from receipts', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/settings/shop');
+    const preview = page.getByTestId('receipt-preview');
+    const shopName = preview.getByText('ALGOVYN MOBILES', { exact: true });
+    await expect(shopName).toBeVisible();
+    await expect(shopName).toHaveCSS('font-weight', '700');
+
+    await page.getByLabel('Show shop name on receipts').uncheck();
+    await expect(shopName).toHaveCount(0);
+    await expect(preview).toContainText('Hall Road');
+
+    await page
+      .getByRole('button', { name: 'Save', exact: true })
+      .first()
+      .click();
+    await expect(page.getByText('Settings saved.')).toBeVisible();
+    await page.goto('/bikri/settings/shop');
+    await expect(
+      page.getByLabel('Show shop name on receipts'),
+    ).not.toBeChecked();
+    await expect(
+      page.getByTestId('receipt-preview').getByText('ALGOVYN MOBILES', {
+        exact: true,
+      }),
+    ).toHaveCount(0);
   });
 
   test('AC 3: the last owner cannot be deactivated, and a cashier can be added', async ({
@@ -342,7 +460,7 @@ test.describe('Settings (T-050)', () => {
 
   test('the shop card saves its own details', async ({ page }) => {
     await openReadyShop(page, '/bikri/settings/shop');
-    await page.getByLabel('Shop name').fill('Saved Shop');
+    await page.getByLabel('Shop name', { exact: true }).fill('Saved Shop');
     await page
       .getByRole('button', { name: 'Save', exact: true })
       .first()

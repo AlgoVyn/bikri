@@ -82,9 +82,11 @@ export function entryDescription(t: TFunction, row: StatementEntry): string {
       count: row.lineCount,
     });
   if (row.kind === 'payment')
-    return t('office.udhaar.entry_payment', {
-      method: row.method ? t(`payment.${row.method}`) : '',
-    });
+    return row.method
+      ? t('office.udhaar.entry_payment', {
+          method: t(`payment.${row.method}`),
+        })
+      : t('office.udhaar.entry_payment_plain');
   if (row.kind === 'refund')
     return t('office.udhaar.entry_refund', { invoice: row.invoiceNo ?? '' });
   if (row.kind === 'void')
@@ -103,9 +105,11 @@ export function entryDescriptionShort(
       invoice: row.invoiceNo ?? '',
     });
   if (row.kind === 'payment')
-    return t('office.udhaar.short_payment', {
-      method: row.method ? t(`payment.${row.method}`) : '',
-    });
+    return row.method
+      ? t('office.udhaar.short_payment', {
+          method: t(`payment.${row.method}`),
+        })
+      : t('office.udhaar.short_payment_plain');
   if (row.kind === 'refund')
     return t('office.udhaar.short_refund', { invoice: row.invoiceNo ?? '' });
   if (row.kind === 'void')

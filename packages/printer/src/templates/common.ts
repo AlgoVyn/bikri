@@ -62,7 +62,7 @@ export function pushShopHeader(
   if (printLogo) {
     blocks.push({ t: 'logo' });
   }
-  const name = shop.name.trim();
+  const name = shop.showShopName === false ? '' : shop.name.trim();
   if (name.length > 0) {
     pushCenter(blocks, name, {
       bold: true,

@@ -46,9 +46,22 @@ export class SyncEngine {
   private runningKind: 'first' | 'full' | 'push' | 'pull' | null = null;
   private failures = 0;
   private stopped = false;
+  /** A cycle was skipped because the till was hidden; flush it when the till returns. */
+  private deferredCycle = false;
   private readonly onOnline = () => void this.run('full');
   private readonly onVisible = () => {
-    if (document.visibilityState === 'visible') void this.run('pull');
+    if (document.visibilityState !== 'visible') return;
+    // Share opens WhatsApp/external apps in another tab, which hides the till. A push
+    // started while hidden can sit suspended until its HTTP/3 connection idles out
+    // (QUIC_NETWORK_IDLE_TIMEOUT), so those requests wait for this flush instead.
+    if (this.deferredCycle) {
+      this.deferredCycle = false;
+      // Forced: a cycle that was already in flight may have pushed before the write
+      // that was deferred here, so its promise does not include the new ops.
+      void this.run('full', true);
+    } else {
+      void this.run('pull');
+    }
   };
 
   constructor(db: BikriDb) {
@@ -78,6 +91,13 @@ export class SyncEngine {
   schedulePush(): void {
     if (this.stopped) return;
     if (this.pushTimer) clearTimeout(this.pushTimer);
+    // Start the debounced push when the till is visible: a request started in a
+    // hidden tab (the sale-complete Share button opens WhatsApp) is suspended by
+    // Chromium and only fails after the QUIC idle timeout. `onVisible` flushes it.
+    if (document.visibilityState === 'hidden') {
+      this.deferredCycle = true;
+      return;
+    }
     this.pushTimer = setTimeout(
       () => void this.run('push', true),
       WRITE_DEBOUNCE_MS,
@@ -122,6 +142,12 @@ export class SyncEngine {
   private async cycle(kind: 'first' | 'full' | 'push' | 'pull'): Promise<void> {
     const state = useSyncState.getState();
     if (this.stopped) return;
+    // Opening a share window hides the till; do not start requests that Chromium may
+    // suspend until the HTTP/3 connection times out. `onVisible` runs a full cycle.
+    if (document.visibilityState === 'hidden') {
+      this.deferredCycle = true;
+      return;
+    }
     if (!navigator.onLine) {
       state.set({ phase: 'offline' });
       await this.scheduleNext();

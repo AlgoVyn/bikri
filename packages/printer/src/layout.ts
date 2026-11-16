@@ -518,18 +518,28 @@ function visibleLine(text: string, align: Align, width: number): string {
   return `${text}${' '.repeat(gap)}`;
 }
 
+/**
+ * The laid text lines of a receipt, with their bold/size/align style. The HTML
+ * preview uses this so bold lines match the printed receipt; the plain-text
+ * preview below only needs their strings.
+ */
+export function receiptTextLines(
+  blocks: Block[],
+  options: LayoutOptions,
+): LaidText[] {
+  return layOut(blocks, options).filter(
+    (command): command is LaidText => command.kind === 'text',
+  );
+}
+
 /** Monospace preview. Every text line is padded to `charsPerLine`. */
 export function renderReceiptText(
   blocks: Block[],
   options: LayoutOptions,
 ): string {
-  const lines: string[] = [];
-  for (const command of layOut(blocks, options)) {
-    if (command.kind !== 'text') {
-      continue;
-    }
-    lines.push(visibleLine(command.text, command.align, options.charsPerLine));
-  }
+  const lines = receiptTextLines(blocks, options).map((command) =>
+    visibleLine(command.text, command.align, options.charsPerLine),
+  );
   if (lines.length === 0) {
     return '';
   }

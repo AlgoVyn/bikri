@@ -284,6 +284,10 @@ export function buildSaleReceipt(
   if (shop.showYouSaved && saved > 0) {
     pushPair(blocks, labels.youSaved, money(saved));
   }
+  const remark = sale.note?.trim() ?? '';
+  if (remark.length > 0) {
+    pushCenter(blocks, `${labels.note}: ${remark}`);
+  }
   const warranties: string[] = [];
   if (shop.printWarranty) {
     for (const line of input.lines) {

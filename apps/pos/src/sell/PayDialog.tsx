@@ -204,7 +204,6 @@ function PayStep({
     setRows([{ method: 'cash', amount: total }]);
     setActiveRow(0);
   }, [total]);
-  const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
   const [picker, setPicker] = useState(false);
   const printer = useLiveQuery(
@@ -219,7 +218,6 @@ function PayStep({
   const [whatsapp, setWhatsapp] = useState(true);
   const printOn = print ?? (printer ? printer.auto_print !== false : false);
   const customer = useCustomer(cart.customer_id);
-  const noteId = useId();
   const merged = mergeRows(rows);
   const s = settle(total, merged);
   const credit = useLiveQuery(
@@ -280,7 +278,7 @@ function PayStep({
           cart,
           money,
           rows: merged,
-          note,
+          note: cart.note,
           print: printOn,
           maxDiscountBp: Number(seller?.max_discount_bp ?? 0),
         },
@@ -589,18 +587,6 @@ function PayStep({
             {t('pay.whatsapp')}
           </label>
         ) : null}
-        <div>
-          <label htmlFor={noteId} className="mb-1 block text-small">
-            {t('pay.note')}
-          </label>
-          <input
-            id={noteId}
-            className={fieldClass}
-            maxLength={120}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
       </div>
 
       <DialogFooter>

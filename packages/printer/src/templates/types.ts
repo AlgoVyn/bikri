@@ -3,6 +3,8 @@ import type { NumberGrouping } from '@bikri/core';
 /** Shop fields the receipt actually prints. Names match `shop` in 02. */
 export type ReceiptShop = {
   name: string;
+  /** Default on; off when the uploaded logo already contains the shop name. */
+  showShopName?: boolean;
   address: string;
   phone: string;
   receiptHeader: string;
@@ -72,6 +74,8 @@ export type ReceiptSale = {
   customerName: string | null;
   /** Printed as "Khata balance now" when the bill has an udhaar part. */
   khataBalancePaisa: number | null;
+  /** Free-text sale remark printed near the bottom of the receipt. */
+  note?: string;
   reprint?: boolean;
 };
 
@@ -85,6 +89,7 @@ export type ReceiptLabels = {
   date: string;
   cashier: string;
   customer: string;
+  note: string;
   item: string;
   qty: string;
   amount: string;

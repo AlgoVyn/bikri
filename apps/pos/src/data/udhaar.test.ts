@@ -126,6 +126,35 @@ describe('udhaar data', () => {
     });
   });
 
+  it('optionally includes sale item lines in the statement export', async () => {
+    const { db, ctx } = await setup('statement-items');
+    const ali = await customer(db);
+    await udhaarSale(db, ctx, ali.id, 300000, NOW, 'Galaxy A15');
+    const plain = await customerStatement(db, ali.id);
+    expect(plain.rows[0]?.items).toBeUndefined();
+    const detailed = await customerStatement(
+      db,
+      ali.id,
+      undefined,
+      Number.POSITIVE_INFINITY,
+      true,
+    );
+    expect(detailed.rows[0]?.items).toEqual([
+      { name: 'Galaxy A15', qtyMilli: 1000, amount: 300000 },
+    ]);
+    const csv = statementCsv(
+      detailed.rows.map((row) => ({
+        date: String(row.entry.business_date),
+        description: row.kind,
+        debit: row.debit,
+        credit: row.credit,
+        balance: row.balance,
+        items: row.items,
+      })),
+    );
+    expect(csv).toContain('Galaxy A15 × 1 — Rs 3,000');
+  });
+
   it('AC 2/3: reminder text and wa.me URL; no phone means no link', () => {
     const message = reminderMessage('en', {
       name: 'Ali',

@@ -4,12 +4,14 @@
 export function csvCell(value: unknown): string {
   let s = String(value ?? '');
   // Spreadsheet formula injection: text starting with = + - @ (or tab/CR) is prefixed
-  // with '. A plain number, including a negative amount, is left as a number so Excel
-  // still sums the column.
+  // with '. Check after leading whitespace too, because indented detail rows would
+  // otherwise bypass the guard. A plain number, including a negative amount, is left
+  // as a number so Excel still sums the column.
+  const trimmed = s.trimStart();
   if (
     typeof value === 'string' &&
-    /^[=+\-@\t\r]/u.test(s) &&
-    !/^-?\d+(?:\.\d+)?$/u.test(s)
+    /^[=+\-@\t\r]/u.test(trimmed) &&
+    !/^-?\d+(?:\.\d+)?$/u.test(trimmed)
   )
     s = `'${s}`;
   // Excel auto-converts long digit strings (barcodes) to scientific notation and drops

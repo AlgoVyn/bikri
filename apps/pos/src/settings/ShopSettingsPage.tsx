@@ -28,7 +28,6 @@ import {
   updateShopSettings,
 } from '../data/settings.ts';
 import type { LogoData } from '../data/setup.ts';
-import { ReadOnlyError } from '../data/write.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { ditheredPreview, LogoError, processLogo } from '../setup/logo.ts';
 import { ReceiptPreview } from '../setup/ReceiptPreview.tsx';
@@ -58,7 +57,8 @@ function ShopForm() {
     return {
       shop: await db.shop.get('shop'),
       branch: await defaultBranch(db),
-      logo: await getKv<LogoData | null>(db, 'logo_bitmap', null),
+      // `kv.logo_bitmap` stores the printer bitmap, not the upload's PNG/hash.
+      logo: await getKv<LogoData['bitmap'] | null>(db, 'logo_bitmap', null),
       printer: await getKv<PrinterKv | null>(db, 'printer', null),
     };
   }, []);
@@ -69,7 +69,14 @@ function ShopForm() {
     address: '',
     phone: '',
   });
-  const [logo, setLogo] = useState<LogoData | null>(null);
+  /** A newly chosen logo, saved by the section's Save button with the shop fields. */
+  const [logoDraft, setLogoDraft] = useState<LogoData | null>(null);
+  /** The logo currently shown: the saved bitmap or the draft's bitmap. */
+  const [logoBitmap, setLogoBitmap] = useState<LogoData['bitmap'] | null>(null);
+  /** Save the logo (new or removed) with the next section Save. */
+  const [logoDirty, setLogoDirty] = useState(false);
+  /** A chosen file is still being resized/dithered; Save must wait for it. */
+  const [logoProcessing, setLogoProcessing] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,20 +93,20 @@ function ShopForm() {
         address: String(data.branch.address ?? ''),
         phone: String(data.branch.phone ?? ''),
       });
-    if (data.logo) setLogo(data.logo);
+    if (data.logo) setLogoBitmap(data.logo);
   }, [data]);
 
   useEffect(() => {
-    if (!logo) {
+    if (!logoBitmap) {
       setLogoUrl(null);
       return;
     }
     try {
-      setLogoUrl(ditheredPreview(logo.bitmap));
+      setLogoUrl(ditheredPreview(logoBitmap));
     } catch {
       setLogoUrl(null);
     }
-  }, [logo]);
+  }, [logoBitmap]);
 
   const preview = useMemo(
     () => ({
@@ -112,6 +119,7 @@ function ShopForm() {
       inclusive: form.tax_mode === 'inclusive',
       tax_label: form.tax_label,
       receipt_language: form.receipt_language,
+      show_shop_name_on_receipt: form.show_shop_name_on_receipt,
     }),
     [form],
   );
@@ -119,7 +127,15 @@ function ShopForm() {
   const saveShop = async () => {
     setSaving(true);
     try {
-      await updateShopSettings(getDb(), form, staff?.id ?? null);
+      const db = getDb();
+      await updateShopSettings(db, form, staff?.id ?? null);
+      // The logo belongs to the shop section, so its Save also persists a chosen or
+      // removed logo; there is no separate Save logo action (screens/17).
+      if (logoDirty) {
+        await updateShopLogo(db, logoDraft, staff?.id ?? null);
+        setLogoDraft(null);
+        setLogoDirty(false);
+      }
       toast.push(t('office.settings.saved'));
     } catch (err) {
       toast.push(
@@ -152,41 +168,29 @@ function ShopForm() {
     }
   };
   const chooseLogo = async (file: File) => {
+    setLogoProcessing(true);
     try {
       const processed = await processLogo(file);
-      setLogo({
+      setLogoDraft({
         png: processed.png,
         sha256: processed.sha256,
         bitmap: processed.bitmap,
       });
+      setLogoBitmap(processed.bitmap);
+      setLogoDirty(true);
     } catch (err) {
       toast.push(
         err instanceof LogoError ? t('setup.errors.logo') : t('errors.generic'),
         'error',
       );
+    } finally {
+      setLogoProcessing(false);
     }
   };
-  const saveLogo = async () => {
-    try {
-      await updateShopLogo(getDb(), logo, staff?.id ?? null);
-      toast.push(t('office.settings.saved'));
-    } catch {
-      toast.push(t('errors.generic'), 'error');
-    }
-  };
-  const removeLogo = async () => {
-    try {
-      await updateShopLogo(getDb(), null, staff?.id ?? null);
-      setLogo(null);
-      toast.push(t('office.settings.saved'));
-    } catch (err) {
-      toast.push(
-        err instanceof ReadOnlyError
-          ? t('tenant.readOnly.blocked')
-          : t('errors.generic'),
-        'error',
-      );
-    }
+  const removeLogo = () => {
+    setLogoDraft(null);
+    setLogoBitmap(null);
+    setLogoDirty(true);
   };
 
   if (!data) return <PageLoading compact />;
@@ -302,6 +306,8 @@ function ShopForm() {
             type="file"
             accept="image/png,image/jpeg,image/svg+xml"
             aria-label={t('office.settings.logo')}
+            data-testid="logo-input"
+            disabled={readOnly || logoProcessing}
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -312,38 +318,34 @@ function ShopForm() {
           <button
             type="button"
             className={buttonQuiet}
+            disabled={readOnly || logoProcessing}
             onClick={() => fileRef.current?.click()}
           >
             {t('setup.logo_choose')}
           </button>
-          {logo ? (
-            <button
-              type="button"
-              className={buttonQuiet}
-              disabled={readOnly}
-              onClick={() => void saveLogo()}
-            >
-              {t('office.settings.save_logo')}
-            </button>
-          ) : null}
           {logoUrl ? (
             <button
               type="button"
               className={buttonQuiet}
-              disabled={readOnly}
-              onClick={() => void removeLogo()}
+              disabled={readOnly || logoProcessing}
+              onClick={removeLogo}
             >
               {t('setup.logo_remove')}
             </button>
           ) : null}
           {logoUrl ? (
-            <img src={logoUrl} alt={t('setup.logo_preview')} className="h-10" />
+            <img
+              src={logoUrl}
+              alt={t('setup.logo_preview')}
+              data-testid="logo-preview"
+              className="h-10 w-auto object-contain"
+            />
           ) : null}
         </div>
         <button
           type="button"
           className={`${buttonPrimary} self-start`}
-          disabled={saving || readOnly}
+          disabled={saving || readOnly || logoProcessing}
           onClick={() => void saveShop()}
         >
           {t('office.settings.save')}
@@ -510,6 +512,19 @@ function ShopForm() {
           <label className="flex items-center gap-2 text-small">
             <input
               type="checkbox"
+              checked={form.show_shop_name_on_receipt}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  show_shop_name_on_receipt: event.target.checked,
+                })
+              }
+            />
+            {t('office.settings.show_shop_name')}
+          </label>
+          <label className="flex items-center gap-2 text-small">
+            <input
+              type="checkbox"
               checked={form.show_cashier_on_receipt}
               onChange={(event) =>
                 setForm({
@@ -560,7 +575,7 @@ function ShopForm() {
         <button
           type="button"
           className={`${buttonQuiet} self-start`}
-          disabled={saving || readOnly}
+          disabled={saving || readOnly || logoProcessing}
           onClick={() => void saveShop()}
         >
           {t('office.settings.save')}

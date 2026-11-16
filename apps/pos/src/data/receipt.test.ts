@@ -80,6 +80,25 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(await loadSaleReceipt(db, 'nope')).toBeNull();
   });
 
+  it('prints and shares the sale remark', async () => {
+    const fx = await shopWithStock('rcpt-note');
+    await addShop(fx.db);
+    const input = sale(
+      t2Cart(fx.phone, fx.buds),
+      [{ method: 'cash', amount: 5000000 }],
+      { note: 'Deliver after 6 pm' },
+    );
+    await completeSale(fx.db, input, fx.ctx, NOW);
+    const r = await loadSaleReceipt(fx.db, input.saleId);
+    expect(r?.sale.note).toBe('Deliver after 6 pm');
+    expect(text(r as NonNullable<typeof r>)).toContain(
+      'Remark: Deliver after 6 pm',
+    );
+    expect(receiptShareText(r as NonNullable<typeof r>)).toContain(
+      'Remark: Deliver after 6 pm',
+    );
+  });
+
   it('prints one bundle header and its components without component prices', async () => {
     const fx = await shopWithStock('rcpt-bundle');
     await addShop(fx.db);
@@ -244,6 +263,14 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(share).toContain('Credit (on ledger) Rs 3,000');
     expect(share).toContain('Ledger balance now Rs 3,000');
     expect(share).toContain('Galaxy A15 × 1');
+    // The text share follows the receipt's show-shop-name setting.
+    const hidden = {
+      ...(r as NonNullable<typeof r>),
+      shop: { ...(r as NonNullable<typeof r>).shop, showShopName: false },
+    };
+    expect(receiptShareText(hidden)).not.toContain(
+      (r as NonNullable<typeof r>).shop.name,
+    );
   });
 
   it('print jobs: queue, latest, retry', async () => {

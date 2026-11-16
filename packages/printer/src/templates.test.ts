@@ -16,6 +16,7 @@ import {
   buildVoidNotice,
   POWERED_BY,
   type RefundReceipt,
+  receiptTextLines,
   renderReceiptText,
   resolvePaper,
   type SaleReceiptInput,
@@ -31,6 +32,35 @@ function variant(change: (input: SaleReceiptInput) => void): SaleReceiptInput {
   change(input);
   return input;
 }
+
+describe('shop header', () => {
+  it('omits the shop name when the logo already contains it', () => {
+    const input = variant((i) => {
+      i.shop.showShopName = false;
+    });
+    const text = text80(buildSaleReceipt(input));
+    expect(text).not.toContain('Algovyn Mobiles');
+    expect(text).toContain('Hall Road');
+  });
+
+  it('keeps the shop name and marks it bold for the HTML preview', () => {
+    const lines = receiptTextLines(
+      buildSaleReceipt(saleBasicInput()),
+      resolvePaper({ paperMm: 80 }),
+    );
+    const name = lines.find((line) => line.text === 'Algovyn Mobiles');
+    expect(name).toMatchObject({ align: 'center', bold: true });
+  });
+
+  it('prints a sale remark near the bottom of the receipt', () => {
+    const input = variant((i) => {
+      i.sale.note = 'Deliver after 6 pm';
+    });
+    const text = text80(buildSaleReceipt(input));
+    expect(text).toContain('Remark: Deliver after 6 pm');
+    expect(text.indexOf('Remark:')).toBeLessThan(text.indexOf(POWERED_BY));
+  });
+});
 
 describe('bundle receipts (06 §4, v1.1)', () => {
   it('prints one bundle header and component names without component prices', () => {

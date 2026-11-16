@@ -60,6 +60,7 @@ export type CartPanelProps = {
   onRemoveBundle: (group: string) => void;
   showCost: boolean;
   onCustomer: () => void;
+  onRemarks: () => void;
   onBillDiscount: () => void;
   onHold: () => void;
   onClear: () => void;
@@ -267,7 +268,7 @@ export function CartPanel(p: CartPanelProps) {
           />
         ) : null}
         <div className="flex items-center justify-between gap-2">
-          <dt className="flex min-w-0 items-center">
+          <dt className="flex min-w-0 flex-wrap items-center gap-x-2">
             {totals.bill_discount > 0 ? (
               <button
                 type="button"
@@ -286,6 +287,16 @@ export function CartPanel(p: CartPanelProps) {
                 {t('sell.add_discount')}
               </button>
             )}
+            {!cart.note.trim() && totals.bill_discount <= 0 ? (
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center text-primary underline underline-offset-2 disabled:pointer-events-none disabled:text-text-muted disabled:no-underline"
+                disabled={cart.lines.length === 0}
+                onClick={p.onRemarks}
+              >
+                {t('sell.add_remarks')}
+              </button>
+            ) : null}
           </dt>
           {totals.bill_discount > 0 ? (
             <dd data-testid="total-discount">
@@ -293,6 +304,37 @@ export function CartPanel(p: CartPanelProps) {
             </dd>
           ) : null}
         </div>
+        {totals.bill_discount > 0 && !cart.note.trim() ? (
+          <div className="-mt-2">
+            <button
+              type="button"
+              className="inline-flex min-h-6 items-center text-small text-primary underline underline-offset-2"
+              onClick={p.onRemarks}
+            >
+              {t('sell.add_remarks')}
+            </button>
+          </div>
+        ) : null}
+        {cart.note.trim() ? (
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <dt
+              className="min-w-0 truncate text-text-muted"
+              title={cart.note}
+              data-testid="cart-remarks"
+            >
+              {t('sell.remarks')}: {cart.note}
+            </dt>
+            <dd>
+              <button
+                type="button"
+                className="inline-flex min-h-6 items-center text-small text-primary underline underline-offset-2"
+                onClick={p.onRemarks}
+              >
+                {t('common.edit')}
+              </button>
+            </dd>
+          </div>
+        ) : null}
         {totals.tax > 0 && money.tax_mode === 'exclusive' ? (
           <Row
             label={t('sell.tax', {

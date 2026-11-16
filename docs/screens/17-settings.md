@@ -30,11 +30,11 @@ Dukaan's account/trial/Shop-ID pages are intentionally not referenced; Bikri has
 
 ## Shop profile (`settings.shop`)
 
-Shop name, business type, phone, address, city, NTN/STRN — same rules as [01 step 1](01-setup-wizard.md#step-1--shop). Logo (REQ-B03) with thermal preview and `Remove`.
+Shop name, business type, phone, address, city, NTN/STRN — same rules as [01 step 1](01-setup-wizard.md#step-1--shop). Logo (REQ-B03) with thermal preview and `Remove`. Choosing or removing the logo does not save immediately: the section's **Save** stores it with the shop fields (there is no separate Save logo action). A saved logo's thermal preview stays next to `Choose logo` when the section is reopened.
 
 ## Receipt and tax (`settings.shop`)
 
-Header, footer, tax % (bp; default 0 = tax off), **Prices include tax** switch (only shown when tax % > 0; `shop.tax_mode`, default off = tax added on top; changing it shows "Applies to new bills only"), tax label (default "Sales tax"), round total to (No / Rs 1 / Rs 5 / Rs 10), refund rounding (Nearest rupee / Round down / Exact), show cashier name, show payment details, show "You saved Rs …" line (sum of discounts), print warranty line, receipt language (Same as app / English / Urdu), number grouping (International `124,500` or Lakh `1,24,500`). Live 58 mm and 80 mm preview sized to the receipt text (not stretched across the card), which ends with the small "Powered by AlgoVyn" line that every customer receipt carries (not a shop setting, note "Added by AlgoVyn"; [06 §4.4](../06-printing.md#44-powered-by-algovyn-line-d-085), D-085).
+Header, footer, tax % (bp; default 0 = tax off), **Prices include tax** switch (only shown when tax % > 0; `shop.tax_mode`, default off = tax added on top; changing it shows "Applies to new bills only"), tax label (default "Sales tax"), round total to (No / Rs 1 / Rs 5 / Rs 10), refund rounding (Nearest rupee / Round down / Exact), show shop name on receipts (default on; turn off when the logo already contains the name), show cashier name, show payment details, show "You saved Rs …" line (sum of discounts), print warranty line, receipt language (Same as app / English / Urdu), number grouping (International `124,500` or Lakh `1,24,500`). Live 58 mm and 80 mm preview sized to the receipt text (not stretched across the card), including the shop logo above the bold shop-name line, which ends with the small "Powered by AlgoVyn" line that every customer receipt carries (not a shop setting, note "Added by AlgoVyn"; [06 §4.4](../06-printing.md#44-powered-by-algovyn-line-d-085), D-085).
 
 ## Cashiers (`settings.staff`)
 

@@ -1,4 +1,5 @@
 import { businessDate } from '@bikri/core';
+import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
@@ -70,6 +71,10 @@ export function SupplierStatement({
       balance: await supplierBalance(db, supplierId),
       tz,
       shopName: String(shop?.name ?? ''),
+      shopAddress: String(shop?.address ?? ''),
+      shopPhone: String(shop?.phone ?? ''),
+      logo: ((await db.kv.get('logo_bitmap'))?.value ??
+        null) as RasterSource | null,
     };
   }, [supplierId, visibleRows]);
 
@@ -94,7 +99,16 @@ export function SupplierStatement({
     );
   if (!data) return <PageLoading compact />;
 
-  const { supplier, statement, balance, tz, shopName } = data;
+  const {
+    supplier,
+    statement,
+    balance,
+    tz,
+    shopName,
+    shopAddress,
+    shopPhone,
+    logo,
+  } = data;
   const name = String(supplier.name);
   const mapRows = (value: typeof statement) =>
     value.rows.map((row) => ({
@@ -111,6 +125,9 @@ export function SupplierStatement({
   const shownRows = statement.rows;
   const meta = {
     shopName,
+    shopAddress,
+    shopPhone,
+    logo,
     customerName: name,
     phone: String(supplier.phone ?? ''),
     balance,
@@ -127,13 +144,21 @@ export function SupplierStatement({
     lang: i18n.language,
     labels: {
       title: t('office.suppliers.statement'),
+      customer: t('office.suppliers.statement_supplier'),
+      phone: t('office.suppliers.phone'),
+      period: t('office.suppliers.statement_period'),
+      periodValue: t('office.suppliers.all_time'),
       date: t('office.suppliers.date'),
       description: t('office.suppliers.description'),
-      debit: t('office.suppliers.got'),
-      credit: t('office.suppliers.paid'),
+      debit: t('office.suppliers.statement_debit'),
+      credit: t('office.suppliers.statement_credit'),
       balance: t('office.suppliers.balance'),
       opening: t('office.suppliers.entry_opening'),
       total: t('office.suppliers.total'),
+      totalDebit: t('office.suppliers.total_debit'),
+      totalCredit: t('office.suppliers.total_credit'),
+      closing: t('office.suppliers.closing_balance'),
+      generatedBy: t('office.suppliers.generated_by'),
       asOf: t('office.suppliers.as_of', {
         date: dateText(businessDate(Date.now(), tz), i18n.language, tz),
       }),

@@ -6,6 +6,8 @@ describe('CSV cells', () => {
     expect(csvCell('a,b')).toBe('"a,b"');
     expect(csvCell('say "hi"')).toBe('"say ""hi"""');
     expect(csvCell('=SUM(A1)')).toBe("'=SUM(A1)");
+    // Indented detail rows must not bypass the guard.
+    expect(csvCell('  =SUM(A1)')).toBe("'  =SUM(A1)");
     expect(csvCell(-1250)).toBe('-1250');
     expect(csvCell('1234.50')).toBe('1234.50');
   });

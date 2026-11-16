@@ -7,7 +7,7 @@ import {
   itemLayoutFor,
   POWERED_BY,
   receiptLabelsFor,
-  renderReceiptText,
+  receiptTextLines,
 } from '@bikri/printer';
 import { useTranslation } from 'react-i18next';
 import { resolveReceiptLanguage } from '../data/receipt.ts';
@@ -22,6 +22,7 @@ export type PreviewShop = {
   inclusive: boolean;
   tax_label?: string;
   receipt_language?: string;
+  show_shop_name_on_receipt?: boolean;
 };
 
 const SAMPLE_PRICE = 4_200_000;
@@ -41,7 +42,7 @@ export function previewBlocks(shop: PreviewShop, uiLanguage = 'en'): Block[] {
       ? mulDivRound(SAMPLE_PRICE, shop.tax_rate_bp, 10_000)
       : 0;
   const blocks: Block[] = [{ t: 'logo' }];
-  if (shop.name.trim())
+  if (shop.show_shop_name_on_receipt !== false && shop.name.trim())
     blocks.push({
       t: 'text',
       text: shop.name.trim().toUpperCase(),
@@ -125,7 +126,7 @@ export function ReceiptPreview({
 }) {
   const { t, i18n } = useTranslation();
   const chars = charsPerLine ?? (paperMm === 58 ? 32 : 48);
-  const text = renderReceiptText(previewBlocks(shop, i18n.language), {
+  const lines = receiptTextLines(previewBlocks(shop, i18n.language), {
     charsPerLine: chars,
     itemLayout: itemLayoutFor(chars, paperMm),
   });
@@ -139,19 +140,38 @@ export function ReceiptPreview({
       <figcaption className="mb-2 text-small text-brand-navy">
         {t('setup.preview')}
       </figcaption>
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={t('setup.logo_preview')}
-          className="mx-auto mb-1 max-w-[60%]"
-        />
-      ) : null}
-      <pre
-        data-testid="receipt-preview"
-        className="overflow-x-auto font-mono text-receipt leading-tight [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      {/* The paper width comes from the receipt text (chars × monospace ch), never
+          from the logo's intrinsic 576 px bitmap: that used to double the card and
+          push the logo out of centre. The dithered bitmap already contains the
+          printer's 60%-wide centred logo, so it is drawn at the paper width. */}
+      <div
+        className="mx-auto max-w-full font-mono text-receipt"
+        style={{ width: `${chars}ch` }}
       >
-        {text}
-      </pre>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={t('setup.logo_preview')}
+            className="mx-auto mb-1 block w-full"
+          />
+        ) : null}
+        <div
+          data-testid="receipt-preview"
+          className="overflow-x-auto leading-tight [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {lines.map((line, index) => (
+            <div
+              // The receipt lines are stable and style-only; index is the only key.
+              // biome-ignore lint/suspicious/noArrayIndexKey: rendered receipt rows have no id
+              key={index}
+              className={`whitespace-pre ${line.bold ? 'font-bold' : ''}`}
+              style={{ textAlign: line.align }}
+            >
+              {line.text || '\u00a0'}
+            </div>
+          ))}
+        </div>
+      </div>
     </figure>
   );
 }

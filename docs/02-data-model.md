@@ -1629,6 +1629,20 @@ D1 counts index entries as rows written. These indexes serve no production SQL
 in `apps/api/src` (the client keeps its own Dexie indexes); dropping them
 recovers about a quarter of the daily write budget (D-231).
 
+### 2.21 Hide the shop name on receipts (migration `0022_show_shop_name_on_receipt.sql`)
+
+```sql
+-- Some shops put the shop name inside their logo. Allow the receipt header to omit
+-- the separate name line while keeping the logo (screens/17, D-232).
+ALTER TABLE shop ADD COLUMN show_shop_name_on_receipt INTEGER NOT NULL DEFAULT 1
+  CHECK (show_shop_name_on_receipt IN (0,1));
+```
+
+Default `1` keeps every existing receipt unchanged. When `0`, the shared receipt
+header (`pushShopHeader`) skips the shop-name line while still printing the logo,
+address, phone and tax numbers; the WhatsApp receipt text skips the name too. It is
+a shop-level setting in Settings → Shop profile & receipt and does not change sales.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

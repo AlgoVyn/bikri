@@ -22,7 +22,7 @@ Modal 640 px wide (full screen < 768 px). Header: "Take payment" + `Total to pay
    - Card: `Last 4 digits` (optional), `Reference` (optional); amount.
    - Udhaar: customer picker (required; `+ New customer` inline: name, phone) → shows "Already owes Rs 5,000 · After this bill Rs 48,000 · Limit Rs 50,000" with amber warning when over (07 §4.1). Amount.
 3. **Split list**: `+ Split payment` adds another method row. Each row: method, amount, remove. A running line: "Paid Rs 40,000 · Remaining Rs 3,000". The last row's amount defaults to the remaining.
-4. **Options**: `Print receipt` toggle (default from device setting), `Send on WhatsApp` toggle (only with a customer phone), `Note` (0–120).
+4. **Options**: `Print receipt` toggle (default from device setting), `Send on WhatsApp` toggle (only with a customer phone). The sale **Remarks** are edited on the Sell cart; the pay step uses that saved text.
 5. **Footer**: primary button reflecting the outcome: "Done — paid Rs 43,000" (Enter), or "Write Rs 43,000 in khata" when fully udhaar, or "Done — Rs 40,000 paid, Rs 3,000 in khata" for a mix. Disabled while remaining ≠ 0 (cash may exceed; others may not).
 
 ## Validation
@@ -53,3 +53,4 @@ Recipe "Sale" in [02 §5](../02-data-model.md#5-record-recipes-which-rows-each-a
 5. Pressing Enter twice quickly creates exactly one sale (button disabled after first submit; idempotent op id).
 6. Pulling the printer cable before Done: sale saved, toast "Print failed — Retry", job visible in Sales.
 7. Esc closes without writing anything.
+8. Remarks typed on the Sell cart are saved on the bill and print as `Remark: <text>` on the receipt and in the WhatsApp share text.

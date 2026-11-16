@@ -197,6 +197,56 @@ export function BillDiscountDialog({
   );
 }
 
+/** Whole-bill remark; optional, so it opens from the totals block instead of taking space. */
+export function RemarksDialog({
+  open,
+  onOpenChange,
+  current,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  current: string;
+  onSave: (note: string) => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    if (open) setNote(current);
+  }, [open, current]);
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={t('sell.remarks')}>
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(note.trim());
+          onOpenChange(false);
+        }}
+      >
+        <div>
+          <label htmlFor={id} className="mb-1 block text-small">
+            {t('sell.remarks')}
+          </label>
+          <input
+            id={id}
+            className={fieldClass}
+            maxLength={120}
+            placeholder={t('sell.remarks_hint')}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </div>
+        <p className="text-small text-text-muted">
+          {t('sell.remarks_popup_hint')}
+        </p>
+        <Actions submit={t('sell.apply')} />
+      </form>
+    </Modal>
+  );
+}
+
 /** Ctrl+H / F4: label (default customer name or "Held 10:42"). */
 export function HoldDialog({
   open,

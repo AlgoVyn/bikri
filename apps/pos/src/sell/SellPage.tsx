@@ -61,6 +61,7 @@ import {
   HeldBillsDialog,
   HoldDialog,
   QuickSaleDialog,
+  RemarksDialog,
   timeOf,
 } from './SellDialogs.tsx';
 import { useSellStore } from './sellStore.ts';
@@ -107,7 +108,15 @@ export function SellPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
   const [dialog, setDialog] = useState<
-    null | 'quick' | 'discount' | 'hold' | 'held' | 'customer' | 'clear' | 'pay'
+    | null
+    | 'quick'
+    | 'discount'
+    | 'remarks'
+    | 'hold'
+    | 'held'
+    | 'customer'
+    | 'clear'
+    | 'pay'
   >(null);
   const [quickName, setQuickName] = useState('');
   const [override, setOverride] = useState<OverrideRequest | null>(null);
@@ -1052,6 +1061,7 @@ export function SellPage() {
             onRemoveBundle={removeBundleByGroup}
             showCost={money.show_cost_on_till && can('cost.view')}
             onCustomer={() => setDialog('customer')}
+            onRemarks={() => setDialog('remarks')}
             onBillDiscount={() => setDialog('discount')}
             onHold={() => setDialog('hold')}
             onClear={askClear}
@@ -1088,6 +1098,12 @@ export function SellPage() {
         onOpenChange={(o) => setDialog(o ? 'discount' : null)}
         current={cart.bill_discount}
         onSave={(d) => void mutate((c) => ({ ...c, bill_discount: d }))}
+      />
+      <RemarksDialog
+        open={dialog === 'remarks'}
+        onOpenChange={(o) => setDialog(o ? 'remarks' : null)}
+        current={cart.note}
+        onSave={(note) => void mutate((c) => ({ ...c, note }))}
       />
       <HoldDialog
         open={dialog === 'hold'}

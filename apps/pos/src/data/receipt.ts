@@ -175,6 +175,7 @@ export async function loadSaleReceipt(
       customerName: customer ? String(customer.name) : null,
       khataBalancePaisa:
         udhaar > 0 && customerId ? await customerBalance(db, customerId) : null,
+      note: String(sale.note ?? ''),
       reprint: options.reprint === true,
     },
     lines: lines.map((l: SyncedRow) => ({
@@ -239,6 +240,7 @@ export async function receiptShop(
     receiptLanguage,
     shop: {
       name: text(row?.name),
+      showShopName: Number(row?.show_shop_name_on_receipt ?? 1) !== 0,
       address: text(row?.address),
       phone: text(row?.phone),
       receiptHeader: text(row?.receipt_header),
@@ -306,7 +308,7 @@ export function receiptShareText(input: SaleReceiptInput): string {
   const money = (p: number) => formatReceiptMoney(p, shop.numberGrouping);
   const labels = input.labels ?? receiptLabelsFor('en');
   const rows = [
-    shop.name,
+    ...(shop.showShopName === false ? [] : [shop.name]),
     `${labels.bill} ${sale.invoiceNo} · ${
       sale.late
         ? formatIsoDate(sale.businessDate)
@@ -326,6 +328,8 @@ export function receiptShareText(input: SaleReceiptInput): string {
     if (sale.khataBalancePaisa !== null)
       rows.push(`${labels.khataBalance} ${money(sale.khataBalancePaisa)}`);
   }
+  const remark = sale.note?.trim() ?? '';
+  if (remark.length > 0) rows.push(`${labels.note}: ${remark}`);
   if (shop.receiptFooter.trim()) rows.push(shop.receiptFooter.trim());
   return rows.join('\n');
 }

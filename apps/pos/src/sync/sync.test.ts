@@ -1808,6 +1808,66 @@ describe('status, me and engine (03 §6–7)', () => {
     engine?.stop();
   });
 
+  it('defers a push while the till is hidden and flushes it on return', async () => {
+    const db = await enrolled('hidden-share');
+    const engine = await SyncEngine.start(db);
+    if (engine === null) throw new Error('engine did not start');
+    await syncNow();
+    server.log = [];
+    let visibility: DocumentVisibilityState = 'hidden';
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+    try {
+      await writeAction(db, (w) => w.create('categories', { name_en: 'H' }));
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      engine.schedulePush();
+      vi.advanceTimersByTime(5_100);
+      await Promise.resolve();
+      // Share opened WhatsApp in another tab: no request starts until the till returns.
+      expect(server.log.some((entry) => entry.path === '/sync/push')).toBe(
+        false,
+      );
+      // A cycle requested by another trigger (manual, online) waits too.
+      await engine.run('push');
+      expect(server.log.some((entry) => entry.path === '/sync/push')).toBe(
+        false,
+      );
+      // A visibility event that is still hidden does nothing.
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(server.log).toHaveLength(0);
+
+      visibility = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+      vi.useRealTimers();
+      await vi.waitFor(() =>
+        expect(server.log.some((entry) => entry.path === '/sync/push')).toBe(
+          true,
+        ),
+      );
+      await vi.waitFor(() =>
+        expect(server.log.some((entry) => entry.path === '/sync/pull')).toBe(
+          true,
+        ),
+      );
+      // Let the deferred full cycle settle, then an ordinary focus pulls only.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      server.log = [];
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.waitFor(() =>
+        expect(server.log.some((entry) => entry.path === '/sync/pull')).toBe(
+          true,
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete (document as { visibilityState?: DocumentVisibilityState })
+        .visibilityState;
+      engine.stop();
+    }
+  });
+
   it('a push cycle does not postpone the poll pull', async () => {
     const db = await enrolled('poll-starvation');
     const engine = new SyncEngine(db);

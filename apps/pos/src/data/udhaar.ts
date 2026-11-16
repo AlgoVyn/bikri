@@ -1,10 +1,11 @@
 import { businessDate, newId, type Role } from '@bikri/core';
 import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
-import { csvCell, rupeesCsv } from '../lib/csv.ts';
+import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
 import type { SortDirection } from '../lib/sort.ts';
 import { isReadOnly } from '../sync/status.ts';
+import { rowsAnyOfTable } from './bulk.ts';
 import type { TableSource } from './caches.ts';
 import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
@@ -78,6 +79,14 @@ export type StatementKind =
   | 'opening'
   | 'adjustment';
 
+/** One sale line included in an opt-in detailed statement export. */
+export type StatementItem = {
+  name: string;
+  qtyMilli: number;
+  /** Line net in paisa, before the bill-level discount/tax allocation. */
+  amount: number;
+};
+
 export type StatementEntry = {
   entry: SyncedRow;
   kind: StatementKind;
@@ -89,6 +98,8 @@ export type StatementEntry = {
   debit: number;
   credit: number;
   balance: number;
+  /** Only filled when the caller asks for detailed export rows. */
+  items?: StatementItem[];
 };
 
 export type Statement = {
@@ -108,6 +119,7 @@ export type StatementCsvRow = {
   debit: number;
   credit: number;
   balance: number;
+  items?: readonly StatementItem[];
 };
 
 export class PaymentError extends Error {
@@ -365,6 +377,7 @@ export async function customerStatement(
   customerId: string,
   range?: { from: string; to: string },
   limit = Number.POSITIVE_INFINITY,
+  withItems = false,
 ): Promise<Statement> {
   const from = range?.from ?? '0000-01-01';
   const to = range?.to ?? '9999-12-31';
@@ -539,6 +552,42 @@ export async function customerStatement(
     });
   }
 
+  if (withItems) {
+    const saleIds = [
+      ...new Set(
+        all
+          .filter((row) => row.kind === 'sale' && row.saleId !== null)
+          .map((row) => String(row.saleId)),
+      ),
+    ];
+    const lines = await rowsAnyOfTable<SyncedRow>(
+      src.table('sale_lines') as Table<SyncedRow>,
+      'sale_id',
+      saleIds,
+      (row) => String(row.sale_id),
+    );
+    const bySale = new Map<string, { lineNo: number; item: StatementItem }[]>();
+    for (const line of lines) {
+      const saleId = String(line.sale_id);
+      const group = bySale.get(saleId) ?? [];
+      group.push({
+        lineNo: n(line.line_no),
+        item: {
+          name: String(line.name_snapshot),
+          qtyMilli: n(line.qty_milli),
+          amount: n(line.net),
+        },
+      });
+      bySale.set(saleId, group);
+    }
+    for (const row of all) {
+      if (row.kind !== 'sale' || row.saleId === null) continue;
+      row.items = (bySale.get(row.saleId) ?? [])
+        .sort((a, b) => a.lineNo - b.lineNo)
+        .map((entry) => entry.item);
+    }
+  }
+
   return {
     rows: all,
     openingBalance,
@@ -551,20 +600,25 @@ export async function customerStatement(
 /** CSV of the statement rows the caller formatted for the active language. */
 export function statementCsv(rows: readonly StatementCsvRow[]): string {
   const header = ['date', 'description', 'debit', 'credit', 'balance'];
+  const lines = rows.flatMap((row) => {
+    const main = [
+      row.date,
+      row.description,
+      rupeesCsv(row.debit),
+      rupeesCsv(row.credit),
+      rupeesCsv(row.balance),
+    ];
+    const items = (row.items ?? []).map((item) => [
+      '',
+      `  ${item.name} × ${qtyCsv(item.qtyMilli)} — ${formatShopMoney(item.amount)}`,
+      '',
+      '',
+      '',
+    ]);
+    return [main, ...items];
+  });
   return [header.join(',')]
-    .concat(
-      rows.map((row) =>
-        [
-          row.date,
-          row.description,
-          rupeesCsv(row.debit),
-          rupeesCsv(row.credit),
-          rupeesCsv(row.balance),
-        ]
-          .map(csvCell)
-          .join(','),
-      ),
-    )
+    .concat(lines.map((line) => line.map(csvCell).join(',')))
     .join('\r\n');
 }
 

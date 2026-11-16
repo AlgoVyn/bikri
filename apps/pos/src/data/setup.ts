@@ -142,6 +142,7 @@ export async function finishSetup(
         round_total_to: input.receipt.round_total_to,
         show_payment_details: 1,
         show_cashier_on_receipt: 1,
+        show_shop_name_on_receipt: 1,
         show_you_saved: 0,
         print_warranty: 1,
         logo_key: logoKey,

@@ -9,6 +9,7 @@ export const CANVAS = {
   muted: '#475569',
   rule: '#cbd5e1',
   surface2: '#f1f5f9',
+  stripe: '#f8fafc',
   primary: '#006bb3',
   success: '#047857',
 } as const;

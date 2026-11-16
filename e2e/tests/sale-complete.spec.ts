@@ -97,6 +97,27 @@ test.describe('Sale complete (T-018)', () => {
     expect(await idbAll(page, 'sales')).toHaveLength(1);
   });
 
+  test('a sale remark is saved on the bill', async ({ page }) => {
+    await shop(page);
+    await tile(page, 'Galaxy A15').click();
+    if ((page.viewportSize()?.width ?? 0) < 1024)
+      await page.getByTestId('cart-bar').click();
+    await page.getByRole('button', { name: 'Add remarks' }).click();
+    const remarks = page.getByRole('dialog', { name: 'Remarks' });
+    await remarks
+      .getByLabel('Remarks', { exact: true })
+      .fill('Customer pickup after 6 pm');
+    await remarks.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByTestId('cart-remarks')).toContainText(
+      'Customer pickup after 6 pm',
+    );
+    await page.keyboard.press('F8');
+    await modal(page).getByTestId('pay-done').click();
+    await expect(page.getByTestId('sale-complete')).toBeVisible();
+    const [saved] = await idbAll<{ note: string }>(page, 'sales');
+    expect(saved?.note).toBe('Customer pickup after 6 pm');
+  });
+
   test('AC 2: Share makes a PNG of the receipt and opens wa.me for a customer with a phone; Download PDF', async ({
     page,
   }) => {

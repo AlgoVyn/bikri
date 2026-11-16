@@ -1,4 +1,5 @@
 import { businessDate } from '@bikri/core';
+import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
@@ -72,6 +73,7 @@ export function CustomerStatement({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
+  const [includeItems, setIncludeItems] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   // Render one layout: the card list and the table both mapped every entry and
   // formatted two dates per row, even when CSS hid one of them (D-231).
@@ -125,6 +127,10 @@ export function CustomerStatement({
         ?.oldest_unpaid_at,
       promise: promise ?? null,
       shopName: String(shop?.name ?? ''),
+      shopAddress: String(shop?.address ?? ''),
+      shopPhone: String(shop?.phone ?? ''),
+      logo: ((await db.kv.get('logo_bitmap'))?.value ??
+        null) as RasterSource | null,
     };
   }, [customerId, from, to, visibleRows]);
 
@@ -144,7 +150,17 @@ export function CustomerStatement({
     );
   if (!data) return <PageLoading compact />;
 
-  const { customer, statement, tz, today, balance, shopName } = data;
+  const {
+    customer,
+    statement,
+    tz,
+    today,
+    balance,
+    shopName,
+    shopAddress,
+    shopPhone,
+    logo,
+  } = data;
   const phone = String(customer.phone ?? '');
   const name = String(customer.name);
   const reminder = reminderLink(
@@ -165,14 +181,24 @@ export function CustomerStatement({
       debit: row.debit,
       credit: row.credit,
       balance: row.balance,
+      items: row.items,
     }));
   const rows = mapRows(statement);
   // The data layer returns the newest page; the printed statement and CSV load every
   // row separately, so paging the screen does not truncate an export.
   const shownRows = statement.rows;
   const shownOpening = statement.openingBalance;
+  const periodValue =
+    from || to
+      ? `${from ? dateText(from, i18n.language, tz) : '…'} – ${
+          to ? dateText(to, i18n.language, tz) : '…'
+        }`
+      : t('office.udhaar.all_time');
   const meta = {
     shopName,
+    shopAddress,
+    shopPhone,
+    logo,
     customerName: name,
     phone,
     balance,
@@ -183,20 +209,34 @@ export function CustomerStatement({
     lang: i18n.language,
     labels: {
       title: t('office.udhaar.statement'),
+      customer: t('office.udhaar.statement_customer'),
+      phone: t('office.udhaar.phone'),
+      period: t('office.udhaar.statement_period'),
+      periodValue,
       date: t('office.udhaar.date'),
       description: t('office.udhaar.description'),
-      debit: t('office.udhaar.debit'),
-      credit: t('office.udhaar.credit'),
+      debit: t('office.udhaar.statement_debit'),
+      credit: t('office.udhaar.statement_credit'),
       balance: t('office.udhaar.balance'),
       opening: t('office.udhaar.entry_opening'),
       total: t('office.udhaar.total'),
+      totalDebit: t('office.udhaar.total_debit'),
+      totalCredit: t('office.udhaar.total_credit'),
+      closing: t('office.udhaar.closing_balance'),
+      generatedBy: t('office.udhaar.generated_by'),
       asOf: t('office.udhaar.as_of', {
         date: dateText(today, i18n.language, tz),
       }),
     },
   };
   const fullStatement = () =>
-    customerStatement(getDb(), customerId, range, Number.POSITIVE_INFINITY);
+    customerStatement(
+      getDb(),
+      customerId,
+      range,
+      Number.POSITIVE_INFINITY,
+      includeItems,
+    );
   const fullMeta = async () => {
     const full = await fullStatement();
     return {
@@ -318,12 +358,20 @@ export function CustomerStatement({
                   {t('office.udhaar.send_reminder')}
                 </button>
                 {can('export.data') ? (
-                  <ExportMenu
-                    onCsv={exportCsv}
-                    onPdf={() => void exportPdf()}
-                    onShare={() => void share()}
-                    onPrint={() => void printStatement()}
-                  />
+                  <>
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      onClick={() => void printStatement()}
+                    >
+                      {t('office.udhaar.print_statement')}
+                    </button>
+                    <ExportMenu
+                      onCsv={exportCsv}
+                      onPdf={() => void exportPdf()}
+                      onShare={() => void share()}
+                    />
+                  </>
                 ) : null}
               </>
             }
@@ -478,6 +526,18 @@ export function CustomerStatement({
         >
           {t('office.udhaar.jump_latest')}
         </button>
+        {can('export.data') ? (
+          <label className="flex min-h-11 items-center gap-2 text-small">
+            <input
+              type="checkbox"
+              className="size-5"
+              checked={includeItems}
+              data-testid="statement-include-items"
+              onChange={(event) => setIncludeItems(event.target.checked)}
+            />
+            {t('office.udhaar.include_bill_details')}
+          </label>
+        ) : null}
       </div>
 
       {!wide ? (

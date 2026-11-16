@@ -151,6 +151,12 @@ test.describe('Sell (T-016)', () => {
     await expect(page.getByTestId('total-discount')).toHaveText('−Rs 500');
     await expect(page.getByTestId('total-to-pay')).toHaveText('Rs 43,000');
     await expect(page.getByTestId('badge-discount')).toHaveText('−Rs 2,000');
+    // Once a discount is set, Add remarks moves to its own line below it.
+    const discountBox = await page.getByTestId('total-discount').boundingBox();
+    const remarksBox = await page
+      .getByRole('button', { name: 'Add remarks' })
+      .boundingBox();
+    expect(remarksBox?.y ?? 0).toBeGreaterThan((discountBox?.y ?? 0) + 10);
 
     // AC 7 (badge part): 2 phones with 1 in stock.
     await page.getByLabel('Quantity of Galaxy A15').fill('2');

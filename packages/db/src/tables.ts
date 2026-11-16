@@ -150,6 +150,8 @@ export const TABLE_COLUMNS = {
     'deleted_at',
     'rev',
     'updated_by',
+    // Added by migration 0022; ALTER TABLE appends it after the original columns.
+    'show_shop_name_on_receipt',
   ],
   branches: [
     'tenant_id',

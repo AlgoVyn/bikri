@@ -120,6 +120,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Test/coverage/build output inside the app folder otherwise floods the watcher
+    // while a dev server is open, and HMR can miss a source edit.
+    watch: { ignored: ['**/coverage/**', '**/dist/**', '**/test-results/**'] },
     proxy: {
       [API_BASE]: {
         target: 'http://localhost:8787',

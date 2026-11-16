@@ -37,11 +37,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ### Selling and back office
 - Offline-first selling with three carts, held bills, cash/card/bank/wallet/udhaar payments, change, receipt printing and sharing.
 - Refunds (including the part-udhaar split), voids and void-and-reissue, append-only corrections and printable notices.
-- Udhaar khata with limits, statements, part payments, promises, chase list and WhatsApp reminders.
+- Udhaar khata with limits, statements, part payments, promises, chase list and WhatsApp reminders; the statement export can optionally append each bill's item name, quantity and line amount to CSV/PDF/PNG/print/share, the PDF/PNG is a branded A4 bank-style statement with the shop logo, address, phone, period and debit/credit summary, and **Print** is a separate header action instead of an export-menu item.
 - Products, barcodes, stock adjustments/counts, weighted-average and last cost, suppliers, deliveries, pay supplier and returns to supplier.
 - Expenses, cash in/out, per-device day close with expected cash, difference and Z-report.
 - Reports (summary, products, stock, udhaar, staff, day closes, expenses) with CSV/PDF/PNG exports.
 - Owner full export, owner server export with email sign-in, barcode labels (50×25, 38×25, 40×30 mm and A4), settings, staff/PINs, permissions and Activity.
+- The shop logo is saved by the Shop profile section's Save (no separate Save logo action); its thermal preview and the receipt-preview logo persist after leaving and reopening Settings, and the receipt preview keeps its text width so the logo stays centred instead of widening the paper.
+- Settings → Shop profile & receipt adds **Show shop name on receipts** (default on) for logos that already contain the name; the receipt preview now shows the shop-name line bold like the printed receipt.
+- Sell has an **Add remarks** popup next to **Add discount** (an existing remark appears as a muted row with Edit); the text is saved on the sale, prints as `Remark: …` on thermal/PDF/browser receipts, and is included in the WhatsApp share text.
 - English, Urdu (RTL) and Roman Urdu; printer-agnostic ESC/POS over WebUSB/Web Serial with browser-print fallback.
 - Refined visual refresh: brand-navy desktop rail, a real 24/30 heading scale, dashboard-style Home, elevated Sell/Products tables and forms, icon payment method cards and card-based filters across the back office. The visual-review pass makes the master–detail split 1280-only, cards phone statements, fixes Urdu Sell tiles, quietens printer/sync status, raises Sell density, uses Inter for display money, adds sale-complete/backup/report/day-close clarity and collapses phone filters (D-145). Sell category chips show their names, Home recent bills are shop-wide and newest-first, and the rail shows only the Bikri brand.
 - Reference-driven structure: icon page headers, primary + overflow actions, Home hero and register column, cart tab totals and quantity badges, descriptive payment cards, and Settings rows with icons/chevrons (D-134).
@@ -51,6 +54,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Sync, tenants and operations
 - Multi-tenant D1 with every row and query scoped by `tenant_id`; per-shop IndexedDB copy and outbox.
+- A write-debounced push no longer starts while the till tab is hidden (for example after Share opens WhatsApp); it flushes as soon as the till is visible, so Chromium cannot suspend the request until its HTTP/3 connection idles out.
 - Device enrolment, PIN lock, owner email sign-in, admin devices, conflict handling and restore recovery.
 - Operator console behind Cloudflare Access: tenants, pairing codes, devices, status changes, support access, per-shop export/restore/delete, usage and backups — restyled to match the shop shell with KPI cards, searchable/paginated shops, tenant status/profile cards and consistent forms and danger zones (D-136).
 - Read-only shops with offline-safe retention of pre-status sales; operator support access is view-only, visible and time-limited.

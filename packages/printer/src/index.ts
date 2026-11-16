@@ -53,6 +53,7 @@ export {
   type PaperPreset,
   paperRuler,
   type ResolvedPaper,
+  receiptTextLines,
   renderReceiptText,
   resolvePaper,
   wrapText,
