@@ -488,33 +488,22 @@ export function HomePage() {
                   ) : null}
                 </div>
               </section>
-            ) : (
-              <Link
-                to="/sell"
-                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-[filter,box-shadow] duration-150 hover:brightness-105 hover:shadow-card-hover active:brightness-95"
-              >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
+            ) : null}
+
+            <div className="order-2">
+              {data ? (
+                <RegisterCard
+                  data={data}
+                  cash={cash}
+                  showCash={can('dayclose.view_expected')}
+                  showProfit={can('cost.view')}
+                  canClose={can('dayclose.create') && !readOnly}
+                  timeText={timeText}
+                  hidden={todayHidden}
+                  onToggleHidden={toggleTodayHidden}
                 />
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-16 end-16 size-32 rounded-full bg-accent/10"
-                />
-                <span className="relative flex size-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink">
-                  <SellIcon />
-                </span>
-                <span className="relative min-w-0 flex-1">
-                  <span className="block text-title font-semibold text-rail-ink">
-                    {t('home.new_sale')}
-                  </span>
-                  <span className="block text-small text-rail-muted">
-                    {t('home.new_sale_hint')}
-                  </span>
-                </span>
-                <ChevronRightIcon className="size-4 relative text-title text-rail-active transition-transform duration-150 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
-              </Link>
-            )}
+              ) : null}
+            </div>
 
             <div className="order-3 flex flex-col gap-6">
               <QuickActions
@@ -558,20 +547,33 @@ export function HomePage() {
           </div>
 
           <aside className="contents lg:col-start-2 lg:flex lg:flex-col lg:gap-4">
-            <div className="order-2">
-              {data ? (
-                <RegisterCard
-                  data={data}
-                  cash={cash}
-                  showCash={can('dayclose.view_expected')}
-                  showProfit={can('cost.view')}
-                  canClose={can('dayclose.create') && !readOnly}
-                  timeText={timeText}
-                  hidden={todayHidden}
-                  onToggleHidden={toggleTodayHidden}
+            {readOnly ? null : (
+              <Link
+                to="/sell"
+                className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-[filter,box-shadow] duration-150 hover:brightness-105 hover:shadow-card-hover active:brightness-95"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
                 />
-              ) : null}
-            </div>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-16 end-16 size-32 rounded-full bg-accent/10"
+                />
+                <span className="relative flex size-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-ink">
+                  <SellIcon />
+                </span>
+                <span className="relative min-w-0 flex-1">
+                  <span className="block text-title font-semibold text-rail-ink">
+                    {t('home.new_sale')}
+                  </span>
+                  <span className="block text-small text-rail-muted">
+                    {t('home.new_sale_hint')}
+                  </span>
+                </span>
+                <ChevronRightIcon className="size-4 relative text-title text-rail-active transition-transform duration-150 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
+              </Link>
+            )}
             <div className="order-4">
               <RecentBillsCard data={data} timeText={timeText} />
             </div>
@@ -877,7 +879,7 @@ function RegisterCard({
           aria-pressed={hidden}
           title={hidden ? t('privacy.show') : t('privacy.hide')}
           onClick={onToggleHidden}
-          className="relative flex size-9 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 hover:text-text aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink"
+          className="relative flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors duration-150 before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface-2 hover:text-text aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink"
         >
           {hidden ? (
             <EyeOffIcon className="size-5" />

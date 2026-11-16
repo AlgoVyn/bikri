@@ -6,6 +6,8 @@ import {
   IMMUTABLE_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
+  STABLE_ASSET_CACHE_CONTROL,
+  STABLE_ASSET_PATHS,
   securityHeaderEntries,
 } from './securityHeaders.ts';
 
@@ -53,7 +55,7 @@ describe('security headers', () => {
     );
   });
 
-  it('keeps no-transform on HTML and makes hashed assets immutable', () => {
+  it('keeps no-transform on HTML and caches hashed and stable assets correctly', () => {
     const file = renderAssetHeaders();
     expect(file.startsWith(`${BASE_PATH}/*\n`)).toBe(true);
     const blocks = parseBlocks(file);
@@ -68,6 +70,16 @@ describe('security headers', () => {
         'Cache-Control': IMMUTABLE_CACHE_CONTROL,
       });
       expect(IMMUTABLE_CACHE_CONTROL).not.toContain('no-transform');
+    }
+    // Icons and fonts keep stable filenames, so a year-long immutable cache would
+    // strand a rebrand or font update in installed PWAs (review M2).
+    for (const path of STABLE_ASSET_PATHS) {
+      expect(blocks[path]).toEqual({
+        '! Cache-Control': '',
+        'Cache-Control': STABLE_ASSET_CACHE_CONTROL,
+      });
+      expect(STABLE_ASSET_CACHE_CONTROL).not.toContain('immutable');
+      expect(IMMUTABLE_ASSET_PATHS).not.toContain(path);
     }
     expect(Object.fromEntries(securityHeaderEntries())).toEqual(
       SECURITY_HEADERS,

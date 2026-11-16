@@ -1,4 +1,4 @@
-import { newId } from '@bikri/core';
+import { CLIENT_SCHEMA_VERSION, newId } from '@bikri/core';
 import type { OutboxEntry } from '@bikri/db';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKv, setKv } from '../data/kv.ts';
@@ -35,6 +35,7 @@ import {
   retryFailed,
   toWire,
 } from './push.ts';
+import { noteShareOpened, SHARE_SYNC_DEFER_MS } from './shareGrace.ts';
 import { useSyncState } from './state.ts';
 import { applyStatus, isReadOnly } from './status.ts';
 
@@ -68,6 +69,8 @@ beforeEach(() => {
 afterEach(async () => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  // Clear the module-level Share window left by the hidden-tab tests.
+  noteShareOpened(Date.now() - SHARE_SYNC_DEFER_MS);
   await dropTestDbs();
 });
 
@@ -226,7 +229,10 @@ describe('push (03 §3, §4.1)', () => {
       device_id: string;
       schema_version: number;
     };
-    expect(body).toMatchObject({ device_id: 'dev-1', schema_version: 5 });
+    expect(body).toMatchObject({
+      device_id: 'dev-1',
+      schema_version: CLIENT_SCHEMA_VERSION,
+    });
     // A failed op is not pushed again until Retry.
     server.log = [];
     await pushAll(db);
@@ -1808,7 +1814,7 @@ describe('status, me and engine (03 §6–7)', () => {
     engine?.stop();
   });
 
-  it('defers a push while the till is hidden and flushes it on return', async () => {
+  it('defers a push during the Share grace and flushes it on return', async () => {
     const db = await enrolled('hidden-share');
     const engine = await SyncEngine.start(db);
     if (engine === null) throw new Error('engine did not start');
@@ -1819,6 +1825,7 @@ describe('status, me and engine (03 §6–7)', () => {
       configurable: true,
       get: () => visibility,
     });
+    noteShareOpened();
     try {
       await writeAction(db, (w) => w.create('categories', { name_en: 'H' }));
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -1866,6 +1873,53 @@ describe('status, me and engine (03 §6–7)', () => {
         .visibilityState;
       engine.stop();
     }
+  });
+
+  it('keeps syncing while hidden when no Share is open', async () => {
+    noteShareOpened(Date.now() - SHARE_SYNC_DEFER_MS);
+    const db = await enrolled('hidden-normal');
+    const engine = await SyncEngine.start(db);
+    if (engine === null) throw new Error('engine did not start');
+    await syncNow();
+    server.log = [];
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    try {
+      await writeAction(db, (w) => w.create('categories', { name_en: 'H' }));
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      engine.schedulePush();
+      vi.advanceTimersByTime(5_100);
+      vi.useRealTimers();
+      // A minimised window or a locked screen is not a Share: the write still pushes.
+      await vi.waitFor(() =>
+        expect(server.log.some((entry) => entry.path === '/sync/push')).toBe(
+          true,
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete (document as { visibilityState?: DocumentVisibilityState })
+        .visibilityState;
+      engine.stop();
+    }
+  });
+
+  it('flushes a pending push on pagehide', async () => {
+    const db = await enrolled('pagehide');
+    const engine = await SyncEngine.start(db);
+    if (engine === null) throw new Error('engine did not start');
+    await syncNow();
+    server.log = [];
+    await writeAction(db, (w) => w.create('categories', { name_en: 'P' }));
+    window.dispatchEvent(new Event('pagehide'));
+    await vi.waitFor(() =>
+      expect(server.log.some((entry) => entry.path === '/sync/push')).toBe(
+        true,
+      ),
+    );
+    engine.stop();
   });
 
   it('a push cycle does not postpone the poll pull', async () => {

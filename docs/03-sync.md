@@ -195,14 +195,15 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 | Trigger | Action |
 |---|---|
 | After any local write | debounce 5 s, then push |
-| Every 60 s while visible and online | push (if pending) then pull |
+| Every 60 s while online | push (if pending) then pull; browsers may throttle timers in a hidden tab |
 | `online` event | push then pull |
-| `visibilitychange` → visible | pull; a push deferred while hidden runs first |
+| `visibilitychange` → visible | pull; a push deferred during the Share grace runs first |
+| `pagehide` (tab closed or navigated away) | best-effort push of pending ops |
 | Day close saved | push + pull immediately; show result in the day-close success view |
 | Manual "Sync now" (staff menu → Sync / Settings → Sync) | push + pull |
 | Push/pull HTTP error | exponential backoff: 5 s, 15 s, 60 s, 5 min (max); reset on success |
 
-No Background Sync in v1: pushes happen only while the app is open (the counter PC keeps Bikri open all day). A cycle does not start while the tab is hidden (for example while the sale-complete **Share** button has opened WhatsApp in another tab): Chromium can suspend a background request until its HTTP/3 connection idles out (`QUIC_NETWORK_IDLE_TIMEOUT`). The deferred push and pull run on the next `visibilitychange` → visible.
+No Background Sync in v1: pushes happen only while the app is open (the counter PC keeps Bikri open all day). Sync keeps running while the tab is hidden (minimised window, another app in front, locked tablet screen), so other tills and the owner's phone see stock and balances without waiting for the till to return. The one exception is a short 30 s grace after the sale-complete **Share** button opens WhatsApp or the OS share sheet in another tab: Chromium can suspend a request started while hidden until its HTTP/3 connection idles out (`QUIC_NETWORK_IDLE_TIMEOUT`), so those cycles wait for `visibilitychange` → visible or the next poll after the grace. A `pagehide` flushes pending ops best-effort.
 
 **Clock check:** every response carries `server_time`. If `|device clock − server_time| > 5 min`, the avatar status shows an amber warning and its menu explains "This PC's clock is wrong — fix the date/time"; Home also shows an attention card. Ledger rows still use the device clock (`created_at`, `business_date` in `shop.timezone`), because selling must work offline; the warning stops a wrong clock from silently putting bills on the wrong business date.
 

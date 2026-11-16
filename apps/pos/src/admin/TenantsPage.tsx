@@ -232,7 +232,7 @@ export function TenantsPage() {
                           <td className="px-4 py-3">
                             <a
                               href={adminHref(`/admin/tenants/${tenant.id}`)}
-                              className="group inline-flex min-w-0 flex-col"
+                              className="group inline-flex min-h-11 min-w-0 flex-col justify-center"
                             >
                               <span className="truncate font-medium text-text group-hover:text-primary">
                                 {tenant.display_name}
@@ -330,29 +330,35 @@ function WriteMeter({
 }) {
   const { t } = useTranslation();
   const budget = tenant.daily_write_budget;
-  const hot = budget > 0 && tenant.today.rows_written >= budget;
-  const warn = !hot && budget > 0 && tenant.today.rows_written >= 0.8 * budget;
+  const blocked = budget <= 0;
+  const hot = !blocked && tenant.today.rows_written >= budget;
+  const warn = !blocked && !hot && tenant.today.rows_written >= 0.8 * budget;
   let tone = 'var(--color-primary)';
-  if (warn) tone = 'var(--color-warning)';
-  if (hot) tone = 'var(--color-danger)';
-  const limit = budget > 0 ? budget : 1;
-  const percent = Math.round((tenant.today.rows_written / limit) * 100);
-  const valueText = t('admin.writes_bar', {
-    written: formatCount(tenant.today.rows_written, lang),
-    budget: formatCount(budget, lang),
-  });
+  if (blocked) tone = 'var(--color-danger)';
+  else if (warn) tone = 'var(--color-warning)';
+  else if (hot) tone = 'var(--color-danger)';
+  const limit = blocked ? 1 : budget;
+  const percent = blocked
+    ? 0
+    : Math.round((tenant.today.rows_written / limit) * 100);
+  const valueText = blocked
+    ? t('admin.writes_blocked')
+    : t('admin.writes_bar', {
+        written: formatCount(tenant.today.rows_written, lang),
+        budget: formatCount(budget, lang),
+      });
   return (
     <div>
       <MeterBar
         label={valueText}
         valueText={valueText}
-        value={tenant.today.rows_written}
+        value={blocked ? 1 : tenant.today.rows_written}
         max={limit}
         tone={tone}
         className="max-w-28"
       />
       <p className="mt-1 text-small text-text-muted tabular-nums">
-        {valueText} · {percent}%
+        {blocked ? valueText : `${valueText} · ${percent}%`}
       </p>
     </div>
   );

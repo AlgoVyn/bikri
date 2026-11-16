@@ -245,10 +245,11 @@ shop.post('/owner-signin/verify', async (c) => {
   // Claim one try before comparing the HMAC. Concurrent guesses now consume the same
   // five-try budget instead of all reading attempts = 0.
   const claimed = await db.run(
-    'UPDATE owner_email_codes SET attempts = attempts + 1 WHERE tenant_id = ?1 AND id = ?2 AND device_id = ?3 AND used_at IS NULL AND expires_at > ?4 AND attempts < 5',
+    'UPDATE owner_email_codes SET attempts = attempts + 1 WHERE tenant_id = ?1 AND id = ?2 AND device_id = ?3 AND used_at IS NULL AND expires_at > ?4 AND attempts < ?5',
     body.code_id,
     device.id,
     now,
+    SIGNIN.tries,
   );
   if ((claimed.meta.changes ?? 0) !== 1) throw bad(0);
   const hash = await hmacHex(

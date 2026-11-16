@@ -28,6 +28,42 @@ export function tenantKey(tenantId: string, relative: string): string {
 
 const notFound = () => new ApiError('NOT_FOUND', 404, 'Not found');
 
+/** The bytes decide whether an upload is really the image type it claims (review L7). */
+function sniffImage(bytes: Uint8Array): string | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  )
+    return 'image/png';
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  )
+    return 'image/jpeg';
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+    return 'image/webp';
+  return null;
+}
+
 /** `PUT /api/files/:kind/:id/:sha256` (04 §3.5). */
 export async function putFile(c: Context<AppEnv>): Promise<Response> {
   const { tenant, device } = c.var;
@@ -81,6 +117,12 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
   if (!staff || !can(staff.role, staff.permissions_json, permission))
     throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
   const body = await readBodyBytes(c, MAX_IMAGE_BYTES);
+  if (sniffImage(body) !== type)
+    throw new ApiError(
+      'UNSUPPORTED_MEDIA_TYPE',
+      415,
+      'Image bytes do not match the content type',
+    );
   if (hex(await crypto.subtle.digest('SHA-256', body)) !== sha256)
     throw new ApiError(
       'VALIDATION_FAILED',

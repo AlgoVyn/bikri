@@ -1642,6 +1642,22 @@ Default `1` keeps every existing receipt unchanged. When `0`, the shared receipt
 header (`pushShopHeader`) skips the shop-name line while still printing the logo,
 address, phone and tax numbers; the WhatsApp receipt text skips the name too. It is
 a shop-level setting in Settings → Shop profile & receipt and does not change sales.
+The schema marker bump lives in migration `0023` so a database that already applied
+`0022` still advances. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 7; the
+Worker's bundle pull gate stays at schema 5 because it marks when bundles shipped,
+not the current schema.
+
+### 2.22 Schema marker after the shop-name column (migration `0023_schema_version_7.sql`)
+
+```sql
+-- 0022 added a shop column after the 1.1.0 schema bump. Set the database marker to the
+-- Worker's SCHEMA_VERSION 7; a fresh database runs this right after 0022 (review L9).
+UPDATE meta SET value = '7' WHERE key = 'schema_version';
+```
+
+A separate migration is deliberate: editing `0022` would not update a database where
+it was already applied. Fresh databases run `0022` (the marker stays at 6) and then
+`0023` (7).
 
 ## 3. Dexie schema (till)
 

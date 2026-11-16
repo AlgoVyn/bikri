@@ -13,7 +13,7 @@ test.describe('worker routing (T-002)', () => {
     expect(await health.json()).toMatchObject({
       ok: true,
       db: 'ok',
-      schema_version: 6,
+      schema_version: 7,
     });
     const missing = await request.get('/bikri/api/does-not-exist');
     expect(missing.status()).toBe(404);

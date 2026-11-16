@@ -30,6 +30,12 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { queueSalePrint } from '../data/receipt.ts';
 import {
+  clampReportRange,
+  firstBusinessDay,
+  LONG_RANGE_DAYS,
+  spanDays,
+} from '../data/reportRange.ts';
+import {
   defaultSaleSortDirection,
   filterSalesHistory,
   loadSalesHistory,
@@ -179,22 +185,26 @@ export function SalesList({
     if (!limited) rememberDateFilter('sales', preset, custom.from, custom.to);
   }, [preset, custom.from, custom.to, limited]);
 
-  const customDays =
-    (Date.parse(`${custom.to}T00:00:00Z`) -
-      Date.parse(`${custom.from}T00:00:00Z`)) /
-      86_400_000 +
-    1;
-  const rangeError =
-    preset === 'custom' && (!Number.isFinite(customDays) || customDays < 1);
+  const customDays = spanDays(custom.from, custom.to);
+  const rangeError = preset === 'custom' && customDays < 1;
 
+  const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `today` changes at midnight and must rebuild the range
-  const range = useMemo(
+  const rawRange = useMemo(
     () =>
       limited
         ? rangeFor('today', Date.now(), timeZone)
         : rangeFor(preset, Date.now(), timeZone, custom),
     [limited, preset, custom.from, custom.to, timeZone, today],
   );
+  // A mistyped year must not load every sale the shop ever wrote (review M4).
+  const resolvedRange = useMemo(
+    () => clampReportRange(rawRange, firstDay ?? today, today),
+    [rawRange, firstDay, today],
+  );
+  const range = resolvedRange.range;
+  const longRange =
+    resolvedRange.long || (preset === 'custom' && customDays > LONG_RANGE_DAYS);
   const history = useLiveQuery(
     () => (rangeError ? null : loadSalesHistory(getDb(), range)),
     [range.from, range.to, rangeError],
@@ -379,6 +389,7 @@ export function SalesList({
             className="w-[9.5rem]"
             label={t('office.sales.from')}
             value={custom.from}
+            min={firstDay ?? undefined}
             max={custom.to}
             onChange={(value) => setCustom((c) => ({ ...c, from: value }))}
           />
@@ -386,7 +397,7 @@ export function SalesList({
             className="w-[9.5rem]"
             label={t('office.sales.to')}
             value={custom.to}
-            min={custom.from}
+            min={firstDay && custom.from < firstDay ? firstDay : custom.from}
             onChange={(value) => setCustom((c) => ({ ...c, to: value }))}
           />
         </div>
@@ -394,6 +405,11 @@ export function SalesList({
       {rangeError ? (
         <p role="alert" className="text-small text-danger">
           {t('office.sales.range_invalid')}
+        </p>
+      ) : null}
+      {longRange ? (
+        <p className="text-small text-text-muted">
+          {t('office.sales.range_long')}
         </p>
       ) : null}
 

@@ -771,6 +771,7 @@
   },
   "sell": {
     "add_discount": "Add discount",
+    "add_items": "Add items",
     "add_product": "Add product",
     "add_to_cart": "Add to cart",
     "apply": "Apply",

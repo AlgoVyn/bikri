@@ -250,7 +250,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   ],
   "vars": {
     "APP_VERSION": "1.0.0",
-    "SCHEMA_VERSION": "6",
+    "SCHEMA_VERSION": "7",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain
@@ -289,18 +289,18 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 
 /bikri/fonts/*
   ! Cache-Control
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400, must-revalidate
 
 /bikri/icons/*
   ! Cache-Control
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400, must-revalidate
 ```
 
-`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting `immutable` (D-231). Content-hashed files never change under the same URL, so they skip revalidation; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`.
+`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` never change under the same URL, so they skip revalidation for a year; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`. Icons and fonts keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`) because the manifest, `index.html` and installed PWAs refer to them, so they revalidate daily instead of being `immutable` (D-237).
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
 
-`no-transform` is required on **HTML**: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131). It must **not** be applied to JS/CSS: Cloudflare disables Brotli/Gzip for any response carrying `no-transform`, which tripled the app payload before D-231. Fonts and images are already compressed formats, but they use the same immutable rule for caching.
+`no-transform` is required on **HTML**: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131). It must **not** be applied to JS/CSS: Cloudflare disables Brotli/Gzip for any response carrying `no-transform`, which tripled the app payload before D-231. Fonts and icons keep stable filenames, so they use a one-day revalidating cache instead of `immutable` (D-237).
 
 The app shell has **no inline scripts**. The pre-paint theme snippet is the static asset `/bikri/theme-init.js`, loaded with a blocking `<script src>` before the app module so the chosen theme is applied before first paint while `script-src 'self'` stays strict (D-149).
 

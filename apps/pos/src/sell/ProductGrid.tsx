@@ -10,7 +10,7 @@ const TILE_MIN = 128;
 /** Urdu needs more width than Latin; below this the price and stock pill collide. */
 const TILE_MIN_UR = 160;
 const GAP = 8;
-const TILE_H = 172;
+const TILE_H = 184;
 const TILE_H_UR = 196;
 const OVERSCAN_ROWS = 3;
 
@@ -204,8 +204,8 @@ function Tile({
             : t('sell.bundle_items', { count: row.bundle.items.length })}
         </span>
       ) : null}
-      <span className="mt-auto flex w-full shrink-0 items-center justify-between gap-1 text-small">
-        <span className="text-body font-semibold">
+      <span className="mt-auto flex w-full shrink-0 flex-wrap items-center justify-between gap-x-1 gap-y-0.5 text-small">
+        <span className="min-w-0 text-body font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />
         </span>
         {pill ? (

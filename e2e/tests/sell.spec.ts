@@ -46,7 +46,7 @@ const tile = (page: Page, name: string) =>
   page.getByTestId('sell-tile').filter({ hasText: name });
 
 test.describe('Sell (T-016)', () => {
-  test('Take payment on an empty bill focuses the search', async ({
+  test('Add items on an empty bill focuses the search', async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -55,7 +55,7 @@ test.describe('Sell (T-016)', () => {
     );
     await openSell(page, [{ name: 'Cable', price: 50000, stock: 5 }]);
     const search = page.getByRole('combobox', { name: /Search or scan/ });
-    await page.getByRole('button', { name: 'Take payment' }).click();
+    await page.getByRole('button', { name: 'Add items' }).click();
     await expect(search).toBeFocused();
   });
 

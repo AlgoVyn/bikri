@@ -130,6 +130,8 @@ export {
   IMMUTABLE_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
+  STABLE_ASSET_CACHE_CONTROL,
+  STABLE_ASSET_PATHS,
   securityHeaderEntries,
 } from './securityHeaders.ts';
 export { generateSku } from './sku.ts';

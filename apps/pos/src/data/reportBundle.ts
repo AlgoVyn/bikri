@@ -7,6 +7,7 @@ import {
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
+import { clampReportRange, firstBusinessDay } from './reportRange.ts';
 import { lineRevenue, type ReportRange } from './reports.ts';
 
 const DAY = 86_400_000;
@@ -344,11 +345,18 @@ function addProductLine(
 /** All report tabs for one range, computed on the device from Dexie (screens/16). */
 export async function reportBundle(
   db: BikriDb,
-  range: ReportRange,
+  requestedRange: ReportRange,
   options: ReportOptions = {},
 ): Promise<ReportBundle> {
   const now = options.now ?? Date.now();
   const today = options.today ?? businessDate(now);
+  // Clamp a mistyped year to the shop's real history before building day buckets
+  // (review M4). The returned range is the one the bundle actually used.
+  const range = clampReportRange(
+    requestedRange,
+    await firstBusinessDay(db),
+    today,
+  ).range;
   const days = reportDays(range.from, range.to);
   const dayMap = new Map<string, DailyPoint>();
   for (const date of days)

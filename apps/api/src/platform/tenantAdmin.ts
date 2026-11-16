@@ -89,11 +89,14 @@ export async function usageHistory(env: Env, tenantId: string, days = 7) {
 /** Account-wide figures for the console Overview (screens/19). */
 export async function accountOverview(env: Env, now: number) {
   const day = utcDay(now);
-  const [size, statuses] = await env.DB.batch([
+  const [size, statuses, budgets] = await env.DB.batch([
     env.DB.prepare(
       'SELECT COALESCE(SUM(rows_written), 0) AS w, COALESCE(SUM(rows_read), 0) AS r FROM tenant_usage WHERE day = ?1',
     ).bind(day),
     env.DB.prepare('SELECT status, COUNT(*) AS n FROM tenants GROUP BY status'),
+    env.DB.prepare(
+      "SELECT COALESCE(SUM(daily_write_budget), 0) AS b FROM tenants WHERE status = 'active'",
+    ),
   ]);
   const totals = (size?.results?.[0] ?? { w: 0, r: 0 }) as {
     w: number;
@@ -105,10 +108,15 @@ export async function accountOverview(env: Env, now: number) {
     n: number;
   }[])
     by[row.status] = row.n;
+  const budgetTotal = Number(
+    (budgets?.results?.[0] as { b?: number } | undefined)?.b ?? 0,
+  );
   return {
     db_size_bytes: size?.meta.size_after ?? null,
     today: { rows_written: totals.w, rows_read: totals.r },
     tenants_by_status: by,
+    budget_total: budgetTotal,
+    budget_alert: budgetTotal > 70_000,
   };
 }
 

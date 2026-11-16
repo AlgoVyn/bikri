@@ -23,6 +23,11 @@ import {
   reportBundle,
 } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
+import {
+  firstBusinessDay,
+  LONG_RANGE_DAYS,
+  spanDays,
+} from '../data/reportRange.ts';
 import type { ReportRange } from '../data/reports.ts';
 import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
@@ -91,6 +96,7 @@ function ReportRangeControls({
   custom,
   onCustom,
   today,
+  first,
   rangeLabel,
 }: {
   limited: boolean;
@@ -99,6 +105,7 @@ function ReportRangeControls({
   custom: { from: string; to: string };
   onCustom: (custom: { from: string; to: string }) => void;
   today: string;
+  first?: string | null;
   rangeLabel?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -129,6 +136,7 @@ function ReportRangeControls({
             className="w-[9.5rem]"
             label={t('office.reports.from')}
             value={custom.from}
+            min={first ?? undefined}
             max={today}
             onChange={(value) => onCustom({ ...custom, from: value })}
           />
@@ -136,7 +144,7 @@ function ReportRangeControls({
             className="w-[9.5rem]"
             label={t('office.reports.to')}
             value={custom.to}
-            min={custom.from}
+            min={first && custom.from < first ? first : custom.from}
             max={today}
             onChange={(value) => onCustom({ ...custom, to: value })}
           />
@@ -172,6 +180,7 @@ export function ReportsPage() {
   const workerRef = useRef<Worker | null>(null);
   const [workerReady, setWorkerReady] = useState(false);
   const requestId = useRef(0);
+  const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
 
   useEffect(() => {
     if (!limited) rememberDateFilter('reports', preset, custom.from, custom.to);
@@ -314,6 +323,7 @@ export function ReportsPage() {
           custom={custom}
           onCustom={setCustom}
           today={businessDate(Date.now())}
+          first={firstDay}
         />
         <p
           role="alert"
@@ -325,6 +335,10 @@ export function ReportsPage() {
     );
 
   const bundle = data.bundle;
+  const longRange =
+    (preset === 'custom' ? spanDays(custom.from, custom.to) : 0) >
+      LONG_RANGE_DAYS ||
+    spanDays(bundle.range.from, bundle.range.to) > LONG_RANGE_DAYS;
   const lang = i18n.language;
   const meta: ReportFileMeta = {
     shopName: data.shopName,
@@ -439,6 +453,7 @@ export function ReportsPage() {
         custom={custom}
         onCustom={setCustom}
         today={data.today}
+        first={firstDay}
         rangeLabel={
           <span
             className="text-small text-text-muted"
@@ -449,6 +464,11 @@ export function ReportsPage() {
           </span>
         }
       />
+      {longRange ? (
+        <p className="text-small text-text-muted">
+          {t('office.reports.range_long')}
+        </p>
+      ) : null}
 
       <div
         role="tablist"
@@ -642,6 +662,30 @@ function ReportTable({
   );
 }
 
+/** A report KPI: the amount is the loudest thing in the card (review M7). */
+function KpiCard({
+  label,
+  value,
+  hint,
+  testId,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <li
+      className="min-w-0 rounded-card border border-border bg-surface p-3 shadow-card"
+      data-testid={testId}
+    >
+      <p className="text-small text-text-muted">{label}</p>
+      <p className="mt-0.5 text-total font-semibold tabular-nums">{value}</p>
+      {hint ? <div className="mt-1">{hint}</div> : null}
+    </li>
+  );
+}
+
 function SummaryTab({
   bundle,
   previous,
@@ -658,6 +702,10 @@ function SummaryTab({
   const summary = bundle.summary;
   const activeHours = summary.hourly.filter((point) => point.sold !== 0);
   const singleHour = activeHours.length === 1 ? activeHours[0] : undefined;
+  const singleDay = bundle.range.from === bundle.range.to;
+  const activeDays = summary.daily.filter(
+    (point) => point.sold !== 0 || point.grossProfit !== 0,
+  ).length;
   const comparison =
     previous &&
     (previous.bills > 0 || previous.sold !== 0 || previous.expenses !== 0)
@@ -675,62 +723,66 @@ function SummaryTab({
   return (
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <li className="min-w-0">
-          <Metric
-            label={t('office.reports.sold')}
-            testId="report-sold"
-            value={<MoneyText paisa={summary.sold} />}
-            hint={<Delta current={summary.sold} previous={comparison?.sold} />}
-          />
-        </li>
-        <li className="min-w-0">
-          <Metric
-            label={t('office.reports.bills')}
-            testId="report-bills"
-            value={summary.bills}
+        <KpiCard
+          label={t('office.reports.sold')}
+          testId="report-sold"
+          value={<MoneyText paisa={summary.sold} />}
+          hint={<Delta current={summary.sold} previous={comparison?.sold} />}
+        />
+        {cost ? (
+          <KpiCard
+            label={t('office.reports.gross_profit')}
+            testId="report-profit"
+            value={<MoneyText paisa={summary.grossProfit} />}
             hint={
-              <Delta current={summary.bills} previous={comparison?.bills} />
+              <Delta
+                current={summary.grossProfit}
+                previous={comparison?.grossProfit}
+              />
             }
           />
-        </li>
-        <li className="min-w-0">
-          <Metric
+        ) : (
+          <KpiCard
             label={t('office.reports.avg_bill')}
             value={<MoneyText paisa={summary.avgBill} />}
             hint={
               <Delta current={summary.avgBill} previous={comparison?.avgBill} />
             }
           />
-        </li>
-        <li className="min-w-0">
-          <Metric
-            label={t('office.reports.expenses')}
-            value={<MoneyText paisa={summary.expenses} />}
-            hint={
-              <Delta
-                current={summary.expenses}
-                previous={comparison?.expenses}
-                good="down"
-              />
-            }
-          />
-        </li>
-        {cost ? (
-          <>
-            <li className="min-w-0">
+        )}
+        <KpiCard
+          label={t('office.reports.bills')}
+          testId="report-bills"
+          value={summary.bills}
+          hint={<Delta current={summary.bills} previous={comparison?.bills} />}
+        />
+        <KpiCard
+          label={t('office.reports.expenses')}
+          value={<MoneyText paisa={summary.expenses} />}
+          hint={
+            <Delta
+              current={summary.expenses}
+              previous={comparison?.expenses}
+              good="down"
+            />
+          }
+        />
+      </ul>
+
+      {cost || bundle.taxEnabled || summary.tax !== 0 ? (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">
+          {cost ? (
+            <>
               <Metric
-                label={t('office.reports.gross_profit')}
-                testId="report-profit"
-                value={<MoneyText paisa={summary.grossProfit} />}
+                label={t('office.reports.avg_bill')}
+                value={<MoneyText paisa={summary.avgBill} />}
                 hint={
                   <Delta
-                    current={summary.grossProfit}
-                    previous={comparison?.grossProfit}
+                    current={summary.avgBill}
+                    previous={comparison?.avgBill}
                   />
                 }
               />
-            </li>
-            <li className="min-w-0">
               <Metric
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
@@ -741,8 +793,6 @@ function SummaryTab({
                   />
                 }
               />
-            </li>
-            <li className="min-w-0">
               <Metric
                 label={t('office.reports.margin')}
                 value={
@@ -760,31 +810,16 @@ function SummaryTab({
                   />
                 }
               />
-            </li>
-            <li className="min-w-0">
-              <Metric
-                label={t('office.reports.refunds')}
-                value={<MoneyText paisa={summary.refunded} />}
-                hint={
-                  <Delta
-                    current={summary.refunded}
-                    previous={comparison?.refunded}
-                    good="down"
-                  />
-                }
-              />
-            </li>
-          </>
-        ) : null}
-        {bundle.taxEnabled || summary.tax !== 0 ? (
-          <li className="min-w-0">
+            </>
+          ) : null}
+          {bundle.taxEnabled || summary.tax !== 0 ? (
             <Metric
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}
             />
-          </li>
-        ) : null}
-      </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasActivity ? (
         <EmptyState
@@ -793,7 +828,7 @@ function SummaryTab({
         />
       ) : (
         <>
-          {bundle.range.from === bundle.range.to && activeHours.length > 0 ? (
+          {singleDay && activeHours.length >= 3 ? (
             <section
               data-testid="report-chart"
               className="rounded-card border border-border bg-surface p-3"
@@ -801,27 +836,20 @@ function SummaryTab({
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.hourly_chart')}
               </h2>
-              {singleHour ? (
-                <>
-                  <div className="flex items-center justify-between gap-3 rounded-control bg-surface-2 px-3 py-2 text-small">
-                    <span className="tabular-nums text-text-muted">
-                      {`${String(singleHour.hour).padStart(2, '0')}:00`}
-                    </span>
-                    <span className="font-semibold">
-                      <MoneyText paisa={singleHour.sold} />
-                    </span>
-                  </div>
-                  <p className="mt-2 text-small text-text-muted">
-                    {t('office.reports.hourly_single')}
-                  </p>
-                </>
-              ) : (
-                <HourlyChart points={summary.hourly} t={t} />
-              )}
+              <HourlyChart points={summary.hourly} t={t} />
             </section>
-          ) : summary.daily.filter(
-              (point) => point.sold !== 0 || point.grossProfit !== 0,
-            ).length > 1 ? (
+          ) : singleDay && singleHour ? (
+            <p
+              data-testid="report-chart"
+              className="text-small text-text-muted"
+            >
+              {t('office.reports.hourly_single')} ·{' '}
+              <span className="tabular-nums">
+                {`${String(singleHour.hour).padStart(2, '0')}:00`}
+              </span>{' '}
+              · <MoneyText paisa={singleHour.sold} />
+            </p>
+          ) : !singleDay && activeDays > 1 ? (
             <section
               data-testid="report-chart"
               className="rounded-card border border-border bg-surface p-3"
@@ -836,11 +864,11 @@ function SummaryTab({
                 t={t}
               />
             </section>
-          ) : (
+          ) : !singleDay ? (
             <p className="text-small text-text-muted">
               {t('office.reports.not_enough_days')}
             </p>
-          )}
+          ) : null}
 
           <div className="grid gap-3 lg:grid-cols-2">
             <section className="rounded-card border border-border bg-surface p-3">
