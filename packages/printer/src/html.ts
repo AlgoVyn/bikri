@@ -14,6 +14,8 @@ export type HtmlOptions = {
   itemLayout: ItemLayout;
   /** Data URL or same-origin URL of the shop's logo; omitted when null. */
   logoUrl?: string | null;
+  /** Logo width as a fraction of the printable width. Default 0.6. */
+  logoWidthPct?: number;
   /** Document title (shown in the print dialog). */
   title?: string;
 };
@@ -85,8 +87,11 @@ export function renderReceiptHtml(
     switch (command.kind) {
       case 'logo':
         if (options.logoUrl) {
+          const widthPct = Math.round(
+            Math.min(1, Math.max(0.1, options.logoWidthPct ?? 0.6)) * 100,
+          );
           body.push(
-            `<div class="logo-wrap"><img class="logo" alt="" src="${escapeHtml(options.logoUrl)}"></div>`,
+            `<div class="logo-wrap"><img class="logo" style="max-width:${widthPct}%" alt="" src="${escapeHtml(options.logoUrl)}"></div>`,
           );
         }
         break;

@@ -183,11 +183,11 @@ describe('transports (06 §10)', () => {
       1,
       undefined,
       undefined,
-      { logoWidthPct: 0.4, logoMaxHeight: 120 },
+      { logoWidthPct: 0.3, logoMaxHeight: 96 },
     );
-    // 80 mm / 576 dots × 40% = 230 dots.
+    // 80 mm / 576 dots × 30% = 173 dots.
     expect(seenWidth).toBeGreaterThan(0);
-    expect(seenWidth).toBeLessThanOrEqual(230);
+    expect(seenWidth).toBeLessThanOrEqual(173);
   });
 
   it('chunks USB writes at 4096 bytes', async () => {

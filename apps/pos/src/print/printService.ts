@@ -174,6 +174,7 @@ export async function printBlocks(
         logo && printer.print_logo !== false
           ? (deps.logoUrl?.(logo) ?? null)
           : null,
+      logoWidthPct: options.logoWidthPct,
     });
     const system = deps.system ?? printHtmlViaSystem;
     for (let i = 0; i < copies; i += 1) {

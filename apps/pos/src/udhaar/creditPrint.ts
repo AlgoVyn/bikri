@@ -92,6 +92,6 @@ export async function printCustomerStatement(
     undefined,
     undefined,
     // A statement is a summary document, not a receipt: keep the mark modest.
-    { logoWidthPct: 0.4, logoMaxHeight: 120 },
+    { logoWidthPct: 0.3, logoMaxHeight: 96 },
   );
 }

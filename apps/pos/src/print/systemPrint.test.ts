@@ -21,6 +21,17 @@ describe('printHtmlViaSystem', () => {
     vi.restoreAllMocks();
   });
 
+  it('lets a statement shrink its logo width', () => {
+    const html = renderReceiptHtml([{ t: 'logo' }], {
+      widthMm: 80,
+      charsPerLine: 48,
+      itemLayout: 'columns',
+      logoUrl: 'data:image/png;base64,AA==',
+      logoWidthPct: 0.3,
+    });
+    expect(html).toContain('max-width:30%');
+  });
+
   it('prints the receipt from a hidden iframe and removes it afterwards', async () => {
     const printed: string[] = [];
     const append = document.body.append.bind(document.body);
