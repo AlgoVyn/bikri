@@ -228,7 +228,11 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
 
   it('validates report ranges and fills defaults', async () => {
     expect(reportDays('nope', TODAY)).toEqual([]);
-    expect(() => reportDays('2025-01-01', '2026-06-01')).toThrow(RangeError);
+    // A custom range is not capped at one year.
+    const longRange = reportDays('2025-01-01', '2026-06-01');
+    expect(longRange).toHaveLength(517);
+    expect(longRange[0]).toBe('2025-01-01');
+    expect(longRange.at(-1)).toBe('2026-06-01');
     expect(reportDays(TODAY, TODAY)).toEqual([TODAY]);
     expect(reportDays('2026-10-28', '2026-10-27')).toEqual([]);
     const db = await sample('defaults');

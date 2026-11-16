@@ -78,6 +78,19 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByText('No day closes in this range.')).toBeVisible();
   });
 
+  test('custom ranges longer than a year stay on the reports page', async ({
+    page,
+  }) => {
+    await seedReports(page);
+    await page.getByRole('button', { name: 'Custom' }).click();
+    await page.getByLabel('From', { exact: true }).fill('2024-01-01');
+    await page.getByLabel('To', { exact: true }).fill('2025-12-31');
+    await expect(page.getByTestId('reports-page')).toBeVisible();
+    await expect(page.getByTestId('report-range')).toContainText('2024');
+    await expect(page.getByTestId('report-sold')).toBeVisible();
+    await expect(page.getByText('Choose a valid date range.')).toHaveCount(0);
+  });
+
   test('AC 5: stock value, low stock and slow movers', async ({ page }) => {
     await openReadyShop(page, '/bikri/');
     const ids = await page.evaluate(

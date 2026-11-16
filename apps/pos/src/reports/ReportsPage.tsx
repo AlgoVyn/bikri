@@ -83,6 +83,69 @@ const TABS: { id: ReportTab; key: string }[] = [
 const field =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
 
+/** Range chips and custom date fields, kept visible even when the range is invalid. */
+function ReportRangeControls({
+  limited,
+  preset,
+  onPreset,
+  custom,
+  onCustom,
+  today,
+  rangeLabel,
+}: {
+  limited: boolean;
+  preset: Preset;
+  onPreset: (preset: Preset) => void;
+  custom: { from: string; to: string };
+  onCustom: (custom: { from: string; to: string }) => void;
+  today: string;
+  rangeLabel?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className={`${scrollStrip} items-center`}>
+          {(limited
+            ? PRESETS.filter((item) => item.id === 'today')
+            : PRESETS
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={preset === item.id}
+              className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
+              onClick={() => onPreset(item.id)}
+            >
+              {t(item.key)}
+            </button>
+          ))}
+        </div>
+        {rangeLabel}
+      </div>
+      {preset === 'custom' && !limited ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.reports.from')}
+            value={custom.from}
+            max={today}
+            onChange={(value) => onCustom({ ...custom, from: value })}
+          />
+          <DateField
+            className="w-[9.5rem]"
+            label={t('office.reports.to')}
+            value={custom.to}
+            min={custom.from}
+            max={today}
+            onChange={(value) => onCustom({ ...custom, to: value })}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Reports for one range, computed on the device (screens/16). */
 export function ReportsPage() {
   const { t, i18n } = useTranslation();
@@ -137,11 +200,7 @@ export function ReportsPage() {
     const now = Date.now();
     const today = businessDate(now, timeZone);
     const selected = limited ? 'today' : preset;
-    if (
-      selected === 'custom' &&
-      (custom.from > custom.to || daysBetween(custom.from, custom.to) > 366)
-    )
-      return null;
+    if (selected === 'custom' && custom.from > custom.to) return null;
     const range = reportRange(selected, now, timeZone, custom);
     const reportRangeValue: ReportRange = {
       ...range,
@@ -241,10 +300,26 @@ export function ReportsPage() {
   if (data === undefined) return <PageLoading compact />;
   if (data === null)
     return (
-      <div className={pageClass('standard')}>
-        <h1 className="text-h1 font-semibold">{t('office.reports.title')}</h1>
-        <p className="mt-2 rounded-card bg-warning-subtle p-3 text-warning-subtle-ink">
-          {t('office.reports.range_too_long')}
+      <div className={pageClass('standard')} data-testid="reports-page">
+        <PageHeader
+          icon={<ReportsIcon />}
+          title={t('office.reports.title')}
+          subtitle={t('office.reports.subtitle')}
+          hideTitleOnPhone
+        />
+        <ReportRangeControls
+          limited={limited}
+          preset={preset}
+          onPreset={setPreset}
+          custom={custom}
+          onCustom={setCustom}
+          today={businessDate(Date.now())}
+        />
+        <p
+          role="alert"
+          className="mt-2 rounded-card bg-warning-subtle p-3 text-warning-subtle-ink"
+        >
+          {t('office.reports.range_invalid')}
         </p>
       </div>
     );
@@ -357,24 +432,14 @@ export function ReportsPage() {
         }
       />
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className={`${scrollStrip} items-center`}>
-            {(limited
-              ? PRESETS.filter((item) => item.id === 'today')
-              : PRESETS
-            ).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={preset === item.id}
-                className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-                onClick={() => setPreset(item.id)}
-              >
-                {t(item.key)}
-              </button>
-            ))}
-          </div>
+      <ReportRangeControls
+        limited={limited}
+        preset={preset}
+        onPreset={setPreset}
+        custom={custom}
+        onCustom={setCustom}
+        today={data.today}
+        rangeLabel={
           <span
             className="text-small text-text-muted"
             data-testid="report-range"
@@ -382,31 +447,8 @@ export function ReportsPage() {
             {longDate(bundle.range.from, lang)} –{' '}
             {longDate(bundle.range.to, lang)}
           </span>
-        </div>
-        {preset === 'custom' && !limited ? (
-          <div className="flex flex-wrap items-end gap-2">
-            <DateField
-              className="w-[9.5rem]"
-              label={t('office.reports.from')}
-              value={custom.from}
-              max={data.today}
-              onChange={(value) =>
-                setCustom((current) => ({ ...current, from: value }))
-              }
-            />
-            <DateField
-              className="w-[9.5rem]"
-              label={t('office.reports.to')}
-              value={custom.to}
-              min={custom.from}
-              max={data.today}
-              onChange={(value) =>
-                setCustom((current) => ({ ...current, to: value }))
-              }
-            />
-          </div>
-        ) : null}
-      </div>
+        }
+      />
 
       <div
         role="tablist"

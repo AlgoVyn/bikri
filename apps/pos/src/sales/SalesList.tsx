@@ -185,8 +185,7 @@ export function SalesList({
       86_400_000 +
     1;
   const rangeError =
-    preset === 'custom' &&
-    (!Number.isFinite(customDays) || customDays < 1 || customDays > 366);
+    preset === 'custom' && (!Number.isFinite(customDays) || customDays < 1);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `today` changes at midnight and must rebuild the range
   const range = useMemo(
@@ -394,7 +393,7 @@ export function SalesList({
       ) : null}
       {rangeError ? (
         <p role="alert" className="text-small text-danger">
-          {t('office.sales.range_too_long')}
+          {t('office.sales.range_invalid')}
         </p>
       ) : null}
 

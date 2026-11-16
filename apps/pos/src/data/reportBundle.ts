@@ -233,7 +233,6 @@ export function reportDays(from: string, to: string): string[] {
   const days: string[] = [];
   for (let at = start; at <= end; at += DAY) {
     days.push(new Date(at).toISOString().slice(0, 10));
-    if (days.length > 366) throw new RangeError('report range is too long');
   }
   return days;
 }
