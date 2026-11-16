@@ -63,6 +63,7 @@ export function isBusinessDate(value: unknown): value is string {
 export const CLIENT_AUDIT_ACTIONS = new Set([
   'branch_change',
   'backup_restore',
+  'bundle_change',
   'cache_rebuilt',
   'cost_change',
   'credit_limit_change',

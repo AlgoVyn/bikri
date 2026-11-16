@@ -875,6 +875,20 @@ describe('bundle recipe guards', () => {
         deleted_at: null,
         updated_by: IDS.owner,
       }),
+      // The till writes a bundle_change audit in the same transaction; the
+      // server's client-action allow-list must accept it or the whole create is
+      // rejected FORBIDDEN.
+      op('audit_log', 'insert', {
+        id: newId(),
+        action: 'bundle_change',
+        entity: 'products',
+        entity_id: bundleId,
+        before_json: null,
+        after_json: '{"name_en":"Starter Pack"}',
+        device_id: shop.admin.id,
+        staff_id: IDS.owner,
+        created_at: now,
+      }),
     ]);
     const denied = await push(shop.till, [
       op(
