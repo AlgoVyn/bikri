@@ -247,7 +247,7 @@ test.describe('Credit (T-043, T-044)', () => {
     expect(await exportCsv()).not.toContain('Charger');
     await page.getByTestId('statement-include-items').check();
     const detailed = await exportCsv();
-    expect(detailed).toContain('Charger × 1 — Rs 500');
+    expect(detailed).toContain('Charger × 1 · Rs 500 each — Rs 500');
   });
 
   test('AC 2/3/6: new customer with a limit and opening balance; no phone disables the reminder', async ({

@@ -83,9 +83,16 @@ export type StatementKind =
 export type StatementItem = {
   name: string;
   qtyMilli: number;
+  /** List/selling unit price in paisa. */
+  unitPrice: number;
   /** Line net in paisa, before the bill-level discount/tax allocation. */
   amount: number;
 };
+
+/** One bill-detail line used by CSV, PDF/PNG and thermal printing. */
+export function statementItemLabel(item: StatementItem): string {
+  return `${item.name} × ${qtyCsv(item.qtyMilli)} · ${formatShopMoney(item.unitPrice)} each — ${formatShopMoney(item.amount)}`;
+}
 
 export type StatementEntry = {
   entry: SyncedRow;
@@ -575,6 +582,7 @@ export async function customerStatement(
         item: {
           name: String(line.name_snapshot),
           qtyMilli: n(line.qty_milli),
+          unitPrice: n(line.unit_price),
           amount: n(line.net),
         },
       });
@@ -610,7 +618,7 @@ export function statementCsv(rows: readonly StatementCsvRow[]): string {
     ];
     const items = (row.items ?? []).map((item) => [
       '',
-      `  ${item.name} × ${qtyCsv(item.qtyMilli)} — ${formatShopMoney(item.amount)}`,
+      `  ${statementItemLabel(item)}`,
       '',
       '',
       '',

@@ -1,6 +1,6 @@
 import type { BikriDb } from '@bikri/db';
 import type { Block } from '@bikri/printer';
-import { qtyCsv } from '../lib/csv.ts';
+import { statementItemLabel } from '../data/udhaar.ts';
 import { formatShopMoney } from '../lib/money.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { printBlocks, readPrinter } from '../print/printService.ts';
@@ -64,7 +64,7 @@ export function statementBlocks(meta: StatementFileMeta): Block[] {
     for (const item of row.items ?? []) {
       blocks.push({
         t: 'text',
-        text: `  ${item.name} × ${qtyCsv(item.qtyMilli)} — ${formatShopMoney(item.amount)}`,
+        text: `  ${statementItemLabel(item)}`,
         size: 'small',
       });
     }

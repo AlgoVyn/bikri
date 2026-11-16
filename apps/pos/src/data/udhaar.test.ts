@@ -140,7 +140,7 @@ describe('udhaar data', () => {
       true,
     );
     expect(detailed.rows[0]?.items).toEqual([
-      { name: 'Galaxy A15', qtyMilli: 1000, amount: 300000 },
+      { name: 'Galaxy A15', qtyMilli: 1000, unitPrice: 300000, amount: 300000 },
     ]);
     const csv = statementCsv(
       detailed.rows.map((row) => ({
@@ -152,7 +152,7 @@ describe('udhaar data', () => {
         items: row.items,
       })),
     );
-    expect(csv).toContain('Galaxy A15 × 1 — Rs 3,000');
+    expect(csv).toContain('Galaxy A15 × 1 · Rs 3,000 each — Rs 3,000');
   });
 
   it('AC 2/3: reminder text and wa.me URL; no phone means no link', () => {

@@ -28,7 +28,14 @@ describe('customer statement print blocks', () => {
           debit: 150000,
           credit: 0,
           balance: 150000,
-          items: [{ name: 'Galaxy A15', qtyMilli: 1000, amount: 150000 }],
+          items: [
+            {
+              name: 'Galaxy A15',
+              qtyMilli: 1000,
+              unitPrice: 150000,
+              amount: 150000,
+            },
+          ],
         },
         {
           date: '13 Nov 2026',
@@ -72,7 +79,7 @@ describe('customer statement print blocks', () => {
     });
     expect(blocks).toContainEqual({
       t: 'text',
-      text: '  Galaxy A15 × 1 — Rs 1,500',
+      text: '  Galaxy A15 × 1 · Rs 1,500 each — Rs 1,500',
       size: 'small',
     });
     expect(blocks).toContainEqual({

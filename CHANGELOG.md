@@ -38,7 +38,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Offline-first selling with three carts, held bills, cash/card/bank/wallet/udhaar payments, change, receipt printing and sharing.
 - Custom date ranges in Reports and Sales are no longer capped at 366 days; the report keeps its date controls visible for any invalid selection.
 - Refunds (including the part-udhaar split), voids and void-and-reissue, append-only corrections and printable notices.
-- Udhaar khata with limits, statements, part payments, promises, chase list and WhatsApp reminders; the statement export can optionally append each bill's item name, quantity and line amount to CSV/PDF/PNG/print/share, the PDF/PNG is a branded A4 bank-style statement with the shop logo, address, phone, period and debit/credit summary, and **Print** is a separate header action instead of an export-menu item.
+- Udhaar khata with limits, statements, part payments, promises, chase list and WhatsApp reminders; the statement export can optionally append each bill's item name, quantity, unit price and line amount to CSV/PDF/PNG/print/share, the PDF/PNG is a branded A4 bank-style statement with the shop logo, address, phone, period and debit/credit summary, and **Print** is a separate header action instead of an export-menu item.
 - Products, barcodes, stock adjustments/counts, weighted-average and last cost, suppliers, deliveries, pay supplier and returns to supplier.
 - Expenses, cash in/out, per-device day close with expected cash, difference and Z-report.
 - Reports (summary, products, stock, udhaar, staff, day closes, expenses) with CSV/PDF/PNG exports.

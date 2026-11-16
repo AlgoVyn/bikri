@@ -1,7 +1,6 @@
 import type { RasterSource } from '@bikri/printer';
-import type { StatementItem } from '../data/udhaar.ts';
+import { type StatementItem, statementItemLabel } from '../data/udhaar.ts';
 import { canvasFont, prepareCanvasFonts } from '../lib/canvasFont.ts';
-import { qtyCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
 import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
@@ -362,7 +361,7 @@ async function draw(meta: StatementFileMeta): Promise<HTMLCanvasElement> {
       ctx.font = canvasFont(meta.lang, 400, 15);
       ctx.fillStyle = CANVAS.muted;
       for (const item of items) {
-        const detail = `${item.name} × ${qtyCsv(item.qtyMilli)} — ${formatShopMoney(item.amount)}`;
+        const detail = statementItemLabel(item);
         ctx.fillText(
           fitText(ctx, detail, cols.debit - cols.description - 54),
           cols.description + 18,
