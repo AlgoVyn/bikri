@@ -2,6 +2,17 @@ export { contrastRatio } from './contrast.ts';
 export { businessDate, DEFAULT_TIME_ZONE, isTimeZone } from './dates.ts';
 export { normaliseDigits, normaliseNumericText } from './digits.ts';
 export { isUlid, newId } from './ids.ts';
+export type {
+  BundleComponentInput,
+  BundlePriceInput,
+  BundlePriceLine,
+  BundlePriceResult,
+  BundleRefundComponentInput,
+  BundleRefundInput,
+  BundleRefundLine,
+  BundleRefundResult,
+} from './money/bundles.ts';
+export { planBundleRefund, priceBundle } from './money/bundles.ts';
 export type { AvgCostInput } from './money/cost.ts';
 export { nextAvgCost } from './money/cost.ts';
 export type {

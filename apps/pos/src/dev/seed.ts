@@ -119,6 +119,45 @@ export async function seedProducts(list: TestProduct[]): Promise<string[]> {
   return ids;
 }
 
+/** Demo bundle: phone + charger + cover + protector, fixed recipe (v1.1). */
+export async function seedStarterPack(): Promise<string> {
+  const db = getDb();
+  const owner = (await db.staff.toArray()).find((s) => s.role === 'owner');
+  const ctx = await ledgerContext(db, owner?.id ?? '');
+  const products = await db.products.toArray();
+  const bySku = new Map(
+    products.map((product) => [String(product.sku), product.id]),
+  );
+  const components = [
+    { sku: 'SAM-A15', qty_milli: 1000 },
+    { sku: 'CHG-25W', qty_milli: 1000 },
+    { sku: 'COV-CLR', qty_milli: 1000 },
+    { sku: 'GLS-TMP', qty_milli: 1000 },
+  ].flatMap((item) => {
+    const id = bySku.get(item.sku);
+    return id ? [{ component_product_id: id, qty_milli: item.qty_milli }] : [];
+  });
+  const existing = products.find((product) => product.sku === 'BND-START');
+  if (existing) return existing.id;
+  const row = await saveNewProduct(
+    db,
+    {
+      name_en: 'Starter Pack',
+      name_ur: 'اسٹارٹر پیک',
+      sku: 'BND-START',
+      barcodes: ['8800000000999'],
+      unit: 'set',
+      price: 5_350_000,
+      cost: 0,
+      track_stock: false,
+      kind: 'bundle',
+      bundle_items: components,
+    },
+    ctx,
+  );
+  return row.id;
+}
+
 /** A mobile-shop catalogue for the local demo (paisa, stock in units). */
 export const DEMO_PRODUCTS: TestProduct[] = [
   {
@@ -252,6 +291,7 @@ export const DEMO_PRODUCTS: TestProduct[] = [
 export async function seedDemoShop(): Promise<void> {
   await seedReadyShop();
   await seedProducts(DEMO_PRODUCTS);
+  await seedStarterPack();
   await seedCustomer({
     name: 'Bilal Ahmed',
     phone: '+923001112233',

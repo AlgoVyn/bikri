@@ -140,7 +140,7 @@ function DiscountTypeToggle({
 }
 
 /** Line discount inside More options, with the Rs/% switch in the field. */
-function InlineDiscount({
+export function InlineDiscount({
   line,
   gross,
   onChange,

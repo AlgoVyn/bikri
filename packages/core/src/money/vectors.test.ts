@@ -2,6 +2,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  type BundleComponentInput,
+  type BundleRefundComponentInput,
+  planBundleRefund,
+  priceBundle,
+} from './bundles.ts';
 import { nextAvgCost } from './cost.ts';
 import { computeDayClose } from './dayClose.ts';
 import type { PriorRefund, RefundMethod, RefundRounding } from './refunds.ts';
@@ -55,6 +61,16 @@ const REQUIRED_IDS: Record<string, readonly string[]> = {
   'money-cost.json': ['C1', 'C2', 'C3', 'C4'],
   'money-dayclose.json': ['D1', 'D2', 'D3'],
   'money-supplier-returns.json': ['S1', 'S2', 'S3'],
+  'money-bundles.json': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8'],
+  'money-bundle-refunds.json': [
+    'R-B1',
+    'R-B2',
+    'R-B3',
+    'R-B4',
+    'R-B5',
+    'R-B6',
+    'R-B7',
+  ],
 };
 
 interface IndexedSale {
@@ -96,7 +112,7 @@ function caseId(name: unknown): string {
   if (typeof name !== 'string') {
     throw new Error('fixture case is missing a name');
   }
-  const id = /^([A-Z]+\d+)\b/.exec(name)?.[1];
+  const id = /^([A-Z]+(?:-[A-Z]+)?\d+)\b/.exec(name)?.[1];
   if (id === undefined) {
     throw new Error(`fixture case name has no id: ${name}`);
   }
@@ -415,6 +431,113 @@ function registerRefunds(cases: unknown[]): void {
   }
 }
 
+function registerBundles(cases: unknown[]): void {
+  for (const entry of cases) {
+    const row = record(entry, 'bundle case');
+    const id = caseId(row.name);
+    const input = record(row.input, `${id} input`);
+    const raw = input.components;
+    if (!Array.isArray(raw))
+      throw new Error(`${id} components must be an array`);
+    const components: BundleComponentInput[] = raw.map((value, index) => {
+      const component = record(value, `${id} components[${index}]`);
+      return {
+        qty_milli: num(component.qty_milli, `${id} qty_milli`),
+        unit_cost: num(component.unit_cost, `${id} unit_cost`),
+        unit_price: num(component.unit_price, `${id} unit_price`),
+      };
+    });
+    it(`${id} ${String(row.name)}`, () => {
+      const actual = priceBundle({
+        bundle_price: num(input.bundle_price, `${id} bundle_price`),
+        bundle_qty: num(input.bundle_qty, `${id} bundle_qty`),
+        components,
+      });
+      expectFields(actual, row.expected, id);
+      expect(sum(actual.lines.map((line) => line.net))).toBe(actual.total_net);
+      expect(sum(actual.lines.map((line) => line.gross))).toBe(
+        sum(actual.lines.map((line) => line.net + line.discount)),
+      );
+      for (const line of actual.lines) {
+        expect(line.gross).toBe(line.net + line.discount);
+        expect(line.cost_total).toBe(
+          Math.round((line.qty_milli * line.unit_cost) / 1000),
+        );
+      }
+    });
+  }
+}
+
+function registerBundleRefunds(cases: unknown[]): void {
+  for (const entry of cases) {
+    const row = record(entry, 'bundle refund case');
+    const id = caseId(row.name);
+    const input = record(row.input, `${id} input`);
+    const raw = input.components;
+    if (!Array.isArray(raw))
+      throw new Error(`${id} components must be an array`);
+    const components: BundleRefundComponentInput[] = raw.map((value, index) => {
+      const component = record(value, `${id} components[${index}]`);
+      return {
+        qty_per_bundle: num(component.qty_per_bundle, `${id} qty_per_bundle`),
+        line_final: num(component.line_final, `${id} line_final`),
+      };
+    });
+    it(`${id} ${String(row.name)}`, () => {
+      const actual = planBundleRefund({
+        bundle_qty: num(input.bundle_qty, `${id} bundle_qty`),
+        prev_refunded_bundles: num(
+          input.prev_refunded_bundles,
+          `${id} prev_refunded_bundles`,
+        ),
+        refund_bundles: num(input.refund_bundles, `${id} refund_bundles`),
+        components,
+      });
+      expect(actual.exact_amount).toBe(
+        num(
+          record(row.expected, `${id} expected`).exact_amount,
+          `${id} exact_amount`,
+        ),
+      );
+      const expected = record(row.expected, `${id} expected`).lines;
+      if (!Array.isArray(expected))
+        throw new Error(`${id} expected.lines must be an array`);
+      expect(actual.lines).toEqual(
+        expected.map((value, index) => {
+          const line = record(value, `${id} expected.lines[${index}]`);
+          return {
+            qty_milli: num(line.qty_milli, `${id} line qty_milli`),
+            amount: num(line.amount, `${id} line amount`),
+          };
+        }),
+      );
+      const refundBundles = num(input.refund_bundles, `${id} refund_bundles`);
+      const sold = num(input.bundle_qty, `${id} bundle_qty`);
+      const prior = num(
+        input.prev_refunded_bundles,
+        `${id} prev_refunded_bundles`,
+      );
+      for (const [index, component] of components.entries()) {
+        expect(actual.lines[index]?.qty_milli).toBe(
+          component.qty_per_bundle * refundBundles,
+        );
+        if (prior + refundBundles === sold) {
+          // Returning every remaining bundle returns exactly the line final.
+          const earlier = computeRefundLine(
+            component.line_final,
+            component.qty_per_bundle * sold,
+            0,
+            component.qty_per_bundle * prior,
+          );
+          expect(earlier + (actual.lines[index]?.amount ?? 0)).toBe(
+            component.line_final,
+          );
+        }
+      }
+    });
+  }
+}
+
 function registerCost(cases: unknown[]): void {
   for (const entry of cases) {
     const row = record(entry, 'cost case');
@@ -487,6 +610,8 @@ const handlers: Record<string, (cases: unknown[]) => void> = {
   'money-cost.json': registerCost,
   'money-dayclose.json': registerDayClose,
   'money-supplier-returns.json': registerSupplierReturns,
+  'money-bundles.json': registerBundles,
+  'money-bundle-refunds.json': registerBundleRefunds,
 };
 
 const moneyFiles = readdirSync(fixturesDir)

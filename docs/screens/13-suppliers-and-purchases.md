@@ -35,6 +35,8 @@ Header: name, balance, buttons `Record delivery` (D), `Pay supplier` (P), `Retur
 | Paid now | `MoneyInput` 0…total, method Cash / Bank-wallet / Card |
 | Note | 0–200 |
 
+Bundle products are excluded from the delivery product picker; record the component products instead. A bundle has no stock of its own ([screens/08](08-products.md#bundles-v11)).
+
 Save writes: `purchases`, `purchase_lines`, `stock_movements` reason `purchase` with `unit_cost` = `landed_unit_cost`, product upserts `last_cost` (and `price` if chosen), `ledger_entries` supplier `+total` and `−paid_now`, `payments` out `purchase_paid_now` when paid now > 0. Summary toast: "Delivery saved · 6 items · Rs 85,000 · you owe Rs 60,000" with an action `Print labels` (opens [screens/20](20-barcode-labels.md) with each line's received quantity, whole units only). A delivery has at most 60 lines ([03 §3](../03-sync.md#3-outbox)).
 
 ## Pay supplier
@@ -48,7 +50,7 @@ Route `/suppliers/:id/return/new` (from supplier detail, or `Return items` on a 
 | Field | Rules |
 |---|---|
 | Linked delivery | optional select of this supplier's deliveries (last 180 days); when set, lines are picked from that delivery |
-| Lines | linked: the delivery's lines with received qty, already returned qty, `Return qty` (`QtyInput`, max = received − returned); unlinked: product search/scan + qty. `Credit per unit` (`MoneyInput`, `cost.view` only) defaults to the line's landed cost (linked) or the product's average cost; users without `cost.view` cannot change it. Line total computed. Max 60 lines |
+| Lines | linked: the delivery's lines with received qty, already returned qty, `Return qty` (`QtyInput`, max = received − returned); unlinked: product search/scan + qty (simple products only; a bundle is returned as its components). `Credit per unit` (`MoneyInput`, `cost.view` only) defaults to the line's landed cost (linked) or the product's average cost; users without `cost.view` cannot change it. Line total computed. Max 60 lines |
 | Reason | chips "Faulty", "Wrong item", "Unsold / slow", "Expired", Other + text (required, 1–120) |
 | Total credit | Σ line totals (read-only): "Rs 2,400 will be taken off what you owe" |
 | Money back now | shown when the return leaves the supplier owing you (`suggested_refund` > 0): `MoneyInput` 0…total, prefilled with the suggestion, method Cash / Bank-wallet. 0 = keep it as an advance |

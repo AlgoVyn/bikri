@@ -37,7 +37,14 @@ const REFUND_WRITE_TABLES = [
 ] as const satisfies readonly DexieTableName[];
 
 export class RefundNotAllowedError extends Error {
-  readonly code: 'void' | 'nothing' | 'qty' | 'reason' | 'line' | 'missing';
+  readonly code:
+    | 'void'
+    | 'nothing'
+    | 'qty'
+    | 'reason'
+    | 'line'
+    | 'missing'
+    | 'bundle';
   constructor(code: RefundNotAllowedError['code']) {
     super(code);
     this.name = 'RefundNotAllowedError';
@@ -163,6 +170,38 @@ export async function computeRefund(
   );
 
   const requested = new Map(input.map((line) => [line.saleLineId, line]));
+  // A bundle group is atomic: every component line of the group must be returned
+  // with the same whole number of bundles (07 §6.2).
+  const bundleGroups = new Map<string, SyncedRow[]>();
+  for (const line of lines) {
+    if (!line.bundle_group) continue;
+    const key = String(line.bundle_group);
+    bundleGroups.set(key, [...(bundleGroups.get(key) ?? []), line]);
+  }
+  for (const group of bundleGroups.values()) {
+    const touched = group.some(
+      (line) => (requested.get(line.id)?.qtyMilli ?? 0) > 0,
+    );
+    if (!touched) continue;
+    if (group.some((line) => (requested.get(line.id)?.qtyMilli ?? 0) <= 0))
+      throw new RefundNotAllowedError('bundle');
+    let bundles = 0;
+    for (const line of group) {
+      const request = requested.get(line.id);
+      const perBundle = n(line.bundle_component_qty_milli);
+      const qty = request?.qtyMilli ?? 0;
+      if (
+        perBundle <= 0 ||
+        qty % perBundle !== 0 ||
+        (priorRows.get(line.id) ?? 0) % perBundle !== 0
+      )
+        throw new RefundNotAllowedError('bundle');
+      const k = qty / perBundle;
+      if (k <= 0) throw new RefundNotAllowedError('bundle');
+      if (bundles === 0) bundles = k;
+      else if (k !== bundles) throw new RefundNotAllowedError('bundle');
+    }
+  }
   const planLines: RefundPlanLine[] = [];
   let exact = 0;
   for (const line of lines) {

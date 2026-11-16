@@ -30,6 +30,11 @@ export type ReceiptLine = {
   final?: number;
   /** `YYYY-MM-DD`, snapshotted on the sale line. */
   warrantyUntil: string | null;
+  /** Bundle grouping; component lines share `bundleGroup`. */
+  bundleGroup?: string | null;
+  bundleName?: string | null;
+  bundleQty?: number | null;
+  bundlePrice?: number | null;
 };
 
 export type ReceiptPayment = {
@@ -54,6 +59,8 @@ export type ReceiptSale = {
   /** Sum of line nets (`sales.subtotal`). */
   subtotal: number;
   billDiscount: number;
+  /** Whole-bundle discounts already included in the line nets. */
+  bundleDiscount?: number;
   taxRateBp: number;
   tax: number;
   taxInclusive: boolean;
@@ -116,8 +123,15 @@ export type ReceiptLabels = {
   subtotalItems: string;
   subtotalItem: string;
   subtotalCount: string;
+  bundle: string;
   includesTax: string;
   salesTax: string;
+};
+
+export type ReceiptBundle = {
+  name: string;
+  quantity: number;
+  components: { name: string; qtyMilli: number }[];
 };
 
 export type RefundLine = {
@@ -125,6 +139,8 @@ export type RefundLine = {
   qtyMilli: number;
   /** Exact line refund in paisa. */
   amount: number;
+  /** Whole-bundle return: one header with component names/quantities. */
+  bundle?: ReceiptBundle;
 };
 
 export type RefundReceipt = {

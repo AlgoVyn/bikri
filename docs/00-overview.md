@@ -20,6 +20,8 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 **In v1:** multiple shops (tenants) on one deployment with a platform operator console (create, make read-only, suspend and delete shops, owner pairing codes, per-shop usage, export, restore, time-limited and visible support access), owner email sign-in for shop administration, owners' own server export, setup wizard, device enrolment, staff PINs and roles, catalogue with photos, barcode/HID/camera scanning, sell screen with 3 parallel carts and held bills, quick sale, line and bill discounts, cash/card/bank-wallet/udhaar and split payments, ESC/POS printing with cut and drawer, browser-print fallback, receipt logo, reprint, refunds (whole/partial), void-and-reissue, udhaar khata with limits/promises/chase list/WhatsApp, suppliers with deliveries, supplier ledger and returns to supplier, refunds on udhaar bills split automatically between money back and khata, Code 128 barcode labels printed from the browser, optional tax-inclusive (MRP) pricing when tax is enabled (tax off by default), one product per variant/SKU, stock adjustments with reason codes, weighted-average cost, expenses, cash pay-in/pay-out, day close, reports with CSV/PDF export, sync across tills, backups, English/Urdu/Roman Urdu, light/dark theme, text size.
 
+**In v1.1:** fixed-recipe product bundles — a bundle product with a recipe, one bundle price, component sale lines and whole-bundle returns only ([07 §3.4](07-money-rules.md#34-bundles-v11), [screens/08](screens/08-products.md#bundles-v11), [screens/11](screens/11-refund.md#whole-bundle-returns-v11)); the fixed 1.0 scope is otherwise unchanged.
+
 **In v2:** multiple branches with branch reports and stock transfers, per-product tax rates, serial/IMEI tracking and warranty lookup by IMEI (v1 already prints a warranty-until date per line), pack quantities on purchases, product variants (option matrix such as colour × length), direct label-printer commands (TSPL/ZPL), electronics starter catalogue, customer loyalty notes.
 
 **Later / optional:** FBR POS integration (only for Tier-1 retailers, see [12-fbr-later](12-fbr-later.md)), local LAN print bridge, Android TWA wrapper.
@@ -88,6 +90,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | REQ-B13 | **Open source, own data.** Full JSON/CSV export of the shop; a restore is performed by the operator from that export (owner restores are not a v1 action); nightly SQL export to R2 and off-Cloudflare. | [09-backups-and-ops](09-backups-and-ops.md) |
 | REQ-B14 | **Below-cost warning.** Selling a line below its cost shows "Below cost" to everyone; cost and margin are shown only to roles with `cost.view`. | [screens/05](screens/05-sell.md) |
 | REQ-B15 | **Failed print never loses a bill.** The sale is saved before printing; failed prints are retried or reprinted from Sales. | [06 §9](06-printing.md#9-print-job-lifecycle-and-errors) |
+| REQ-B16 | **Product bundles.** A fixed-recipe bundle is one catalogue product with one price and a list of component products/quantities. A bundle sale writes real component sale lines (so stock, cost and refunds stay per product), prints one bundle header and its components on the receipt, and can only be returned as whole bundle units. Component revenue is allocated by cost; a bundle saving is not a staff discount. | [07 §3.4](07-money-rules.md#34-bundles-v11), [02 §2.16](02-data-model.md#216-bundles-migration-0017_bundlessql), [screens/05](screens/05-sell.md#bundles-v11), [screens/08](screens/08-products.md#bundles-v11), [screens/11](screens/11-refund.md#whole-bundle-returns-v11) |
 
 ## 7. Glossary
 
@@ -104,6 +107,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | **Pay-in / Pay-out** | Cash added to / taken out of the drawer that is not a sale or expense (e.g. float top-up, owner drawing). |
 | **Godown** | Back-store / warehouse. |
 | **Quick sale** | A sale line for an item not in the catalogue (name + price typed). |
+| **Bundle** (بنڈل / سیٹ) | A fixed recipe of real products sold together for one bundle price. The bundle is a product (`kind='bundle'`) with `track_stock=0`; the bill stores one component sale line per item, so stock and refunds stay per product. Returns are whole-bundle only. |
 | **Held bill** | A cart parked to serve another customer, resumed later. |
 | **Tenant / Shop** | One business on the deployment, with its own data. Row in `tenants`; every business row carries its `tenant_id`. |
 | **Platform operator** | Runs the deployment and the console; not a member of any shop. |

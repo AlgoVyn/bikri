@@ -31,8 +31,8 @@
     { "binding": "BACKUPS", "bucket_name": "bikri-backups" } // admin API only
   ],
   "vars": {
-    "APP_VERSION": "1.0.0",
-    "SCHEMA_VERSION": "3",
+    "APP_VERSION": "1.1.0",
+    "SCHEMA_VERSION": "6",
     "MIN_CLIENT_SCHEMA": "1",
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "odd-rain-0287.cloudflareaccess.com", // Zero Trust team domain (Access app "Bikri admin")

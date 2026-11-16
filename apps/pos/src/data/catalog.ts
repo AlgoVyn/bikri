@@ -1,6 +1,7 @@
 import {
   businessDate,
   generateSku,
+  mulDivRound,
   newId,
   type OpRow,
   refundedRevenue,
@@ -54,6 +55,25 @@ export function defaultProductSortDirection(sort: ProductSort): SortDirection {
   return PRODUCT_SORT_DIRECTIONS[sort];
 }
 
+export type BundleRecipeRow = {
+  product: MasterRow;
+  qty_milli: number;
+  sort_order: number;
+};
+
+/** Derived bundle data; `null` when the product is not a bundle. */
+export type BundleInfo = {
+  items: BundleRecipeRow[];
+  /** Whole bundles that can be made; null when every component is untracked. */
+  availability: number | null;
+  /** Component cost total for one bundle (shop cost method). */
+  cost: number;
+  /** Component shelf-price total for one bundle. */
+  itemsTotal: number;
+  /** The component with the least availability, or null for made-to-order. */
+  limiting: BundleRecipeRow | null;
+};
+
 export type ProductListRow = {
   product: MasterRow;
   category: MasterRow | null;
@@ -61,7 +81,116 @@ export type ProductListRow = {
   sold30: number;
   barcodes: string[];
   stockState: 'ok' | 'low' | 'out' | 'untracked';
+  bundle?: BundleInfo;
 };
+
+export function isBundle(product: MasterRow | null | undefined): boolean {
+  return product?.kind === 'bundle';
+}
+
+/** Cost of one component quantity under the shop's cost method. */
+export function componentCost(
+  product: MasterRow,
+  qtyMilli: number,
+  method: 'avg' | 'last',
+): number {
+  const unit =
+    method === 'last'
+      ? Number(product.last_cost ?? 0)
+      : Number(product.avg_cost ?? 0);
+  return mulDivRound(qtyMilli, unit, 1000);
+}
+
+/** Active recipe rows of one bundle, oldest position first. */
+export async function loadBundleRecipe(
+  db: BikriDb,
+  bundleId: string,
+): Promise<MasterRow[]> {
+  return (await db.bundle_items.where('bundle_id').equals(bundleId).toArray())
+    .filter((row) => !row.deleted_at)
+    .sort(
+      (a, b) =>
+        Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+}
+
+/**
+ * Derived recipe, availability and cost. Availability is the smallest whole number of
+ * bundles every tracked component can make; untracked components are ignored.
+ */
+export function bundleInfoOf(
+  bundleId: string,
+  itemRows: readonly MasterRow[],
+  products: ReadonlyMap<string, MasterRow>,
+  levels: ReadonlyMap<string, number>,
+  method: 'avg' | 'last' = 'avg',
+): BundleInfo {
+  const items: BundleRecipeRow[] = [];
+  for (const row of itemRows) {
+    if (row.deleted_at || row.bundle_id !== bundleId) continue;
+    const product = products.get(String(row.component_product_id));
+    if (!product || product.deleted_at) continue;
+    items.push({
+      product,
+      qty_milli: Number(row.qty_milli),
+      sort_order: Number(row.sort_order ?? 0),
+    });
+  }
+  items.sort(
+    (a, b) =>
+      a.sort_order - b.sort_order || a.product.id.localeCompare(b.product.id),
+  );
+  let availability: number | null = null;
+  let limiting: BundleRecipeRow | null = null;
+  let cost = 0;
+  let itemsTotal = 0;
+  for (const item of items) {
+    cost += componentCost(item.product, item.qty_milli, method);
+    itemsTotal += mulDivRound(
+      item.qty_milli,
+      Number(item.product.price ?? 0),
+      1000,
+    );
+    if (item.product.track_stock !== 1) continue;
+    const onHand = levels.get(item.product.id) ?? 0;
+    const canMake = Math.floor(onHand / item.qty_milli);
+    if (availability === null || canMake < availability) {
+      availability = canMake;
+      limiting = item;
+    }
+  }
+  return { items, availability, cost, itemsTotal, limiting };
+}
+
+/** Bundle info for every active bundle, keyed by bundle product id. */
+export function buildBundleInfoMap(
+  products: readonly MasterRow[],
+  itemRows: readonly MasterRow[],
+  levels: ReadonlyMap<string, number>,
+  method: 'avg' | 'last' = 'avg',
+): Map<string, BundleInfo> {
+  const byId = new Map(products.map((product) => [product.id, product]));
+  const bundleIds = new Set(
+    products
+      .filter((product) => isBundle(product) && !product.deleted_at)
+      .map((product) => product.id),
+  );
+  const grouped = new Map<string, MasterRow[]>();
+  for (const row of itemRows) {
+    if (row.deleted_at) continue;
+    const id = String(row.bundle_id);
+    if (!bundleIds.has(id)) continue;
+    grouped.set(id, [...(grouped.get(id) ?? []), row]);
+  }
+  const result = new Map<string, BundleInfo>();
+  for (const id of bundleIds)
+    result.set(
+      id,
+      bundleInfoOf(id, grouped.get(id) ?? [], byId, levels, method),
+    );
+  return result;
+}
 
 export class DuplicateBarcodeError extends Error {
   readonly barcode: string;
@@ -90,6 +219,14 @@ export class ProductInUseError extends Error {
   }
 }
 
+/** A tracked product's cost is owned by deliveries/stock movements, not the form. */
+export class TrackedCostError extends Error {
+  constructor() {
+    super('Tracked product cost can only change through stock movements');
+    this.name = 'TrackedCostError';
+  }
+}
+
 export class CategoryInUseError extends Error {
   readonly count: number;
   constructor(count: number) {
@@ -105,7 +242,13 @@ const live = <T extends { deleted_at?: unknown }>(rows: T[]) =>
 export function stockStateOf(
   product: MasterRow,
   onHand: number,
+  bundle?: BundleInfo,
 ): ProductListRow['stockState'] {
+  if (isBundle(product)) {
+    if (bundle?.availability === null || bundle === undefined)
+      return 'untracked';
+    return bundle.availability <= 0 ? 'out' : 'ok';
+  }
   if (product.track_stock !== 1) return 'untracked';
   if (onHand <= 0) return 'out';
   const min = Number(product.min_stock_milli ?? 0);
@@ -162,11 +305,38 @@ export async function soldByProduct(
   const saleIds = new Set(liveSales.map((sale) => String(sale.id)));
   // The line's own business date (D-228) bounds this to the 30-day window. The old
   // sale-id list crossed 100 keys on a busy day and scanned every line ever written.
+  // A bundle counts once per `bundle_group`; its components are also real product sales.
+  const bundleGroups = new Set<string>();
+  const bundleGroupLines = new Map<
+    string,
+    {
+      bundleId: string;
+      lines: { id: string; qty_milli: number }[];
+    }
+  >();
   for (const line of await db.sale_lines
     .where('business_date')
     .between(from, to, true, true)
     .toArray()) {
-    if (!line.product_id || !saleIds.has(String(line.sale_id))) continue;
+    if (!saleIds.has(String(line.sale_id))) continue;
+    if (line.bundle_id && line.bundle_group) {
+      const key = `${String(line.sale_id)}|${String(line.bundle_group)}`;
+      const group = bundleGroupLines.get(key) ?? {
+        bundleId: String(line.bundle_id),
+        lines: [],
+      };
+      group.lines.push({
+        id: String(line.id),
+        qty_milli: Number(line.qty_milli),
+      });
+      bundleGroupLines.set(key, group);
+      if (!bundleGroups.has(key)) {
+        bundleGroups.add(key);
+        // Sold quantities are milli-units everywhere; one bundle = 1000.
+        sold.set(group.bundleId, (sold.get(group.bundleId) ?? 0) + 1000);
+      }
+    }
+    if (!line.product_id) continue;
     const id = String(line.product_id);
     sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
   }
@@ -198,6 +368,32 @@ export async function soldByProduct(
       sold.set(id, (sold.get(id) ?? 0) - Number(line.qty_milli));
     }
   }
+  // A fully returned bundle group is no longer a bundle sale, even when the sale
+  // itself was before this window. Refund dates can fall outside the window.
+  if (bundleGroupLines.size > 0) {
+    const lineIds = [...bundleGroupLines.values()].flatMap((group) =>
+      group.lines.map((line) => line.id),
+    );
+    const allRefundLines = await rowsForIds(
+      db.refund_lines,
+      'sale_line_id',
+      (row: SyncedRow) => String(row.sale_line_id),
+      lineIds,
+    );
+    const refunded = new Map<string, number>();
+    for (const line of allRefundLines) {
+      const id = String(line.sale_line_id);
+      refunded.set(id, (refunded.get(id) ?? 0) + Number(line.qty_milli));
+    }
+    for (const group of bundleGroupLines.values()) {
+      if (
+        group.lines.every(
+          (line) => (refunded.get(line.id) ?? 0) >= line.qty_milli,
+        )
+      )
+        sold.set(group.bundleId, (sold.get(group.bundleId) ?? 0) - 1000);
+    }
+  }
   return sold;
 }
 
@@ -221,9 +417,11 @@ export function filterAndSortProducts(
     sort?: ProductSort;
     direction?: SortDirection;
     language?: string;
+    kind?: 'simple' | 'bundle';
   } = {},
 ): ProductListRow[] {
   let rows = input.slice();
+  if (opts.kind) rows = rows.filter((r) => r.product.kind === opts.kind);
   if (opts.query) rows = rows.filter((r) => matchesQuery(r, opts.query ?? ''));
   if (opts.categoryId)
     rows = rows.filter((r) => r.product.category_id === opts.categoryId);
@@ -237,10 +435,12 @@ export function filterAndSortProducts(
   const sort = opts.sort ?? 'name';
   const sign =
     (opts.direction ?? defaultProductSortDirection(sort)) === 'asc' ? 1 : -1;
+  const rowCost = (row: ProductListRow): number =>
+    row.bundle ? row.bundle.cost : Number(row.product.avg_cost ?? 0);
   const margin = (row: ProductListRow): number | null => {
     const price = Number(row.product.price);
     if (!(price > 0)) return null;
-    return (price - Number(row.product.avg_cost ?? 0)) / price;
+    return (price - rowCost(row)) / price;
   };
   rows.sort((a, b) => {
     if (sort === 'category') {
@@ -258,11 +458,7 @@ export function filterAndSortProducts(
       );
     if (sort === 'stock') return sign * (a.onHand - b.onHand) || byName(a, b);
     if (sort === 'cost')
-      return (
-        sign *
-          (Number(a.product.avg_cost ?? 0) - Number(b.product.avg_cost ?? 0)) ||
-        byName(a, b)
-      );
+      return sign * (rowCost(a) - rowCost(b)) || byName(a, b);
     if (sort === 'margin') {
       const aMargin = margin(a);
       const bMargin = margin(b);
@@ -287,6 +483,7 @@ export async function listProducts(
     direction?: SortDirection;
     language?: string;
     now?: number;
+    costMethod?: 'avg' | 'last';
   } = {},
 ): Promise<ProductListRow[]> {
   const products = live(await db.products.toArray());
@@ -304,16 +501,26 @@ export async function listProducts(
       l.on_hand_milli,
     ]),
   );
+  const bundles = buildBundleInfoMap(
+    products,
+    await db.bundle_items.toArray(),
+    levels,
+    opts.costMethod ?? 'avg',
+  );
   const sold = await soldByProduct(db, 30, opts.now);
   const rows: ProductListRow[] = products.map((product) => {
-    const onHand = levels.get(product.id) ?? 0;
+    const bundle = bundles.get(product.id);
+    const onHand = bundle
+      ? (bundle.availability ?? 0) * 1000
+      : (levels.get(product.id) ?? 0);
     return {
       product,
       category: categories.get(String(product.category_id)) ?? null,
       onHand,
       sold30: sold.get(product.id) ?? 0,
       barcodes: barcodes.get(product.id) ?? [],
-      stockState: stockStateOf(product, onHand),
+      stockState: stockStateOf(product, onHand, bundle),
+      ...(bundle ? { bundle } : {}),
     };
   });
   return filterAndSortProducts(rows, opts);
@@ -350,8 +557,10 @@ export type ProductDetail = {
   history: HistoryRow[];
   /** True when older movements exist beyond the requested page. */
   hasMoreHistory: boolean;
-  /** Oldest first: 14 business days of qty sold. */
+  /** Oldest first: 14 business days of qty sold (bundles for a bundle product). */
   last14: { date: string; qty: number; revenue: number }[];
+  /** Recipe, availability and derived cost; null for a simple product. */
+  bundle: BundleInfo | null;
 };
 
 function parsedHistoryJson(value: unknown): Record<string, unknown> | null {
@@ -489,6 +698,7 @@ export async function productDetail(
   id: string,
   now = Date.now(),
   historyLimit = PRODUCT_HISTORY_PAGE,
+  costMethod: 'avg' | 'last' = 'avg',
 ): Promise<ProductDetail | null> {
   const product = await db.products.get(id);
   if (!product || product.deleted_at) return null;
@@ -498,9 +708,32 @@ export async function productDetail(
   const barcodes = live(
     await db.product_barcodes.where('product_id').equals(id).toArray(),
   );
+  const bundle = isBundle(product)
+    ? await (async () => {
+        const items = await loadBundleRecipe(db, id);
+        const products = new Map(
+          (
+            await db.products.bulkGet(
+              items.map((row) => String(row.component_product_id)),
+            )
+          )
+            .filter((row): row is MasterRow => row !== undefined)
+            .map((row) => [row.id, row]),
+        );
+        const levels = new Map(
+          (await db.stock_levels.toArray()).map((level) => [
+            level.product_id,
+            level.on_hand_milli,
+          ]),
+        );
+        return bundleInfoOf(id, items, products, levels, costMethod);
+      })()
+    : null;
   // Read one extra movement to know whether "Show older" is needed, without a
   // second index count over a long history.
-  const historyPage = await productStockHistoryPage(db, id, historyLimit);
+  const historyPage = bundle
+    ? { rows: [], hasMore: false }
+    : await productStockHistoryPage(db, id, historyLimit);
   const days: ProductDetail['last14'] = [];
   for (let i = 13; i >= 0; i -= 1)
     days.push({ date: businessDate(now - i * DAY_MS), qty: 0, revenue: 0 });
@@ -586,6 +819,130 @@ export async function productDetail(
       }
     }
   }
+  if (bundle) {
+    for (const day of days) {
+      day.qty = 0;
+      day.revenue = 0;
+    }
+    const groups = new Map<
+      string,
+      {
+        saleId: string;
+        day: string;
+        lines: { id: string; qty_milli: number; revenue: number }[];
+        revenue: number;
+      }
+    >();
+    const bundleLines = (
+      await db.sale_lines.where('bundle_id').equals(id).toArray()
+    ).filter(
+      (line) =>
+        String(line.business_date) >= first &&
+        String(line.business_date) <= last &&
+        line.bundle_group !== undefined,
+    );
+    for (const line of bundleLines) {
+      const sale = byId.get(String(line.sale_id));
+      if (!sale) continue;
+      const day = dayByDate.get(String(sale.business_date));
+      if (!day) continue;
+      const key = `${String(line.sale_id)}|${String(line.bundle_group)}`;
+      const revenue = lineRevenue(line, sale.tax_inclusive === 1);
+      const group = groups.get(key) ?? {
+        saleId: String(sale.id),
+        day: String(sale.business_date),
+        lines: [],
+        revenue: 0,
+      };
+      if (group.lines.length === 0) day.qty += 1000;
+      group.lines.push({
+        id: String(line.id),
+        qty_milli: Number(line.qty_milli),
+        revenue,
+      });
+      group.revenue += revenue;
+      groups.set(key, group);
+      day.revenue += revenue;
+    }
+    if (groups.size > 0) {
+      const lineIds = [...groups.values()].flatMap((group) =>
+        group.lines.map((line) => line.id),
+      );
+      const bundleRefundLines = await rowsForIds(
+        db.refund_lines,
+        'sale_line_id',
+        (row: SyncedRow) => String(row.sale_line_id),
+        lineIds,
+      );
+      if (bundleRefundLines.length > 0) {
+        const refundRows = new Map(
+          (
+            await db.refunds.bulkGet([
+              ...new Set(
+                bundleRefundLines.map((line) => String(line.refund_id)),
+              ),
+            ])
+          )
+            .filter((refund): refund is SyncedRow => refund !== undefined)
+            .map((refund) => [String(refund.id), refund]),
+        );
+        const byLine = new Map<string, SyncedRow[]>();
+        for (const refundLine of bundleRefundLines) {
+          const key = String(refundLine.sale_line_id);
+          byLine.set(key, [...(byLine.get(key) ?? []), refundLine]);
+        }
+        const fullyRefunded = new Set<string>();
+        for (const [key, group] of groups) {
+          if (
+            group.lines.every(
+              (line) =>
+                (byLine.get(line.id) ?? []).reduce(
+                  (sum, row) => sum + Number(row.qty_milli),
+                  0,
+                ) >= line.qty_milli,
+            )
+          )
+            fullyRefunded.add(key);
+        }
+        // Fully returned groups disappear from the sale day; partial returns reduce
+        // revenue on the refund's own business date.
+        for (const [key, group] of groups) {
+          if (fullyRefunded.has(key)) {
+            const day = dayByDate.get(group.day);
+            if (day) {
+              day.qty -= 1000;
+              day.revenue -= group.revenue;
+            }
+            continue;
+          }
+          for (const line of group.lines) {
+            const refundsForLine = (byLine.get(line.id) ?? []).sort(
+              (a, b) =>
+                Number(a.created_at) - Number(b.created_at) ||
+                String(a.id).localeCompare(String(b.id)),
+            );
+            let previous = 0;
+            for (const refundLine of refundsForLine) {
+              const refund = refundRows.get(String(refundLine.refund_id));
+              const qty = Number(refundLine.qty_milli);
+              if (refund) {
+                const day = dayByDate.get(String(refund.business_date));
+                if (day) {
+                  day.revenue -= refundedRevenue(
+                    line.revenue,
+                    line.qty_milli,
+                    previous,
+                    qty,
+                  );
+                }
+              }
+              previous += qty;
+            }
+          }
+        }
+      }
+    }
+  }
   return {
     product,
     category,
@@ -594,6 +951,7 @@ export async function productDetail(
     history: historyPage.rows,
     hasMoreHistory: historyPage.hasMore,
     last14: days,
+    bundle,
   };
 }
 
@@ -662,10 +1020,129 @@ async function checkCodes(
     throw new DuplicateSkuError(sku.trim());
 }
 
+export type BundleItemInput = {
+  component_product_id: string;
+  qty_milli: number;
+};
+
 export type ProductInput = NewProduct & {
   /** New photo to store; `null` removes the photo on edit; `undefined` keeps it. */
   photo?: Photo | null;
+  /** Fixed recipe when `kind='bundle'`. */
+  bundle_items?: BundleItemInput[];
 };
+
+export type NormalBundleItem = BundleItemInput & { sort_order: number };
+
+/** Merges duplicates and enforces the 1–20 simple-component recipe rules (02 §2.16). */
+export async function normaliseBundleItems(
+  db: BikriDb,
+  bundleId: string,
+  items: readonly BundleItemInput[],
+): Promise<{ items: NormalBundleItem[]; products: Map<string, MasterRow> }> {
+  const merged = new Map<string, number>();
+  for (const item of items) {
+    const id = item.component_product_id;
+    if (!id || id === bundleId) throw new BundleRecipeError('component');
+    if (!Number.isSafeInteger(item.qty_milli) || item.qty_milli <= 0)
+      throw new BundleRecipeError('qty');
+    merged.set(id, (merged.get(id) ?? 0) + item.qty_milli);
+  }
+  if (merged.size < 1 || merged.size > 20) throw new BundleRecipeError('count');
+  const products = new Map<string, MasterRow>();
+  for (const id of merged.keys()) {
+    const product = await db.products.get(id);
+    if (!product || product.deleted_at || product.kind === 'bundle')
+      throw new BundleRecipeError('component');
+    products.set(id, product);
+  }
+  return {
+    items: [...merged.entries()].map(
+      ([component_product_id, qty_milli], i) => ({
+        component_product_id,
+        qty_milli,
+        sort_order: i,
+      }),
+    ),
+    products,
+  };
+}
+
+export class BundleRecipeError extends Error {
+  readonly code: 'component' | 'qty' | 'count';
+  constructor(code: BundleRecipeError['code']) {
+    super(code);
+    this.name = 'BundleRecipeError';
+    this.code = code;
+  }
+}
+
+export class ComponentInUseError extends Error {
+  readonly bundleName: string;
+  constructor(bundleName: string) {
+    super(`Component is used by ${bundleName}`);
+    this.name = 'ComponentInUseError';
+    this.bundleName = bundleName;
+  }
+}
+
+async function bundleUsingComponent(
+  db: BikriDb,
+  productId: string,
+): Promise<MasterRow | null> {
+  const rows = (
+    await db.bundle_items
+      .where('component_product_id')
+      .equals(productId)
+      .toArray()
+  ).filter((row) => !row.deleted_at);
+  for (const row of rows) {
+    const bundle = await db.products.get(String(row.bundle_id));
+    if (bundle && !bundle.deleted_at && bundle.kind === 'bundle') return bundle;
+  }
+  return null;
+}
+
+/** Replaces the recipe in the caller's action; removes rows by soft delete. */
+async function syncBundleItems(
+  w: Writer,
+  bundleId: string,
+  items: readonly NormalBundleItem[],
+  ctx: LedgerContext,
+): Promise<void> {
+  const table = w.table<MasterRow, string>('bundle_items');
+  const existing = (
+    await table.where('bundle_id').equals(bundleId).toArray()
+  ).filter((row) => !row.deleted_at);
+  const wanted = new Map(
+    items.map((item) => [item.component_product_id, item]),
+  );
+  for (const row of existing) {
+    const next = wanted.get(String(row.component_product_id));
+    if (!next) {
+      await w.remove('bundle_items', row.id);
+      continue;
+    }
+    if (
+      Number(row.qty_milli) !== next.qty_milli ||
+      Number(row.sort_order ?? 0) !== next.sort_order
+    )
+      await w.update('bundle_items', row.id, {
+        qty_milli: next.qty_milli,
+        sort_order: next.sort_order,
+        updated_by: ctx.staff_id,
+      });
+    wanted.delete(String(row.component_product_id));
+  }
+  for (const item of wanted.values())
+    await w.create('bundle_items', {
+      bundle_id: bundleId,
+      component_product_id: item.component_product_id,
+      qty_milli: item.qty_milli,
+      sort_order: item.sort_order,
+      updated_by: ctx.staff_id,
+    });
+}
 
 async function queuePhoto(
   w: Writer,
@@ -728,8 +1205,12 @@ export async function saveNewProduct(
 ): Promise<MasterRow> {
   const sku = input.sku?.trim() || (await uniqueSku(db, input.name_en));
   await checkCodes(db, input.barcodes ?? [], sku);
-  const { photo, ...rest } = input;
+  const { photo, bundle_items: bundleItems, ...rest } = input;
+  const isBundle = input.kind === 'bundle';
   const id = input.id ?? newId(opts.now);
+  const recipe = isBundle
+    ? await normaliseBundleItems(db, id, bundleItems ?? [])
+    : null;
   const imageKey = photo ? photoKey(id, photo) : null;
   // Cache first, so the thumbnail can render as soon as the row appears.
   if (photo && imageKey) await putFile(db.tenantId, imageKey, photo.blob);
@@ -738,22 +1219,44 @@ export async function saveNewProduct(
     async (w) => {
       const created = await createProduct(
         w,
-        { ...rest, id, sku, image_key: imageKey },
+        {
+          ...rest,
+          id,
+          sku,
+          image_key: imageKey,
+          kind: isBundle ? 'bundle' : 'simple',
+        },
         ctx,
       );
       if (photo) await queuePhoto(w, id, photo, ctx.staff_id);
+      if (recipe) {
+        await syncBundleItems(w, id, recipe.items, ctx);
+        await productAudit(w, ctx, 'bundle_change', id, null, {
+          items: recipe.items,
+        });
+      }
       return created;
     },
     {
       actor: ctx.staff_id,
       ...opts,
-      tables: writeScope(
-        'products',
-        'product_barcodes',
-        'stock_movements',
-        'stock_levels',
-        'file_queue',
-      ),
+      tables: isBundle
+        ? writeScope(
+            'products',
+            'bundle_items',
+            'product_barcodes',
+            'audit_log',
+            'stock_movements',
+            'stock_levels',
+            'file_queue',
+          )
+        : writeScope(
+            'products',
+            'product_barcodes',
+            'stock_movements',
+            'stock_levels',
+            'file_queue',
+          ),
     },
   );
   return product;
@@ -775,15 +1278,37 @@ export async function saveProductEdit(
   const current = await db.products.get(id);
   if (!current || current.deleted_at)
     throw new Error(`Product ${id} not found`);
+  const isBundle = input.kind === 'bundle' || current.kind === 'bundle';
+  if (current.kind === 'bundle' && input.kind === 'simple')
+    throw new BundleRecipeError('component');
+  if (current.kind !== 'bundle' && input.kind === 'bundle') {
+    const bundle = await bundleUsingComponent(db, id);
+    if (bundle)
+      throw new ComponentInUseError(String(bundle.name_en ?? 'a bundle'));
+  }
   const sku = input.sku?.trim() || String(current.sku);
   await checkCodes(db, input.barcodes ?? [], sku, id);
   if (input.photo)
     await putFile(db.tenantId, photoKey(id, input.photo), input.photo.blob);
+  const recipe =
+    isBundle && input.bundle_items !== undefined
+      ? await normaliseBundleItems(db, id, input.bundle_items)
+      : null;
   return writeAction(
     db,
     async (w) => {
       const before = await w.table<MasterRow>('products').get(id);
       if (!before) throw new Error(`Product ${id} not found`);
+      const stillTracked =
+        !isBundle &&
+        input.track_stock !== false &&
+        Number(before.track_stock) === 1;
+      if (
+        stillTracked &&
+        input.cost !== undefined &&
+        input.cost !== Number(before.last_cost)
+      )
+        throw new TrackedCostError();
       const patch: OpRow = {
         name_en: input.name_en.trim(),
         name_ur: input.name_ur?.trim() ?? '',
@@ -792,17 +1317,38 @@ export async function saveProductEdit(
         sku,
         unit: input.unit ?? 'pc',
         price: input.price,
-        track_stock: input.track_stock === false ? 0 : 1,
-        min_stock_milli: input.min_stock_milli ?? 0,
-        warranty_days: input.warranty_days ?? 0,
+        track_stock: isBundle || input.track_stock === false ? 0 : 1,
+        min_stock_milli: isBundle ? 0 : (input.min_stock_milli ?? 0),
+        warranty_days: isBundle ? 0 : (input.warranty_days ?? 0),
         notes: input.notes?.trim() ?? '',
+        kind: isBundle ? 'bundle' : 'simple',
       };
-      if (input.cost !== undefined) patch.last_cost = input.cost;
+      if (!isBundle && input.cost !== undefined) patch.last_cost = input.cost;
+      if (isBundle) patch.last_cost = 0;
       if (input.photo === null) patch.image_key = null;
       if (input.photo) {
         patch.image_key = photoKey(id, input.photo);
         await queuePhoto(w, id, input.photo, ctx.staff_id);
       }
+      const beforeRecipe = isBundle
+        ? live(
+            await w
+              .table<MasterRow, string>('bundle_items')
+              .where('bundle_id')
+              .equals(id)
+              .toArray(),
+          )
+            .map((row) => ({
+              component_product_id: String(row.component_product_id),
+              qty_milli: Number(row.qty_milli),
+              sort_order: Number(row.sort_order ?? 0),
+            }))
+            .sort(
+              (a, b) =>
+                a.sort_order - b.sort_order ||
+                a.component_product_id.localeCompare(b.component_product_id),
+            )
+        : [];
       const after = await w.update('products', id, patch);
       if (Number(before.price) !== input.price) {
         await productAudit(
@@ -814,7 +1360,11 @@ export async function saveProductEdit(
           { price: input.price },
         );
       }
-      if (input.cost !== undefined && Number(before.last_cost) !== input.cost) {
+      if (
+        !isBundle &&
+        input.cost !== undefined &&
+        Number(before.last_cost) !== input.cost
+      ) {
         await productAudit(
           w,
           ctx,
@@ -824,9 +1374,24 @@ export async function saveProductEdit(
           { last_cost: input.cost },
         );
       }
+      if (recipe) {
+        await syncBundleItems(w, id, recipe.items, ctx);
+        if (JSON.stringify(beforeRecipe) !== JSON.stringify(recipe.items)) {
+          await productAudit(
+            w,
+            ctx,
+            'bundle_change',
+            id,
+            {
+              items: beforeRecipe,
+            },
+            { items: recipe.items },
+          );
+        }
+      }
       const beforeTrack = Number(before.track_stock) === 1 ? 1 : 0;
-      const afterTrack = input.track_stock === false ? 0 : 1;
-      if (beforeTrack !== afterTrack) {
+      const afterTrack = Number(patch.track_stock) === 1 ? 1 : 0;
+      if (!isBundle && beforeTrack !== afterTrack) {
         const minBefore = Number(before.min_stock_milli ?? 0);
         const minAfter = Number(patch.min_stock_milli ?? 0);
         const auditBefore: Record<string, number> = {
@@ -870,12 +1435,15 @@ export async function saveProductEdit(
     {
       actor: ctx.staff_id,
       ...opts,
-      tables: writeScope(
-        'products',
-        'product_barcodes',
-        'audit_log',
-        'file_queue',
-      ),
+      tables: isBundle
+        ? writeScope(
+            'products',
+            'bundle_items',
+            'product_barcodes',
+            'audit_log',
+            'file_queue',
+          )
+        : writeScope('products', 'product_barcodes', 'audit_log', 'file_queue'),
     },
   );
 }
@@ -903,6 +1471,9 @@ export async function removeProduct(
   ctx: LedgerContext,
   opts: WriteOptions = {},
 ): Promise<void> {
+  const usedBy = await bundleUsingComponent(db, id);
+  if (usedBy)
+    throw new ComponentInUseError(String(usedBy.name_en ?? 'a bundle'));
   if (await referencedByUnsyncedOp(db, id)) throw new ProductInUseError();
   await writeAction(
     db,
@@ -947,12 +1518,13 @@ export function duplicateDraft(p: MasterRow): ProductInput {
     barcodes: [],
     unit: String(p.unit ?? 'pc'),
     price: Number(p.price),
-    cost: Number(p.last_cost ?? 0),
-    track_stock: p.track_stock === 1,
-    min_stock_milli: Number(p.min_stock_milli ?? 0),
-    warranty_days: Number(p.warranty_days ?? 0),
+    cost: p.kind === 'bundle' ? 0 : Number(p.last_cost ?? 0),
+    track_stock: p.kind === 'bundle' ? false : p.track_stock === 1,
+    min_stock_milli: p.kind === 'bundle' ? 0 : Number(p.min_stock_milli ?? 0),
+    warranty_days: p.kind === 'bundle' ? 0 : Number(p.warranty_days ?? 0),
     notes: String(p.notes ?? ''),
     opening_milli: 0,
+    kind: p.kind === 'bundle' ? 'bundle' : 'simple',
   };
 }
 
@@ -1082,6 +1654,7 @@ export function productsCsv(rows: ProductListRow[], withCost: boolean): string {
     'unit',
     'min_stock',
     'track_stock',
+    'kind',
     'sold_30_days',
   ];
   const lines = [header.join(',')];
@@ -1099,10 +1672,11 @@ export function productsCsv(rows: ProductListRow[], withCost: boolean): string {
         ...(withCost
           ? [rupees(Number(p.last_cost ?? 0)), rupees(Number(p.avg_cost ?? 0))]
           : []),
-        qty(r.onHand),
+        qty(r.bundle ? (r.bundle.availability ?? 0) * 1000 : r.onHand),
         p.unit,
         qty(Number(p.min_stock_milli ?? 0)),
         p.track_stock === 1 ? 1 : 0,
+        p.kind === 'bundle' ? 'bundle' : 'simple',
         qty(r.sold30),
       ]
         .map(csvCell)

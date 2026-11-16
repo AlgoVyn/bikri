@@ -228,7 +228,21 @@
     "warranty_custom": "Apne din",
     "warranty_days": "Warranty ke din",
     "warranty_invalid": "1 se 3650 din likhein.",
-    "warranty_none": "Koi nahin"
+    "warranty_none": "Koi nahin",
+    "is_bundle": "Yeh bundle hai",
+    "bundle_price": "Bundle price",
+    "bundle_items": "Is bundle ki cheezein",
+    "bundle_items_empty": "Is bundle mein kam az kam ek cheez shamil karein.",
+    "bundle_add_item": "Cheez shamil karein",
+    "bundle_search": "Naam ya SKU se product talash karein",
+    "bundle_qty": "Fi bundle miqdar",
+    "bundle_remove": "{{name}} hatayein",
+    "bundle_recipe_hint": "Recipe fixed hai. Cashier Sell par cheezein tabdeel nahi kar sakta.",
+    "bundle_items_required": "Bundle ke liye 1 se 20 cheezein aur zero se zyada miqdar chahiye.",
+    "bundle_error_component": "Ek active simple product chunein, khud yeh bundle nahi.",
+    "bundle_error_qty": "Har cheez ki miqdar zero se zyada honi chahiye.",
+    "bundle_error_count": "Bundle mein 1 se 20 mukhtalif cheezein honi chahiye.",
+    "cost_tracked_hint": "Laagat delivery aur stock movements se update hoti hai. Ise edit karne ke liye pehle stock tracking band karein."
   },
   "glossary": {
     "baqaya": "Baqaya",
@@ -741,7 +755,19 @@
     "back_to_product": "Product par wapas",
     "min_stock_off": "Off",
     "last14_empty": "Pichhle 14 din mein stock mein koi harkat nahin.",
-    "sell": "Bechein"
+    "sell": "Bechein",
+    "bundles": "Bundles",
+    "bundle_pill": "Bundle",
+    "bundle_count": "{{count}} bundle",
+    "made_to_order": "Order par tayyar",
+    "available_bundles": "Dastyab",
+    "items_total": "Cheezon ka total",
+    "bundle_saves": "Customer ki bachat",
+    "bundle_items_title": "Is bundle ki cheezein",
+    "bundle_qty_per": "Fi bundle {{qty}}",
+    "bundle_stock_note": "Bundle bikne par har cheez ka stock kam hota hai. Bundle ka apna stock nahi.",
+    "component_in_use": "Yeh cheez {{name}} mein istemal ho rahi hai. Pehle ise bundle se hatayein.",
+    "bundle_empty_recipe": "Is bundle mein koi cheez nahi. Ise edit kar ke 1 se 20 items shamil karein."
   },
   "sell": {
     "add_discount": "Discount lagayein",
@@ -839,7 +865,16 @@
     "walk_in": "Aam gahak",
     "empty_tab": "Nayi bill",
     "backdate_banner": "Purani sale darj ho rahi hai · {{date}} · {{staff}}",
-    "backdate_cancel": "Purani sale cancel karein"
+    "backdate_cancel": "Purani sale cancel karein",
+    "bundle_pill": "Bundle",
+    "bundle_items": "Bundle · {{count}} items",
+    "bundle_made_to_order": "Bundle · {{count}} items · Order par tayyar",
+    "bundle_qty": "Bundles",
+    "bundle_components_readonly": "Ek bundle ke tor par sale. Poore bundle ki price ya quantity tabdeel karein; items khud tabdeel ho jayenge.",
+    "bundle_item_count": "{{count}} items",
+    "bundle_price": "Bundle price",
+    "bundle_list_price": "List {{amount}}",
+    "bundle_empty": "Is bundle mein koi cheez nahi. Sell se pehle Products mein items shamil karein."
   },
   "setup": {
     "add_one": "Aik product shamil karein",

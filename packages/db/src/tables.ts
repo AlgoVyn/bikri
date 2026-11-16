@@ -225,6 +225,7 @@ export const TABLE_COLUMNS = {
     'updated_by',
     'on_hand_milli',
     'cost_changed_at',
+    'kind',
   ],
   product_barcodes: [
     'tenant_id',
@@ -325,6 +326,7 @@ export const TABLE_COLUMNS = {
     'status',
     'replaces_sale_id',
     'note',
+    'bundle_discount_total',
   ],
   sale_lines: [
     'tenant_id',
@@ -350,6 +352,13 @@ export const TABLE_COLUMNS = {
     'warranty_until',
     'created_at',
     'business_date',
+    'bundle_id',
+    'bundle_group',
+    'bundle_name',
+    'bundle_qty',
+    'bundle_price',
+    'bundle_component_qty_milli',
+    'bundle_discount',
   ],
   payments: [
     'tenant_id',
@@ -606,6 +615,19 @@ export const TABLE_COLUMNS = {
     'before_json',
     'after_json',
     'created_at',
+  ],
+  bundle_items: [
+    'tenant_id',
+    'id',
+    'bundle_id',
+    'component_product_id',
+    'qty_milli',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'rev',
+    'updated_by',
   ],
 } as const satisfies Record<string, readonly string[]>;
 

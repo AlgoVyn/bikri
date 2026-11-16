@@ -23,6 +23,8 @@ export type NewProduct = {
   /** Low-stock alert (0 = off). */
   min_stock_milli?: number;
   notes?: string;
+  /** Bundle products track no stock of their own. */
+  kind?: 'simple' | 'bundle';
 };
 
 export type LedgerContext = {
@@ -47,11 +49,12 @@ export async function createProduct(
     sku: input.sku?.trim() || generateSku(name),
     unit: input.unit ?? 'pc',
     price: input.price,
-    last_cost: input.cost ?? 0,
-    avg_cost: input.cost ?? 0,
-    min_stock_milli: input.min_stock_milli ?? 0,
-    track_stock: input.track_stock === false ? 0 : 1,
-    warranty_days: input.warranty_days ?? 0,
+    last_cost: input.kind === 'bundle' ? 0 : (input.cost ?? 0),
+    avg_cost: input.kind === 'bundle' ? 0 : (input.cost ?? 0),
+    min_stock_milli: input.kind === 'bundle' ? 0 : (input.min_stock_milli ?? 0),
+    track_stock: input.kind === 'bundle' || input.track_stock === false ? 0 : 1,
+    warranty_days: input.kind === 'bundle' ? 0 : (input.warranty_days ?? 0),
+    kind: input.kind ?? 'simple',
     image_key: input.image_key ?? null,
     notes: input.notes?.trim() ?? '',
   };

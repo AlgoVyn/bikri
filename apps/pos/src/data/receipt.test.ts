@@ -1,5 +1,7 @@
 import { buildSaleReceipt, renderReceiptText } from '@bikri/printer';
 import { afterEach, describe, expect, it } from 'vitest';
+import { addBundle, emptyCart, setBundleDiscount } from './cart.ts';
+import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
 import { retryPrintJob } from './printJobs.ts';
 import {
@@ -76,6 +78,113 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(out).toContain('Powered by AlgoVyn');
     expect(out).not.toContain('REPRINT');
     expect(await loadSaleReceipt(db, 'nope')).toBeNull();
+  });
+
+  it('prints one bundle header and its components without component prices', async () => {
+    const fx = await shopWithStock('rcpt-bundle');
+    await addShop(fx.db);
+    const ctx = await ledgerContext(fx.db, 'st-1');
+    const bundle = await saveNewProduct(
+      fx.db,
+      {
+        name_en: 'Starter Pack',
+        sku: 'RCPT-BND',
+        unit: 'set',
+        price: 4_000_000,
+        kind: 'bundle',
+        track_stock: false,
+        bundle_items: [
+          { component_product_id: fx.phone.id, qty_milli: 1000 },
+          { component_product_id: fx.buds.id, qty_milli: 1000 },
+        ],
+      },
+      ctx,
+      { now: NOW },
+    );
+    let cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: fx.phone, qty_milli: 1000 },
+        { product: fx.buds, qty_milli: 1000 },
+      ],
+      2,
+      'avg',
+    );
+    cart = setBundleDiscount(
+      cart,
+      String(cart.lines[0]?.bundle_group),
+      'amount',
+      50_000,
+      new Map([
+        [fx.phone.id, fx.phone],
+        [fx.buds.id, fx.buds],
+      ]),
+      'avg',
+    );
+    const input = sale(cart, [{ method: 'cash', amount: 7_900_000 }], {
+      saleId: 'sale-rcpt-bundle',
+    });
+    await completeSale(fx.db, input, fx.ctx, NOW);
+    const loaded = await loadSaleReceipt(fx.db, input.saleId);
+    expect(loaded?.lines.map((line) => line.bundleQty)).toEqual([2, 2]);
+    expect(loaded?.lines[0]?.bundleName).toBe('Starter Pack');
+    expect(loaded?.sale.bundleDiscount).toBe(100_000);
+    const out = text(loaded as NonNullable<typeof loaded>);
+    expect(out).not.toContain('Bundle:');
+    expect(out).toContain('Starter Pack');
+    expect(out).toContain('Galaxy A15');
+    expect(out).toContain('Earbuds');
+    expect(out).toContain('Rs 79,000');
+  });
+
+  it('falls back when a saved bundle snapshot has no name or price', async () => {
+    const fx = await shopWithStock('rcpt-bundle-null');
+    await addShop(fx.db);
+    const ctx = await ledgerContext(fx.db, 'st-1');
+    const bundle = await saveNewProduct(
+      fx.db,
+      {
+        name_en: 'Null Pack',
+        sku: 'RCPT-NULL',
+        unit: 'set',
+        price: 3_000_000,
+        kind: 'bundle',
+        track_stock: false,
+        bundle_items: [
+          { component_product_id: fx.phone.id, qty_milli: 1000 },
+          { component_product_id: fx.buds.id, qty_milli: 1000 },
+        ],
+      },
+      ctx,
+      { now: NOW },
+    );
+    const cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: fx.phone, qty_milli: 1000 },
+        { product: fx.buds, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    const input = sale(cart, [{ method: 'cash', amount: 3_000_000 }], {
+      saleId: 'sale-rcpt-null',
+    });
+    await completeSale(fx.db, input, fx.ctx, NOW);
+    await fx.db.sale_lines.where('sale_id').equals(input.saleId).modify({
+      bundle_name: null,
+      bundle_qty: null,
+      bundle_price: null,
+      bundle_discount: null,
+    });
+    const loaded = await loadSaleReceipt(fx.db, input.saleId);
+    expect(loaded?.sale.bundleDiscount).toBe(0);
+    expect(loaded?.lines[0]?.bundleName).toBeNull();
+    const out = text(loaded as NonNullable<typeof loaded>);
+    expect(out).not.toContain('Bundle:');
+    expect(out).toContain('Rs 30,000');
   });
 
   it('Urdu receipts print Urdu labels; Powered by AlgoVyn stays as is', async () => {

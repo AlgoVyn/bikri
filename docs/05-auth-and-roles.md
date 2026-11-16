@@ -127,10 +127,12 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 
 | Op | Required |
 |---|---|
-| insert `refunds` | staff has `refund.create`, or an `audit_log` row `action = 'override'`, `entity = 'refunds'`, `entity_id = <refund id>`, `after_json.permission = 'refund.create'`, whose `approved_by` staff has the permission, is applied in the **same batch** (the refund op is applied only together with it) |
+| insert `refunds` | staff has `refund.create`, or an `audit_log` row `action = 'override'`, `entity = 'refunds'`, `entity_id = <refund id>`, `after_json.permission = 'refund.create'`, whose `approved_by` staff has the permission, is applied in the **same batch** (the refund op is applied only together with it). A whole-bundle refund uses the same permission and must satisfy the atomic group rule in [04 §5](04-api.md#5-server-side-checks-beyond-the-request-envelope) |
 | insert `sale_voids` | `sale.void` (or override, same linking rule); a manager only when the sale's `business_date` equals the void's `business_date` |
 | insert `sale_lines` with `below_cost = 1` | the sale's staff has `sale.below_cost`, or an override audit row for the sale (same linking rule) |
-| insert `sales` | `sale.create`; a line priced below the product's current price needs `catalog.edit` or a line-bound override; any discount needs `sale.discount`, and a discount above the staff's `max_discount_bp` needs an override; udhaar needs `sale.udhaar`; a sale whose `business_date` is earlier than the op's business date needs a `sale_backdated` audit row in the same batch, written by staff with `sale.backdate`, naming the attributed staff, date and reason (any past date; no future date) |
+| insert `sale_lines` with a `bundle_id` | no extra permission beyond `sale.create`; the seven `bundle_*` fields and the component group must pass [04 §5](04-api.md#5-server-side-checks-beyond-the-request-envelope). A derived component price below the component's shelf price is allowed; the bundle group total is the guard |
+| insert `sales` | `sale.create`; a line priced below the product's current price needs `catalog.edit` or a line-bound override (bundle component lines are exempt because their prices are derived); a **manual** discount needs `sale.discount`, and a manual discount above the staff's `max_discount_bp` needs an override (bundle savings and residual paisa do not count; a sale with only bundle residual discount needs no `sale.discount`); udhaar needs `sale.udhaar`; a sale whose `business_date` is earlier than the op's business date needs a `sale_backdated` audit row in the same batch, written by staff with `sale.backdate`, naming the attributed staff, date and reason (any past date; no future date) |
+| upsert/delete `bundle_items`, change `products.kind` | `catalog.edit` for a recipe edit; `catalog.delete` for deleting a bundle/product. A component used by an active bundle cannot be deleted or changed to a bundle; no nesting |
 | insert `expenses` | `expense.create`; for a cashier: `method = 'cash'` and `amount ≤ 200000` (Rs 2,000) unless overridden |
 | insert `supplier_returns` (and its lines, payment, ledger rows) | staff has `purchase.create` |
 | insert `ledger_entries` | `opening`/`sale`/`refund`/`void`/`payment`/`purchase`/`supplier_return` must carry the source document in the same transaction; `adjustment` is owner/manager only |
@@ -140,7 +142,7 @@ The till enforces permissions in the UI; the Worker re-checks the ones that matt
 | insert child lines (`sale_lines`, `refund_lines`, `purchase_lines`, `supplier_return_lines`) | the parent header is in the same batch |
 | upsert/delete `staff`, `branches`, `shop` | `updated_by` is an owner |
 | delete `products`, `customers`, `suppliers` | `updated_by` has `catalog.delete` / `party.delete` |
-| upsert `products.price` / `last_cost` | `updated_by` has `catalog.edit` (purchases set `last_cost` and need `purchase.create`) |
+| upsert `products.price` / `last_cost` | `updated_by` has `catalog.edit` for price and for an untracked product’s cost. A tracked product’s cost changes only through a delivery/stock movement (`purchase.create` or the matching stock permission), never through the product form |
 
 ## 6. Permission matrix
 
@@ -154,7 +156,7 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 | `sale.below_cost` | Complete a sale with a below-cost line without override | ✔ | ✔ | ✘ |
 | `sale.void` | Void / reissue a bill | ✔ | ✔ (same day only) | ✘ |
 | `sale.backdate` | Record a past sale on its real business date (owner device, date only, any past date) | ✔ | ✘ (grant per person if needed) | ✘ |
-| `refund.create` | Refund whole/partial | ✔ | ✔ | ✘ |
+| `refund.create` | Refund whole/partial; a bundle is always returned as whole bundle units | ✔ | ✔ | ✘ |
 | `drawer.open` | Open drawer without a sale (F9) | ✔ | ✔ | ✘ |
 | `cash.move` | Pay-in / pay-out | ✔ | ✔ | ✘ |
 | `dayclose.create` | Close the day for this device | ✔ | ✔ | ✔ |
@@ -163,8 +165,8 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 | `party.edit` | Create/edit customers and suppliers, credit limits | ✔ | ✔ | create only, no limit edit |
 | hard credit limit | Change a customer's `hard_limit` | ✔ | ✘ | ✘ |
 | `party.delete` | Delete customer/supplier (balance must be 0) | ✔ | ✘ | ✘ |
-| `catalog.edit` | Create/edit products, prices, categories, import, bulk price update, generate barcodes, print barcode labels | ✔ | ✔ | ✘ |
-| `catalog.delete` | Delete products | ✔ | ✘ | ✘ |
+| `catalog.edit` | Create/edit products, bundle definitions, prices, categories, import, bulk price update, generate barcodes, print barcode labels | ✔ | ✔ | ✘ |
+| `catalog.delete` | Delete products and bundles | ✔ | ✘ | ✘ |
 | `cost.view` | See cost, margin, profit | ✔ | ✔ | ✘ |
 | `stock.adjust` | Stock adjustments and counts | ✔ | ✔ | ✘ |
 | `purchase.create` | Record deliveries, pay suppliers, return to supplier, print barcode labels | ✔ | ✔ | ✘ |
@@ -178,6 +180,6 @@ Defaults by role; the owner can override per person via `staff.permissions_json`
 
 ## 7. Audit log actions
 
-`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `sale_backdated`, `drawer_open`, `price_change`, `cost_change`, `track_stock_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `sync_conflict_ack`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_file_gc`, `operator_import`, `tenant_restore`, `tenant_purge`, `tenant_change`, `shop_created`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
+`override`, `discount_over_limit`, `refund`, `void`, `supplier_return`, `reissue`, `sale_backdated`, `drawer_open`, `price_change`, `cost_change`, `bundle_change`, `track_stock_change`, `product_delete`, `party_delete`, `credit_limit_change`, `staff_change`, `pin_reset`, `day_close_difference` (when |difference| ≥ Rs 100), `stock_count`, `backup_restore`, `cache_rebuilt`, `sync_ops_discarded`, `sync_conflict_ack`, `device_enrol_code`, `device_change`, `device_revoke`, `ops_import`, `operator_export`, `operator_file_gc`, `operator_import`, `tenant_restore`, `tenant_purge`, `tenant_change`, `shop_created`, `tenant_status_change`, `owner_email_change`, `owner_signin`, `owner_export`, `support_access_start`, `support_access_end`.
 
 Each row stores `before_json`/`after_json` with only the changed fields and belongs to one tenant. The shop owner sees that shop's log in Settings → Activity (filter by action, staff, date; CSV export). For a refund, void/reissue, supplier return and a day-close difference the Worker checks the row's ids/amounts against the event and writes the canonical row itself if the till did not send one.

@@ -378,7 +378,7 @@ describe('push (03 §4.1, §9)', () => {
       json: {
         device_id: shop.admin.id,
         schema_version: 1,
-        app_version: '1.0.0',
+        app_version: '1.1.0',
         ops: saleOps(shop, shop.till, 10),
       },
     });
@@ -843,6 +843,64 @@ describe('sale policy (07 §6)', () => {
   });
 });
 
+describe('bundle recipe guards', () => {
+  it('requires catalog.edit for recipe deletes and keeps at least one item', async () => {
+    const shop = await seedShop('Bundle guard');
+    const bundleId = newId();
+    const itemId = newId();
+    const now = Date.now();
+    await pushOk(shop.admin, [
+      op(
+        'products',
+        'upsert',
+        productRow(
+          bundleId,
+          {
+            name_en: 'Starter Pack',
+            kind: 'bundle',
+            track_stock: 0,
+            price: 5000,
+          },
+          now,
+        ),
+      ),
+      op('bundle_items', 'upsert', {
+        id: itemId,
+        bundle_id: bundleId,
+        component_product_id: IDS.product,
+        qty_milli: 1000,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+        updated_by: IDS.owner,
+      }),
+    ]);
+    const denied = await push(shop.till, [
+      op(
+        'bundle_items',
+        'delete',
+        { id: itemId },
+        { base_rev: 1, updated_by: IDS.cashier },
+      ),
+    ]);
+    const deniedBody = await json<{ results: { error_code?: string }[] }>(
+      denied,
+    );
+    expect(deniedBody.results[0]?.error_code).toBe('FORBIDDEN');
+    const last = await push(shop.admin, [
+      op(
+        'bundle_items',
+        'delete',
+        { id: itemId },
+        { base_rev: 1, updated_by: IDS.owner },
+      ),
+    ]);
+    const lastBody = await json<{ results: { error_code?: string }[] }>(last);
+    expect(lastBody.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+  });
+});
+
 describe('pull and snapshot', () => {
   it('caps the D1 rows one shop may read in a UTC day', async () => {
     const shop = await seedShop('Read cap');
@@ -885,6 +943,59 @@ describe('pull and snapshot', () => {
       shop.tenantId,
     );
     expect(all.at(-1)?.seq).toBe(max);
+  });
+
+  it('advances the cursor past bundle rows hidden from an old client', async () => {
+    const shop = await seedShop('Old cursor');
+    const start = await count(
+      'SELECT MAX(seq) AS n FROM change_log WHERE tenant_id = ?1',
+      shop.tenantId,
+    );
+    const at = Date.now();
+    for (const [tbl, row] of [
+      ['products', { id: 'bundle-product', kind: 'bundle' }],
+      ['bundle_items', { id: 'bundle-item' }],
+      ['expenses', { id: 'visible-expense' }],
+    ] as const) {
+      await env.DB.prepare(
+        'INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+      )
+        .bind(
+          shop.tenantId,
+          tbl,
+          String(row.id),
+          'upsert',
+          JSON.stringify(row),
+          shop.till.id,
+          at,
+        )
+        .run();
+    }
+    const first = await api(`/sync/pull?since=${start}&limit=2`, {
+      token: shop.till.token,
+      headers: { 'x-bikri-schema': '2' },
+    });
+    const firstBody = await json<{
+      changes: unknown[];
+      next_since: number;
+      has_more: boolean;
+    }>(first);
+    expect(firstBody.changes).toEqual([]);
+    expect(firstBody.has_more).toBe(true);
+    expect(firstBody.next_since).toBe(start + 2);
+    const second = await api(
+      `/sync/pull?since=${firstBody.next_since}&limit=2`,
+      {
+        token: shop.till.token,
+        headers: { 'x-bikri-schema': '2' },
+      },
+    );
+    const secondBody = await json<{
+      changes: { tbl: string }[];
+    }>(second);
+    expect(secondBody.changes.map((change) => change.tbl)).toEqual([
+      'expenses',
+    ]);
   });
 
   it('snapshot starts without counting every table and pages rows without tenant_id or token_hash', async () => {

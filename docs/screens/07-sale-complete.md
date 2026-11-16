@@ -15,6 +15,8 @@ Step 2 of the pay modal. Shown after the sale is saved.
 
 Centered: success icon, "Sale saved · INV-A-1042", `Change to give Rs 7,000` (very large, only when change > 0), then for udhaar "Rs 3,000 written in Ali's khata · now owes Rs 8,000". Print status line: "Printing…" → "Printed" / "Print failed" with `Retry`. Buttons: `New sale` (primary, Enter / N), `Print again` (P), `Share` (WhatsApp image + text via wa.me, REQ-B04; or Web Share), `Download PDF`, `Open bill` (goes to bill detail).
 
+The receipt preview, Share PNG and PDF use the bundle block from [06 §4.1](../06-printing.md#41-sale-receipt-80-mm-48-columns): one bundle header and the component names/quantities underneath, no component prices. This screen itself shows only the sale total, change and khata amount; the bundle header is never a second total.
+
 The modal auto-closes to an empty Sell screen after 8 s if auto-close is on (Settings → Display; default off), and immediately on any scan (the scanned item starts the next sale).
 
 ## Acceptance criteria

@@ -51,6 +51,7 @@ export const englishReceiptLabels: ReceiptLabels = {
   subtotalItems: 'Subtotal ({n} items)',
   subtotalItem: 'Subtotal ({n} item)',
   subtotalCount: 'Subtotal ({n})',
+  bundle: 'Bundle',
   includesTax: 'Includes {label} {rate}%:',
   salesTax: '{label} {rate}%',
 };
@@ -103,6 +104,7 @@ export const urduReceiptLabels: ReceiptLabels = {
   subtotalItems: 'ذیلی کل ({n} چیزیں)',
   subtotalItem: 'ذیلی کل ({n} چیز)',
   subtotalCount: 'ذیلی کل ({n})',
+  bundle: 'بنڈل',
   includesTax: 'شامل {label} {rate}%:',
   salesTax: '{label} {rate}%',
 };

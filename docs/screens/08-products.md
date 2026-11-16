@@ -34,6 +34,39 @@ Cards:
 3. **Last 14 days**: bar chart of qty sold per day (local data), total sold, revenue.
 4. **Stock history**: list of movements and stock-tracking changes newest first — date/time, reason (localised), ± qty (`—` for a tracking change), balance after, by whom, link to bill/delivery. A tracking change row also shows the low-stock alert before → after when it changed. The screen renders the newest 200 movements plus any tracking changes in that time window and appends older rows with `Show older`; Export CSV still writes the product's full history (tracking rows use `track_stock_off` / `track_stock_on`).
 
+## Bundles (v1.1)
+
+A **bundle** is a product row with `products.kind='bundle'`, `track_stock=0`, a bundle price and a fixed recipe of real component products. It reuses the product row so barcodes, search, photos, categories, labels and price check work unchanged; the recipe is `bundle_items` ([02 §2.16](../02-data-model.md#216-bundles-migration-0017_bundlessql)). The cashier cannot substitute components; the owner edits the recipe here.
+
+The English UI label is **Bundle**; Roman Urdu uses **Bundle**. The Urdu label is a translation choice between **بنڈل**, **سیٹ** and **پیکج** (native-speaker review). Do not use "combo" in UI strings or identifiers.
+
+**Product list**
+- The existing filter toolbar gains a `Bundles` filter (All / Bundles / categories) and rows show a small neutral `Bundle` pill next to the name.
+- The stock column shows derived availability (`min(floor(component on_hand / per-bundle qty))`) as "3 bundles" rather than a stock quantity; untracked components are ignored. If every component is untracked, show "Made to order" instead of a number.
+- Avg cost and margin are derived from the recipe for `cost.view`; the 30-day sold figure counts distinct `bundle_group`s, not component lines.
+- Select mode may include bundles for category changes, labels and delete, but **not** for Update prices in v1.1.
+
+**Product detail**
+- Header: photo/monogram, name, `Bundle` pill, category/SKU/barcodes. Actions: `Edit`, `Print label`, `Sell`, `Duplicate`, `Delete`; no `Adjust stock` and no stock-adjust shortcut.
+- Price and Margin cards use the derived figures. The three-figure row shows **Avg cost**, **Items total** (sum of component shelf prices) and **Available** (bundles). Price card hint: "Customer saves Rs X vs items" (can be negative when the bundle costs more).
+- `Last 14 days` shows bundles sold and bundle revenue (distinct `bundle_group` count).
+- `Items in this bundle` card: component name, SKU, `1 per bundle` (or the recipe quantity), component price and component stock; a muted note "Stock is deducted from each item when the bundle is sold. The bundle itself has no stock."
+- No Stock history card for the bundle itself; the recipe card replaces it. Component stock history is available from each component product.
+
+**Add / edit bundle**
+- The normal product form is reused with these differences:
+  - Hide `Cost price`, `Opening stock`, `Track stock`, `Low stock alert` and `Warranty` for a bundle; force `track_stock=0` and unit `set` (or another whole-unit type). Show the derived cost/margin/availability instead.
+  - `Bundle price` is the normal `Sale price`; required ≥ 0.
+  - **Items in this bundle** editor: product search/scan (simple products only), `QtyInput` per bundle, drag/sort and remove; `+ Add item`. At least 1 and at most 20 components; duplicate components merge; no self-reference and no nested bundle; do not allow deleted components.
+  - Live summary: items total, customer saves, derived margin (with `cost.view`), availability and the limiting component.
+  - Save writes the changed product row (create, price or name) and the `bundle_items` upserts/soft deletes in one action; audit `bundle_change` with the recipe before/after; a price change also writes `price_change`. No stock movement is written.
+- Delete: soft-delete the product; existing sales, receipts and held-bill snapshots are unchanged. A product used by an active bundle cannot be deleted or changed to `kind='bundle'` until the recipe is removed. `Duplicate` copies the recipe, with new item ids and no SKU/barcodes/photo/stock.
+
+**Import, bulk price, labels, search, purchases and stock**
+- The normal spreadsheet import and bulk price update **exclude bundles** in v1.1. The product CSV export adds a `kind` column (`simple`/`bundle`) and includes bundle rows; it does not include the recipe. The normal import skips bundle rows with a row error ("bundles are managed on the bundle screen") until a dedicated bundle import/export (a `bundle_items` sheet) exists. The server export/backup still includes the table.
+- Purchases and supplier returns use the component products only; a bundle product is excluded from their product picker (buy the components). Stock count/adjust also lists components only; the bundle is never counted or adjusted as a unit.
+- A bundle barcode can be printed from the normal label screen; scanning it on Sell adds the bundle. Price check shows the bundle price and a compact contents list. Global search finds the bundle by its own name/SKU/barcode; searching a component name does not add the bundle.
+
 ## Add / edit product
 
 Single page form (sheet on mobile). Sections:
@@ -48,7 +81,7 @@ Single page form (sheet on mobile). Sections:
 | Barcode(s) | text + `Scan` (camera) + `+ Add another` + `Generate` | unique across active products → "Already used by {name}" (blocking). `Generate` creates an in-store code (12 digits starting with `2`, [screens/20](20-barcode-labels.md#generated-barcodes)) for items that came without a barcode |
 | SKU | text + `Generate` | if blank, generated (02 rule); unique |
 | Sale price | `MoneyInput` | required ≥ 0; 0 asks "Sell for free?" confirm |
-| Cost price | `MoneyInput` | `cost.view` only; on create becomes opening `unit_cost` |
+| Cost price | `MoneyInput` | `cost.view` only; on create becomes opening `unit_cost`. After create it is editable only while the product is untracked; a tracked product takes its cost from deliveries and stock movements |
 | Opening stock | `QtyInput` | create only; writes `stock_movements` `opening` with unit cost; later changes go through Adjust stock |
 | Unit | select pc, pair, set, box, pack, dozen, m, kg, g, l, ml | default pc |
 | Track stock | switch | default on; off hides stock fields (services, quick items). Turning it off on a product that had it on shows an inline warning and asks for confirmation before saving: the current stock and history stay, sales/deliveries stop changing it and the low-stock alert is cleared. Cancelling the confirmation (or pressing Esc) puts the switch back on |
@@ -56,7 +89,7 @@ Single page form (sheet on mobile). Sections:
 | Warranty | select None / 7 days / 1 month / 3 / 6 / 12 months / custom days | printed on receipt line "Warranty till 26-04-2027" when > 0 |
 | Notes | textarea 0–500 | |
 
-Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price or cost change writes `audit_log` `price_change` / `cost_change`. Turning tracking on or off writes `audit_log` `track_stock_change` (with the old/new low-stock alert when it changes); it never writes a stock movement, so existing stock stays but is frozen while untracked. Editing cost on an existing product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
+Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price change and an untracked product’s cost change write `audit_log` `price_change` / `cost_change`. A tracked product’s cost field is disabled on edit; turn tracking off first to edit it. Turning tracking on or off writes `audit_log` `track_stock_change` (with the old/new low-stock alert when it changes); it never writes a stock movement, so existing stock stays but is frozen while untracked. Editing cost on an existing untracked product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
 
 Delete: only if not referenced by an unsynced op; soft delete (`deleted_at`), product disappears from Sell, history remains. `audit_log product_delete`.
 
@@ -83,3 +116,9 @@ List with drag to reorder (`sort_order`), rename, colour (the 8 Algovyn-based ti
 7. `Duplicate` on "Type-C cable 1 m white" opens a new product with the same category, brand, price, cost, unit and warranty, and empty SKU, barcodes, photo and opening stock; saving creates a separate product.
 7. Stock history balance-after column matches on hand after the latest row.
 8. Turning `Track stock` off on a tracked product shows the warning and asks before saving; after confirming, no stock movement is written, the old on-hand and history stay, and Stock history gains a "Stock tracking turned off" row showing the on-hand balance at that moment.
+9. Creating a bundle with a phone, charger, case and protector at Rs 56,500 shows items total Rs 59,980, customer saves Rs 3,480, derived cost/margin and availability 3 bundles; the saved product has `kind='bundle'`, `track_stock=0` and four `bundle_items`.
+10. The bundle list row shows the `Bundle` pill and "3 bundles" availability; the detail has no `Adjust stock`, opening stock or low-stock fields, and its 30-day figure counts bundles, not components.
+11. Selling the bundle deducts each tracked component by the bundle quantity; an untracked service component gets no stock movement; a component out of stock shows the amber warning on Sell but does not block.
+12. Deleting a component used by the bundle is blocked with the bundle name; deleting the bundle is allowed and old bills/receipts still print the old name and components.
+13. Editing the recipe or bundle price updates new carts only; a saved bill and its reprint are unchanged; `Duplicate` copies the recipe but leaves SKU, barcodes, photo and stock empty.
+14. A cashier sees no cost, margin or items total on the bundle list/detail or in CSV; the bundle is excluded from spreadsheet import and bulk price update; its barcode prints and price check shows the contents. English and Urdu at 1280×800 and 390×844.

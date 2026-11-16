@@ -175,12 +175,49 @@ export type Lookups = {
   /** Stored sale lines of refunded/voided sales, for restock repair and checks. */
   saleLinesBySale: Map<
     string,
-    { id: string; product_id: string | null; qty_milli: number }[]
+    {
+      id: string;
+      product_id: string | null;
+      qty_milli: number;
+      bundle_group?: string | null;
+      bundle_component_qty_milli?: number | null;
+      bundle_qty?: number | null;
+      bundle_id?: string | null;
+      name_snapshot?: string | null;
+      net?: number;
+    }[]
   >;
-  /** sale_line_id → its sale line, for refund restock repair. */
+  /** sale_line_id → its sale line, for refund restock repair and bundle checks. */
   saleLineById: Map<
     string,
-    { sale_id: string; product_id: string | null; qty_milli: number }
+    {
+      sale_id: string;
+      product_id: string | null;
+      qty_milli: number;
+      bundle_group?: string | null;
+      bundle_component_qty_milli?: number | null;
+      bundle_qty?: number | null;
+      bundle_id?: string | null;
+      name_snapshot?: string | null;
+      net?: number;
+    }
+  >;
+  /** Active recipe rows of every bundle, for fresh-sale checks. */
+  bundleRecipes: Map<
+    string,
+    {
+      id: string;
+      component_product_id: string;
+      qty_milli: number;
+      sort_order: number;
+      updated_at: number;
+      deleted_at: number | null;
+    }[]
+  >;
+  /** Active recipe row id → its bundle and component, for delete checks. */
+  bundleItemById: Map<
+    string,
+    { bundle_id: string; component_product_id: string }
   >;
   /** Stored sale movements of a sale: product → positive qty sold. */
   saleMoved: Map<string, Map<string, number>>;
@@ -216,6 +253,7 @@ export type Lookups = {
       last_cost: number;
       track_stock: number;
       updated_at: number;
+      kind: string;
     }
   >;
   /** The latest stored close of each device, for period chaining. */

@@ -1,0 +1,386 @@
+[
+ {
+  "name": "B1 exact split at a higher bundle price",
+  "input": {
+   "bundle_price": 120000,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 1000,
+     "unit_cost": 60000,
+     "unit_price": 60000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 40000,
+     "unit_price": 40000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 72000,
+     "gross": 72000,
+     "discount": 0,
+     "net": 72000,
+     "unit_cost": 60000,
+     "cost_total": 60000,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 48000,
+     "gross": 48000,
+     "discount": 0,
+     "net": 48000,
+     "unit_cost": 40000,
+     "cost_total": 40000,
+     "below_cost": false
+    }
+   ],
+   "total_net": 120000,
+   "total_cost": 100000,
+   "below_cost": false,
+   "items_total": 100000,
+   "saving": -20000
+  }
+ },
+ {
+  "name": "B2 split at total cost (no below-cost)",
+  "input": {
+   "bundle_price": 100000,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 1000,
+     "unit_cost": 60000,
+     "unit_price": 60000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 40000,
+     "unit_price": 40000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 60000,
+     "gross": 60000,
+     "discount": 0,
+     "net": 60000,
+     "unit_cost": 60000,
+     "cost_total": 60000,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 40000,
+     "gross": 40000,
+     "discount": 0,
+     "net": 40000,
+     "unit_cost": 40000,
+     "cost_total": 40000,
+     "below_cost": false
+    }
+   ],
+   "total_net": 100000,
+   "total_cost": 100000,
+   "below_cost": false,
+   "items_total": 100000,
+   "saving": 0
+  }
+ },
+ {
+  "name": "B3 below-cost bundle",
+  "input": {
+   "bundle_price": 90000,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 1000,
+     "unit_cost": 60000,
+     "unit_price": 60000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 40000,
+     "unit_price": 40000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 54000,
+     "gross": 54000,
+     "discount": 0,
+     "net": 54000,
+     "unit_cost": 60000,
+     "cost_total": 60000,
+     "below_cost": true
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 36000,
+     "gross": 36000,
+     "discount": 0,
+     "net": 36000,
+     "unit_cost": 40000,
+     "cost_total": 40000,
+     "below_cost": true
+    }
+   ],
+   "total_net": 90000,
+   "total_cost": 100000,
+   "below_cost": true,
+   "items_total": 100000,
+   "saving": 10000
+  }
+ },
+ {
+  "name": "B4 fractional component quantity",
+  "input": {
+   "bundle_price": 1200,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 500,
+     "unit_cost": 1000,
+     "unit_price": 1000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 500,
+     "unit_price": 500
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 500,
+     "unit_price": 1200,
+     "gross": 600,
+     "discount": 0,
+     "net": 600,
+     "unit_cost": 1000,
+     "cost_total": 500,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 600,
+     "gross": 600,
+     "discount": 0,
+     "net": 600,
+     "unit_cost": 500,
+     "cost_total": 500,
+     "below_cost": false
+    }
+   ],
+   "total_net": 1200,
+   "total_cost": 1000,
+   "below_cost": false,
+   "items_total": 1000,
+   "saving": -200
+  }
+ },
+ {
+  "name": "B5 residual paisa from a non-divisible quantity",
+  "input": {
+   "bundle_price": 3001,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 3000,
+     "unit_cost": 333,
+     "unit_price": 333
+    },
+    {
+     "qty_milli": 3000,
+     "unit_cost": 333,
+     "unit_price": 333
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 3000,
+     "unit_price": 501,
+     "gross": 1503,
+     "discount": 2,
+     "net": 1501,
+     "unit_cost": 333,
+     "cost_total": 999,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 3000,
+     "unit_price": 500,
+     "gross": 1500,
+     "discount": 0,
+     "net": 1500,
+     "unit_cost": 333,
+     "cost_total": 999,
+     "below_cost": false
+    }
+   ],
+   "total_net": 3001,
+   "total_cost": 1998,
+   "below_cost": false,
+   "items_total": 1998,
+   "saving": -1003
+  }
+ },
+ {
+  "name": "B6 all component costs zero, fall back to shelf price",
+  "input": {
+   "bundle_price": 1000,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 1000,
+     "unit_cost": 0,
+     "unit_price": 600
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 0,
+     "unit_price": 400
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 1000,
+     "unit_price": 600,
+     "gross": 600,
+     "discount": 0,
+     "net": 600,
+     "unit_cost": 0,
+     "cost_total": 0,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 400,
+     "gross": 400,
+     "discount": 0,
+     "net": 400,
+     "unit_cost": 0,
+     "cost_total": 0,
+     "below_cost": false
+    }
+   ],
+   "total_net": 1000,
+   "total_cost": 0,
+   "below_cost": false,
+   "items_total": 1000,
+   "saving": 0
+  }
+ },
+ {
+  "name": "B7 free component with zero weight",
+  "input": {
+   "bundle_price": 1000,
+   "bundle_qty": 1,
+   "components": [
+    {
+     "qty_milli": 3000,
+     "unit_cost": 1000,
+     "unit_price": 1000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 0,
+     "unit_price": 0
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 3000,
+     "unit_price": 334,
+     "gross": 1002,
+     "discount": 2,
+     "net": 1000,
+     "unit_cost": 1000,
+     "cost_total": 3000,
+     "below_cost": true
+    },
+    {
+     "qty_milli": 1000,
+     "unit_price": 0,
+     "gross": 0,
+     "discount": 0,
+     "net": 0,
+     "unit_cost": 0,
+     "cost_total": 0,
+     "below_cost": false
+    }
+   ],
+   "total_net": 1000,
+   "total_cost": 3000,
+   "below_cost": true,
+   "items_total": 3000,
+   "saving": 2000
+  }
+ },
+ {
+  "name": "B8 two whole bundles (linear scaling)",
+  "input": {
+   "bundle_price": 120000,
+   "bundle_qty": 2,
+   "components": [
+    {
+     "qty_milli": 1000,
+     "unit_cost": 60000,
+     "unit_price": 60000
+    },
+    {
+     "qty_milli": 1000,
+     "unit_cost": 40000,
+     "unit_price": 40000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "qty_milli": 2000,
+     "unit_price": 72000,
+     "gross": 144000,
+     "discount": 0,
+     "net": 144000,
+     "unit_cost": 60000,
+     "cost_total": 120000,
+     "below_cost": false
+    },
+    {
+     "qty_milli": 2000,
+     "unit_price": 48000,
+     "gross": 96000,
+     "discount": 0,
+     "net": 96000,
+     "unit_cost": 40000,
+     "cost_total": 80000,
+     "below_cost": false
+    }
+   ],
+   "total_net": 240000,
+   "total_cost": 200000,
+   "items_total": 200000,
+   "saving": -40000,
+   "below_cost": false
+  }
+ }
+]

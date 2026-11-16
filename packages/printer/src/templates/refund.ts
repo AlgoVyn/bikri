@@ -81,6 +81,27 @@ export function buildRefundReceipt(
     });
   }
   for (const line of input.lines) {
+    if (line.bundle) {
+      blocks.push({
+        t: 'item',
+        name: line.bundle.name.trim(),
+        qty: `${line.bundle.quantity}`,
+        amount: money(line.amount),
+        breakdown: ` ${line.bundle.quantity}`,
+        bold: true,
+      });
+      for (const component of line.bundle.components) {
+        const qty = formatItemCount(component.qtyMilli);
+        blocks.push({
+          t: 'item',
+          name: `  ${component.name.trim()}`,
+          qty,
+          amount: '',
+          breakdown: ` ${qty}`,
+        });
+      }
+      continue;
+    }
     const qty = formatItemCount(line.qtyMilli);
     blocks.push({
       t: 'item',

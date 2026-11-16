@@ -23,7 +23,7 @@ This document is the **source of truth** for table and column names. D1 (server)
 
 | Kind | Tables | Rules |
 |---|---|---|
-| **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
+| **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
 | **Server-owned** (tenant-scoped) | `devices`, `enrolment_codes`, `owner_email_codes`, `change_log`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` is never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
@@ -1457,6 +1457,111 @@ Additive only; `SCHEMA_VERSION` is unchanged.
 CREATE INDEX change_log_prune ON change_log (tenant_id, at, seq);
 ```
 
+### 2.16 Bundles (migration `0017_bundles.sql`)
+
+Adds the bundle product kind, the fixed recipe table, and the bundle metadata on sale lines. This is a column/wire change: bump `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION`; the Dexie schema goes to **V8**. The migration does **not** rebuild `sale_lines` (SQLite cannot add a composite FK with `ALTER TABLE`, and rebuilding a parent referenced by `refund_lines` needs foreign keys disabled); the server validates `sale_lines.bundle_id` against the tenant's products and the bundle group in `checkOp`. The isolation suite still covers the column.
+
+```sql
+-- 0017_bundles.sql
+--
+-- A bundle is a product row with kind='bundle', track_stock=0 and a fixed recipe.
+-- The sale is expanded into ordinary component sale_lines; the bundle product
+-- never becomes a sale line and never gets a stock movement.
+ALTER TABLE products ADD COLUMN kind TEXT NOT NULL DEFAULT 'simple'
+  CHECK (kind IN ('simple','bundle'));
+CREATE INDEX products_kind ON products (tenant_id, kind);
+
+CREATE TABLE bundle_items (
+  tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+  id                  TEXT NOT NULL,
+  bundle_id           TEXT NOT NULL,
+  component_product_id TEXT NOT NULL,
+  qty_milli           INTEGER NOT NULL CHECK (qty_milli > 0),
+  sort_order          INTEGER NOT NULL DEFAULT 0,
+  created_at          INTEGER NOT NULL,
+  updated_at          INTEGER NOT NULL,
+  deleted_at          INTEGER,
+  rev                 INTEGER NOT NULL DEFAULT 1,
+  updated_by          TEXT,
+  FOREIGN KEY (tenant_id, bundle_id) REFERENCES products(tenant_id, id),
+  FOREIGN KEY (tenant_id, component_product_id) REFERENCES products(tenant_id, id),
+  PRIMARY KEY (tenant_id, id)
+) STRICT;
+CREATE UNIQUE INDEX bundle_items_component
+  ON bundle_items (tenant_id, bundle_id, component_product_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX bundle_items_lookup
+  ON bundle_items (tenant_id, component_product_id)
+  WHERE deleted_at IS NULL;
+
+-- sale_lines: bundle metadata. All null for a normal or quick-sale line.
+-- The all-or-none group, qty identity and group totals are checked by checkOp;
+-- a composite FK on bundle_id is deliberately not added (see the note above).
+ALTER TABLE sale_lines ADD COLUMN bundle_id TEXT;
+ALTER TABLE sale_lines ADD COLUMN bundle_group TEXT;
+ALTER TABLE sale_lines ADD COLUMN bundle_name TEXT
+  CHECK (bundle_name IS NULL OR length(bundle_name) BETWEEN 1 AND 80);
+ALTER TABLE sale_lines ADD COLUMN bundle_qty INTEGER
+  CHECK (bundle_qty IS NULL OR bundle_qty > 0);
+ALTER TABLE sale_lines ADD COLUMN bundle_price INTEGER
+  CHECK (bundle_price IS NULL OR bundle_price >= 0);
+ALTER TABLE sale_lines ADD COLUMN bundle_component_qty_milli INTEGER
+  CHECK (bundle_component_qty_milli IS NULL OR bundle_component_qty_milli > 0);
+
+UPDATE meta SET value = '4' WHERE key = 'schema_version';
+```
+
+**Rules the migration cannot express in D1** (enforced by `checkOp` and the product form):
+
+- `products.kind = 'bundle'` ⇒ `track_stock = 0`; a bundle has no `avg_cost`/`last_cost` of its own, no opening stock, no stock adjustment and no low-stock alert.
+- `bundle_items.bundle_id` is a bundle product (`kind='bundle'`); `component_product_id` is a simple product (`kind='simple'`), not the bundle itself and not another bundle (no nesting); components must exist and not be soft-deleted.
+- A bundle has 1–20 active `bundle_items`; duplicate component ids are merged into one row with the summed quantity.
+- A product used by an active bundle cannot be deleted or changed to `kind='bundle'` until the recipe is removed.
+- Sale-line group: all seven `bundle_*` columns are set or all are null; `bundle_qty` is a positive whole number; `bundle_id <> product_id`; `qty_milli = bundle_component_qty_milli × bundle_qty`; every line in a `bundle_group` shares `bundle_id`, `bundle_group`, `bundle_name`, `bundle_qty`, `bundle_price` and `bundle_discount`; `Σ net = (bundle_price − bundle_discount) × bundle_qty`; the component set/quantity matches the current recipe when the sale is fresh (or the replaced sale's snapshot on a reissue).
+- A component line's price may be below the component's shelf price without `catalog.edit`/a price override, because it is derived by `priceBundle()` ([07 §3.4](07-money-rules.md#34-bundles-v11)). The group total check is the guard.
+- `bundle_name` is a snapshot for receipts/reprints; renaming or deleting the bundle later never changes a saved sale.
+- `bundle_price` is the pre-discount whole-bundle price; `bundle_discount` is the per-bundle manual discount. The discount is part of the staff discount limit and "You saved"; it is not a price override.
+
+`bundle_items` follows the master-row soft-delete rule; a recipe edit upserts/soft-deletes item rows with `base_rev` like any master row. The bundle product's price edit writes `price_change`; a recipe edit writes `bundle_change` ([05 §7](05-auth-and-roles.md#7-audit-log-actions)).
+
+### 2.17 Bundle discount (migration `0018_bundle_discount.sql`)
+
+```sql
+-- 0018_bundle_discount.sql
+--
+-- A bundle can carry a manual discount on the whole-bundle price. The sale lines keep
+-- the pre-discount bundle price in `bundle_price` and the per-bundle discount here, so
+-- the discount can be checked against the staff limit and shown as "You saved".
+ALTER TABLE sale_lines ADD COLUMN bundle_discount INTEGER
+  CHECK (bundle_discount IS NULL OR bundle_discount >= 0);
+
+UPDATE meta SET value = '5' WHERE key = 'schema_version';
+```
+
+The column is repeated on every component line of the group like the other bundle
+snapshot fields. `bundle_discount` is per bundle, so the group's discount total is
+`bundle_discount × bundle_qty`; it must not exceed `bundle_price`. The sale check
+includes it once per `bundle_group` in `manual_discount` and validates
+`Σ net = (bundle_price − bundle_discount) × bundle_qty`.
+
+### 2.18 Sale bundle discount total (migration `0019_sale_bundle_discount_total.sql`)
+
+```sql
+-- 0019_sale_bundle_discount_total.sql
+--
+-- Denormalise the whole-bundle discount total on the bill so reports and CSV exports
+-- do not have to re-read every sale line to show the discount.
+ALTER TABLE sales ADD COLUMN bundle_discount_total INTEGER NOT NULL DEFAULT 0
+  CHECK (bundle_discount_total >= 0);
+
+UPDATE meta SET value = '6' WHERE key = 'schema_version';
+```
+
+`bundle_discount_total` is the sum of every bundle group's
+`bundle_discount × bundle_qty`. It is part of the manual discount shown in reports
+and "You saved"; it is not part of `item_discount_total`, which remains the sum of
+component line residual discounts.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1470,7 +1575,8 @@ export const DEXIE_SCHEMA_V1 = {
   devices: 'id, branch_id',
   staff: 'id, active, deleted_at',
   categories: 'id, sort_order, deleted_at',
-  products: 'id, sku, category_id, name_en, updated_at, deleted_at',
+  products: 'id, sku, category_id, name_en, updated_at, deleted_at, kind', // V8 adds kind (bundle filter)
+  bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
   product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
   customers: 'id, name, phone, deleted_at',
   suppliers: 'id, name, deleted_at',
@@ -1479,7 +1585,8 @@ export const DEXIE_SCHEMA_V1 = {
   sync_conflicts: 'id, row_id, at',   // pulled read-only
   // ledger
   sales: 'id, &invoice_no, business_date, customer_id, created_at, [device_id+invoice_seq], status',
-  sale_lines: 'id, sale_id, product_id, business_date, [product_id+business_date]', // V7 adds the sale's business date and its product index
+  sale_lines: 'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date]', // V7 adds the sale's business date and its product index; V8 adds bundle_id for bundle analytics
+
   payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
   refunds: 'id, sale_id, business_date, [device_id+created_at]',
   refund_lines: 'id, refund_id, sale_line_id',
@@ -1507,6 +1614,8 @@ export const DEXIE_SCHEMA_V1 = {
 };
 ```
 
+**Dexie V8 (bundles)** adds the `products.kind` index, the `bundle_items` table and the `sale_lines.bundle_id` index. The upgrade backfills `kind='simple'` on local product rows that lack it (an indexed field must exist); existing `sale_lines` get null bundle fields, and held carts keep their current lines. No server data is rewritten. A till that has never pulled a bundle has an empty `bundle_items` table.
+
 ### 3.1 Local-only tables
 
 | Table | Shape | Purpose |
@@ -1528,6 +1637,8 @@ export const DEXIE_SCHEMA_V1 = {
 
 Settings → Sync → "Rebuild local data" (owner only; [screens/17](screens/17-settings.md#sync-everyone-sees-status-actions-need-owner)) pushes pending ops, then clears `stock_levels` and `party_balances` and recomputes them from movements and ledger entries. The app also runs a silent consistency check once a day at first unlock: recompute 20 random products and parties; if any differ, rebuild and log `cache_rebuilt` in `audit_log`.
 
+**Cart/held-bill shape (local-only).** A bundle group lives in the existing `Cart.lines` JSON; there is no local `bundle_cart` table. Each component line carries `bundle_id`, `bundle_group`, `bundle_name`, `bundle_qty`, `bundle_price` and `bundle_component_qty_milli`; the group header is derived from those fields. A held bill stores the recipe/price snapshot taken when the bundle was added, so editing or deleting the bundle later does not change an open or held cart. The cart adds the group as one block; the 60-line limit counts the component lines.
+
 ## 4. Derived values
 
 | Value | Formula | Where |
@@ -1537,6 +1648,8 @@ Settings → Sync → "Rebuild local data" (owner only; [screens/17](screens/17-
 | Supplier balance | Σ `ledger_entries.amount` where `party_type='supplier'` | `party_balances`; > 0 means the shop owes the supplier |
 | `sales.status` | `void` if a `sale_voids` row exists; else `refunded` if every line's refunded qty = sold qty; else `part_refunded` if any refund; else `paid` | Recomputed on the till and on the server whenever a refund or void for the sale is inserted. Not sent in ops. |
 | Average cost | [07 §7](07-money-rules.md#7-cost-weighted-average) | Server recomputes and writes `products.avg_cost`; till computes provisionally |
+| Bundle availability | `min(floor(on_hand_milli_i / qty_milli_i))` over active tracked components (untracked components ignored; all untracked → "made to order") | Read-only derivation on the till for the Sell tile, product detail and cart warning; no stored counter |
+| Bundle sold count | count of distinct `bundle_group` in `sale_lines` for a `bundle_id` (minus fully refunded groups) | Bundle product detail and a later bundle report; never sum `sale_lines.qty_milli` or the component count |
 
 ## 5. Record recipes (which rows each action writes)
 
@@ -1544,9 +1657,10 @@ All rows of one action are written in **one Dexie transaction** together with th
 
 | Action | Rows written |
 |---|---|
-| Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
+| Bundle product create/edit | 1 `products` on create or when the bundle price/name changes (`kind='bundle'`, `track_stock=0`); 1..20 `bundle_items` upserts/soft deletes on a recipe edit; 1 `audit_log` `bundle_change` with the before/after recipe; a price edit also writes `price_change`. No stock movement |
+| Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); a bundle sale writes one line per component, never a line for the bundle product itself, with the seven `bundle_*` fields; `sales.line_count` and `sales.items_qty_milli` count those component lines/units, not bundles (a 4-component bundle × 2 is 4 lines and 8 units; the bundle header is a UI grouping only); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
 | Backdated sale | Same rows as Sale, plus 1 `audit_log` `sale_backdated` (`after_json`: attributed staff, business date, reason, recorded_at). The sale is written on the owner's device with `business_date` = the chosen date and `created_at` = the entry time; the attributed `staff_id` is the cashier who made it ([D-173](decisions.md#decisions-log)) |
-| Refund | 1 `refunds` (split into paid part and udhaar part, [07 §6.1](07-money-rules.md#61-refunds-on-udhaar-bills)); n `refund_lines`; 1 `payments` (direction out, purpose refund, `method`, `amount`) if `amount > 0`; 1 `ledger_entries` (customer, −`udhaar_part`, source refund) if `udhaar_part > 0`; `stock_movements` (`refund_return`, +qty) for restocked lines; `audit_log` |
+| Refund | 1 `refunds` (split into paid part and udhaar part, [07 §6.1](07-money-rules.md#61-refunds-on-udhaar-bills)); n `refund_lines`; a whole-bundle return writes one refund line per component and includes every component line of the touched `bundle_group` with the same `k` whole bundles; 1 `payments` (direction out, purpose refund, `method`, `amount`) if `amount > 0`; 1 `ledger_entries` (customer, −`udhaar_part`, source refund) if `udhaar_part > 0`; `stock_movements` (`refund_return`, +qty) for restocked lines; `audit_log` |
 | Void | 1 `sale_voids`; reversing `payments` (direction out, purpose void) for each original payment; reversing `ledger_entries` (−udhaar); `stock_movements` (`void_return`, +qty); `audit_log` |
 | Reissue | Void (above) + a new sale with `replaces_sale_id`, then `sale_voids.replacement_sale_id` is known up front because the new sale ID is generated before writing |
 | Customer payment | 1 `payments` (in, customer_payment, party) + 1 `ledger_entries` (−amount, source payment) ; promise status → `kept` if the balance reaches ≤ promised remaining |
@@ -1554,6 +1668,7 @@ All rows of one action are written in **one Dexie transaction** together with th
 | Pay supplier | 1 `payments` (out, supplier_payment) + 1 `ledger_entries` (supplier, −amount) |
 | Return to supplier | 1 `supplier_returns`; n `supplier_return_lines`; n `stock_movements` (`supplier_return`, −qty, `ref_type` supplier_return, `unit_cost` NULL so avg cost is not recomputed) for lines with `track_stock = 1`; 1 `ledger_entries` (supplier, −total, source supplier_return); if `refund_received > 0`: 1 `payments` (direction in, purpose `supplier_refund`, `refund_method`, party supplier, `supplier_return_id`) + 1 `ledger_entries` (supplier, +refund_received, source payment); 1 `audit_log` `supplier_return` |
 | Stock adjust | 1 `stock_movements` (reason code, signed qty, note); for `count`: qty = counted − on_hand **at the moment of saving** (not the frozen "expected" shown when the count started) |
+| Bundle/component delete | Soft-delete the product (`deleted_at`, `rev + 1`) and write `product_delete`; a component used by an active bundle is blocked until the recipe is removed. Deleting a bundle leaves its `bundle_items`/saved sales untouched (history and reprints keep the snapshot) |
 | Expense | 1 `expenses`; a reversal is 1 more `expenses` row with `reverses_id` |
 | Pay-in / pay-out | 1 `cash_moves` |
 | Day close | 1 `day_closes`; forces a sync |

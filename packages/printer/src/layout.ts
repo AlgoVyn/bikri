@@ -434,7 +434,7 @@ function pushBlock(
           kind: 'text',
           text: line,
           align: 'left',
-          bold: false,
+          bold: block.bold ?? false,
           size: 'normal',
         });
       }

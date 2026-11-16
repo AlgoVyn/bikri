@@ -3,6 +3,7 @@ import { newId } from '@bikri/core';
 import type { BikriDb, SyncedRow } from '@bikri/db';
 import {
   type ReceiptLabels,
+  type RefundLine,
   type RefundReceipt,
   receiptLabelsFor,
 } from '@bikri/printer';
@@ -28,6 +29,71 @@ export async function loadRefundReceipt(
       .filter((l): l is SyncedRow => l !== undefined)
       .map((l) => [l.id, l]),
   );
+  const ordered = [...rows].sort((a, b) => {
+    const left = saleLines.get(String(a.sale_line_id));
+    const right = saleLines.get(String(b.sale_line_id));
+    return Number(left?.line_no ?? 0) - Number(right?.line_no ?? 0);
+  });
+  const receiptLines: RefundLine[] = [];
+  const bundlesSeen = new Set<string>();
+  for (const row of ordered) {
+    const saleLine = saleLines.get(String(row.sale_line_id));
+    if (!saleLine) {
+      receiptLines.push({
+        name: '',
+        qtyMilli: Number(row.qty_milli),
+        amount: Number(row.amount),
+      });
+      continue;
+    }
+    if (saleLine.bundle_group) {
+      const group = String(saleLine.bundle_group);
+      if (bundlesSeen.has(group)) continue;
+      bundlesSeen.add(group);
+      const components = ordered
+        .map((candidate) => saleLines.get(String(candidate.sale_line_id)))
+        .filter(
+          (line): line is SyncedRow =>
+            line !== undefined && String(line.bundle_group) === group,
+        );
+      const perBundle = Number(
+        components[0]?.bundle_component_qty_milli ?? 1000,
+      );
+      const quantity = Math.floor(
+        Number(row.qty_milli) / Math.max(1, perBundle),
+      );
+      receiptLines.push({
+        name: String(saleLine.bundle_name ?? ''),
+        qtyMilli: Number(row.qty_milli),
+        amount: ordered
+          .filter(
+            (candidate) =>
+              String(
+                saleLines.get(String(candidate.sale_line_id))?.bundle_group ??
+                  '',
+              ) === group,
+          )
+          .reduce((sum, candidate) => sum + Number(candidate.amount), 0),
+        bundle: {
+          name: String(saleLine.bundle_name ?? ''),
+          quantity,
+          components: components.map((line) => ({
+            name: String(line.name_snapshot ?? ''),
+            qtyMilli: Number(
+              ordered.find((candidate) => candidate.sale_line_id === line.id)
+                ?.qty_milli ?? 0,
+            ),
+          })),
+        },
+      });
+      continue;
+    }
+    receiptLines.push({
+      name: String(saleLine.name_snapshot ?? ''),
+      qtyMilli: Number(row.qty_milli),
+      amount: Number(row.amount),
+    });
+  }
   const staff = refund.staff_id
     ? await db.staff.get(String(refund.staff_id))
     : undefined;
@@ -41,13 +107,7 @@ export async function loadRefundReceipt(
     originalInvoiceNo: String(sale.invoice_no),
     originalCreatedAt: Number(sale.created_at),
     refundCreatedAt: Number(refund.created_at),
-    lines: rows.map((row) => ({
-      name: String(
-        saleLines.get(String(row.sale_line_id))?.name_snapshot ?? '',
-      ),
-      qtyMilli: Number(row.qty_milli),
-      amount: Number(row.amount),
-    })),
+    lines: receiptLines,
     exactAmount: Number(refund.exact_amount ?? 0),
     rounding: Number(refund.rounding ?? 0),
     amount: Number(refund.amount ?? 0),

@@ -1,4 +1,5 @@
-import { QTY_UNITS, type QtyUnit } from '@bikri/core';
+import { priceBundle, QTY_UNITS, type QtyUnit } from '@bikri/core';
+import type { MasterRow } from '@bikri/db';
 import { Navigate, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -14,12 +15,17 @@ import {
 } from '../components/classes.ts';
 import { CloseIcon, ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
+import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { shopMoney } from '../data/cart.ts';
 import {
   addCategory,
+  type BundleItemInput,
+  BundleRecipeError,
   barcodeOwner,
+  ComponentInUseError,
   DuplicateBarcodeError,
   DuplicateSkuError,
   duplicateDraft,
@@ -30,6 +36,7 @@ import {
   saveNewProduct,
   saveProductEdit,
   skuTaken,
+  TrackedCostError,
   uniqueSku,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -59,12 +66,14 @@ type Draft = {
   warranty: string;
   warranty_days: string;
   notes: string;
+  kind: 'simple' | 'bundle';
+  bundle_items: BundleItemInput[];
   /** New photo; null = removed; undefined = unchanged. */
   photo?: Photo | null;
 };
 
 type Errors = Partial<
-  Record<'name_en' | 'price' | 'sku' | 'warranty_days', string>
+  Record<'name_en' | 'price' | 'sku' | 'warranty_days' | 'bundle', string>
 > & { barcodes?: Record<number, string> };
 
 const EMPTY: Draft = {
@@ -83,6 +92,8 @@ const EMPTY: Draft = {
   warranty: '0',
   warranty_days: '',
   notes: '',
+  kind: 'simple',
+  bundle_items: [],
 };
 
 function draftFrom(input: ProductInput): Draft {
@@ -107,6 +118,8 @@ function draftFrom(input: ProductInput): Draft {
     warranty: preset ? days : 'custom',
     warranty_days: preset ? '' : days,
     notes: input.notes ?? '',
+    kind: input.kind === 'bundle' ? 'bundle' : 'simple',
+    bundle_items: input.bundle_items ?? [],
   };
 }
 
@@ -151,6 +164,24 @@ export function ProductFormPage({
   const [photoError, setPhotoError] = useState(false);
   const existingUrl = useFileUrl(existingKey);
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
+  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
+  const money = shopMoney(shop);
+  const simpleProducts = useLiveQuery(async () => {
+    const db = getDb();
+    const all = (await db.products.toArray()).filter(
+      (product) =>
+        !product.deleted_at &&
+        product.kind !== 'bundle' &&
+        product.id !== editId,
+    );
+    const levels = new Map(
+      (await db.stock_levels.toArray()).map((level) => [
+        level.product_id,
+        level.on_hand_milli,
+      ]),
+    );
+    return { all, levels };
+  }, [editId]) ?? { all: [], levels: new Map<string, number>() };
   const onHand =
     useLiveQuery(async () => {
       if (!editId) return 0;
@@ -188,6 +219,13 @@ export function ProductFormPage({
   const wantsUntrack =
     isEdit && initial.track_stock && draft?.track_stock === false;
   const onHandQty = qtyWithUnit(t, onHand, draft?.unit ?? 'pc');
+  const isBundleDraft = draft?.kind === 'bundle';
+  // A tracked product's cost is maintained by deliveries and stock movements.
+  const costLocked =
+    isEdit &&
+    !isBundleDraft &&
+    Boolean(initial.track_stock) &&
+    Boolean(draft?.track_stock);
 
   useEffect(() => {
     const sourceId = editId ?? duplicateOf;
@@ -200,6 +238,18 @@ export function ProductFormPage({
         return;
       }
       const base = duplicateDraft(p);
+      if (p.kind === 'bundle') {
+        base.kind = 'bundle';
+        base.bundle_items = (
+          await db.bundle_items.where('bundle_id').equals(p.id).toArray()
+        )
+          .filter((row) => !row.deleted_at)
+          .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+          .map((row) => ({
+            component_product_id: String(row.component_product_id),
+            qty_milli: Number(row.qty_milli),
+          }));
+      }
       if (editId) {
         const codes = (
           await db.product_barcodes.where('product_id').equals(editId).toArray()
@@ -268,6 +318,18 @@ export function ProductFormPage({
     if (name.length < 1 || name.length > 80)
       next.name_en = t('form.name_required');
     if (d.price === null) next.price = t('form.price_required');
+    if (d.kind === 'bundle') {
+      const valid =
+        d.bundle_items.length >= 1 &&
+        d.bundle_items.length <= 20 &&
+        d.bundle_items.every(
+          (item) =>
+            item.component_product_id !== editId &&
+            Number.isSafeInteger(item.qty_milli) &&
+            item.qty_milli > 0,
+        );
+      if (!valid) next.bundle = t('form.bundle_items_required');
+    }
     if (d.warranty === 'custom') {
       const days = Number(d.warranty_days);
       if (!Number.isInteger(days) || days < 1 || days > 3650)
@@ -302,12 +364,14 @@ export function ProductFormPage({
       ...(e.barcodes ? [`barcode-${Object.keys(e.barcodes)[0]}`] : []),
       'sku',
       'price',
+      'bundle',
       'warranty_days',
     ];
     for (const key of order) {
       if (key === 'name_en' && !e.name_en) continue;
       if (key === 'sku' && !e.sku) continue;
       if (key === 'price' && !e.price) continue;
+      if (key === 'bundle' && !e.bundle) continue;
       if (key === 'warranty_days' && !e.warranty_days) continue;
       document.getElementById(`${formId}-${key}`)?.focus();
       return;
@@ -352,15 +416,22 @@ export function ProductFormPage({
         barcodes: draft.barcodes.map((b) => b.trim()).filter(Boolean),
         unit: draft.unit,
         price: draft.price ?? 0,
-        cost: showCost ? (draft.cost ?? 0) : undefined,
+        cost: showCost && !costLocked ? (draft.cost ?? 0) : undefined,
         track_stock: draft.track_stock,
         min_stock_milli: draft.track_stock ? (draft.min_stock ?? 0) : 0,
         warranty_days: warrantyDays(),
         notes: draft.notes,
         photo: draft.photo,
-        opening_milli: draft.track_stock ? (draft.opening ?? 0) : 0,
+        opening_milli:
+          draft.kind === 'bundle' || !draft.track_stock
+            ? 0
+            : (draft.opening ?? 0),
+        kind: draft.kind,
+        ...(draft.kind === 'bundle'
+          ? { bundle_items: draft.bundle_items }
+          : {}),
       };
-      if (!showCost && !isEdit) input.cost = 0;
+      if (!showCost && !isEdit && draft.kind !== 'bundle') input.cost = 0;
       const saved = isEdit
         ? await saveProductEdit(db, editId, input, ctx)
         : await saveNewProduct(db, input, ctx);
@@ -381,6 +452,15 @@ export function ProductFormPage({
         });
       else if (error instanceof DuplicateSkuError)
         setErrors({ sku: t('form.sku_taken') });
+      else if (error instanceof BundleRecipeError)
+        setErrors({ bundle: t(`form.bundle_error_${error.code}`) });
+      else if (error instanceof TrackedCostError)
+        toast.push(t('form.cost_tracked_hint'), 'error');
+      else if (error instanceof ComponentInUseError)
+        toast.push(
+          t('products.component_in_use', { name: error.bundleName }),
+          'error',
+        );
       else toast.push(t('errors.generic'), 'error');
     } finally {
       pendingSave.current = false;
@@ -768,25 +848,61 @@ export function ProductFormPage({
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-card">
+          <label className="flex min-h-11 items-center gap-3">
+            <input
+              id={fieldId('kind')}
+              type="checkbox"
+              className="size-5"
+              checked={isBundleDraft}
+              disabled={isEdit && initial.kind === 'bundle'}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setDraft((current) =>
+                    current
+                      ? {
+                          ...current,
+                          kind: 'bundle',
+                          unit: 'set',
+                          track_stock: false,
+                          opening: null,
+                          min_stock: null,
+                          cost: null,
+                          warranty: '0',
+                        }
+                      : current,
+                  );
+                } else {
+                  set('kind', 'simple');
+                }
+              }}
+            />
+            {t('form.is_bundle')}
+          </label>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <MoneyInput
                 id={fieldId('price')}
-                label={t('form.price')}
+                label={t(isBundleDraft ? 'form.bundle_price' : 'form.price')}
                 value={draft.price}
                 onChange={(v) => set('price', v)}
               />
               {errorText('price', errors.price)}
             </div>
-            {showCost ? (
+            {showCost && !isBundleDraft ? (
               <div>
                 <MoneyInput
                   id={fieldId('cost')}
                   label={t('form.cost')}
                   value={draft.cost}
+                  disabled={costLocked}
                   onChange={(v) => set('cost', v)}
                 />
-                {isEdit ? (
+                {costLocked ? (
+                  <p className="mt-1 text-small text-text-muted">
+                    {t('form.cost_tracked_hint')}
+                  </p>
+                ) : isEdit ? (
                   <p className="mt-1 text-small text-text-muted">
                     {t('form.cost_edit_hint')}
                   </p>
@@ -816,24 +932,43 @@ export function ProductFormPage({
                 ))}
               </select>
             </div>
-            <label className="flex min-h-11 items-center gap-3 self-end">
-              <input
-                id={fieldId('track_stock')}
-                type="checkbox"
-                role="switch"
-                aria-checked={draft.track_stock}
-                aria-describedby={
-                  wantsUntrack ? `${fieldId('track_stock')}-warn` : undefined
-                }
-                className="size-5"
-                checked={draft.track_stock}
-                onChange={(e) => set('track_stock', e.target.checked)}
-              />
-              {t('form.track_stock')}
-            </label>
+            {isBundleDraft ? null : (
+              <label className="flex min-h-11 items-center gap-3 self-end">
+                <input
+                  id={fieldId('track_stock')}
+                  type="checkbox"
+                  role="switch"
+                  aria-checked={draft.track_stock}
+                  aria-describedby={
+                    wantsUntrack ? `${fieldId('track_stock')}-warn` : undefined
+                  }
+                  className="size-5"
+                  checked={draft.track_stock}
+                  onChange={(e) => set('track_stock', e.target.checked)}
+                />
+                {t('form.track_stock')}
+              </label>
+            )}
           </div>
 
-          {wantsUntrack ? (
+          {errors.bundle ? (
+            <p className="text-small text-danger">{errors.bundle}</p>
+          ) : null}
+
+          {isBundleDraft ? (
+            <BundleRecipeEditor
+              items={draft.bundle_items}
+              onChange={(items) => set('bundle_items', items)}
+              products={simpleProducts.all}
+              levels={simpleProducts.levels}
+              price={draft.price ?? 0}
+              method={money.cost_method}
+              showCost={showCost}
+              excludeId={editId}
+            />
+          ) : null}
+
+          {wantsUntrack && !isBundleDraft ? (
             <p
               id={`${fieldId('track_stock')}-warn`}
               role="status"
@@ -843,7 +978,7 @@ export function ProductFormPage({
             </p>
           ) : null}
 
-          {draft.track_stock ? (
+          {draft.track_stock && !isBundleDraft ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {isEdit ? null : (
                 <QtyInput
@@ -864,57 +999,59 @@ export function ProductFormPage({
             </div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor={fieldId('warranty')}
-                className="mb-1 block text-small"
-              >
-                {t('form.warranty')}
-              </label>
-              <select
-                id={fieldId('warranty')}
-                className={fieldClass}
-                value={draft.warranty}
-                onChange={(e) => set('warranty', e.target.value)}
-              >
-                <option value="0">{t('form.warranty_none')}</option>
-                <option value="7">{t('form.warranty_7')}</option>
-                <option value="30">{t('form.warranty_30')}</option>
-                <option value="90">{t('form.warranty_90')}</option>
-                <option value="180">{t('form.warranty_180')}</option>
-                <option value="365">{t('form.warranty_365')}</option>
-                <option value="custom">{t('form.warranty_custom')}</option>
-              </select>
-            </div>
-            {draft.warranty === 'custom' ? (
+          {isBundleDraft ? null : (
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label
-                  htmlFor={fieldId('warranty_days')}
+                  htmlFor={fieldId('warranty')}
                   className="mb-1 block text-small"
                 >
-                  {t('form.warranty_days')}
+                  {t('form.warranty')}
                 </label>
-                <input
-                  id={fieldId('warranty_days')}
-                  inputMode="numeric"
-                  dir="ltr"
-                  className={monoFieldClass}
-                  value={draft.warranty_days}
-                  aria-invalid={errors.warranty_days ? true : undefined}
-                  aria-describedby={
-                    errors.warranty_days
-                      ? `${fieldId('warranty_days')}-error`
-                      : undefined
-                  }
-                  onChange={(e) =>
-                    set('warranty_days', e.target.value.replace(/\D/gu, ''))
-                  }
-                />
-                {errorText('warranty_days', errors.warranty_days)}
+                <select
+                  id={fieldId('warranty')}
+                  className={fieldClass}
+                  value={draft.warranty}
+                  onChange={(e) => set('warranty', e.target.value)}
+                >
+                  <option value="0">{t('form.warranty_none')}</option>
+                  <option value="7">{t('form.warranty_7')}</option>
+                  <option value="30">{t('form.warranty_30')}</option>
+                  <option value="90">{t('form.warranty_90')}</option>
+                  <option value="180">{t('form.warranty_180')}</option>
+                  <option value="365">{t('form.warranty_365')}</option>
+                  <option value="custom">{t('form.warranty_custom')}</option>
+                </select>
               </div>
-            ) : null}
-          </div>
+              {draft.warranty === 'custom' ? (
+                <div>
+                  <label
+                    htmlFor={fieldId('warranty_days')}
+                    className="mb-1 block text-small"
+                  >
+                    {t('form.warranty_days')}
+                  </label>
+                  <input
+                    id={fieldId('warranty_days')}
+                    inputMode="numeric"
+                    dir="ltr"
+                    className={monoFieldClass}
+                    value={draft.warranty_days}
+                    aria-invalid={errors.warranty_days ? true : undefined}
+                    aria-describedby={
+                      errors.warranty_days
+                        ? `${fieldId('warranty_days')}-error`
+                        : undefined
+                    }
+                    onChange={(e) =>
+                      set('warranty_days', e.target.value.replace(/\D/gu, ''))
+                    }
+                  />
+                  {errorText('warranty_days', errors.warranty_days)}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div>
             <label htmlFor={fieldId('notes')} className="mb-1 block text-small">
@@ -1009,5 +1146,226 @@ export function ProductFormPage({
         }}
       />
     </form>
+  );
+}
+
+/** Fixed recipe editor inside the normal product form (screens/08 bundles). */
+function BundleRecipeEditor({
+  items,
+  onChange,
+  products,
+  levels,
+  price,
+  method,
+  showCost,
+  excludeId,
+}: {
+  items: BundleItemInput[];
+  onChange: (items: BundleItemInput[]) => void;
+  products: MasterRow[];
+  levels: ReadonlyMap<string, number>;
+  price: number;
+  method: 'avg' | 'last';
+  showCost: boolean;
+  excludeId?: string;
+}) {
+  const { t, i18n } = useTranslation();
+  const [query, setQuery] = useState('');
+  const byId = new Map(products.map((product) => [product.id, product]));
+  const chosen = new Set(items.map((item) => item.component_product_id));
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? products
+        .filter(
+          (product) =>
+            !chosen.has(product.id) &&
+            product.id !== excludeId &&
+            [product.name_en, product.name_ur, product.sku]
+              .map((value) => String(value ?? '').toLowerCase())
+              .some((value) => value.includes(q)),
+        )
+        .slice(0, 8)
+    : [];
+  const result =
+    items.length > 0
+      ? priceBundle({
+          bundle_price: price,
+          bundle_qty: 1,
+          components: items.flatMap((item) => {
+            const product = byId.get(item.component_product_id);
+            return product
+              ? [
+                  {
+                    qty_milli: item.qty_milli,
+                    unit_cost:
+                      method === 'last'
+                        ? Number(product.last_cost ?? 0)
+                        : Number(product.avg_cost ?? 0),
+                    unit_price: Number(product.price ?? 0),
+                  },
+                ]
+              : [];
+          }),
+        })
+      : null;
+  let available: number | null = null;
+  for (const item of items) {
+    const product = byId.get(item.component_product_id);
+    if (product?.track_stock !== 1) continue;
+    const canMake = Math.floor((levels.get(product.id) ?? 0) / item.qty_milli);
+    available = available === null ? canMake : Math.min(available, canMake);
+  }
+  const add = (id: string) => {
+    const item = items.find((row) => row.component_product_id === id);
+    onChange(
+      item
+        ? items.map((row) =>
+            row.component_product_id === id
+              ? { ...row, qty_milli: row.qty_milli + 1000 }
+              : row,
+          )
+        : [...items, { component_product_id: id, qty_milli: 1000 }],
+    );
+    setQuery('');
+  };
+  return (
+    <fieldset className="flex flex-col gap-2 rounded-control border border-border p-3">
+      <legend className="px-1 text-small font-medium">
+        {t('form.bundle_items')}
+      </legend>
+      {items.length === 0 ? (
+        <p className="text-small text-text-muted">
+          {t('form.bundle_items_empty')}
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border">
+          {items.map((item, index) => {
+            const product = byId.get(item.component_product_id);
+            return (
+              <li
+                key={item.component_product_id}
+                className="flex flex-wrap items-end gap-2 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">
+                    {product
+                      ? i18n.language === 'ur' && product.name_ur
+                        ? String(product.name_ur)
+                        : String(product.name_en)
+                      : item.component_product_id}
+                  </p>
+                  {product ? (
+                    <p className="text-small text-text-muted">
+                      <bdi dir="ltr">{String(product.sku)}</bdi> ·{' '}
+                      <MoneyText paisa={Number(product.price)} />
+                    </p>
+                  ) : null}
+                </div>
+                <div className="w-32">
+                  <QtyInput
+                    dense
+                    label={t('form.bundle_qty')}
+                    unit={(product?.unit as QtyUnit | undefined) ?? 'pc'}
+                    value={item.qty_milli}
+                    onChange={(milli) => {
+                      if (milli === null) return;
+                      onChange(
+                        items.map((row, at) =>
+                          at === index
+                            ? { ...row, qty_milli: Math.max(1, milli) }
+                            : row,
+                        ),
+                      );
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  aria-label={t('form.bundle_remove', {
+                    name: product ? String(product.name_en) : '',
+                  })}
+                  onClick={() =>
+                    onChange(items.filter((_, at) => at !== index))
+                  }
+                >
+                  <CloseIcon className="size-5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="flex flex-col gap-1">
+        <label className="text-small" htmlFor="bundle-add-search">
+          {t('form.bundle_add_item')}
+        </label>
+        <input
+          id="bundle-add-search"
+          className={fieldClass}
+          placeholder={t('form.bundle_search')}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {matches.length > 0 ? (
+          <ul className="flex flex-col rounded-control border border-border">
+            {matches.map((product) => (
+              <li key={product.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 px-2 py-2 text-start hover:bg-surface-2"
+                  onClick={() => add(product.id)}
+                >
+                  <span className="min-w-0 truncate">
+                    {String(product.name_en)}
+                    <span className="ms-2 text-small text-text-muted">
+                      <bdi dir="ltr">{String(product.sku)}</bdi>
+                    </span>
+                  </span>
+                  <MoneyText paisa={Number(product.price)} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {result ? (
+        <dl className="grid grid-cols-2 gap-2 rounded-control bg-surface-2 p-2 text-small">
+          <div>
+            <dt className="text-text-muted">{t('products.items_total')}</dt>
+            <dd>
+              <MoneyText paisa={result.items_total} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">{t('products.bundle_saves')}</dt>
+            <dd>
+              <MoneyText paisa={result.saving} />
+            </dd>
+          </div>
+          {showCost ? (
+            <div>
+              <dt className="text-text-muted">{t('products.avg_cost')}</dt>
+              <dd>
+                <MoneyText paisa={result.total_cost} />
+              </dd>
+            </div>
+          ) : null}
+          <div>
+            <dt className="text-text-muted">
+              {t('products.available_bundles')}
+            </dt>
+            <dd>
+              {available === null
+                ? t('products.made_to_order')
+                : t('products.bundle_count', { count: available })}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
+      <p className="text-small text-text-muted">
+        {t('form.bundle_recipe_hint')}
+      </p>
+    </fieldset>
   );
 }

@@ -61,6 +61,7 @@ export function MoneyInput({
   leading,
   placeholder,
   compact = false,
+  disabled = false,
 }: {
   id?: string;
   label: string;
@@ -77,6 +78,7 @@ export function MoneyInput({
   placeholder?: string;
   /** 48 px field whose label is for assistive tech only (dense cart rows). */
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -118,8 +120,9 @@ export function MoneyInput({
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
-          className={`bikri-focus-wrapper min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
+          className={`bikri-focus-wrapper min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted disabled:cursor-not-allowed disabled:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
           value={shown}
+          disabled={disabled}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
           onFocus={(event) => {

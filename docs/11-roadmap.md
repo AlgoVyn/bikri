@@ -13,6 +13,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 | M2 Sync, devices and tenants | 5–7 | Tenant-scoped enrolment and sync, PIN, multi-till, operator console (tenants, onboarding), owner email sign-in, shop admin on admin devices, per-shop quotas, read-only shops, operator support access |
 | M3 Back office | 8–9 | Refunds (incl. udhaar split), void/reissue, udhaar, suppliers, returns to supplier, barcode labels, expenses, day close, reports, exports, owner's server export |
 | M4 Hardening | 10–11 | Backups, per-tenant export/restore/deletion, performance, a11y, Urdu polish, hardware checklist, v1.0.0 release |
+| v1.1 Bundles | after v1.0.0 | Fixed-recipe product bundles: one bundle price, component sale lines, whole-bundle returns only |
 | v2 | later | Branches, IMEI/serials, batches & expiry, Bluetooth printing, FBR, direct label-printer commands, product variants |
 
 ## M0 — Foundations
@@ -138,6 +139,20 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 **T-066 Tenant export, restore and deletion (MT, new).** Console export (zip in the browser), maintenance → purge → import → restore epoch, `tools/backup/tenant-extract.mjs` (one tenant out of a nightly backup loaded into `bikri-restore`), deletion confirm flow + cron deletion and R2 prefix cleanup ([09 §3.4–3.5](09-backups-and-ops.md#34-restore-one-tenant), [13 §7](13-multi-tenancy.md#7-tenant-lifecycle)). AC: drill H14; isolation I16–I18.
 
 **T-065 Release v1.0.0.** Changelog, tag, deploy, `docs/operator-guide.md` (setup Cloudflare, create a shop, pairing codes, budgets, export/restore/delete) and `docs/owner-guide.md` for shop owners (connect the first device, verify the owner email and sign in with codes, add tills and staff, server export, what read-only and support access mean, the terms and privacy notes of [09 §6.1](09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners), printer and label tips). AC: fresh Cloudflare account set up from the operator guide in < 30 min; a second shop onboarded from the guides in < 15 min; the [go-live checklist](09-backups-and-ops.md#7-go-live-checklist) is complete, including a passing website check (no third-party scripts, no service worker on `algovyn.com`) and the isolation suite.
+
+## v1.1 — Bundles (after v1.0.0)
+
+The feature is specified in [07 §3.4](07-money-rules.md#34-bundles-v11) and [§6.2](07-money-rules.md#62-whole-bundle-refunds-v11), [02 §2.16](02-data-model.md#216-bundles-migration-0017_bundlessql), [06 §4](06-printing.md#4-receipt-templates), [screens/05](screens/05-sell.md#bundles-v11), [screens/08](screens/08-products.md#bundles-v11), [screens/10](screens/10-sales-and-bill-detail.md) and [screens/11](screens/11-refund.md#whole-bundle-returns-v11). Decision: D-229. Do not start until v1.0.0 is released; the five tasks are one feature and can ship together.
+
+**T-114 Core bundle pricing — implemented.** `priceBundle()` in `packages/core` plus `money-bundles.json` B1–B8 and `money-bundle-refunds.json` R-B1–R-B7; the reviewed vectors live in `docs/fixtures/` and have handlers. AC: every vector passes; the property tests in [10 §2](10-testing.md#2-money-vectors-mandatory) pass; no bundle arithmetic in UI code; docs 07 and fixtures checked by `vectors.test.ts`.
+
+**T-115 — implemented. Bundle schema, sync and backups (MT).** Migrations `0017_bundles.sql`/`0018_bundle_discount.sql`, `products.kind`, `bundle_items`, seven `sale_lines.bundle_*` columns, Dexie V8, `bundle_items` in sync/snapshot/export/restore order, old-client pull/snapshot gate, backup table list and the cross-tenant cases I25–I27. AC: migration applies to an empty DB and a DB with existing sales; a second till receives the recipe; an old client sees no bundle rows but sees component products; backup/export/restore includes `bundle_items`; isolation I25–I27 and I20 pass.
+
+**T-116 — implemented. Bundle product management.** Products list filter/badge, detail cards, add/edit recipe editor with 1–20 simple components, derived cost/margin/availability, delete/kind/component guards, Duplicate copies recipe, import/bulk-price exclusions, labels and price check. AC: screens/08 AC 9–14; no cost/margin for cashiers; a component delete is blocked; editing a recipe or price leaves old bills/receipts unchanged.
+
+**T-117 — implemented. Sell, receipt and sale detail.** Bundle tile line, cart group with read-only component rows, whole-unit qty/remove, stock warning, held-bill revalidation, receipt block at 58/80 mm, sale-detail grouping and reissue snapshot. AC: screens/05 AC 11–16, screens/10 AC 9–11, `06 §10` bundle receipt golden files; Playwright EN/UR at 1280×800 and 390×844; offline sale and sync.
+
+**T-118 — implemented. Whole-bundle refunds and release.** Refund row, whole-bundle stepper, all-component server check, refund receipt, old-client refund gate, E2E, analytics note, owner-guide/help copy and release. AC: screens/11 AC 9–12; a partial group is rejected; 1-of-3 then 2-of-3 returns exactly the component finals; udhaar split and rounding pass; refund receipt grouped; docs/decisions and the owner guide updated; the full definition of done in AGENTS.md.
 
 ## v2 backlog (ordered by value)
 

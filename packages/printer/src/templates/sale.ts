@@ -83,7 +83,43 @@ function pushItems(
   }
   const money = (paisa: number): string =>
     formatReceiptMoney(paisa, shop.numberGrouping);
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] as ReceiptLine;
+    if (line.bundleGroup) {
+      const group: ReceiptLine[] = [];
+      let next = index;
+      while (
+        next < lines.length &&
+        lines[next]?.bundleGroup === line.bundleGroup
+      ) {
+        group.push(lines[next] as ReceiptLine);
+        next += 1;
+      }
+      const bundleQty = line.bundleQty ?? 1;
+      const bundlePrice =
+        line.bundlePrice ??
+        group.reduce((sum, component) => sum + component.net, 0);
+      blocks.push({
+        t: 'item',
+        name: (line.bundleName ?? '').trim(),
+        qty: `${bundleQty}`,
+        amount: money(bundlePrice * bundleQty),
+        breakdown: ` ${bundleQty}`,
+        bold: true,
+      });
+      for (const component of group) {
+        const qty = formatItemCount(component.qtyMilli);
+        blocks.push({
+          t: 'item',
+          name: `  ${component.name.trim()}`,
+          qty,
+          amount: '',
+          breakdown: ` ${qty}`,
+        });
+      }
+      index = next - 1;
+      continue;
+    }
     const qty = formatItemCount(line.qtyMilli);
     const unitNumber = formatReceiptNumber(line.unitPrice, shop.numberGrouping);
     const discount =
@@ -243,7 +279,8 @@ export function buildSaleReceipt(
     shop.numberGrouping,
     shop.showPaymentDetails,
   );
-  const saved = sale.itemDiscountTotal + sale.billDiscount;
+  const saved =
+    sale.itemDiscountTotal + sale.billDiscount + (sale.bundleDiscount ?? 0);
   if (shop.showYouSaved && saved > 0) {
     pushPair(blocks, labels.youSaved, money(saved));
   }

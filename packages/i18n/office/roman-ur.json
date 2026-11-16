@@ -124,7 +124,9 @@
       "voided_title": "Mansookh",
       "tendered": "Wasool {{amount}}",
       "change": "Baqaya {{amount}}",
-      "recorded_late": "Der se darj · sale date {{date}} · {{staff}} ki taraf se. Wajah: {{reason}}"
+      "recorded_late": "Der se darj · sale date {{date}} · {{staff}} ki taraf se. Wajah: {{reason}}",
+      "bundle": "Bundle: {{name}}",
+      "totals_bundle_discount": "Bundle discount"
     },
     "void": {
       "body": "Bill list mein mansookh ke nishan ke sath rahega. Cash wapas, stock wapas aur udhaar khatay se kam ho jayega.",
@@ -188,7 +190,15 @@
       "start_new_sale": "Is customer ke liye nayi sale shuru karein",
       "title": "{{invoice}} ki wapsi",
       "title_plain": "Raqam wapas",
-      "choose_reason": "Jaari rakhne ke liye wajah aur miqdar chunein."
+      "choose_reason": "Jaari rakhne ke liye wajah aur miqdar chunein.",
+      "bundle_sold": "{{qty}} bundle bike",
+      "bundle_already": "pehle {{qty}} wapas",
+      "bundle_qty": "Wapas karne ke bundle",
+      "bundle_restock": "Tamam {{count}} cheezein stock mein wapas dalein",
+      "bundle_qty_value": "{{qty}} poore bundle wapas",
+      "bundle_includes": "Shamil:",
+      "bundle_whole_only": "Sirf poora bundle — cheezein alag se wapas nahi ho sakti.",
+      "error_bundle": "Sirf poore bundle wapas karein; bundle ki har cheez shamil honi chahiye."
     },
     "udhaar": {
       "add_promise": "Wada shamil karein",

@@ -57,6 +57,7 @@ export function RefundDialog({
   const readOnly = useReadOnly();
   const [mode, setMode] = useState<'whole' | 'items'>('whole');
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [bundleChoice, setBundleChoice] = useState<Record<string, number>>({});
   const [restock, setRestock] = useState<Record<string, boolean>>({});
   const [method, setMethod] = useState<'cash' | 'card' | 'bank_wallet'>('cash');
   const [reasonKey, setReasonKey] = useState<ReasonKey | ''>('');
@@ -87,30 +88,105 @@ export function RefundDialog({
     setReasonKey('');
     setReasonText('');
     setQty({});
+    setBundleChoice({});
     setRestock({});
   }, [open]);
 
   useEffect(() => {
     if (!detail || done) return;
-    const refundable = detail.lines.filter((l) => l.keptMilli > 0).length;
-    setMode(refundable > 1 ? 'items' : 'whole');
+    const groups = new Set<string>();
+    for (const { line, keptMilli } of detail.lines)
+      if (keptMilli > 0)
+        groups.add(line.bundle_group ? String(line.bundle_group) : line.id);
+    setMode(groups.size > 1 ? 'items' : 'whole');
   }, [detail, done]);
 
   const chosen: Choice[] = useMemo(() => {
     if (!detail) return [];
-    return detail.lines.flatMap(({ line, keptMilli }) => {
+    const out: Choice[] = [];
+    const seenBundle = new Set<string>();
+    for (const { line, keptMilli } of detail.lines) {
+      if (line.bundle_group) {
+        const group = String(line.bundle_group);
+        if (seenBundle.has(group)) continue;
+        seenBundle.add(group);
+        const groupLines = detail.lines.filter(
+          (row) => row.line.bundle_group === group,
+        );
+        const remaining = Math.min(
+          ...groupLines.map(({ line: row, keptMilli: kept }) => {
+            const perBundle = Number(row.bundle_component_qty_milli ?? 0);
+            return perBundle > 0 ? Math.floor(kept / perBundle) : 0;
+          }),
+        );
+        const k =
+          mode === 'whole'
+            ? remaining
+            : Math.min(Math.max(0, bundleChoice[group] ?? 0), remaining);
+        if (k <= 0) continue;
+        for (const { line: row } of groupLines) {
+          const perBundle = Number(row.bundle_component_qty_milli ?? 0);
+          if (perBundle <= 0) continue;
+          out.push({
+            saleLineId: row.id,
+            qtyMilli: perBundle * k,
+            restock: restock[group] !== false,
+          });
+        }
+        continue;
+      }
       const requested = mode === 'whole' ? keptMilli : (qty[line.id] ?? 0);
       const amount = Math.min(Math.max(0, requested), keptMilli);
-      if (amount <= 0) return [];
-      return [
-        {
+      if (amount > 0)
+        out.push({
           saleLineId: line.id,
           qtyMilli: amount,
           restock: restock[line.id] !== false,
-        },
-      ];
-    });
-  }, [detail, mode, qty, restock]);
+        });
+    }
+    return out;
+  }, [detail, mode, qty, bundleChoice, restock]);
+  const blocks = useMemo(() => {
+    if (!detail) return [];
+    const rows: Array<{
+      kind: 'line' | 'bundle';
+      key: string;
+      lines: typeof detail.lines;
+      remaining: number;
+    }> = [];
+    const seen = new Set<string>();
+    for (const entry of detail.lines) {
+      const group = entry.line.bundle_group;
+      if (!group) {
+        rows.push({
+          kind: 'line',
+          key: entry.line.id,
+          lines: [entry],
+          remaining: entry.keptMilli,
+        });
+        continue;
+      }
+      const id = String(group);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const groupLines = detail.lines.filter(
+        (row) => row.line.bundle_group === group,
+      );
+      rows.push({
+        kind: 'bundle',
+        key: id,
+        lines: groupLines,
+        remaining: Math.min(
+          ...groupLines.map(({ line, keptMilli }) => {
+            const perBundle = Number(line.bundle_component_qty_milli ?? 0);
+            return perBundle > 0 ? Math.floor(keptMilli / perBundle) : 0;
+          }),
+        ),
+      });
+    }
+    return rows;
+  }, [detail]);
+
   const signature = JSON.stringify(chosen);
 
   const planRow = useLiveQuery(async () => {
@@ -303,10 +379,149 @@ export function RefundDialog({
         <p className="sr-only">{t('common.loading')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {detail.lines.map(({ line, refundedMilli, keptMilli, unit }) => {
-            const selected = chosen.some((c) => c.saleLineId === line.id);
-            const amount =
-              plan?.lines.find((l) => l.saleLineId === line.id)?.amount ?? 0;
+          {blocks.map((block) => {
+            const first = block.lines[0];
+            if (!first) return null;
+            const selected = block.lines.some(({ line }) =>
+              chosen.some((c) => c.saleLineId === line.id),
+            );
+            const amount = block.lines.reduce(
+              (sum, { line }) =>
+                sum +
+                (plan?.lines.find((l) => l.saleLineId === line.id)?.amount ??
+                  0),
+              0,
+            );
+            if (block.kind === 'bundle') {
+              const soldBundles = Number(first.line.bundle_qty ?? 0);
+              const already = Math.max(0, soldBundles - block.remaining);
+              const k = Math.min(
+                Math.max(0, bundleChoice[block.key] ?? 0),
+                block.remaining,
+              );
+              return (
+                <li
+                  key={block.key}
+                  className="flex flex-col gap-1 rounded-control border border-border p-2"
+                  data-testid="refund-bundle"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    {mode === 'items' ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={k > 0}
+                          disabled={block.remaining <= 0}
+                          onChange={(e) =>
+                            setBundleChoice((current) => ({
+                              ...current,
+                              [block.key]: e.target.checked
+                                ? Math.max(1, block.remaining)
+                                : 0,
+                            }))
+                          }
+                        />
+                        <span className="font-medium">
+                          {String(first.line.bundle_name ?? '')}
+                        </span>
+                        <span className="rounded-full bg-surface-2 px-1.5 text-caption font-medium text-text-muted">
+                          {t('sell.bundle_pill')}
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden="true">•</span>
+                        <span className="font-medium">
+                          {String(first.line.bundle_name ?? '')}
+                        </span>
+                        <span className="rounded-full bg-surface-2 px-1.5 text-caption font-medium text-text-muted">
+                          {t('sell.bundle_pill')}
+                        </span>
+                      </span>
+                    )}
+                    <span className="text-small text-text-muted">
+                      {t('office.refund.bundle_sold', {
+                        qty: soldBundles,
+                      })}
+                      {already > 0
+                        ? ` · ${t('office.refund.bundle_already', {
+                            qty: already,
+                          })}`
+                        : ''}
+                    </span>
+                  </div>
+                  {mode === 'items' && selected ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="w-36">
+                          <QtyInput
+                            label={t('office.refund.bundle_qty')}
+                            unit="pc"
+                            value={k * 1000}
+                            onChange={(milli) =>
+                              setBundleChoice((current) => ({
+                                ...current,
+                                [block.key]: Math.min(
+                                  Math.max(0, Math.round((milli ?? 0) / 1000)),
+                                  block.remaining,
+                                ),
+                              }))
+                            }
+                          />
+                        </div>
+                        <p className="ms-auto text-end">
+                          <MoneyText paisa={amount} />
+                        </p>
+                      </div>
+                      <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 text-small">
+                        <input
+                          type="checkbox"
+                          className="size-4 shrink-0"
+                          checked={restock[block.key] !== false}
+                          onChange={(e) =>
+                            setRestock((current) => ({
+                              ...current,
+                              [block.key]: e.target.checked,
+                            }))
+                          }
+                        />
+                        {t('office.refund.bundle_restock', {
+                          count: block.lines.length,
+                        })}
+                      </label>
+                    </div>
+                  ) : selected ? (
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-small text-text-muted">
+                        {t('office.refund.bundle_qty_value', {
+                          qty: block.remaining,
+                        })}
+                      </p>
+                      <MoneyText paisa={amount} />
+                    </div>
+                  ) : null}
+                  <p className="text-small text-text-muted">
+                    {t('office.refund.bundle_includes')}{' '}
+                    {block.lines
+                      .map(({ line }) => {
+                        const per = Number(
+                          line.bundle_component_qty_milli ?? 0,
+                        );
+                        return `${String(line.name_snapshot)} × ${
+                          per % 1000 === 0
+                            ? per / 1000
+                            : (per / 1000).toFixed(3)
+                        }`;
+                      })
+                      .join(' · ')}
+                  </p>
+                  <p className="text-caption text-text-muted">
+                    {t('office.refund.bundle_whole_only')}
+                  </p>
+                </li>
+              );
+            }
+            const { line, refundedMilli, keptMilli, unit } = first;
             const qtyUnit = isQtyUnit(unit) ? unit : 'pc';
             return (
               <li

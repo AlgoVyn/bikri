@@ -65,7 +65,7 @@ export const DEXIE_SCHEMA_V3 = {
     'id, sale_id, refund_id, day_close_id, supplier_return_id, status, created_at',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V1;
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V8;
 
 /**
  * V4 indexes `stock_movements` by its document. A refund/void asks "which products did this
@@ -116,6 +116,19 @@ export const DEXIE_SCHEMA_V7 = {
   // index only ordered by created_at, so a range/page could not be pushed down.
   ledger_entries:
     'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id',
+} as const;
+
+/**
+ * V8 adds bundles: the {@link MasterRow} kind index, the fixed recipe table and the
+ * bundle id on sale lines. Every existing product row is backfilled to `simple` because
+ * an indexed field must exist on every row.
+ */
+export const DEXIE_SCHEMA_V8 = {
+  ...DEXIE_SCHEMA_V7,
+  products: 'id, sku, category_id, name_en, updated_at, deleted_at, kind',
+  bundle_items: 'id, bundle_id, component_product_id, deleted_at',
+  sale_lines:
+    'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date]',
 } as const;
 
 export const LOCAL_ONLY_TABLES = [
@@ -209,6 +222,21 @@ export type CartLine = {
   note?: string;
   track_stock?: 0 | 1;
   unit?: string;
+  /** Bundle snapshot; set together on every component line of one bundle group. */
+  bundle_id?: string;
+  bundle_group?: string;
+  bundle_name?: string;
+  bundle_qty?: number;
+  /** Effective bundle price in the cart (can be edited at Sell). */
+  bundle_price?: number;
+  /** Bundle shelf price when it was added; a lower `bundle_price` is an override. */
+  bundle_list_price?: number;
+  /** Price after a manual price edit, before any discount. */
+  bundle_base_price?: number;
+  /** Sell-time group discount; `bundle_price` already holds the net group price. */
+  bundle_discount_type?: 'amount' | 'percent';
+  bundle_discount_value?: number;
+  bundle_component_qty_milli?: number;
 };
 
 /**
@@ -308,6 +336,7 @@ export class BikriDb extends Dexie {
   staff!: Rows<MasterRow>;
   categories!: Rows<MasterRow>;
   products!: Rows<MasterRow>;
+  bundle_items!: Rows<MasterRow>;
   product_barcodes!: Rows<MasterRow>;
   customers!: Rows<MasterRow>;
   suppliers!: Rows<MasterRow>;
@@ -379,6 +408,18 @@ export class BikriDb extends Dexie {
             return;
           const date = dates.get(String(line.sale_id));
           if (date !== undefined) line.business_date = date;
+        });
+      });
+    this.version(8)
+      .stores(DEXIE_SCHEMA_V8)
+      .upgrade(async (tx) => {
+        const products = tx.table('products') as Table<
+          Record<string, unknown>,
+          string
+        >;
+        await products.toCollection().modify((product) => {
+          if (typeof product.kind !== 'string' || product.kind === '')
+            product.kind = 'simple';
         });
       });
   }

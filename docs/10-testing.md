@@ -23,9 +23,12 @@ Every task in [11-roadmap](11-roadmap.md) is done only when its tests exist and 
 - `money-cost.json` — C1–C4 → `nextAvgCost()`.
 - `money-dayclose.json` — D1–D3 → `computeDayClose()` (incl. `supplier_cash_in`).
 - `money-supplier-returns.json` — S1–S3 → `computeSupplierReturn()` (unit credit, totals, return difference, suggested refund, ledger amounts, balance after).
+- `money-bundles.json` — B1–B8 → `priceBundle()` (cost-weighted allocation, residual paisa, fractional quantities, all-zero fallbacks, qty scaling); the cost floor is covered by the property tests.
+- `money-bundle-refunds.json` — R-B1–R-B7 → whole-bundle refund quantities and amounts via the §6 cumulative formula.
+- The bundle fixtures live in `docs/fixtures/` and are loaded by `vectors.test.ts`.
 - `barcode-code128.json` — `packages/printer/labels/code128.test.ts` → `encodeCode128()` symbols, check and module count.
 
-Add a property-based test (fast-check) for: Σ allocations = amount; Σ line finals = total (both tax modes); inclusive mode `Σ revenue + tax = total − rounding`; refunds of all units in any split = line final; over any sequence of refunds of one bill Σ `udhaar_part` ≤ `udhaar_amount` and Σ cash `amount` ≤ `paid_total`; `|rounding| ≤ round_total_to / 2`.
+Add a property-based test (fast-check) for: Σ allocations = amount; Σ line finals = total (both tax modes); inclusive mode `Σ revenue + tax = total − rounding`; refunds of all units in any split = line final; over any sequence of refunds of one bill Σ `udhaar_part` ≤ `udhaar_amount` and Σ cash `amount` ≤ `paid_total`; `|rounding| ≤ round_total_to / 2`. Bundle properties: `Σ bundle line.net = bundle_price × bundle_qty`; every line `qty_milli = per_bundle_qty × bundle_qty`; `gross − discount = net` and `discount ≥ 0`; if the bundle price ≥ total component cost and tax is exclusive, no line is below cost; refunding all whole bundles returns exactly the sum of the component line finals; a free/zero-cost component gets a non-negative share and never makes the group exceed the bundle price.
 
 ## 2.1 Shop-request tests (D-175)
 
@@ -36,7 +39,7 @@ Add a property-based test (fast-check) for: Σ allocations = amount; Σ line fin
 
 ## 3. Sync tests
 
-The 20 cases in [03 §9](03-sync.md#9-test-cases-must-exist-in-appsapi-and-appspos-tests) plus:
+The cases in [03 §9](03-sync.md#9-test-cases-must-exist-in-appsapi-and-appspos-tests) plus:
 
 - Over-refund from two devices → both accepted + `sync_conflicts` `over_refund`.
 - `restore_epoch` change → client re-pulls and re-pushes; no duplicate sales on server.
@@ -46,17 +49,21 @@ The 20 cases in [03 §9](03-sync.md#9-test-cases-must-exist-in-appsapi-and-appsp
 - Supplier return with money received: rows pass the checks; a return line linked to another supplier's delivery → `CONSTRAINT_FAILED`; over-return from two tills → both accepted + `over_return`.
 - No repository transaction writes more than 200 outbox ops (60-line bill, refund, delivery and return; import chunk of 50; bulk price chunk of 100).
 - Worker CPU: a 200-op push finishes under 10 ms CPU in Miniflare's profile (`performance.now` guard as a proxy; fail test at 8 ms).
+- Bundle master sync: bundle product + 20 `bundle_items` create/edit/delete, kind and track-stock guards, no nesting, component delete blocked; old-client pull/snapshot omits bundle products and items but keeps their component products.
+- Bundle sale sync: valid component groups pass; missing/mixed/wrong-qty groups and a group whose total does not equal `bundle_price × bundle_qty` are rejected; a stale snapshot from a sale before a recipe edit is accepted; a reissue validates against `replaces_sale_id`.
+- Whole-bundle refund sync: all component lines with the same `k` pass and restock all tracked components; a partial group, mixed `k`, non-multiple cumulative qty or mixed restock flags are rejected; two tills over-refunding still produce `over_refund` as for normal lines.
 
 ## 4. Fixtures
 
 | File | Contents |
 |---|---|
 | `e2e/fixtures/shop-basic.json` | tenant `algovyn-mobiles`, shop "Algovyn Mobiles", branch Main/INV, owner Adnan PIN 2580, manager Bilal PIN 3691, cashier Sana PIN 4725, tax 0, round to Rs 1 |
-| `e2e/fixtures/catalog-electronics.json` | 40 products: phones (Rs 25,000–1,20,000), chargers, cables (one sold per metre, unit `m`), earbuds, power banks, covers; barcodes `8964000000011`…; costs; opening stock; 2 with `track_stock = 0` (repair labour, screen fitting) |
+| `e2e/fixtures/catalog-electronics.json` | 40 products: phones (Rs 25,000–1,20,000), chargers, cables (one sold per metre, unit `m`), earbuds, power banks, covers; barcodes `8964000000011`…; costs; opening stock; 2 with `track_stock = 0` (repair labour, screen fitting). Add one fixed-recipe bundle "Starter Pack" (phone + charger + case + protector) and one bundle with a `track_stock = 0` service component |
+| `e2e/fixtures/sale-bundle.json` | one bundle at Rs 56,500 (4 components), one loose cable; expected component lines, stock movements, receipt text snapshot, whole-bundle refund sequence |
 | `e2e/fixtures/customers.json` | 10 customers incl. Ali (`+923001234567`, limit Rs 40,000, opening Rs 5,000), Hamza (no phone), one with hard limit |
 | `e2e/fixtures/suppliers.json` | 3 suppliers incl. "Hall Road Traders" opening Rs 20,000 |
 | `e2e/fixtures/sale-basic.json` | the T2 cart: phone Rs 42,000 less Rs 2,000 + earbuds Rs 3,500, bill discount Rs 500, cash tendered Rs 50,000 → expected totals, payments, change Rs 7,000, receipt text snapshot |
-| `e2e/fixtures/shop-other.json` | second tenant `hall-road-mobiles`, shop "Hall Road Mobiles": **the same ULIDs** for its branch, owner staff, 3 products and 2 customers as shop-basic, the same SKUs, barcodes, bill prefix `INV` and invoice numbers, different names and prices — so any missing `tenant_id` filter shows up as a wrong name or price |
+| `e2e/fixtures/shop-other.json` | second tenant `hall-road-mobiles`, shop "Hall Road Mobiles": **the same ULIDs** for its branch, owner staff, 3 products, 2 customers and one bundle/recipe as shop-basic, the same SKUs, barcodes, bill prefix `INV` and invoice numbers, different names and prices — so any missing `tenant_id` filter shows up as a wrong name or price |
 | `e2e/fixtures/large.json` (generated by `node tools/seed/large.ts`; gitignored, ~68 MB) | 1,000 products, 20,000 bills over 120 days, 500 customers — for performance tests; the tests build the same data in memory |
 
 Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-electronics` creates the tenant if needed and writes via the normal repositories (so outbox/sync paths are exercised) or directly into D1 for Worker tests.
@@ -88,6 +95,8 @@ Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-el
 23. Read-only: a till of shop A goes offline and makes 2 sales; the operator makes A read-only with a reason; the till reconnects → both sales reach the server, the read-only banner appears (EN and UR), Sell and Pay are blocked with the toast, Reports and Sales history still work, `Download full export` works, and Activity shows the status change with the reason; shop B keeps selling; reactivating removes the banner.
 24. Owner email sign-in: on an admin device unlocked as owner, `Add a till` asks for the email code → the code read from the fake `EMAIL` binding signs in → the code is created; a wrong code 5 times kills it; Lock drops the session and the next action asks again; `Download from server` builds a zip whose row counts equal the server's.
 25. Support access: the operator starts support access for shop A (2 h, reason) → every till of A shows the support banner with the reason, B shows none; the support browser profile enrols, sees A's reports, cannot save a sale; the owner presses `End now` → the support device gets `DEVICE_REVOKED` and the banner disappears; Activity shows start and end.
+26. Bundle sale and whole-bundle refund: add two "Starter Pack" bundles with the bundle qty stepper (bundle line + 4 components), add a loose cable, take payment; the receipt shows one bundle header (`× 2`) and four component lines with no component prices; the sale detail groups the components; component stock went down by 2 each; refund one of the two bundles → all components restock, component stock returns, a partial component refund is not offered; a second refund of the remaining bundle makes the lines fully refunded. Run in English and Urdu at 1280×800 and 390×844, and repeat the sale offline.
+27. Bundle management: create a bundle with four components, see derived items total/saving/margin and availability; a component out of stock shows the amber "Only X in stock" warning but the sale completes; edit the recipe/price and confirm an earlier saved bill and its reprint do not change; attempt to delete a component used by the bundle → blocked; delete the bundle → Sell no longer offers it, history remains.
 
 Visual snapshots: the deterministic English screenshots in `e2e/tests/visual.spec.ts-snapshots` (desktop and phone, light) use a fixed pixel budget; other language/theme captures are attached with `VISUAL=1` for review.
 
@@ -122,7 +131,7 @@ Record results in `docs/releases/<version>-hardware.md`.
 
 Bikri is multi-tenant on one shared database ([13](13-multi-tenancy.md)), so leakage between shops is the most serious bug class. This suite is **required in CI on every PR** and part of the definition of done (AGENTS.md §5): any new endpoint, table, query, file path or export must extend it in the same PR.
 
-Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `shop-basic` and `shop-other`, with **colliding ids, SKUs, barcodes, invoice numbers and bill prefixes**, two devices each (one admin), plus a suspended tenant **S**, a tenant **D** in `deleting` and a read-only tenant **R** (one device that has already seen the status, one that has not). Each tenant has an `owner_email`; the `EMAIL` binding is a fake that records messages.
+Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `shop-basic` and `shop-other`, with **colliding ids, SKUs, barcodes, invoice numbers and bill prefixes**, two devices each (one admin), plus a suspended tenant **S**, a tenant **D** in `deleting` and a read-only tenant **R** (one device that has already seen the status, one that has not). Each tenant has a bundle product and a 4-item `bundle_items` recipe using the **same bundle/component ULIDs**; the component products are each tenant's own rows. Each tenant has an `owner_email`; the `EMAIL` binding is a fake that records messages.
 
 | # | Case | Expected |
 |---|---|---|
@@ -149,6 +158,9 @@ Setup (`apps/api/test/isolation/setup.ts`): two tenants **A** and **B** from `sh
 | I22 | Owner server export (`POST /api/shop/export` to start, then `GET` with `export_id`) with B's admin device and owner session | only B rows, no `tenant_id`, no `token_hash`, no `enrolled_by`, no `owner_email_codes`; an `export_id` started by A is refused on B's device; A's export limit does not affect B; a non-admin device, a manager or a missing session → `403` / `401`; `owner_export` audit row in B only |
 | I23 | Owner email sign-in | a code started on A's admin device is sent only to A's `owner_email`; verifying A's `code_id` from B's device → `400 BAD_SIGNIN_CODE` with the same body as an unknown id; A's owner session sent with B's device token → `401 OWNER_SIGNIN_REQUIRED`; B's sign-in limits are independent of A's |
 | I24 | Operator support access to A | the support code enrols into A only; the support device sees only A rows, cannot push or upload (`403`), stops at `expires_at`; `support` is non-null only in A's `/api/me`; start and end audit rows in A only; B's owner cannot end A's support access (`404`) |
-| I20 | Schema check: every tenant table has `tenant_id`, `PRIMARY KEY (tenant_id, id)` (or `(tenant_id, op_id)`), every FK to a tenant table is composite, every index starts with `tenant_id` (except `change_log_at`, `applied_ops_at` and the automatic indexes of the global `token_hash` / `code_hash` keys) — read from `sqlite_master` / `pragma_foreign_key_list` | test fails naming the table |
+| I25 | B pulls/snapshots after A created a bundle and a 4-item recipe with the same product/bundle ULIDs as B's rows | only B's `bundle_items` and B's bundle product; no A recipe row, no A component; the component products are B's own rows |
+| I26 | B pushes `bundle_items` — or a bundle sale group — whose `bundle_id` or component id exists only in A | `rejected` / `FOREIGN_KEY` for `bundle_items`; `rejected` / `CONSTRAINT_FAILED` for the sale group (the `sale_lines.bundle_id` column has no composite FK, so the server lookup is the guard); nothing written |
+| I27 | Operator export/restore of A | the zip/restore includes A's `bundle_items` and the `sale_lines.bundle_*` columns; B's export/restore contains no A bundle row and B's counts are unchanged |
+| I20 | Schema check: every tenant table has `tenant_id`, `PRIMARY KEY (tenant_id, id)` (or `(tenant_id, op_id)`), every FK to a tenant table is composite, every index starts with `tenant_id` (except `change_log_at`, `applied_ops_at` and the automatic indexes of the global `token_hash` / `code_hash` keys) — read from `sqlite_master` / `pragma_foreign_key_list`; includes the new `bundle_items` table and its composite FKs | test fails naming the table |
 
 Till side (`apps/pos`, fake-indexeddb): the Dexie database name is `bikri-<tenant_id>`; "Leave this shop" clears every store (the empty name may remain); enrolling into a second tenant never opens the first tenant's database; exports contain only the active tenant.

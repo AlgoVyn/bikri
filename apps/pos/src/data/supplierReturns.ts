@@ -121,7 +121,7 @@ export async function supplierReturnData(
     byPurchase.set(String(line.purchase_id), list);
   }
   const allProducts = (await db.products.toArray()).filter(
-    (product) => !product.deleted_at,
+    (product) => !product.deleted_at && product.kind !== 'bundle',
   );
   const balance = await db.party_balances.get(['supplier', supplierId]);
   return {

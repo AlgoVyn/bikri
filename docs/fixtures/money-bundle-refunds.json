@@ -1,0 +1,233 @@
+[
+ {
+  "name": "R-B1 one whole bundle after 0 already returned",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 0,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 72000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 1000,
+     "amount": 24000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 40000
+  }
+ },
+ {
+  "name": "R-B2 one whole bundle after 1 already returned",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 1,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 72000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 1000,
+     "amount": 24000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 40000
+  }
+ },
+ {
+  "name": "R-B3 one whole bundle after 2 already returned",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 2,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 72000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 1000,
+     "amount": 24000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 40000
+  }
+ },
+ {
+  "name": "R-B4 two whole bundles",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 0,
+   "refund_bundles": 2,
+   "components": [
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 72000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 2000,
+     "amount": 48000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 2000,
+     "amount": 32000
+    }
+   ],
+   "exact_amount": 80000
+  }
+ },
+ {
+  "name": "R-B5 the remaining bundle",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 2,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 72000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 1000,
+     "amount": 24000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 40000
+  }
+ },
+ {
+  "name": "R-B6 fractional component, first whole bundle",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 0,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 500,
+     "line_final": 60000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 500,
+     "amount": 20000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 36000
+  }
+ },
+ {
+  "name": "R-B7 fractional component, second whole bundle",
+  "input": {
+   "bundle_qty": 3,
+   "prev_refunded_bundles": 1,
+   "refund_bundles": 1,
+   "components": [
+    {
+     "qty_per_bundle": 500,
+     "line_final": 60000
+    },
+    {
+     "qty_per_bundle": 1000,
+     "line_final": 48000
+    }
+   ]
+  },
+  "expected": {
+   "lines": [
+    {
+     "name": "component A",
+     "qty_milli": 500,
+     "amount": 20000
+    },
+    {
+     "name": "component B",
+     "qty_milli": 1000,
+     "amount": 16000
+    }
+   ],
+   "exact_amount": 36000
+  }
+ }
+]

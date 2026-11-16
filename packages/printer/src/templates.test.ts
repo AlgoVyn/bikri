@@ -32,6 +32,92 @@ function variant(change: (input: SaleReceiptInput) => void): SaleReceiptInput {
   return input;
 }
 
+describe('bundle receipts (06 §4, v1.1)', () => {
+  it('prints one bundle header and component names without component prices', () => {
+    const input = variant((i) => {
+      i.lines = [
+        {
+          name: 'Galaxy A15',
+          qtyMilli: 2000,
+          unitPrice: 2_000_000,
+          discount: 0,
+          net: 4_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: 4_000_000,
+        },
+        {
+          name: 'Charger',
+          qtyMilli: 2000,
+          unitPrice: 500_000,
+          discount: 0,
+          net: 1_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: 4_000_000,
+        },
+      ];
+      i.sale.subtotal = 5_000_000;
+      i.sale.total = 5_000_000;
+      i.sale.itemsQtyMilli = 4000;
+      i.payments = [{ method: 'cash', amount: 5_000_000 }];
+    });
+    const t = text80(buildSaleReceipt(input));
+    expect(t).not.toContain('Bundle:');
+    expect(t).toContain('Starter Pack');
+    expect(t).toContain('Galaxy A15');
+    expect(t).toContain('Charger');
+    expect(t).toMatch(/^Starter Pack +2 +Rs 80,000$/m);
+    // Components print names/quantities but no amount.
+    expect(t).toMatch(/^ {2}Galaxy A15 +2 +$/m);
+  });
+
+  it('groups a whole-bundle refund under one header', () => {
+    const base = saleBasicInput();
+    const t = text80(
+      buildRefundReceipt({
+        shop: base.shop,
+        staffName: 'Adnan',
+        customerName: null,
+        originalInvoiceNo: 'A-A-1',
+        originalCreatedAt: base.sale.createdAt,
+        refundCreatedAt: base.sale.createdAt,
+        lines: [
+          {
+            name: 'Starter Pack',
+            qtyMilli: 2000,
+            amount: 4_000_000,
+            bundle: {
+              name: 'Starter Pack',
+              quantity: 2,
+              components: [
+                { name: 'Galaxy A15', qtyMilli: 2000 },
+                { name: 'Charger', qtyMilli: 2000 },
+              ],
+            },
+          },
+        ],
+        exactAmount: 4_000_000,
+        rounding: 0,
+        amount: 4_000_000,
+        method: 'cash',
+        udhaarPart: 0,
+        khataBalancePaisa: null,
+        reason: 'Faulty',
+      }),
+    );
+    expect(t).not.toContain('Bundle:');
+    expect(t).toContain('Starter Pack');
+    expect(t).toContain('Galaxy A15');
+    expect(t).toContain('Charger');
+    expect(t).toMatch(/^Starter Pack +2 +Rs 40,000$/m);
+  });
+});
+
 describe('sale receipt conditional rows (06 §4.1)', () => {
   it('prints the business date and RECORDED LATE for a backdated sale', () => {
     const t = text80(

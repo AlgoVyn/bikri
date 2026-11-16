@@ -63,7 +63,9 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
     if (!supplier || supplier.deleted_at) return null;
     const tz = await shopTimeZone(db);
     const today = businessDate(Date.now(), tz);
-    const products = (await db.products.toArray()).filter((p) => !p.deleted_at);
+    const products = (await db.products.toArray()).filter(
+      (p) => !p.deleted_at && p.kind !== 'bundle',
+    );
     const barcodes = await db.product_barcodes.toArray();
     return {
       supplier,

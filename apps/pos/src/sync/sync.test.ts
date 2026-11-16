@@ -226,7 +226,7 @@ describe('push (03 §3, §4.1)', () => {
       device_id: string;
       schema_version: number;
     };
-    expect(body).toMatchObject({ device_id: 'dev-1', schema_version: 2 });
+    expect(body).toMatchObject({ device_id: 'dev-1', schema_version: 5 });
     // A failed op is not pushed again until Retry.
     server.log = [];
     await pushAll(db);

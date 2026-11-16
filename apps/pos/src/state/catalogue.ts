@@ -2,6 +2,8 @@ import type { BikriDb, MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import {
+  type BundleInfo,
+  buildBundleInfoMap,
   type ProductListRow,
   soldByProduct,
   stockStateOf,
@@ -21,15 +23,17 @@ export type CatalogueMaster = {
   products: MasterRow[];
   categories: Map<string, MasterRow>;
   barcodes: Map<string, string[]>;
+  bundleItems: MasterRow[];
 };
 
 export async function loadCatalogueMaster(
   db: BikriDb,
 ): Promise<CatalogueMaster> {
-  const [products, categories, barcodeRows] = await Promise.all([
+  const [products, categories, barcodeRows, bundleItems] = await Promise.all([
     db.products.toArray(),
     db.categories.toArray(),
     db.product_barcodes.toArray(),
+    db.bundle_items.toArray(),
   ]);
   const categoryMap = new Map(
     categories
@@ -46,6 +50,7 @@ export async function loadCatalogueMaster(
     products: products.filter((product) => !product.deleted_at),
     categories: categoryMap,
     barcodes,
+    bundleItems: bundleItems.filter((row) => !row.deleted_at),
   };
 }
 
@@ -127,16 +132,27 @@ export function buildProductRows(
   master: CatalogueMaster,
   levels: ReadonlyMap<string, number>,
   sold: ReadonlyMap<string, number>,
+  costMethod: 'avg' | 'last' = 'avg',
 ): ProductListRow[] {
+  const bundles = buildBundleInfoMap(
+    master.products,
+    master.bundleItems,
+    levels,
+    costMethod,
+  );
   return master.products.map((product) => {
-    const onHand = levels.get(product.id) ?? 0;
+    const bundle: BundleInfo | undefined = bundles.get(product.id);
+    const onHand = bundle
+      ? (bundle.availability ?? 0) * 1000
+      : (levels.get(product.id) ?? 0);
     return {
       product,
       category: master.categories.get(String(product.category_id)) ?? null,
       onHand,
       sold30: sold.get(product.id) ?? 0,
       barcodes: master.barcodes.get(product.id) ?? [],
-      stockState: stockStateOf(product, onHand),
+      stockState: stockStateOf(product, onHand, bundle),
+      ...(bundle ? { bundle } : {}),
     };
   });
 }

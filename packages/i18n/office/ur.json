@@ -124,7 +124,9 @@
       "voided_title": "منسوخ",
       "tendered": "وصول {{amount}}",
       "change": "بقایا {{amount}}",
-      "recorded_late": "دیر سے درج · فروخت کی تاریخ {{date}} · {{staff}} کی طرف سے۔ وجہ: {{reason}}"
+      "recorded_late": "دیر سے درج · فروخت کی تاریخ {{date}} · {{staff}} کی طرف سے۔ وجہ: {{reason}}",
+      "bundle": "بنڈل: {{name}}",
+      "totals_bundle_discount": "بنڈل رعایت"
     },
     "void": {
       "body": "بل فہرست میں منسوخ کے نشان کے ساتھ رہے گا۔ نقد واپس، اسٹاک واپس اور ادھار کھاتے سے کم ہو جائے گا۔",
@@ -188,7 +190,15 @@
       "start_new_sale": "اس گاہک کے لیے نئی فروخت شروع کریں",
       "title": "{{invoice}} کی واپسی",
       "title_plain": "رقم واپس",
-      "choose_reason": "جاری رکھنے کے لیے وجہ اور مقدار چنیں۔"
+      "choose_reason": "جاری رکھنے کے لیے وجہ اور مقدار چنیں۔",
+      "bundle_sold": "{{qty}} بنڈل بکے",
+      "bundle_already": "پہلے {{qty}} واپس",
+      "bundle_qty": "واپس کرنے کے بنڈل",
+      "bundle_restock": "تمام {{count}} اشیاء اسٹاک میں واپس ڈالیں",
+      "bundle_qty_value": "{{qty}} پورے بنڈل واپس",
+      "bundle_includes": "شامل:",
+      "bundle_whole_only": "صرف پورا بنڈل — اشیاء الگ سے واپس نہیں ہو سکتیں۔",
+      "error_bundle": "صرف پورے بنڈل واپس کریں؛ بنڈل کی ہر چیز شامل ہونی چاہیے۔"
     },
     "udhaar": {
       "add_promise": "وعدہ شامل کریں",

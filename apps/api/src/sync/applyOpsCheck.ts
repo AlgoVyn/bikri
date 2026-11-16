@@ -68,6 +68,15 @@ function checkRefund(
       Number(row.exact_amount ?? 0)
   )
     throw new Reject('CONSTRAINT_FAILED');
+  const saleLineInfo = (id: string) => {
+    const pushed = group.find(
+      (candidate) =>
+        candidate.tbl === 'sale_lines' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.id === id,
+    )?.row;
+    return pushed ?? look.saleLineById.get(id);
+  };
   for (const line of lines) {
     const pushedLine = group.find(
       (candidate) =>
@@ -79,6 +88,60 @@ function checkRefund(
       (typeof pushedLine === 'string' ? pushedLine : undefined);
     if (lineSale !== undefined && lineSale !== saleId)
       throw new Reject('CONSTRAINT_FAILED');
+  }
+  // Whole-bundle refunds (07 §6.2): a bundle group is atomic and every component
+  // line moves by the same `k` whole bundles.
+  const allSaleLines = new Map<
+    string,
+    {
+      id: string;
+      bundle_group?: unknown;
+      bundle_component_qty_milli?: unknown;
+    }
+  >();
+  for (const line of look.saleLinesBySale.get(saleId) ?? [])
+    allSaleLines.set(String(line.id), line);
+  for (const candidate of group) {
+    if (
+      candidate.tbl === 'sale_lines' &&
+      candidate.kind === 'insert' &&
+      candidate.row?.sale_id === saleId &&
+      typeof candidate.row.id === 'string'
+    )
+      allSaleLines.set(candidate.row.id, {
+        id: candidate.row.id,
+        bundle_group: candidate.row.bundle_group,
+        bundle_component_qty_milli: candidate.row.bundle_component_qty_milli,
+      });
+  }
+  const refundQty = new Map(
+    lines.map((line) => [
+      String(line.sale_line_id),
+      Number(line.qty_milli ?? 0),
+    ]),
+  );
+  const bundleGroups = new Map<string, string[]>();
+  for (const [id, line] of allSaleLines) {
+    if (typeof line.bundle_group !== 'string') continue;
+    bundleGroups.set(line.bundle_group, [
+      ...(bundleGroups.get(line.bundle_group) ?? []),
+      id,
+    ]);
+  }
+  for (const componentIds of bundleGroups.values()) {
+    const touched = componentIds.some((id) => (refundQty.get(id) ?? 0) > 0);
+    if (!touched) continue;
+    let bundles: number | null = null;
+    for (const id of componentIds) {
+      const line = saleLineInfo(id);
+      const perBundle = Number(line?.bundle_component_qty_milli ?? 0);
+      const qty = refundQty.get(id) ?? 0;
+      if (perBundle <= 0 || qty <= 0 || qty % perBundle !== 0)
+        throw new Reject('CONSTRAINT_FAILED');
+      const k = qty / perBundle;
+      if (bundles === null) bundles = k;
+      else if (k !== bundles) throw new Reject('CONSTRAINT_FAILED');
+    }
   }
   if (sale && udhaar > 0) {
     if (!sale.customer_id) throw new Reject('CONSTRAINT_FAILED');
@@ -914,6 +977,197 @@ function checkSaleInsert(
   }
 }
 
+/** Active component ids of a bundle after the recipe ops in this push. */
+function activeBundleComponents(
+  look: Lookups,
+  group: PushOp[],
+  bundleId: string,
+): Set<string> {
+  const components = new Set(
+    (look.bundleRecipes.get(bundleId) ?? [])
+      .filter((item) => item.deleted_at === null)
+      .map((item) => item.component_product_id),
+  );
+  for (const candidate of group) {
+    if (candidate.tbl !== 'bundle_items') continue;
+    if (candidate.kind === 'delete') {
+      const known =
+        look.bundleItemById.get(String(candidate.row_id ?? '')) ??
+        group.find(
+          (row) =>
+            row.tbl === 'bundle_items' &&
+            row.kind !== 'delete' &&
+            row.row?.id === candidate.row_id,
+        )?.row;
+      if (known && String(known.bundle_id) === bundleId)
+        components.delete(String(known.component_product_id));
+      continue;
+    }
+    if (
+      candidate.row &&
+      String(candidate.row.bundle_id) === bundleId &&
+      candidate.row.deleted_at == null
+    )
+      components.add(String(candidate.row.component_product_id));
+  }
+  return components;
+}
+
+/** True when the product is deleted in this push or already deleted in D1. */
+function productDeletedInGroup(
+  look: Lookups,
+  group: PushOp[],
+  productId: string,
+): boolean {
+  return (
+    group.some(
+      (candidate) =>
+        candidate.tbl === 'products' &&
+        candidate.kind === 'delete' &&
+        candidate.row_id === productId,
+    ) || look.current.get(key('products', productId))?.deleted_at != null
+  );
+}
+
+const BUNDLE_FIELDS = [
+  'bundle_id',
+  'bundle_group',
+  'bundle_name',
+  'bundle_qty',
+  'bundle_price',
+  'bundle_discount',
+  'bundle_component_qty_milli',
+] as const;
+
+/**
+ * Bundle sale groups (04 §5): component lines only, all six fields set together,
+ * same snapshot per group, quantity identity and group total. A fresh sale must match
+ * the current recipe and bundle price; a stale/offline or reissued sale keeps its snapshot.
+ */
+function checkBundleSaleGroups(
+  look: Lookups,
+  group: PushOp[],
+  sale: Record<string, unknown>,
+  lines: Record<string, unknown>[],
+  entryAt: number,
+  deviceSeenAt: number,
+  allowed: (permission: Permission) => boolean,
+): void {
+  const n = (value: unknown) => Number(value ?? 0);
+  const groups = new Map<string, Record<string, unknown>[]>();
+  let bundleDiscountTotal = 0;
+  for (const line of lines) {
+    const set = BUNDLE_FIELDS.filter(
+      (field) => line[field] !== null && line[field] !== undefined,
+    ).length;
+    if (set === 0) continue;
+    if (set !== BUNDLE_FIELDS.length) throw new Reject('CONSTRAINT_FAILED');
+    const bundleId = String(line.bundle_id);
+    const bundleGroup = String(line.bundle_group);
+    if (!bundleId || !bundleGroup || bundleId === line.product_id)
+      throw new Reject('CONSTRAINT_FAILED');
+    groups.set(bundleGroup, [...(groups.get(bundleGroup) ?? []), line]);
+  }
+  for (const bundleLines of groups.values()) {
+    const first = bundleLines[0];
+    if (!first) continue;
+    const bundleId = String(first.bundle_id);
+    const bundleQty = n(first.bundle_qty);
+    const bundlePrice = n(first.bundle_price);
+    const bundleDiscount = n(first.bundle_discount);
+    const bundleName = String(first.bundle_name ?? '');
+    bundleDiscountTotal += bundleDiscount * bundleQty;
+    if (
+      !Number.isSafeInteger(bundleQty) ||
+      bundleQty <= 0 ||
+      !Number.isSafeInteger(bundlePrice) ||
+      bundlePrice < 0 ||
+      !Number.isSafeInteger(bundleDiscount) ||
+      bundleDiscount < 0 ||
+      bundleDiscount > bundlePrice ||
+      bundleName.length < 1 ||
+      bundleName.length > 80
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    let net = 0;
+    const components = new Map<string, number>();
+    for (const line of bundleLines) {
+      if (
+        line.bundle_id !== bundleId ||
+        line.bundle_group !== first.bundle_group ||
+        line.bundle_name !== first.bundle_name ||
+        n(line.bundle_qty) !== bundleQty ||
+        n(line.bundle_price) !== bundlePrice ||
+        n(line.bundle_discount) !== bundleDiscount
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+      const perBundle = n(line.bundle_component_qty_milli);
+      if (
+        !Number.isSafeInteger(perBundle) ||
+        perBundle <= 0 ||
+        n(line.qty_milli) !== perBundle * bundleQty
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+      const productId = String(line.product_id ?? '');
+      if (!productId || components.has(productId))
+        throw new Reject('CONSTRAINT_FAILED');
+      components.set(productId, perBundle);
+      net += n(line.net);
+    }
+    if (net !== (bundlePrice - bundleDiscount) * bundleQty)
+      throw new Reject('CONSTRAINT_FAILED');
+
+    const pushedProduct = group.find(
+      (candidate) =>
+        candidate.tbl === 'products' &&
+        candidate.kind !== 'delete' &&
+        candidate.row?.id === bundleId,
+    )?.row;
+    const product = pushedProduct ?? look.products.get(bundleId);
+    if (!product || String(product.kind ?? 'simple') !== 'bundle')
+      throw new Reject('CONSTRAINT_FAILED');
+
+    const fresh =
+      !sale.replaces_sale_id &&
+      (pushedProduct !== undefined ||
+        (entryAt >= Number(product.updated_at) &&
+          Number(product.updated_at) <= deviceSeenAt));
+    if (fresh) {
+      if (
+        bundlePrice < Number(product.price) &&
+        !allowed('catalog.edit') &&
+        !bundleLines.some((line) =>
+          overrideForLine(
+            look,
+            group,
+            'sales',
+            String(sale.id),
+            String(line.id),
+            bundlePrice,
+          ),
+        )
+      )
+        throw new Reject('FORBIDDEN');
+      const recipe = (look.bundleRecipes.get(bundleId) ?? []).filter(
+        (item) => item.deleted_at === null,
+      );
+      if (recipe.length < 1 || recipe.length > 20)
+        throw new Reject('CONSTRAINT_FAILED');
+      if (recipe.length !== components.size)
+        throw new Reject('CONSTRAINT_FAILED');
+      for (const item of recipe) {
+        if (components.get(item.component_product_id) !== item.qty_milli)
+          throw new Reject('CONSTRAINT_FAILED');
+      }
+    }
+  }
+  if (
+    sale.bundle_discount_total !== undefined &&
+    n(sale.bundle_discount_total) !== bundleDiscountTotal
+  )
+    throw new Reject('CONSTRAINT_FAILED');
+}
+
 /** Recompute price/tax/discount policy instead of trusting the client totals. */
 function checkSalePolicy(
   look: Lookups,
@@ -934,6 +1188,15 @@ function checkSalePolicy(
       // writes the bill oldest-first, so line_no descending is that cart order.
       Number(b.line_no) - Number(a.line_no) ||
       String(b.id).localeCompare(String(a.id)),
+  );
+  checkBundleSaleGroups(
+    look,
+    group,
+    row,
+    lines.map((line) => line),
+    entryAt,
+    deviceSeenAt,
+    allowed,
   );
   const taxRate = n(row.tax_rate_bp);
   const inclusive = Number(row.tax_inclusive) === 1;
@@ -1077,7 +1340,9 @@ function checkSalePolicy(
           : (costState?.avg_cost ?? product?.avg_cost ?? 0);
       if (unitCost !== expectedCost) throw new Reject('CONSTRAINT_FAILED');
     }
-    if (product && entryAt >= product.updated_at) {
+    // A bundle component price is derived by priceBundle, not a manual override;
+    // the bundle group total is the guard instead.
+    if (product && !line.bundle_id && entryAt >= product.updated_at) {
       if (
         unitPrice < product.price &&
         !allowed('catalog.edit') &&
@@ -1113,7 +1378,23 @@ function checkSalePolicy(
   )
     throw new Reject('FORBIDDEN');
 
-  const discount = n(row.item_discount_total) + bill;
+  // Bundle residual paisa is an allocation artifact, not a staff discount (07 §3.1).
+  // A whole-bundle discount is a real manual discount and counts once per group.
+  const bundleResidual = lines.reduce(
+    (sum, line) => sum + (line.bundle_id ? n(line.discount) : 0),
+    0,
+  );
+  const bundleGroups = new Set<string>();
+  let bundleDiscountTotal = 0;
+  for (const line of lines) {
+    if (!line.bundle_id || !line.bundle_group) continue;
+    const group = String(line.bundle_group);
+    if (bundleGroups.has(group)) continue;
+    bundleGroups.add(group);
+    bundleDiscountTotal += n(line.bundle_discount) * n(line.bundle_qty);
+  }
+  const discount =
+    n(row.item_discount_total) + bill - bundleResidual + bundleDiscountTotal;
   if (discount > 0) {
     if (!allowed('sale.discount')) throw new Reject('FORBIDDEN');
     const share =
@@ -1227,6 +1508,7 @@ export function checkOp(
     const need: Partial<Record<string, Permission>> = {
       products: 'catalog.delete',
       product_barcodes: 'catalog.edit',
+      bundle_items: 'catalog.edit',
       categories: 'catalog.edit',
       expense_categories: 'settings.shop',
       promises: 'party.edit',
@@ -1238,6 +1520,41 @@ export function checkOp(
       const s = staffOf(look, group, op.updated_by);
       if (!s || !can(s.role, s.permissions_json, perm))
         throw new Reject('FORBIDDEN');
+    }
+    if (op.tbl === 'bundle_items') {
+      const rowId = String(op.row_id);
+      const pushed = group.find(
+        (candidate) =>
+          candidate.tbl === 'bundle_items' &&
+          candidate.kind !== 'delete' &&
+          candidate.row?.id === rowId,
+      )?.row;
+      const target =
+        look.bundleItemById.get(rowId) ??
+        (pushed
+          ? {
+              bundle_id: String(pushed.bundle_id),
+              component_product_id: String(pushed.component_product_id),
+            }
+          : undefined);
+      if (!target) throw new Reject('CONSTRAINT_FAILED');
+      const remaining = activeBundleComponents(look, group, target.bundle_id);
+      if (
+        remaining.size < 1 &&
+        !productDeletedInGroup(look, group, target.bundle_id)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+    }
+    if (op.tbl === 'products') {
+      for (const bundleId of look.bundleRecipes.keys()) {
+        if (
+          bundleId === op.row_id ||
+          productDeletedInGroup(look, group, bundleId)
+        )
+          continue;
+        if (activeBundleComponents(look, group, bundleId).has(op.row_id))
+          throw new Reject('CONSTRAINT_FAILED');
+      }
     }
     if (op.row_id && (op.tbl === 'customers' || op.tbl === 'suppliers')) {
       const type = op.tbl === 'customers' ? 'customer' : 'supplier';
@@ -1898,7 +2215,8 @@ export function checkOp(
   if (
     op.tbl === 'products' ||
     op.tbl === 'categories' ||
-    op.tbl === 'product_barcodes'
+    op.tbl === 'product_barcodes' ||
+    op.tbl === 'bundle_items'
   ) {
     const catalogueEdit = Boolean(
       updater && can(updater.role, updater.permissions_json, 'catalog.edit'),
@@ -1921,7 +2239,6 @@ export function checkOp(
             typeof candidate.row?.purchase_id === 'string') ||
             (candidate.tbl === 'stock_movements' &&
               [
-                'opening',
                 'purchase',
                 'received_godown',
                 'received_local',
@@ -1931,11 +2248,98 @@ export function checkOp(
     if (!catalogueEdit && !costSource) throw new Reject('FORBIDDEN');
     if (
       op.tbl === 'products' &&
+      changes.includes('last_cost') &&
+      row.last_cost !== undefined &&
+      !costSource
+    ) {
+      const current = look.products.get(String(row.id));
+      if (
+        current?.track_stock === 1 &&
+        Number(row.track_stock ?? 1) !== 0 &&
+        Number(row.last_cost) !== current.last_cost
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+    }
+    if (
+      op.tbl === 'products' &&
       row.deleted_at != null &&
       (!updater ||
         !can(updater.role, updater.permissions_json, 'catalog.delete'))
     )
       throw new Reject('FORBIDDEN');
+  }
+  if (op.tbl === 'bundle_items') {
+    const bundleId = String(row.bundle_id ?? '');
+    const componentId = String(row.component_product_id ?? '');
+    const qty = Number(row.qty_milli ?? 0);
+    const pushed = (id: string) =>
+      group.find(
+        (candidate) =>
+          candidate.tbl === 'products' &&
+          candidate.kind !== 'delete' &&
+          candidate.row?.id === id,
+      )?.row;
+    const bundle = pushed(bundleId) ?? look.products.get(bundleId);
+    const component = pushed(componentId) ?? look.products.get(componentId);
+    if (
+      !bundle ||
+      String(bundle.kind ?? 'simple') !== 'bundle' ||
+      !component ||
+      String(component.kind ?? 'simple') === 'bundle' ||
+      bundleId === componentId ||
+      !Number.isSafeInteger(qty) ||
+      qty <= 0
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    const components = new Set<string>();
+    for (const item of look.bundleRecipes.get(bundleId) ?? []) {
+      if (item.deleted_at === null) components.add(item.component_product_id);
+    }
+    for (const candidate of group) {
+      if (candidate.tbl !== 'bundle_items' || !candidate.row) continue;
+      if (candidate.row.bundle_id !== bundleId) continue;
+      if (candidate.kind === 'delete') {
+        const known =
+          look.bundleItemById.get(String(candidate.row_id ?? '')) ??
+          candidate.row;
+        components.delete(String(known.component_product_id ?? ''));
+      } else if (candidate.row.deleted_at == null) {
+        const id = String(candidate.row.component_product_id ?? '');
+        if (id) components.add(id);
+      }
+    }
+    if (
+      (components.size < 1 || components.size > 20) &&
+      !productDeletedInGroup(look, group, bundleId)
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+  }
+  if (
+    op.tbl === 'products' &&
+    (row.deleted_at != null || row.kind === 'bundle' || row.kind === 'simple')
+  ) {
+    const productId = String(row.id);
+    for (const bundleId of look.bundleRecipes.keys()) {
+      if (
+        bundleId === productId ||
+        productDeletedInGroup(look, group, bundleId)
+      )
+        continue;
+      if (activeBundleComponents(look, group, bundleId).has(productId))
+        throw new Reject('CONSTRAINT_FAILED');
+    }
+    if (row.kind === 'bundle' && Number(row.track_stock ?? 1) !== 0)
+      throw new Reject('CONSTRAINT_FAILED');
+    if (
+      row.kind === 'bundle' &&
+      activeBundleComponents(look, group, productId).size < 1
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    if (
+      row.kind === 'simple' &&
+      activeBundleComponents(look, group, productId).size > 0
+    )
+      throw new Reject('CONSTRAINT_FAILED');
   }
   if (op.tbl === 'expense_categories') {
     if (

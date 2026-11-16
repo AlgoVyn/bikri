@@ -69,6 +69,7 @@ export type Block =
       detail?: string;
       /** Stacked mode: left side of the qty line, leading space included. */
       breakdown?: string;
+      bold?: boolean;
     }
   | { t: 'rule'; char: '-' | '=' }
   | { t: 'qr'; data: string }

@@ -1,6 +1,8 @@
 import type { PrintJob, SyncedRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobReceipt } from '../print/receiptFiles.ts';
+import { addBundle, emptyCart } from './cart.ts';
+import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
 import { loadRefundReceipt, queueRefundPrint } from './refundReceipt.ts';
 import { refundSale } from './refunds.ts';
@@ -87,6 +89,93 @@ async function refundWith(over: { customer?: boolean; card?: boolean } = {}) {
 }
 
 describe('refund receipt data', () => {
+  it('groups a whole-bundle return under one header', async () => {
+    const fx = await shopWithStock('rr-bundle');
+    await addShop(fx.db, fullShop);
+    const ctx = await ledgerContext(fx.db, 'st-1');
+    const bundle = await saveNewProduct(
+      fx.db,
+      {
+        name_en: 'Starter Pack',
+        sku: 'RR-BND',
+        unit: 'set',
+        price: 4_000_000,
+        kind: 'bundle',
+        track_stock: false,
+        bundle_items: [
+          { component_product_id: fx.phone.id, qty_milli: 1000 },
+          { component_product_id: fx.buds.id, qty_milli: 1000 },
+        ],
+      },
+      ctx,
+      { now: NOW },
+    );
+    const cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: fx.phone, qty_milli: 1000 },
+        { product: fx.buds, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    const saleId = 'rr-bundle-sale';
+    await completeSale(
+      fx.db,
+      sale(cart, [{ method: 'cash', amount: 4_000_000 }], { saleId }),
+      fx.ctx,
+      NOW,
+    );
+    const lines = await fx.db.sale_lines
+      .where('sale_id')
+      .equals(saleId)
+      .toArray();
+    await refundSale(
+      fx.db,
+      {
+        refundId: 'rr-bundle-refund',
+        saleId,
+        lines: lines.map((line) => ({
+          saleLineId: line.id,
+          qtyMilli: Number(line.qty_milli),
+          restock: true,
+        })),
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      fx.ctx,
+      NOW + 1000,
+    );
+    const receipt = await loadRefundReceipt(fx.db, 'rr-bundle-refund');
+    expect(receipt?.lines).toHaveLength(1);
+    expect(receipt?.lines[0]?.bundle?.quantity).toBe(1);
+    expect(receipt?.lines[0]?.bundle?.components).toHaveLength(2);
+    await fx.db.sale_lines.where('sale_id').equals(saleId).modify({
+      bundle_name: null,
+      bundle_component_qty_milli: null,
+      name_snapshot: null,
+    });
+    const sparse = await loadRefundReceipt(fx.db, 'rr-bundle-refund');
+    expect(sparse?.lines[0]?.bundle?.name).toBe('');
+    expect(sparse?.lines[0]?.bundle?.quantity).toBe(1);
+    expect(sparse?.lines[0]?.bundle?.components[0]?.name).toBe('');
+    await fx.db.refunds.update('rr-bundle-refund', {
+      exact_amount: null,
+      rounding: null,
+      amount: null,
+      udhaar_part: null,
+      method: null,
+    });
+    const empty = await loadRefundReceipt(fx.db, 'rr-bundle-refund');
+    expect(empty?.exactAmount).toBe(0);
+    expect(empty?.rounding).toBe(0);
+    expect(empty?.amount).toBe(0);
+    expect(empty?.udhaarPart).toBe(0);
+    expect(empty?.method).toBeNull();
+  });
+
   it('loads a cash refund with a customer and the khata balance', async () => {
     const { db, refundId, saleId } = await refundWith({ customer: true });
     const r = await loadRefundReceipt(db, refundId);

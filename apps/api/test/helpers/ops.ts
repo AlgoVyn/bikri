@@ -79,6 +79,7 @@ export function saleOps(
     items_qty_milli: 1000,
     gross_total: total,
     item_discount_total: 0,
+    bundle_discount_total: 0,
     subtotal: total,
     bill_discount_type: null,
     bill_discount_value: 0,
@@ -166,7 +167,7 @@ export async function push(dev: Dev, ops: PushOp[], schemaVersion = 2) {
     json: {
       device_id: dev.id,
       schema_version: schemaVersion,
-      app_version: '1.0.0',
+      app_version: '1.1.0',
       ops,
     },
   });

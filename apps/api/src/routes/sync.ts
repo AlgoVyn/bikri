@@ -181,7 +181,7 @@ type ChangeRow = {
 };
 
 /** Pull/snapshot speak the schema the till was built for; an outdated till must update first. */
-function assertClientSchema(c: Context<AppEnv>): void {
+function assertClientSchema(c: Context<AppEnv>): number {
   const raw = c.req.header('x-bikri-schema');
   const version = raw === undefined ? Number.NaN : Number(raw);
   const min = Number(c.env.MIN_CLIENT_SCHEMA);
@@ -194,11 +194,15 @@ function assertClientSchema(c: Context<AppEnv>): void {
         min_client_schema: min,
       },
     );
+  return version;
 }
+
+/** Bundle columns (and the bundle discount) require the current schema. */
+const BUNDLE_SCHEMA = 5;
 
 /** `GET /api/sync/pull?since=&limit=` (03 §4.2). */
 export async function pull(c: Context<AppEnv>): Promise<Response> {
-  assertClientSchema(c);
+  const clientSchema = assertClientSchema(c);
   const { tenant, device, db } = c.var;
   const now = Date.now();
   const q = PullQuery.parse({
@@ -226,7 +230,18 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
     q.since,
     q.limit + 1,
   );
-  const page = rows.slice(0, q.limit);
+  const rawPage = rows.slice(0, q.limit);
+  const page = rawPage.filter((row) => {
+    if (clientSchema >= BUNDLE_SCHEMA) return true;
+    if (row.tbl === 'bundle_items') return false;
+    if (row.tbl !== 'products') return true;
+    try {
+      const parsed = JSON.parse(row.row_json) as { kind?: unknown };
+      return parsed.kind !== 'bundle';
+    } catch {
+      return true;
+    }
+  });
   addRowsRead(tenant.id, page.length);
   return c.json({
     changes: page.map((r) => ({
@@ -235,7 +250,8 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
       op: r.op,
       row: JSON.parse(r.row_json) as unknown,
     })),
-    next_since: page.at(-1)?.seq ?? q.since,
+    // Advance past hidden bundle rows even when the visible page is shorter.
+    next_since: rawPage.at(-1)?.seq ?? q.since,
     has_more: rows.length > q.limit,
     server_time: now,
     restore_epoch: tenant.restore_epoch,
@@ -261,7 +277,12 @@ export async function snapshotPayload(
   tenant: TenantRow,
   maxLimit = 1000,
   counts = false,
+  clientSchema = BUNDLE_SCHEMA,
 ): Promise<Record<string, unknown>> {
+  const tables =
+    clientSchema >= BUNDLE_SCHEMA
+      ? SNAPSHOT_TABLES
+      : SNAPSHOT_TABLES.filter((tbl) => tbl !== 'bundle_items');
   const q = SnapshotQuery.parse({
     tbl: query('tbl') || undefined,
     after: query('after') ?? '',
@@ -283,14 +304,14 @@ export async function snapshotPayload(
       // large snapshot block itself before the first page. Progress is rows downloaded.
       return {
         snapshot_seq: seq,
-        tables: SNAPSHOT_TABLES.map((tbl) => ({ tbl, rows: 0 })),
+        tables: tables.map((tbl) => ({ tbl, rows: 0 })),
       };
     }
     // The operator console's export tab needs per-table totals for its progress bars.
     // It is Access-only and not on the till's read quota; do not charge these counts to
     // the tenant's download budget, or a large operator export blocks itself.
     const res = await db.batch(
-      SNAPSHOT_TABLES.map((tbl) => {
+      tables.map((tbl) => {
         const column = q.before === undefined ? null : cutoffColumn(tbl);
         return db.prepare(
           `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${column ? ` AND ${column} <= ?2` : ''}`,
@@ -300,7 +321,7 @@ export async function snapshotPayload(
     );
     return {
       snapshot_seq: seq,
-      tables: SNAPSHOT_TABLES.map((tbl, i) => ({
+      tables: tables.map((tbl, i) => ({
         tbl,
         rows: Number(
           (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
@@ -308,10 +329,18 @@ export async function snapshotPayload(
       })),
     };
   }
+  if (q.tbl === 'bundle_items' && clientSchema < BUNDLE_SCHEMA)
+    return {
+      tbl: q.tbl,
+      rows: [],
+      next_after: q.after,
+      has_more: false,
+    };
   const limit = Math.min(q.limit, maxLimit);
   const column = q.before === undefined ? null : cutoffColumn(q.tbl);
+  const hideBundles = clientSchema < BUNDLE_SCHEMA && q.tbl === 'products';
   const rows = await db.select(
-    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
+    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''}${hideBundles ? " AND kind <> 'bundle'" : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
     ...(column
       ? [q.after, q.before as number, limit + 1]
       : [q.after, limit + 1]),
@@ -328,7 +357,7 @@ export async function snapshotPayload(
 
 /** `GET /api/sync/snapshot` (03 §4.3). */
 export async function snapshot(c: Context<AppEnv>): Promise<Response> {
-  assertClientSchema(c);
+  const clientSchema = assertClientSchema(c);
   const { tenant, device, db } = c.var;
   const now = Date.now();
   assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
@@ -337,7 +366,14 @@ export async function snapshot(c: Context<AppEnv>): Promise<Response> {
   const seen = readOnlySeenStatement(db, tenant, device, now);
   if (seen) await seen.run();
   return c.json({
-    ...(await snapshotPayload((k) => c.req.query(k), db, tenant)),
+    ...(await snapshotPayload(
+      (k) => c.req.query(k),
+      db,
+      tenant,
+      1000,
+      false,
+      clientSchema,
+    )),
     server_time: now,
     tenant_status: tenantStatusPayload(tenant),
     support: supportPayload(tenant, now),

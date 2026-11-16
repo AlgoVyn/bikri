@@ -124,7 +124,9 @@
       "voided_title": "VOID",
       "tendered": "Tendered {{amount}}",
       "change": "Change {{amount}}",
-      "recorded_late": "Recorded late · sale date {{date}} · made by {{staff}}. Reason: {{reason}}"
+      "recorded_late": "Recorded late · sale date {{date}} · made by {{staff}}. Reason: {{reason}}",
+      "bundle": "Bundle: {{name}}",
+      "totals_bundle_discount": "Bundle discount"
     },
     "void": {
       "body": "The bill stays in the list with a VOID stamp. Cash goes back, stock returns, and the credit balance is removed from the ledger.",
@@ -188,7 +190,15 @@
       "start_new_sale": "Start new sale for this customer",
       "title": "Refund {{invoice}}",
       "title_plain": "Refund",
-      "choose_reason": "Choose a reason and quantity to continue."
+      "choose_reason": "Choose a reason and quantity to continue.",
+      "bundle_sold": "Sold {{qty}} bundles",
+      "bundle_already": "already refunded {{qty}}",
+      "bundle_qty": "Bundles to return",
+      "bundle_restock": "Put all {{count}} items back in stock",
+      "bundle_qty_value": "Return {{qty}} whole bundles",
+      "bundle_includes": "Includes:",
+      "bundle_whole_only": "Whole bundle only — the items cannot be returned separately.",
+      "error_bundle": "Return whole bundle units only; every item in the bundle must be included."
     },
     "udhaar": {
       "add_promise": "Add promise",

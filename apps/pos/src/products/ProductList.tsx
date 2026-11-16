@@ -97,13 +97,17 @@ export function ProductList({
   const master = useCatalogueMaster();
   const levels = useStockLevels();
   const sold = useSold30();
+  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
+  const costMethod = shop?.cost_method === 'last' ? 'last' : 'avg';
   const rows = useMemo(() => {
     if (master === undefined || levels === undefined) return undefined;
     return filterAndSortProducts(
-      buildProductRows(master, levels, sold ?? EMPTY_SOLD),
+      buildProductRows(master, levels, sold ?? EMPTY_SOLD, costMethod),
       {
         query: deferredQuery,
-        categoryId: categoryId || null,
+        categoryId:
+          categoryId && categoryId !== '__bundles' ? categoryId : null,
+        kind: categoryId === '__bundles' ? 'bundle' : undefined,
         stock,
         sort,
         direction,
@@ -120,6 +124,7 @@ export function ProductList({
     sort,
     direction,
     i18n.language,
+    costMethod,
   ]);
   const total = master?.products.length;
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
@@ -308,6 +313,7 @@ export function ProductList({
                     onChange={(e) => setCategoryId(e.target.value)}
                   >
                     <option value="">{t('products.all_categories')}</option>
+                    <option value="__bundles">{t('products.bundles')}</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {categoryName(c, i18n.language)}
@@ -631,7 +637,15 @@ function ProductRow({
       : row.stockState === 'low'
         ? 'text-warning'
         : 'text-text';
-  const margin = marginText(Number(p.price), Number(p.avg_cost ?? 0));
+  const stockText = row.bundle
+    ? row.bundle.availability === null
+      ? t('products.made_to_order')
+      : t('products.bundle_count', { count: row.bundle.availability })
+    : row.stockState === 'untracked'
+      ? t('products.not_tracked')
+      : qtyWithUnit(t, row.onHand, unit);
+  const cost = row.bundle ? row.bundle.cost : Number(p.avg_cost ?? 0);
+  const margin = marginText(Number(p.price), cost);
   return (
     <li
       className="absolute inset-x-0"
@@ -658,6 +672,11 @@ function ProductRow({
               title={String(p.name_en)}
             >
               {String(p.name_en)}
+              {p.kind === 'bundle' ? (
+                <span className="ms-1.5 inline-block rounded-full bg-surface-2 px-1.5 text-caption font-medium align-middle text-text-muted">
+                  {t('products.bundle_pill')}
+                </span>
+              ) : null}
             </span>
             <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
@@ -674,17 +693,11 @@ function ProductRow({
             <span
               className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
-              {row.stockState === 'untracked'
-                ? t('products.not_tracked')
-                : qtyWithUnit(t, row.onHand, unit)}
+              {stockText}
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>
-              {row.stockState === 'untracked'
-                ? t('products.not_tracked')
-                : qtyWithUnit(t, row.onHand, unit)}
-            </span>
+            <span className={`text-start ${stockTone}`}>{stockText}</span>
           ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
@@ -694,7 +707,7 @@ function ProductRow({
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
-                  <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+                  <MoneyText paisa={cost} />
                 </span>
               ) : null}
               {showCost ? (
@@ -728,6 +741,11 @@ function ProductRow({
               title={String(p.name_en)}
             >
               {String(p.name_en)}
+              {p.kind === 'bundle' ? (
+                <span className="ms-1.5 inline-block rounded-full bg-surface-2 px-1.5 text-caption font-medium align-middle text-text-muted">
+                  {t('products.bundle_pill')}
+                </span>
+              ) : null}
             </span>
             <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
@@ -744,17 +762,11 @@ function ProductRow({
             <span
               className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
-              {row.stockState === 'untracked'
-                ? t('products.not_tracked')
-                : qtyWithUnit(t, row.onHand, unit)}
+              {stockText}
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>
-              {row.stockState === 'untracked'
-                ? t('products.not_tracked')
-                : qtyWithUnit(t, row.onHand, unit)}
-            </span>
+            <span className={`text-start ${stockTone}`}>{stockText}</span>
           ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
@@ -764,7 +776,7 @@ function ProductRow({
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
-                  <MoneyText paisa={Number(p.avg_cost ?? 0)} />
+                  <MoneyText paisa={cost} />
                 </span>
               ) : null}
               {showCost ? (

@@ -138,6 +138,16 @@ export async function loadSaleReceipt(
   const customer = customerId ? await db.customers.get(customerId) : undefined;
   const udhaar = Number(sale.udhaar_amount ?? 0);
   const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  const groupDiscounts = new Set<string>();
+  let computedBundleDiscount = 0;
+  for (const line of lines) {
+    if (!line.bundle_group || groupDiscounts.has(String(line.bundle_group)))
+      continue;
+    groupDiscounts.add(String(line.bundle_group));
+    computedBundleDiscount +=
+      Number(line.bundle_discount ?? 0) * Number(line.bundle_qty ?? 0);
+  }
+  const saleBundleDiscount = Number(sale.bundle_discount_total ?? 0);
   return {
     shop,
     sale: {
@@ -150,6 +160,8 @@ export async function loadSaleReceipt(
         String(sale.business_date),
       itemsQtyMilli: Number(sale.items_qty_milli ?? 0),
       itemDiscountTotal: Number(sale.item_discount_total ?? 0),
+      bundleDiscount:
+        saleBundleDiscount > 0 ? saleBundleDiscount : computedBundleDiscount,
       subtotal: Number(sale.subtotal ?? 0),
       billDiscount: Number(sale.bill_discount ?? 0),
       taxRateBp: Number(sale.tax_rate_bp ?? 0),
@@ -181,6 +193,12 @@ export async function loadSaleReceipt(
         sale.tax_inclusive === 1,
       ),
       warrantyUntil: l.warranty_until ? String(l.warranty_until) : null,
+      bundleGroup: l.bundle_group ? String(l.bundle_group) : null,
+      bundleName: l.bundle_name ? String(l.bundle_name) : null,
+      bundleQty: l.bundle_qty ? Number(l.bundle_qty) : null,
+      bundlePrice: l.bundle_price
+        ? Number(l.bundle_price) - Number(l.bundle_discount ?? 0)
+        : null,
     })),
     payments: payments.map(
       (p): ReceiptPayment => ({

@@ -12,10 +12,13 @@ import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import { isRapidBarcode } from '../components/SearchBox.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
+  addBundle,
   addOverride,
   addProduct,
   addQuickSale,
   approversFor,
+  bundleListPriceOf,
+  bundleQtyOf,
   CART_IDS,
   CartFullError,
   type CartId,
@@ -23,17 +26,24 @@ import {
   cartSignature,
   cartTotals,
   deleteHeld,
+  EmptyBundleError,
   emptyCart,
   findByCode,
   holdCart,
   isEmptyCart,
+  manualDiscountBp,
   overrideMatches,
   parseQtyPrefix,
   paymentChecks,
+  removeBundle,
   removeLine,
   resumeHeld,
+  setBundleDiscount,
+  updateBundlePrice,
+  updateBundleQty,
   updateLine,
 } from '../data/cart.ts';
+import { loadBundleRecipe } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
@@ -160,6 +170,40 @@ export function SellPage() {
     const qtyMilli = qty ?? nextQty ?? 1000;
     setNextQty(null);
     beep();
+    if (product.kind === 'bundle') {
+      void (async () => {
+        const db = getDb();
+        const items = await loadBundleRecipe(db, product.id);
+        const products = await db.products.bulkGet(
+          items.map((row) => String(row.component_product_id)),
+        );
+        const recipe = items.flatMap((row, index) => {
+          const component = products[index];
+          return component
+            ? [{ product: component, qty_milli: Number(row.qty_milli) }]
+            : [];
+        });
+        const bundles = Math.max(1, Math.floor(qtyMilli / 1000));
+        try {
+          const next = await mutate((c) =>
+            addBundle(c, product, recipe, bundles, money.cost_method),
+          );
+          const line = next?.lines.find(
+            (l) => l.bundle_id === product.id && l.bundle_group,
+          );
+          if (line) {
+            setSelected(String(line.bundle_group));
+            setExpanded(String(line.bundle_group));
+          }
+        } catch (error) {
+          if (error instanceof EmptyBundleError)
+            toast.push(t('sell.bundle_empty'), 'error');
+          else throw error;
+        }
+      })();
+      focusSearch();
+      return;
+    }
     void mutate((c) =>
       addProduct(c, product, qtyMilli, money.cost_method),
     ).then((next) => {
@@ -260,7 +304,7 @@ export function SellPage() {
       return (
         ok &&
         (s.role === 'owner' ||
-          Number(s.max_discount_bp ?? 0) >= totals.discount_share_bp)
+          Number(s.max_discount_bp ?? 0) >= manualDiscountBp(cart, totals))
       );
     });
 
@@ -303,7 +347,7 @@ export function SellPage() {
     // A backdated price below today's catalogue price needs a line-bound catalog.edit
     // approval for the attributed seller. The recorder may not have catalog.edit either;
     // ask for another approver before opening Pay.
-    let priceApproval: CartLine | null = null;
+    let priceApproval: { key: string; price: number } | null = null;
     if (
       current.backdate &&
       !can('catalog.edit') &&
@@ -318,7 +362,8 @@ export function SellPage() {
       ];
       const products = await getDb().products.bulkGet(productIds);
       for (const line of current.lines) {
-        if (!line.product_id) continue;
+        // Bundle component prices are derived by priceBundle, not overrides.
+        if (!line.product_id || line.bundle_id) continue;
         const product = products.find((row) => row?.id === line.product_id);
         if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
         if (
@@ -328,11 +373,34 @@ export function SellPage() {
           })
         )
           continue;
-        priceApproval = line;
+        priceApproval = { key: line.key, price: line.unit_price };
         break;
       }
+      if (!priceApproval) {
+        const seen = new Set<string>();
+        for (const line of current.lines) {
+          if (!line.bundle_group) continue;
+          const group = line.bundle_group;
+          if (seen.has(group)) continue;
+          seen.add(group);
+          const price = Number(
+            line.bundle_base_price ?? line.bundle_price ?? 0,
+          );
+          if (price >= bundleListPriceOf(current, group)) continue;
+          if (
+            overrideMatches(current, 'catalog.edit', {
+              line: line.key,
+              price,
+            })
+          )
+            continue;
+          priceApproval = { key: line.key, price };
+          break;
+        }
+      }
     }
-    if (now.discount_share_bp > 0 && !sellerCan('sale.discount')) {
+    const manualDiscount = manualDiscountBp(current, now);
+    if (manualDiscount > 0 && !sellerCan('sale.discount')) {
       // A revoked permission is not overrideable; only the discount limit is.
       toast.push(t('sell.discount_forbidden'), 'error');
       return;
@@ -353,7 +421,7 @@ export function SellPage() {
               approved_by: by,
               approved_at: Date.now(),
               bound_line: approved.key,
-              bound_price: approved.unit_price,
+              bound_price: approved.price,
             }),
           ).then(() => takePayment());
         },
@@ -414,10 +482,110 @@ export function SellPage() {
   };
 
   const removeLineByKey = (key: string) => {
+    const group = cart.lines.find((line) => line.key === key)?.bundle_group;
     void mutate((c) => removeLine(c, key)).then(() => {
-      setSelected((current) => (current === key ? null : current));
-      setExpanded((current) => (current === key ? null : current));
+      setSelected((current) =>
+        current === key || (group && current === group) ? null : current,
+      );
+      setExpanded((current) =>
+        current === key || (group && current === group) ? null : current,
+      );
     });
+  };
+
+  const changeBundleQty = async (group: string, qty: number) => {
+    const ids = cart.lines
+      .filter((line) => line.bundle_group === group && line.product_id)
+      .map((line) => String(line.product_id));
+    const products = new Map(
+      (await getDb().products.bulkGet(ids))
+        .filter((row): row is MasterRow => row !== undefined)
+        .map((row) => [row.id, row]),
+    );
+    await mutate((c) =>
+      updateBundleQty(c, group, qty, products, money.cost_method),
+    );
+    if (qty <= 0) {
+      setSelected((current) => (current === group ? null : current));
+      setExpanded((current) => (current === group ? null : current));
+    }
+  };
+
+  const removeBundleByGroup = (group: string) => {
+    void mutate((c) => removeBundle(c, group)).then(() => {
+      setSelected((current) => (current === group ? null : current));
+      setExpanded((current) => (current === group ? null : current));
+    });
+  };
+
+  const changeBundleDiscount = (
+    group: string,
+    type: 'amount' | 'percent',
+    value: number,
+  ) => {
+    void (async () => {
+      const ids = cart.lines
+        .filter((line) => line.bundle_group === group && line.product_id)
+        .map((line) => String(line.product_id));
+      const products = new Map(
+        (await getDb().products.bulkGet(ids))
+          .filter((row): row is MasterRow => row !== undefined)
+          .map((row) => [row.id, row]),
+      );
+      await mutate((c) =>
+        setBundleDiscount(c, group, type, value, products, money.cost_method),
+      );
+    })();
+  };
+
+  const changeBundlePrice = (group: string, price: number) => {
+    const first = cart.lines.find((line) => line.bundle_group === group);
+    if (!first || price < 0) return;
+    const listPrice = bundleListPriceOf(cart, group);
+    const loadProducts = async () => {
+      const ids = cart.lines
+        .filter((line) => line.bundle_group === group && line.product_id)
+        .map((line) => String(line.product_id));
+      return new Map(
+        (await getDb().products.bulkGet(ids))
+          .filter((row): row is MasterRow => row !== undefined)
+          .map((row) => [row.id, row]),
+      );
+    };
+    const apply = (approved?: { by: string }) =>
+      void (async () => {
+        const products = await loadProducts();
+        await mutate((c) => {
+          const priced = updateBundlePrice(
+            c,
+            group,
+            price,
+            products,
+            money.cost_method,
+          );
+          return approved
+            ? addOverride(priced, {
+                permission: 'catalog.edit',
+                approved_by: approved.by,
+                approved_at: Date.now(),
+                bound_line: first.key,
+                bound_price: price,
+              })
+            : priced;
+        });
+      })();
+    const approvedAlready = overrideMatches(cart, 'catalog.edit', {
+      line: first.key,
+      price,
+    });
+    if (price < listPrice && !can('catalog.edit') && !approvedAlready) {
+      setOverride({
+        permission: 'catalog.edit',
+        onApproved: (by) => apply({ by }),
+      });
+      return;
+    }
+    apply();
   };
 
   const clearCart = () => {
@@ -590,16 +758,28 @@ export function SellPage() {
     },
     { enabled: ready },
   );
-  const selectedLine = cart.lines.find((l) => l.key === selected);
+  const selectedLine = cart.lines.find(
+    (l) => l.key === selected || l.bundle_group === selected,
+  );
+  const selectedIsBundle = Boolean(selectedLine?.bundle_group);
   useHotkey(
     (e) => (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.altKey,
     (e) => {
-      const idx = cart.lines.findIndex((l) => l.key === selected);
+      // A bundle block moves as one row: its component lines are never selected.
+      const keys: string[] = [];
+      const seen = new Set<string>();
+      for (const line of cart.lines) {
+        const key = line.bundle_group ?? line.key;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        keys.push(key);
+      }
+      const idx = keys.indexOf(selected ?? '');
       const next = Math.min(
-        cart.lines.length - 1,
+        keys.length - 1,
         Math.max(0, idx + (e.key === 'ArrowDown' ? 1 : -1)),
       );
-      const key = cart.lines[next]?.key ?? null;
+      const key = keys[next] ?? null;
       setSelected(key);
       // Keep one active line: the editor follows the ↑/↓ selection.
       setExpanded(key);
@@ -610,6 +790,14 @@ export function SellPage() {
     (e) => e.key === '+' || e.key === '-',
     (e) => {
       if (!selectedLine) return;
+      if (selectedLine.bundle_group) {
+        const group = selectedLine.bundle_group;
+        void changeBundleQty(
+          group,
+          Math.max(0, bundleQtyOf(cart, group) + (e.key === '+' ? 1 : -1)),
+        );
+        return;
+      }
       void mutate((c) =>
         updateLine(c, selectedLine.key, {
           qty_milli: Math.max(
@@ -624,7 +812,9 @@ export function SellPage() {
   useHotkey(
     (e) => e.key === 'Delete',
     () => {
-      if (selectedLine) removeLineByKey(selectedLine.key);
+      if (selectedIsBundle && selectedLine?.bundle_group)
+        removeBundleByGroup(selectedLine.bundle_group);
+      else if (selectedLine) removeLineByKey(selectedLine.key);
     },
     { enabled: ready && selectedLine !== undefined },
   );
@@ -856,6 +1046,10 @@ export function SellPage() {
             }
             onRemoveLine={removeLineByKey}
             onPriceChange={onPriceChange}
+            onBundleQty={(group, qty) => void changeBundleQty(group, qty)}
+            onBundlePrice={changeBundlePrice}
+            onBundleDiscount={changeBundleDiscount}
+            onRemoveBundle={removeBundleByGroup}
             showCost={money.show_cost_on_till && can('cost.view')}
             onCustomer={() => setDialog('customer')}
             onBillDiscount={() => setDialog('discount')}

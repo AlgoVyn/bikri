@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearTenantDb,
-  DEXIE_SCHEMA_V1,
+  DEXIE_SCHEMA_V8,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -36,7 +36,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V1).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V8).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,

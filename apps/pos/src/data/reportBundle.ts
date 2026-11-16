@@ -1040,7 +1040,10 @@ async function staffReport(
     const row = rowFor(String(sale.staff_id));
     row.bills += 1;
     row.sold += n(sale.total);
-    row.discounts += n(sale.item_discount_total) + n(sale.bill_discount);
+    row.discounts +=
+      n(sale.item_discount_total) +
+      n(sale.bill_discount) +
+      n(sale.bundle_discount_total);
   }
   for (const refund of input.refunds) {
     const row = rowFor(String(refund.staff_id));

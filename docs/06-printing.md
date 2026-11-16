@@ -163,6 +163,21 @@ Warranty: Samsung A15 - 365 days (till            <- lines with sale_lines.warra
 <feed 3><cut><drawer if cash and drawer enabled>
 ```
 
+**Bundle block.** A bundle sale prints one priced header and the component lines underneath, inside the same item table:
+
+```
+Starter Pack               2      Rs 1,13,000
+  Samsung A15 128GB                x 2
+  Anker 45W charger                x 2
+  Phone case                       x 2
+  Screen protector                 x 2
+```
+
+- Header: the bundle name in the name columns, the number of bundles in the qty columns, `bundle_price × bundle_qty` in the amount columns. The header is bold; the price is the only price printed for the group. Do not print the word `Bundle` on the receipt.
+- Component rows: two-space indent, component name, then the **total** component quantity (`per-bundle qty × bundle qty`) in the qty columns; the amount columns stay blank. No component prices. If a component has more than one per bundle, append `(n each)` only when it fits; otherwise the total qty is enough.
+- The bundle product itself is never printed as an item and never adds a separate amount. The totals block remains `Subtotal = Σ line.net`; the bundle header/component rows must not be summed again.
+- A bundle with zero tracked components still prints its component names; the stock warning is a UI concern, not a receipt line.
+
 Conditional rows: `Sales tax 17%` after Discount when `tax_rate_bp > 0` and the sale is tax-exclusive; for a tax-inclusive sale (`sales.tax_inclusive = 1`) no tax row is added, instead `Includes Sales tax 17%   Rs 1,700` is printed right after `TOTAL`; `Rounding` when `rounding ≠ 0`; `Udhaar (on khata)` plus `Khata balance now` when the bill has an udhaar part; `Card`/`Bank/wallet` rows with reference when used; `Customer` row only when a customer is attached; payment rows are hidden when `show_payment_details = 0`.
 
 Column layout (48): item name cols 1–28 (wrap to further lines, max 2), qty cols 29–33 right-aligned, amount cols 34–48 right-aligned (the sample above follows it exactly; text before `<-` is the printed line, at most 48 columns). Detail line indented 2 spaces, max 46 chars. `pair` blocks: label left, value right, at least one space between; if too long, value on the next line right-aligned.
@@ -201,11 +216,13 @@ Change                    Rs 600
 
 58 mm always uses the two-line item format: name line (wrap at 32), then ` <qty> x <unit price>[ -<discount>]` left and amount right.
 
+A bundle at 58 mm uses the same block: the bundle name and its amount on the header line (or the amount on the next line right-aligned when the name wraps), then each component as `  <name> x <total qty>` without a price. Wrap a long bundle name over two lines; do not split the amount across the component block. The component quantities are the total for the whole group, not the per-bundle quantity.
+
 ### 4.3 Other documents
 
 | Document | Title line | Differences |
 |---|---|---|
-| Refund receipt | `REFUND RECEIPT` | Shows original bill no and date, refunded lines with qty, exact amount, rounding, money paid back and method (omitted when 0), `Taken off khata` and `Khata balance now` when there is an udhaar part, reason |
+| Refund receipt | `REFUND RECEIPT` | Shows original bill no and date, refunded lines with qty, exact amount, rounding, money paid back and method (omitted when 0), `Taken off khata` and `Khata balance now` when there is an udhaar part, reason. A whole-bundle return prints one bundle-name header with the returned whole-bundle quantity and the group refund amount, with the component names/quantities underneath; component prices and the word `Bundle` are omitted. Components cannot appear as separate refund lines for a bundle |
 | Void notice | `BILL CANCELLED` | Original bill no, reason, replacement bill no if reissued |
 | Day close summary | `DAY CLOSE` | Device, staff, period, each formula line, expected, counted, difference, denominations |
 | Customer statement | `KHATA STATEMENT` | Customer name/phone, period, each entry (date, description, +/−, balance), closing balance. Usually shared as image, printable |
@@ -318,7 +335,7 @@ REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 
 ## 10. Tests
 
-- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`), ending with the Font B "Powered by AlgoVyn" line (§4.4); the day-close template snapshot has no such line.
+- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`), ending with the Font B "Powered by AlgoVyn" line (§4.4); the day-close template snapshot has no such line. Add a bundle sale fixture with a 4-component bundle at 80 mm and 58 mm and a whole-bundle refund receipt; assert the bundle header, indented components, no component prices and no double-counted total.
 - `layout.test.ts`: long names wrap, amounts right-align, pair overflow, 24/32/40/42/48/69 widths.
 - `raster.test.ts`: 1-bit packing of a known 16×2 bitmap; band splitting at 255 rows.
 - `transports.test.ts`: fake `navigator.usb` and `navigator.serial` record bytes; both produce identical bytes for the same job; chunking ≤ 4096 bytes; timeout → `TIMEOUT`.

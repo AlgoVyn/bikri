@@ -14,8 +14,15 @@ import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { addProduct, CartFullError } from '../data/cart.ts';
 import {
+  addBundle,
+  addProduct,
+  CartFullError,
+  EmptyBundleError,
+} from '../data/cart.ts';
+import {
+  ComponentInUseError,
+  componentCost,
   ledgerContext,
   PRODUCT_HISTORY_PAGE,
   ProductInUseError,
@@ -66,9 +73,11 @@ export function ProductDetailPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(PRODUCT_HISTORY_PAGE);
+  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
+  const costMethod = shop?.cost_method === 'last' ? 'last' : 'avg';
   const detail = useLiveQuery(
-    () => productDetail(getDb(), id, Date.now(), historyLimit),
-    [id, historyLimit],
+    () => productDetail(getDb(), id, Date.now(), historyLimit, costMethod),
+    [id, historyLimit, costMethod],
   );
   const readOnly = useReadOnly();
   const canEdit = can('catalog.edit') && !readOnly;
@@ -99,12 +108,18 @@ export function ProductDetailPage({
   const p = detail.product;
   const unit = String(p.unit ?? 'pc');
   const price = Number(p.price);
-  const avg = Number(p.avg_cost ?? 0);
+  const bundle = detail.bundle;
+  const avg = bundle ? bundle.cost : Number(p.avg_cost ?? 0);
   const showCost = can('cost.view');
   const margin = marginText(price, avg);
   const minStock = Number(p.min_stock_milli ?? 0);
-  const stockTone =
-    p.track_stock !== 1
+  const stockTone = bundle
+    ? bundle.availability === null
+      ? 'default'
+      : bundle.availability <= 0
+        ? 'danger'
+        : 'default'
+    : p.track_stock !== 1
       ? 'default'
       : detail.onHand <= 0
         ? 'danger'
@@ -167,14 +182,41 @@ export function ProductDetailPage({
 
   const addToSale = async () => {
     try {
-      await mutateCart(activeCart, (cart) =>
-        addProduct(cart, p, 1000, money.cost_method),
-      );
+      if (bundle) {
+        const db = getDb();
+        const itemRows = await db.bundle_items
+          .where('bundle_id')
+          .equals(id)
+          .toArray();
+        const components = await db.products.bulkGet(
+          itemRows.map((row) => String(row.component_product_id)),
+        );
+        const recipe = itemRows.flatMap((row, index) => {
+          const product = components[index];
+          return product
+            ? [
+                {
+                  product,
+                  qty_milli: Number(row.qty_milli),
+                },
+              ]
+            : [];
+        });
+        await mutateCart(activeCart, (cart) =>
+          addBundle(cart, p, recipe, 1, money.cost_method),
+        );
+      } else {
+        await mutateCart(activeCart, (cart) =>
+          addProduct(cart, p, 1000, money.cost_method),
+        );
+      }
       toast.push(t('pricecheck.added', { name: String(p.name_en) }), 'info');
       void navigate({ to: '/sell' });
     } catch (error) {
       if (error instanceof CartFullError)
         toast.push(t('sell.cart_full'), 'error');
+      else if (error instanceof EmptyBundleError)
+        toast.push(t('sell.bundle_empty'), 'error');
       else throw error;
     }
   };
@@ -242,6 +284,11 @@ export function ProductDetailPage({
             title={String(p.name_en)}
           >
             {String(p.name_en)}
+            {bundle ? (
+              <span className="ms-2 inline-block rounded-full bg-surface-2 px-2 py-0.5 align-middle text-small font-medium text-text-muted">
+                {t('products.bundle_pill')}
+              </span>
+            ) : null}
           </h1>
           {p.name_ur ? (
             <p lang="ur" dir="rtl" className="font-urdu">
@@ -361,7 +408,19 @@ export function ProductDetailPage({
               <bdi dir="ltr">{margin ?? '—'}</bdi>
             </Figure>
           ) : null}
-          {p.track_stock === 1 ? (
+          {bundle ? (
+            <Figure
+              label={t('products.available_bundles')}
+              testId="detail-on-hand"
+              emphasize
+              tone={stockTone}
+              className={showCost ? 'col-span-2 sm:col-span-1' : undefined}
+            >
+              {bundle.availability === null
+                ? t('products.made_to_order')
+                : String(bundle.availability)}
+            </Figure>
+          ) : p.track_stock === 1 ? (
             <Figure
               label={t('products.on_hand')}
               testId="detail-on-hand"
@@ -378,7 +437,28 @@ export function ProductDetailPage({
             </Figure>
           ) : null}
         </div>
-        {showCost || p.track_stock === 1 ? (
+        {bundle ? (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
+            {showCost ? (
+              <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
+                <MoneyText paisa={bundle.cost} />
+              </Figure>
+            ) : null}
+            <Figure
+              label={t('products.items_total')}
+              testId="detail-items-total"
+            >
+              <MoneyText paisa={bundle.itemsTotal} />
+            </Figure>
+            <Figure
+              label={t('products.bundle_saves')}
+              testId="detail-bundle-saves"
+            >
+              <MoneyText paisa={bundle.itemsTotal - price} />
+            </Figure>
+          </div>
+        ) : null}
+        {!bundle && (showCost || p.track_stock === 1) ? (
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
             {showCost ? (
               <>
@@ -486,7 +566,69 @@ export function ProductDetailPage({
         </section>
       ) : null}
 
-      <section aria-labelledby="history-heading">
+      {bundle ? (
+        <section
+          aria-labelledby="bundle-items-heading"
+          className="rounded-card border border-border bg-surface p-4"
+          data-testid="bundle-recipe"
+        >
+          <h2 id="bundle-items-heading" className="text-title font-semibold">
+            {t('products.bundle_items_title')}
+          </h2>
+          <ul className="mt-2 flex flex-col divide-y divide-border">
+            {bundle.items.map((item) => (
+              <li
+                key={item.product.id}
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2"
+              >
+                <Link
+                  to="/products/$id"
+                  params={{ id: item.product.id }}
+                  className="min-w-0 font-medium underline-offset-2 hover:underline"
+                >
+                  {String(item.product.name_en)}
+                </Link>
+                <span className="text-small text-text-muted">
+                  {t('products.bundle_qty_per', {
+                    qty: qtyWithUnit(
+                      t,
+                      item.qty_milli,
+                      String(item.product.unit ?? 'pc'),
+                    ),
+                  })}
+                </span>
+                <span className="ms-auto text-small">
+                  <MoneyText paisa={Number(item.product.price)} />
+                  {showCost ? (
+                    <span className="ms-2 text-text-muted">
+                      <MoneyText
+                        paisa={componentCost(
+                          item.product,
+                          item.qty_milli,
+                          costMethod,
+                        )}
+                      />
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {bundle.items.length === 0 ? (
+            <p role="alert" className="mt-2 text-small text-danger">
+              {t('products.bundle_empty_recipe')}
+            </p>
+          ) : null}
+          <p className="mt-2 text-small text-text-muted">
+            {t('products.bundle_stock_note')}
+          </p>
+        </section>
+      ) : null}
+
+      <section
+        aria-labelledby="history-heading"
+        className={bundle ? 'hidden' : undefined}
+      >
         <div className="mb-2 flex items-center gap-2">
           <h2 id="history-heading" className="me-auto text-title font-semibold">
             {t('products.history')}
@@ -642,6 +784,11 @@ export function ProductDetailPage({
           } catch (error) {
             if (error instanceof ProductInUseError)
               toast.push(t('products.in_use'), 'error');
+            else if (error instanceof ComponentInUseError)
+              toast.push(
+                t('products.component_in_use', { name: error.bundleName }),
+                'error',
+              );
             else
               toast.push(
                 error instanceof ReadOnlyError

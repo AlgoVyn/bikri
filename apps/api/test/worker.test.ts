@@ -44,8 +44,8 @@ describe('worker', () => {
     const body: unknown = await response.json();
     expect(body).toMatchObject({
       ok: true,
-      app_version: '1.0.0',
-      schema_version: 3,
+      app_version: '1.1.0',
+      schema_version: 6,
       min_client_schema: 1,
       db: 'ok',
     });

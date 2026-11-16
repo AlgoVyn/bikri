@@ -1,7 +1,7 @@
 import { businessDate, newId, saleLineFinal } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useState } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
@@ -581,99 +581,133 @@ export function BillDetail({
             </tr>
           </thead>
           <tbody>
-            {detail.lines.map(({ line, refundedMilli, keptMilli, unit }) => {
-              const qty = Number(line.qty_milli);
-              return (
-                <tr
-                  key={line.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="p-2">
-                    <span
-                      className={`data-name block ${isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''}`}
-                    >
-                      {String(line.name_snapshot)}
-                    </span>
-                    <span
-                      className={
-                        embedded
-                          ? 'block text-text-muted'
-                          : 'block text-text-muted sm:hidden'
-                      }
-                    >
-                      {t('office.bill.qty_price', {
-                        qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
-                        price: money(Number(line.unit_price)),
-                      })}
-                    </span>
-                    <span
-                      className={
-                        embedded
-                          ? 'block text-small text-text-muted'
-                          : 'block text-small text-text-muted sm:hidden'
-                      }
-                    >
-                      {refundedMilli > 0
-                        ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
-                        : ''}
-                      {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
-                    </span>
-                  </td>
-                  <td className="p-2 text-start tabular-nums">
-                    {qty / 1000} {t(`unit.${unit}`)}
-                  </td>
-                  <td
-                    className={
-                      embedded
-                        ? 'hidden'
-                        : 'hidden p-2 text-start sm:table-cell'
-                    }
-                  >
-                    <MoneyText paisa={Number(line.unit_price)} />
-                  </td>
-                  <td
-                    className={
-                      embedded
-                        ? 'hidden'
-                        : 'hidden p-2 text-start sm:table-cell'
-                    }
-                  >
-                    <MoneyText paisa={Number(line.discount ?? 0)} />
-                  </td>
-                  <td className="p-2 text-start">
-                    <MoneyText
-                      paisa={saleLineFinal(
-                        {
-                          net: Number(line.net),
-                          bill_discount_alloc: Number(line.bill_discount_alloc),
-                          tax_alloc: Number(line.tax_alloc),
-                          rounding_alloc: Number(line.rounding_alloc),
-                        },
-                        inclusive,
-                      )}
-                    />
-                  </td>
-                  <td
-                    className={
-                      embedded
-                        ? 'hidden'
-                        : 'hidden p-2 text-start sm:table-cell'
-                    }
-                  >
-                    {refundedMilli > 0 ? refundedMilli / 1000 : '—'}
-                  </td>
-                  <td
-                    className={
-                      embedded
-                        ? 'hidden'
-                        : 'hidden p-2 text-start sm:table-cell'
-                    }
-                  >
-                    {keptMilli / 1000}
-                  </td>
-                </tr>
-              );
-            })}
+            {detail.lines.map(
+              ({ line, refundedMilli, keptMilli, unit }, lineIndex) => {
+                const qty = Number(line.qty_milli);
+                const group = line.bundle_group
+                  ? String(line.bundle_group)
+                  : null;
+                const firstOfGroup =
+                  group !== null &&
+                  detail.lines.findIndex(
+                    (row) => String(row.line.bundle_group ?? '') === group,
+                  ) === lineIndex;
+                return (
+                  <Fragment key={line.id}>
+                    {firstOfGroup ? (
+                      <tr className="border-b border-border bg-surface-2">
+                        <td colSpan={7} className="p-2">
+                          <span className="flex flex-wrap items-center gap-2 font-medium">
+                            {t('office.bill.bundle', {
+                              name: String(line.bundle_name ?? ''),
+                            })}
+                            <span className="rounded-full bg-surface px-1.5 text-caption font-medium text-text-muted">
+                              {t('sell.bundle_pill')}
+                            </span>
+                            <span className="ms-auto text-small text-text-muted">
+                              {Number(line.bundle_qty)} ×{' '}
+                              <MoneyText
+                                paisa={
+                                  Number(line.bundle_price) -
+                                  Number(line.bundle_discount ?? 0)
+                                }
+                              />
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null}
+                    <tr className="border-b border-border last:border-0">
+                      <td className={group ? 'p-2 ps-6' : 'p-2'}>
+                        <span
+                          className={`data-name block ${isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''}`}
+                        >
+                          {String(line.name_snapshot)}
+                        </span>
+                        <span
+                          className={
+                            embedded
+                              ? 'block text-text-muted'
+                              : 'block text-text-muted sm:hidden'
+                          }
+                        >
+                          {t('office.bill.qty_price', {
+                            qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
+                            price: money(Number(line.unit_price)),
+                          })}
+                        </span>
+                        <span
+                          className={
+                            embedded
+                              ? 'block text-small text-text-muted'
+                              : 'block text-small text-text-muted sm:hidden'
+                          }
+                        >
+                          {refundedMilli > 0
+                            ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
+                            : ''}
+                          {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
+                        </span>
+                      </td>
+                      <td className="p-2 text-start tabular-nums">
+                        {qty / 1000} {t(`unit.${unit}`)}
+                      </td>
+                      <td
+                        className={
+                          embedded
+                            ? 'hidden'
+                            : 'hidden p-2 text-start sm:table-cell'
+                        }
+                      >
+                        <MoneyText paisa={Number(line.unit_price)} />
+                      </td>
+                      <td
+                        className={
+                          embedded
+                            ? 'hidden'
+                            : 'hidden p-2 text-start sm:table-cell'
+                        }
+                      >
+                        <MoneyText paisa={Number(line.discount ?? 0)} />
+                      </td>
+                      <td className="p-2 text-start">
+                        <MoneyText
+                          paisa={saleLineFinal(
+                            {
+                              net: Number(line.net),
+                              bill_discount_alloc: Number(
+                                line.bill_discount_alloc,
+                              ),
+                              tax_alloc: Number(line.tax_alloc),
+                              rounding_alloc: Number(line.rounding_alloc),
+                            },
+                            inclusive,
+                          )}
+                        />
+                      </td>
+                      <td
+                        className={
+                          embedded
+                            ? 'hidden'
+                            : 'hidden p-2 text-start sm:table-cell'
+                        }
+                      >
+                        {refundedMilli > 0 ? refundedMilli / 1000 : '—'}
+                      </td>
+                      <td
+                        className={
+                          embedded
+                            ? 'hidden'
+                            : 'hidden p-2 text-start sm:table-cell'
+                        }
+                      >
+                        {keptMilli / 1000}
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              },
+            )}
           </tbody>
         </table>
       </section>
@@ -689,6 +723,12 @@ export function BillDetail({
             <Row
               label={t('office.bill.totals_item_discount')}
               value={<MoneyText paisa={Number(sale.item_discount_total)} />}
+            />
+          ) : null}
+          {Number(sale.bundle_discount_total ?? 0) > 0 ? (
+            <Row
+              label={t('office.bill.totals_bundle_discount')}
+              value={<MoneyText paisa={Number(sale.bundle_discount_total)} />}
             />
           ) : null}
           {Number(sale.bill_discount) > 0 ? (

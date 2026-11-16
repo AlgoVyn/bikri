@@ -174,8 +174,31 @@ function validRows(t: TenantFixture): ReadonlyArray<readonly [string, Row]> {
       },
     ],
     [
+      'products',
+      {
+        id: 'p2',
+        name_en: 'Starter Pack',
+        sku: 'BND-START',
+        kind: 'bundle',
+        track_stock: 0,
+        price: 4_500_000,
+        ...master,
+      },
+    ],
+    [
       'product_barcodes',
       { id: 'pb1', product_id: 'p1', barcode: '8964000000011', ...master },
+    ],
+    [
+      'bundle_items',
+      {
+        id: 'bi1',
+        bundle_id: 'p2',
+        component_product_id: 'p1',
+        qty_milli: 1000,
+        sort_order: 0,
+        ...master,
+      },
     ],
     [
       'customers',
@@ -479,7 +502,7 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
       .all<{ key: string; value: string }>();
     expect(
       Object.fromEntries(meta.results.map((r) => [r.key, r.value])),
-    ).toEqual({ last_prune_at: '0', prune_cursor: '', schema_version: '2' });
+    ).toEqual({ last_prune_at: '0', prune_cursor: '', schema_version: '6' });
     const cats = await db
       .prepare(
         'SELECT code FROM expense_category_templates ORDER BY sort_order',

@@ -586,7 +586,11 @@ export function salesCsv(
           row.customerName ?? '',
           qtyCsv(n(sale.items_qty_milli)),
           rupeesCsv(n(sale.subtotal)),
-          rupeesCsv(n(sale.item_discount_total) + n(sale.bill_discount)),
+          rupeesCsv(
+            n(sale.item_discount_total) +
+              n(sale.bill_discount) +
+              n(sale.bundle_discount_total),
+          ),
           rupeesCsv(n(sale.tax)),
           rupeesCsv(n(sale.total)),
           rupeesCsv(row.applied.cash),

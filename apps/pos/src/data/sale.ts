@@ -17,15 +17,20 @@ import type {
 } from '@bikri/db';
 import { addDays, BACKDATE_REASON_MAX, isBusinessDate } from './backdate.ts';
 import {
+  bundleBasePriceOf,
+  bundleDiscountTotal,
+  bundleListPriceOf,
   type CartId,
   CartNotEmptyError,
   cartTotals,
   emptyCart,
   isEmptyCart,
+  manualDiscountBp,
   overrideMatches,
   type ShopMoney,
   shopMoney,
   unitCostOf,
+  updateBundleQty,
 } from './cart.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
@@ -246,12 +251,30 @@ export async function completeSale(
   for (const p of await db.products.bulkGet(productIds))
     if (p) products.set(p.id, p);
   // Costs may have changed since the line was added (e.g. a delivery synced from another
-  // till). Re-price the cart now so the below-cost decision matches the cost snapshot the
-  // server will verify.
+  // till). Re-price the cart now (bundles included) so the below-cost decision and the
+  // component split match the cost snapshot the server will verify.
+  let pricedCart = cart;
+  for (const group of new Set(
+    cart.lines
+      .map((line) => line.bundle_group)
+      .filter((value): value is string => typeof value === 'string'),
+  )) {
+    const qty = Number(
+      pricedCart.lines.find((line) => line.bundle_group === group)
+        ?.bundle_qty ?? 0,
+    );
+    pricedCart = updateBundleQty(
+      pricedCart,
+      group,
+      qty,
+      products,
+      money.cost_method,
+    );
+  }
   totals = cartTotals(
     {
-      ...cart,
-      lines: cart.lines.map((line) => {
+      ...pricedCart,
+      lines: pricedCart.lines.map((line) => {
         const product = line.product_id
           ? products.get(line.product_id)
           : undefined;
@@ -262,6 +285,7 @@ export async function completeSale(
     },
     money,
   );
+  const manualDiscount = manualDiscountBp(pricedCart, totals);
 
   const seller = await db.staff.get(sellerId);
   const sellerPerm = (permission: Parameters<typeof can>[2]) =>
@@ -276,18 +300,28 @@ export async function completeSale(
   const sellerLimit = backdate
     ? Number(seller?.max_discount_bp ?? input.maxDiscountBp)
     : input.maxDiscountBp;
+  // A bundle sold below its shelf price follows the normal price-override rule.
+  const seenBundleGroups = new Set<string>();
+  for (const line of cart.lines) {
+    if (!line.bundle_group || seenBundleGroups.has(line.bundle_group)) continue;
+    seenBundleGroups.add(line.bundle_group);
+    const price = bundleBasePriceOf(cart, line.bundle_group);
+    if (price >= bundleListPriceOf(cart, line.bundle_group)) continue;
+    if (
+      !sellerPerm('catalog.edit') &&
+      !overrideMatches(cart, 'catalog.edit', { line: line.key, price })
+    )
+      throw new SaleInvalidError('bundle price approval');
+  }
   if (
     totals.lines.some((line) => line.below_cost === 1) &&
     !sellerPerm('sale.below_cost') &&
     !overrideMatches(cart, 'sale.below_cost')
   )
     throw new SaleInvalidError('below-cost approval');
-  if (totals.discount_share_bp > 0 && !sellerPerm('sale.discount'))
+  if (manualDiscount > 0 && !sellerPerm('sale.discount'))
     throw new SaleInvalidError('discount permission');
-  if (
-    totals.discount_share_bp > sellerLimit &&
-    !overrideMatches(cart, 'sale.discount')
-  )
+  if (manualDiscount > sellerLimit && !overrideMatches(cart, 'sale.discount'))
     throw new SaleInvalidError('discount override');
   if (s.udhaar > 0 && !sellerPerm('sale.udhaar'))
     throw new SaleInvalidError('udhaar permission');
@@ -408,11 +442,12 @@ export async function completeSale(
         id: input.saleId,
         invoice_no: `${String(branch.bill_prefix ?? 'A')}-${device.code}-${seq}`,
         invoice_seq: seq,
-        customer_id: cart.customer_id ?? null,
-        line_count: cart.lines.length,
-        items_qty_milli: cart.lines.reduce((n, l) => n + l.qty_milli, 0),
+        customer_id: pricedCart.customer_id ?? null,
+        line_count: pricedCart.lines.length,
+        items_qty_milli: pricedCart.lines.reduce((n, l) => n + l.qty_milli, 0),
         gross_total: totals.gross_total,
         item_discount_total: totals.item_discount_total,
+        bundle_discount_total: bundleDiscountTotal(pricedCart),
         subtotal: totals.subtotal,
         bill_discount_type: bill
           ? bill.type === 'percent'
@@ -436,7 +471,7 @@ export async function completeSale(
       };
       await w.insert('sales', saleRow);
       // Cart lines are newest-first; the bill lists them in the order they were added.
-      const ordered = cart.lines
+      const ordered = pricedCart.lines
         .map((line, i) => ({ line, r: totals.lines[i] }))
         .reverse();
       let lineNo = 0;
@@ -455,6 +490,12 @@ export async function completeSale(
           : line.unit_cost;
         const warranty = Number(product?.warranty_days ?? 0);
         const discounted = line.discount_type && line.discount_value > 0;
+        const bundleBasePrice =
+          line.bundle_base_price ?? line.bundle_price ?? 0;
+        const bundleDiscount = Math.max(
+          0,
+          bundleBasePrice - Number(line.bundle_price ?? 0),
+        );
         const saleLineId = newId(now);
         saleLineIds.set(line.key, saleLineId);
         await w.insert('sale_lines', {
@@ -483,6 +524,19 @@ export async function completeSale(
           below_cost: isBelowCost(r.revenue, line.qty_milli, unitCost) ? 1 : 0,
           serial: line.note ? line.note : null,
           warranty_until: warranty > 0 ? addDays(date, warranty) : null,
+          ...(line.bundle_id && line.bundle_group
+            ? {
+                bundle_id: line.bundle_id,
+                bundle_group: line.bundle_group,
+                bundle_name: line.bundle_name ?? '',
+                bundle_qty: Number(line.bundle_qty ?? 0),
+                bundle_price: Number(bundleBasePrice),
+                bundle_discount: Number(bundleDiscount),
+                bundle_component_qty_milli: Number(
+                  line.bundle_component_qty_milli ?? 0,
+                ),
+              }
+            : {}),
           created_at: now,
         });
         if (product && product.track_stock === 1) {
@@ -580,9 +634,9 @@ export async function completeSale(
           bound_price: price.price,
         });
       }
-      if (totals.discount_share_bp > sellerLimit)
+      if (manualDiscount > sellerLimit)
         await audit('discount_over_limit', {
-          discount_share_bp: totals.discount_share_bp,
+          discount_share_bp: manualDiscount,
           limit_bp: sellerLimit,
           approved_by: overrideMatches(cart, 'sale.discount')
             ? (cart.overrides?.find((o) => o.permission === 'sale.discount')
@@ -714,6 +768,25 @@ export async function startReissue(
       ...(line.serial ? { note: String(line.serial) } : {}),
       track_stock: product?.track_stock === 1 ? 1 : 0,
       unit: String(product?.unit ?? 'pc'),
+      ...(line.bundle_id
+        ? {
+            bundle_id: String(line.bundle_id),
+            bundle_group: String(line.bundle_group),
+            bundle_name: String(line.bundle_name ?? ''),
+            bundle_qty: Number(line.bundle_qty ?? 0),
+            bundle_price:
+              Number(line.bundle_price ?? 0) -
+              Number(line.bundle_discount ?? 0),
+            bundle_list_price: Number(line.bundle_price ?? 0),
+            bundle_base_price: Number(line.bundle_price ?? 0),
+            bundle_discount_type:
+              Number(line.bundle_discount ?? 0) > 0 ? 'amount' : undefined,
+            bundle_discount_value: Number(line.bundle_discount ?? 0),
+            bundle_component_qty_milli: Number(
+              line.bundle_component_qty_milli ?? 0,
+            ),
+          }
+        : {}),
     };
   });
   const discountValue = Number(sale.bill_discount_value ?? 0);

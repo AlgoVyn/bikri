@@ -228,7 +228,21 @@
     "warranty_custom": "اپنے دن",
     "warranty_days": "وارنٹی کے دن",
     "warranty_invalid": "1 سے 3650 دن لکھیں۔",
-    "warranty_none": "کوئی نہیں"
+    "warranty_none": "کوئی نہیں",
+    "is_bundle": "یہ بنڈل ہے",
+    "bundle_price": "بنڈل کی قیمت",
+    "bundle_items": "اس بنڈل کی اشیاء",
+    "bundle_items_empty": "اس بنڈل میں کم از کم ایک چیز شامل کریں۔",
+    "bundle_add_item": "چیز شامل کریں",
+    "bundle_search": "نام یا SKU سے پروڈکٹ تلاش کریں",
+    "bundle_qty": "فی بنڈل مقدار",
+    "bundle_remove": "{{name}} ہٹائیں",
+    "bundle_recipe_hint": "ترکیب مقرر ہے۔ کیشیئر فروخت پر اشیاء تبدیل نہیں کر سکتا۔",
+    "bundle_items_required": "بنڈل کے لیے 1 سے 20 اشیاء اور صفر سے زیادہ مقدار درکار ہے۔",
+    "bundle_error_component": "ایک فعال سادہ پروڈکٹ منتخب کریں، خود یہ بنڈل نہیں۔",
+    "bundle_error_qty": "ہر چیز کی مقدار صفر سے زیادہ ہونی چاہیے۔",
+    "bundle_error_count": "بنڈل میں 1 سے 20 مختلف اشیاء ہونی چاہئیں۔",
+    "cost_tracked_hint": "لاگت ڈیلیوری اور اسٹاک موومنٹس سے اپ ڈیٹ ہوتی ہے۔ اسے ایڈٹ کرنے کے لیے پہلے اسٹاک ٹریکنگ بند کریں۔"
   },
   "glossary": {
     "baqaya": "بقایا",
@@ -741,7 +755,19 @@
     "back_to_product": "پروڈکٹ پر واپس",
     "min_stock_off": "بند",
     "last14_empty": "پچھلے 14 دنوں میں اسٹاک میں کوئی حرکت نہیں۔",
-    "sell": "بیچیں"
+    "sell": "بیچیں",
+    "bundles": "بنڈل",
+    "bundle_pill": "بنڈل",
+    "bundle_count": "{{count}} بنڈل",
+    "made_to_order": "آرڈر پر تیار",
+    "available_bundles": "دستیاب",
+    "items_total": "اشیاء کا کل",
+    "bundle_saves": "گاہک کی بچت",
+    "bundle_items_title": "اس بنڈل کی اشیاء",
+    "bundle_qty_per": "فی بنڈل {{qty}}",
+    "bundle_stock_note": "بنڈل بکنے پر ہر چیز کا اسٹاک کم ہوتا ہے۔ بنڈل کا اپنا اسٹاک نہیں۔",
+    "component_in_use": "یہ چیز {{name}} میں استعمال ہو رہی ہے۔ پہلے اسے بنڈل سے ہٹائیں۔",
+    "bundle_empty_recipe": "اس بنڈل میں کوئی چیز نہیں۔ اسے ایڈٹ کر کے 1 سے 20 اشیاء شامل کریں۔"
   },
   "sell": {
     "add_discount": "رعایت شامل کریں",
@@ -839,7 +865,16 @@
     "walk_in": "عام گاہک",
     "empty_tab": "نئی بل",
     "backdate_banner": "پرانی فروخت درج ہو رہی ہے · {{date}} · {{staff}}",
-    "backdate_cancel": "پرانی فروخت منسوخ کریں"
+    "backdate_cancel": "پرانی فروخت منسوخ کریں",
+    "bundle_pill": "بنڈل",
+    "bundle_items": "بنڈل · {{count}} اشیاء",
+    "bundle_made_to_order": "بنڈل · {{count}} اشیاء · آرڈر پر تیار",
+    "bundle_qty": "بنڈل",
+    "bundle_components_readonly": "ایک بنڈل کے طور پر فروخت۔ پورے بنڈل کی قیمت یا مقدار تبدیل کریں؛ اشیاء خود بخود تبدیل ہو جائیں گی۔",
+    "bundle_item_count": "{{count}} اشیاء",
+    "bundle_price": "بنڈل کی قیمت",
+    "bundle_list_price": "فہرست {{amount}}",
+    "bundle_empty": "اس بنڈل میں کوئی چیز نہیں۔ فروخت سے پہلے پروڈکٹس میں اشیاء شامل کریں۔"
   },
   "setup": {
     "add_one": "ایک مصنوع شامل کریں",

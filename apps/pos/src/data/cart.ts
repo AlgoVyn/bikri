@@ -5,6 +5,7 @@ import {
   MAX_LINES_PER_DOCUMENT,
   mulDivRound,
   newId,
+  priceBundle,
   type TaxMode,
 } from '@bikri/core';
 import type {
@@ -28,6 +29,14 @@ export class CartFullError extends Error {
   constructor() {
     super(`A bill can have ${MAX_CART_LINES} lines`);
     this.name = 'CartFullError';
+  }
+}
+
+/** A bundle row reached Sell without a recipe (legacy or damaged data). */
+export class EmptyBundleError extends Error {
+  constructor() {
+    super('This bundle has no items');
+    this.name = 'EmptyBundleError';
   }
 }
 
@@ -146,6 +155,346 @@ export function addProduct(
   return { ...cart, lines: [line, ...cart.lines] };
 }
 
+export type BundleRecipeItem = {
+  product: MasterRow;
+  qty_milli: number;
+};
+
+function bundleLines(cart: Cart, group: string): CartLine[] {
+  return cart.lines.filter((line) => line.bundle_group === group);
+}
+
+export function bundleQtyOf(cart: Cart, group: string): number {
+  return Number(bundleLines(cart, group)[0]?.bundle_qty ?? 0);
+}
+
+/** The bundle's shelf price when added; the operator can sell below it if permitted. */
+export function bundleListPriceOf(cart: Cart, group: string): number {
+  const first = bundleLines(cart, group)[0];
+  return Number(first?.bundle_list_price ?? first?.bundle_price ?? 0);
+}
+
+/** Price the group discount applies to: a manual edit, else the shelf price. */
+export function bundleBasePriceOf(cart: Cart, group: string): number {
+  const first = bundleLines(cart, group)[0];
+  return Number(
+    first?.bundle_base_price ??
+      first?.bundle_list_price ??
+      first?.bundle_price ??
+      0,
+  );
+}
+
+/** Per-bundle manual discount currently applied to the group. */
+export function bundleDiscountOf(cart: Cart, group: string): number {
+  const first = bundleLines(cart, group)[0];
+  if (!first) return 0;
+  return Math.max(
+    0,
+    bundleBasePriceOf(cart, group) - Number(first.bundle_price ?? 0),
+  );
+}
+
+/** Whole-bill total of the bundle group discounts. */
+export function bundleDiscountTotal(cart: Cart): number {
+  let total = 0;
+  for (const [group, lines] of bundleGroupLines(cart)) {
+    const qty = Number(lines[0]?.bundle_qty ?? 0);
+    if (qty > 0) total += bundleDiscountOf(cart, group) * qty;
+  }
+  return total;
+}
+
+/** Net bundle price after a Rs or % group discount. */
+export function bundleNetPrice(
+  base: number,
+  type: 'amount' | 'percent',
+  value: number,
+): number {
+  if (value <= 0 || base <= 0) return base;
+  if (type === 'percent')
+    return Math.max(
+      0,
+      base - mulDivRound(base, Math.min(value, 10_000), 10_000),
+    );
+  return Math.max(0, base - value);
+}
+
+/** The group's component lines with the per-bundle quantity each snapshot carries. */
+export function bundleGroupLines(cart: Cart): Map<string, CartLine[]> {
+  const groups = new Map<string, CartLine[]>();
+  for (const line of cart.lines) {
+    if (!line.bundle_group) continue;
+    const list = groups.get(line.bundle_group) ?? [];
+    list.push(line);
+    groups.set(line.bundle_group, list);
+  }
+  return groups;
+}
+
+type RecipeIdentity = {
+  product_id?: string | null;
+  bundle_component_qty_milli?: number;
+};
+
+/** Stable recipe identity used to merge the same bundle snapshot only. */
+function recipeSignature(lines: readonly RecipeIdentity[]): string {
+  return lines
+    .map(
+      (line) =>
+        `${String(line.product_id)}:${Number(line.bundle_component_qty_milli ?? 0)}`,
+    )
+    .sort()
+    .join('|');
+}
+
+/**
+ * Adds whole bundles as one block of component lines (07 §3.4, screens/05).
+ * The component prices are internal: the group total is the bundle price.
+ */
+export function addBundle(
+  cart: Cart,
+  bundle: MasterRow,
+  recipe: readonly BundleRecipeItem[],
+  qtyBundles: number,
+  method: CostMethod,
+): Cart {
+  const price = Number(bundle.price ?? 0);
+  const wanted = recipeSignature(
+    recipe.map((item) => ({
+      product_id: item.product.id,
+      bundle_component_qty_milli: item.qty_milli,
+    })),
+  );
+  const existing = cart.lines.find(
+    (line) =>
+      line.bundle_group !== undefined &&
+      line.bundle_id === bundle.id &&
+      Number(line.bundle_price) === price &&
+      recipeSignature(bundleLines(cart, String(line.bundle_group))) === wanted,
+  );
+  if (existing) {
+    const products = new Map(
+      recipe.map((item) => [item.product.id, item.product]),
+    );
+    const current = bundleQtyOf(cart, String(existing.bundle_group));
+    return updateBundleQty(
+      cart,
+      String(existing.bundle_group),
+      current + qtyBundles,
+      products,
+      method,
+    );
+  }
+  if (recipe.length === 0) throw new EmptyBundleError();
+  if (cart.lines.length + recipe.length > MAX_CART_LINES)
+    throw new CartFullError();
+  const priced = priceBundle({
+    bundle_price: price,
+    bundle_qty: qtyBundles,
+    components: recipe.map((item) => ({
+      qty_milli: item.qty_milli,
+      unit_cost: unitCostOf(item.product, method),
+      unit_price: Number(item.product.price ?? 0),
+    })),
+  });
+  const group = newId();
+  const lines: CartLine[] = recipe.map((item, index) => {
+    const result = priced.lines[index];
+    if (!result) throw new Error('bundle recipe and price lines differ');
+    return {
+      key: newId(),
+      product_id: item.product.id,
+      name: String(item.product.name_en ?? ''),
+      sku: String(item.product.sku ?? ''),
+      qty_milli: result.qty_milli,
+      unit_price: result.unit_price,
+      list_price: result.unit_price,
+      discount_type: 'amount',
+      discount_value: result.discount,
+      unit_cost: result.unit_cost,
+      track_stock: item.product.track_stock === 1 ? 1 : 0,
+      unit: String(item.product.unit ?? 'pc'),
+      ...(item.product.image_key
+        ? { image_key: String(item.product.image_key) }
+        : {}),
+      bundle_id: bundle.id,
+      bundle_group: group,
+      bundle_name: String(bundle.name_en ?? ''),
+      bundle_qty: qtyBundles,
+      bundle_price: price,
+      bundle_list_price: price,
+      bundle_base_price: price,
+      bundle_component_qty_milli: item.qty_milli,
+    };
+  });
+  return { ...cart, lines: [...lines, ...cart.lines] };
+}
+
+/** Re-runs the cost-weighted split for a quantity and effective bundle price. */
+function repriceBundle(
+  cart: Cart,
+  group: string,
+  qtyBundles: number,
+  bundlePrice: number,
+  products: ReadonlyMap<string, MasterRow>,
+  method: CostMethod,
+): Cart {
+  const lines = bundleLines(cart, group);
+  if (lines.length === 0 || qtyBundles <= 0) return cart;
+  const priced = priceBundle({
+    bundle_price: bundlePrice,
+    bundle_qty: qtyBundles,
+    components: lines.map((line) => {
+      const product = line.product_id
+        ? products.get(line.product_id)
+        : undefined;
+      return {
+        qty_milli: Number(line.bundle_component_qty_milli ?? line.qty_milli),
+        unit_cost: product ? unitCostOf(product, method) : line.unit_cost,
+        unit_price: product ? Number(product.price ?? 0) : line.unit_price,
+      };
+    }),
+  });
+  let index = 0;
+  const next = cart.lines.map((line) => {
+    if (line.bundle_group !== group) return line;
+    const result = priced.lines[index];
+    index += 1;
+    if (!result) return line;
+    return {
+      ...line,
+      qty_milli: result.qty_milli,
+      unit_price: result.unit_price,
+      list_price: result.unit_price,
+      discount_type: 'amount' as const,
+      discount_value: result.discount,
+      unit_cost: result.unit_cost,
+      bundle_qty: qtyBundles,
+      bundle_price: bundlePrice,
+    };
+  });
+  return { ...cart, lines: next };
+}
+
+function setBundleBasePrice(cart: Cart, group: string, base: number): Cart {
+  return {
+    ...cart,
+    lines: cart.lines.map((line) =>
+      line.bundle_group === group ? { ...line, bundle_base_price: base } : line,
+    ),
+  };
+}
+
+/** Re-runs the cost-weighted split for a new whole-bundle quantity; 0 removes the group. */
+export function updateBundleQty(
+  cart: Cart,
+  group: string,
+  qtyBundles: number,
+  products: ReadonlyMap<string, MasterRow>,
+  method: CostMethod,
+): Cart {
+  const lines = bundleLines(cart, group);
+  if (lines.length === 0) return cart;
+  if (qtyBundles <= 0) return removeBundle(cart, group);
+  const first = lines[0] as CartLine;
+  return repriceBundle(
+    cart,
+    group,
+    qtyBundles,
+    Number(first.bundle_price ?? 0),
+    products,
+    method,
+  );
+}
+
+/** Edits the whole-bundle price and redistributes it across the component lines. */
+export function updateBundlePrice(
+  cart: Cart,
+  group: string,
+  bundlePrice: number,
+  products: ReadonlyMap<string, MasterRow>,
+  method: CostMethod,
+): Cart {
+  const lines = bundleLines(cart, group);
+  if (lines.length === 0 || bundlePrice < 0) return cart;
+  const first = lines[0] as CartLine;
+  const qty = Number(first.bundle_qty ?? 0);
+  if (qty <= 0) return cart;
+  const next = repriceBundle(cart, group, qty, bundlePrice, products, method);
+  // Typing a price replaces a previous discount control.
+  const clean = {
+    ...next,
+    lines: next.lines.map((line) =>
+      line.bundle_group === group
+        ? {
+            ...line,
+            bundle_base_price: bundlePrice,
+            bundle_discount_type: undefined,
+            bundle_discount_value: undefined,
+          }
+        : line,
+    ),
+  };
+  return clean;
+}
+
+/** Applies a Rs/% discount on the bundle shelf price as the new net group price. */
+export function setBundleDiscount(
+  cart: Cart,
+  group: string,
+  type: 'amount' | 'percent',
+  value: number,
+  products: ReadonlyMap<string, MasterRow>,
+  method: CostMethod,
+): Cart {
+  const lines = bundleLines(cart, group);
+  if (lines.length === 0) return cart;
+  const first = lines[0] as CartLine;
+  const qty = Number(first.bundle_qty ?? 0);
+  if (qty <= 0) return cart;
+  const base = bundleBasePriceOf(cart, group);
+  const net = bundleNetPrice(base, type, value);
+  const next = repriceBundle(cart, group, qty, net, products, method);
+  const baseSet = setBundleBasePrice(next, group, base);
+  return {
+    ...baseSet,
+    lines: baseSet.lines.map((line) =>
+      line.bundle_group === group
+        ? {
+            ...line,
+            bundle_discount_type: type,
+            bundle_discount_value: Math.max(0, value),
+          }
+        : line,
+    ),
+  };
+}
+
+export function removeBundle(cart: Cart, group: string): Cart {
+  return { ...cart, lines: cart.lines.filter((l) => l.bundle_group !== group) };
+}
+
+/** Bundle residual paisa is not a manual discount (07 §3.1). */
+export function bundleResidualDiscount(cart: Cart, totals: CartResult): number {
+  let residual = 0;
+  for (const [index, line] of cart.lines.entries()) {
+    if (line.bundle_id) residual += totals.lines[index]?.discount ?? 0;
+  }
+  return residual;
+}
+
+/** Manual discount share in basis points, excluding bundle rounding residuals. */
+export function manualDiscountBp(cart: Cart, totals: CartResult): number {
+  const manual =
+    totals.item_discount_total +
+    totals.bill_discount -
+    bundleResidualDiscount(cart, totals) +
+    bundleDiscountTotal(cart);
+  if (manual <= 0 || totals.gross_total === 0) return 0;
+  return mulDivRound(manual, 10_000, totals.gross_total);
+}
+
 /** Quick sale: no product, no stock movement, cost 0 (screens/05). */
 export function addQuickSale(
   cart: Cart,
@@ -168,12 +517,14 @@ export function addQuickSale(
   return { ...cart, lines: [line, ...cart.lines] };
 }
 
-/** Changes one line; quantity 0 removes it. */
+/** Changes one line; quantity 0 removes it. Bundle components are read-only. */
 export function updateLine(
   cart: Cart,
   key: string,
   patch: Partial<CartLine>,
 ): Cart {
+  if (cart.lines.some((line) => line.key === key && line.bundle_group))
+    throw new Error('bundle components cannot be edited individually');
   const lines: CartLine[] = [];
   for (const line of cart.lines) {
     if (line.key !== key) {
@@ -188,6 +539,8 @@ export function updateLine(
 }
 
 export function removeLine(cart: Cart, key: string): Cart {
+  const line = cart.lines.find((l) => l.key === key);
+  if (line?.bundle_group) return removeBundle(cart, line.bundle_group);
   return { ...cart, lines: cart.lines.filter((l) => l.key !== key) };
 }
 
@@ -222,6 +575,13 @@ export function cartSignature(cart: Cart): string {
       line.unit_cost,
       line.discount_type ?? null,
       line.discount_value ?? 0,
+      line.bundle_group ?? null,
+      line.bundle_qty ?? null,
+      line.bundle_price ?? null,
+      line.bundle_list_price ?? null,
+      line.bundle_base_price ?? null,
+      line.bundle_discount_type ?? null,
+      line.bundle_discount_value ?? null,
     ]),
   });
 }
@@ -293,11 +653,11 @@ export function paymentChecks(
   staff: { maxDiscountBp: number; canBelowCost: boolean; canDiscount: boolean },
 ): { belowCost: boolean; discount: boolean } {
   const anyBelow = totals.lines.some((l) => l.below_cost === 1);
-  const discounted = totals.item_discount_total + totals.bill_discount > 0;
+  const manual = manualDiscountBp(cart, totals);
+  const discounted = manual > 0;
   // A staff member whose `sale.discount` permission is revoked cannot override the
   // permission itself; only the max-discount limit is overrideable (05 §6).
-  const overLimit =
-    discounted && totals.discount_share_bp > staff.maxDiscountBp;
+  const overLimit = discounted && manual > staff.maxDiscountBp;
   return {
     belowCost:
       anyBelow &&

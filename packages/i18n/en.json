@@ -228,7 +228,21 @@
     "warranty_custom": "Custom days",
     "warranty_days": "Warranty days",
     "warranty_invalid": "Enter 1 to 3650 days.",
-    "warranty_none": "None"
+    "warranty_none": "None",
+    "is_bundle": "This is a bundle",
+    "bundle_price": "Bundle price",
+    "bundle_items": "Items in this bundle",
+    "bundle_items_empty": "Add at least one item to this bundle.",
+    "bundle_add_item": "Add item",
+    "bundle_search": "Search a product by name or SKU",
+    "bundle_qty": "Qty per bundle",
+    "bundle_remove": "Remove {{name}}",
+    "bundle_recipe_hint": "The recipe is fixed. Cashiers cannot swap items at Sell.",
+    "bundle_items_required": "A bundle needs 1–20 items with a quantity above zero.",
+    "bundle_error_component": "Choose an active simple product that is not this bundle.",
+    "bundle_error_qty": "Each item needs a quantity above zero.",
+    "bundle_error_count": "A bundle needs between 1 and 20 different items.",
+    "cost_tracked_hint": "Cost is updated by deliveries and stock movements. To edit it, turn off stock tracking first."
   },
   "glossary": {
     "baqaya": "Balance",
@@ -741,7 +755,19 @@
     "back_to_product": "Back to product",
     "min_stock_off": "Off",
     "last14_empty": "No stock movement in the last 14 days.",
-    "sell": "Sell"
+    "sell": "Sell",
+    "bundles": "Bundles",
+    "bundle_pill": "Bundle",
+    "bundle_count": "{{count}} bundles",
+    "made_to_order": "Made to order",
+    "available_bundles": "Available",
+    "items_total": "Items total",
+    "bundle_saves": "Customer saves",
+    "bundle_items_title": "Items in this bundle",
+    "bundle_qty_per": "{{qty}} per bundle",
+    "bundle_stock_note": "Stock is deducted from each item when the bundle is sold. The bundle itself has no stock.",
+    "component_in_use": "This item is used by {{name}}. Remove it from the bundle first.",
+    "bundle_empty_recipe": "This bundle has no items. Edit it and add 1–20 items."
   },
   "sell": {
     "add_discount": "Add discount",
@@ -839,7 +865,16 @@
     "walk_in": "Walk-in customer",
     "empty_tab": "New bill",
     "backdate_banner": "Recording a past sale · {{date}} · {{staff}}",
-    "backdate_cancel": "Cancel past sale"
+    "backdate_cancel": "Cancel past sale",
+    "bundle_pill": "Bundle",
+    "bundle_items": "Bundle · {{count}} items",
+    "bundle_made_to_order": "Bundle · {{count}} items · Made to order",
+    "bundle_qty": "Bundles",
+    "bundle_components_readonly": "Sold as one bundle. Change the whole-bundle price or quantity; component items follow.",
+    "bundle_item_count": "{{count}} items",
+    "bundle_price": "Bundle price",
+    "bundle_list_price": "List {{amount}}",
+    "bundle_empty": "This bundle has no items. Add items in Products before selling it."
   },
   "setup": {
     "add_one": "Add one product",

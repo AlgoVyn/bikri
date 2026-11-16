@@ -195,6 +195,15 @@ function Tile({
       >
         {name}
       </span>
+      {row.bundle ? (
+        <span className="w-full shrink-0 truncate text-caption text-text-muted">
+          {row.bundle.availability === null
+            ? t('sell.bundle_made_to_order', {
+                count: row.bundle.items.length,
+              })
+            : t('sell.bundle_items', { count: row.bundle.items.length })}
+        </span>
+      ) : null}
       <span className="mt-auto flex w-full shrink-0 items-center justify-between gap-1 text-small">
         <span className="text-body font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />

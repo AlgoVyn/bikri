@@ -33,6 +33,8 @@ Other options: show shop name (default off), show price (default on), printer re
 
 **Rendering:** one inline SVG per label with `viewBox` in mm, bars as `<rect>` with `shape-rendering="crispEdges"`, no anti-aliasing; text in HTML. Print CSS hides the app (`body > :not(#label-print-root) { display: none }`), sets `-webkit-print-color-adjust: exact`, `break-after: page` per roll label, and `break-inside: avoid` per A4 cell. The dialog tells the user once: "In the print dialog choose your label printer, Margins: None, Scale: 100%, Headers and footers off".
 
+A bundle product can be selected in the label dialog like any product; the label prints the bundle's own name, price and barcode. The recipe is not printed on the label; component labels are printed from the component products.
+
 ## Layout
 
 1. List of products to label: thumbnail, name, barcode value (or `Generate barcode` button), copies (`QtyInput`, whole numbers 0–500; default 1 from product screens, the received quantity from a delivery for unit `pc`/`pair`/`set`/`box`/`pack`/`dozen`, 1 for weighed/measured units).

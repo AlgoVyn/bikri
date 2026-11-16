@@ -43,18 +43,38 @@ There is no standalone action row below the product grid; held bills sit in the 
 
 Same product added twice merges into one line unless the line has a note or a price override.
 
+## Bundles (v1.1)
+
+A bundle is a product with `kind='bundle'`, `track_stock=0` and a fixed recipe ([08](08-products.md#bundles-v11)). The cart treats it as **one block**, but the bill stores one component sale line per item ([02 §2.16](../02-data-model.md#216-bundles-migration-0017_bundlessql)).
+
+- **Tile:** the normal product tile with a pale monogram, the standard price and stock pill, and a muted `Bundle · N items` line under the name. No gradient, separate badge or special tile. The stock pill is the derived bundle availability (lowest tracked component stock ÷ per-bundle quantity); "Out" only when a tracked component cannot make one bundle. The bundle's own `track_stock=0` must **not** hide the pill: bundle kind overrides the normal untracked-product rule. If every component is untracked, hide the pill and append `· Made to order` to the `Bundle · N items` line.
+- **Adding:** one bundle line is added, followed by its component rows:
+  - header: chevron, name, a small neutral `Bundle` pill, `1 × Rs 56,500 · N items`, an amber `Only 3 in stock` badge when relevant, the line total (the bundle price), and a × that removes the whole block;
+  - component rows: indented, name + total quantity only. No unit price, discount, note or remove control per component.
+- **Changing:** the bundle header has one whole-unit quantity stepper, an editable bundle price and the normal `More options` group discount (the existing `QtyInput`, `MoneyInput` and Rs/% discount field in the expanded area); changing the quantity multiplies every component quantity and the group total, and changing the price or discount re-runs the component split at the new group total. A price below the bundle shelf price follows the normal price-override rule (`catalog.edit` or a manager override); the bundle discount counts in the staff discount limit and "You saved". Removing the bundle removes all component rows. Adding the same bundle again merges only if the bundle id, price and recipe snapshot match; a loose component product stays a separate line.
+- **Held bills:** the group and its recipe/price snapshot are stored in the local cart. On resume or payment, if the bundle price or recipe changed (or the bundle was deleted) and the till has seen the change, show "This bundle changed — update or remove it" with those two actions. If the till had not pulled the change, the server accepts the old snapshot with the normal freshness rule.
+- **Totals:** the totals block and the sale total use the component line nets; the bundle header is not a second total. The bundle saving is not a line or bill discount and does not count against the cashier's discount limit. A tiny bundle-rounding residual may appear in the sale detail as "Bundle rounding"; it is a rounding artifact, not a bundle saving or a manual discount. If the cart's totals block shows line discounts, the residual is included there (a few paisa); it is excluded from the staff limit and "You saved".
+- **One-off combinations:** keep using normal lines + a bill discount; ad-hoc bundle grouping is not part of v1.1.
+
+Cart limit: a bundle with N components uses N of the 60 lines; a bundle may have at most 20 components. The existing 60-line message still applies. `Subtotal (n items)` counts component units (a 4-component bundle ×2 is 8 items); the bundle header shows `Bundle ×2`, so the count is not a second total.
+
 ## Validation and warnings (never block unless stated)
 
 | Rule | UX |
 |---|---|
 | Qty > on hand (track_stock) | amber badge "Only 2 in stock" — sale allowed (REQ-C07) |
 | Line below cost (07 §3.2) | red badge "Below cost!"; Take payment requires `sale.below_cost` or override |
+| Bundle group below cost | the group header shows "Below cost!" when the bundle total is below total component cost; the normal `sale.below_cost`/override applies. A profitable bundle must not show it (cost-weighted split + floor) |
 | Total discount > staff limit | Take payment opens override (07 §3.1) |
 | Price override below sale price | requires `catalog.edit` or override |
+| Bundle price | editable as one group total; below the shelf bundle price requires `catalog.edit` or an override. Component prices are derived by `priceBundle()` and are not editable individually |
 | Line discount > gross | capped, field shows red border with "Max Rs 500" |
 | Empty cart | `Take payment` stays in the actions row and focuses the search instead of opening payment |
-| 60 lines in the cart | adding another line is blocked: "A bill can have 60 lines — take payment and start a second bill" (keeps one bill's sync ops ≤ 200, [03 §3](../03-sync.md#3-outbox)) |
-| Quantity 0 | line removed |
+| 60 lines in the cart | adding another line is blocked: "A bill can have 60 lines — take payment and start a second bill" (keeps one bill's sync ops ≤ 200, [03 §3](../03-sync.md#3-outbox)); a bundle with N components uses N lines |
+| Bundle component stock | amber `Only X in stock` on the bundle header, where X is the derived bundle availability; sale allowed (REQ-C07) |
+| Bundle edit while held | "This bundle changed — update or remove it" when the price/recipe changed and the till has seen the change |
+| Bundle component edit/remove | no control; only the whole bundle qty/removal. A component cannot be refunded or removed separately |
+| Quantity 0 | line removed (a bundle qty of 0 removes the whole group) |
 
 Cost and margin are never shown here, except a small "Cost Rs 1,120 · margin 12%" in the expanded line for users with `cost.view` when `shop.show_cost_on_till = 1`.
 
@@ -75,7 +95,7 @@ A cart opened from **Sales → Record past sale** shows a warning banner above t
 
 ## Hotkeys
 
-`F2`/`Ctrl+F` search, `Ctrl+1–3` cart tabs, `↑/↓` move in results or lines (the open line editor follows the selection), `+`/`-` change qty of the selected line, `Delete` remove selected line, `F3` bill discount, `Ctrl+H`/`F4` hold, `F6` held bills, `F7` quick sale, `Enter`/`F8` take payment (when search is empty), `F9` open drawer (`drawer.open`), `Esc` clear search → collapse line → clear cart (confirm), `N` new sale (clears current tab after confirm when not focused in an input).
+`F2`/`Ctrl+F` search, `Ctrl+1–3` cart tabs, `↑/↓` move in results or lines (the open line editor follows the selection; a bundle group moves as one block), `+`/`-` change qty of the selected line (the whole bundle when a bundle header is selected), `Delete` remove selected line (the whole bundle), `F3` bill discount, `Ctrl+H`/`F4` hold, `F6` held bills, `F7` quick sale, `Enter`/`F8` take payment (when search is empty), `F9` open drawer (`drawer.open`), `Esc` clear search → collapse line → clear cart (confirm), `N` new sale (clears current tab after confirm when not focused in an input).
 
 ## Acceptance criteria
 
@@ -89,3 +109,9 @@ A cart opened from **Sales → Record past sale** shows a warning banner above t
 8. Quick sale "Repair labour Rs 500" completes with no stock movement.
 9. RTL: in Urdu, cart is on the left, grid on the right, numbers remain LTR.
 10. At 1920×1080 a 14-line bill shows all fourteen lines without scrolling while the active line's editor is open.
+11. Adding "Starter Pack" (4 components) shows one bundle header (`Bundle`, `1 × Rs 56,500 · 4 items`, total Rs 56,500) and four indented component rows with quantities only; a following loose cable adds a normal line; the total is bundle + cable.
+12. Changing the bundle qty to 2 doubles every component quantity and the bundle total; removing the bundle removes the header and all four components; no component has its own remove, price or discount control.
+13. A bundle whose phone component has 3 in stock shows "Only 3 in stock" and still completes; after the sale the phone, charger, case and protector each go down by the bundle quantity; a component with `track_stock=0` gets no movement.
+14. A held bundle survives reload; changing the bundle's price/recipe on another till then resuming prompts "update or remove"; after updating, the new price is used; an offline till that had not pulled the change still syncs the old snapshot.
+15. The receipt for a bundle sale prints one bundle header and the component names/quantities underneath, with no component prices and no double-counted total ([06 §4.1](../06-printing.md#41-sale-receipt-80-mm-48-columns)).
+16. English and Urdu at 1280×800 and 390×844: the group, components and warning mirror correctly; numbers stay LTR; the bundle hotkeys in §Hotkeys work.

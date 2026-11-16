@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { seedSampleDay } from '../dev/sampleDay.ts';
 import {
   addCategory,
+  BundleRecipeError,
   barcodeOwner,
   CategoryInUseError,
+  ComponentInUseError,
   DuplicateBarcodeError,
   DuplicateSkuError,
   duplicateDraft,
@@ -15,6 +17,7 @@ import {
   listCategories,
   listProducts,
   moveCategory,
+  normaliseBundleItems,
   ProductInUseError,
   type ProductListRow,
   type ProductSort,
@@ -26,6 +29,7 @@ import {
   saveNewProduct,
   saveProductEdit,
   stockHistoryCsv,
+  TrackedCostError,
   updateCategory,
 } from './catalog.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
@@ -376,39 +380,71 @@ describe('products (screens/08)', () => {
     expect(await db.products.count()).toBe(1);
   });
 
-  it('edit: price change and cost change are audited; cost sets last_cost only; barcodes diff', async () => {
+  it('edit: price is audited; tracked cost is locked; untracked cost is editable', async () => {
     const db = await readyDb();
     const ctx = await ledgerContext(db, 'st-1');
     const p = await saveNewProduct(db, cable, ctx, { now: NOW });
     await saveProductEdit(
       db,
       p.id,
-      { ...cable, price: 159900, cost: 120000, barcodes: ['222333444'] },
+      { ...cable, price: 159900, barcodes: ['222333444'] },
       ctx,
-      {
-        now: NOW + 1,
-      },
+      { now: NOW + 1 },
     );
     const after = await db.products.get(p.id);
     expect(after).toMatchObject({
       price: 159900,
-      last_cost: 120000,
+      last_cost: 110000,
       avg_cost: 110000,
     });
-    const audits = (await db.audit_log.toArray()).map((a) => [
-      a.action,
-      a.before_json,
-      a.after_json,
-    ]);
+    await expect(
+      saveProductEdit(
+        db,
+        p.id,
+        { ...cable, price: 159900, cost: 120000 },
+        ctx,
+        { now: NOW + 2 },
+      ),
+    ).rejects.toBeInstanceOf(TrackedCostError);
+    const audits = (await db.audit_log.toArray())
+      .filter((audit) => audit.entity_id === p.id)
+      .map((a) => [a.action, a.before_json, a.after_json]);
     expect(audits).toEqual([
       ['price_change', '{"price":149900}', '{"price":159900}'],
-      ['cost_change', '{"last_cost":110000}', '{"last_cost":120000}'],
     ]);
     const live = (await db.product_barcodes.toArray())
       .filter((b) => !b.deleted_at)
       .map((b) => b.barcode);
     expect(live).toEqual(['222333444']);
     expect(await db.stock_movements.count()).toBe(1);
+
+    const service = await saveNewProduct(
+      db,
+      {
+        ...cable,
+        name_en: 'Repair service',
+        sku: 'SRV-1',
+        barcodes: [],
+        track_stock: false,
+        opening_milli: 0,
+        cost: 5000,
+      },
+      ctx,
+      { now: NOW + 3 },
+    );
+    await saveProductEdit(
+      db,
+      service.id,
+      {
+        name_en: 'Repair service',
+        price: 149900,
+        cost: 6000,
+        track_stock: false,
+      },
+      ctx,
+      { now: NOW + 4 },
+    );
+    expect((await db.products.get(service.id))?.last_cost).toBe(6000);
   });
 
   it('leaves barcodes untouched when an edit omits them', async () => {
@@ -666,15 +702,15 @@ describe('products (screens/08)', () => {
     const owner = productsCsv(rows, true);
     const cashier = productsCsv(rows, false);
     expect(owner.split('\r\n')[0]).toBe(
-      'name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,sold_30_days',
+      'name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,kind,sold_30_days',
     );
     expect(cashier.split('\r\n')[0]).toBe(
-      'name_en,name_ur,category,brand,barcode,sku,price,stock,unit,min_stock,track_stock,sold_30_days',
+      'name_en,name_ur,category,brand,barcode,sku,price,stock,unit,min_stock,track_stock,kind,sold_30_days',
     );
     expect(cashier).not.toContain('cost');
     expect(cashier).not.toContain('1100');
     expect(owner.split('\r\n')[1]).toBe(
-      `'=SUM(A1),,,"A, ""B""",'8901234567890,${rows[0]?.product.sku},1499,1100,1100,20,pc,0,1,0`,
+      `'=SUM(A1),,,"A, ""B""",'8901234567890,${rows[0]?.product.sku},1499,1100,1100,20,pc,0,1,simple,0`,
     );
   });
 
@@ -755,6 +791,157 @@ it('writeAction is used for each catalog change (one outbox tx per save)', async
   await saveNewProduct(db, cable, await ledgerContext(db, 'st-1'));
   const txs = new Set((await db.outbox.toArray()).map((o) => o.tx_id));
   expect(txs.size).toBe(1);
+});
+
+describe('bundles (screens/08, v1.1)', () => {
+  async function bundleShop() {
+    const db = await readyDb('bundle');
+    const ctx = await ledgerContext(db, 'st-1');
+    const phone = await saveNewProduct(
+      db,
+      {
+        ...cable,
+        name_en: 'Phone',
+        sku: 'PHONE-1',
+        barcodes: ['1111111111111'],
+        price: 5000000,
+        cost: 4500000,
+        opening_milli: 6000,
+      },
+      ctx,
+    );
+    const charger = await saveNewProduct(
+      db,
+      {
+        ...cable,
+        name_en: 'Charger',
+        sku: 'CHARGER-1',
+        barcodes: ['2222222222222'],
+        price: 130000,
+        cost: 90000,
+        opening_milli: 10000,
+      },
+      ctx,
+    );
+    const bundle = await saveNewProduct(
+      db,
+      {
+        name_en: 'Starter Pack',
+        sku: 'BND-1',
+        unit: 'set',
+        price: 5000000,
+        cost: 0,
+        track_stock: false,
+        kind: 'bundle',
+        bundle_items: [
+          { component_product_id: phone.id, qty_milli: 1000 },
+          { component_product_id: charger.id, qty_milli: 1000 },
+        ],
+      },
+      ctx,
+    );
+    return { db, ctx, phone, charger, bundle };
+  }
+
+  it('saves the product kind and recipe, and derives list/detail figures', async () => {
+    const { db, phone, charger, bundle } = await bundleShop();
+    const stored = await db.products.get(bundle.id);
+    expect(stored?.kind).toBe('bundle');
+    expect(stored?.track_stock).toBe(0);
+    expect(
+      await db.bundle_items.where('bundle_id').equals(bundle.id).count(),
+    ).toBe(2);
+    const rows = await listProducts(db);
+    const row = rows.find((candidate) => candidate.product.id === bundle.id);
+    expect(row?.bundle?.items.map((item) => item.product.id)).toEqual([
+      phone.id,
+      charger.id,
+    ]);
+    expect(row?.bundle?.availability).toBe(6);
+    expect(row?.bundle?.itemsTotal).toBe(5130000);
+    expect(row?.onHand).toBe(6000);
+    const detail = await productDetail(db, bundle.id, NOW);
+    expect(detail?.bundle?.cost).toBe(4590000);
+    expect(detail?.history).toEqual([]);
+    const csv = productsCsv(rows, true);
+    expect(csv).toContain('BND-1');
+    expect(csv).toContain(',bundle,');
+  });
+
+  it('merges duplicate components and rejects invalid recipes', async () => {
+    const { db, phone, charger, bundle } = await bundleShop();
+    const merged = await normaliseBundleItems(db, bundle.id, [
+      { component_product_id: phone.id, qty_milli: 1000 },
+      { component_product_id: phone.id, qty_milli: 2000 },
+      { component_product_id: charger.id, qty_milli: 500 },
+    ]);
+    expect(merged.items).toHaveLength(2);
+    expect(merged.items[0]?.qty_milli).toBe(3000);
+    await expect(
+      normaliseBundleItems(db, bundle.id, []),
+    ).rejects.toBeInstanceOf(BundleRecipeError);
+    await expect(
+      normaliseBundleItems(db, bundle.id, [
+        { component_product_id: bundle.id, qty_milli: 1000 },
+      ]),
+    ).rejects.toBeInstanceOf(BundleRecipeError);
+    await expect(
+      normaliseBundleItems(db, bundle.id, [
+        { component_product_id: phone.id, qty_milli: 0 },
+      ]),
+    ).rejects.toBeInstanceOf(BundleRecipeError);
+    await expect(
+      normaliseBundleItems(db, bundle.id, [
+        { component_product_id: phone.id, qty_milli: 1000 },
+        { component_product_id: bundle.id, qty_milli: 1000 },
+      ]),
+    ).rejects.toBeInstanceOf(BundleRecipeError);
+  });
+
+  it('edits the recipe and blocks deleting or converting a used component', async () => {
+    const { db, ctx, phone, charger, bundle } = await bundleShop();
+    await saveProductEdit(
+      db,
+      bundle.id,
+      {
+        name_en: 'Starter Pack',
+        sku: 'BND-1',
+        unit: 'set',
+        price: 4900000,
+        track_stock: false,
+        kind: 'bundle',
+        bundle_items: [
+          { component_product_id: phone.id, qty_milli: 1000 },
+          { component_product_id: charger.id, qty_milli: 2000 },
+        ],
+      },
+      ctx,
+    );
+    const items = await db.bundle_items
+      .where('bundle_id')
+      .equals(bundle.id)
+      .toArray();
+    expect(
+      items.filter((item) => !item.deleted_at).map((item) => item.qty_milli),
+    ).toEqual([1000, 2000]);
+    await expect(removeProduct(db, phone.id, ctx)).rejects.toBeInstanceOf(
+      ComponentInUseError,
+    );
+    await expect(
+      saveProductEdit(
+        db,
+        phone.id,
+        {
+          name_en: 'Phone',
+          sku: 'PHONE-1',
+          price: 5000000,
+          kind: 'bundle',
+          bundle_items: [{ component_product_id: charger.id, qty_milli: 1000 }],
+        },
+        ctx,
+      ),
+    ).rejects.toBeInstanceOf(ComponentInUseError);
+  });
 });
 
 it('exports the documented stock-history CSV header', () => {

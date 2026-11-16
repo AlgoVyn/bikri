@@ -979,6 +979,16 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       saleProductIds.add(op.row.product_id);
       products.add(op.row.product_id);
     }
+    if (op.tbl === 'sale_lines' && typeof op.row?.bundle_id === 'string')
+      saleProductIds.add(op.row.bundle_id);
+    if (op.tbl === 'products' && typeof op.row?.id === 'string')
+      saleProductIds.add(op.row.id);
+    if (op.tbl === 'bundle_items') {
+      for (const field of ['bundle_id', 'component_product_id'] as const) {
+        const id = op.row?.[field];
+        if (typeof id === 'string') saleProductIds.add(id);
+      }
+    }
     if (
       (op.tbl === 'purchase_lines' || op.tbl === 'supplier_return_lines') &&
       typeof op.row?.product_id === 'string'
@@ -1131,6 +1141,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { closeExpenses: true }
     | { saleLines: true }
     | { saleMoved: true }
+    | { bundleItems: true }
     | { ledgerExists: string }
   > = [];
   for (const [tbl, ids] of byTable) {
@@ -1238,9 +1249,15 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   chunked(
     saleIds,
     (p) =>
-      `SELECT id, sale_id, product_id, qty_milli FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
+      `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, name_snapshot, net FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
     { saleLines: true },
   );
+  stmts.push(
+    db.prepare(
+      `SELECT id, bundle_id, component_product_id, qty_milli, sort_order, updated_at, deleted_at FROM bundle_items WHERE tenant_id = ?1 AND deleted_at IS NULL`,
+    ),
+  );
+  kinds.push({ bundleItems: true });
   chunked(
     saleIds,
     (p) =>
@@ -1300,7 +1317,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   chunked(
     saleProductIds,
     (p) =>
-      `SELECT id, price, avg_cost, last_cost, track_stock, updated_at FROM products WHERE tenant_id = ?1 AND id IN (${p})`,
+      `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind FROM products WHERE tenant_id = ?1 AND id IN (${p})`,
     { saleProducts: true },
   );
   chunked(
@@ -1367,6 +1384,8 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     saleLineSale: new Map(),
     saleLinesBySale: new Map(),
     saleLineById: new Map(),
+    bundleRecipes: new Map(),
+    bundleItemById: new Map(),
     saleMoved: new Map(),
     customers: new Set(),
     suppliers: new Set(),
@@ -1414,6 +1433,16 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       product_id:
         typeof op.row.product_id === 'string' ? op.row.product_id : null,
       qty_milli: Number(op.row.qty_milli ?? 0),
+      bundle_group:
+        typeof op.row.bundle_group === 'string' ? op.row.bundle_group : null,
+      bundle_component_qty_milli: Number(
+        op.row.bundle_component_qty_milli ?? 0,
+      ),
+      bundle_qty: Number(op.row.bundle_qty ?? 0),
+      bundle_id: typeof op.row.bundle_id === 'string' ? op.row.bundle_id : null,
+      name_snapshot:
+        typeof op.row.name_snapshot === 'string' ? op.row.name_snapshot : null,
+      net: Number(op.row.net ?? 0),
     };
     if (!look.saleLineById.has(id)) {
       look.saleLineById.set(id, line);
@@ -1492,6 +1521,14 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           id: String(r.id),
           product_id: typeof r.product_id === 'string' ? r.product_id : null,
           qty_milli: Number(r.qty_milli),
+          bundle_group:
+            typeof r.bundle_group === 'string' ? r.bundle_group : null,
+          bundle_component_qty_milli: Number(r.bundle_component_qty_milli ?? 0),
+          bundle_qty: Number(r.bundle_qty ?? 0),
+          bundle_id: typeof r.bundle_id === 'string' ? r.bundle_id : null,
+          name_snapshot:
+            typeof r.name_snapshot === 'string' ? r.name_snapshot : null,
+          net: Number(r.net ?? 0),
         };
         const list = look.saleLinesBySale.get(saleId) ?? [];
         list.push(line);
@@ -1500,6 +1537,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           sale_id: saleId,
           product_id: line.product_id,
           qty_milli: line.qty_milli,
+          bundle_group: line.bundle_group,
+          bundle_component_qty_milli: line.bundle_component_qty_milli,
+          bundle_qty: line.bundle_qty,
+          bundle_id: line.bundle_id,
+          name_snapshot: line.name_snapshot,
+          net: line.net,
         });
       } else if ('saleMoved' in k) {
         const saleId = String(r.sale_id);
@@ -1534,6 +1577,27 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           last_cost: Number(r.last_cost ?? 0),
           track_stock: Number(r.track_stock ?? 0),
           updated_at: Number(r.updated_at ?? 0),
+          kind: String(r.kind ?? 'simple'),
+        });
+      } else if ('bundleItems' in k) {
+        const bundleId = String(r.bundle_id);
+        look.bundleRecipes.set(bundleId, [
+          ...(look.bundleRecipes.get(bundleId) ?? []),
+          {
+            id: String(r.id),
+            component_product_id: String(r.component_product_id),
+            qty_milli: Number(r.qty_milli ?? 0),
+            sort_order: Number(r.sort_order ?? 0),
+            updated_at: Number(r.updated_at ?? 0),
+            deleted_at:
+              r.deleted_at === null || r.deleted_at === undefined
+                ? null
+                : Number(r.deleted_at),
+          },
+        ]);
+        look.bundleItemById.set(String(r.id), {
+          bundle_id: bundleId,
+          component_product_id: String(r.component_product_id),
         });
       } else if ('lastClose' in k) {
         look.lastClose.set(String(r.id), {
@@ -1747,6 +1811,7 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
       updated_at: Number(
         op.row.updated_at ?? previous?.updated_at ?? op.row.created_at ?? 0,
       ),
+      kind: String(op.row.kind ?? previous?.kind ?? 'simple'),
     });
   }
 }

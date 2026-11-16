@@ -1,10 +1,13 @@
 import type { Cart, MasterRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  addBundle,
   addOverride,
   addProduct,
   addQuickSale,
   approversFor,
+  bundleQtyOf,
+  bundleResidualDiscount,
   CartFullError,
   CartNotEmptyError,
   cartSignature,
@@ -20,13 +23,16 @@ import {
   listHeld,
   loadCarts,
   MAX_CART_LINES,
+  manualDiscountBp,
   overrideMatches,
   parseQtyPrefix,
   paymentChecks,
+  removeBundle,
   removeLine,
   resumeHeld,
   saveCart,
   shopMoney,
+  updateBundleQty,
   updateLine,
 } from './cart.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
@@ -54,6 +60,121 @@ const product = (id: string, price: number, extra: Partial<MasterRow> = {}) =>
   }) as MasterRow;
 
 const money = shopMoney(null);
+
+describe('bundle cart groups (v1.1)', () => {
+  const bundle = product('bundle', 120000, {
+    name_en: 'Starter Pack',
+    kind: 'bundle',
+    track_stock: 0,
+    unit: 'set',
+  });
+  const a = product('a', 60000, { avg_cost: 60000, last_cost: 60000 });
+  const b = product('b', 40000, { avg_cost: 40000, last_cost: 40000 });
+  const recipe = [
+    { product: a, qty_milli: 1000 },
+    { product: b, qty_milli: 1000 },
+  ];
+
+  it('adds one block of component lines and merges the same snapshot', () => {
+    let cart = addBundle(emptyCart('c1'), bundle, recipe, 1, 'avg');
+    expect(cart.lines).toHaveLength(2);
+    expect(cart.lines.every((line) => line.bundle_group)).toBe(true);
+    expect(cart.lines.map((line) => line.unit_price)).toEqual([72000, 48000]);
+    expect(cartTotals(cart, money).total).toBe(120000);
+    const group = String(cart.lines[0]?.bundle_group);
+    cart = addBundle(cart, bundle, recipe, 2, 'avg');
+    expect(cart.lines).toHaveLength(2);
+    expect(bundleQtyOf(cart, group)).toBe(3);
+    expect(cart.lines.map((line) => line.qty_milli)).toEqual([3000, 3000]);
+    expect(cartTotals(cart, money).total).toBe(360000);
+    cart = updateBundleQty(
+      cart,
+      group,
+      2,
+      new Map([
+        [a.id, a],
+        [b.id, b],
+      ]),
+      'avg',
+    );
+    expect(bundleQtyOf(cart, group)).toBe(2);
+    expect(bundleQtyOf(removeBundle(cart, group), group)).toBe(0);
+    expect(cart.lines).toHaveLength(2);
+  });
+
+  it('does not merge a changed price or recipe', () => {
+    let cart = addBundle(emptyCart('c1'), bundle, recipe, 1, 'avg');
+    cart = addBundle(cart, { ...bundle, price: 110000 }, recipe, 1, 'avg');
+    expect(cart.lines).toHaveLength(4);
+    cart = addBundle(
+      cart,
+      bundle,
+      [
+        { product: a, qty_milli: 2000 },
+        { product: b, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    expect(cart.lines).toHaveLength(6);
+  });
+
+  it('keeps component lines read-only and removes the whole group', () => {
+    const cart = addBundle(emptyCart('c1'), bundle, recipe, 1, 'avg');
+    const key = String(cart.lines[0]?.key);
+    expect(() => updateLine(cart, key, { qty_milli: 2000 })).toThrow();
+    const removed = removeLine(cart, key);
+    expect(removed.lines).toHaveLength(0);
+    expect(() =>
+      addBundle(
+        {
+          ...emptyCart('c1'),
+          lines: Array.from({ length: 59 }, () => cart.lines[0] as never),
+        },
+        bundle,
+        recipe,
+        1,
+        'avg',
+      ),
+    ).toThrow(CartFullError);
+  });
+
+  it('excludes bundle residual paisa from manual discounts', () => {
+    const residualBundle = { ...bundle, price: 3001 };
+    const high = product('high', 333, { avg_cost: 333 });
+    const line1 = product('h1', 333, { avg_cost: 333 });
+    const line2 = product('h2', 333, { avg_cost: 333 });
+    let cart = addBundle(
+      emptyCart('c1'),
+      residualBundle,
+      [
+        { product: high, qty_milli: 3000 },
+        { product: line1, qty_milli: 3000 },
+        { product: line2, qty_milli: 3000 },
+      ],
+      1,
+      'avg',
+    );
+    const totals = cartTotals(cart, money);
+    expect(bundleResidualDiscount(cart, totals)).toBeGreaterThan(0);
+    expect(manualDiscountBp(cart, totals)).toBe(0);
+    expect(
+      paymentChecks(cart, totals, {
+        maxDiscountBp: 0,
+        canBelowCost: true,
+        canDiscount: false,
+      }).discount,
+    ).toBe(false);
+    cart = addProduct(cart, product('loose', 1000), 1000, 'avg');
+    const key = String(cart.lines[0]?.key);
+    const discounted = updateLine(cart, key, {
+      discount_type: 'amount',
+      discount_value: 100,
+    });
+    const manual = cartTotals(discounted, money);
+    expect(manualDiscountBp(discounted, manual)).toBeGreaterThan(0);
+  });
+});
 
 describe('cart lines (screens/05)', () => {
   it('AC 1: the same product three times is one line with qty 3', () => {

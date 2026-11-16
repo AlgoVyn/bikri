@@ -12,6 +12,8 @@ Modal from hotkey `Ctrl+Shift+P` (and the command palette). Everyone. Customers 
 
 Large search/scan field (autofocus). Typing a name searches automatically after a short pause (a status line says "Press Enter to search" until the result arrives); scanners still commit the exact code on Enter. Result card: photo, name (English + Urdu), price (very large), stock ("12 in stock" / "Out of stock" / hidden if not tracked), other barcodes; with `cost.view`: avg cost and margin small. Buttons `Add to cart` (Enter; adds to the active Sell cart), `Scan another` (clears), `Close` (Esc). Unknown barcode: "Not found" + `Add product` (with `catalog.edit`).
 
+A bundle barcode shows the bundle name, bundle price and a compact `Items: phone ×1 · charger ×1 · case ×1 · protector ×1` list; the component barcodes show the component price, not the bundle. The price check never expands the bundle into separate priced lines.
+
 ## Acceptance criteria
 
 1. Scanning shows the card in < 100 ms after the Enter suffix.

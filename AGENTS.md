@@ -25,7 +25,7 @@ An offline-first, **multi-tenant** POS PWA: many independent shops (tenants), ea
 | 12 | [12-fbr-later](docs/12-fbr-later.md) | Optional FBR module (do not build in v1) |
 | 13 | [13-multi-tenancy](docs/13-multi-tenancy.md) | Tenancy model, tenant scoping rules, per-shop budget, onboarding, read-only/suspended status, export/restore/delete, operator support access, migration from M0, open questions |
 | 14 | [14-print-agent](docs/14-print-agent.md) | **Implemented (Phase 1)** local print agent: cross-platform Go service, raw ESC/POS via the OS queue, driver-rendered fallback, pairing/security, rollout; installers/signing remain release tasks |
-| — | [fixtures/](docs/fixtures/money-totals.json) | Machine-readable test vectors: money (`money-*.json`) used by `packages/core` tests, and Code 128 (`barcode-code128.json`) used by `packages/printer` |
+| — | [fixtures/](docs/fixtures/money-totals.json) | Machine-readable test vectors: money (`money-*.json`, including the bundle vectors) used by `packages/core` tests, and Code 128 (`barcode-code128.json`) used by `packages/printer` |
 | — | [decisions](docs/decisions.md) | Design decisions log — append here when you resolve an unclear point |
 | — | [screens/](docs/screens/README.md) | One spec per screen: layout, fields, validation, states, hotkeys, acceptance criteria |
 | — | [reference/dukaan/](docs/reference/dukaan/README.md) | Screenshots of a third-party product used **only** as UX reference. **Local-only:** gitignored, so these links work only in the owner's local checkout; in a fresh clone they are missing — rely on the screen specs, which are complete on their own |
@@ -80,6 +80,7 @@ Follow [docs/11-roadmap.md](docs/11-roadmap.md) task by task (T-001, T-002, …)
 - Money and stock records are **append-only**: `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log`. Never UPDATE or DELETE them; correct with a new row (refund, void, reversal, adjustment). The only allowed update on `sales` is the `status` field via a refund/void op.
 - Stock on hand and party balances are **derived** (sums), never edited directly.
 - Soft delete (`deleted_at`) for master data. Never hard-delete.
+- **Bundles (v1.1):** a bundle is a `products` row with `kind='bundle'`, `track_stock=0` and a fixed `bundle_items` recipe (1–20 simple components, no nesting). A bundle sale writes one ordinary `sale_lines` row per component with the `bundle_*` fields; never write a synthetic bundle sale line and never give the bundle its own stock movement. `priceBundle()` in `packages/core` does the cost-weighted split; bundle savings and rounding residuals are not staff discounts. Returns are whole-bundle units only and must include every component line of the group with the same `k`; never refund one component of a bundle. Receipts print one bundle header and component names/quantities, not component prices. Reuse the existing tile, cart line, product-detail cards and refund row; the only new visual markers are a neutral `Bundle` pill and the muted `Bundle · N items` tile line ([D-229](docs/decisions.md#decisions-log)).
 - Every write on the till goes through a repository function in `apps/pos/src/data/` that writes the row(s) **and** the matching outbox ops in one Dexie transaction.
 
 **Code organisation**
@@ -112,6 +113,7 @@ A task is done only when **all** of these hold:
 - Do not add third-party analytics, ads or tracking scripts.
 - Do not put Cloudflare Access in front of the till (it breaks offline) or the rest of `algovyn.com`; only `/bikri/admin*` and `/bikri/api/admin/*` (the platform operator console), allowed email `operator@example.com`. Shop owners never use Access; they administer their shop from admin devices (`/api/shop/*`).
 - Do not accept a tenant id from a client, query a tenant table without `tenant_id`, or add a deployment-wide unique on shop data (SKU, barcode, invoice number, bill prefix, codes).
+- Do not model a bundle as one synthetic sale line, give a bundle product its own stock, or refund a single component of a bundle. Bundles expand to component sale lines and are returned only as whole bundle units ([D-229](docs/decisions.md#decisions-log)).
 - Do not use a Workers Custom Domain for `algovyn.com` (it would replace the website); use the two Worker routes in [01 §5.1](docs/01-architecture.md#51-wranglerjsonc).
 - Do not store secrets in the repo. Use `wrangler secret put` and GitHub Actions secrets.
 - Do not build FBR integration, batches/expiry, multi-currency, public **self-service tenant creation**, billing or several shops in one browser in v1. Request-only onboarding with operator approval (D-175) is allowed.

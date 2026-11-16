@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobReceipt } from '../print/receiptFiles.ts';
 import { discardFailed } from '../sync/push.ts';
-import { addProduct, addQuickSale, emptyCart } from './cart.ts';
+import { addBundle, addProduct, addQuickSale, emptyCart } from './cart.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
 import { computeRefund, RefundNotAllowedError, refundSale } from './refunds.ts';
@@ -758,5 +758,155 @@ describe('discarding a rejected refund', () => {
       await db.refund_lines.where('refund_id').equals('refund-discard').count(),
     ).toBe(0);
     expect((await db.sales.get(saleId))?.status).toBe('paid');
+  });
+});
+
+describe('whole-bundle refunds (07 §6.2, v1.1)', () => {
+  async function bundleSale() {
+    const db = await readyDb('refund-bundle');
+    const ctx = await ledgerContext(db, 'st-1');
+    const phone = await saveNewProduct(
+      db,
+      {
+        name_en: 'Phone',
+        sku: 'BND-PHONE',
+        price: 5_000_000,
+        cost: 4_500_000,
+        opening_milli: 10_000,
+      },
+      ctx,
+      { now: NOW },
+    );
+    const charger = await saveNewProduct(
+      db,
+      {
+        name_en: 'Charger',
+        sku: 'BND-CHARGER',
+        price: 120_000,
+        cost: 90_000,
+        opening_milli: 10_000,
+      },
+      ctx,
+      { now: NOW },
+    );
+    const bundle = await saveNewProduct(
+      db,
+      {
+        name_en: 'Starter Pack',
+        sku: 'BND-PACK',
+        unit: 'set',
+        price: 5_100_000,
+        cost: 0,
+        track_stock: false,
+        kind: 'bundle',
+        bundle_items: [
+          { component_product_id: phone.id, qty_milli: 1000 },
+          { component_product_id: charger.id, qty_milli: 1000 },
+        ],
+      },
+      ctx,
+      { now: NOW },
+    );
+    const cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: phone, qty_milli: 1000 },
+        { product: charger, qty_milli: 1000 },
+      ],
+      3,
+      'avg',
+    );
+    const saleId = 'sale-bundle';
+    await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 15_300_000 }], { saleId }),
+      ctx,
+      NOW,
+    );
+    const lines = await db.sale_lines
+      .where('sale_id')
+      .equals(saleId)
+      .sortBy('line_no');
+    return { db, ctx, saleId, lines };
+  }
+
+  it('rejects a partial component refund', async () => {
+    const { db, saleId, lines } = await bundleSale();
+    await expect(
+      computeRefund(
+        db,
+        saleId,
+        [{ saleLineId: lines[0]?.id ?? '', qtyMilli: 1000, restock: true }],
+        'cash',
+      ),
+    ).rejects.toMatchObject({ code: 'bundle' });
+  });
+
+  it('returns whole bundles only and restocks every component', async () => {
+    const { db, ctx, saleId, lines } = await bundleSale();
+    const [phone, charger] = lines;
+    const plan = await computeRefund(
+      db,
+      saleId,
+      [
+        {
+          saleLineId: phone?.id ?? '',
+          qtyMilli: 1000,
+          restock: true,
+        },
+        {
+          saleLineId: charger?.id ?? '',
+          qtyMilli: 1000,
+          restock: true,
+        },
+      ],
+      'cash',
+    );
+    expect(plan.lines).toHaveLength(2);
+    expect(plan.exact).toBe(
+      Math.round(Number(phone?.net) / 3) + Math.round(Number(charger?.net) / 3),
+    );
+    const refunded = await refundSale(
+      db,
+      {
+        refundId: 'refund-bundle-1',
+        saleId,
+        lines: plan.lines.map((line) => ({
+          saleLineId: line.saleLineId,
+          qtyMilli: line.qtyMilli,
+          restock: true,
+        })),
+        reason: 'Changed mind',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW + 1000,
+    );
+    expect(refunded.created).toBe(true);
+    expect(
+      await db.refund_lines
+        .where('refund_id')
+        .equals('refund-bundle-1')
+        .count(),
+    ).toBe(2);
+    expect(
+      await db.stock_movements
+        .where('[ref_type+ref_id]')
+        .equals(['refund', 'refund-bundle-1'])
+        .count(),
+    ).toBe(2);
+    const remaining = await computeRefund(
+      db,
+      saleId,
+      [
+        { saleLineId: phone?.id ?? '', qtyMilli: 2000, restock: false },
+        { saleLineId: charger?.id ?? '', qtyMilli: 2000, restock: false },
+      ],
+      'cash',
+    );
+    expect(remaining.lines.map((line) => line.qtyMilli)).toEqual([2000, 2000]);
+    expect((await db.sales.get(saleId))?.status).toBe('part_refunded');
   });
 });

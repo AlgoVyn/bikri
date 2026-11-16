@@ -23,7 +23,7 @@ Fields: Qty (`QtyInput`, > 0 for in/out), Note (required for Other, Lost, Fix en
 
 ## Stock count (`/stock/count`)
 
-For a full or category count: choose scope (all tracked / category / low stock), then a list with Expected (on hand at start of count, frozen), Counted (`QtyInput`, scan increments by 1), Difference. Unsaved progress kept in `kv.stock_count_draft`. `Finish count` writes one `count` movement per product with `counted − current on_hand` ≠ 0, using the on-hand **at Finish** (sales made during the count are therefore not lost; the frozen Expected column is display only) and one `audit_log stock_count` with totals (items counted, value difference with `cost.view`). Products with no counted value are skipped (not set to 0) unless "Set uncounted to 0" is ticked.
+For a full or category count: choose scope (all tracked / category / low stock), then a list with Expected (on hand at start of count, frozen), Counted (`QtyInput`, scan increments by 1), Difference. Bundle products are never listed or counted as a unit; count their component products. Unsaved progress kept in `kv.stock_count_draft`. `Finish count` writes one `count` movement per product with `counted − current on_hand` ≠ 0, using the on-hand **at Finish** (sales made during the count are therefore not lost; the frozen Expected column is display only) and one `audit_log stock_count` with totals (items counted, value difference with `cost.view`). Products with no counted value are skipped (not set to 0) unless "Set uncounted to 0" is ticked.
 
 ## Acceptance criteria
 

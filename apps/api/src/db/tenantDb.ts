@@ -28,6 +28,7 @@ export const TENANT_TABLES = [
   'staff',
   'categories',
   'products',
+  'bundle_items',
   'product_barcodes',
   'customers',
   'suppliers',

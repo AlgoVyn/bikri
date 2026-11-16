@@ -50,7 +50,7 @@ export async function pricePreview(
   const ids = filter.ids ? new Set(filter.ids) : null;
   const brand = filter.brand?.trim().toLowerCase() ?? '';
   const products = (await db.products.toArray()).filter((p) => {
-    if (p.deleted_at) return false;
+    if (p.deleted_at || p.kind === 'bundle') return false;
     if (ids) return ids.has(p.id);
     if (filter.categoryId && p.category_id !== filter.categoryId) return false;
     if (
