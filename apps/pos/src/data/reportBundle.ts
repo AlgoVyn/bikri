@@ -257,12 +257,10 @@ async function byIds<T extends { id: string }>(
 ): Promise<Map<string, T>> {
   const out = new Map<string, T>();
   const list = unique(ids);
-  if (list.length > SCAN_ABOVE) {
-    const wanted = new Set(list);
-    for (const row of await table.toArray())
-      if (wanted.has(row.id)) out.set(row.id, row);
-    return out;
-  }
+  // `bulkGet` is one native request for a whole key array. The old "scan above
+  // 200 ids" rule (D-119) was measured against one index range per key, not a
+  // bulk get, and turned a report over a lifetime `sale_lines` table into a full
+  // scan of every line the shop ever wrote (D-231).
   for (let at = 0; at < list.length; at += CHUNK) {
     const rows = await table.bulkGet(list.slice(at, at + CHUNK));
     for (const row of rows) if (row) out.set(row.id, row);
@@ -400,8 +398,15 @@ export async function reportBundle(
       .toArray()
   ).filter((sale) => inRange(sale, range) && sale.status !== 'void');
   const saleById = new Map(sales.map((sale) => [sale.id, sale]));
-  const saleIds = sales.map((sale) => sale.id);
-  const saleLines = await byAnyOf(db.sale_lines, 'sale_id', saleIds);
+  // Read the lines of the selected business days through the V7 date index.
+  // Joining by `sale_id` with `byAnyOf` above 200 bills used to scan every
+  // sale line the shop had ever written (D-231).
+  const saleLines = (
+    await db.sale_lines
+      .where('business_date')
+      .between(range.from, range.to, true, true)
+      .toArray()
+  ).filter((line) => saleById.has(String(line.sale_id)));
   const linesBySale = new Map<string, SyncedRow[]>();
   for (const line of saleLines) {
     const key = String(line.sale_id);

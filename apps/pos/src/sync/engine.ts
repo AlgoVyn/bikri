@@ -175,7 +175,10 @@ export class SyncEngine {
         quotaUntil: null,
         clockSkewMs: serverTime === null ? 0 : now - serverTime,
       });
-      await this.scheduleNext();
+      // A write-debounced push must not restart the poll timer: a till that sells
+      // more often than the poll interval would otherwise push forever and never
+      // pull the other tills' sales, refunds and stock (D-231).
+      if (kind !== 'push') await this.scheduleNext();
     } catch (error) {
       await this.handle(error);
     }

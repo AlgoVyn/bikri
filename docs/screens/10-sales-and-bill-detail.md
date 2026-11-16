@@ -24,7 +24,7 @@ Toolbar: date range (Today, Yesterday, 7 days, 30 days, This month, Custom); the
 
 Summary strip above the list (for the filter): bills, sold (net of refunds), refunds, avg bill.
 
-Rows: time, invoice no (mono font), customer, items count, total, method chips, status pill, print status icon (failed prints show a red printer icon — REQ-B15 — click to reprint). A bill recorded on a later day than its `business_date` shows a small **Late** badge beside the invoice. Grouped by business date with day totals. Infinite scroll, 50 per page from Dexie index `business_date`.
+Rows: time, invoice no (mono font), customer, items count, total, method chips, status pill, print status icon (failed prints show a red printer icon — REQ-B15 — click to reprint). A bill recorded on a later day than its `business_date` shows a small **Late** badge beside the invoice. Grouped by business date with day totals. Paginated at day boundaries (about 50 bills per page; a day is never split), read from Dexie index `business_date`.
 
 ## Bill detail
 

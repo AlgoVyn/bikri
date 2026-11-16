@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
-import { op, pushOk } from './helpers/ops.ts';
+import { op, productRow, pushOk } from './helpers/ops.ts';
 
 // T-062: two large tenants, the documented write budget and the hot-query plans.
 
@@ -85,6 +85,12 @@ const HOT_QUERIES: Array<{
     index: 'payments_supplier_return',
   },
   {
+    name: 'payments by purchase',
+    sql: 'SELECT id FROM payments WHERE tenant_id = ? AND purchase_id = ?',
+    args: ['t', 'p'],
+    index: 'payments_purchase',
+  },
+  {
     name: 'expenses by reversal',
     sql: 'SELECT id FROM expenses WHERE tenant_id = ? AND reverses_id = ?',
     args: ['t', 'e'],
@@ -109,16 +115,22 @@ const HOT_QUERIES: Array<{
     index: 'ledger_source',
   },
   {
-    name: 'stock on hand',
-    sql: 'SELECT SUM(qty_delta_milli) FROM stock_movements WHERE tenant_id = ? AND product_id = ?',
-    args: ['t', 'p'],
-    index: 'stock_movements_product',
+    name: 'sale movements for a refund',
+    sql: "SELECT ref_id FROM stock_movements WHERE tenant_id = ? AND ref_id = ? AND reason_code = 'sale'",
+    args: ['t', 's'],
+    index: 'stock_movements_ref',
   },
   {
-    name: 'sales by business date',
-    sql: 'SELECT id FROM sales WHERE tenant_id = ? AND business_date BETWEEN ? AND ?',
-    args: ['t', '2026-01-01', '2026-12-31'],
-    index: 'sales_date',
+    name: 'sales by branch invoice',
+    sql: 'SELECT invoice_no FROM sales WHERE tenant_id = ? AND branch_id = ?',
+    args: ['t', 'b'],
+    index: 'sales_branch_invoice',
+  },
+  {
+    name: 'tenant status history',
+    sql: "SELECT after_json FROM audit_log WHERE tenant_id = ? AND action = 'tenant_status_change' ORDER BY created_at DESC LIMIT 50",
+    args: ['t'],
+    index: 'audit_log_status',
   },
   {
     name: 'audit by time',
@@ -319,8 +331,10 @@ describe('T-062 performance', () => {
       // 150 reference bills incl. indexes and change_log must fit daily_write_budget (D-076).
       expect(usage, shop.slug).toBeDefined();
       // T-062 measured ~127 rows/bill including the D-225 stock-cache trigger.
-      // The default budget is 19,500, so a regression above 130 rows/bill must fail here.
-      expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(16_000);
+      // D-231 dropped 16 indexes no server query uses and added 4 hot-path ones;
+      // the reference bill is now ~97 rows. The default budget is 19,500, so a
+      // regression above 130 rows/bill must fail here.
+      expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(12_000);
       expect(Number(usage?.rows_written ?? 0)).toBeLessThanOrEqual(19_500);
     }
   }, 60_000);
@@ -385,4 +399,82 @@ describe('T-062 performance', () => {
     expect(Number(usage?.rows_read ?? 0)).toBeLessThan(5_000);
     expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(0);
   }, 120_000);
+
+  it('does not read bundle recipes for a push with no bundle', async () => {
+    const shop = await seedShop('Perf bundles', { budget: 100_000 });
+    const now = Date.now();
+    const today = new Date(now).toISOString().slice(0, 10);
+    // 100 bundles × 5 components = 500 active recipe rows. The old lookup read
+    // all of them on every push, even a plain sale (D-231).
+    await env.DB.batch([
+      env.DB.prepare(
+        `WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 100)
+         INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, created_at, updated_at)
+         SELECT ?1, printf('bundle-%03d', x), 'Bundle', printf('B-%03d', x), 1000, 'bundle', 0, ?2, ?2 FROM n`,
+      ).bind(shop.tenantId, now),
+      env.DB.prepare(
+        `WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 100)
+         INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, created_at, updated_at)
+         SELECT ?1, printf('component-%03d', x), 'Component', printf('C-%03d', x), 100, 'simple', 1, ?2, ?2 FROM n`,
+      ).bind(shop.tenantId, now),
+      env.DB.prepare(
+        `WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 100)
+         INSERT INTO bundle_items (tenant_id, id, bundle_id, component_product_id, qty_milli, sort_order, created_at, updated_at)
+         SELECT ?1, printf('bi-%03d-%d', x, y), printf('bundle-%03d', x),
+                printf('component-%03d', ((x + y) % 100) + 1), 1000, y, ?2, ?2
+         FROM n CROSS JOIN (SELECT 1 AS y UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5)`,
+      ).bind(shop.tenantId, now),
+    ]);
+    const recipes = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1',
+    )
+      .bind(shop.tenantId)
+      .first<{ n: number }>();
+    expect(recipes?.n).toBe(500);
+    await env.DB.prepare(
+      'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .run();
+    const res = await pushOk(shop.till, referenceSaleOps(shop, 1));
+    expect(res.results.every((row) => row.result === 'applied')).toBe(true);
+    const usage = await env.DB.prepare(
+      'SELECT rows_read FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .first<{ rows_read: number }>();
+    // A 500-recipe shop must not pay for the recipes on a normal sale.
+    expect(Number(usage?.rows_read ?? 0)).toBeLessThan(400);
+  }, 60_000);
+
+  it('still guards a component delete while allowing a normal edit', async () => {
+    const shop = await seedShop('Perf component', { budget: 100_000 });
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, created_at, updated_at)
+         VALUES (?1, 'bundle-1', 'Bundle', 'BUNDLE-1', 1000, 'bundle', 0, ?2, ?2)`,
+      ).bind(shop.tenantId, now),
+      env.DB.prepare(
+        `INSERT INTO bundle_items (tenant_id, id, bundle_id, component_product_id, qty_milli, sort_order, created_at, updated_at)
+         VALUES (?1, 'bi-1', 'bundle-1', ?2, 1000, 0, ?3, ?3)`,
+      ).bind(shop.tenantId, IDS.product, now),
+    ]);
+    const edit = await pushOk(shop.admin, [
+      op('products', 'upsert', productRow(IDS.product, { price: 60000 }, now), {
+        base_rev: 3,
+        changed_fields: ['price'],
+      }),
+    ]);
+    expect(edit.results[0]?.result).toBe('applied');
+    const removed = await pushOk(shop.admin, [
+      op(
+        'products',
+        'delete',
+        { id: IDS.product },
+        { base_rev: 4, updated_by: IDS.owner },
+      ),
+    ]);
+    expect(removed.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+  }, 60_000);
 });

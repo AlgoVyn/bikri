@@ -11,11 +11,7 @@ import {
 import type { ProductListRow } from '../data/catalog.ts';
 import { filterAndSortProducts } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import {
-  productHaystack,
-  useCatalogueRows,
-  useSold30,
-} from '../state/catalogue.ts';
+import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 
 export type SellRow = ProductListRow & { haystack: string };
 
@@ -29,10 +25,9 @@ export function useSellProducts(): SellRow[] | undefined {
     () =>
       rows === undefined
         ? undefined
-        : filterAndSortProducts(rows, { sort: 'best' }).map((row) => ({
-            ...row,
-            haystack: productHaystack(row),
-          })),
+        : // `buildProductRows` always sets the haystack; the cast avoids
+          // re-spreading every row after each catalogue change.
+          (filterAndSortProducts(rows, { sort: 'best' }) as SellRow[]),
     [rows],
   );
 }

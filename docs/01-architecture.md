@@ -275,17 +275,32 @@ Asset layout: `apps/pos` builds into `apps/pos/dist/bikri/` (Vite `base: '/bikri
 API responses get them from a Hono middleware. Static assets get them from a Workers-assets `_headers` file, which must sit at the **root of the assets directory** (`apps/pos/dist/_headers`, written by the post-build step, rules for `/bikri/*`), not inside `dist/bikri/` (Vite would put `public/_headers` there). T-002 checks with `curl -sI https://algovyn.com/bikri/` that CSP and HSTS are present on the HTML:
 
 ```
-Strict-Transport-Security: max-age=31536000
-Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'
-Cache-Control: public, max-age=0, must-revalidate, no-transform
-X-Content-Type-Options: nosniff
-Referrer-Policy: same-origin
-Permissions-Policy: camera=(self), usb=(self), serial=(self)
+/bikri/*
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+  Strict-Transport-Security: max-age=31536000
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Permissions-Policy: camera=(self), usb=(self), serial=(self)
+
+/bikri/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+/bikri/fonts/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+/bikri/icons/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
 ```
+
+`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting `immutable` (D-231). Content-hashed files never change under the same URL, so they skip revalidation; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`.
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
 
-`no-transform` is required too: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131).
+`no-transform` is required on **HTML**: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131). It must **not** be applied to JS/CSS: Cloudflare disables Brotli/Gzip for any response carrying `no-transform`, which tripled the app payload before D-231. Fonts and images are already compressed formats, but they use the same immutable rule for caching.
 
 The app shell has **no inline scripts**. The pre-paint theme snippet is the static asset `/bikri/theme-init.js`, loaded with a blocking `<script src>` before the app module so the chosen theme is applied before first paint while `script-src 'self'` stays strict (D-149).
 

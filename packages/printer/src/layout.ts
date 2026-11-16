@@ -138,34 +138,43 @@ export function wrapText(text: string, width: number): string[] {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
   }
-  const clean = graphemes(text)
-    .map((ch) => {
+  const chars = (hasNonAscii(text) ? graphemes(text) : Array.from(text)).map(
+    (ch) => {
       const code = ch.codePointAt(0) ?? 0;
       return code < 32 || code === 127 ? ' ' : ch;
-    })
-    .join('')
-    .trimEnd();
-  if (clean.length === 0) {
+    },
+  );
+  let end = chars.length;
+  while (end > 0 && chars[end - 1] === ' ') end -= 1;
+  if (end === 0) {
     return [];
   }
   const lines: string[] = [];
-  let rest = graphemes(clean);
-  while (rest.length > width) {
-    const breakAt = rest.lastIndexOf(' ', width);
-    if (breakAt <= 0) {
-      lines.push(rest.slice(0, width).join(''));
-      rest = rest.slice(width);
+  let start = 0;
+  // A cursor over the grapheme array: the old version rebuilt `rest` with
+  // slice/join per line, which is O(n²) on a long footer (D-231).
+  while (end - start > width) {
+    let breakAt = -1;
+    for (let i = start + width; i > start; i -= 1) {
+      if (chars[i] === ' ') {
+        breakAt = i;
+        break;
+      }
+    }
+    if (breakAt <= start) {
+      lines.push(chars.slice(start, start + width).join(''));
+      start += width;
       continue;
     }
-    const piece = rest.slice(0, breakAt).join('').trimEnd();
-    rest = rest.slice(breakAt + 1);
-    while (rest[0] === ' ') rest = rest.slice(1);
+    const piece = chars.slice(start, breakAt).join('').trimEnd();
+    start = breakAt + 1;
+    while (start < end && chars[start] === ' ') start += 1;
     if (piece.length > 0) {
       lines.push(piece);
     }
   }
-  if (rest.length > 0) {
-    lines.push(rest.join(''));
+  if (start < end) {
+    lines.push(chars.slice(start, end).join(''));
   }
   return lines;
 }

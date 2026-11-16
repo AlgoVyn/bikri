@@ -900,6 +900,12 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
   const refundLineIds = new Set<string>();
   const expenseIds = new Set<string>();
   const reversalIds = new Set<string>();
+  /** Bundle recipes needed by sale lines, recipe edits and kind changes. */
+  const bundleIds = new Set<string>();
+  /** Recipe rows touched by a bundle_items op (a delete has no row payload). */
+  const bundleItemIds = new Set<string>();
+  /** Products being deleted or changing kind: is a bundle using them? */
+  const componentCandidates = new Set<string>();
   const partyIds = {
     customer: new Set<string>(),
     supplier: new Set<string>(),
@@ -981,6 +987,37 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     }
     if (op.tbl === 'sale_lines' && typeof op.row?.bundle_id === 'string')
       saleProductIds.add(op.row.bundle_id);
+    if (op.tbl === 'sale_lines' && typeof op.row?.bundle_id === 'string')
+      bundleIds.add(op.row.bundle_id);
+    if (op.tbl === 'bundle_items') {
+      if (typeof op.row?.bundle_id === 'string')
+        bundleIds.add(op.row.bundle_id);
+      const itemId = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof itemId === 'string') bundleItemIds.add(itemId);
+    }
+    if (op.tbl === 'products') {
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id === 'string') {
+        // Only a delete or a kind change needs "is a bundle using this product?".
+        // A normal price/cost edit must stay allowed (D-231).
+        if (
+          op.kind === 'delete' ||
+          op.row?.deleted_at != null ||
+          (op.changed_fields ?? []).includes('kind')
+        )
+          componentCandidates.add(id);
+        // A bundle row always needs its recipe for the active-recipe check; a
+        // bundle→simple change needs the old recipe to prove it is empty.
+        if (op.kind !== 'delete' && op.row?.kind === 'bundle')
+          bundleIds.add(id);
+        if (
+          op.kind !== 'delete' &&
+          op.row?.kind === 'simple' &&
+          (op.changed_fields ?? []).includes('kind')
+        )
+          bundleIds.add(id);
+      }
+    }
     if (op.tbl === 'products' && typeof op.row?.id === 'string')
       saleProductIds.add(op.row.id);
     if (op.tbl === 'bundle_items') {
@@ -1141,7 +1178,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     | { closeExpenses: true }
     | { saleLines: true }
     | { saleMoved: true }
-    | { bundleItems: true }
+    | { bundleRows: true }
     | { ledgerExists: string }
   > = [];
   for (const [tbl, ids] of byTable) {
@@ -1252,12 +1289,28 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
       `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, name_snapshot, net FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
     { saleLines: true },
   );
-  stmts.push(
-    db.prepare(
-      `SELECT id, bundle_id, component_product_id, qty_milli, sort_order, updated_at, deleted_at FROM bundle_items WHERE tenant_id = ?1 AND deleted_at IS NULL`,
-    ),
+  // Only the recipes this push can affect: the bundles named by sale/recipe ops,
+  // the bundles of touched recipe rows (a delete has no row payload) and the
+  // bundles that use a product being deleted or re-kinded. A normal sale with no
+  // bundle costs zero reads here (D-231).
+  const bundleSql = (where: string) =>
+    `SELECT id, bundle_id, component_product_id, qty_milli, sort_order, updated_at, deleted_at FROM bundle_items WHERE tenant_id = ?1 AND deleted_at IS NULL AND ${where}`;
+  chunked(bundleIds, (p) => bundleSql(`bundle_id IN (${p})`), {
+    bundleRows: true,
+  });
+  chunked(
+    bundleItemIds,
+    (p) =>
+      bundleSql(
+        `bundle_id IN (SELECT bundle_id FROM bundle_items WHERE tenant_id = ?1 AND id IN (${p}))`,
+      ),
+    { bundleRows: true },
   );
-  kinds.push({ bundleItems: true });
+  chunked(
+    componentCandidates,
+    (p) => bundleSql(`component_product_id IN (${p})`),
+    { bundleRows: true },
+  );
   chunked(
     saleIds,
     (p) =>
@@ -1386,6 +1439,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
     saleLineById: new Map(),
     bundleRecipes: new Map(),
     bundleItemById: new Map(),
+    bundleOfComponent: new Map(),
     saleMoved: new Map(),
     customers: new Set(),
     suppliers: new Set(),
@@ -1579,7 +1633,7 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           updated_at: Number(r.updated_at ?? 0),
           kind: String(r.kind ?? 'simple'),
         });
-      } else if ('bundleItems' in k) {
+      } else if ('bundleRows' in k) {
         const bundleId = String(r.bundle_id);
         look.bundleRecipes.set(bundleId, [
           ...(look.bundleRecipes.get(bundleId) ?? []),
@@ -1599,6 +1653,10 @@ async function loadLookups(ctx: ApplyContext, ops: PushOp[]): Promise<Lookups> {
           bundle_id: bundleId,
           component_product_id: String(r.component_product_id),
         });
+        const componentId = String(r.component_product_id);
+        const usedBy = look.bundleOfComponent.get(componentId) ?? [];
+        if (!usedBy.includes(bundleId)) usedBy.push(bundleId);
+        look.bundleOfComponent.set(componentId, usedBy);
       } else if ('lastClose' in k) {
         look.lastClose.set(String(r.id), {
           id: String(r.close_id ?? ''),

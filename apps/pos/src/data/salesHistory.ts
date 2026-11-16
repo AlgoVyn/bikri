@@ -540,13 +540,20 @@ export async function salesFilterOptions(
   return { staff, devices };
 }
 
+const TIME_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
 function timeText(at: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(at);
+  let formatter = TIME_FORMATTERS.get(timeZone);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    TIME_FORMATTERS.set(timeZone, formatter);
+  }
+  return formatter.format(at);
 }
 
 /**

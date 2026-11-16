@@ -1546,12 +1546,9 @@ export function checkOp(
         throw new Reject('CONSTRAINT_FAILED');
     }
     if (op.tbl === 'products') {
-      for (const bundleId of look.bundleRecipes.keys()) {
-        if (
-          bundleId === op.row_id ||
-          productDeletedInGroup(look, group, bundleId)
-        )
-          continue;
+      for (const bundleId of look.bundleOfComponent.get(String(op.row_id)) ??
+        []) {
+        if (productDeletedInGroup(look, group, bundleId)) continue;
         if (activeBundleComponents(look, group, bundleId).has(op.row_id))
           throw new Reject('CONSTRAINT_FAILED');
       }
@@ -2319,12 +2316,8 @@ export function checkOp(
     (row.deleted_at != null || row.kind === 'bundle' || row.kind === 'simple')
   ) {
     const productId = String(row.id);
-    for (const bundleId of look.bundleRecipes.keys()) {
-      if (
-        bundleId === productId ||
-        productDeletedInGroup(look, group, bundleId)
-      )
-        continue;
+    for (const bundleId of look.bundleOfComponent.get(productId) ?? []) {
+      if (productDeletedInGroup(look, group, bundleId)) continue;
       if (activeBundleComponents(look, group, bundleId).has(productId))
         throw new Reject('CONSTRAINT_FAILED');
     }

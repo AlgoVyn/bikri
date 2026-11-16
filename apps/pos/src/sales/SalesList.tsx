@@ -1,7 +1,15 @@
 import { businessDate } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -133,9 +141,9 @@ export function SalesList({
     defaultSaleSortDirection('time'),
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [shown, setShown] = useState(PAGE);
-  const sentinel = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listTop = useRef<HTMLDivElement>(null);
   const toast = useToast();
   const readOnly = useReadOnly();
   const setActive = useSellStore((s) => s.setActive);
@@ -245,7 +253,7 @@ export function SalesList({
   // A new filter starts again at the first page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the query changes
   useEffect(
-    () => setShown(PAGE),
+    () => setPage(0),
     [
       preset,
       custom.from,
@@ -260,38 +268,48 @@ export function SalesList({
     ],
   );
 
-  const visibleDays = useMemo(() => {
+  // Paginate at day boundaries so a day header never splits; a single busy day
+  // still forms one page. Keeps the DOM bounded without hiding older bills (D-231).
+  const pages = useMemo((): SalesDay[][] => {
     if (!data) return [];
-    let left = shown;
-    const out: SalesDay[] = [];
+    const out: SalesDay[][] = [];
+    let current: SalesDay[] = [];
+    let count = 0;
     for (const day of data.days) {
-      if (left <= 0) break;
-      const rows = day.rows.slice(0, left);
-      left -= rows.length;
-      out.push({ ...day, rows });
+      if (current.length > 0 && count + day.rows.length > PAGE) {
+        out.push(current);
+        current = [];
+        count = 0;
+      }
+      current.push(day);
+      count += day.rows.length;
     }
+    if (current.length > 0) out.push(current);
     return out;
-  }, [data, shown]);
-
+  }, [data]);
+  const pageDays = pages[page] ?? [];
+  const pageCount = Math.max(1, pages.length);
   useEffect(() => {
-    const el = sentinel.current;
-    if (!el || !data) return;
-    if (shown >= data.rows.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting))
-          setShown((count) => count + PAGE);
-      },
-      { rootMargin: '240px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [data, shown]);
+    if (page > pages.length - 1) setPage(Math.max(0, pages.length - 1));
+  }, [page, pages.length]);
 
   const runPreset = (next: SalesPreset) => {
     setPreset(next);
     if (next !== 'custom') setCustom({ from: today, to: today });
   };
+
+  const goToPage = (next: number) => {
+    setPage(next);
+    listTop.current?.scrollIntoView?.({ block: 'start' });
+  };
+
+  const reprint = useCallback(
+    async (saleId: string) => {
+      await queueSalePrint(getDb(), saleId, { reprint: true });
+      toast.push(t('office.bill.print_queued'));
+    },
+    [toast, t],
+  );
 
   return (
     <div
@@ -380,306 +398,328 @@ export function SalesList({
         </p>
       ) : null}
 
-      <ListSurface
-        toolbar={
-          <search className="flex flex-wrap items-end gap-2">
-            <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
-              <span className="mb-1 text-small">
-                {t('office.sales.search')}
-              </span>
-              <span className={searchWrapperClass}>
-                <SearchIcon />
-                <input
-                  ref={searchRef}
-                  type="search"
-                  autoComplete="off"
-                  className={searchInputClass}
-                  placeholder={t('office.sales.search_placeholder')}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </span>
-            </label>
-            <button
-              type="button"
-              className={`${buttonQuiet} gap-2 lg:hidden`}
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              {t('common.filters')}
-              {activeFilters > 0 ? (
-                <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
-                  {activeFilters}
-                </span>
-              ) : null}
-            </button>
-            <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+      <div ref={listTop}>
+        <ListSurface
+          toolbar={
+            <search className="flex flex-wrap items-end gap-2">
+              <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
                 <span className="mb-1 text-small">
-                  {t('office.sales.filter_method')}
+                  {t('office.sales.search')}
                 </span>
-                <select
-                  className={selectClass}
-                  value={method}
-                  onChange={(e) =>
-                    setMethod(e.target.value as MethodFilter | '')
-                  }
-                >
-                  <option value="">{t('office.sales.all_methods')}</option>
-                  {METHOD_FILTERS.map((m) => (
-                    <option key={m} value={m}>
-                      {m === 'split'
-                        ? t('office.sales.method_split')
-                        : methodLabel(t, m)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
-                <span className="mb-1 text-small">
-                  {t('office.sales.filter_status')}
-                </span>
-                <select
-                  className={selectClass}
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as SaleStatus | '')}
-                >
-                  <option value="">{t('office.sales.all_statuses')}</option>
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(t, s)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
-                <span className="mb-1 text-small">
-                  {t('office.sales.filter_cashier')}
-                </span>
-                <select
-                  className={selectClass}
-                  value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                >
-                  <option value="">{t('office.sales.all_cashiers')}</option>
-                  {options.staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
-                <span className="mb-1 text-small">
-                  {t('office.sales.filter_device')}
-                </span>
-                <select
-                  className={selectClass}
-                  value={deviceId}
-                  onChange={(e) => setDeviceId(e.target.value)}
-                >
-                  <option value="">{t('office.sales.all_devices')}</option>
-                  {options.devices.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex min-w-0 flex-[0_1_11rem] flex-col">
-                <span className="mb-1 text-small">
-                  {t('office.sales.sort')}
-                </span>
-                <div className="flex gap-1">
-                  <select
-                    aria-label={t('office.sales.sort')}
-                    className={`${selectClass} min-w-0 flex-1`}
-                    value={sort}
-                    onChange={(e) => changeSort(e.target.value as SaleSort)}
-                  >
-                    <option value="time">{t('office.sales.col_time')}</option>
-                    <option value="invoice">
-                      {t('office.sales.col_invoice')}
-                    </option>
-                    <option value="customer">
-                      {t('office.sales.col_customer')}
-                    </option>
-                    <option value="items">{t('office.sales.col_items')}</option>
-                    <option value="total">{t('office.sales.col_total')}</option>
-                    <option value="method">
-                      {t('office.sales.col_method')}
-                    </option>
-                    <option value="status">
-                      {t('office.sales.col_status')}
-                    </option>
-                  </select>
-                  <SortDirectionButton
-                    direction={direction}
-                    onToggle={() => setDirection(toggleSortDirection)}
-                    testId="sales-sort-direction"
+                <span className={searchWrapperClass}>
+                  <SearchIcon />
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    autoComplete="off"
+                    className={searchInputClass}
+                    placeholder={t('office.sales.search_placeholder')}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
                   />
+                </span>
+              </label>
+              <button
+                type="button"
+                className={`${buttonQuiet} gap-2 lg:hidden`}
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                {t('common.filters')}
+                {activeFilters > 0 ? (
+                  <span className="rounded-full bg-primary px-1.5 text-small text-primary-ink">
+                    {activeFilters}
+                  </span>
+                ) : null}
+              </button>
+              <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
+                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('office.sales.filter_method')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={method}
+                    onChange={(e) =>
+                      setMethod(e.target.value as MethodFilter | '')
+                    }
+                  >
+                    <option value="">{t('office.sales.all_methods')}</option>
+                    {METHOD_FILTERS.map((m) => (
+                      <option key={m} value={m}>
+                        {m === 'split'
+                          ? t('office.sales.method_split')
+                          : methodLabel(t, m)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('office.sales.filter_status')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={status}
+                    onChange={(e) =>
+                      setStatus(e.target.value as SaleStatus | '')
+                    }
+                  >
+                    <option value="">{t('office.sales.all_statuses')}</option>
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {statusLabel(t, s)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('office.sales.filter_cashier')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={staffId}
+                    onChange={(e) => setStaffId(e.target.value)}
+                  >
+                    <option value="">{t('office.sales.all_cashiers')}</option>
+                    {options.staff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('office.sales.filter_device')}
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={deviceId}
+                    onChange={(e) => setDeviceId(e.target.value)}
+                  >
+                    <option value="">{t('office.sales.all_devices')}</option>
+                    {options.devices.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex min-w-0 flex-[0_1_11rem] flex-col">
+                  <span className="mb-1 text-small">
+                    {t('office.sales.sort')}
+                  </span>
+                  <div className="flex gap-1">
+                    <select
+                      aria-label={t('office.sales.sort')}
+                      className={`${selectClass} min-w-0 flex-1`}
+                      value={sort}
+                      onChange={(e) => changeSort(e.target.value as SaleSort)}
+                    >
+                      <option value="time">{t('office.sales.col_time')}</option>
+                      <option value="invoice">
+                        {t('office.sales.col_invoice')}
+                      </option>
+                      <option value="customer">
+                        {t('office.sales.col_customer')}
+                      </option>
+                      <option value="items">
+                        {t('office.sales.col_items')}
+                      </option>
+                      <option value="total">
+                        {t('office.sales.col_total')}
+                      </option>
+                      <option value="method">
+                        {t('office.sales.col_method')}
+                      </option>
+                      <option value="status">
+                        {t('office.sales.col_status')}
+                      </option>
+                    </select>
+                    <SortDirectionButton
+                      direction={direction}
+                      onToggle={() => setDirection(toggleSortDirection)}
+                      testId="sales-sort-direction"
+                    />
+                  </div>
                 </div>
               </div>
+            </search>
+          }
+        >
+          {data && data.rows.length > 0 ? (
+            <div
+              data-testid="sales-summary"
+              className={`grid gap-3 border-b border-border px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
+            >
+              <Metric
+                label={t('office.sales.summary_bills')}
+                value={String(data.summary.bills)}
+              />
+              <Metric
+                label={t('office.sales.summary_sold')}
+                value={<MoneyText paisa={data.summary.sold} />}
+              />
+              <Metric
+                label={t('office.sales.summary_refunds')}
+                value={<MoneyText paisa={data.summary.refunds} />}
+              />
+              <Metric
+                label={t('office.sales.summary_avg')}
+                value={<MoneyText paisa={data.summary.avgBill} />}
+              />
             </div>
-          </search>
-        }
-      >
-        {data && data.rows.length > 0 ? (
-          <div
-            data-testid="sales-summary"
-            className={`grid gap-3 border-b border-border px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
-          >
-            <Metric
-              label={t('office.sales.summary_bills')}
-              value={String(data.summary.bills)}
-            />
-            <Metric
-              label={t('office.sales.summary_sold')}
-              value={<MoneyText paisa={data.summary.sold} />}
-            />
-            <Metric
-              label={t('office.sales.summary_refunds')}
-              value={<MoneyText paisa={data.summary.refunds} />}
-            />
-            <Metric
-              label={t('office.sales.summary_avg')}
-              value={<MoneyText paisa={data.summary.avgBill} />}
-            />
-          </div>
-        ) : null}
+          ) : null}
 
-        {data && data.rows.length === 0 ? (
-          <EmptyState
-            variant="plain"
-            icon={<SalesIcon />}
-            message={
-              query || method || status || staffId || deviceId
-                ? t('office.sales.no_match')
-                : t('office.sales.empty')
-            }
-            actionLabel={
-              query || method || status || staffId || deviceId
-                ? t('common.clear_filters')
-                : undefined
-            }
-            onAction={
-              query || method || status || staffId || deviceId
-                ? () => {
-                    setQuery('');
-                    setMethod('');
-                    setStatus('');
-                    setStaffId('');
-                    setDeviceId('');
-                  }
-                : undefined
-            }
-          />
-        ) : null}
+          {data && data.rows.length === 0 ? (
+            <EmptyState
+              variant="plain"
+              icon={<SalesIcon />}
+              message={
+                query || method || status || staffId || deviceId
+                  ? t('office.sales.no_match')
+                  : t('office.sales.empty')
+              }
+              actionLabel={
+                query || method || status || staffId || deviceId
+                  ? t('common.clear_filters')
+                  : undefined
+              }
+              onAction={
+                query || method || status || staffId || deviceId
+                  ? () => {
+                      setQuery('');
+                      setMethod('');
+                      setStatus('');
+                      setStaffId('');
+                      setDeviceId('');
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
 
-        {visibleDays.map((day) => (
-          <section key={day.date} className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
-              <h2 className="text-title font-semibold">
-                {dayHeading(
-                  t,
-                  day.date,
-                  today,
-                  yesterday,
-                  i18n.language,
-                  data?.timeZone ?? 'Asia/Karachi',
-                )}
-              </h2>
-              <p className="text-small text-text-muted">
-                {t('office.sales.day_total', {
-                  bills: day.bills,
-                  amount: money(day.total),
-                })}
-              </p>
-            </div>
-            <ul className="flex flex-col">
-              <li
-                data-testid="sales-list-header"
-                className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
-              >
-                <SortHeader
-                  label={t('office.sales.col_time')}
-                  active={sort === 'time'}
-                  direction={direction}
-                  onClick={() => applySort('time')}
-                />
-                <SortHeader
-                  label={t('office.sales.col_invoice')}
-                  active={sort === 'invoice'}
-                  direction={direction}
-                  onClick={() => applySort('invoice')}
-                />
-                {embedded ? null : (
-                  <>
-                    <SortHeader
-                      label={t('office.sales.col_customer')}
-                      active={sort === 'customer'}
-                      direction={direction}
-                      onClick={() => applySort('customer')}
-                    />
-                    <SortHeader
-                      label={t('office.sales.col_items')}
-                      active={sort === 'items'}
-                      direction={direction}
-                      onClick={() => applySort('items')}
-                    />
-                  </>
-                )}
-                <SortHeader
-                  label={t('office.sales.col_total')}
-                  active={sort === 'total'}
-                  direction={direction}
-                  onClick={() => applySort('total')}
-                />
-                {embedded ? null : (
+          {pageDays.map((day) => (
+            <section key={day.date} className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
+                <h2 className="text-title font-semibold">
+                  {dayHeading(
+                    t,
+                    day.date,
+                    today,
+                    yesterday,
+                    i18n.language,
+                    data?.timeZone ?? 'Asia/Karachi',
+                  )}
+                </h2>
+                <p className="text-small text-text-muted">
+                  {t('office.sales.day_total', {
+                    bills: day.bills,
+                    amount: money(day.total),
+                  })}
+                </p>
+              </div>
+              <ul className="flex flex-col">
+                <li
+                  data-testid="sales-list-header"
+                  className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
+                >
                   <SortHeader
-                    label={t('office.sales.col_method')}
-                    active={sort === 'method'}
+                    label={t('office.sales.col_time')}
+                    active={sort === 'time'}
                     direction={direction}
-                    onClick={() => applySort('method')}
+                    onClick={() => applySort('time')}
                   />
-                )}
-                <SortHeader
-                  label={t('office.sales.col_status')}
-                  active={sort === 'status'}
-                  direction={direction}
-                  onClick={() => applySort('status')}
-                />
-              </li>
-              {day.rows.map((row) => (
-                <SaleRow
-                  key={row.sale.id}
-                  row={row}
-                  current={row.sale.id === selectedId}
-                  embedded={embedded}
-                  timeZone={data?.timeZone ?? 'Asia/Karachi'}
-                  onReprint={async () => {
-                    await queueSalePrint(getDb(), String(row.sale.id), {
-                      reprint: true,
-                    });
-                    toast.push(t('office.bill.print_queued'));
-                  }}
-                />
-              ))}
-            </ul>
-          </section>
-        ))}
+                  <SortHeader
+                    label={t('office.sales.col_invoice')}
+                    active={sort === 'invoice'}
+                    direction={direction}
+                    onClick={() => applySort('invoice')}
+                  />
+                  {embedded ? null : (
+                    <>
+                      <SortHeader
+                        label={t('office.sales.col_customer')}
+                        active={sort === 'customer'}
+                        direction={direction}
+                        onClick={() => applySort('customer')}
+                      />
+                      <SortHeader
+                        label={t('office.sales.col_items')}
+                        active={sort === 'items'}
+                        direction={direction}
+                        onClick={() => applySort('items')}
+                      />
+                    </>
+                  )}
+                  <SortHeader
+                    label={t('office.sales.col_total')}
+                    active={sort === 'total'}
+                    direction={direction}
+                    onClick={() => applySort('total')}
+                  />
+                  {embedded ? null : (
+                    <SortHeader
+                      label={t('office.sales.col_method')}
+                      active={sort === 'method'}
+                      direction={direction}
+                      onClick={() => applySort('method')}
+                    />
+                  )}
+                  <SortHeader
+                    label={t('office.sales.col_status')}
+                    active={sort === 'status'}
+                    direction={direction}
+                    onClick={() => applySort('status')}
+                  />
+                </li>
+                {day.rows.map((row) => (
+                  <SaleRow
+                    key={row.sale.id}
+                    row={row}
+                    current={row.sale.id === selectedId}
+                    embedded={embedded}
+                    timeZone={data?.timeZone ?? 'Asia/Karachi'}
+                    onReprint={reprint}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
 
-        {data &&
-        data.rows.length >
-          visibleDays.reduce((s, d) => s + d.rows.length, 0) ? (
-          <div
-            ref={sentinel}
-            className="py-4 text-center text-small text-text-muted"
-          >
-            {t('office.sales.loading_more')}
-          </div>
-        ) : null}
-      </ListSurface>
+          {data && pageCount > 1 ? (
+            <nav
+              className="flex items-center justify-between gap-2 border-t border-border p-3"
+              aria-label={t('office.sales.pagination')}
+            >
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={page === 0}
+                onClick={() => goToPage(Math.max(0, page - 1))}
+              >
+                {t('office.sales.previous')}
+              </button>
+              <span className="text-small text-text-muted" role="status">
+                {t('office.sales.page_of', {
+                  page: page + 1,
+                  pages: pageCount,
+                })}
+              </span>
+              <button
+                type="button"
+                className={buttonQuiet}
+                disabled={page >= pageCount - 1}
+                onClick={() => goToPage(Math.min(pageCount - 1, page + 1))}
+              >
+                {t('office.sales.next')}
+              </button>
+            </nav>
+          ) : null}
+        </ListSurface>
+      </div>
       <BackdateDialog
         open={backdateOpen}
         onOpenChange={setBackdateOpen}
@@ -692,7 +732,7 @@ export function SalesList({
   );
 }
 
-function SaleRow({
+const SaleRow = memo(function SaleRow({
   row,
   current,
   embedded,
@@ -703,7 +743,7 @@ function SaleRow({
   current: boolean;
   embedded: boolean;
   timeZone: string;
-  onReprint: () => Promise<void>;
+  onReprint: (saleId: string) => Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
   const sale = row.sale;
@@ -712,7 +752,7 @@ function SaleRow({
     businessDate(Number(sale.created_at), timeZone) !==
     String(sale.business_date);
   return (
-    <li className="relative border-b border-border">
+    <li className="relative border-b border-border [contain-intrinsic-size:auto_52px] [content-visibility:auto]">
       <Link
         to="/sales/$id"
         params={{ id: sale.id }}
@@ -780,11 +820,11 @@ function SaleRow({
           className="absolute end-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-control text-danger"
           title={t('office.sales.print_failed')}
           aria-label={t('office.sales.print_failed')}
-          onClick={() => void onReprint()}
+          onClick={() => void onReprint(String(sale.id))}
         >
           <PrinterIcon className="size-5" />
         </button>
       ) : null}
     </li>
   );
-}
+});

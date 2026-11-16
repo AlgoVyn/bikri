@@ -47,12 +47,9 @@ export async function syncAttention(
 /** Products with track_stock = 1 at or below their low-stock alert (min 0 = off; screens/04 AC 4). */
 export async function lowStockCount(db: BikriDb): Promise<number> {
   let count = 0;
-  const products = (await db.products.toArray()).filter(
-    (p) =>
-      !p.deleted_at &&
-      p.track_stock === 1 &&
-      Number(p.min_stock_milli ?? 0) > 0,
-  );
+  const products = (
+    await db.products.where('track_stock').equals(1).toArray()
+  ).filter((p) => !p.deleted_at && Number(p.min_stock_milli ?? 0) > 0);
   const levels = await db.stock_levels.bulkGet(products.map((p) => p.id));
   for (const [index, p] of products.entries()) {
     const level = levels[index]?.on_hand_milli ?? 0;
@@ -92,12 +89,9 @@ export async function attentionItems(
     if (promises > 0) items.push({ kind: 'promises_due', count: promises });
   }
   if (wants('customers', 'party_balances')) {
-    const customers = (await db.customers.toArray()).filter(
-      (c) =>
-        !c.deleted_at &&
-        c.credit_limit !== null &&
-        c.credit_limit !== undefined,
-    );
+    const customers = (
+      await db.customers.where('credit_limit').above(-Infinity).toArray()
+    ).filter((c) => !c.deleted_at);
     const balances = await db.party_balances.bulkGet(
       customers.map((c) => ['customer', c.id] as [PartyType, string]),
     );
@@ -115,9 +109,10 @@ export async function attentionItems(
     if (failed > 0) items.push({ kind: 'failed_prints', count: failed });
   }
   if (opts.isOwner && wants('sync_conflicts')) {
-    const conflicts = (await db.sync_conflicts.toArray()).filter(
-      (c) => c.resolution === 'needs_owner',
-    ).length;
+    const conflicts = await db.sync_conflicts
+      .where('resolution')
+      .equals('needs_owner')
+      .count();
     if (conflicts > 0) items.push({ kind: 'conflicts', count: conflicts });
   }
   if (wants('held_bills')) {
@@ -164,8 +159,11 @@ export async function recentBills(
     )
     .slice(0, limit);
   const out: RecentBill[] = [];
-  for (const sale of sales) {
-    const pays = await db.payments.where('sale_id').equals(sale.id).toArray();
+  const payments = await Promise.all(
+    sales.map((sale) => db.payments.where('sale_id').equals(sale.id).toArray()),
+  );
+  for (const [index, sale] of sales.entries()) {
+    const pays = payments[index] ?? [];
     const methods = [
       ...new Set(
         pays.filter((p) => p.direction === 'in').map((p) => String(p.method)),

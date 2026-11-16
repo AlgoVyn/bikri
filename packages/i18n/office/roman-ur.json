@@ -15,7 +15,6 @@
       "filter_method": "Tareeqa",
       "filter_status": "Halat",
       "from": "Se",
-      "loading_more": "Mazeed load ho raha hai…",
       "method_split": "Mixed",
       "no_match": "In filters se koi bill nahi mila.",
       "print_failed": "Print fail — dobara print ke liye dabayein",
@@ -52,7 +51,11 @@
       "select_bill_hint": "Us ki items, payments aur actions yahan nazar aayenge.",
       "record_past": "Purani sale darj karein",
       "late": "Der se",
-      "sort": "Tarteeb"
+      "sort": "Tarteeb",
+      "pagination": "Safhay",
+      "previous": "Pichla",
+      "next": "Agla",
+      "page_of": "Safha {{page}} / {{pages}}"
     },
     "bill": {
       "audit": "Audit",

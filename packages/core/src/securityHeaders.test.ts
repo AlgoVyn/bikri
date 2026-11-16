@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { BASE_PATH } from './paths.ts';
 import {
   ASSET_CACHE_CONTROL,
+  IMMUTABLE_ASSET_PATHS,
+  IMMUTABLE_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
   securityHeaderEntries,
@@ -16,18 +18,31 @@ const SPEC_HEADERS = {
   'Permissions-Policy': 'camera=(self), usb=(self), serial=(self)',
 } as const;
 
-function parseAssetHeaders(file: string): Record<string, string> {
-  const parsed: Record<string, string> = {};
+function parseBlocks(file: string): Record<string, Record<string, string>> {
+  const blocks: Record<string, Record<string, string>> = {};
+  let current: Record<string, string> | null = null;
   for (const line of file.split('\n')) {
+    if (line.trim() === '') {
+      current = null;
+      continue;
+    }
     if (!line.startsWith('  ')) {
+      current = {};
+      blocks[line] = current;
+      continue;
+    }
+    if (current === null) continue;
+    if (line.startsWith('  ! ')) {
+      current[`! ${line.slice(4).trim()}`] = '';
       continue;
     }
     const separator = line.indexOf(':');
-    const name = line.slice(2, separator);
-    const value = line.slice(separator + 2);
-    parsed[name] = value;
+    if (separator < 0) continue;
+    const name = line.slice(2, separator).trim();
+    const value = line.slice(separator + 2).trim();
+    current[name] = value;
   }
-  return parsed;
+  return blocks;
 }
 
 describe('security headers', () => {
@@ -38,14 +53,22 @@ describe('security headers', () => {
     );
   });
 
-  it('writes an asset _headers file with the same pairs the middleware sets', () => {
+  it('keeps no-transform on HTML and makes hashed assets immutable', () => {
     const file = renderAssetHeaders();
     expect(file.startsWith(`${BASE_PATH}/*\n`)).toBe(true);
-    expect(parseAssetHeaders(file)).toEqual({
+    const blocks = parseBlocks(file);
+    expect(blocks[`${BASE_PATH}/*`]).toEqual({
       'Cache-Control': ASSET_CACHE_CONTROL,
       ...SECURITY_HEADERS,
     });
     expect(ASSET_CACHE_CONTROL).toContain('no-transform');
+    for (const path of IMMUTABLE_ASSET_PATHS) {
+      expect(blocks[path]).toEqual({
+        '! Cache-Control': '',
+        'Cache-Control': IMMUTABLE_CACHE_CONTROL,
+      });
+      expect(IMMUTABLE_CACHE_CONTROL).not.toContain('no-transform');
+    }
     expect(Object.fromEntries(securityHeaderEntries())).toEqual(
       SECURITY_HEADERS,
     );

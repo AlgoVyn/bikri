@@ -51,19 +51,30 @@ export function formatTaxRate(bp: number): string {
 }
 
 /** `DD-MM-YYYY HH:mm` in the shop time zone (default Asia/Karachi). */
+const DATE_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = DATE_FORMATTERS.get(timeZone);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    DATE_FORMATTERS.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 export function formatReceiptDate(
   epochMs: number,
   timeZone = 'Asia/Karachi',
 ): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(epochMs));
+  const parts = dateFormatter(timeZone).formatToParts(new Date(epochMs));
   const read = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((part) => part.type === type)?.value ?? '';
   const hour = read('hour') === '24' ? '00' : read('hour');

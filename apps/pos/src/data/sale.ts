@@ -474,6 +474,21 @@ export async function completeSale(
       const ordered = pricedCart.lines
         .map((line, i) => ({ line, r: totals.lines[i] }))
         .reverse();
+      // One fresh read of every product in the bill, inside the transaction: the
+      // previous loop did one `products.get` per line while 17 stores were locked
+      // (D-231).
+      const productIds = [
+        ...new Set(
+          ordered
+            .map(({ line }) => line.product_id)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      const currentProducts = new Map(
+        (await w.table<MasterRow, string>('products').bulkGet(productIds))
+          .filter((row): row is MasterRow => row !== undefined)
+          .map((row) => [row.id, row]),
+      );
       let lineNo = 0;
       const saleLineIds = new Map<string, string>();
       for (const { line, r } of ordered) {
@@ -483,7 +498,7 @@ export async function completeSale(
           ? products.get(line.product_id)
           : undefined;
         const currentProduct = line.product_id
-          ? await w.table<MasterRow, string>('products').get(line.product_id)
+          ? currentProducts.get(line.product_id)
           : undefined;
         const unitCost = currentProduct
           ? unitCostOf(currentProduct, money.cost_method)

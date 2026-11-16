@@ -9,23 +9,44 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 )
 
 // cupsBackend talks to CUPS with the standard command-line tools. It works on
 // Linux and macOS and never needs root: the agent runs as the logged-in user and
 // CUPS policy decides whether that user may print.
-type cupsBackend struct{}
+type cupsBackend struct {
+	printersMu sync.Mutex
+	printers   []Printer
+	printersAt time.Time
+}
 
 var requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
 
 func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
+	// `/v1/jobs` verifies the requested queue, and health/printers/diagnostics
+	// each list again. Without this cache every print spawned 1–3 `lpstat`
+	// processes (the Windows backend already caches for 10 s).
+	b.printersMu.Lock()
+	if b.printers != nil && time.Since(b.printersAt) < 10*time.Second {
+		list := append([]Printer(nil), b.printers...)
+		b.printersMu.Unlock()
+		return list, nil
+	}
+	b.printersMu.Unlock()
 	namesOut, err := run(ctx, "lpstat", "-e")
 	if err != nil {
 		return nil, &Error{Code: "CUPS_UNAVAILABLE", Message: err.Error()}
 	}
 	names := parseQueueNames(namesOut)
 	if len(names) == 0 {
-		return []Printer{}, nil
+		empty := []Printer{}
+		b.printersMu.Lock()
+		b.printers = empty
+		b.printersAt = time.Now()
+		b.printersMu.Unlock()
+		return empty, nil
 	}
 	defaultName := ""
 	if out, err := run(ctx, "lpstat", "-d"); err == nil {
@@ -43,6 +64,10 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 			IsDefault: name == defaultName,
 		})
 	}
+	b.printersMu.Lock()
+	b.printers = append([]Printer(nil), printers...)
+	b.printersAt = time.Now()
+	b.printersMu.Unlock()
 	return printers, nil
 }
 

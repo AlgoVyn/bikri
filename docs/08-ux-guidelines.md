@@ -252,8 +252,10 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
 | JS initial bundle (gz) | < 290 KB (includes the blocking theme script and the active language catalog); route chunks < 100 KB |
+| Initial CSS (gz) | < 25 KB |
+| Offline precache (gz) | < 1.25 MB; content-hashed JS/CSS/fonts are served `immutable` and compressed (D-231) |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
-| Lists | virtualised above 100 rows; 60 fps scroll |
+| Lists | virtualised or paged above 100 rows; 60 fps scroll |
 
 Techniques required: in-memory product search index (prefix + token, normalised Urdu/English, rebuilt on product change), `useDeferredValue` for result lists, no synchronous Dexie queries in render, Web Worker for reports and imports.
 

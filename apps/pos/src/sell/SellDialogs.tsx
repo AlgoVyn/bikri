@@ -393,7 +393,12 @@ export function CustomerDialog({
     setPhone(null);
     setError(null);
   }, [open]);
-  const directory = useLiveQuery(() => loadCustomerDirectory(getDb()), []);
+  // Load the directory only while the picker is open. Mounting it closed made
+  // every Sell screen read all customers and balances (D-231).
+  const directory = useLiveQuery(
+    () => (open ? loadCustomerDirectory(getDb()) : undefined),
+    [open],
+  );
   const hits = useMemo(
     () => (directory ? filterCustomers(directory, deferredQuery) : []),
     [directory, deferredQuery],
@@ -477,6 +482,14 @@ export function CustomerDialog({
                 {t('sell.walk_in')}
               </button>
             </li>
+            {open && directory === undefined ? (
+              <li
+                className="px-2 py-3 text-small text-text-muted"
+                role="status"
+              >
+                {t('common.loading')}
+              </li>
+            ) : null}
             {hits.map((h) => (
               <li key={h.customer.id}>
                 <button

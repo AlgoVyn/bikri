@@ -15,7 +15,6 @@
       "filter_method": "طریقہ",
       "filter_status": "حالت",
       "from": "سے",
-      "loading_more": "مزید لوڈ ہو رہا ہے…",
       "method_split": "مخلوط",
       "no_match": "ان فلٹرز سے کوئی بل نہیں ملا۔",
       "print_failed": "پرنٹ ناکام — دوبارہ پرنٹ کے لیے دبائیں",
@@ -52,7 +51,11 @@
       "select_bill_hint": "اس کی اشیاء، ادائیگیاں اور اقدامات یہاں نظر آئیں گے۔",
       "record_past": "پرانی فروخت درج کریں",
       "late": "دیر سے",
-      "sort": "ترتیب"
+      "sort": "ترتیب",
+      "pagination": "صفحات",
+      "previous": "پچھلا",
+      "next": "اگلا",
+      "page_of": "صفحہ {{page}} از {{pages}}"
     },
     "bill": {
       "audit": "آڈٹ",

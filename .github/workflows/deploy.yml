@@ -144,3 +144,15 @@ jobs:
           curl -fsS https://algovyn.com/bikri/api/health | tee /dev/stderr | grep -q '"ok":true'
           curl -fsSI https://algovyn.com/bikri/ | grep -qi '^content-security-policy:'
           test "$(curl -s -o /dev/null -w '%{http_code}' https://algovyn.com/)" = "200"
+          # D-231: the entry JS/CSS must be compressed and content-hashed assets immutable.
+          html="$(curl -fsS https://algovyn.com/bikri/)"
+          # Check the entry chunk, not the tiny locale-preload (below Cloudflare's
+          # compression threshold) that happens to be the first asset in the HTML.
+          js="$(printf '%s' "$html" | grep -o '/bikri/assets/index-[^"]*\.js' | head -1)"
+          css="$(printf '%s' "$html" | grep -o '/bikri/assets/[^"]*\.css' | head -1)"
+          for url in "$js" "$css"; do
+            test -n "$url" || { echo "no entry asset in index.html"; exit 1; }
+            headers="$(curl -fsSI -H 'Accept-Encoding: br, gzip' "https://algovyn.com$url")"
+            printf '%s' "$headers" | grep -qiE '^content-encoding: (br|gzip)' || { echo "not compressed: $url"; exit 1; }
+            printf '%s' "$headers" | grep -qi '^cache-control:.*immutable' || { echo "not immutable: $url"; exit 1; }
+          done

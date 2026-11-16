@@ -1807,4 +1807,26 @@ describe('status, me and engine (03 §6–7)', () => {
     );
     engine?.stop();
   });
+
+  it('a push cycle does not postpone the poll pull', async () => {
+    const db = await enrolled('poll-starvation');
+    const engine = new SyncEngine(db);
+    await engine.run('full');
+    // Re-arm the poll with a short test interval (the full's pull just stored the
+    // server's 60 s value).
+    await setKv(db, 'poll_after_ms', 200);
+    await (
+      engine as unknown as { scheduleNext: () => Promise<void> }
+    ).scheduleNext();
+    server.log = [];
+    const start = Date.now();
+    while (Date.now() - start < 300) {
+      await engine.run('push');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    // The poll at t=200 must have fired even though pushes kept happening.
+    // Before D-231 each push moved it 200 ms further out, so it never fired.
+    expect(server.log.some((entry) => entry.path === '/sync/pull')).toBe(true);
+    engine.stop();
+  });
 });

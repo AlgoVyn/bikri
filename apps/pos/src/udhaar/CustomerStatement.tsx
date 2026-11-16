@@ -32,6 +32,7 @@ import { errorCode } from '../print/printService.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
+import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
@@ -72,6 +73,9 @@ export function CustomerStatement({
   const [to, setTo] = useState('');
   const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
   const tableRef = useRef<HTMLDivElement>(null);
+  // Render one layout: the card list and the table both mapped every entry and
+  // formatted two dates per row, even when CSS hid one of them (D-231).
+  const wide = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
     if (!canEditPromises) return;
@@ -476,144 +480,152 @@ export function CustomerStatement({
         </button>
       </div>
 
-      <ul className="flex flex-col gap-2 sm:hidden">
-        {shownOpening !== 0 ? (
-          <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
-            <span>{t('office.udhaar.entry_opening')}</span>
-            <span className="font-medium">
-              <MoneyText paisa={shownOpening} />
-            </span>
-          </li>
-        ) : null}
-        {rows.length === 0 ? (
-          <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
-            {t('office.udhaar.no_entries')}
-          </li>
-        ) : (
-          shownRows.map((row, index) => (
-            <li
-              key={row.entry.id}
-              className="rounded-card border border-border bg-surface p-3 text-small"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-text-muted">
-                  {dateText(String(row.entry.business_date), i18n.language, tz)}
-                </span>
-                <span className="font-medium">
-                  <MoneyText paisa={row.balance} />
-                </span>
-              </div>
-              <p className="mt-1">
-                {row.saleId ? (
-                  <Link
-                    to="/sales/$id"
-                    params={{ id: row.saleId }}
-                    className="underline"
-                  >
-                    {rows[index]?.description}
-                  </Link>
-                ) : (
-                  rows[index]?.description
-                )}
-              </p>
-              <dl className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.udhaar.debit')}
-                  </dt>
-                  <dd className="text-start">
-                    {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-text-muted">
-                    {t('office.udhaar.credit')}
-                  </dt>
-                  <dd className="text-start">
-                    {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
-                  </dd>
-                </div>
-              </dl>
+      {!wide ? (
+        <ul className="flex flex-col gap-2">
+          {shownOpening !== 0 ? (
+            <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
+              <span>{t('office.udhaar.entry_opening')}</span>
+              <span className="font-medium">
+                <MoneyText paisa={shownOpening} />
+              </span>
             </li>
-          ))
-        )}
-      </ul>
-
-      <div
-        ref={tableRef}
-        className="hidden max-h-[60vh] overflow-auto rounded-card border border-border sm:block"
-      >
-        <table className="w-full min-w-[34rem] text-small">
-          <thead className="sticky top-0 bg-surface">
-            <tr className="border-b border-border text-text-muted">
-              <th className="p-2 text-start">{t('office.udhaar.date')}</th>
-              <th className="p-2 text-start">
-                {t('office.udhaar.description')}
-              </th>
-              <th className="p-2 text-start">{t('office.udhaar.debit')}</th>
-              <th className="p-2 text-start">{t('office.udhaar.credit')}</th>
-              <th className="p-2 text-start">{t('office.udhaar.balance')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shownOpening !== 0 ? (
-              <tr className="border-b border-border">
-                <td className="p-2" />
-                <td className="p-2">{t('office.udhaar.entry_opening')}</td>
-                <td className="p-2" />
-                <td className="p-2" />
-                <td className="p-2 text-start">
-                  <MoneyText paisa={shownOpening} />
-                </td>
-              </tr>
-            ) : null}
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-4 text-center text-text-muted">
-                  {t('office.udhaar.no_entries')}
-                </td>
-              </tr>
-            ) : (
-              shownRows.map((row, index) => (
-                <tr
-                  key={row.entry.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="p-2 whitespace-nowrap">
+          ) : null}
+          {rows.length === 0 ? (
+            <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+              {t('office.udhaar.no_entries')}
+            </li>
+          ) : (
+            shownRows.map((row, index) => (
+              <li
+                key={row.entry.id}
+                className="rounded-card border border-border bg-surface p-3 text-small"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-text-muted">
                     {dateText(
                       String(row.entry.business_date),
                       i18n.language,
                       tz,
                     )}
-                  </td>
-                  <td className="p-2">
-                    {row.saleId ? (
-                      <Link
-                        to="/sales/$id"
-                        params={{ id: row.saleId }}
-                        className="underline"
-                      >
-                        {rows[index]?.description}
-                      </Link>
-                    ) : (
-                      rows[index]?.description
-                    )}
-                  </td>
-                  <td className="p-2 text-start">
-                    {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
-                  </td>
-                  <td className="p-2 text-start">
-                    {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
-                  </td>
-                  <td className="p-2 text-start font-medium">
+                  </span>
+                  <span className="font-medium">
                     <MoneyText paisa={row.balance} />
+                  </span>
+                </div>
+                <p className="mt-1">
+                  {row.saleId ? (
+                    <Link
+                      to="/sales/$id"
+                      params={{ id: row.saleId }}
+                      className="underline"
+                    >
+                      {rows[index]?.description}
+                    </Link>
+                  ) : (
+                    rows[index]?.description
+                  )}
+                </p>
+                <dl className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <dt className="text-text-muted">
+                      {t('office.udhaar.debit')}
+                    </dt>
+                    <dd className="text-start">
+                      {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-text-muted">
+                      {t('office.udhaar.credit')}
+                    </dt>
+                    <dd className="text-start">
+                      {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+
+      {wide ? (
+        <div
+          ref={tableRef}
+          className="max-h-[60vh] overflow-auto rounded-card border border-border"
+        >
+          <table className="w-full min-w-[34rem] text-small">
+            <thead className="sticky top-0 bg-surface">
+              <tr className="border-b border-border text-text-muted">
+                <th className="p-2 text-start">{t('office.udhaar.date')}</th>
+                <th className="p-2 text-start">
+                  {t('office.udhaar.description')}
+                </th>
+                <th className="p-2 text-start">{t('office.udhaar.debit')}</th>
+                <th className="p-2 text-start">{t('office.udhaar.credit')}</th>
+                <th className="p-2 text-start">{t('office.udhaar.balance')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shownOpening !== 0 ? (
+                <tr className="border-b border-border">
+                  <td className="p-2" />
+                  <td className="p-2">{t('office.udhaar.entry_opening')}</td>
+                  <td className="p-2" />
+                  <td className="p-2" />
+                  <td className="p-2 text-start">
+                    <MoneyText paisa={shownOpening} />
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : null}
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-text-muted">
+                    {t('office.udhaar.no_entries')}
+                  </td>
+                </tr>
+              ) : (
+                shownRows.map((row, index) => (
+                  <tr
+                    key={row.entry.id}
+                    className="border-b border-border last:border-0"
+                  >
+                    <td className="p-2 whitespace-nowrap">
+                      {dateText(
+                        String(row.entry.business_date),
+                        i18n.language,
+                        tz,
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {row.saleId ? (
+                        <Link
+                          to="/sales/$id"
+                          params={{ id: row.saleId }}
+                          className="underline"
+                        >
+                          {rows[index]?.description}
+                        </Link>
+                      ) : (
+                        rows[index]?.description
+                      )}
+                    </td>
+                    <td className="p-2 text-start">
+                      {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}
+                    </td>
+                    <td className="p-2 text-start">
+                      {row.credit > 0 ? <MoneyText paisa={row.credit} /> : '—'}
+                    </td>
+                    <td className="p-2 text-start font-medium">
+                      <MoneyText paisa={row.balance} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {statement.hasMore ? (
         <button

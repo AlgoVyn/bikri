@@ -126,6 +126,8 @@ export {
 export type { SecurityHeaderName } from './securityHeaders.ts';
 export {
   ASSET_CACHE_CONTROL,
+  IMMUTABLE_ASSET_PATHS,
+  IMMUTABLE_CACHE_CONTROL,
   renderAssetHeaders,
   SECURITY_HEADERS,
   securityHeaderEntries,

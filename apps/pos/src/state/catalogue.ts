@@ -1,6 +1,6 @@
 import type { BikriDb, MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type BundleInfo,
   buildBundleInfoMap,
@@ -127,6 +127,29 @@ export function useSold30(): Map<string, number> | undefined {
   return sold;
 }
 
+/** One row; the haystack is built once here so a keystroke only runs `includes`. */
+function buildProductRow(
+  product: MasterRow,
+  master: CatalogueMaster,
+  levels: ReadonlyMap<string, number>,
+  sold: ReadonlyMap<string, number>,
+  bundle: BundleInfo | undefined,
+): ProductListRow {
+  const onHand = bundle
+    ? (bundle.availability ?? 0) * 1000
+    : (levels.get(product.id) ?? 0);
+  const row: ProductListRow = {
+    product,
+    category: master.categories.get(String(product.category_id)) ?? null,
+    onHand,
+    sold30: sold.get(product.id) ?? 0,
+    barcodes: master.barcodes.get(product.id) ?? [],
+    stockState: stockStateOf(product, onHand, bundle),
+    ...(bundle ? { bundle } : {}),
+  };
+  return { ...row, haystack: productHaystack(row) };
+}
+
 /** Build the list rows once; filtering and sorting happen in memory on each keystroke. */
 export function buildProductRows(
   master: CatalogueMaster,
@@ -140,21 +163,9 @@ export function buildProductRows(
     levels,
     costMethod,
   );
-  return master.products.map((product) => {
-    const bundle: BundleInfo | undefined = bundles.get(product.id);
-    const onHand = bundle
-      ? (bundle.availability ?? 0) * 1000
-      : (levels.get(product.id) ?? 0);
-    return {
-      product,
-      category: master.categories.get(String(product.category_id)) ?? null,
-      onHand,
-      sold30: sold.get(product.id) ?? 0,
-      barcodes: master.barcodes.get(product.id) ?? [],
-      stockState: stockStateOf(product, onHand, bundle),
-      ...(bundle ? { bundle } : {}),
-    };
-  });
+  return master.products.map((product) =>
+    buildProductRow(product, master, levels, sold, bundles.get(product.id)),
+  );
 }
 
 /** A product row's barcode list as a flat search haystack (used by the Sell filter). */
@@ -170,12 +181,76 @@ export function productHaystack(row: ProductListRow): string {
     .join(' ');
 }
 
+type CatalogueCache = {
+  master: CatalogueMaster;
+  sold: ReadonlyMap<string, number>;
+  levels: ReadonlyMap<string, number>;
+  costMethod: 'avg' | 'last';
+  rows: ProductListRow[];
+  index: Map<string, number>;
+};
+
+/**
+ * Sell/Products rows. A sale invalidates the `stock_levels` live query; patching
+ * the few rows whose level changed keeps the per-sale cost proportional to the
+ * sale instead of the catalogue. Shops with bundles fall back to a full rebuild
+ * because a component sale changes the bundle's availability (D-231).
+ */
 export function useCatalogueRows(
   sold: ReadonlyMap<string, number>,
+  costMethod: 'avg' | 'last' = 'avg',
 ): ProductListRow[] | undefined {
   const master = useCatalogueMaster();
   const levels = useStockLevels();
-  return master === undefined || levels === undefined
-    ? undefined
-    : buildProductRows(master, levels, sold);
+  const cache = useRef<CatalogueCache | null>(null);
+  return useMemo(() => {
+    if (master === undefined || levels === undefined) return undefined;
+    const prev = cache.current;
+    if (
+      prev !== null &&
+      prev.master === master &&
+      prev.sold === sold &&
+      prev.costMethod === costMethod &&
+      master.bundleItems.length === 0
+    ) {
+      const changed: string[] = [];
+      const seen = new Set<string>();
+      for (const [id, level] of levels) {
+        seen.add(id);
+        if (prev.levels.get(id) !== level) changed.push(id);
+      }
+      for (const id of prev.levels.keys()) {
+        if (!seen.has(id)) changed.push(id);
+      }
+      if (changed.length === 0) return prev.rows;
+      if (changed.length <= 500) {
+        const rows = prev.rows.slice();
+        for (const id of changed) {
+          const index = prev.index.get(id);
+          if (index === undefined) continue;
+          const product = master.products[index];
+          const old = rows[index];
+          if (!product || !old) continue;
+          const onHand = levels.get(id) ?? 0;
+          rows[index] = {
+            ...old,
+            onHand,
+            stockState: stockStateOf(product, onHand),
+          };
+        }
+        cache.current = { ...prev, levels, rows };
+        return rows;
+      }
+    }
+    const rows = buildProductRows(master, levels, sold, costMethod);
+    cache.current = {
+      master,
+      sold,
+      levels,
+      costMethod,
+      rows,
+      index: new Map(rows.map((row, index) => [row.product.id, index])),
+    };
+    return rows;
+  }, [master, levels, sold, costMethod]);
 }

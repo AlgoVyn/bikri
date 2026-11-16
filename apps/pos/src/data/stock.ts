@@ -263,8 +263,10 @@ export async function startCount(
   now = Date.now(),
 ): Promise<CountDraft> {
   const products = await countProducts(db, scope);
+  const levels = await db.stock_levels.bulkGet(products.map((p) => p.id));
   const expected: Record<string, number> = {};
-  for (const p of products) expected[p.id] = await onHand(db, p.id);
+  for (const [index, p] of products.entries())
+    expected[p.id] = levels[index]?.on_hand_milli ?? 0;
   const draft: CountDraft = {
     scope,
     started_at: now,

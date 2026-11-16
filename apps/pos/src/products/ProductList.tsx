@@ -41,12 +41,7 @@ import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import type { SortDirection } from '../lib/sort.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
-import {
-  buildProductRows,
-  useCatalogueMaster,
-  useSold30,
-  useStockLevels,
-} from '../state/catalogue.ts';
+import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { isLatinName, marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
@@ -94,39 +89,33 @@ export function ProductList({
     (stock !== 'all' ? 1 : 0) +
     (sort !== 'name' || direction !== 'asc' ? 1 : 0);
   const deferredQuery = useDeferredValue(query);
-  const master = useCatalogueMaster();
-  const levels = useStockLevels();
   const sold = useSold30();
   const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const costMethod = shop?.cost_method === 'last' ? 'last' : 'avg';
+  // The hook patches only the rows whose stock changed after a sale; a keystroke
+  // then just filters and sorts (D-231).
+  const baseRows = useCatalogueRows(sold ?? EMPTY_SOLD, costMethod);
   const rows = useMemo(() => {
-    if (master === undefined || levels === undefined) return undefined;
-    return filterAndSortProducts(
-      buildProductRows(master, levels, sold ?? EMPTY_SOLD, costMethod),
-      {
-        query: deferredQuery,
-        categoryId:
-          categoryId && categoryId !== '__bundles' ? categoryId : null,
-        kind: categoryId === '__bundles' ? 'bundle' : undefined,
-        stock,
-        sort,
-        direction,
-        language: i18n.language,
-      },
-    );
+    if (baseRows === undefined) return undefined;
+    return filterAndSortProducts(baseRows, {
+      query: deferredQuery,
+      categoryId: categoryId && categoryId !== '__bundles' ? categoryId : null,
+      kind: categoryId === '__bundles' ? 'bundle' : undefined,
+      stock,
+      sort,
+      direction,
+      language: i18n.language,
+    });
   }, [
-    master,
-    levels,
-    sold,
+    baseRows,
     deferredQuery,
     categoryId,
     stock,
     sort,
     direction,
     i18n.language,
-    costMethod,
   ]);
-  const total = master?.products.length;
+  const total = baseRows?.length;
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const showCost = can('cost.view');
   const canEdit = can('catalog.edit');

@@ -13,6 +13,7 @@ import { type Writer, writeAction, writeScope } from './write.ts';
 
 const DAY = 86_400_000;
 const n = (v: unknown): number => Number(v ?? 0);
+const DATE_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 
 export type CustomerFilter =
   | 'all'
@@ -146,9 +147,12 @@ async function balancesOf(
 async function openPromises(
   src: TableSource,
 ): Promise<Map<string, SyncedRow[]>> {
-  const rows = (await (src.table('promises') as Table<SyncedRow>).toArray())
-    .filter((p) => !p.deleted_at && p.status === 'open')
-    .sort((a, b) => String(a.promised_on).localeCompare(String(b.promised_on)));
+  const rows = (
+    await (src.table('promises') as Table<SyncedRow>)
+      .where('[status+promised_on]')
+      .between(['open', ''], ['open', '\uffff'], true, true)
+      .toArray()
+  ).filter((p) => !p.deleted_at);
   const map = new Map<string, SyncedRow[]>();
   for (const promise of rows) {
     const key = String(promise.customer_id);
@@ -319,15 +323,20 @@ export function customersCsv(
   ];
   const day = (at: number | null): string =>
     at === null ? '' : String(Math.max(0, Math.floor((now - at) / DAY)));
-  const date = (at: number | null): string =>
-    at === null
-      ? ''
-      : new Intl.DateTimeFormat('en-CA', {
-          timeZone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(at);
+  const date = (at: number | null): string => {
+    if (at === null) return '';
+    let formatter = DATE_FORMATTERS.get(timeZone);
+    if (formatter === undefined) {
+      formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      DATE_FORMATTERS.set(timeZone, formatter);
+    }
+    return formatter.format(at);
+  };
   return [header.join(',')]
     .concat(
       rows.map((row) =>

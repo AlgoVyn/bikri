@@ -15,7 +15,6 @@
       "filter_method": "Method",
       "filter_status": "Status",
       "from": "From",
-      "loading_more": "Loading more…",
       "method_split": "Split",
       "no_match": "No bills match these filters.",
       "print_failed": "Print failed — click to reprint",
@@ -52,7 +51,11 @@
       "select_bill_hint": "Its items, payments and actions appear here.",
       "record_past": "Record past sale",
       "late": "Late",
-      "sort": "Sort"
+      "sort": "Sort",
+      "pagination": "Sales pages",
+      "previous": "Previous",
+      "next": "Next",
+      "page_of": "Page {{page}} of {{pages}}"
     },
     "bill": {
       "audit": "Audit",

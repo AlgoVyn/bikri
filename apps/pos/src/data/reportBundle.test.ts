@@ -388,6 +388,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       serial: null,
       warranty_until: null,
       created_at: NOW - 86_400_000,
+      business_date: YESTERDAY,
     } as SyncedRow);
     await db.refunds.add({
       id: 'refund-today',
@@ -574,6 +575,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       serial: null,
       warranty_until: null,
       created_at: NOW + 2,
+      business_date: TODAY,
     } as SyncedRow);
     await db.payments.bulkAdd([
       {

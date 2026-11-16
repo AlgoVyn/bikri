@@ -121,6 +121,20 @@ export async function applyLedgerEntry(
     });
     return;
   }
+  // A credit that clears the account leaves no open debit, so the exact
+  // oldest-unpaid date is null and the party's whole history does not need a
+  // rescan. A partial credit still takes the exact path below (a payment can
+  // clear the oldest debit and part of the next).
+  if (amount < 0 && current !== undefined && current.balance + amount <= 0) {
+    await partyBalances(src).put({
+      party_type: type,
+      party_id: id,
+      balance: current.balance + amount,
+      last_activity_at: Math.max(current.last_activity_at, at),
+      oldest_unpaid_at: null,
+    });
+    return;
+  }
   await partyBalances(src).put(
     balanceOf(type, id, await partyEntries(src, type, id)),
   );

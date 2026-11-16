@@ -108,7 +108,8 @@ export default defineConfig({
           const admin =
             chunk.isDynamicEntry &&
             (facade.includes('/src/routes/admin') ||
-              facade.includes('/src/admin/'));
+              facade.includes('/src/admin/') ||
+              facade.includes('/packages/i18n/admin/'));
           return admin
             ? 'assets/admin/[name]-[hash].js'
             : 'assets/[name]-[hash].js';

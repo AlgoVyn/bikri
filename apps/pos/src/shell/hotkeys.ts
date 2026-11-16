@@ -42,8 +42,10 @@ export function useHotkey(
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (!inFields && ignoresHotkey(event.target)) return;
-      if (!inDialog && dialogOpen()) return;
+      // Match first: `dialogOpen()` walks the DOM, and on Sell there are 13
+      // listeners per keydown; only the matching binding needs that query.
       if (!ref.current.match(event)) return;
+      if (!inDialog && dialogOpen()) return;
       event.preventDefault();
       ref.current.handler(event);
     };

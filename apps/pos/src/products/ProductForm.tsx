@@ -166,29 +166,24 @@ export function ProductFormPage({
   const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
   const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const money = shopMoney(shop);
-  const simpleProducts = useLiveQuery(async () => {
+  // One read of the catalogue powers the bundle picker, the brand suggestions and
+  // the duplicate-name check; the form used to read products twice and levels once
+  // more (D-231).
+  const catalogue = useLiveQuery(async () => {
     const db = getDb();
-    const all = (await db.products.toArray()).filter(
-      (product) =>
-        !product.deleted_at &&
-        product.kind !== 'bundle' &&
-        product.id !== editId,
-    );
+    const all = await db.products.toArray();
     const levels = new Map(
       (await db.stock_levels.toArray()).map((level) => [
         level.product_id,
         level.on_hand_milli,
       ]),
     );
-    return { all, levels };
-  }, [editId]) ?? { all: [], levels: new Map<string, number>() };
-  const onHand =
-    useLiveQuery(async () => {
-      if (!editId) return 0;
-      return (await getDb().stock_levels.get(editId))?.on_hand_milli ?? 0;
-    }, [editId]) ?? 0;
-  const catalogue = useLiveQuery(async () => {
-    const all = await getDb().products.toArray();
+    const simple = all.filter(
+      (product) =>
+        !product.deleted_at &&
+        product.kind !== 'bundle' &&
+        product.id !== editId,
+    );
     const brands = new Set<string>();
     const names = new Map<string, string>();
     for (const product of all) {
@@ -201,10 +196,22 @@ export function ProductFormPage({
       if (brand) brands.add(brand);
     }
     return {
+      all: simple,
+      levels,
       brands: [...brands].sort((a, b) => a.localeCompare(b)),
       names,
     };
-  }, []) ?? { brands: [], names: new Map<string, string>() };
+  }, [editId]) ?? {
+    all: [],
+    levels: new Map<string, number>(),
+    brands: [] as string[],
+    names: new Map<string, string>(),
+  };
+  const onHand =
+    useLiveQuery(async () => {
+      if (!editId) return 0;
+      return (await getDb().stock_levels.get(editId))?.on_hand_milli ?? 0;
+    }, [editId]) ?? 0;
   const brands = catalogue.brands;
   const draftName = String(draft?.name_en ?? '')
     .trim()
@@ -959,8 +966,8 @@ export function ProductFormPage({
             <BundleRecipeEditor
               items={draft.bundle_items}
               onChange={(items) => set('bundle_items', items)}
-              products={simpleProducts.all}
-              levels={simpleProducts.levels}
+              products={catalogue.all}
+              levels={catalogue.levels}
               price={draft.price ?? 0}
               method={money.cost_method}
               showCost={showCost}

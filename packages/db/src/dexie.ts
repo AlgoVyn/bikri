@@ -65,8 +65,6 @@ export const DEXIE_SCHEMA_V3 = {
     'id, sale_id, refund_id, day_close_id, supplier_return_id, status, created_at',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V8;
-
 /**
  * V4 indexes `stock_movements` by its document. A refund/void asks "which products did this
  * sale move?"; without the index that scan reads every movement the shop has ever written
@@ -130,6 +128,21 @@ export const DEXIE_SCHEMA_V8 = {
   sale_lines:
     'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date]',
 } as const;
+
+/**
+ * V9 indexes the Home attention probes and the promise/print pickers. The previous
+ * passes fixed the `anyOf` shape; these avoid reading every product, customer and
+ * conflict row when only the flagged ones matter (D-231).
+ */
+export const DEXIE_SCHEMA_V9 = {
+  ...DEXIE_SCHEMA_V8,
+  products:
+    'id, sku, category_id, name_en, updated_at, deleted_at, kind, track_stock',
+  customers: 'id, name, phone, deleted_at, credit_limit',
+  sync_conflicts: 'id, row_id, at, resolution',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V9;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -422,6 +435,8 @@ export class BikriDb extends Dexie {
             product.kind = 'simple';
         });
       });
+    // V9 only adds indexes; IndexedDB backfills them from the stored rows.
+    this.version(9).stores(DEXIE_SCHEMA_V9);
   }
 }
 

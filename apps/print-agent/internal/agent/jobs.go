@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -221,18 +222,16 @@ func (m *Manager) Recent(limit int) []JobStatus {
 		limit = 20
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	out := make([]JobStatus, 0, limit)
+	out := make([]JobStatus, 0, len(m.jobs))
 	for _, rec := range m.jobs {
 		out = append(out, rec.JobStatus)
 	}
-	// The map is unordered; a tiny insertion sort keeps diagnostics readable and
-	// avoids importing sort for 20 rows.
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].CreatedAt > out[j-1].CreatedAt; j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
+	m.mu.Unlock()
+	// Sort outside the mutex: a busy shop keeps ~1,400 records for the 24 h TTL,
+	// and holding m.mu through an O(n log n) sort blocked Submit/Get (D-231).
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt > out[j].CreatedAt
+	})
 	if len(out) > limit {
 		out = out[:limit]
 	}

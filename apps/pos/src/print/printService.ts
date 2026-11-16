@@ -264,13 +264,15 @@ async function sendAgentJob(
     throw mapAgentError(err);
   }
   const deadline = Date.now() + (deps.timeoutMs ?? 30_000);
+  let wait = 400;
   while (
     job.status !== 'done' &&
     job.status !== 'failed' &&
     job.status !== 'canceled'
   ) {
     if (Date.now() >= deadline) throw new PrintError('TIMEOUT');
-    await sleep(400);
+    await sleep(wait);
+    wait = Math.min(wait * 2, 2_000);
     try {
       job = await client.job(config.url, config.token, job.jobId);
     } catch (err) {

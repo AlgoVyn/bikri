@@ -75,6 +75,7 @@ describe('reports performance (screens/16 AC 5)', () => {
         serial: null,
         warranty_until: null,
         created_at: BASE - index * 1000,
+        business_date: date,
       } as SyncedRow);
       payments.push({
         id: `payment-${index}`,
@@ -130,5 +131,115 @@ describe('reports performance (screens/16 AC 5)', () => {
     // Isolated this is ~0.9 s; the reference browser target is <2 s, so keep
     // scheduling headroom here.
     expect(elapsed).toBeLessThan(4_000);
+  });
+
+  it('reads sale lines by business date, never by sale id over history', {
+    timeout: 90_000,
+  }, async () => {
+    const db = await readyDb('perf-report-history');
+    await addShop(db);
+    const inRange = 1_000;
+    const old = 20_000;
+    const sales: SyncedRow[] = [];
+    const lines: SyncedRow[] = [];
+    const line = (
+      id: string,
+      saleId: string,
+      date: string,
+      at: number,
+    ): SyncedRow =>
+      ({
+        id,
+        sale_id: saleId,
+        line_no: 1,
+        product_id: 'product-1',
+        name_snapshot: 'Item',
+        sku_snapshot: 'ITM-1',
+        qty_milli: 1000,
+        unit_price: 10000,
+        gross: 10000,
+        discount_type: null,
+        discount_value: 0,
+        discount: 0,
+        net: 10000,
+        bill_discount_alloc: 0,
+        tax_alloc: 0,
+        rounding_alloc: 0,
+        unit_cost_snapshot: 5000,
+        below_cost: 0,
+        serial: null,
+        warranty_until: null,
+        created_at: at,
+        business_date: date,
+      }) as SyncedRow;
+    for (let index = 0; index < inRange; index += 1) {
+      const date = new Date(BASE - (index % 30) * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const id = `sale-${index}`;
+      sales.push({
+        id,
+        invoice_no: `A-A-${index}`,
+        invoice_seq: index,
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        customer_id: null,
+        business_date: date,
+        created_at: BASE - index * 1000,
+        line_count: 1,
+        items_qty_milli: 1000,
+        gross_total: 10000,
+        item_discount_total: 0,
+        subtotal: 10000,
+        bill_discount_type: null,
+        bill_discount_value: 0,
+        bill_discount: 0,
+        tax_rate_bp: 0,
+        tax: 0,
+        tax_inclusive: 0,
+        rounding: 0,
+        total: 10000,
+        paid_total: 10000,
+        udhaar_amount: 0,
+        cash_tendered: 10000,
+        change_given: 0,
+        status: 'paid',
+        replaces_sale_id: null,
+        note: '',
+      } as SyncedRow);
+      lines.push(line(`line-${index}`, id, date, BASE - index * 1000));
+    }
+    for (let index = 0; index < old; index += 1) {
+      const date = new Date(BASE - (90 + (index % 365)) * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      lines.push(
+        line(`old-line-${index}`, `old-sale-${index}`, date, BASE - 1e9),
+      );
+    }
+    await db.sales.bulkAdd(sales);
+    await db.sale_lines.bulkAdd(lines);
+
+    // A shape assertion: the report must use the V7 date index, not a lifetime
+    // sale-id join (D-231).
+    const seen: string[] = [];
+    const original = db.sale_lines.where.bind(db.sale_lines);
+    (db.sale_lines as unknown as { where: (index: string) => unknown }).where =
+      (index: string) => {
+        seen.push(index);
+        return (original as (index: string) => unknown)(index);
+      };
+    const started = performance.now();
+    const bundle = await reportBundle(
+      db,
+      { from: '2026-09-28', to: '2026-10-27' },
+      { now: BASE, today: '2026-10-27' },
+    );
+    const elapsed = performance.now() - started;
+    expect(bundle.summary.bills).toBe(inRange);
+    expect(seen).toContain('business_date');
+    expect(seen).not.toContain('sale_id');
+    expect(elapsed).toBeLessThan(2_000);
   });
 });

@@ -38,6 +38,74 @@ function storage(): CacheStorage | null {
   return typeof caches === 'undefined' ? null : caches;
 }
 
+/**
+ * Object URLs are content-addressed, so one URL per distinct photo can be reused
+ * instead of re-reading Cache Storage on every virtualized tile mount. Keep a bounded
+ * LRU: every URL retains its Blob in memory, and 2,000 photos × up to 150 KB could
+ * otherwise reach the app's whole 300 MB memory budget (D-231).
+ */
+export const FILE_URL_CACHE_MAX = 200;
+const FILE_URLS = new Map<string, Promise<string | null>>();
+
+function revokeWhenReady(pending: Promise<string | null>): void {
+  void pending
+    .then((url) => {
+      if (url) URL.revokeObjectURL(url);
+    })
+    .catch(() => undefined);
+}
+
+function evictOldestUrl(): void {
+  while (FILE_URLS.size > FILE_URL_CACHE_MAX) {
+    const oldest = FILE_URLS.keys().next().value;
+    if (oldest === undefined) return;
+    const pending = FILE_URLS.get(oldest);
+    FILE_URLS.delete(oldest);
+    if (pending !== undefined) revokeWhenReady(pending);
+  }
+}
+
+export function fileUrlFor(
+  tenantId: string,
+  key: string,
+  load: () => Promise<Blob | null>,
+): Promise<string | null> {
+  const cacheKey = `${tenantId}\u0000${key}`;
+  const cached = FILE_URLS.get(cacheKey);
+  if (cached !== undefined) {
+    // A Map keeps insertion order; re-inserting marks this URL as most recently used.
+    FILE_URLS.delete(cacheKey);
+    FILE_URLS.set(cacheKey, cached);
+    return cached;
+  }
+  const pending = load()
+    .then((blob) => {
+      if (!blob) {
+        // A missing file may be uploaded or pulled later; do not cache the miss.
+        FILE_URLS.delete(cacheKey);
+        return null;
+      }
+      return URL.createObjectURL(blob);
+    })
+    .catch((error: unknown) => {
+      // A transient CacheStorage/network failure must not poison later mounts.
+      FILE_URLS.delete(cacheKey);
+      throw error;
+    });
+  FILE_URLS.set(cacheKey, pending);
+  evictOldestUrl();
+  return pending;
+}
+
+export function clearFileUrls(tenantId?: string): void {
+  const prefix = tenantId === undefined ? null : `${tenantId}\u0000`;
+  for (const [key, pending] of FILE_URLS) {
+    if (prefix !== null && !key.startsWith(prefix)) continue;
+    FILE_URLS.delete(key);
+    revokeWhenReady(pending);
+  }
+}
+
 export async function putFile(
   tenantId: string,
   key: string,
@@ -78,6 +146,7 @@ export async function deleteFile(tenantId: string, key: string): Promise<void> {
 
 /** "Leave this shop" (T-034): drop one tenant's cached files only. */
 export async function clearTenantFiles(tenantId: string): Promise<void> {
+  clearFileUrls(tenantId);
   const store = storage();
   if (!store) return;
   const cache = await store.open(FILE_CACHE);

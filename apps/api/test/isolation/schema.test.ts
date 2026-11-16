@@ -14,7 +14,7 @@ const PK_EXCEPTIONS: Record<string, string[]> = {
   applied_ops: ['tenant_id', 'op_id'],
 };
 /** Cross-tenant indexes allowed by 10 §8 I20, plus globally unique secrets. */
-const INDEX_EXCEPTIONS = new Set(['change_log_at', 'applied_ops_at']);
+const INDEX_EXCEPTIONS = new Set(['applied_ops_at']);
 const UNIQUE_EXCEPTIONS: Record<string, string[]> = {
   devices: ['token_hash'], // globally unique, identifies the tenant (02 §2)
   enrolment_codes: ['code_hash'],

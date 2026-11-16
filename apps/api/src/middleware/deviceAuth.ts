@@ -1,3 +1,4 @@
+import { API_BASE } from '@bikri/core';
 import type { MiddlewareHandler } from 'hono';
 import { sha256Hex } from '../auth/crypto.ts';
 import { tenantDb } from '../db/tenantDb.ts';
@@ -43,7 +44,10 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('tenant', tenant);
   c.set('device', device);
   c.set('db', db);
-  c.header('Cache-Control', 'private, no-store');
+  // Photos/logos are content-addressed and cached by the file route; a global
+  // no-store here used to override its immutable header (D-231).
+  if (!(c.req.method === 'GET' && c.req.path.startsWith(`${API_BASE}/files/`)))
+    c.header('Cache-Control', 'private, no-store');
 
   const pending = parsePending(c.req.header('x-bikri-pending'));
   if (now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {

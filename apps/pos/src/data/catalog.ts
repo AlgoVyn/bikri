@@ -82,6 +82,8 @@ export type ProductListRow = {
   barcodes: string[];
   stockState: 'ok' | 'low' | 'out' | 'untracked';
   bundle?: BundleInfo;
+  /** Lower-cased name/brand/SKU/barcode text, built once for fast filtering. */
+  haystack?: string;
 };
 
 export function isBundle(product: MasterRow | null | undefined): boolean {
@@ -402,9 +404,11 @@ export function matchesQuery(row: ProductListRow, query: string): boolean {
   const words = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
   if (words.length === 0) return true;
   const p = row.product;
-  const haystack = [p.name_en, p.name_ur, p.brand, p.sku, ...row.barcodes]
-    .map((v) => String(v ?? '').toLowerCase())
-    .join(' ');
+  const haystack =
+    row.haystack ??
+    [p.name_en, p.name_ur, p.brand, p.sku, ...row.barcodes]
+      .map((v) => String(v ?? '').toLowerCase())
+      .join(' ');
   return words.every((w) => haystack.includes(w));
 }
 
@@ -1544,10 +1548,14 @@ export const CATEGORY_COLORS = [
 export async function listCategories(
   db: BikriDb,
 ): Promise<(MasterRow & { productCount: number })[]> {
-  const products = live(await db.products.toArray());
+  const counts = new Map<string, number>();
+  for (const product of live(await db.products.toArray())) {
+    const id = product.category_id ? String(product.category_id) : '';
+    if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
   return live(await db.categories.orderBy('sort_order').toArray()).map((c) => ({
     ...c,
-    productCount: products.filter((p) => p.category_id === c.id).length,
+    productCount: counts.get(c.id) ?? 0,
   }));
 }
 

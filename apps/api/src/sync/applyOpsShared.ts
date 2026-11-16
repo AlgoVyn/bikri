@@ -203,7 +203,7 @@ export type Lookups = {
       net?: number;
     }
   >;
-  /** Active recipe rows of every bundle, for fresh-sale checks. */
+  /** Active recipe rows of the bundles referenced by this push, for fresh-sale checks. */
   bundleRecipes: Map<
     string,
     {
@@ -220,6 +220,8 @@ export type Lookups = {
     string,
     { bundle_id: string; component_product_id: string }
   >;
+  /** Component product id → bundles that use it, for delete/kind-change checks. */
+  bundleOfComponent: Map<string, string[]>;
   /** Stored sale movements of a sale: product → positive qty sold. */
   saleMoved: Map<string, Map<string, number>>;
   /** Parties referenced by payments/ledger rows, for polymorphic party checks. */

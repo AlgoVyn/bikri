@@ -1,7 +1,7 @@
 import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { getDb } from '../data/db.ts';
 import { useSession } from './session.ts';
 
@@ -64,22 +64,34 @@ export function useCurrentStaff(): CurrentStaff {
     // permissions in memory (the server enforces the same rules, but the UI should not offer them).
     if (!live || live.role !== session.role) useSession.getState().lock();
   }, [session, loaded, live]);
-  if (session?.role === 'support')
-    return {
-      staff: null,
-      role: 'cashier',
-      can: (p) => SUPPORT_ALLOWED.has(p),
-      support: true,
-      branchId: deviceBranch ?? null,
-    };
+  const support = session?.role === 'support';
   const role = (live?.role ??
     (loaded ? 'cashier' : (session?.role ?? 'owner'))) as Role;
   const json = String(live?.permissions_json ?? '{}');
-  return {
-    staff: live,
-    role,
-    can: (p) => canDo(role, json, p),
-    support: false,
-    branchId: deviceBranch ?? null,
-  };
+  // Stable `can` and result object: consumers use this in memo dependencies
+  // (D-231).
+  const can = useCallback(
+    (p: Permission) =>
+      support ? SUPPORT_ALLOWED.has(p) : canDo(role, json, p),
+    [support, role, json],
+  );
+  return useMemo(
+    () =>
+      support
+        ? {
+            staff: null,
+            role: 'cashier' as Role,
+            can,
+            support: true,
+            branchId: deviceBranch ?? null,
+          }
+        : {
+            staff: live,
+            role,
+            can,
+            support: false,
+            branchId: deviceBranch ?? null,
+          },
+    [support, live, role, can, deviceBranch],
+  );
 }

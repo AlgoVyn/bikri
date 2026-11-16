@@ -89,15 +89,45 @@ export function latestUnresolvedFailed(
   )[0];
 }
 
+function documentIndex(job: PrintJob): { index: string; id: string } | null {
+  if (job.sale_id) return { index: 'sale_id', id: job.sale_id };
+  if (job.refund_id) return { index: 'refund_id', id: job.refund_id };
+  if (job.day_close_id) return { index: 'day_close_id', id: job.day_close_id };
+  if (job.supplier_return_id)
+    return { index: 'supplier_return_id', id: job.supplier_return_id };
+  return null;
+}
+
 /** Failed jobs that a later successful job for the same document has not superseded. */
 export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
-  // Two native index reads, not `anyOf('failed', 'done')`. Dexie's anyOf adds a
-  // cursor algorithm, so count/toArray fall back to one request per row; on a
-  // status index with thousands of duplicates that is quadratic and made the
-  // shell's printer dot slower than the old per-document query (D-228).
-  const [failed, done] = await Promise.all([
-    db.print_jobs.where('status').equals('failed').toArray(),
-    db.print_jobs.where('status').equals('done').toArray(),
-  ]);
-  return unresolvedFailed([...failed, ...done]).length;
+  // Read only the failed jobs (usually zero), then probe the document's index for
+  // a later `done`. Reading every `done` job in the 90-day table made every print
+  // and every Home refresh scan thousands of rows (D-231).
+  const failed = await db.print_jobs.where('status').equals('failed').toArray();
+  // A broken printer can leave thousands of failed jobs (retention trims only
+  // `done`). One index lookup per failed job would then be an N+1 on every Home
+  // refresh; fall back to the single done scan for a backlog.
+  if (failed.length > 50) {
+    const done = await db.print_jobs.where('status').equals('done').toArray();
+    return unresolvedFailed([...failed, ...done]).length;
+  }
+  let count = 0;
+  for (const job of failed) {
+    const ref = documentIndex(job);
+    if (ref === null) {
+      count += 1;
+      continue;
+    }
+    const later = await db.print_jobs
+      .where(ref.index)
+      .equals(ref.id)
+      .filter(
+        (candidate) =>
+          candidate.status === 'done' &&
+          Number(candidate.created_at) > Number(job.created_at),
+      )
+      .first();
+    if (!later) count += 1;
+  }
+  return count;
 }

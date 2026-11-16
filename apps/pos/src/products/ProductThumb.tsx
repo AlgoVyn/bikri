@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDb } from '../data/db.ts';
-import { getFile } from '../data/fileCache.ts';
+import { fileUrlFor, getFile } from '../data/fileCache.ts';
 import { fetchRemoteFile } from '../sync/files.ts';
 import { TILE_BG, tileBg } from './tiles.ts';
 
@@ -13,18 +13,18 @@ export function useFileUrl(key: string | null | undefined): string | null {
       return;
     }
     let alive = true;
-    let made: string | null = null;
     const db = getDb();
-    void getFile(db.tenantId, key)
-      .then((hit) => hit ?? fetchRemoteFile(db, key))
-      .then((blob) => {
-        if (!alive || !blob) return;
-        made = URL.createObjectURL(blob);
-        setUrl(made);
+    void fileUrlFor(db.tenantId, key, () =>
+      getFile(db.tenantId, key).then((hit) => hit ?? fetchRemoteFile(db, key)),
+    )
+      .then((next) => {
+        if (alive) setUrl(next);
+      })
+      .catch(() => {
+        if (alive) setUrl(null);
       });
     return () => {
       alive = false;
-      if (made) URL.revokeObjectURL(made);
     };
   }, [key]);
   return url;

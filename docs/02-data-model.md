@@ -1562,6 +1562,73 @@ UPDATE meta SET value = '6' WHERE key = 'schema_version';
 and "You saved"; it is not part of `item_discount_total`, which remains the sum of
 component line residual discounts.
 
+### 2.19 Hot-path indexes (migration `0020_perf_indexes.sql`)
+
+```sql
+-- D-231: indexes for the fourth whole-app performance review. Additive only;
+-- SCHEMA_VERSION is unchanged (the previous review migrations did the same).
+--
+-- Refund/void planning reads the sale movements of the bills in the transaction.
+-- Without a ref_id index SQLite can only use the tenant_id prefix, so one refund
+-- scanned every stock movement the shop had ever written.
+CREATE INDEX stock_movements_ref
+  ON stock_movements (tenant_id, ref_id, reason_code, product_id)
+  WHERE ref_id IS NOT NULL;
+
+-- A purchase document carries its paid-now payment; the lookup by purchase_id had
+-- only the tenant prefix and scanned all payments.
+CREATE INDEX payments_purchase
+  ON payments (tenant_id, purchase_id)
+  WHERE purchase_id IS NOT NULL;
+
+-- Device-code allocation on enrolment/branch move reads the branch's invoice
+-- numbers; a year-old shop scanned all its sales and built a DISTINCT temp tree.
+CREATE INDEX sales_branch_invoice
+  ON sales (tenant_id, branch_id, invoice_no);
+
+-- The operator tenant page reads the last status changes; the partial index keeps
+-- this index tiny while avoiding a backwards scan over the whole audit log.
+CREATE INDEX audit_log_status
+  ON audit_log (tenant_id, created_at)
+  WHERE action = 'tenant_status_change';
+```
+
+These are the refund/void movement lookup, the purchase-payment lookup, the
+branch invoice lookup used by device-code allocation, and the operator status
+history. All lead with `tenant_id` (D-231).
+
+### 2.20 Unused index cleanup (migration `0021_drop_unused_indexes.sql`)
+
+```sql
+-- D-231: drop indexes no production query in apps/api/src uses. D1 counts index
+-- entries as rows written, and the 150-bill budget measured ~127 rows/bill with
+-- these present; removing them recovers about a quarter of the daily write budget.
+--
+-- The client has its own Dexie indexes for the same columns; this only changes the
+-- server schema. Keep every index that a query in routes/, sync/, platform/ or cron/
+-- actually names (see apps/api/test/perf.test.ts HOT_QUERIES).
+DROP INDEX change_log_row;
+DROP INDEX change_log_at;
+DROP INDEX applied_ops_device;
+DROP INDEX sales_date;
+DROP INDEX sales_customer;
+DROP INDEX sales_device_seq;
+DROP INDEX payments_date;
+DROP INDEX payments_party;
+DROP INDEX refunds_date;
+DROP INDEX expenses_date;
+DROP INDEX stock_movements_product;
+DROP INDEX products_category;
+DROP INDEX product_barcodes_product;
+DROP INDEX customers_phone;
+DROP INDEX promises_due;
+DROP INDEX audit_log_entity;
+```
+
+D1 counts index entries as rows written. These indexes serve no production SQL
+in `apps/api/src` (the client keeps its own Dexie indexes); dropping them
+recovers about a quarter of the daily write budget (D-231).
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -1575,14 +1642,14 @@ export const DEXIE_SCHEMA_V1 = {
   devices: 'id, branch_id',
   staff: 'id, active, deleted_at',
   categories: 'id, sort_order, deleted_at',
-  products: 'id, sku, category_id, name_en, updated_at, deleted_at, kind', // V8 adds kind (bundle filter)
+  products: 'id, sku, category_id, name_en, updated_at, deleted_at, kind, track_stock', // V8 adds kind (bundle filter); V9 adds track_stock (Home low-stock probe)
   bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
   product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
-  customers: 'id, name, phone, deleted_at',
+  customers: 'id, name, phone, deleted_at, credit_limit', // V9 adds credit_limit (Home over-limit probe)
   suppliers: 'id, name, deleted_at',
   expense_categories: 'id, code, sort_order',
   promises: 'id, customer_id, [status+promised_on]',
-  sync_conflicts: 'id, row_id, at',   // pulled read-only
+  sync_conflicts: 'id, row_id, at, resolution',   // pulled read-only; V9 adds resolution
   // ledger
   sales: 'id, &invoice_no, business_date, customer_id, created_at, [device_id+invoice_seq], status',
   sale_lines: 'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date]', // V7 adds the sale's business date and its product index; V8 adds bundle_id for bundle analytics
@@ -1615,6 +1682,8 @@ export const DEXIE_SCHEMA_V1 = {
 ```
 
 **Dexie V8 (bundles)** adds the `products.kind` index, the `bundle_items` table and the `sale_lines.bundle_id` index. The upgrade backfills `kind='simple'` on local product rows that lack it (an indexed field must exist); existing `sale_lines` get null bundle fields, and held carts keep their current lines. No server data is rewritten. A till that has never pulled a bundle has an empty `bundle_items` table.
+
+**Dexie V9 (D-231)** only adds indexes: `products.track_stock`, `customers.credit_limit` and `sync_conflicts.resolution` (Home's attention probes). IndexedDB backfills the entries from the stored rows; no data is rewritten. The client filter/statement changes in the same decision do not change the schema.
 
 ### 3.1 Local-only tables
 
