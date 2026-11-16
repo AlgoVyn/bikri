@@ -12,6 +12,7 @@ import {
   type RasterRenderer,
   type RasterSource,
   renderReceiptHtml,
+  scaleToFit,
 } from '@bikri/printer';
 import { deviceInfo } from '../data/localTenant.ts';
 import {
@@ -101,6 +102,13 @@ export function encodeFor(
 }
 
 /** Sends blocks to the printer: bytes over USB / Serial, or HTML through the system dialog. */
+export type PrintBlockOptions = {
+  /** Limit the logo to this fraction of the print width. Default 0.6 (the receipt size). */
+  logoWidthPct?: number;
+  /** Maximum logo height in dots. Default 160. */
+  logoMaxHeight?: number;
+};
+
 export async function printBlocks(
   db: BikriDb,
   blocks: Block[],
@@ -109,10 +117,26 @@ export async function printBlocks(
   copies = 1,
   languageOverride?: 'en' | 'ur',
   jobId?: string,
+  options: PrintBlockOptions = {},
 ): Promise<void> {
   if (!printer?.transport) throw new PrintError('NO_PRINTER');
-  const logo = await readLogo(db);
   const paper = receiptPaper(printer);
+  const storedLogo = await readLogo(db);
+  // Statements need a smaller mark than a sale receipt. Pre-scale the bitmap so
+  // every transport (raw ESC/POS, agent PNG, system HTML) gets the same size.
+  const logo =
+    storedLogo && options.logoWidthPct !== undefined
+      ? scaleToFit(
+          storedLogo,
+          Math.max(
+            1,
+            Math.round(
+              paper.dots * Math.min(1, Math.max(0.1, options.logoWidthPct)),
+            ),
+          ),
+          options.logoMaxHeight ?? 160,
+        )
+      : storedLogo;
   if (printer.transport === 'agent' && printer.agent?.mode === 'driver') {
     const canvas = await renderReceiptCanvas(blocks, {
       dots: paper.dots,

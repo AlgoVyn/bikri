@@ -19,6 +19,7 @@ import { fakeSerial, fakeUsb, joined } from './fakePrinters.ts';
 import {
   kickDrawer,
   type PrintDeps,
+  printBlocks,
   printTestPage,
   processQueue,
   runJob,
@@ -152,6 +153,41 @@ describe('transports (06 §10)', () => {
     const usb = fakeUsb();
     await printTestPage(db, usbPrinter(), { usb, serial: null, renderer });
     expect(latin(joined(usb.device.sent))).toContain(paperRuler(48));
+  });
+
+  it('can print a smaller statement logo without changing receipt defaults', async () => {
+    const { db } = await soldShop('psSmallLogo');
+    await db.kv.put({
+      key: 'logo_bitmap',
+      value: {
+        width: 400,
+        height: 100,
+        data: new Uint8Array(400 * 100).fill(255),
+        format: 'gray',
+      },
+    });
+    let seenWidth = 0;
+    await printBlocks(
+      db,
+      [{ t: 'logo' }, { t: 'text', text: 'Statement' }],
+      { transport: 'system', paper_mm: 80 },
+      {
+        usb: null,
+        serial: null,
+        logoUrl: (logo) => {
+          seenWidth = logo.width;
+          return null;
+        },
+        system: async () => ({ ok: true }),
+      },
+      1,
+      undefined,
+      undefined,
+      { logoWidthPct: 0.4, logoMaxHeight: 120 },
+    );
+    // 80 mm / 576 dots × 40% = 230 dots.
+    expect(seenWidth).toBeGreaterThan(0);
+    expect(seenWidth).toBeLessThanOrEqual(230);
   });
 
   it('chunks USB writes at 4096 bytes', async () => {
