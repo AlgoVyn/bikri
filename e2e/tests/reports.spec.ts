@@ -78,7 +78,7 @@ test.describe('Reports (T-048)', () => {
     await expect(page.getByText('No day closes in this range.')).toBeVisible();
   });
 
-  test('custom ranges longer than a year stay on the reports page', async ({
+  test('custom ranges before the shop history clamp and warn above two years', async ({
     page,
   }) => {
     await seedReports(page);
@@ -86,7 +86,9 @@ test.describe('Reports (T-048)', () => {
     await page.getByLabel('From', { exact: true }).fill('2024-01-01');
     await page.getByLabel('To', { exact: true }).fill('2025-12-31');
     await expect(page.getByTestId('reports-page')).toBeVisible();
-    await expect(page.getByTestId('report-range')).toContainText('2024');
+    // The shop's first business day is 2025-12-31, so the 2024 start clamps to it.
+    await expect(page.getByTestId('report-range')).toContainText('2025');
+    await expect(page.getByText(/over two years/)).toBeVisible();
     await expect(page.getByTestId('report-sold')).toBeVisible();
     await expect(page.getByText('Choose a valid date range.')).toHaveCount(0);
   });

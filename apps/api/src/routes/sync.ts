@@ -198,6 +198,7 @@ function assertClientSchema(c: Context<AppEnv>): number {
 }
 
 /** Bundle columns (and the bundle discount) require the current schema. */
+/** Bundles shipped in client schema 5; this gates the feature, not the current schema. */
 const BUNDLE_SCHEMA = 5;
 
 /** `GET /api/sync/pull?since=&limit=` (03 §4.2). */

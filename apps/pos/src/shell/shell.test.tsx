@@ -15,6 +15,7 @@ import { initI18n, setLanguage } from '../i18n/i18n.ts';
 import { resetUpdateStore, setUpdateReady } from '../pwa/updateStore.ts';
 import { routeTree } from '../routeTree.gen.ts';
 import { useSession } from '../state/session.ts';
+import { PENDING_DOT_STALE_MS } from './TopBarParts.tsx';
 
 async function renderAt(entry: string) {
   const history = createMemoryHistory({ initialEntries: [entry] });
@@ -222,12 +223,25 @@ describe('app shell', () => {
     );
   });
 
-  it('counts waiting outbox ops on the avatar status', async () => {
+  it('counts waiting outbox ops on the avatar status without a constant warning', async () => {
     await renderAt(`${BASE_PATH}/`);
     const avatar = await screen.findByTestId('staff-menu');
     await waitFor(() =>
       expect(avatar.getAttribute('data-sync-state')).toBe('pending'),
     );
     expect(avatar.getAttribute('aria-label')).toContain('On device');
+    // A fresh op is normal (the 5 s debounce); only a stale backlog turns amber.
+    expect(avatar.getAttribute('data-sync-stale')).toBe('false');
+    const db = getDb();
+    const ops = await db.outbox.where('status').equals('pending').toArray();
+    await db.outbox.bulkPut(
+      ops.map((op) => ({
+        ...op,
+        created_at: Date.now() - PENDING_DOT_STALE_MS - 1,
+      })),
+    );
+    await waitFor(() =>
+      expect(avatar.getAttribute('data-sync-stale')).toBe('true'),
+    );
   });
 });

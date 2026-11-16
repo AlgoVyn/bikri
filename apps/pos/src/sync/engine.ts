@@ -1,6 +1,8 @@
 /**
  * Sync scheduling (03 §6): push after writes (5 s debounce), push+pull every poll interval while
- * visible and online, on `online` and on becoming visible; exponential backoff on errors.
+ * online, on `online`, on becoming visible and on `pagehide`; exponential backoff on errors.
+ * A short grace window after a Share keeps requests out of a hidden tab that Chromium may
+ * suspend (see `shareGrace.ts`); ordinary hidden tabs keep syncing.
  */
 import type { BikriDb } from '@bikri/db';
 import { getKv, setKv } from '../data/kv.ts';
@@ -10,6 +12,7 @@ import { uploadQueued } from './files.ts';
 import { refreshMe } from './me.ts';
 import { pullAll } from './pull.ts';
 import { pushAll } from './push.ts';
+import { shareGraceActive } from './shareGrace.ts';
 import { useSyncState } from './state.ts';
 
 export const BACKOFF_MS = [5_000, 15_000, 60_000, 300_000] as const;
@@ -49,11 +52,16 @@ export class SyncEngine {
   /** A cycle was skipped because the till was hidden; flush it when the till returns. */
   private deferredCycle = false;
   private readonly onOnline = () => void this.run('full');
+  private readonly onPageHide = () => {
+    // Best effort: a phone browser may freeze the page after this event, but a last
+    // push often still completes before the tab is discarded.
+    if (!this.stopped) void this.run('push', true);
+  };
   private readonly onVisible = () => {
     if (document.visibilityState !== 'visible') return;
-    // Share opens WhatsApp/external apps in another tab, which hides the till. A push
-    // started while hidden can sit suspended until its HTTP/3 connection idles out
-    // (QUIC_NETWORK_IDLE_TIMEOUT), so those requests wait for this flush instead.
+    // A Share hides the till while WhatsApp opens in another tab; requests started then
+    // can sit suspended until their HTTP/3 connection idles out. Those cycles wait for
+    // this flush. Ordinary background time (minimised window, locked screen) syncs.
     if (this.deferredCycle) {
       this.deferredCycle = false;
       // Forced: a cycle that was already in flight may have pushed before the write
@@ -63,6 +71,11 @@ export class SyncEngine {
       void this.run('pull');
     }
   };
+
+  /** Hidden by the Share sheet, where a fresh request may be suspended. */
+  private shareHidden(): boolean {
+    return document.visibilityState === 'hidden' && shareGraceActive();
+  }
 
   constructor(db: BikriDb) {
     this.db = db;
@@ -74,6 +87,7 @@ export class SyncEngine {
     const engine = new SyncEngine(db);
     current = engine;
     window.addEventListener('online', engine.onOnline);
+    window.addEventListener('pagehide', engine.onPageHide);
     document.addEventListener('visibilitychange', engine.onVisible);
     void engine.run('first');
     return engine;
@@ -84,6 +98,7 @@ export class SyncEngine {
     if (this.timer) clearTimeout(this.timer);
     if (this.pushTimer) clearTimeout(this.pushTimer);
     window.removeEventListener('online', this.onOnline);
+    window.removeEventListener('pagehide', this.onPageHide);
     document.removeEventListener('visibilitychange', this.onVisible);
     if (current === this) current = null;
   }
@@ -91,10 +106,9 @@ export class SyncEngine {
   schedulePush(): void {
     if (this.stopped) return;
     if (this.pushTimer) clearTimeout(this.pushTimer);
-    // Start the debounced push when the till is visible: a request started in a
-    // hidden tab (the sale-complete Share button opens WhatsApp) is suspended by
-    // Chromium and only fails after the QUIC idle timeout. `onVisible` flushes it.
-    if (document.visibilityState === 'hidden') {
+    // Start the debounced push when the till is visible, or after the Share grace has
+    // passed: only a request started right after Share may be suspended by Chromium.
+    if (this.shareHidden()) {
       this.deferredCycle = true;
       return;
     }
@@ -110,7 +124,7 @@ export class SyncEngine {
     const poll =
       delay ?? (await getKv<number>(this.db, 'poll_after_ms', 60_000));
     this.timer = setTimeout(() => {
-      if (document.visibilityState === 'hidden') void this.scheduleNext();
+      if (this.shareHidden()) void this.scheduleNext();
       else void this.run('full');
     }, poll);
   }
@@ -142,9 +156,10 @@ export class SyncEngine {
   private async cycle(kind: 'first' | 'full' | 'push' | 'pull'): Promise<void> {
     const state = useSyncState.getState();
     if (this.stopped) return;
-    // Opening a share window hides the till; do not start requests that Chromium may
-    // suspend until the HTTP/3 connection times out. `onVisible` runs a full cycle.
-    if (document.visibilityState === 'hidden') {
+    // Opening a share window hides the till for a short grace; do not start requests
+    // that Chromium may suspend until the HTTP/3 connection times out. Ordinary hidden
+    // tabs keep syncing, and `onVisible` flushes a deferred cycle.
+    if (this.shareHidden()) {
       this.deferredCycle = true;
       return;
     }

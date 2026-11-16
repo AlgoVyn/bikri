@@ -107,7 +107,7 @@ Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNI
 
 ### 3.1 `GET /api/health`
 ```json
-200 { "ok": true, "app_version": "1.1.0", "schema_version": 6, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
+200 { "ok": true, "app_version": "1.1.0", "schema_version": 7, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
 ```
 
 ### 3.2 `POST /api/devices/enrol`

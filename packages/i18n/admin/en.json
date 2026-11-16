@@ -210,6 +210,7 @@
     "wa": "WhatsApp",
     "wa_text": "{{name}} code {{code}}. Open {{link}} before {{when}}.",
     "writes_bar": "{{written}} of {{budget}}",
+    "writes_blocked": "Writes blocked",
     "writes_today": "Rows written today",
     "skip_content": "Skip to content",
     "access_note": "Protected by Cloudflare Access",

@@ -308,7 +308,7 @@ export function CartPanel(p: CartPanelProps) {
           <div className="-mt-2">
             <button
               type="button"
-              className="inline-flex min-h-6 items-center text-small text-primary underline underline-offset-2"
+              className="inline-flex min-h-11 items-center text-small text-primary underline underline-offset-2"
               onClick={p.onRemarks}
             >
               {t('sell.add_remarks')}
@@ -327,7 +327,7 @@ export function CartPanel(p: CartPanelProps) {
             <dd>
               <button
                 type="button"
-                className="inline-flex min-h-6 items-center text-small text-primary underline underline-offset-2"
+                className="inline-flex min-h-11 items-center text-small text-primary underline underline-offset-2"
                 onClick={p.onRemarks}
               >
                 {t('common.edit')}
@@ -399,9 +399,9 @@ export function CartPanel(p: CartPanelProps) {
         <button
           type="button"
           className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-9 lg:px-3`}
-          onClick={cart.lines.length === 0 ? p.onAddItem : p.onPay}
+          onClick={isEmptyCart(cart) ? p.onAddItem : p.onPay}
         >
-          {t('sell.take_payment')}
+          {isEmptyCart(cart) ? t('sell.add_items') : t('sell.take_payment')}
         </button>
       </div>
     </div>

@@ -76,6 +76,33 @@ for (const name of migrationFiles) {
       `packages/db/migrations/${name} differs from its SQL block in docs/02-data-model.md`,
     );
 }
+// Reviews keep finding duplicate decision numbers (L10); fail CI the next time.
+const decisions = readFileSync(join(ROOT, 'docs/decisions.md'), 'utf8');
+const seenDecisions = new Set();
+const duplicateDecisions = new Set();
+for (const match of decisions.matchAll(/^\| (D-\d+) /gmu)) {
+  const id = match[1];
+  if (seenDecisions.has(id)) duplicateDecisions.add(id);
+  seenDecisions.add(id);
+}
+if (duplicateDecisions.size > 0)
+  problems.push(
+    `docs/decisions.md: duplicate decision id(s) ${[...duplicateDecisions].sort().join(', ')}`,
+  );
+
+// Keep the Worker and the till on one schema number (review L9); `BUNDLE_SCHEMA` is a
+// feature gate and deliberately stays at the version where bundles shipped.
+const serverSchema = /"SCHEMA_VERSION":\s*"(\d+)"/u.exec(
+  readFileSync(join(ROOT, 'apps/api/wrangler.jsonc'), 'utf8'),
+)?.[1];
+const clientSchema = /CLIENT_SCHEMA_VERSION\s*=\s*(\d+)/u.exec(
+  readFileSync(join(ROOT, 'packages/core/src/version.ts'), 'utf8'),
+)?.[1];
+if (!serverSchema || !clientSchema || serverSchema !== clientSchema)
+  problems.push(
+    `schema versions differ: Worker ${serverSchema ?? '?'}, client ${clientSchema ?? '?'}`,
+  );
+
 if (problems.length > 0) {
   console.error(problems.join('\n'));
   console.error(`docs check: FAIL (${problems.length})`);

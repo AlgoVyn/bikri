@@ -48,6 +48,9 @@ export function useOnline(): boolean {
   return online;
 }
 
+/** A pending op older than this turns the avatar dot amber (review L3). */
+export const PENDING_DOT_STALE_MS = 5 * 60_000;
+
 /** Sync state, pending/failed counts and the user-facing label (03 §7). */
 export function useSyncStatus() {
   const { t } = useTranslation();
@@ -61,12 +64,17 @@ export function useSyncStatus() {
   );
   const counts = useLiveQuery(async () => {
     const db = getDb();
-    const [pending, failed, status, lastSync] = await Promise.all([
-      db.outbox.where('status').equals('pending').count(),
-      db.outbox.where('status').equals('failed').count(),
-      db.kv.get('tenant_status'),
-      db.kv.get('last_sync_at'),
-    ]);
+    const [pending, failed, status, lastSync, oldestPending] =
+      await Promise.all([
+        db.outbox.where('status').equals('pending').count(),
+        db.outbox.where('status').equals('failed').count(),
+        db.kv.get('tenant_status'),
+        db.kv.get('last_sync_at'),
+        db.outbox
+          .orderBy('seq')
+          .filter((op) => op.status === 'pending')
+          .first(),
+      ]);
     return {
       pending,
       failed,
@@ -74,6 +82,7 @@ export function useSyncStatus() {
         (status?.value as { status?: string } | undefined)?.status ===
         'read_only',
       lastSync: (lastSync?.value as number | undefined) ?? null,
+      oldestPendingAt: oldestPending?.created_at ?? null,
     };
   }, []);
   if (!counts) return null;
@@ -138,6 +147,10 @@ export function useSyncStatus() {
   } else if (sync.phase === 'syncing') {
     label = t('shell.sync_syncing');
   }
+  const stale =
+    counts.pending > 0 &&
+    counts.oldestPendingAt !== null &&
+    Date.now() - counts.oldestPendingAt > PENDING_DOT_STALE_MS;
   return {
     state,
     label,
@@ -146,6 +159,7 @@ export function useSyncStatus() {
     failed: counts.failed,
     lastSync: counts.lastSync,
     online,
+    stale,
   };
 }
 
@@ -229,10 +243,10 @@ export function StaffMenu({
   const dot =
     sync?.state === 'error' || printer.state === 'failed'
       ? 'bg-danger'
-      : sync?.state === 'pending' ||
-          sync?.state === 'offline' ||
+      : sync?.state === 'offline' ||
           sync?.state === 'paused' ||
-          sync?.state === 'quota'
+          sync?.state === 'quota' ||
+          (sync?.state === 'pending' && sync.stale)
         ? 'bg-warning'
         : printer.state === 'none'
           ? 'bg-border-strong'
@@ -251,6 +265,7 @@ export function StaffMenu({
           type="button"
           data-testid="staff-menu"
           data-sync-state={sync?.state}
+          data-sync-stale={sync?.stale ? 'true' : 'false'}
           data-printer-state={printer.state}
           aria-label={statusLabel}
           title={statusLabel}
@@ -279,6 +294,7 @@ export function StaffMenu({
           type="button"
           data-testid="staff-menu"
           data-sync-state={sync?.state}
+          data-sync-stale={sync?.stale ? 'true' : 'false'}
           data-printer-state={printer.state}
           aria-label={statusLabel}
           title={statusLabel}

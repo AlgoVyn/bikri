@@ -453,7 +453,7 @@ export function EnrolPage({
       <p className="border-t border-border pt-3 text-center text-small text-text-muted">
         {t('enrol.request_shop_hint')}{' '}
         <a
-          className="text-primary underline underline-offset-2"
+          className="inline-flex min-h-11 items-center text-primary underline underline-offset-2"
           href={`${BASE_PATH}/request`}
         >
           {t('enrol.request_shop_link')}

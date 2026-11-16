@@ -210,6 +210,7 @@
     "wa": "واٹس ایپ",
     "wa_text": "{{name}} کوڈ {{code}}۔ {{link}} کھولیں {{when}} سے پہلے۔",
     "writes_bar": "{{written}} / {{budget}}",
+    "writes_blocked": "لکھائی بلاک ہے",
     "writes_today": "آج لکھی قطاریں",
     "skip_content": "مواد پر جائیں",
     "access_note": "Cloudflare Access سے محفوظ",

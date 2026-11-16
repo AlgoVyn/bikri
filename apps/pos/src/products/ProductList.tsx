@@ -405,6 +405,7 @@ export function ProductList({
                 selecting={selecting}
                 selected={selected}
                 embedded={embedded}
+                hasCategories={categories.length > 0}
                 onToggle={toggle}
               />
             </>
@@ -533,6 +534,7 @@ function VirtualRows({
   selected,
   embedded,
   selectedId,
+  hasCategories,
   onToggle,
 }: {
   rows: ProductListRow[];
@@ -541,6 +543,7 @@ function VirtualRows({
   selected: ReadonlySet<string>;
   embedded: boolean;
   selectedId?: string;
+  hasCategories: boolean;
   onToggle: (id: string) => void;
 }) {
   const { t } = useTranslation();
@@ -589,6 +592,7 @@ function VirtualRows({
           selected={selected.has(row.product.id)}
           current={row.product.id === selectedId}
           embedded={embedded}
+          hasCategories={hasCategories}
           onToggle={() => onToggle(row.product.id)}
         />
       ))}
@@ -605,6 +609,7 @@ function ProductRow({
   selected,
   current,
   embedded,
+  hasCategories,
   onToggle,
 }: {
   row: ProductListRow;
@@ -615,10 +620,14 @@ function ProductRow({
   selected: boolean;
   current: boolean;
   embedded: boolean;
+  hasCategories: boolean;
   onToggle: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const p = row.product;
+  const category = categoryName(row.category, i18n.language);
+  const categoryText =
+    category || (hasCategories ? t('form.no_category') : '—');
   const unit = String(p.unit ?? 'pc');
   const stockTone =
     row.stockState === 'out'
@@ -673,8 +682,7 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {categoryName(row.category, i18n.language) ||
-                t('form.no_category')}
+              {categoryText}
             </span>
           )}
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
@@ -742,8 +750,7 @@ function ProductRow({
           </span>
           {embedded ? null : (
             <span className="hidden truncate text-text-muted lg:block">
-              {categoryName(row.category, i18n.language) ||
-                t('form.no_category')}
+              {categoryText}
             </span>
           )}
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">

@@ -1,9 +1,12 @@
+import { noteShareOpened } from '../sync/shareGrace.ts';
+
 /**
  * Opens a blank tab during the click that starts a share. Building the receipt image
  * takes several awaits, after which `window.open` is no longer user-initiated and most
  * browsers block it. Navigating the pre-opened tab keeps the WhatsApp draft working.
  */
 export function openShareWindow(): Window | null {
+  noteShareOpened();
   if (typeof window === 'undefined') return null;
   try {
     const win = window.open('about:blank', '_blank');

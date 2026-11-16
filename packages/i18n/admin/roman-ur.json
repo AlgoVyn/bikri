@@ -210,6 +210,7 @@
     "wa": "WhatsApp",
     "wa_text": "{{name}} code {{code}}. {{link}} kholein {{when}} se pehle.",
     "writes_bar": "{{written}} / {{budget}}",
+    "writes_blocked": "Writes blocked",
     "writes_today": "Aaj likhi qatarein",
     "skip_content": "Content par jayen",
     "access_note": "Cloudflare Access se mehfooz",

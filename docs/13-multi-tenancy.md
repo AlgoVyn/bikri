@@ -101,6 +101,13 @@ Reference shop (01 §8): 2 tills, 13 h/day open, 150 bills/day, 3 lines/bill.
 
 So **about 3–4 reference-size shops fit inside the planned 70,000-row share** (5.1 at the 100,000 account limit); 10 shops need Workers Paid or lower volume. Storage is not the binding limit for that smaller set: those 4 shops need about **1–2 databases after a year** (≈33 shop-years across the 10-database allowance), so add a shard when a DB reaches ~450 MB. Workers Paid (USD 5/month: 10 GB per database, 50 M rows written and 25 B rows read per month included) removes the storage pressure. The measurement is reproducible with `node tools/perf/measure-d1.mjs` ([T-062](11-roadmap.md)).
 
+**Capacity trigger (D-245).** Move the account to Workers Paid — or cut writes per sale first — when any of these holds for three consecutive days:
+- Σ `daily_write_budget` of active shops is above **70,000 rows/day** (the console already warns at that sum), or D1 reports more than 70,000 rows written in a day.
+- The reference per-sale cost is not reduced and a shop reaches **80 %** of its budget on a normal day; batching audit + stock rows or dropping more unused indexes can buy time, but a fourth reference shop does not fit the free tier.
+- A D1 database reaches **450 MB** (add a shard) or R2 reaches 80 % of the 10 GB-month allowance.
+
+At ~14,500 rows per reference shop-day, Workers Paid's included 50 M writes/month covers roughly **100 reference shops** and the 25 B reads/month leaves ample snapshot headroom; the $5/month is the expected first paid step, not a redesign. The operator console's Σ-budget warning is the practical gauge until this trigger is automated.
+
 How the daily row budget is shared:
 - `tenants.daily_write_budget` (console/API default **19,500** rows; schema default 7,000 for direct inserts) is set by the operator; the console warns when Σ budgets of active tenants > 70,000. A reference shop now writes ~14,500 rows (D-231), so the 19,500 default leaves headroom and about three and a half fit the 70 % share.
 - Every push batch ends with `INSERT INTO tenant_usage … ON CONFLICT DO UPDATE SET rows_written = rows_written + ?` using the sum of `meta.rows_written` reported by D1 for that batch (and `rows_read`, `pushes`). Snapshot and pull handlers add their `rows_read` on the next push of that device (kept in memory per isolate, best effort) so pulls cost no extra writes.

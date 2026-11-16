@@ -176,13 +176,30 @@ describe('files (T-033, I7)', () => {
       (await upload(a.admin.token, `logo/shop/${digest}`, IMG, 'image/webp'))
         .status,
     ).toBe(415);
+    // The bytes must match the declared type, not only the header (review L7).
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `product_image/${IDS.product}/${digest}`,
+          IMG,
+          'image/png',
+        )
+      ).status,
+    ).toBe(415);
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
+    ]);
+    const pngDigest = await sha(png);
     const logo = await upload(
       a.admin.token,
-      `logo/shop/${digest}`,
-      IMG,
+      `logo/shop/${pngDigest}`,
+      png,
       'image/png',
     );
-    expect(await json(logo)).toMatchObject({ key: `shop/logo-${digest}.png` });
+    expect(await json(logo)).toMatchObject({
+      key: `shop/logo-${pngDigest}.png`,
+    });
     const support = await addSupportDevice(a, Date.now() + 60_000);
     expect(
       (
@@ -204,8 +221,11 @@ describe('files (T-033, I7)', () => {
       'TENANT_READ_ONLY',
     );
     expect(
-      (await api(`/files/shop/logo-${digest}.png`, { token: a.till.token }))
-        .status,
+      (
+        await api(`/files/shop/logo-${pngDigest}.png`, {
+          token: a.till.token,
+        })
+      ).status,
     ).toBe(200);
   });
 

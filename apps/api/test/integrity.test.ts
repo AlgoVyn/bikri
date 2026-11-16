@@ -624,4 +624,30 @@ describe('document integrity checks (03 §4.1, 07 §5)', () => {
       ),
     ).toEqual(['CONSTRAINT_FAILED']);
   });
+  it('caps short text fields per table (review L6)', async () => {
+    const shop = await seedShop('Text caps');
+    const ok = saleOps(shop, shop.till, 1);
+    const okSale = ok[0]!;
+    const okRow = {
+      ...(okSale.row as Record<string, unknown>),
+      note: 'x'.repeat(120),
+    };
+    expect(
+      codes(
+        await pushOk(shop.till, [{ ...okSale, row: okRow }, ...ok.slice(1)]),
+      ),
+    ).not.toContain('CONSTRAINT_FAILED');
+
+    const bad = saleOps(shop, shop.till, 2);
+    const badSale = bad[0]!;
+    const badRow = {
+      ...(badSale.row as Record<string, unknown>),
+      note: 'x'.repeat(121),
+    };
+    expect(
+      codes(
+        await pushOk(shop.till, [{ ...badSale, row: badRow }, ...bad.slice(1)]),
+      ),
+    ).toContain('CONSTRAINT_FAILED');
+  });
 });
