@@ -171,6 +171,23 @@ export function OverviewPage() {
                   value: formatCount(writeShare, lang),
                 })}
               </p>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border pt-3">
+                <p className="text-small text-text-muted">
+                  {t('admin.budget_total')}
+                </p>
+                <p
+                  className={`text-body font-semibold tabular-nums ${
+                    usage.budget_alert ? 'text-danger' : ''
+                  }`}
+                >
+                  {formatCount(usage.budget_total, lang)}
+                </p>
+              </div>
+              {usage.budget_alert ? (
+                <p className="text-small text-danger">
+                  {t('admin.budget_alert')}
+                </p>
+              ) : null}
               <Meter
                 label={t('admin.reads_today')}
                 value={usage.today.rows_read}

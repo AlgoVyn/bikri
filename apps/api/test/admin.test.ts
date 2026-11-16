@@ -45,6 +45,19 @@ describe('accessAuth and sameOrigin (05 §3.1, 01 §5)', () => {
     ).toBe(200);
   });
 
+  it('usage reports the active daily-budget sum used by the capacity trigger', async () => {
+    await seedShop('Budget A');
+    await seedShop('Budget B');
+    const expected = await n(
+      "SELECT COALESCE(SUM(daily_write_budget), 0) AS n FROM tenants WHERE status = 'active'",
+    );
+    const body = await json<{ budget_total: number; budget_alert: boolean }>(
+      await api('/admin/usage'),
+    );
+    expect(body.budget_total).toBe(expected);
+    expect(body.budget_alert).toBe(expected > 70_000);
+  });
+
   it('a cross-origin POST to /admin gets 403; cross-site fetch metadata gets 403', async () => {
     const res = await api('/admin/tenants', {
       method: 'POST',

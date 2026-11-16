@@ -106,7 +106,7 @@ So **about 3–4 reference-size shops fit inside the planned 70,000-row share** 
 - The reference per-sale cost is not reduced and a shop reaches **80 %** of its budget on a normal day; batching audit + stock rows or dropping more unused indexes can buy time, but a fourth reference shop does not fit the free tier.
 - A D1 database reaches **450 MB** (add a shard) or R2 reaches 80 % of the 10 GB-month allowance.
 
-At ~14,500 rows per reference shop-day, Workers Paid's included 50 M writes/month covers roughly **100 reference shops** and the 25 B reads/month leaves ample snapshot headroom; the $5/month is the expected first paid step, not a redesign. The operator console's Σ-budget warning is the practical gauge until this trigger is automated.
+At ~14,500 rows per reference shop-day, Workers Paid's included 50 M writes/month covers roughly **100 reference shops** and the 25 B reads/month leaves ample snapshot headroom; the $5/month is the expected first paid step, not a redesign. The operator console shows the active Σ budget and flags it red above 70,000 rows/day.
 
 How the daily row budget is shared:
 - `tenants.daily_write_budget` (console/API default **19,500** rows; schema default 7,000 for direct inserts) is set by the operator; the console warns when Σ budgets of active tenants > 70,000. A reference shop now writes ~14,500 rows (D-231), so the 19,500 default leaves headroom and about three and a half fit the 70 % share.
