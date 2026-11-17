@@ -29,7 +29,7 @@ Tabs:
 
 Table headers and cells share one start alignment (left in English/Roman Urdu, right in Urdu), matching the main lists (D-214); amounts stay tabular and never truncate. On phones the summary cards stay two-up, the range row stacks below the presets, and chart labels stay readable (never below 10 px); charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.
 
-**Bundles.** Reports stay component-level: sold, profit, tax, best sellers and stock value use the real component sale lines; the cost-weighted split is the component revenue ([07 §3.4](../07-money-rules.md#34-bundles-v11)). A bundle product's own last-14/30-day figure counts distinct `bundle_group`s and sums the group line finals. A separate `Bundles` tab/report (sold bundles, revenue, margin per bundle) is a later task, not part of the first bundle release.
+**Bundles.** Reports stay component-level: sold, profit, tax, best sellers and stock value use the real component sale lines; the cost-weighted split is the component revenue ([07 §3.4](../07-money-rules.md#34-bundles-v11)). A bundle product's own last-14/30-day figure sums each group's `bundle_qty` (so two bundles in one group count as two) and the group line finals. A separate `Bundles` tab/report (sold bundles, revenue, margin per bundle) is a later task, not part of the first bundle release.
 
 ## CSV columns
 

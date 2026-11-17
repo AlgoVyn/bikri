@@ -295,9 +295,10 @@ export async function soldByProduct(
   db: BikriDb,
   days: number,
   now = Date.now(),
+  timeZone = 'Asia/Karachi',
 ): Promise<Map<string, number>> {
-  const from = businessDate(now - (days - 1) * DAY_MS);
-  const to = businessDate(now);
+  const from = businessDate(now - (days - 1) * DAY_MS, timeZone);
+  const to = businessDate(now, timeZone);
   const sold = new Map<string, number>();
   const sales = await db.sales
     .where('business_date')
@@ -473,6 +474,7 @@ export async function listProducts(
     direction?: SortDirection;
     language?: string;
     now?: number;
+    timeZone?: string;
     costMethod?: 'avg' | 'last';
   } = {},
 ): Promise<ProductListRow[]> {
@@ -497,7 +499,7 @@ export async function listProducts(
     levels,
     opts.costMethod ?? 'avg',
   );
-  const sold = await soldByProduct(db, 30, opts.now);
+  const sold = await soldByProduct(db, 30, opts.now, opts.timeZone);
   const rows: ProductListRow[] = products.map((product) => {
     const bundle = bundles.get(product.id);
     const onHand = bundle
@@ -689,6 +691,7 @@ export async function productDetail(
   now = Date.now(),
   historyLimit = PRODUCT_HISTORY_PAGE,
   costMethod: 'avg' | 'last' = 'avg',
+  timeZone = 'Asia/Karachi',
 ): Promise<ProductDetail | null> {
   const product = await db.products.get(id);
   if (!product || product.deleted_at) return null;
@@ -726,7 +729,11 @@ export async function productDetail(
     : await productStockHistoryPage(db, id, historyLimit);
   const days: ProductDetail['last14'] = [];
   for (let i = 13; i >= 0; i -= 1)
-    days.push({ date: businessDate(now - i * DAY_MS), qty: 0, revenue: 0 });
+    days.push({
+      date: businessDate(now - i * DAY_MS, timeZone),
+      qty: 0,
+      revenue: 0,
+    });
   const dayByDate = new Map(days.map((day) => [day.date, day]));
   const first = days[0]?.date ?? '';
   const last = days[13]?.date ?? '';

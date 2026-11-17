@@ -76,8 +76,16 @@ export function ProductDetailPage({
   const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const costMethod = shop?.cost_method === 'last' ? 'last' : 'avg';
   const detail = useLiveQuery(
-    () => productDetail(getDb(), id, Date.now(), historyLimit, costMethod),
-    [id, historyLimit, costMethod],
+    () =>
+      productDetail(
+        getDb(),
+        id,
+        Date.now(),
+        historyLimit,
+        costMethod,
+        timeZone,
+      ),
+    [id, historyLimit, costMethod, timeZone],
   );
   const readOnly = useReadOnly();
   const canEdit = can('catalog.edit') && !readOnly;
