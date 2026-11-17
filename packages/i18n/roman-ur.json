@@ -144,6 +144,8 @@
     "not_mine_help": "Maalik se sahi code lein. Yeh device {{shop}} se nikal gayi hai.",
     "downloading": "Aap ki dukaan download ho rahi hai…",
     "downloading_count": "Aap ki dukaan download ho rahi hai… {{total}} mein se {{done}}",
+    "downloading_rows": "Aap ki dukaan download ho rahi hai… {{rows}} rows",
+    "downloading_rows_one": "Aap ki dukaan download ho rahi hai… {{rows}} row",
     "download_failed": "Download ruk gaya: {{message}}",
     "retry": "Dobara koshish karein",
     "already": "Yeh browser {{shop}} se jura hai.",

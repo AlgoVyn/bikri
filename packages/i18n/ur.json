@@ -144,6 +144,8 @@
     "not_mine_help": "مالک سے صحیح کوڈ لیں۔ یہ ڈیوائس {{shop}} سے نکل گئی ہے۔",
     "downloading": "آپ کی دکان ڈاؤن لوڈ ہو رہی ہے…",
     "downloading_count": "آپ کی دکان ڈاؤن لوڈ ہو رہی ہے… {{total}} میں سے {{done}}",
+    "downloading_rows": "آپ کی دکان ڈاؤن لوڈ ہو رہی ہے… {{rows}} قطاریں",
+    "downloading_rows_one": "آپ کی دکان ڈاؤن لوڈ ہو رہی ہے… {{rows}} قطار",
     "download_failed": "ڈاؤن لوڈ رک گیا: {{message}}",
     "retry": "دوبارہ کوشش کریں",
     "already": "یہ براؤزر {{shop}} سے جڑا ہے۔",

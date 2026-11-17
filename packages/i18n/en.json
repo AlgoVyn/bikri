@@ -144,6 +144,8 @@
     "not_mine_help": "Ask the owner for the right code. This device has left {{shop}}.",
     "downloading": "Downloading your shop…",
     "downloading_count": "Downloading your shop… {{done}} of {{total}}",
+    "downloading_rows": "Downloading your shop… {{rows}} rows",
+    "downloading_rows_one": "Downloading your shop… {{rows}} row",
     "download_failed": "The download stopped: {{message}}",
     "retry": "Try again",
     "already": "This browser is connected to {{shop}}.",
