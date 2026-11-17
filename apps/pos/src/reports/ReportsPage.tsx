@@ -711,11 +711,14 @@ function KpiCard({
   value,
   hint,
   testId,
+  valueClassName = 'text-h2 lg:text-title xl:text-total',
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   testId?: string;
+  /** The figure size; a long amount steps down so it never leaves the card. */
+  valueClassName?: string;
 }) {
   return (
     <li
@@ -723,7 +726,9 @@ function KpiCard({
       data-testid={testId}
     >
       <p className="text-small text-text-muted">{label}</p>
-      <p className="mt-0.5 text-total font-semibold tabular-nums">{value}</p>
+      <p className={`mt-0.5 font-semibold tabular-nums ${valueClassName}`}>
+        {value}
+      </p>
       {hint ? <div className="mt-1">{hint}</div> : null}
     </li>
   );
@@ -763,6 +768,21 @@ function SummaryTab({
     summary.udhaarReceived !== 0 ||
     summary.paymentMix.card !== 0 ||
     summary.paymentMix.bank_wallet !== 0;
+  // The KPI row shares one figure size. A long amount (large range, paisa) steps down
+  // so it cannot leave the card; `money()` already applies grouping and privacy masking.
+  const kpiTextLength = Math.max(
+    money(summary.sold).length,
+    money(summary.grossProfit).length,
+    money(summary.avgBill).length,
+    money(summary.expenses).length,
+    String(summary.bills).length,
+  );
+  const kpiSize =
+    kpiTextLength > 19
+      ? 'text-small lg:text-body xl:text-h2'
+      : kpiTextLength > 16
+        ? 'text-body lg:text-h2 xl:text-title'
+        : 'text-h2 lg:text-title xl:text-total';
   return (
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -771,6 +791,7 @@ function SummaryTab({
           testId="report-sold"
           value={<MoneyText paisa={summary.sold} />}
           hint={<Delta current={summary.sold} previous={comparison?.sold} />}
+          valueClassName={kpiSize}
         />
         {cost ? (
           <KpiCard
@@ -783,6 +804,7 @@ function SummaryTab({
                 previous={comparison?.grossProfit}
               />
             }
+            valueClassName={kpiSize}
           />
         ) : (
           <KpiCard
@@ -791,6 +813,7 @@ function SummaryTab({
             hint={
               <Delta current={summary.avgBill} previous={comparison?.avgBill} />
             }
+            valueClassName={kpiSize}
           />
         )}
         <KpiCard
@@ -798,6 +821,7 @@ function SummaryTab({
           testId="report-bills"
           value={summary.bills}
           hint={<Delta current={summary.bills} previous={comparison?.bills} />}
+          valueClassName={kpiSize}
         />
         <KpiCard
           label={t('office.reports.expenses')}
@@ -809,6 +833,7 @@ function SummaryTab({
               good="down"
             />
           }
+          valueClassName={kpiSize}
         />
       </ul>
 
@@ -819,6 +844,7 @@ function SummaryTab({
               <Metric
                 label={t('office.reports.avg_bill')}
                 value={<MoneyText paisa={summary.avgBill} />}
+                valueClassName="max-sm:text-body"
                 hint={
                   <Delta
                     current={summary.avgBill}
@@ -829,6 +855,7 @@ function SummaryTab({
               <Metric
                 label={t('office.reports.net_profit')}
                 value={<MoneyText paisa={summary.netProfit} />}
+                valueClassName="max-sm:text-body"
                 hint={
                   <Delta
                     current={summary.netProfit}
@@ -843,6 +870,7 @@ function SummaryTab({
                     {percentText(summary.marginBp)}
                   </PrivacyValue>
                 }
+                valueClassName="max-sm:text-body"
                 hint={
                   <Delta
                     current={summary.marginBp / 100}
@@ -859,6 +887,7 @@ function SummaryTab({
             <Metric
               label={t('office.reports.tax_collected')}
               value={<MoneyText paisa={summary.tax} />}
+              valueClassName="max-sm:text-body"
             />
           ) : null}
         </div>
@@ -924,12 +953,12 @@ function SummaryTab({
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.udhaar')}
               </h2>
-              <dl className="grid grid-cols-2 gap-3 text-small">
+              <dl className="grid grid-cols-1 gap-3 text-small sm:grid-cols-2">
                 <div>
                   <dt className="text-text-muted">
                     {t('office.reports.udhaar_given')}
                   </dt>
-                  <dd className="text-title font-semibold">
+                  <dd className="text-h2 font-semibold lg:text-title">
                     <MoneyText paisa={summary.udhaarGiven} />
                   </dd>
                 </div>
@@ -937,7 +966,7 @@ function SummaryTab({
                   <dt className="text-text-muted">
                     {t('office.reports.udhaar_received')}
                   </dt>
-                  <dd className="text-title font-semibold">
+                  <dd className="text-h2 font-semibold lg:text-title">
                     <MoneyText paisa={summary.udhaarReceived} />
                   </dd>
                 </div>
