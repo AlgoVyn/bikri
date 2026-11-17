@@ -1,4 +1,4 @@
-import { businessDate, mulDivRound } from '@bikri/core';
+import { businessDate, isTimeZone, mulDivRound } from '@bikri/core';
 import type { MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
@@ -142,8 +142,10 @@ export async function shopTimeZone(src: TableSource): Promise<string> {
   const shop = await (src.table('shop') as Table<MasterRow, string>).get(
     'shop',
   );
-  const tz = String(shop?.timezone ?? 'Asia/Karachi');
-  return tz === '' ? 'Asia/Karachi' : tz;
+  const tz = String(shop?.timezone ?? '');
+  // A typo from an import/restore must not make every Intl call throw; the core
+  // business-date helper already falls back to the default (D-218).
+  return isTimeZone(tz) ? tz : 'Asia/Karachi';
 }
 
 function paymentRows(rows: readonly SyncedRow[]): SyncedRow[] {
@@ -399,7 +401,7 @@ export async function loadSalesLineText(
   for (const line of lines) {
     const saleId = String(line.sale_id);
     const text =
-      `${String(line.name_snapshot ?? '')} ${String(line.sku_snapshot ?? '')}`
+      `${String(line.name_snapshot ?? '')} ${String(line.sku_snapshot ?? '')} ${String(line.bundle_name ?? '')}`
         .trim()
         .toLowerCase();
     lineText.set(saleId, `${lineText.get(saleId) ?? ''} ${text}`.trim());

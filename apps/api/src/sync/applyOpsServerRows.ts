@@ -401,7 +401,9 @@ export function stockRepairStatements(
     typeof row.branch_id === 'string'
       ? row.branch_id
       : tbl === 'sale_voids'
-        ? (look.sales.get(String(row.sale_id))?.branch_id ?? '')
+        ? (look.sales.get(String(row.sale_id))?.branch_id ??
+          look.pushedSales.get(String(row.sale_id))?.branch_id ??
+          '')
         : '';
   const staffId = String(row.staff_id);
   const businessDate = String(row.business_date);

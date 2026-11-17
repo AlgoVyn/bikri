@@ -39,7 +39,6 @@ import {
   tenantBySlug,
   usageHistory,
 } from '../platform/tenantAdmin.ts';
-import { usageToday } from '../platform/tenants.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { importOps } from '../sync/importOps.ts';
@@ -47,7 +46,7 @@ import { ImportOpsBody } from '../sync/opSchema.ts';
 import { revokeSupportDevices, supportPayload } from '../sync/status.ts';
 import { APPLY_ORDER, clientColumns, SNAPSHOT_TABLES } from '../sync/tables.ts';
 import type { DeviceRow, TenantRow, TenantStatus } from '../types.ts';
-import { assertReadQuota, snapshotPayload } from './sync.ts';
+import { snapshotPayload } from './sync.ts';
 
 type AdminEnv = {
   Bindings: Env;
@@ -743,7 +742,6 @@ admin.get('/tenants/:id/owners', async (c) => {
 admin.get('/tenants/:id/export', async (c) => {
   const { tenant, db } = c.var;
   const exportedAt = Date.now();
-  assertReadQuota(tenant, await usageToday(c.env, tenant.id, exportedAt));
   if (c.req.query('tbl') && !c.req.query('before'))
     throw new ApiError(
       'VALIDATION_FAILED',
@@ -756,6 +754,8 @@ admin.get('/tenants/:id/export', async (c) => {
     tenant,
     1000,
     true,
+    undefined,
+    false,
   );
   if (!c.req.query('tbl')) {
     await db.batch(

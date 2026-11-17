@@ -698,9 +698,7 @@ function ProductRow({
           ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
-                {row.stockState === 'untracked'
-                  ? t('products.not_tracked')
-                  : qtyWithUnit(t, row.onHand, unit)}
+                {stockText}
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
@@ -713,7 +711,11 @@ function ProductRow({
                 </span>
               ) : null}
               <span className="hidden text-start lg:block">
-                {qtyWithUnit(t, row.sold30, unit)}
+                {row.bundle
+                  ? t('products.bundle_count', {
+                      count: Math.round(row.sold30 / 1000),
+                    })
+                  : qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
           )}
@@ -766,9 +768,7 @@ function ProductRow({
           ) : (
             <>
               <span className={`hidden text-start lg:block ${stockTone}`}>
-                {row.stockState === 'untracked'
-                  ? t('products.not_tracked')
-                  : qtyWithUnit(t, row.onHand, unit)}
+                {stockText}
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
@@ -781,7 +781,11 @@ function ProductRow({
                 </span>
               ) : null}
               <span className="hidden text-start lg:block">
-                {qtyWithUnit(t, row.sold30, unit)}
+                {row.bundle
+                  ? t('products.bundle_count', {
+                      count: Math.round(row.sold30 / 1000),
+                    })
+                  : qtyWithUnit(t, row.sold30, unit)}
               </span>
             </>
           )}

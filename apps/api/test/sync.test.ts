@@ -849,6 +849,7 @@ describe('bundle recipe guards', () => {
     const bundleId = newId();
     const itemId = newId();
     const now = Date.now();
+    const createTx = newId();
     await pushOk(shop.admin, [
       op(
         'products',
@@ -863,32 +864,43 @@ describe('bundle recipe guards', () => {
           },
           now,
         ),
+        { tx_id: createTx },
       ),
-      op('bundle_items', 'upsert', {
-        id: itemId,
-        bundle_id: bundleId,
-        component_product_id: IDS.product,
-        qty_milli: 1000,
-        sort_order: 0,
-        created_at: now,
-        updated_at: now,
-        deleted_at: null,
-        updated_by: IDS.owner,
-      }),
+      op(
+        'bundle_items',
+        'upsert',
+        {
+          id: itemId,
+          bundle_id: bundleId,
+          component_product_id: IDS.product,
+          qty_milli: 1000,
+          sort_order: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+          updated_by: IDS.owner,
+        },
+        { tx_id: createTx },
+      ),
       // The till writes a bundle_change audit in the same transaction; the
       // server's client-action allow-list must accept it or the whole create is
       // rejected FORBIDDEN.
-      op('audit_log', 'insert', {
-        id: newId(),
-        action: 'bundle_change',
-        entity: 'products',
-        entity_id: bundleId,
-        before_json: null,
-        after_json: '{"name_en":"Starter Pack"}',
-        device_id: shop.admin.id,
-        staff_id: IDS.owner,
-        created_at: now,
-      }),
+      op(
+        'audit_log',
+        'insert',
+        {
+          id: newId(),
+          action: 'bundle_change',
+          entity: 'products',
+          entity_id: bundleId,
+          before_json: null,
+          after_json: '{"name_en":"Starter Pack"}',
+          device_id: shop.admin.id,
+          staff_id: IDS.owner,
+          created_at: now,
+        },
+        { tx_id: createTx },
+      ),
     ]);
     const denied = await push(shop.till, [
       op(

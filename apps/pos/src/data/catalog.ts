@@ -762,18 +762,53 @@ export async function productDetail(
     // would rewrite history after a tax setting change.
     day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
   }
-  // Refund revenue is the cumulative ex-tax share of the line final (07 §6); using
-  // refund_lines.amount would subtract tax/rounding that was never in revenue.
-  const allRefundLines =
-    productLines.length === 0
+  // Refunds count on the date they happen, including a refund today of a sale older
+  // than the 14-day chart window (07 §9). Load the refunds in the window first, then
+  // their original sale lines and every earlier refund of those lines for the
+  // cumulative per-line allocation.
+  const windowRefunds = await db.refunds
+    .where('business_date')
+    .between(first, last, true, true)
+    .toArray();
+  const windowRefundLines =
+    windowRefunds.length === 0
       ? []
       : await rowsForIds(
           db.refund_lines,
-          'sale_line_id',
-          (row: SyncedRow) => String(row.sale_line_id),
-          productLines.map(({ line }) => String(line.id)),
+          'refund_id',
+          (row: SyncedRow) => String(row.refund_id),
+          windowRefunds.map((refund) => String(refund.id)),
         );
-  if (allRefundLines.length > 0) {
+  const refundOriginalLines =
+    windowRefundLines.length === 0
+      ? new Map<string, SyncedRow>()
+      : new Map(
+          (
+            await db.sale_lines.bulkGet(
+              windowRefundLines.map((line) => String(line.sale_line_id)),
+            )
+          )
+            .filter((line): line is SyncedRow => line !== undefined)
+            .map((line) => [String(line.id), line]),
+        );
+  const saleCache = new Map(byId);
+  const saleFor = async (saleId: string): Promise<SyncedRow | undefined> => {
+    const known = saleCache.get(saleId);
+    if (known) return known;
+    const sale = await db.sales.get(saleId);
+    if (sale) saleCache.set(saleId, sale);
+    return sale;
+  };
+  const simpleRefundLines = [...refundOriginalLines.values()].filter(
+    (line) => line.product_id === id,
+  );
+  if (simpleRefundLines.length > 0) {
+    const allRefundLines = await rowsForIds(
+      db.refund_lines,
+      'sale_line_id',
+      (row: SyncedRow) => String(row.sale_line_id),
+      simpleRefundLines.map((line) => String(line.id)),
+    );
     const allRefunds = new Map(
       (
         await db.refunds.bulkGet([
@@ -790,7 +825,9 @@ export async function productDetail(
       list.push(refundLine);
       bySaleLine.set(key, list);
     }
-    for (const { line, sale } of productLines) {
+    for (const line of simpleRefundLines) {
+      const sale = await saleFor(String(line.sale_id));
+      if (!sale) continue;
       const forLine = (bySaleLine.get(String(line.id)) ?? []).sort(
         (a, b) =>
           Number(a.created_at) - Number(b.created_at) ||
@@ -799,20 +836,20 @@ export async function productDetail(
       let previous = 0;
       for (const refundLine of forLine) {
         const refund = allRefunds.get(String(refundLine.refund_id));
-        if (refund) {
-          const day = dayByDate.get(String(refund.business_date));
-          const qty = Number(refundLine.qty_milli);
-          if (day) {
-            day.qty -= qty;
-            day.revenue -= refundedRevenue(
-              lineRevenue(line, sale.tax_inclusive === 1),
-              Number(line.qty_milli),
-              previous,
-              qty,
-            );
-          }
+        const qty = Number(refundLine.qty_milli);
+        const day = refund
+          ? dayByDate.get(String(refund.business_date))
+          : undefined;
+        if (refund && day) {
+          day.qty -= qty;
+          day.revenue -= refundedRevenue(
+            lineRevenue(line, sale.tax_inclusive === 1),
+            Number(line.qty_milli),
+            previous,
+            qty,
+          );
         }
-        previous += Number(refundLine.qty_milli);
+        previous += qty;
       }
     }
   }
@@ -821,12 +858,8 @@ export async function productDetail(
       day.qty = 0;
       day.revenue = 0;
     }
-    const groups = new Map<
-      string,
-      { lines: { id: string; qty_milli: number; revenue: number }[] }
-    >();
-    const lineToGroup = new Map<string, string>();
-    const lineRows = new Map<string, SyncedRow>();
+    // Sale day: one bundle quantity per group, component revenue per line.
+    const seenSaleGroups = new Set<string>();
     const bundleLines = (
       await db.sale_lines.where('bundle_id').equals(id).toArray()
     ).filter(
@@ -841,98 +874,86 @@ export async function productDetail(
       const day = dayByDate.get(String(sale.business_date));
       if (!day) continue;
       const key = `${String(line.sale_id)}|${String(line.bundle_group)}`;
-      const bundleQty = Number(line.bundle_qty);
-      const bundles =
-        Number.isSafeInteger(bundleQty) && bundleQty > 0 ? bundleQty : 1;
-      let group = groups.get(key);
-      if (!group) {
-        group = { lines: [] };
-        groups.set(key, group);
+      if (!seenSaleGroups.has(key)) {
+        seenSaleGroups.add(key);
+        const bundleQty = Number(line.bundle_qty);
+        const bundles =
+          Number.isSafeInteger(bundleQty) && bundleQty > 0 ? bundleQty : 1;
         day.qty += bundles * 1000;
       }
-      const revenue = lineRevenue(line, sale.tax_inclusive === 1);
-      group.lines.push({
-        id: String(line.id),
-        qty_milli: Number(line.qty_milli),
-        revenue,
-      });
-      day.revenue += revenue;
-      lineToGroup.set(String(line.id), key);
-      lineRows.set(String(line.id), line);
+      day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
     }
-    if (groups.size > 0) {
-      const lineIds = [...groups.values()].flatMap((group) =>
-        group.lines.map((line) => line.id),
-      );
-      const bundleRefundLines = await rowsForIds(
+    // Refunds in the window, including refunds of sales older than the chart window.
+    const bundleRefundLines = [...refundOriginalLines.values()].filter(
+      (line) => line.bundle_id === id && line.bundle_group,
+    );
+    if (bundleRefundLines.length > 0) {
+      const allRefundLines = await rowsForIds(
         db.refund_lines,
         'sale_line_id',
         (row: SyncedRow) => String(row.sale_line_id),
-        lineIds,
+        bundleRefundLines.map((line) => String(line.id)),
       );
-      if (bundleRefundLines.length > 0) {
-        const refundRows = new Map(
-          (
-            await db.refunds.bulkGet([
-              ...new Set(
-                bundleRefundLines.map((line) => String(line.refund_id)),
-              ),
-            ])
-          )
-            .filter((refund): refund is SyncedRow => refund !== undefined)
-            .map((refund) => [String(refund.id), refund]),
+      const allRefunds = new Map(
+        (
+          await db.refunds.bulkGet([
+            ...new Set(allRefundLines.map((line) => String(line.refund_id))),
+          ])
+        )
+          .filter((refund): refund is SyncedRow => refund !== undefined)
+          .map((refund) => [String(refund.id), refund]),
+      );
+      // Quantity: subtract the returned whole bundles once per refund group.
+      const refundedGroups = new Set<string>();
+      for (const refundLine of allRefundLines) {
+        const original = refundOriginalLines.get(
+          String(refundLine.sale_line_id),
         );
-        // Quantity: subtract the returned whole bundles once per refund group on the
-        // refund's own business date, not once per component line.
-        const refundedGroups = new Set<string>();
-        for (const refundLine of bundleRefundLines) {
-          const original = lineRows.get(String(refundLine.sale_line_id));
-          const refund = refundRows.get(String(refundLine.refund_id));
-          if (!original || !refund) continue;
-          const day = dayByDate.get(String(refund.business_date));
-          if (!day) continue;
-          const groupKey = lineToGroup.get(String(original.id));
-          if (!groupKey) continue;
-          const seenKey = `${String(refund.id)}|${groupKey}`;
-          if (refundedGroups.has(seenKey)) continue;
-          refundedGroups.add(seenKey);
-          const perBundle = Number(original.bundle_component_qty_milli);
+        const refund = allRefunds.get(String(refundLine.refund_id));
+        if (!original || !refund) continue;
+        const day = dayByDate.get(String(refund.business_date));
+        if (!day) continue;
+        const groupKey = `${String(refund.id)}|${String(original.bundle_group)}`;
+        if (refundedGroups.has(groupKey)) continue;
+        refundedGroups.add(groupKey);
+        const perBundle = Number(original.bundle_component_qty_milli);
+        const qty = Number(refundLine.qty_milli);
+        if (perBundle > 0 && qty > 0 && qty % perBundle === 0)
+          day.qty -= (qty / perBundle) * 1000;
+      }
+      // Revenue: the cumulative ex-tax share of each component line, on the refund's
+      // own business date.
+      const byLine = new Map<string, SyncedRow[]>();
+      for (const refundLine of allRefundLines) {
+        const key = String(refundLine.sale_line_id);
+        byLine.set(key, [...(byLine.get(key) ?? []), refundLine]);
+      }
+      for (const [lineId, refundsForLine] of byLine) {
+        const original = refundOriginalLines.get(lineId);
+        if (!original) continue;
+        const sale = await saleFor(String(original.sale_id));
+        if (!sale) continue;
+        const sorted = [...refundsForLine].sort(
+          (a, b) =>
+            Number(a.created_at) - Number(b.created_at) ||
+            String(a.id).localeCompare(String(b.id)),
+        );
+        let previous = 0;
+        for (const refundLine of sorted) {
+          const refund = allRefunds.get(String(refundLine.refund_id));
           const qty = Number(refundLine.qty_milli);
-          if (perBundle > 0 && qty > 0 && qty % perBundle === 0)
-            day.qty -= (qty / perBundle) * 1000;
-        }
-        // Revenue: the cumulative ex-tax share of each component line, on the refund's
-        // own business date.
-        const byLine = new Map<string, SyncedRow[]>();
-        for (const refundLine of bundleRefundLines) {
-          const key = String(refundLine.sale_line_id);
-          byLine.set(key, [...(byLine.get(key) ?? []), refundLine]);
-        }
-        for (const group of groups.values()) {
-          for (const line of group.lines) {
-            const refundsForLine = (byLine.get(line.id) ?? []).sort(
-              (a, b) =>
-                Number(a.created_at) - Number(b.created_at) ||
-                String(a.id).localeCompare(String(b.id)),
+          const day = refund
+            ? dayByDate.get(String(refund.business_date))
+            : undefined;
+          if (refund && day) {
+            day.revenue -= refundedRevenue(
+              lineRevenue(original, sale.tax_inclusive === 1),
+              Number(original.qty_milli),
+              previous,
+              qty,
             );
-            let previous = 0;
-            for (const refundLine of refundsForLine) {
-              const refund = refundRows.get(String(refundLine.refund_id));
-              const qty = Number(refundLine.qty_milli);
-              if (refund) {
-                const day = dayByDate.get(String(refund.business_date));
-                if (day) {
-                  day.revenue -= refundedRevenue(
-                    line.revenue,
-                    line.qty_milli,
-                    previous,
-                    qty,
-                  );
-                }
-              }
-              previous += qty;
-            }
           }
+          previous += qty;
         }
       }
     }

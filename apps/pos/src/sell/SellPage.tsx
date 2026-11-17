@@ -128,12 +128,23 @@ export function SellPage() {
   const totals = useMemo(() => cartTotals(cart, money), [cart, money]);
   const cartQty = useMemo(() => {
     const map = new Map<string, number>();
-    for (const line of cart.lines)
+    const seenBundles = new Set<string>();
+    for (const line of cart.lines) {
+      if (line.bundle_id && line.bundle_group) {
+        if (seenBundles.has(line.bundle_group)) continue;
+        seenBundles.add(line.bundle_group);
+        map.set(
+          line.bundle_id,
+          (map.get(line.bundle_id) ?? 0) + Number(line.bundle_qty ?? 0) * 1000,
+        );
+        continue;
+      }
       if (line.product_id)
         map.set(
           line.product_id,
           (map.get(line.product_id) ?? 0) + line.qty_milli,
         );
+    }
     return map;
   }, [cart.lines]);
   const prefix = parseQtyPrefix(query);
@@ -188,7 +199,7 @@ export function SellPage() {
         );
         const recipe = items.flatMap((row, index) => {
           const component = products[index];
-          return component
+          return component && !component.deleted_at
             ? [{ product: component, qty_milli: Number(row.qty_milli) }]
             : [];
         });

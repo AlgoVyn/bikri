@@ -1,3 +1,4 @@
+import { businessDate } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -525,6 +526,62 @@ describe('bundle product CRUD', () => {
     expect(draft.sku).toBe('');
     const recipe = await loadBundleRecipe(db, bundle.id);
     expect(recipe).toHaveLength(2);
+  });
+
+  it('shows a refund of an older bundle sale on the refund day', async () => {
+    const { db, ctx, first, second, bundle } = await shop();
+    const cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: first, qty_milli: 1000 },
+        { product: second, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 2500 }], {
+        saleId: 'old-bundle-sale',
+      }),
+      ctx,
+      NOW,
+    );
+    const oldAt = NOW - 20 * 86_400_000;
+    const oldDate = businessDate(oldAt);
+    await db.sales.update('old-bundle-sale', {
+      business_date: oldDate,
+      created_at: oldAt,
+    });
+    await db.sale_lines
+      .where('sale_id')
+      .equals('old-bundle-sale')
+      .modify({ business_date: oldDate, created_at: oldAt });
+    const lines = await db.sale_lines
+      .where('sale_id')
+      .equals('old-bundle-sale')
+      .toArray();
+    await refundSale(
+      db,
+      {
+        refundId: 'old-bundle-refund',
+        saleId: 'old-bundle-sale',
+        lines: lines.map((line) => ({
+          saleLineId: line.id,
+          qtyMilli: 1000,
+          restock: true,
+        })),
+        reason: 'Faulty',
+        method: 'cash',
+        print: false,
+      },
+      ctx,
+      NOW,
+    );
+    const detail = await productDetail(db, bundle.id, NOW);
+    expect(detail?.last14.at(-1)?.qty).toBe(-1000);
+    expect(detail?.last14.at(-1)?.revenue).toBe(-2500);
   });
 
   it('writes bundle columns/discount and removes a returned bundle from reports', async () => {

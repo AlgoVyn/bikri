@@ -29,7 +29,9 @@ import {
   spanDays,
 } from '../data/reportRange.ts';
 import type { ReportRange } from '../data/reports.ts';
-import { rangeFor, shopTimeZone } from '../data/salesHistory.ts';
+import { rangeFor } from '../data/salesHistory.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
@@ -181,6 +183,9 @@ export function ReportsPage() {
   const [workerReady, setWorkerReady] = useState(false);
   const requestId = useRef(0);
   const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
+  const timeZone = useShopTimeZone();
+  // Rerun the live query when the business date passes midnight on an idle screen.
+  const { today: businessToday } = useBusinessDates(timeZone);
 
   useEffect(() => {
     if (!limited) rememberDateFilter('reports', preset, custom.from, custom.to);
@@ -205,7 +210,6 @@ export function ReportsPage() {
 
   const data = useLiveQuery(async () => {
     const db = getDb();
-    const timeZone = await shopTimeZone(db);
     const now = Date.now();
     const today = businessDate(now, timeZone);
     const selected = limited ? 'today' : preset;
@@ -297,7 +301,16 @@ export function ReportsPage() {
       devices,
       shopName: String(shop?.name ?? ''),
     };
-  }, [preset, custom.from, custom.to, deviceId, limited, workerReady]);
+  }, [
+    preset,
+    custom.from,
+    custom.to,
+    deviceId,
+    limited,
+    workerReady,
+    timeZone,
+    businessToday,
+  ]);
 
   if (!can('report.view'))
     return (

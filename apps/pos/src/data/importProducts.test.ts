@@ -26,6 +26,16 @@ async function shop(prefix: string) {
 }
 
 describe('import spreadsheet (screens/08)', () => {
+  it('skips bundle rows instead of creating a simple product', async () => {
+    const { db } = await shop('import-bundle');
+    const g = grid('name_en,sku,price,kind\nPack,PACK,25,bundle');
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.rows[0]).toMatchObject({
+      action: 'error',
+      errors: [{ code: 'bundle_row' }],
+    });
+  });
+
   it('the template maps itself; English and Roman Urdu headers auto-match', () => {
     const [head] = grid(templateCsv());
     expect(head).toEqual([...TEMPLATE_COLUMNS]);

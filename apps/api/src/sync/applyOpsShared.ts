@@ -222,6 +222,8 @@ export type Lookups = {
   >;
   /** Component product id → bundles that use it, for delete/kind-change checks. */
   bundleOfComponent: Map<string, string[]>;
+  /** Bundle products already soft-deleted in D1. */
+  bundleDeleted: Set<string>;
   /** Stored sale movements of a sale: product → positive qty sold. */
   saleMoved: Map<string, Map<string, number>>;
   /** Parties referenced by payments/ledger rows, for polymorphic party checks. */

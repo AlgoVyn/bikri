@@ -159,7 +159,7 @@ export function checkOp(
               component_product_id: String(pushed.component_product_id),
             }
           : undefined);
-      if (!target) throw new Reject('CONSTRAINT_FAILED');
+      if (!target) return; // a replay of an already-deleted recipe row is a no-op
       const remaining = activeBundleComponents(look, group, target.bundle_id);
       if (
         remaining.size < 1 &&
@@ -976,12 +976,6 @@ export function checkOp(
     // 05 §6: a cashier may create a party, but not edit an existing one or set a limit.
     const isNew = !look.current.has(key(op.tbl, partyId));
     if (updater.role === 'cashier' && !isNew) throw new Reject('FORBIDDEN');
-    if (
-      updater.role !== 'owner' &&
-      row.hard_limit !== undefined &&
-      Number(row.hard_limit ?? 0) !== 0
-    )
-      throw new Reject('FORBIDDEN');
     if (updater.role === 'cashier' && isNew) {
       const defaultLimit = look.shop?.default_credit_limit ?? null;
       if (
@@ -1000,14 +994,13 @@ export function checkOp(
       throw new Reject('FORBIDDEN');
     if (op.tbl === 'customers' && row.hard_limit !== undefined) {
       const cur = look.current.get(key(op.tbl, partyId));
-      // Only an owner may change a hard limit; an unchanged value is fine.
-      if (
-        updater.role !== 'owner' &&
-        cur &&
-        cur.deleted_at === null &&
-        Number(row.hard_limit ?? 0) !== Number(cur.hard_limit ?? 0)
-      )
-        throw new Reject('FORBIDDEN');
+      // Only an owner may change a hard limit (or set one on a new customer); an
+      // unchanged value from the full row payload is fine.
+      const changed =
+        cur && cur.deleted_at === null
+          ? Number(row.hard_limit ?? 0) !== Number(cur.hard_limit ?? 0)
+          : Number(row.hard_limit ?? 0) !== 0;
+      if (updater.role !== 'owner' && changed) throw new Reject('FORBIDDEN');
     }
   }
 }

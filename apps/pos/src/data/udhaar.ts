@@ -996,6 +996,7 @@ export async function chaseList(
 export function chaseCsv(
   list: ChaseList,
   groupLabel: (key: ChaseGroupKey) => string,
+  timeZone = 'Asia/Karachi',
 ): string {
   const header = [
     'group',
@@ -1017,7 +1018,7 @@ export function chaseCsv(
             row.ageDays,
             row.lastPaymentAt === null
               ? ''
-              : new Date(row.lastPaymentAt).toISOString().slice(0, 10),
+              : businessDate(row.lastPaymentAt, timeZone),
           ]
             .map(csvCell)
             .join(','),

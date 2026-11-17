@@ -361,6 +361,7 @@
       "sku_taken": "SKU already used",
       "stock_invalid": "Stock is not a valid quantity for this unit",
       "too_many_rows": "More than {{max}} rows — split the file",
+      "bundle_row": "Bundles are managed on the bundle screen",
       "track_invalid": "Track stock must be yes or no",
       "unit_invalid": "Unknown unit (use pc, kg, m, l…)"
     },
@@ -483,6 +484,7 @@
     "close": "Close",
     "cost": "Avg cost",
     "in_stock": "{{qty}} in stock",
+    "items": "Items",
     "margin": "Margin",
     "matches": "Matching products",
     "not_found": "Not found",

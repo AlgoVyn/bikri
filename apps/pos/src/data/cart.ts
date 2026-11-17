@@ -123,9 +123,12 @@ export function addProduct(
   qtyMilli: number,
   method: CostMethod,
 ): Cart {
+  if (product.kind === 'bundle')
+    throw new Error('a bundle must be added through addBundle');
   const price = Number(product.price ?? 0);
   const index = cart.lines.findIndex(
     (l) =>
+      !l.bundle_group &&
       l.product_id === product.id &&
       !l.note &&
       l.unit_price === (l.list_price ?? l.unit_price) &&

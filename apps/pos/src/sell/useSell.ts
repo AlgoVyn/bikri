@@ -2,14 +2,19 @@ import type { Cart, MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useMemo } from 'react';
 import {
+  addBundle,
+  addProduct,
   type CartId,
   emptyCart,
   loadCarts,
   type ShopMoney,
   shopMoney,
 } from '../data/cart.ts';
-import type { ProductListRow } from '../data/catalog.ts';
-import { filterAndSortProducts } from '../data/catalog.ts';
+import {
+  filterAndSortProducts,
+  loadBundleRecipe,
+  type ProductListRow,
+} from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 
@@ -61,6 +66,34 @@ export function mutateCart(
   });
   chain = run.catch(() => undefined);
   return run;
+}
+
+/** Adds a product (or a whole bundle) to a cart; the Sell grid and Price check share it. */
+export async function addProductToCart(
+  id: CartId,
+  product: MasterRow,
+  qtyMilli: number,
+  method: 'avg' | 'last',
+): Promise<Cart> {
+  const db = getDb();
+  if (product.kind !== 'bundle')
+    return mutateCart(id, (cart) =>
+      addProduct(cart, product, qtyMilli, method),
+    );
+  const items = await loadBundleRecipe(db, product.id);
+  const products = await db.products.bulkGet(
+    items.map((row) => String(row.component_product_id)),
+  );
+  const recipe = items.flatMap((row, index) => {
+    const component = products[index];
+    return component && !component.deleted_at
+      ? [{ product: component, qty_milli: Number(row.qty_milli) }]
+      : [];
+  });
+  const bundles = Math.max(1, Math.floor(qtyMilli / 1000));
+  return mutateCart(id, (cart) =>
+    addBundle(cart, product, recipe, bundles, method),
+  );
 }
 
 /** Waits for queued cart writes (before hold, pay or tab switches). */

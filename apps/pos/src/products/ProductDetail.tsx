@@ -24,6 +24,7 @@ import {
   ComponentInUseError,
   componentCost,
   ledgerContext,
+  loadBundleRecipe,
   PRODUCT_HISTORY_PAGE,
   ProductInUseError,
   productDetail,
@@ -192,16 +193,13 @@ export function ProductDetailPage({
     try {
       if (bundle) {
         const db = getDb();
-        const itemRows = await db.bundle_items
-          .where('bundle_id')
-          .equals(id)
-          .toArray();
+        const itemRows = await loadBundleRecipe(db, id);
         const components = await db.products.bulkGet(
           itemRows.map((row) => String(row.component_product_id)),
         );
         const recipe = itemRows.flatMap((row, index) => {
           const product = components[index];
-          return product
+          return product && !product.deleted_at
             ? [
                 {
                   product,
@@ -531,7 +529,11 @@ export function ProductDetailPage({
           {totalQty > 0 ? (
             <p className="text-small text-text-muted">
               {t('products.last14_total', {
-                qty: qtyWithUnit(t, totalQty, unit),
+                qty: detail.bundle
+                  ? t('products.bundle_count', {
+                      count: Math.round(totalQty / 1000),
+                    })
+                  : qtyWithUnit(t, totalQty, unit),
                 amount: displayMoney(totalRevenue),
               })}
             </p>

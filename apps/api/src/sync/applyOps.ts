@@ -165,11 +165,20 @@ function planOp(
         existingInsert: true,
       };
     }
+    const insertCols = [...cols];
+    const insertValues = cols.map((c) => sqlValue(row[c]));
+    // `avg_cost` is server-managed, but a product with a catalogue cost and no stock
+    // movement must still start from that cost; otherwise every offline sale before the
+    // first costed movement is rejected and later profit uses zero (07 §7).
+    if (tbl === 'products' && !insertCols.includes('avg_cost')) {
+      insertCols.push('avg_cost');
+      insertValues.push(sqlValue(Number(row.last_cost ?? 0)));
+    }
     const stmts = [
       db.prepare(
-        `INSERT INTO ${tbl} (tenant_id, id${cols.map((c) => `, ${c}`).join('')}) VALUES (?1, ?2${cols.map((_, i) => `, ?${i + 3}`).join('')}) ON CONFLICT (tenant_id, id) DO NOTHING`,
+        `INSERT INTO ${tbl} (tenant_id, id${insertCols.map((c) => `, ${c}`).join('')}) VALUES (?1, ?2${insertCols.map((_, i) => `, ?${i + 3}`).join('')}) ON CONFLICT (tenant_id, id) DO NOTHING`,
         id,
-        ...cols.map((c) => sqlValue(row[c])),
+        ...insertValues,
       ),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
       appliedOp(db, op, deviceId, now, 'applied', null, false),
@@ -201,13 +210,19 @@ function planOp(
   // upsert
   const cur = look.current.get(key(tbl, id));
   if (!cur) {
+    const insertCols = [...cols];
+    const insertValues = cols.map((c) => sqlValue(row[c]));
+    if (tbl === 'products' && !insertCols.includes('avg_cost')) {
+      insertCols.push('avg_cost');
+      insertValues.push(sqlValue(Number(row.last_cost ?? 0)));
+    }
     return {
       op,
       stmts: [
         db.prepare(
-          `INSERT INTO ${tbl} (tenant_id, id${cols.map((c) => `, ${c}`).join('')}, rev) VALUES (?1, ?2${cols.map((_, i) => `, ?${i + 3}`).join('')}, 1) ON CONFLICT (tenant_id, id) DO NOTHING`,
+          `INSERT INTO ${tbl} (tenant_id, id${insertCols.map((c) => `, ${c}`).join('')}, rev) VALUES (?1, ?2${insertCols.map((_, i) => `, ?${i + 3}`).join('')}, 1) ON CONFLICT (tenant_id, id) DO NOTHING`,
           id,
-          ...cols.map((c) => sqlValue(row[c])),
+          ...insertValues,
         ),
         appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'upsert', deviceId, now, true),
@@ -400,6 +415,27 @@ function groupByTx(ops: PushOp[]): PushOp[][] {
 }
 
 /** Apply the product rows of a successfully planned transaction to the next group in order. */
+/** Apply the ledger rows of a successfully planned transaction to later balance checks. */
+function applyLedgerChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.tbl !== 'ledger_entries' || op.kind !== 'insert' || !op.row)
+      continue;
+    const type = op.row.party_type;
+    if (type !== 'customer' && type !== 'supplier') continue;
+    const id = String(op.row.party_id ?? '');
+    const amount = Number(op.row.amount ?? 0);
+    if (id === '' || !Number.isSafeInteger(amount)) continue;
+    // A replay is already reflected in the stored tenant row loaded by loadLookups.
+    if (look.existingLedger.has(key('ledger_entries', String(op.row.id ?? ''))))
+      continue;
+    const party = key(type, id);
+    look.partyBalances.set(
+      party,
+      (look.partyBalances.get(party) ?? 0) + amount,
+    );
+  }
+}
+
 function applyProductChanges(look: Lookups, ops: PushOp[]): void {
   for (const op of ops) {
     if (
@@ -411,7 +447,7 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
     const previous = look.products.get(op.row.id);
     look.products.set(op.row.id, {
       price: Number(op.row.price ?? previous?.price ?? 0),
-      avg_cost: previous?.avg_cost ?? 0,
+      avg_cost: previous?.avg_cost ?? Number(op.row.last_cost ?? 0),
       last_cost: Number(op.row.last_cost ?? previous?.last_cost ?? 0),
       // Keep the persisted tracking mode for an existing row: a tracking change in a
       // later transaction must not make an earlier sale look tracked.
@@ -575,8 +611,9 @@ export async function applyOps(
         continue;
       avg.set(op.row.id, {
         on_hand: 0,
-        // avg_cost is server-managed; never trust a client value.
-        avg_cost: 0,
+        // A product created with a catalogue cost starts from that cost until the
+        // first costed movement recomputes it.
+        avg_cost: Number(op.row.last_cost ?? 0),
         last_cost: Number(op.row.last_cost ?? 0),
         cost_changed_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
         pushed: true,
@@ -622,6 +659,7 @@ export async function applyOps(
         applyProductChanges(look, ops);
         applyStaffChanges(look, ops);
         applyShopChanges(look, ops);
+        applyLedgerChanges(look, ops);
         for (const [id, value] of groupAvg) avg.set(id, value);
       } catch (error) {
         if (!(error instanceof Reject)) throw error;

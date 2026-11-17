@@ -314,6 +314,7 @@ export async function loadLookups(
     | { saleLines: true }
     | { saleMoved: true }
     | { bundleRows: true }
+    | { bundleDeleted: true }
     | { ledgerExists: string }
   > = [];
   for (const [tbl, ids] of byTable) {
@@ -447,6 +448,12 @@ export async function loadLookups(
     { bundleRows: true },
   );
   chunked(
+    componentCandidates,
+    (p) =>
+      `SELECT p.id FROM products p JOIN bundle_items bi ON bi.tenant_id = p.tenant_id AND bi.bundle_id = p.id WHERE p.tenant_id = ?1 AND bi.tenant_id = ?1 AND bi.deleted_at IS NULL AND p.deleted_at IS NOT NULL AND bi.component_product_id IN (${p})`,
+    { bundleDeleted: true },
+  );
+  chunked(
     saleIds,
     (p) =>
       `SELECT ref_id AS sale_id, product_id, SUM(-qty_delta_milli) AS qty FROM stock_movements WHERE tenant_id = ?1 AND reason_code = 'sale' AND ref_id IN (${p}) AND qty_delta_milli < 0 GROUP BY ref_id, product_id`,
@@ -575,6 +582,7 @@ export async function loadLookups(
     bundleRecipes: new Map(),
     bundleItemById: new Map(),
     bundleOfComponent: new Map(),
+    bundleDeleted: new Set(),
     saleMoved: new Map(),
     customers: new Set(),
     suppliers: new Set(),
@@ -768,6 +776,8 @@ export async function loadLookups(
           updated_at: Number(r.updated_at ?? 0),
           kind: String(r.kind ?? 'simple'),
         });
+      } else if ('bundleDeleted' in k) {
+        look.bundleDeleted.add(String(r.id));
       } else if ('bundleRows' in k) {
         const bundleId = String(r.bundle_id);
         look.bundleRecipes.set(bundleId, [
