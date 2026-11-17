@@ -45,7 +45,12 @@ async function compute(request: Request): Promise<Response> {
     const previous =
       previousRange === undefined
         ? undefined
-        : (await reportBundle(db, previousRange, options)).summary;
+        : (
+            await reportBundle(db, previousRange, {
+              ...options,
+              summaryOnly: true,
+            })
+          ).summary;
     return { id, bundle, previous };
   } catch (error) {
     return {

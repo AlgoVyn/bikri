@@ -21,6 +21,7 @@ import {
   type ReportOptions,
   type ReportSummary,
   reportBundle,
+  slowMoversReport,
 } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import {
@@ -180,8 +181,13 @@ export function ReportsPage() {
   const [deviceId, setDeviceId] = useState('');
   const [tab, setTab] = useState<ReportTab>('summary');
   const workerRef = useRef<Worker | null>(null);
-  const [workerReady, setWorkerReady] = useState(false);
+  // 'starting' must not fall back to the main thread: that computed the whole bundle
+  // on the counter and then again in the worker, doubling the first Reports visit.
+  const [workerState, setWorkerState] = useState<
+    'starting' | 'ready' | 'unavailable'
+  >('starting');
   const requestId = useRef(0);
+  const firstRequest = useRef(true);
   const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
   const timeZone = useShopTimeZone();
   // Rerun the live query when the business date passes midnight on an idle screen.
@@ -197,18 +203,20 @@ export function ReportsPage() {
         type: 'module',
       });
       workerRef.current = worker;
-      setWorkerReady(true);
+      setWorkerState('ready');
       return () => {
         worker.terminate();
         workerRef.current = null;
       };
     } catch {
       // A browser without module workers falls back to the main thread below.
+      setWorkerState('unavailable');
       return undefined;
     }
   }, []);
 
   const data = useLiveQuery(async () => {
+    if (workerState === 'starting') return undefined;
     const db = getDb();
     const now = Date.now();
     const today = businessDate(now, timeZone);
@@ -219,7 +227,14 @@ export function ReportsPage() {
       ...range,
       deviceId: deviceId || undefined,
     };
-    const options: ReportOptions = { now, today, timeZone };
+    // The slow-mover walk scans every movement in the shop; the Products tab loads it
+    // separately so the Summary and other tabs do not pay for it.
+    const options: ReportOptions = {
+      now,
+      today,
+      timeZone,
+      slowMovers: false,
+    };
     const span = daysBetween(range.from, range.to) + 1;
     const previousRange: ReportRange | undefined =
       span <= 90
@@ -231,31 +246,41 @@ export function ReportsPage() {
           }
         : undefined;
     // Dexie liveQuery tracks these reads; the heavy aggregation itself runs in the worker.
+    // One row from each table registers the dependency and is far cheaper than COUNT(*)
+    // on a shop with tens of thousands of sales and movements.
     await Promise.all([
-      db.sales.count(),
-      db.payments.count(),
-      db.refunds.count(),
-      db.sale_voids.count(),
-      db.expenses.count(),
-      db.day_closes.count(),
-      db.stock_movements.count(),
-      db.ledger_entries.count(),
-      db.products.count(),
-      db.customers.count(),
+      db.sales.toCollection().first(),
+      db.payments.toCollection().first(),
+      db.refunds.toCollection().first(),
+      db.sale_voids.toCollection().first(),
+      db.expenses.toCollection().first(),
+      db.day_closes.toCollection().first(),
+      db.stock_movements.toCollection().first(),
+      db.ledger_entries.toCollection().first(),
+      db.products.toCollection().first(),
+      db.customers.toCollection().first(),
     ]);
     // Coalesce a burst of invalidations (a pull page, a sale, a settings write) before
     // asking the worker. The worker keeps only the latest pending request, so a 200-page
-    // pull can no longer queue 200 full bundles.
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // pull can no longer queue 200 full bundles. The first open skips the wait: there is
+    // no burst yet, and it is the one the user is waiting for.
+    if (!firstRequest.current)
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    firstRequest.current = false;
     const worker = workerRef.current;
     let bundle: ReportBundle;
     let previous: ReportSummary | undefined;
-    if (worker === null) {
+    if (worker === null || workerState === 'unavailable') {
       bundle = await reportBundle(db, reportRangeValue, options);
       previous =
         previousRange === undefined
           ? undefined
-          : (await reportBundle(db, previousRange, options)).summary;
+          : (
+              await reportBundle(db, previousRange, {
+                ...options,
+                summaryOnly: true,
+              })
+            ).summary;
     } else {
       requestId.current += 1;
       const id = requestId.current;
@@ -307,7 +332,7 @@ export function ReportsPage() {
     custom.to,
     deviceId,
     limited,
-    workerReady,
+    workerState,
     timeZone,
     businessToday,
   ]);
@@ -520,7 +545,12 @@ export function ReportsPage() {
           />
         ) : null}
         {tab === 'products' ? (
-          <ProductsTab bundle={bundle} cost={cost} lang={lang} />
+          <ProductsTab
+            bundle={bundle}
+            cost={cost}
+            lang={lang}
+            today={data.today}
+          />
         ) : null}
         {tab === 'stock' ? (
           <StockTab bundle={bundle} cost={cost} lang={lang} />
@@ -930,13 +960,21 @@ function ProductsTab({
   bundle,
   cost,
   lang,
+  today,
 }: {
   bundle: ReportBundle;
   cost: boolean;
   lang: string;
+  today: string;
 }) {
   const { t } = useTranslation();
   const products = bundle.products;
+  // Only this tab needs the slow-mover walk over every movement, so it loads after the
+  // tables above are already on screen.
+  const slowMovers = useLiveQuery(
+    () => slowMoversReport(getDb(), today),
+    [today],
+  );
   const name = (row: { name: string; nameUr?: string }) =>
     groupName({ name: row.name, nameUr: row.nameUr ?? '' }, lang);
   return (
@@ -1034,14 +1072,18 @@ function ProductsTab({
           t('office.reports.on_hand'),
           t('office.reports.last_sale'),
         ]}
-        rows={products.slowMovers.map((row) => [
+        rows={(slowMovers ?? []).map((row) => [
           String(row.product.name_en),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
           row.lastSale
             ? longDate(row.lastSale, lang)
             : t('office.reports.never_sold'),
         ])}
-        empty={t('office.reports.no_slow_movers')}
+        empty={
+          slowMovers === undefined
+            ? t('office.loading')
+            : t('office.reports.no_slow_movers')
+        }
       />
     </>
   );
