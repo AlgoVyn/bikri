@@ -20,6 +20,7 @@ import {
   SalesIcon,
   SellIcon,
 } from '../components/icons.tsx';
+import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PrivacyProvider, usePrivacyActive } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -498,7 +499,8 @@ export function HomePage() {
                   showCash={can('dayclose.view_expected')}
                   showProfit={can('cost.view')}
                   canClose={can('dayclose.create') && !readOnly}
-                  timeText={timeText}
+                  today={today}
+                  timeZone={timeZone}
                   hidden={todayHidden}
                   onToggleHidden={toggleTodayHidden}
                 />
@@ -847,7 +849,8 @@ function RegisterCard({
   showCash,
   showProfit,
   canClose,
-  timeText,
+  today,
+  timeZone,
   hidden,
   onToggleHidden,
 }: {
@@ -856,20 +859,76 @@ function RegisterCard({
   showCash: boolean;
   showProfit: boolean;
   canClose: boolean;
-  timeText: (at: number) => string;
+  today: string;
+  timeZone: string;
   hidden: boolean;
   onToggleHidden: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const globalPrivacy = usePrivacyActive();
-  const last = data.recent[0]?.sale.created_at;
+  const lastSale = data.recent[0]?.sale;
+  const lastWhen = lastSale
+    ? formatTimestamp(
+        Number(lastSale.created_at),
+        i18n.language,
+        timeZone,
+        String(lastSale.business_date) === today ? 'time' : 'datetimeShort',
+      )
+    : null;
+  const metrics: {
+    id: string;
+    label: string;
+    value: React.ReactNode;
+    hint?: string;
+    testId: string;
+  }[] = [
+    ...(showCash
+      ? [
+          {
+            id: 'cash',
+            label: t('home.cash_drawer'),
+            value: <MoneyText paisa={cash} />,
+            hint: t('home.cash_hint'),
+            testId: 'today-cash',
+          },
+        ]
+      : []),
+    ...(showProfit
+      ? [
+          {
+            id: 'profit',
+            label: t('home.profit_today'),
+            value: <MoneyText paisa={data.today.grossProfit} />,
+            testId: 'today-profit',
+          },
+        ]
+      : []),
+    {
+      id: 'udhaar_given',
+      label: t('home.udhaar_given'),
+      value: <MoneyText paisa={data.today.udhaarGiven} />,
+      testId: 'today-udhaar-given',
+    },
+    {
+      id: 'udhaar_received',
+      label: t('home.udhaar_received'),
+      value: <MoneyText paisa={data.today.udhaarReceived} />,
+      testId: 'today-udhaar-received',
+    },
+  ];
+  const metricCols =
+    metrics.length >= 4
+      ? 'xl:grid-cols-4'
+      : metrics.length === 3
+        ? 'xl:grid-cols-3'
+        : 'xl:grid-cols-2';
   return (
     <section
       aria-labelledby="register-heading"
       className="rounded-card border border-border bg-surface p-4 shadow-card"
     >
       <div className="flex items-center gap-2">
-        <h2 id="register-heading" className={sectionLabel(i18n.language)}>
+        <h2 id="register-heading" className="text-title font-semibold">
           {t('home.todays_register')}
         </h2>
         <button
@@ -887,25 +946,19 @@ function RegisterCard({
             <EyeIcon className="size-5" />
           )}
         </button>
-        {last ? (
+        {lastWhen ? (
           <p className="ms-auto min-w-0 truncate text-small text-text-muted">
-            {t('home.last_bill', {
-              time: timeText(Number(last)),
-            })}
+            {t('home.last_bill', { time: lastWhen })}
           </p>
         ) : null}
       </div>
       <PrivacyProvider active={globalPrivacy || hidden}>
         <div className="mt-4" data-testid="today-sold">
-          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <p className="text-small text-text-muted">
-                {t('home.sold_today')}
-              </p>
-              <p className="mt-1 text-total font-semibold tabular-nums leading-none">
-                <MoneyText paisa={data.today.sold} />
-              </p>
-            </div>
+          <p className="text-small text-text-muted">{t('home.sold_today')}</p>
+          <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-2">
+            <p className="text-figure font-semibold tabular-nums leading-none">
+              <MoneyText paisa={data.today.sold} />
+            </p>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
               <span aria-hidden="true" className="[&>svg]:size-3.5">
                 <SalesIcon />
@@ -914,61 +967,33 @@ function RegisterCard({
             </span>
           </div>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-border pt-3">
-          {showCash ? (
-            <div data-testid="today-cash">
-              <dt className="text-small text-text-muted">
-                {t('home.cash_drawer')}
-              </dt>
-              <dd className="mt-0.5 text-body font-semibold">
-                <MoneyText paisa={cash} />
-              </dd>
-            </div>
-          ) : null}
-          {showProfit ? (
-            <div data-testid="today-profit">
-              <dt className="text-small text-text-muted">
-                {t('home.profit_today')}
-              </dt>
-              <dd className="mt-0.5 text-body font-semibold">
-                <MoneyText paisa={data.today.grossProfit} />
-              </dd>
-            </div>
-          ) : null}
-          <div data-testid="today-udhaar" className="col-span-2">
-            <dt className="text-small text-text-muted">
-              {t('home.udhaar_today')}
-            </dt>
-            <dd className="mt-0.5 flex flex-col gap-1 text-body font-medium">
-              <span className="flex items-baseline justify-between gap-3">
-                <span>{t('home.udhaar_given')}</span>
-                <span
-                  className="font-semibold"
-                  data-testid="today-udhaar-given"
-                >
-                  <MoneyText paisa={data.today.udhaarGiven} />
-                </span>
-              </span>
-              <span className="flex items-baseline justify-between gap-3">
-                <span>{t('home.udhaar_received')}</span>
-                <span
-                  className="font-semibold"
-                  data-testid="today-udhaar-received"
-                >
-                  <MoneyText paisa={data.today.udhaarReceived} />
-                </span>
-              </span>
-            </dd>
-          </div>
-        </dl>
+        <div
+          className={`mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 ${metricCols}`}
+        >
+          {metrics.map((metric) => (
+            <Metric
+              key={metric.id}
+              label={metric.label}
+              value={metric.value}
+              hint={
+                metric.hint ? (
+                  <span className="mt-0.5 block text-caption text-text-muted">
+                    {metric.hint}
+                  </span>
+                ) : undefined
+              }
+              testId={metric.testId}
+            />
+          ))}
+        </div>
       </PrivacyProvider>
       {canClose ? (
-        <div className="mt-3 flex justify-end border-t border-border pt-1">
+        <div className="-mx-4 -mb-4 mt-4 border-t border-border">
           <Link
             to="/day-close"
-            className="inline-flex min-h-11 items-center gap-1 text-small font-medium text-primary"
+            className="flex min-h-11 items-center justify-between rounded-b-card px-4 text-small font-medium text-primary transition-colors duration-150 hover:bg-surface-2"
           >
-            {t('home.day_close')}
+            <span>{t('home.day_close')}</span>
             <ChevronRightIcon className="size-4 rtl:rotate-180" />
           </Link>
         </div>
