@@ -579,10 +579,10 @@ describe('bundle product CRUD', () => {
         .count(),
     ).toBe(2);
     let sold = await soldByProduct(db, 30, NOW);
-    expect(sold.get(bundle.id)).toBe(1000);
+    expect(sold.get(bundle.id)).toBe(2000);
     expect(sold.get(first.id)).toBe(2000);
     let detail = await productDetail(db, bundle.id, NOW);
-    expect(detail?.last14.at(-1)?.qty).toBe(1000);
+    expect(detail?.last14.at(-1)?.qty).toBe(2000);
     expect(detail?.bundle?.items).toHaveLength(2);
 
     const refund = (id: string, qtyMilli: number, at: number) =>

@@ -307,15 +307,9 @@ export async function soldByProduct(
   const saleIds = new Set(liveSales.map((sale) => String(sale.id)));
   // The line's own business date (D-228) bounds this to the 30-day window. The old
   // sale-id list crossed 100 keys on a busy day and scanned every line ever written.
-  // A bundle counts once per `bundle_group`; its components are also real product sales.
+  // A bundle group contributes its bundle_qty (not one per group); its components are
+  // also real product sales.
   const bundleGroups = new Set<string>();
-  const bundleGroupLines = new Map<
-    string,
-    {
-      bundleId: string;
-      lines: { id: string; qty_milli: number }[];
-    }
-  >();
   for (const line of await db.sale_lines
     .where('business_date')
     .between(from, to, true, true)
@@ -323,19 +317,14 @@ export async function soldByProduct(
     if (!saleIds.has(String(line.sale_id))) continue;
     if (line.bundle_id && line.bundle_group) {
       const key = `${String(line.sale_id)}|${String(line.bundle_group)}`;
-      const group = bundleGroupLines.get(key) ?? {
-        bundleId: String(line.bundle_id),
-        lines: [],
-      };
-      group.lines.push({
-        id: String(line.id),
-        qty_milli: Number(line.qty_milli),
-      });
-      bundleGroupLines.set(key, group);
       if (!bundleGroups.has(key)) {
         bundleGroups.add(key);
+        const bundleQty = Number(line.bundle_qty);
+        const bundles =
+          Number.isSafeInteger(bundleQty) && bundleQty > 0 ? bundleQty : 1;
         // Sold quantities are milli-units everywhere; one bundle = 1000.
-        sold.set(group.bundleId, (sold.get(group.bundleId) ?? 0) + 1000);
+        const bundleId = String(line.bundle_id);
+        sold.set(bundleId, (sold.get(bundleId) ?? 0) + bundles * 1000);
       }
     }
     if (!line.product_id) continue;
@@ -363,37 +352,34 @@ export async function soldByProduct(
         .filter((line): line is SyncedRow => line !== undefined)
         .map((line) => [String(line.id), line]),
     );
+    const refundedBundleGroups = new Set<string>();
     for (const line of refundLines) {
       const saleLine = saleLines.get(String(line.sale_line_id));
-      if (!saleLine?.product_id) continue;
+      if (!saleLine) continue;
+      // A bundle refund has one line per component; subtract the returned whole
+      // bundles once per refund group, not once per component line.
+      if (saleLine.bundle_id && saleLine.bundle_group) {
+        const groupKey = `${String(line.refund_id)}|${String(saleLine.bundle_group)}`;
+        if (!refundedBundleGroups.has(groupKey)) {
+          refundedBundleGroups.add(groupKey);
+          const perBundle = Number(saleLine.bundle_component_qty_milli);
+          const qty = Number(line.qty_milli);
+          const bundles =
+            perBundle > 0 &&
+            Number.isSafeInteger(qty) &&
+            qty > 0 &&
+            qty % perBundle === 0
+              ? qty / perBundle
+              : 0;
+          if (bundles > 0) {
+            const bundleId = String(saleLine.bundle_id);
+            sold.set(bundleId, (sold.get(bundleId) ?? 0) - bundles * 1000);
+          }
+        }
+      }
+      if (!saleLine.product_id) continue;
       const id = String(saleLine.product_id);
       sold.set(id, (sold.get(id) ?? 0) - Number(line.qty_milli));
-    }
-  }
-  // A fully returned bundle group is no longer a bundle sale, even when the sale
-  // itself was before this window. Refund dates can fall outside the window.
-  if (bundleGroupLines.size > 0) {
-    const lineIds = [...bundleGroupLines.values()].flatMap((group) =>
-      group.lines.map((line) => line.id),
-    );
-    const allRefundLines = await rowsForIds(
-      db.refund_lines,
-      'sale_line_id',
-      (row: SyncedRow) => String(row.sale_line_id),
-      lineIds,
-    );
-    const refunded = new Map<string, number>();
-    for (const line of allRefundLines) {
-      const id = String(line.sale_line_id);
-      refunded.set(id, (refunded.get(id) ?? 0) + Number(line.qty_milli));
-    }
-    for (const group of bundleGroupLines.values()) {
-      if (
-        group.lines.every(
-          (line) => (refunded.get(line.id) ?? 0) >= line.qty_milli,
-        )
-      )
-        sold.set(group.bundleId, (sold.get(group.bundleId) ?? 0) - 1000);
     }
   }
   return sold;
@@ -830,13 +816,10 @@ export async function productDetail(
     }
     const groups = new Map<
       string,
-      {
-        saleId: string;
-        day: string;
-        lines: { id: string; qty_milli: number; revenue: number }[];
-        revenue: number;
-      }
+      { lines: { id: string; qty_milli: number; revenue: number }[] }
     >();
+    const lineToGroup = new Map<string, string>();
+    const lineRows = new Map<string, SyncedRow>();
     const bundleLines = (
       await db.sale_lines.where('bundle_id').equals(id).toArray()
     ).filter(
@@ -851,22 +834,24 @@ export async function productDetail(
       const day = dayByDate.get(String(sale.business_date));
       if (!day) continue;
       const key = `${String(line.sale_id)}|${String(line.bundle_group)}`;
+      const bundleQty = Number(line.bundle_qty);
+      const bundles =
+        Number.isSafeInteger(bundleQty) && bundleQty > 0 ? bundleQty : 1;
+      let group = groups.get(key);
+      if (!group) {
+        group = { lines: [] };
+        groups.set(key, group);
+        day.qty += bundles * 1000;
+      }
       const revenue = lineRevenue(line, sale.tax_inclusive === 1);
-      const group = groups.get(key) ?? {
-        saleId: String(sale.id),
-        day: String(sale.business_date),
-        lines: [],
-        revenue: 0,
-      };
-      if (group.lines.length === 0) day.qty += 1000;
       group.lines.push({
         id: String(line.id),
         qty_milli: Number(line.qty_milli),
         revenue,
       });
-      group.revenue += revenue;
-      groups.set(key, group);
       day.revenue += revenue;
+      lineToGroup.set(String(line.id), key);
+      lineRows.set(String(line.id), line);
     }
     if (groups.size > 0) {
       const lineIds = [...groups.values()].flatMap((group) =>
@@ -890,35 +875,33 @@ export async function productDetail(
             .filter((refund): refund is SyncedRow => refund !== undefined)
             .map((refund) => [String(refund.id), refund]),
         );
+        // Quantity: subtract the returned whole bundles once per refund group on the
+        // refund's own business date, not once per component line.
+        const refundedGroups = new Set<string>();
+        for (const refundLine of bundleRefundLines) {
+          const original = lineRows.get(String(refundLine.sale_line_id));
+          const refund = refundRows.get(String(refundLine.refund_id));
+          if (!original || !refund) continue;
+          const day = dayByDate.get(String(refund.business_date));
+          if (!day) continue;
+          const groupKey = lineToGroup.get(String(original.id));
+          if (!groupKey) continue;
+          const seenKey = `${String(refund.id)}|${groupKey}`;
+          if (refundedGroups.has(seenKey)) continue;
+          refundedGroups.add(seenKey);
+          const perBundle = Number(original.bundle_component_qty_milli);
+          const qty = Number(refundLine.qty_milli);
+          if (perBundle > 0 && qty > 0 && qty % perBundle === 0)
+            day.qty -= (qty / perBundle) * 1000;
+        }
+        // Revenue: the cumulative ex-tax share of each component line, on the refund's
+        // own business date.
         const byLine = new Map<string, SyncedRow[]>();
         for (const refundLine of bundleRefundLines) {
           const key = String(refundLine.sale_line_id);
           byLine.set(key, [...(byLine.get(key) ?? []), refundLine]);
         }
-        const fullyRefunded = new Set<string>();
-        for (const [key, group] of groups) {
-          if (
-            group.lines.every(
-              (line) =>
-                (byLine.get(line.id) ?? []).reduce(
-                  (sum, row) => sum + Number(row.qty_milli),
-                  0,
-                ) >= line.qty_milli,
-            )
-          )
-            fullyRefunded.add(key);
-        }
-        // Fully returned groups disappear from the sale day; partial returns reduce
-        // revenue on the refund's own business date.
-        for (const [key, group] of groups) {
-          if (fullyRefunded.has(key)) {
-            const day = dayByDate.get(group.day);
-            if (day) {
-              day.qty -= 1000;
-              day.revenue -= group.revenue;
-            }
-            continue;
-          }
+        for (const group of groups.values()) {
           for (const line of group.lines) {
             const refundsForLine = (byLine.get(line.id) ?? []).sort(
               (a, b) =>
