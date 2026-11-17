@@ -8,9 +8,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Sync keeps running while the tab is hidden; only a 30 s grace after the sale-complete **Share** opens WhatsApp defers requests, and `pagehide` flushes pending ops (M1, D-238).
 - `/bikri/icons/*` and `/bikri/fonts/*` revalidate daily instead of caching for a year; only content-hashed `/assets/*` stays immutable (M2, D-237).
 - Sell tiles wrap the price row and grow to 184 px so a 5-digit price and the stock pill no longer collide; an empty bill's primary action reads **Add items**; Products shows a muted dash instead of "No category" when the shop has none; remark links and other small targets meet 44 px; a zero-budget shop shows **Writes blocked** (M3, L1–L5, D-239).
-- Reports and Sales clamp custom ranges to the shop's first business day and today, warn above two years, and can no longer build hundreds of thousands of day buckets from a mistyped year (M4, D-240).
+- Reports and Sales clamp custom ranges to the shop's first business day and today, warn above two years, and can no longer build hundreds of thousands of day buckets from a mistyped year; the report worker aggregates one calendar month at a time (M4, D-240).
 - The Reports summary opens with four KPI cards and hides the hourly chart below three active hours; refunds appear once; the desktop Home puts the Today register first and the New sale hero in the side column (M7, D-241).
-- The push checker and server-row modules are split by domain (`sync/checks/*`, `applyOpsServerRows.ts`); the public entry points are unchanged (M5, D-244).
+- The push checker, server-row and lookup modules are split by domain (`sync/checks/*`, `applyOpsServerRows.ts`, `applyOpsLookups.ts`); the public entry points are unchanged (M5, D-244).
 - The operator console shows the active daily-budget sum and flags it above 70,000 rows/day, matching the documented Workers Paid trigger (M6, D-245).
 - Push rejects over-long short-text fields (sale remarks 120 characters) and uploads must match their image magic bytes; owner sign-in binds `SIGNIN.tries`; `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 7; D-216 is renumbered and `docs:check` rejects duplicate decision IDs (L6–L10).
 

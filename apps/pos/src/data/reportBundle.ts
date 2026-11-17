@@ -7,7 +7,11 @@ import {
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
-import { clampReportRange, firstBusinessDay } from './reportRange.ts';
+import {
+  clampReportRange,
+  firstBusinessDay,
+  monthChunks,
+} from './reportRange.ts';
 import { lineRevenue, type ReportRange } from './reports.ts';
 
 const DAY = 86_400_000;
@@ -398,199 +402,224 @@ export async function reportBundle(
   const onBusinessDay = (at: unknown, business: unknown) =>
     !singleDay || dayFormat.format(n(at)) === String(business);
 
-  const sales = (
-    await db.sales
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((sale) => inRange(sale, range) && sale.status !== 'void');
-  const saleById = new Map(sales.map((sale) => [sale.id, sale]));
-  // Read the lines of the selected business days through the V7 date index.
-  // Joining by `sale_id` with `byAnyOf` above 200 bills used to scan every
-  // sale line the shop had ever written (D-231).
-  const saleLines = (
-    await db.sale_lines
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((line) => saleById.has(String(line.sale_id)));
-  const linesBySale = new Map<string, SyncedRow[]>();
-  for (const line of saleLines) {
-    const key = String(line.sale_id);
-    const list = linesBySale.get(key) ?? [];
-    list.push(line);
-    linesBySale.set(key, list);
-  }
-
-  const refunds = (
-    await db.refunds
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((refund) => inRange(refund, range));
-  const refundById = new Map(refunds.map((refund) => [refund.id, refund]));
-  const refundIds = refunds.map((refund) => refund.id);
-  const refundLines = await byAnyOf(db.refund_lines, 'refund_id', refundIds);
-  const touchedLineIds = unique(
-    refundLines.map((line) => String(line.sale_line_id)),
-  );
-  const relatedRefundLines = await byAnyOf(
-    db.refund_lines,
-    'sale_line_id',
-    touchedLineIds,
-  );
-  const originalLines = await byIds(db.sale_lines, touchedLineIds);
-  const originalSaleIds = unique(
-    [...originalLines.values()].map((line) => String(line.sale_id)),
-  ).filter((id) => !saleById.has(id));
-  const originalSales = await byIds(db.sales, originalSaleIds);
-  const extraRefundIds = unique(
-    relatedRefundLines.map((line) => String(line.refund_id)),
-  ).filter((id) => !refundById.has(id));
-  for (const [id, refund] of await byIds(db.refunds, extraRefundIds))
-    refundById.set(id, refund);
-
+  const productAgg = new Map<string, ProductAgg>();
+  const staffAgg = new Map<string, StaffReportRow>();
+  const expenseTotals = new Map<string, number>();
   let revenue = 0;
   let refundCount = 0;
   let refunded = 0;
-  const productAgg = new Map<string, ProductAgg>();
-  for (const sale of sales) {
-    const day = dayMap.get(String(sale.business_date));
-    if (!day) continue;
-    day.sold += n(sale.total);
-    day.bills += 1;
-    day.tax += n(sale.tax);
-    const hour = onBusinessDay(sale.created_at, sale.business_date)
-      ? hourly[hourOf(sale.created_at)]
-      : undefined;
-    if (hour) {
-      hour.sold += n(sale.total);
-      hour.bills += 1;
-    }
-    const udhaar = n(sale.udhaar_amount);
-    day.udhaarGiven += udhaar;
-    day.mix.udhaar += udhaar;
-    const taxInclusive = sale.tax_inclusive === 1;
-    for (const line of linesBySale.get(sale.id) ?? []) {
-      const lineRevenueValue = lineRevenue(line, taxInclusive);
-      const lineCost = mulDivRound(
-        n(line.qty_milli),
-        n(line.unit_cost_snapshot),
-        1000,
-      );
-      day.grossProfit += lineRevenueValue - lineCost;
-      revenue += lineRevenueValue;
-      addProductLine(
-        productAgg,
-        line,
-        n(line.qty_milli),
-        lineRevenueValue,
-        lineCost,
-      );
-    }
-  }
 
-  // Refunds count on their own business date; profit and tax reverse with the cumulative
-  // per-line pattern so repeated partial refunds never drift (07 §6, §9).
-  const allRefundLinesBySaleLine = new Map<string, SyncedRow[]>();
-  for (const line of relatedRefundLines) {
-    const key = String(line.sale_line_id);
-    const list = allRefundLinesBySaleLine.get(key) ?? [];
-    list.push(line);
-    allRefundLinesBySaleLine.set(key, list);
-  }
-  for (const refund of refunds) {
-    const day = dayMap.get(String(refund.business_date));
-    if (!day) continue;
-    const money = n(refund.amount);
-    const khata = n(refund.udhaar_part);
-    day.sold -= money + khata;
-    const refundHour = onBusinessDay(refund.created_at, refund.business_date)
-      ? hourly[hourOf(refund.created_at)]
-      : undefined;
-    if (refundHour) refundHour.sold -= money + khata;
-    day.udhaarGiven -= khata;
-    day.mix.udhaar -= khata;
-    addMix(day.mix, String(refund.method ?? ''), -money);
-    refundCount += 1;
-    refunded += money + khata;
-  }
-  for (const [lineId, refundLinesForLine] of allRefundLinesBySaleLine) {
-    const line = originalLines.get(lineId);
-    if (!line) continue;
-    const sale =
-      saleById.get(String(line.sale_id)) ??
-      originalSales.get(String(line.sale_id));
-    if (!sale) continue;
-    const taxInclusive = sale.tax_inclusive === 1;
-    const lineRevenueValue = lineRevenue(line, taxInclusive);
-    const soldQty = n(line.qty_milli);
-    let previous = 0;
-    for (const refundLine of [...refundLinesForLine].sort(compareLedger)) {
-      const refund = refundById.get(String(refundLine.refund_id));
-      const qty = n(refundLine.qty_milli);
-      if (refund && inRange(refund, range)) {
+  // One calendar month at a time: a multi-year report must not keep every sale, line,
+  // payment and refund in memory at once (review M4).
+  for (const chunk of monthChunks(range.from, range.to)) {
+    const sales = (
+      await db.sales
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((sale) => inRange(sale, range) && sale.status !== 'void');
+    const saleById = new Map(sales.map((sale) => [sale.id, sale]));
+    const saleLines = (
+      await db.sale_lines
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((line) => saleById.has(String(line.sale_id)));
+    const linesBySale = new Map<string, SyncedRow[]>();
+    for (const line of saleLines) {
+      const key = String(line.sale_id);
+      const list = linesBySale.get(key) ?? [];
+      list.push(line);
+      linesBySale.set(key, list);
+    }
+
+    for (const sale of sales) {
+      const day = dayMap.get(String(sale.business_date));
+      if (!day) continue;
+      day.sold += n(sale.total);
+      day.bills += 1;
+      day.tax += n(sale.tax);
+      const hour = onBusinessDay(sale.created_at, sale.business_date)
+        ? hourly[hourOf(sale.created_at)]
+        : undefined;
+      if (hour) {
+        hour.sold += n(sale.total);
+        hour.bills += 1;
+      }
+      const udhaar = n(sale.udhaar_amount);
+      day.udhaarGiven += udhaar;
+      day.mix.udhaar += udhaar;
+      const staff = staffRowFor(staffAgg, String(sale.staff_id));
+      staff.bills += 1;
+      staff.sold += n(sale.total);
+      staff.discounts +=
+        n(sale.item_discount_total) +
+        n(sale.bill_discount) +
+        n(sale.bundle_discount_total);
+      const taxInclusive = sale.tax_inclusive === 1;
+      for (const line of linesBySale.get(sale.id) ?? []) {
+        const lineRevenueValue = lineRevenue(line, taxInclusive);
+        const lineCost = mulDivRound(
+          n(line.qty_milli),
+          n(line.unit_cost_snapshot),
+          1000,
+        );
+        day.grossProfit += lineRevenueValue - lineCost;
+        revenue += lineRevenueValue;
+        addProductLine(
+          productAgg,
+          line,
+          n(line.qty_milli),
+          lineRevenueValue,
+          lineCost,
+        );
+      }
+    }
+
+    const refunds = (
+      await db.refunds
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((refund) => inRange(refund, range));
+    if (refunds.length > 0) {
+      const refundById = new Map(refunds.map((refund) => [refund.id, refund]));
+      const refundIds = new Set(refunds.map((refund) => String(refund.id)));
+      const refundLines = await byAnyOf(
+        db.refund_lines,
+        'refund_id',
+        refunds.map((refund) => refund.id),
+      );
+      const touchedLineIds = unique(
+        refundLines.map((line) => String(line.sale_line_id)),
+      );
+      const relatedRefundLines = await byAnyOf(
+        db.refund_lines,
+        'sale_line_id',
+        touchedLineIds,
+      );
+      const originalLines = await byIds(db.sale_lines, touchedLineIds);
+      const originalSaleIds = unique(
+        [...originalLines.values()].map((line) => String(line.sale_id)),
+      ).filter((id) => !saleById.has(id));
+      const originalSales = await byIds(db.sales, originalSaleIds);
+
+      for (const refund of refunds) {
         const day = dayMap.get(String(refund.business_date));
-        if (day) {
-          const returnedRevenue = refundedRevenue(
-            lineRevenueValue,
-            soldQty,
-            previous,
-            qty,
-          );
-          const returnedCost = refundedCost(
-            n(line.unit_cost_snapshot),
-            previous,
-            qty,
-          );
-          day.grossProfit -= returnedRevenue - returnedCost;
-          day.tax -= refundedTax(n(line.tax_alloc), soldQty, previous, qty);
-          revenue -= returnedRevenue;
-          addProductLine(
-            productAgg,
-            line,
-            -qty,
-            -returnedRevenue,
-            -returnedCost,
-          );
+        if (!day) continue;
+        const money = n(refund.amount);
+        const khata = n(refund.udhaar_part);
+        day.sold -= money + khata;
+        const refundHour = onBusinessDay(
+          refund.created_at,
+          refund.business_date,
+        )
+          ? hourly[hourOf(refund.created_at)]
+          : undefined;
+        if (refundHour) refundHour.sold -= money + khata;
+        day.udhaarGiven -= khata;
+        day.mix.udhaar -= khata;
+        addMix(day.mix, String(refund.method ?? ''), -money);
+        refundCount += 1;
+        refunded += money + khata;
+        const staff = staffRowFor(staffAgg, String(refund.staff_id));
+        staff.refunds += 1;
+        staff.refunded += money + khata;
+      }
+
+      const allRefundLinesBySaleLine = new Map<string, SyncedRow[]>();
+      for (const line of relatedRefundLines) {
+        const key = String(line.sale_line_id);
+        const list = allRefundLinesBySaleLine.get(key) ?? [];
+        list.push(line);
+        allRefundLinesBySaleLine.set(key, list);
+      }
+      for (const [lineId, refundLinesForLine] of allRefundLinesBySaleLine) {
+        const line = originalLines.get(lineId);
+        if (!line) continue;
+        const sale =
+          saleById.get(String(line.sale_id)) ??
+          originalSales.get(String(line.sale_id));
+        if (!sale) continue;
+        const taxInclusive = sale.tax_inclusive === 1;
+        const lineRevenueValue = lineRevenue(line, taxInclusive);
+        const soldQty = n(line.qty_milli);
+        let previous = 0;
+        for (const refundLine of [...refundLinesForLine].sort(compareLedger)) {
+          const refundId = String(refundLine.refund_id);
+          const qty = n(refundLine.qty_milli);
+          // Count every earlier refund into `previous`, but apply only this month's
+          // header: related lines can span several months.
+          if (refundIds.has(refundId)) {
+            const refund = refundById.get(refundId);
+            const day = refund
+              ? dayMap.get(String(refund.business_date))
+              : undefined;
+            if (refund && day) {
+              const returnedRevenue = refundedRevenue(
+                lineRevenueValue,
+                soldQty,
+                previous,
+                qty,
+              );
+              const returnedCost = refundedCost(
+                n(line.unit_cost_snapshot),
+                previous,
+                qty,
+              );
+              day.grossProfit -= returnedRevenue - returnedCost;
+              day.tax -= refundedTax(n(line.tax_alloc), soldQty, previous, qty);
+              revenue -= returnedRevenue;
+              addProductLine(
+                productAgg,
+                line,
+                -qty,
+                -returnedRevenue,
+                -returnedCost,
+              );
+            }
+          }
+          previous += qty;
         }
       }
-      previous += qty;
     }
-  }
 
-  const payments = (
-    await db.payments
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((payment) => inRange(payment, range));
-  for (const payment of payments) {
-    const day = dayMap.get(String(payment.business_date));
-    if (!day) continue;
-    const amount = n(payment.amount);
-    if (payment.direction === 'in' && payment.purpose === 'sale') {
-      // A voided sale is excluded from Sold and Bills; its original payment and the
-      // reversing void payout must not reappear in the method mix either.
-      if (payment.sale_id && saleById.has(String(payment.sale_id)))
-        addMix(day.mix, String(payment.method), amount);
-    } else if (
-      payment.direction === 'in' &&
-      payment.purpose === 'customer_payment'
-    )
-      day.udhaarReceived += amount;
-  }
+    const payments = (
+      await db.payments
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((payment) => inRange(payment, range));
+    for (const payment of payments) {
+      const day = dayMap.get(String(payment.business_date));
+      if (!day) continue;
+      const amount = n(payment.amount);
+      if (payment.direction === 'in' && payment.purpose === 'sale') {
+        // A voided sale is excluded from Sold and Bills; its original payment and the
+        // reversing void payout must not reappear in the method mix either.
+        if (payment.sale_id && saleById.has(String(payment.sale_id)))
+          addMix(day.mix, String(payment.method), amount);
+      } else if (
+        payment.direction === 'in' &&
+        payment.purpose === 'customer_payment'
+      )
+        day.udhaarReceived += amount;
+    }
 
-  const expenses = (
-    await db.expenses
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((expense) => inRange(expense, range));
-  for (const expense of expenses) {
-    const day = dayMap.get(String(expense.business_date));
-    if (!day) continue;
-    day.expenses += n(expense.amount) * (expense.reverses_id ? -1 : 1);
+    const expenses = (
+      await db.expenses
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((expense) => inRange(expense, range));
+    for (const expense of expenses) {
+      const day = dayMap.get(String(expense.business_date));
+      if (!day) continue;
+      const amount = n(expense.amount) * (expense.reverses_id ? -1 : 1);
+      day.expenses += amount;
+      const category = String(expense.category_id);
+      expenseTotals.set(category, (expenseTotals.get(category) ?? 0) + amount);
+    }
   }
 
   const daily = [...dayMap.values()];
@@ -640,9 +669,9 @@ export async function reportBundle(
   ]);
   const [udhaar, staff, dayCloses, expenseReport] = await Promise.all([
     udhaarReport(db, { now, today }),
-    staffReport(db, { range, sales, refunds, voidRows: undefined }),
+    staffReport(db, { range, staff: staffAgg }),
     dayCloseReport(db, range),
-    expenseReportFor(db, { range, expenses }),
+    expenseReportFor(db, expenseTotals),
   ]);
   const shop = await db.shop.get('shop');
   return {
@@ -1012,16 +1041,31 @@ async function udhaarReport(
   };
 }
 
+function staffRowFor(
+  staff: Map<string, StaffReportRow>,
+  staffId: string,
+): StaffReportRow {
+  const row = staff.get(staffId) ?? {
+    staffId,
+    name: '',
+    bills: 0,
+    sold: 0,
+    discounts: 0,
+    refunds: 0,
+    refunded: 0,
+    voids: 0,
+    voided: 0,
+    netSold: 0,
+  };
+  staff.set(staffId, row);
+  return row;
+}
+
 async function staffReport(
   db: BikriDb,
-  input: {
-    range: ReportRange;
-    sales: SyncedRow[];
-    refunds: SyncedRow[];
-    voidRows?: SyncedRow[];
-  },
+  input: { range: ReportRange; staff: Map<string, StaffReportRow> },
 ): Promise<StaffReportRow[]> {
-  const voids = (input.voidRows ?? (await db.sale_voids.toArray())).filter(
+  const voids = (await db.sale_voids.toArray()).filter(
     (row) =>
       String(row.business_date) >= input.range.from &&
       String(row.business_date) <= input.range.to &&
@@ -1031,48 +1075,17 @@ async function staffReport(
     db.sales,
     voids.map((row) => String(row.sale_id)),
   );
-  const map = new Map<string, StaffReportRow>();
-  const rowFor = (staffId: string): StaffReportRow => {
-    const row = map.get(staffId) ?? {
-      staffId,
-      name: '',
-      bills: 0,
-      sold: 0,
-      discounts: 0,
-      refunds: 0,
-      refunded: 0,
-      voids: 0,
-      voided: 0,
-      netSold: 0,
-    };
-    map.set(staffId, row);
-    return row;
-  };
-  for (const sale of input.sales) {
-    const row = rowFor(String(sale.staff_id));
-    row.bills += 1;
-    row.sold += n(sale.total);
-    row.discounts +=
-      n(sale.item_discount_total) +
-      n(sale.bill_discount) +
-      n(sale.bundle_discount_total);
-  }
-  for (const refund of input.refunds) {
-    const row = rowFor(String(refund.staff_id));
-    row.refunds += 1;
-    row.refunded += n(refund.amount) + n(refund.udhaar_part);
-  }
   for (const voidRow of voids) {
-    const row = rowFor(String(voidRow.staff_id));
+    const row = staffRowFor(input.staff, String(voidRow.staff_id));
     row.voids += 1;
     row.voided += n(voidedSales.get(String(voidRow.sale_id))?.total);
   }
-  const staff = await byIds(db.staff, [...map.keys()]);
-  for (const row of map.values()) {
+  const staff = await byIds(db.staff, [...input.staff.keys()]);
+  for (const row of input.staff.values()) {
     row.name = String(staff.get(row.staffId)?.name ?? '');
     row.netSold = row.sold - row.refunded;
   }
-  return [...map.values()]
+  return [...input.staff.values()]
     .filter(
       (row) =>
         row.bills + row.refunds + row.voids > 0 ||
@@ -1145,27 +1158,16 @@ async function dayCloseReport(
 
 async function expenseReportFor(
   db: BikriDb,
-  input: { range: ReportRange; expenses: SyncedRow[] },
+  totals: Map<string, number>,
 ): Promise<ExpenseReport> {
-  const categories = await byIds(
-    db.expense_categories,
-    unique(input.expenses.map((row) => String(row.category_id))),
-  );
-  const map = new Map<string, number>();
-  for (const expense of input.expenses) {
-    const key = String(expense.category_id);
-    map.set(
-      key,
-      (map.get(key) ?? 0) + n(expense.amount) * (expense.reverses_id ? -1 : 1),
-    );
-  }
-  const total = [...map.values()].reduce(
+  const categories = await byIds(db.expense_categories, [...totals.keys()]);
+  const total = [...totals.values()].reduce(
     (sumValue, value) => sumValue + value,
     0,
   );
   return {
     total,
-    rows: [...map]
+    rows: [...totals]
       .filter(([, amount]) => amount !== 0)
       .map(([id, amount]) => ({
         category: categories.get(id) ?? null,

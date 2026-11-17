@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { clampReportRange, LONG_RANGE_DAYS, spanDays } from './reportRange.ts';
+import {
+  clampReportRange,
+  LONG_RANGE_DAYS,
+  monthChunks,
+  spanDays,
+} from './reportRange.ts';
 
 describe('report range', () => {
   it('counts inclusive days and rejects invalid dates', () => {
@@ -49,6 +54,19 @@ describe('report range', () => {
         '2026-11-17',
       ).range.to,
     ).toBe('2026-11-17');
+  });
+
+  it('splits a range on calendar-month boundaries', () => {
+    expect(monthChunks('2026-01-15', '2026-03-02')).toEqual([
+      { from: '2026-01-15', to: '2026-01-31' },
+      { from: '2026-02-01', to: '2026-02-28' },
+      { from: '2026-03-01', to: '2026-03-02' },
+    ]);
+    expect(monthChunks('2024-02-01', '2024-02-29')).toEqual([
+      { from: '2024-02-01', to: '2024-02-29' },
+    ]);
+    expect(monthChunks('2026-03-02', '2026-01-01')).toEqual([]);
+    expect(monthChunks('bad', '2026-01-01')).toEqual([]);
   });
 
   it('falls back to today for invalid dates and keeps an inverted range small', () => {
