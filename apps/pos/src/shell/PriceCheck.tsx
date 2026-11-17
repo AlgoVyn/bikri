@@ -1,11 +1,14 @@
+import { formatQtyFromMilli } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Link } from '@tanstack/react-router';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
-import { addProduct, CartFullError } from '../data/cart.ts';
+import { CartFullError, EmptyBundleError } from '../data/cart.ts';
+import { loadBundleRecipe } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
   type PriceCheckResult,
@@ -16,7 +19,7 @@ import { isLatinName, marginText, qtyWithUnit } from '../products/format.ts';
 import { ProductThumb } from '../products/ProductThumb.tsx';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
-import { mutateCart, useShopMoney } from '../sell/useSell.ts';
+import { addProductToCart, useShopMoney } from '../sell/useSell.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { usePriceCheck } from './priceCheckStore.ts';
 
@@ -104,14 +107,32 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   };
 
   const card = shown?.result.kind === 'found' ? shown.result.card : null;
+  const bundleItems = useLiveQuery(async () => {
+    if (card?.product.kind !== 'bundle') return [];
+    const db = getDb();
+    const rows = await loadBundleRecipe(db, card.product.id);
+    const products = await db.products.bulkGet(
+      rows.map((row) => String(row.component_product_id)),
+    );
+    return rows.flatMap((row, index) => {
+      const product = products[index];
+      return product && !product.deleted_at
+        ? [
+            {
+              name: String(product.name_en),
+              qty: Number(row.qty_milli),
+              unit: String(product.unit ?? 'pc'),
+            },
+          ]
+        : [];
+    });
+  }, [card?.product.id]);
   const canSell = can('sale.create');
 
   const addToCart = async () => {
     if (!card) return;
     try {
-      await mutateCart(active, (c) =>
-        addProduct(c, card.product, 1000, money.cost_method),
-      );
+      await addProductToCart(active, card.product, 1000, money.cost_method);
       toast.push(
         t('pricecheck.added', { name: String(card.product.name_en) }),
         'info',
@@ -120,6 +141,8 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
     } catch (error) {
       if (error instanceof CartFullError)
         toast.push(t('sell.cart_full'), 'error');
+      else if (error instanceof EmptyBundleError)
+        toast.push(t('sell.bundle_empty'), 'error');
       else throw error;
     }
   };
@@ -250,6 +273,20 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
               <p className="text-small text-text-muted">
                 {t('pricecheck.barcodes')}{' '}
                 <bdi dir="ltr">{card.barcodes.join(', ')}</bdi>
+              </p>
+            ) : null}
+            {bundleItems && bundleItems.length > 0 ? (
+              <p
+                className="text-small text-text-muted"
+                data-testid="price-card-bundle-items"
+              >
+                {t('pricecheck.items')}{' '}
+                {bundleItems.map((item, index) => (
+                  <span key={item.name}>
+                    {index > 0 ? ' · ' : ''}
+                    {item.name} ×{formatQtyFromMilli(item.qty, item.unit)}
+                  </span>
+                ))}
               </p>
             ) : null}
             {can('cost.view') ? (

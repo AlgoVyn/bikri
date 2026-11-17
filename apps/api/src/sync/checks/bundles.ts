@@ -24,8 +24,13 @@ export function activeBundleComponents(
   );
   for (const candidate of group) {
     if (candidate.tbl !== 'bundle_items') continue;
-    if (candidate.kind === 'delete') {
+    const softDeleted =
+      candidate.kind === 'upsert' &&
+      candidate.row?.deleted_at !== null &&
+      candidate.row?.deleted_at !== undefined;
+    if (candidate.kind === 'delete' || softDeleted) {
       const known =
+        (candidate.kind === 'upsert' ? candidate.row : undefined) ??
         look.bundleItemById.get(String(candidate.row_id ?? '')) ??
         group.find(
           (row) =>
@@ -54,12 +59,14 @@ export function productDeletedInGroup(
   productId: string,
 ): boolean {
   return (
+    look.bundleDeleted.has(productId) ||
     group.some(
       (candidate) =>
         candidate.tbl === 'products' &&
         candidate.kind === 'delete' &&
         candidate.row_id === productId,
-    ) || look.current.get(key('products', productId))?.deleted_at != null
+    ) ||
+    look.current.get(key('products', productId))?.deleted_at != null
   );
 }
 

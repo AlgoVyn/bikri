@@ -517,6 +517,14 @@ function BundleRows({
                   })}
                 </span>
               ) : null}
+              {cost > total ? (
+                <span
+                  className="shrink-0 rounded-full bg-danger-subtle px-1.5 text-caption font-medium text-danger-subtle-ink"
+                  data-testid="badge-below-cost"
+                >
+                  {t('sell.below_cost')}
+                </span>
+              ) : null}
             </span>
           </span>
           <span className="shrink-0 font-medium" data-testid="line-total">

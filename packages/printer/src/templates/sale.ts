@@ -279,8 +279,21 @@ export function buildSaleReceipt(
     shop.numberGrouping,
     shop.showPaymentDetails,
   );
-  const saved =
-    sale.itemDiscountTotal + sale.billDiscount + (sale.bundleDiscount ?? 0);
+  // The component line discount includes the bundle allocation residual, which is a
+  // rounding artifact, not a saving (07 §3.1/§3.4). Only the whole-bundle discount and
+  // real manual discounts count.
+  const bundleResidual = input.lines
+    .filter(
+      (line) => line.bundleGroup !== null && line.bundleGroup !== undefined,
+    )
+    .reduce((sum, line) => sum + line.discount, 0);
+  const saved = Math.max(
+    0,
+    sale.itemDiscountTotal -
+      bundleResidual +
+      sale.billDiscount +
+      (sale.bundleDiscount ?? 0),
+  );
   if (shop.showYouSaved && saved > 0) {
     pushPair(blocks, labels.youSaved, money(saved));
   }

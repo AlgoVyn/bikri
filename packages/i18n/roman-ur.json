@@ -361,6 +361,7 @@
       "sku_taken": "SKU pehle se istemal mein",
       "stock_invalid": "Stock is ikaai ke liye durust nahin",
       "too_many_rows": "{{max}} se zyada lines — file taqseem karein",
+      "bundle_row": "Bundles bundle screen se manage hote hain",
       "track_invalid": "Stock ka hisaab haan ya nahin ho",
       "unit_invalid": "Na maloom ikaai (pc, kg, m, l…)"
     },
@@ -483,6 +484,7 @@
     "close": "Band karein",
     "cost": "Ausat laagat",
     "in_stock": "Stock mein {{qty}}",
+    "items": "Items",
     "margin": "Munafa",
     "matches": "Milti julti products",
     "not_found": "Nahin mila",

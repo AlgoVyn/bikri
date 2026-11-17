@@ -162,7 +162,11 @@ function Tile({
             cls: 'bg-danger-subtle text-danger-subtle-ink',
           }
         : {
-            text: t('sell.left', { qty: formatQtyFromMilli(row.onHand, unit) }),
+            text: row.bundle
+              ? t('products.bundle_count', {
+                  count: row.bundle.availability ?? 0,
+                })
+              : t('sell.left', { qty: formatQtyFromMilli(row.onHand, unit) }),
             cls:
               row.stockState === 'low'
                 ? 'bg-warning-subtle text-warning-subtle-ink'

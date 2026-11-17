@@ -286,6 +286,13 @@ export function checkSalePolicy(
       typeof line.product_id === 'string'
         ? look.products.get(line.product_id)
         : undefined;
+    // A bundle is never a sale line of its own; its components carry the bundle_* fields.
+    if (
+      product &&
+      !line.bundle_id &&
+      String(product.kind ?? 'simple') === 'bundle'
+    )
+      throw new Reject('CONSTRAINT_FAILED');
     const costState =
       typeof line.product_id === 'string'
         ? costs.get(line.product_id)

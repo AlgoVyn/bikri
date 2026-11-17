@@ -87,7 +87,9 @@ export async function sold30For(db: BikriDb): Promise<Map<string, number>> {
     Date.now() - soldCache.at < SOLD_TTL_MS
   )
     return soldCache.value;
-  const value = await soldByProduct(db, 30);
+  const shop = await db.shop.get('shop');
+  const timeZone = String(shop?.timezone ?? '') || 'Asia/Karachi';
+  const value = await soldByProduct(db, 30, Date.now(), timeZone);
   soldCache = { tenant: db.tenantId, at: Date.now(), value };
   return value;
 }

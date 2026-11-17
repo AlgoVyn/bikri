@@ -1,4 +1,4 @@
-import { businessDate } from '@bikri/core';
+import { businessDate, formatQtyFromMilli } from '@bikri/core';
 import type { PrintJob } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
@@ -307,7 +307,15 @@ export function SaleComplete({
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <dt className="text-text-muted">
-              {t('sell.items', { count: Number(sale.line_count ?? 0) })}
+              {t('sell.items', {
+                count:
+                  Number(sale.items_qty_milli ?? 0) % 1000 === 0
+                    ? Number(sale.items_qty_milli ?? 0) / 1000
+                    : formatQtyFromMilli(
+                        Number(sale.items_qty_milli ?? 0),
+                        'pc',
+                      ),
+              })}
             </dt>
             <dd>
               <MoneyText paisa={Number(sale.total ?? 0)} />

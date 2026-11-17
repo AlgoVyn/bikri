@@ -223,7 +223,8 @@ export type ErrorCode =
   | 'barcode_repeat'
   | 'sku_repeat'
   | 'sku_taken'
-  | 'too_many_rows';
+  | 'too_many_rows'
+  | 'bundle_row';
 
 export type RowError = {
   field: ImportField | 'row';
@@ -351,6 +352,7 @@ export async function previewImport(
 ): Promise<ImportPreview> {
   const [headerRow, ...body] = grid;
   const headers = (headerRow ?? []).map((h) => String(h ?? ''));
+  const kindIndex = headers.findIndex((h) => norm(h) === 'kind');
   const products = (await db.products.toArray()).filter((p) => !p.deleted_at);
   const byId = new Map(products.map((p) => [p.id, p]));
   const bySku = new Map(products.map((p) => [String(p.sku ?? ''), p.id]));
@@ -400,6 +402,19 @@ export async function previewImport(
       errors.push({ field: 'sku', code: 'sku_repeat' });
     if (productId && matched.has(productId))
       errors.push({ field: 'sku', code: 'sku_repeat' });
+    // Bundles are managed on the bundle screen; a normal import must never create a
+    // simple product from a bundle export row or strip an existing bundle's recipe.
+    const kindCell =
+      kindIndex >= 0
+        ? String(cells[kindIndex] ?? '')
+            .trim()
+            .toLowerCase()
+        : '';
+    if (
+      kindCell === 'bundle' ||
+      (productId !== null && byId.get(productId)?.kind === 'bundle')
+    )
+      errors.push({ field: 'row', code: 'bundle_row' });
     if (!productId) {
       if (!parsed.name_en)
         errors.push({ field: 'name_en', code: 'name_required' });

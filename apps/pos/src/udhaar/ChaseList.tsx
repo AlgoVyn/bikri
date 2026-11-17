@@ -97,7 +97,7 @@ export function ChaseList() {
               onClick={() =>
                 downloadText(
                   'bikri-chase.csv',
-                  chaseCsv(data, (key) => groupLabel(t, key)),
+                  chaseCsv(data, (key) => groupLabel(t, key), data.tz),
                 )
               }
             >

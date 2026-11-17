@@ -65,6 +65,103 @@ async function readyDb(): Promise<BikriDb> {
 }
 
 describe('catalog edge cases', () => {
+  it('shows a refund of an older sale on the 14-day chart', async () => {
+    const db = await readyDb();
+    const ctx = await ledgerContext(db, 'st-1');
+    const product = await saveNewProduct(
+      db,
+      { name_en: 'Old phone', price: 10000, cost: 5000, opening_milli: 10000 },
+      ctx,
+      { now: NOW },
+    );
+    const old = businessDate(NOW - 20 * 86_400_000);
+    const today = businessDate(NOW);
+    await db.sales.add({
+      ...row,
+      id: 'old-sale',
+      invoice_no: 'A-A-1',
+      invoice_seq: 1,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: old,
+      line_count: 1,
+      items_qty_milli: 1000,
+      gross_total: 10000,
+      item_discount_total: 0,
+      subtotal: 10000,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      total: 10000,
+      paid_total: 10000,
+      udhaar_amount: 0,
+      cash_tendered: 10000,
+      change_given: 0,
+      status: 'paid',
+      replaces_sale_id: null,
+      note: '',
+    } as never);
+    await db.sale_lines.add({
+      ...row,
+      id: 'old-line',
+      sale_id: 'old-sale',
+      line_no: 1,
+      product_id: product.id,
+      name_snapshot: 'Old phone',
+      sku_snapshot: 'PHN-0001',
+      qty_milli: 1000,
+      unit_price: 10000,
+      gross: 10000,
+      discount_type: null,
+      discount_value: 0,
+      discount: 0,
+      net: 10000,
+      bill_discount_alloc: 0,
+      tax_alloc: 0,
+      rounding_alloc: 0,
+      unit_cost_snapshot: 5000,
+      below_cost: 0,
+      serial: null,
+      warranty_until: null,
+      business_date: old,
+    } as never);
+    await db.refunds.add({
+      id: 'old-refund',
+      sale_id: 'old-sale',
+      kind: 'whole',
+      reason: 'Faulty',
+      method: 'cash',
+      exact_amount: 10000,
+      udhaar_part: 0,
+      rounding: 0,
+      amount: 10000,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: today,
+      created_at: NOW,
+    } as never);
+    await db.refund_lines.add({
+      id: 'old-refund-line',
+      refund_id: 'old-refund',
+      sale_line_id: 'old-line',
+      qty_milli: 1000,
+      amount: 10000,
+      restock: 1,
+      created_at: NOW,
+    } as never);
+    const detail = await productDetail(db, product.id, NOW);
+    expect(detail?.last14.at(-1)).toMatchObject({
+      qty: -1000,
+      revenue: -10000,
+    });
+  });
+
   it('ledgerContext needs a device and branch', async () => {
     await expect(ledgerContext(freshDb('empty'), 'st-1')).rejects.toThrow(
       /no device or branch/u,

@@ -231,6 +231,19 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
     q.since,
     q.limit + 1,
   );
+  // The prune can raise the floor between the device lookup and this SELECT. Re-read it
+  // so a page that starts inside a pruned gap never advances the till past missing rows.
+  const floor = await db.first<{ change_log_floor: number }>(
+    'SELECT change_log_floor FROM tenants WHERE id = ?1',
+  );
+  if (floor && Number(floor.change_log_floor) > q.since) {
+    throw new ApiError(
+      'SNAPSHOT_REQUIRED',
+      410,
+      'This till must download the shop again',
+      { change_log_floor: Number(floor.change_log_floor) },
+    );
+  }
   const rawPage = rows.slice(0, q.limit);
   const page = rawPage.filter((row) => {
     if (clientSchema >= BUNDLE_SCHEMA) return true;
@@ -279,6 +292,7 @@ export async function snapshotPayload(
   maxLimit = 1000,
   counts = false,
   clientSchema = BUNDLE_SCHEMA,
+  chargeReads = true,
 ): Promise<Record<string, unknown>> {
   const tables =
     clientSchema >= BUNDLE_SCHEMA
@@ -347,7 +361,9 @@ export async function snapshotPayload(
       : [q.after, limit + 1]),
   );
   const page = rows.slice(0, limit);
-  addRowsRead(tenant.id, page.length);
+  // The operator export is Access-only and deliberately outside the shop's read
+  // budget; till snapshots and owner exports still charge their pages.
+  if (chargeReads) addRowsRead(tenant.id, page.length);
   return {
     tbl: q.tbl,
     rows: page,

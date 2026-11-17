@@ -1,5 +1,6 @@
 import {
   businessDate,
+  isTimeZone,
   mulDivRound,
   refundedCost,
   refundedRevenue,
@@ -382,7 +383,9 @@ export async function reportBundle(
     sold: 0,
     bills: 0,
   }));
-  const timeZone = options.timeZone ?? 'Asia/Karachi';
+  const timeZone = isTimeZone(options.timeZone)
+    ? options.timeZone
+    : 'Asia/Karachi';
   const hourFormat = new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
     hour12: false,
@@ -452,8 +455,14 @@ export async function reportBundle(
       const staff = staffRowFor(staffAgg, String(sale.staff_id));
       staff.bills += 1;
       staff.sold += n(sale.total);
+      // The bundle allocation residual is not a staff discount (07 §3.1).
+      let bundleResidual = 0;
+      for (const line of linesBySale.get(sale.id) ?? []) {
+        if (line.bundle_id) bundleResidual += n(line.discount);
+      }
       staff.discounts +=
-        n(sale.item_discount_total) +
+        n(sale.item_discount_total) -
+        bundleResidual +
         n(sale.bill_discount) +
         n(sale.bundle_discount_total);
       const taxInclusive = sale.tax_inclusive === 1;
