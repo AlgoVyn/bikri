@@ -11,6 +11,7 @@ export function Metric({
   size = 'md',
   testId,
   className = '',
+  valueClassName = '',
 }: {
   label: string;
   value: ReactNode;
@@ -18,6 +19,8 @@ export function Metric({
   size?: 'md' | 'lg';
   testId?: string;
   className?: string;
+  /** Extra classes for the figure, e.g. a smaller phone size for long amounts. */
+  valueClassName?: string;
 }) {
   return (
     <div className={`min-w-0 ${className}`} data-testid={testId}>
@@ -25,7 +28,7 @@ export function Metric({
       <p
         className={`${
           size === 'lg' ? 'text-total' : 'text-title'
-        } font-semibold`}
+        } font-semibold ${valueClassName}`}
       >
         {value}
       </p>

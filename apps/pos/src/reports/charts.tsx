@@ -238,17 +238,19 @@ export function PaymentMixBar({ mix, t }: { mix: PaymentMix; t: TFunction }) {
               ? Math.round((Math.max(0, mix[method]) / total) * 100)
               : 0;
           return (
-            <li key={method} className="flex items-center gap-2">
+            <li key={method} className="flex min-w-0 items-center gap-2">
               <span
                 aria-hidden="true"
-                className="inline-block size-2.5 rounded-sm"
+                className="inline-block size-2.5 shrink-0 rounded-sm"
                 style={{ background: COLORS[method] }}
               />
-              <span className="me-auto">{t(`payment.${method}`)}</span>
-              <bdi dir="ltr" className="tabular-nums text-text-muted">
+              <span className="me-auto min-w-0 truncate">
+                {t(`payment.${method}`)}
+              </span>
+              <bdi dir="ltr" className="shrink-0 tabular-nums text-text-muted">
                 {share}%
               </bdi>
-              <span className="w-24 text-end">
+              <span className="shrink-0 text-end">
                 <MoneyText paisa={mix[method]} />
               </span>
             </li>
