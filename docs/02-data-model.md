@@ -1659,6 +1659,29 @@ A separate migration is deliberate: editing `0022` would not update a database w
 it was already applied. Fresh databases run `0022` (the marker stays at 6) and then
 `0023` (7).
 
+### 2.23 Backfill catalogue cost into product average cost (migration `0024_backfill_product_avg_cost.sql`)
+
+```sql
+-- Products created with a catalogue cost but no stock movement kept `avg_cost = 0` on
+-- the server (the column is server-managed and was only derived from movements). That
+-- made a sale before the first costed movement look like a zero-cost sale after a pull.
+-- Initialise those rows from the catalogue cost; rows with movements keep their derived
+-- weighted average. Additive data repair only: no column or wire change.
+UPDATE products
+SET avg_cost = last_cost
+WHERE avg_cost = 0
+  AND last_cost > 0
+  AND NOT EXISTS (
+    SELECT 1
+    FROM stock_movements sm
+    WHERE sm.tenant_id = products.tenant_id
+      AND sm.product_id = products.id
+  );
+```
+
+Data-only migration: `SCHEMA_VERSION` stays 7. New products are initialised at insert
+by `applyOps`; this repairs rows created before that change.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
