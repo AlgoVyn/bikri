@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { idbCount } from './helpers.ts';
 import {
   API,
   createShop,
@@ -162,6 +163,19 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
   // A browser that leaves shop B and joins shop A loses B's database (journey 21, I-case).
   await b.page.goto('/bikri/settings');
   await unlock(b.page);
+  // The leave action is intentionally blocked while the outbox has ops. Wait for the
+  // queue instead of racing a background sync under CI load.
+  await syncNow(b.page);
+  await expect
+    .poll(
+      async () => {
+        const pending = await idbCount(b.page, 'outbox');
+        if (pending > 0) await syncNow(b.page);
+        return pending;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(0);
   await b.page.getByRole('button', { name: 'Leave this shop' }).click();
   await b.page
     .getByRole('dialog', { name: 'Leave that shop' })
