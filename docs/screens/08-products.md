@@ -43,13 +43,13 @@ The English UI label is **Bundle**; Roman Urdu uses **Bundle**. The Urdu label i
 **Product list**
 - The existing filter toolbar gains a `Bundles` filter (All / Bundles / categories) and rows show a small neutral `Bundle` pill next to the name.
 - The stock column shows derived availability (`min(floor(component on_hand / per-bundle qty))`) as "3 bundles" rather than a stock quantity; untracked components are ignored. If every component is untracked, show "Made to order" instead of a number.
-- Avg cost and margin are derived from the recipe for `cost.view`; the 30-day sold figure counts distinct `bundle_group`s, not component lines.
+- Avg cost and margin are derived from the recipe for `cost.view`; the 30-day sold figure sums each bundle group's `bundle_qty`, not component lines.
 - Select mode may include bundles for category changes, labels and delete, but **not** for Update prices in v1.1.
 
 **Product detail**
 - Header: photo/monogram, name, `Bundle` pill, category/SKU/barcodes. Actions: `Edit`, `Print label`, `Sell`, `Duplicate`, `Delete`; no `Adjust stock` and no stock-adjust shortcut.
 - Price and Margin cards use the derived figures. The three-figure row shows **Avg cost**, **Items total** (sum of component shelf prices) and **Available** (bundles). Price card hint: "Customer saves Rs X vs items" (can be negative when the bundle costs more).
-- `Last 14 days` shows bundles sold and bundle revenue (distinct `bundle_group` count).
+- `Last 14 days` shows bundles sold (the sum of each group's `bundle_qty`) and bundle revenue; returns subtract whole bundles on the refund's business date.
 - `Items in this bundle` card: component name, SKU, `1 per bundle` (or the recipe quantity), component price and component stock; a muted note "Stock is deducted from each item when the bundle is sold. The bundle itself has no stock."
 - No Stock history card for the bundle itself; the recipe card replaces it. Component stock history is available from each component product.
 
