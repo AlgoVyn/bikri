@@ -13,6 +13,7 @@
     "format": "biome format --write .",
     "typecheck": "tsc -b",
     "dev": "turbo dev --filter=@bikri/pos",
+    "seed:perf": "node tools/seed/perf-shop.mjs",
     "e2e": "turbo e2e",
     "i18n:check": "pnpm --filter @bikri/i18n check && node tools/check-i18n-keys.mjs",
     "contrast:check": "node tools/contrast-check.ts",
