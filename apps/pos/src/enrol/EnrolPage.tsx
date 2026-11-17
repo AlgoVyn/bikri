@@ -239,9 +239,13 @@ export function EnrolPage({
   );
 
   if (stage.kind === 'downloading' || stage.kind === 'failed') {
+    // The snapshot start carries no per-table counts (03 §4.3), so `total` is usually 0
+    // and a 0–100 bar would sit at 0% for the whole download. Show the rows that have
+    // already landed and an indeterminate bar instead; the count moves every page.
+    const knownTotal = stage.kind === 'downloading' ? stage.total : 0;
     const pct =
-      stage.kind === 'downloading' && stage.total > 0
-        ? Math.round((stage.done / stage.total) * 100)
+      knownTotal > 0 && stage.kind === 'downloading'
+        ? Math.round((stage.done / knownTotal) * 100)
         : 0;
     return card(
       <>
@@ -251,17 +255,22 @@ export function EnrolPage({
         {stage.kind === 'downloading' ? (
           <>
             <p className="text-small text-text-muted">
-              {stage.total > 0
+              {knownTotal > 0
                 ? t('enrol.downloading_count', {
                     done: stage.done.toLocaleString(),
-                    total: stage.total.toLocaleString(),
+                    total: knownTotal.toLocaleString(),
                   })
-                : t('enrol.downloading')}
+                : stage.done > 0
+                  ? t('enrol.downloading_rows', {
+                      count: stage.done,
+                      rows: stage.done.toLocaleString(),
+                    })
+                  : t('enrol.downloading')}
             </p>
             <progress
               className="w-full"
-              max={100}
-              value={pct}
+              max={knownTotal > 0 ? 100 : undefined}
+              value={knownTotal > 0 ? pct : undefined}
               aria-label={t('enrol.downloading')}
             />
           </>

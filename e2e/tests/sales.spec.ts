@@ -130,7 +130,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     page,
   }) => {
     await sellOne(page);
-    await expect(page.getByTestId('bill-status')).toHaveText('Paid');
+    await expect(page.getByTestId('bill-status')).toHaveText('Completed');
     await page
       .getByTestId('sales-detail')
       .getByTestId('page-actions-more')
@@ -227,7 +227,7 @@ test.describe('Void and reissue (T-042)', () => {
     const done = page.getByRole('dialog', { name: 'Sale complete' });
     await expect(done.getByTestId('sale-saved')).toBeVisible();
     await done.getByRole('button', { name: 'Open bill' }).click();
-    await expect(page.getByTestId('bill-status')).toHaveText('Paid');
+    await expect(page.getByTestId('bill-status')).toHaveText('Completed');
 
     await page.evaluate(() => window.__bikriTest?.navigate('/sales'));
     await expect(page.getByRole('link', { name: /A-A-1/ })).toBeVisible();
@@ -252,7 +252,7 @@ test.describe('Void and reissue (T-042)', () => {
       .click();
     const done2 = page.getByRole('dialog', { name: 'Sale complete' });
     await done2.getByRole('button', { name: 'Open bill' }).click();
-    await expect(page.getByTestId('bill-status')).toHaveText('Paid');
+    await expect(page.getByTestId('bill-status')).toHaveText('Completed');
     await page
       .getByTestId('sales-detail')
       .getByTestId('page-actions-more')

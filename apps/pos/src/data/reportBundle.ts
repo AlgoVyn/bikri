@@ -222,6 +222,13 @@ export type ReportOptions = {
   now?: number;
   today?: string;
   timeZone?: string;
+  /**
+   * Only the sales aggregation (summary, daily, hourly). The worker uses this for the
+   * previous-period comparison, which renders one number and needs no stock or party scans.
+   */
+  summaryOnly?: boolean;
+  /** Set false for the Summary tab: the slow-mover walk covers every movement ever made. */
+  slowMovers?: boolean;
 };
 
 export function addDays(date: string, days: number): string {
@@ -345,6 +352,47 @@ function addProductLine(
   row.revenue += revenue;
   row.cost += cost;
   agg.set(key, row);
+}
+
+/** Placeholders for a summary-only bundle; no screen renders them. */
+function emptySections(): Pick<
+  ReportBundle,
+  'products' | 'stock' | 'udhaar' | 'staff' | 'dayCloses' | 'expenses'
+> {
+  return {
+    products: {
+      rows: [],
+      bestByQty: [],
+      bestByRevenue: [],
+      bestByProfit: [],
+      categories: [],
+      brands: [],
+      slowMovers: [],
+    },
+    stock: {
+      value: 0,
+      items: [],
+      lowStock: [],
+      outOfStock: [],
+      negativeStock: [],
+      attention: [],
+      movements: [],
+      supplierReturns: { count: 0, credit: 0, difference: 0, rows: [] },
+    },
+    udhaar: { totalOwed: 0, count: 0, buckets: [], top: [], rows: [] },
+    staff: [],
+    dayCloses: {
+      rows: [],
+      expected: 0,
+      counted: 0,
+      difference: 0,
+      shortCount: 0,
+      shortTotal: 0,
+      overCount: 0,
+      overTotal: 0,
+    },
+    expenses: { total: 0, rows: [] },
+  };
 }
 
 /** All report tabs for one range, computed on the device from Dexie (screens/16). */
@@ -672,8 +720,21 @@ export async function reportBundle(
     hourly,
   };
 
+  const shop = await db.shop.get('shop');
+  const taxEnabled = n(shop?.tax_rate_bp) > 0 || summary.tax !== 0;
+  if (options.summaryOnly)
+    return {
+      range,
+      summary,
+      ...emptySections(),
+      taxEnabled,
+    };
   const [products, stock] = await Promise.all([
-    productReports(db, { agg: productAgg, today }),
+    productReports(db, {
+      agg: productAgg,
+      today,
+      withSlowMovers: options.slowMovers !== false,
+    }),
     stockReport(db, range),
   ]);
   const [udhaar, staff, dayCloses, expenseReport] = await Promise.all([
@@ -682,7 +743,6 @@ export async function reportBundle(
     dayCloseReport(db, range),
     expenseReportFor(db, expenseTotals),
   ]);
-  const shop = await db.shop.get('shop');
   return {
     range,
     summary,
@@ -692,13 +752,17 @@ export async function reportBundle(
     staff,
     dayCloses,
     expenses: expenseReport,
-    taxEnabled: n(shop?.tax_rate_bp) > 0 || summary.tax !== 0,
+    taxEnabled,
   };
 }
 
 async function productReports(
   db: BikriDb,
-  input: { agg: Map<string, ProductAgg>; today: string },
+  input: {
+    agg: Map<string, ProductAgg>;
+    today: string;
+    withSlowMovers: boolean;
+  },
 ): Promise<ProductReports> {
   const agg = input.agg;
   const productIds = [...agg.values()]
@@ -765,58 +829,9 @@ async function productReports(
     brandRows.set(brandKey, brandRow);
   }
 
-  const allProducts = (await db.products.toArray()).filter(
-    (product) => !product.deleted_at,
-  );
-  const levels = new Map(
-    (
-      await db.stock_levels.bulkGet(
-        allProducts.map((product) => String(product.id)),
-      )
-    )
-      .filter(
-        (level): level is { product_id: string; on_hand_milli: number } =>
-          level !== undefined,
-      )
-      .map((level) => [level.product_id, level.on_hand_milli]),
-  );
-  const lastSales = new Map<string, string>();
-  const voidedSales = new Set(
-    (await db.sale_voids.toArray()).map((voidRow) => String(voidRow.sale_id)),
-  );
-  await db.stock_movements
-    .where('business_date')
-    .belowOrEqual(input.today)
-    .each((movement) => {
-      // A voided sale still has its original `sale` movement; it must not keep a
-      // product out of the slow movers list.
-      if (
-        movement.reason_code !== 'sale' ||
-        voidedSales.has(String(movement.ref_id))
-      )
-        return;
-      const productId = String(movement.product_id);
-      const date = String(movement.business_date);
-      if (!lastSales.has(productId) || date > String(lastSales.get(productId)))
-        lastSales.set(productId, date);
-    });
-  const slowCutoff = addDays(input.today, -30);
-  const slowMovers: SlowMover[] = allProducts
-    .filter((product) => product.track_stock === 1)
-    .map((product) => {
-      const onHand = levels.get(String(product.id)) ?? 0;
-      const lastSale = lastSales.get(String(product.id)) ?? null;
-      return { product, onHand, lastSale };
-    })
-    .filter(
-      (row) =>
-        row.onHand > 0 && (row.lastSale === null || row.lastSale <= slowCutoff),
-    )
-    .sort(
-      (a, b) =>
-        String(a.lastSale ?? '').localeCompare(String(b.lastSale ?? '')) ||
-        String(a.product.name_en).localeCompare(String(b.product.name_en)),
-    );
+  const slowMovers = input.withSlowMovers
+    ? await slowMoversReport(db, input.today)
+    : [];
 
   const byQty = [...rows]
     .filter((row) => row.qtyMilli > 0)
@@ -840,6 +855,68 @@ async function productReports(
       .sort((a, b) => b.revenue - a.revenue),
     slowMovers,
   };
+}
+
+/**
+ * Products with stock that have not sold for 30 days. This walks every sale movement
+ * ever written, so the Summary tab skips it and the Products tab loads it separately.
+ */
+export async function slowMoversReport(
+  db: BikriDb,
+  today: string,
+): Promise<SlowMover[]> {
+  const allProducts = (await db.products.toArray()).filter(
+    (product) => !product.deleted_at,
+  );
+  const levels = new Map(
+    (
+      await db.stock_levels.bulkGet(
+        allProducts.map((product) => String(product.id)),
+      )
+    )
+      .filter(
+        (level): level is { product_id: string; on_hand_milli: number } =>
+          level !== undefined,
+      )
+      .map((level) => [level.product_id, level.on_hand_milli]),
+  );
+  const lastSales = new Map<string, string>();
+  const voidedSales = new Set(
+    (await db.sale_voids.toArray()).map((voidRow) => String(voidRow.sale_id)),
+  );
+  await db.stock_movements
+    .where('business_date')
+    .belowOrEqual(today)
+    .each((movement) => {
+      // A voided sale still has its original `sale` movement; it must not keep a
+      // product out of the slow movers list.
+      if (
+        movement.reason_code !== 'sale' ||
+        voidedSales.has(String(movement.ref_id))
+      )
+        return;
+      const productId = String(movement.product_id);
+      const date = String(movement.business_date);
+      if (!lastSales.has(productId) || date > String(lastSales.get(productId)))
+        lastSales.set(productId, date);
+    });
+  const slowCutoff = addDays(today, -30);
+  return allProducts
+    .filter((product) => product.track_stock === 1)
+    .map((product) => {
+      const onHand = levels.get(String(product.id)) ?? 0;
+      const lastSale = lastSales.get(String(product.id)) ?? null;
+      return { product, onHand, lastSale };
+    })
+    .filter(
+      (row) =>
+        row.onHand > 0 && (row.lastSale === null || row.lastSale <= slowCutoff),
+    )
+    .sort(
+      (a, b) =>
+        String(a.lastSale ?? '').localeCompare(String(b.lastSale ?? '')) ||
+        String(a.product.name_en).localeCompare(String(b.product.name_en)),
+    );
 }
 
 async function stockReport(

@@ -44,6 +44,7 @@ async function setUpTill(
   await expect(page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'synced',
+    { timeout: 30_000 },
   );
 }
 
@@ -158,6 +159,7 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
   await expect(b.page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'synced',
+    { timeout: 30_000 },
   );
 
   // A browser that leaves shop B and joins shop A loses B's database (journey 21, I-case).

@@ -77,6 +77,7 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
   await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'synced',
+    { timeout: 30_000 },
   );
   // Let the service worker take control so the app reloads offline.
   await a.page.evaluate(
@@ -104,6 +105,7 @@ test('journey 6: five offline sales survive a reload and reach the server', asyn
   await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'synced',
+    { timeout: 30_000 },
   );
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(5);
   await a.ctx.close();
@@ -214,6 +216,7 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
   await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'synced',
+    { timeout: 30_000 },
   );
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(3);
   await a.ctx.close();

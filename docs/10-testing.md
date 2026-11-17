@@ -68,6 +68,10 @@ The cases in [03 §9](03-sync.md#9-test-cases-must-exist-in-appsapi-and-appspos-
 
 Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-electronics` creates the tenant if needed and writes via the normal repositories (so outbox/sync paths are exercised) or directly into D1 for Worker tests.
 
+### 4.1 Local performance shop (manual)
+
+`pnpm seed:perf` writes a large, realistic shop straight into the local `wrangler dev` D1 (never D1 in production): 2,000 products, 1,000 customers and 25,000 bills over 180 days, plus deliveries, udhaar collections, expenses, cash moves, day closes and a dozen bundles. It prints the owner PIN, a one-time enrolment code and the exact `wrangler dev` command. A fresh browser downloads the shop through the real snapshot API (a few hundred pages) and then rebuilds the stock and balance caches, so the download, the cache pass and every screen afterwards measure the app itself. `--bills`, `--days`, `--products`, `--customers` and related options are documented at the top of [`tools/seed/perf-shop.mjs`](../tools/seed/perf-shop.mjs); re-running replaces the same `perf-shop` tenant and issues a fresh code.
+
 ## 5. E2E journeys (each in EN and UR, desktop 1280×800 and phone 390×844)
 
 1. Enrol with code → setup wizard → first product → sale → receipt preview.
