@@ -451,6 +451,136 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
     expect(reportCsv('products', today)).toContain('0.00');
   });
 
+  it('keeps partial refunds across month chunks cumulative, not double-counted', async () => {
+    const db = await readyDb('refund-months');
+    await addShop(db, { timezone: TZ });
+    const at = (date: string) => Date.parse(`${date}T12:00:00Z`);
+    await db.sales.add({
+      ...row,
+      id: 'sale-jan',
+      invoice_no: 'A-A-10',
+      invoice_seq: 10,
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: '2026-01-31',
+      created_at: at('2026-01-31'),
+      line_count: 1,
+      items_qty_milli: 3000,
+      gross_total: 600000,
+      item_discount_total: 0,
+      subtotal: 600000,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      total: 600000,
+      paid_total: 600000,
+      udhaar_amount: 0,
+      cash_tendered: 600000,
+      change_given: 0,
+      status: 'paid',
+      replaces_sale_id: null,
+      note: '',
+    } as SyncedRow);
+    await db.sale_lines.add({
+      ...row,
+      id: 'line-jan',
+      sale_id: 'sale-jan',
+      line_no: 1,
+      product_id: null,
+      name_snapshot: 'Phone',
+      sku_snapshot: '',
+      qty_milli: 3000,
+      unit_price: 200000,
+      gross: 600000,
+      discount_type: null,
+      discount_value: 0,
+      discount: 0,
+      net: 600000,
+      bill_discount_alloc: 0,
+      tax_alloc: 0,
+      rounding_alloc: 0,
+      unit_cost_snapshot: 100000,
+      below_cost: 0,
+      serial: null,
+      warranty_until: null,
+      business_date: '2026-01-31',
+    } as SyncedRow);
+    for (const [index, date] of ['2026-02-10', '2026-03-10'].entries()) {
+      const id = `refund-${index + 1}`;
+      await db.refunds.add({
+        id,
+        sale_id: 'sale-jan',
+        kind: 'partial',
+        reason: 'Faulty',
+        method: 'cash',
+        exact_amount: 200000,
+        udhaar_part: 0,
+        rounding: 0,
+        amount: 200000,
+        branch_id: 'br-1',
+        device_id: 'dev-1',
+        staff_id: 'st-1',
+        business_date: date,
+        created_at: at(date),
+      } as SyncedRow);
+      await db.refund_lines.add({
+        id: `${id}-line`,
+        refund_id: id,
+        sale_line_id: 'line-jan',
+        qty_milli: 1000,
+        amount: 200000,
+        restock: 1,
+        created_at: at(date),
+      } as SyncedRow);
+    }
+
+    const january = await reportBundle(
+      db,
+      { from: '2026-01-01', to: '2026-01-31' },
+      { now: at('2026-03-31'), today: '2026-03-31', timeZone: TZ },
+    );
+    expect(january.summary).toMatchObject({
+      sold: 600000,
+      bills: 1,
+      grossProfit: 300000,
+      refunded: 0,
+    });
+    const march = await reportBundle(
+      db,
+      { from: '2026-03-01', to: '2026-03-31' },
+      { now: at('2026-03-31'), today: '2026-03-31', timeZone: TZ },
+    );
+    expect(march.summary).toMatchObject({
+      sold: -200000,
+      grossProfit: -100000,
+      refunded: 200000,
+      refundCount: 1,
+    });
+    const all = await reportBundle(
+      db,
+      { from: '2026-01-01', to: '2026-03-31' },
+      { now: at('2026-03-31'), today: '2026-03-31', timeZone: TZ },
+    );
+    expect(all.summary).toMatchObject({
+      sold: 200000,
+      bills: 1,
+      grossProfit: 100000,
+      refunded: 400000,
+      refundCount: 2,
+    });
+    expect(all.products.rows[0]).toMatchObject({
+      name: 'Phone',
+      qtyMilli: 1000,
+      revenue: 200000,
+      profit: 100000,
+    });
+  });
+
   it('covers every tab CSV, mixed payment methods, aging buckets and voids', async () => {
     const db = await sample('coverage');
     await db.categories.add({

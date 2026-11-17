@@ -75,6 +75,27 @@ export async function firstBusinessDay(
   return dates[0] ?? null;
 }
 
+/** Inclusive calendar-month chunks covering a range; [] for an invalid range. */
+export function monthChunks(
+  from: string,
+  to: string,
+): { from: string; to: string }[] {
+  const start = dateMs(from);
+  const end = dateMs(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start)
+    return [];
+  const chunks: { from: string; to: string }[] = [];
+  let cursor = start;
+  while (cursor <= end) {
+    const date = new Date(cursor);
+    const monthEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0);
+    const chunkEnd = Math.min(monthEnd, end);
+    chunks.push({ from: isoDay(cursor), to: isoDay(chunkEnd) });
+    cursor = chunkEnd + DAY;
+  }
+  return chunks;
+}
+
 export type ClampedRange = {
   range: ReportRange;
   /** The requested days before clamping. */

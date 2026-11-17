@@ -7,8 +7,8 @@
 import { isLedgerTable, isMasterTable, newId, type Role } from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import { checkOp } from './applyOpsCheck.ts';
+import { loadLookups } from './applyOpsLookups.ts';
 import {
-  loadLookups,
   moneyAuditStatements,
   sideEffects,
   stockRepairStatements,
