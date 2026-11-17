@@ -10,6 +10,7 @@ export const METHOD_KEYS: Record<SaleMethod, string> = {
   udhaar: 'payment.udhaar',
 };
 
+/** The stored value `paid` is the document lifecycle (not refunded/void), not payment. */
 export const STATUS_KEYS: Record<SaleStatus, string> = {
   paid: 'office.sales.status_paid',
   part_refunded: 'office.sales.status_part_refunded',

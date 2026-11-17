@@ -28,7 +28,7 @@
       "range_yesterday": "Yesterday",
       "search": "Search bills",
       "search_placeholder": "Bill, customer or product",
-      "status_paid": "Paid",
+      "status_paid": "Completed",
       "status_part_refunded": "Part refunded",
       "status_refunded": "Refunded",
       "status_void": "Void",
