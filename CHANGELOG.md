@@ -17,6 +17,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - The operator console shows the active daily-budget sum and flags it above 70,000 rows/day, matching the documented Workers Paid trigger (M6, D-245).
 - Push rejects over-long short-text fields (sale remarks 120 characters) and uploads must match their image magic bytes; owner sign-in binds `SIGNIN.tries`; `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 7; D-216 is renumbered and `docs:check` rejects duplicate decision IDs (L6–L10).
 
+### Design
+- The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, four shared metric cells at ≥ 1280 px, the last-bill time in the title row, the “Expected · since last close” cash hint, and a full-width Day close row (D-249, D-250).
+
 ## [1.1.0] — 2026-11-16
 
 ### Bundles
