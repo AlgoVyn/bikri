@@ -14,6 +14,7 @@ test('operator console: overview, new shop with a one-time code, read-only and r
   test.setTimeout(90_000);
   await page.goto('/bikri/admin');
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page).toHaveTitle('Bikri Operator Console');
   await expect(page.getByText('Platform operator')).toBeVisible();
   // The console never opens a shop database or the PIN lock.
   await expect(page.getByTestId('lock-screen')).toHaveCount(0);
@@ -37,6 +38,10 @@ test('operator console: overview, new shop with a one-time code, read-only and r
   await page.goto('/bikri/admin/tenants');
   await page.getByLabel('Search shops').fill(slug);
   await page.getByRole('link', { name: `Console ${slug}` }).click();
+  await expect(
+    page.getByRole('heading', { name: `Console ${slug}` }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle(`Console ${slug} — Bikri Operator Console`);
   await page.getByRole('button', { name: 'Make read-only' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Reason').fill('Payment overdue (e2e)');
