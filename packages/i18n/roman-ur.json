@@ -302,6 +302,8 @@
     "recent_bills": "Haaliya bill",
     "run_till": "Dukaan chalayein",
     "sold_today": "Aaj ki farokht",
+    "credit_bills": "Udhaar bill",
+    "credit_bills_value": "{{total}} mein se {{credit}}",
     "suggested": "Tajweez karda fehrist se",
     "udhaar_given": "Udhaar diya",
     "udhaar_received": "Udhaar wasool",

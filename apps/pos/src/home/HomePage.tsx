@@ -875,34 +875,7 @@ function RegisterCard({
         String(lastSale.business_date) === today ? 'time' : 'datetimeShort',
       )
     : null;
-  const metrics: {
-    id: string;
-    label: string;
-    value: React.ReactNode;
-    hint?: string;
-    testId: string;
-  }[] = [
-    ...(showCash
-      ? [
-          {
-            id: 'cash',
-            label: t('home.cash_drawer'),
-            value: <MoneyText paisa={cash} />,
-            hint: t('home.cash_hint'),
-            testId: 'today-cash',
-          },
-        ]
-      : []),
-    ...(showProfit
-      ? [
-          {
-            id: 'profit',
-            label: t('home.profit_today'),
-            value: <MoneyText paisa={data.today.grossProfit} />,
-            testId: 'today-profit',
-          },
-        ]
-      : []),
+  const metrics = [
     {
       id: 'udhaar_given',
       label: t('home.udhaar_given'),
@@ -916,12 +889,6 @@ function RegisterCard({
       testId: 'today-udhaar-received',
     },
   ];
-  const metricCols =
-    metrics.length >= 4
-      ? 'xl:grid-cols-4'
-      : metrics.length === 3
-        ? 'xl:grid-cols-3'
-        : 'xl:grid-cols-2';
   return (
     <section
       aria-labelledby="register-heading"
@@ -953,51 +920,85 @@ function RegisterCard({
         ) : null}
       </div>
       <PrivacyProvider active={globalPrivacy || hidden}>
-        <div className="mt-4" data-testid="today-sold">
-          <p className="text-small text-text-muted">{t('home.sold_today')}</p>
-          <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-2">
-            <p className="text-figure font-semibold tabular-nums leading-none">
-              <MoneyText paisa={data.today.sold} />
-            </p>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
-              <span aria-hidden="true" className="[&>svg]:size-3.5">
-                <SalesIcon />
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0" data-testid="today-sold">
+            <p className="text-small text-text-muted">{t('home.sold_today')}</p>
+            <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-2">
+              <p className="text-figure font-semibold tabular-nums leading-none">
+                <MoneyText paisa={data.today.sold} />
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
+                <span aria-hidden="true" className="[&>svg]:size-3.5">
+                  <SalesIcon />
+                </span>
+                {t('home.bills_count', { count: data.today.bills })}
               </span>
-              {t('home.bills_count', { count: data.today.bills })}
-            </span>
+            </div>
           </div>
+          {showProfit ? (
+            <div className="min-w-0 text-end" data-testid="today-profit">
+              <p className="text-small text-text-muted">
+                {t('home.profit_today')}
+              </p>
+              <p className="mt-1 text-title font-semibold tabular-nums">
+                <MoneyText paisa={data.today.grossProfit} />
+              </p>
+            </div>
+          ) : null}
         </div>
-        <div
-          className={`mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 ${metricCols}`}
-        >
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_auto]">
           {metrics.map((metric) => (
             <Metric
               key={metric.id}
               label={metric.label}
               value={metric.value}
-              hint={
-                metric.hint ? (
-                  <span className="mt-0.5 block text-caption text-text-muted">
-                    {metric.hint}
-                  </span>
-                ) : undefined
-              }
               testId={metric.testId}
             />
           ))}
+          <Metric
+            className="col-span-2 sm:col-span-1"
+            label={t('home.credit_bills')}
+            value={t('home.credit_bills_value', {
+              credit: data.today.creditBills,
+              total: data.today.bills,
+            })}
+            testId="today-credit-bills"
+          />
         </div>
+        {showCash || canClose ? (
+          <div className="mt-4 border-t border-border pt-3">
+            {showCash ? (
+              <div
+                className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1"
+                data-testid="today-cash"
+              >
+                <div className="min-w-0">
+                  <p className="text-small text-text-muted">
+                    {t('home.cash_drawer')}
+                  </p>
+                  <p className="mt-0.5 text-caption text-text-muted">
+                    {t('home.cash_hint')}
+                  </p>
+                </div>
+                <p className="text-title font-semibold tabular-nums">
+                  <MoneyText paisa={cash} />
+                </p>
+              </div>
+            ) : null}
+            {canClose ? (
+              <Link
+                to="/day-close"
+                className={`-mx-4 -mb-4 flex min-h-11 items-center justify-between rounded-b-card px-4 text-small font-medium text-primary transition-colors duration-150 hover:bg-surface-2 ${
+                  showCash ? 'mt-2' : ''
+                }`}
+              >
+                <span>{t('home.day_close')}</span>
+                <ChevronRightIcon className="size-4 rtl:rotate-180" />
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </PrivacyProvider>
-      {canClose ? (
-        <div className="-mx-4 -mb-4 mt-4 border-t border-border">
-          <Link
-            to="/day-close"
-            className="flex min-h-11 items-center justify-between rounded-b-card px-4 text-small font-medium text-primary transition-colors duration-150 hover:bg-surface-2"
-          >
-            <span>{t('home.day_close')}</span>
-            <ChevronRightIcon className="size-4 rtl:rotate-180" />
-          </Link>
-        </div>
-      ) : null}
     </section>
   );
 }

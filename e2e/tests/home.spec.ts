@@ -35,6 +35,9 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.getByTestId('today-udhaar-received')).toContainText(
       'Rs 100',
     );
+    await expect(page.getByTestId('today-credit-bills')).toContainText(
+      '1 of 2',
+    );
     const recent = page.getByRole('region', { name: 'Recent bills' });
     await expect(
       recent.getByRole('link').filter({ hasText: 'A-A-2' }).first(),
@@ -136,6 +139,9 @@ test.describe('Home and shell (T-013)', () => {
     ).toBeVisible();
     await expect(page.getByTestId('today-sold')).toContainText('1,000');
     await expect(page.getByText('آج کی فروخت')).toBeVisible();
+    await expect(page.getByTestId('today-credit-bills')).toContainText(
+      '2 میں سے 1',
+    );
     await expect(page.getByRole('heading', { name: 'حالیہ بل' })).toBeVisible();
     await expectNoSeriousAxe(page);
     await expectNoHorizontalScroll(page);

@@ -302,6 +302,8 @@
     "recent_bills": "حالیہ بل",
     "run_till": "دکان چلائیں",
     "sold_today": "آج کی فروخت",
+    "credit_bills": "ادھار بل",
+    "credit_bills_value": "{{total}} میں سے {{credit}}",
     "suggested": "تجویز کردہ فہرست سے",
     "udhaar_given": "ادھار دیا",
     "udhaar_received": "ادھار وصول",
