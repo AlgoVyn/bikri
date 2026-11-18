@@ -162,11 +162,9 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
     { timeout: 30_000 },
   );
 
-  // A browser that leaves shop B and joins shop A loses B's database (journey 21, I-case).
-  await b.page.goto('/bikri/settings');
-  await unlock(b.page);
-  // The leave action is intentionally blocked while the outbox has ops. Wait for the
-  // queue instead of racing a background sync under CI load.
+  // The leave action is intentionally blocked while the outbox has ops. Drain it before
+  // navigating: a full page load aborts a push in flight and leaves its claim for the
+  // stale-reclaim window, so the queue would look stuck after Settings loads.
   await syncNow(b.page);
   await expect
     .poll(
@@ -178,6 +176,10 @@ test('two shops stay apart; a shop over its sync budget keeps selling (I-cases, 
       { timeout: 30_000 },
     )
     .toBe(0);
+
+  // A browser that leaves shop B and joins shop A loses B's database (journey 21, I-case).
+  await b.page.goto('/bikri/settings');
+  await unlock(b.page);
   await b.page.getByRole('button', { name: 'Leave this shop' }).click();
   await b.page
     .getByRole('dialog', { name: 'Leave that shop' })
