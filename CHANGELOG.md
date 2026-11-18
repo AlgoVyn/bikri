@@ -28,7 +28,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - POS declaration output moves to `.tsbuild/`, and the post-build removes legacy `dist/types`/`dist/types-node`, so ~1 MB of TypeScript declarations is no longer uploaded as static assets (16 Nov review §11, D-254).
 
 ### Design
-- The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer section with the “Expected · since last close” cash hint and a full-width Day close row (D-249, D-250, D-252, D-253).
+- The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer footer on a subtle band with the “Expected · since last close” cash hint and a full-width Day close row. The phone credit-bill count is a horizontal label/value row, the count uses a lighter 18 px weight, the bill-count pill drops its icon, and negative profit uses the danger tone only while amounts are visible (D-249, D-250, D-252, D-253, D-255).
 
 ## [1.1.0] — 2026-11-16
 
