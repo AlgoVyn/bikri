@@ -44,7 +44,7 @@ Also shown (informational, not part of cash): card total, bank/wallet total by p
 
 ## Writes
 
-One `day_closes` row with every component (CHECK constraint enforces the formula), denominations JSON, note; `audit_log day_close_difference` when |difference| ≥ Rs 100; forces sync. Prints a Z-report on the receipt printer (all lines above + per-method totals + "Closed by"), and offers PDF/CSV export. Next period starts at this close; next opening cash = this counted cash (owner can record "Took home" as a pay-out before closing).
+One `day_closes` row with every component (CHECK constraint enforces the formula), denominations JSON, note; `audit_log day_close_difference` when |difference| ≥ Rs 100; forces sync. Prints a Z-report on the receipt printer (all lines above + per-method totals + "Closed by") unless **Printer → Print Z-report after day close** is off; **Print Z-report** on the closed-day screen still queues it. Offers PDF/CSV export. Next period starts at this close; next opening cash = this counted cash (owner can record "Took home" as a pay-out before closing).
 
 ## States
 

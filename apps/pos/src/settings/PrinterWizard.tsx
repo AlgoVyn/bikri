@@ -109,6 +109,7 @@ export function PrinterWizard({
       auto_print: true,
       copies: 1,
       print_logo: true,
+      print_day_close: true,
       qr: false,
       drawer: true,
       drawer_pin: 2,

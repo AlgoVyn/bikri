@@ -40,6 +40,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ### Statements
 - Customer statement exports always include each bill's item lines and leave out cancelled bills; the till's history still shows a cancelled bill with a **Cancelled** pill and its reversing row so the balance stays auditable (D-257, D-258).
 
+### Day close
+- Reports → Day closes now shows the note recorded with each short/over close, and Printer settings gain **Print Z-report after day close** (per device, default on). The manual **Print Z-report** button still queues a report when automatic printing is off (D-264).
+
 ## [1.1.0] — 2026-11-16
 
 ### Bundles

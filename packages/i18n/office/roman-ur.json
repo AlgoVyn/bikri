@@ -745,7 +745,8 @@
       "voided_amount": "Mansookh shuda",
       "voids": "Mansookh",
       "subtitle": "Farokht, munafa aur stock",
-      "not_enough_days": "Trend ke liye abhi kaafi din nahin."
+      "not_enough_days": "Trend ke liye abhi kaafi din nahin.",
+      "note": "Note"
     },
     "backup": {
       "building": "Export ban raha hai…",

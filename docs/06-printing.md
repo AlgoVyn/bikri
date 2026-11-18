@@ -321,7 +321,7 @@ Wizard steps:
 
 If a USB `claimInterface` fails on Windows, the wizard explains the driver issue (§5.1) and offers Serial or System printing instead of failing.
 
-Other fields: auto-print after sale (default on), copies (1–3), print logo on this device (on; the shop-level receipt switch can also hide it), QR on receipt (off), drawer pin, cut type, preview at the chosen width.
+Other fields: auto-print after sale (default on), copies (1–3), print logo on this device (on; the shop-level receipt switch can also hide it), print Z-report after day close (on), QR on receipt (off), drawer pin, cut type, preview at the chosen width.
 
 ## 9. Print job lifecycle and errors
 

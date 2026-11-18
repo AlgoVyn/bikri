@@ -10,6 +10,7 @@ import type { Table } from 'dexie';
 import { csvCell, rupeesCsv2 } from '../lib/csv.ts';
 import type { TableSource } from './caches.ts';
 import type { LedgerContext } from './products.ts';
+import type { PrinterKv } from './receipt.ts';
 import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
@@ -308,10 +309,16 @@ export async function closeDay(
   );
   // The close is committed; a print-queue failure must not make the caller retry with a
   // new dayCloseId and create a second close.
-  if (options.print !== false && String(row.id) === input.dayCloseId)
-    await queueDayClosePrint(db, String(row.id), { now }).catch(
-      () => undefined,
-    );
+  if (options.print !== false && String(row.id) === input.dayCloseId) {
+    try {
+      const printer = ((await db.kv.get('printer'))?.value ??
+        null) as PrinterKv | null;
+      if (printer?.print_day_close !== false)
+        await queueDayClosePrint(db, String(row.id), { now });
+    } catch {
+      // Printing is optional; the close itself is already saved.
+    }
+  }
   return row;
 }
 

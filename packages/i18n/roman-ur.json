@@ -665,7 +665,8 @@
     "agent_download_all": "Tamam downloads",
     "agent_download_sha": "SHA-256 checksums",
     "agent_download_hint": "Unsigned builds: SHA-256 check karein; Windows SmartScreen dikha sakta hai.",
-    "agent_checking": "Print service dhoondhi ja rahi hai…"
+    "agent_checking": "Print service dhoondhi ja rahi hai…",
+    "print_day_close": "Day close ke baad Z-report print karein"
   },
   "privacy": {
     "title": "Raqam chhupayein",

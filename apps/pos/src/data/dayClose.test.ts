@@ -300,6 +300,28 @@ describe('day close (T-047)', () => {
     expect(job ? await jobReceipt(db, job) : null).not.toBeNull();
   });
 
+  it('can skip the automatic Z-report from the printer setting', async () => {
+    const { db, ctx } = await setup('no-z');
+    await db.kv.put({
+      key: 'printer',
+      value: { print_day_close: false },
+    });
+    const row = await closeDay(
+      db,
+      { dayCloseId: 'no-z', countedCash: 0 },
+      ctx,
+      { now: NOW + 1000 },
+    );
+    expect(
+      await db.print_jobs.filter((j) => j.day_close_id === 'no-z').count(),
+    ).toBe(0);
+    // The manual Print Z-report action still queues it.
+    await queueDayClosePrint(db, String(row.id), { now: NOW + 2000 });
+    expect(
+      await db.print_jobs.filter((j) => j.day_close_id === 'no-z').count(),
+    ).toBe(1);
+  });
+
   it('AC 2/3: D2 is correct; a previous close provides the opening and D3 supplier cash', async () => {
     const { db, ctx } = await setup('d2');
     await db.payments.bulkAdd([

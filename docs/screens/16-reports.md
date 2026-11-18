@@ -24,7 +24,7 @@ Tabs:
 3. **Stock**: stock value (avg cost), low stock, out of stock, negative stock exceptions, stock movement summary by reason, supplier returns (count, credit, return difference — informational, not in profit).
 4. **Udhaar**: total owed, aging buckets (same as chase list), top debtors.
 5. **Staff**: bills, sold, discounts given, refunds, cancellations by cashier.
-6. **Day closes**: list of closes with expected, counted, difference; totals of shorts/overs.
+6. **Day closes**: list of closes with expected, counted, difference and note; totals of shorts/overs.
 7. **Expenses**: by category.
 
 Table headers and cells share one start alignment (left in English/Roman Urdu, right in Urdu), matching the main lists (D-214); amounts stay tabular and never truncate. On phones the summary cards stay two-up, long KPI amounts step down at narrow widths and for long figures rather than spilling into the next card, the range row stacks below the presets, and chart labels stay readable (never below 10 px); charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.

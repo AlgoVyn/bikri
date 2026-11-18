@@ -1406,6 +1406,7 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
           t('office.reports.expected'),
           t('office.reports.counted'),
           t('office.reports.difference'),
+          t('office.reports.note'),
         ]}
         rowKeys={closes.rows.map((row) => String(row.close.id))}
         rows={closes.rows.map((row) => [
@@ -1426,6 +1427,7 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
           >
             <MoneyText paisa={Number(row.close.difference)} />
           </span>,
+          String(row.close.note ?? '') || '—',
         ])}
         empty={t('office.reports.no_closes')}
       />

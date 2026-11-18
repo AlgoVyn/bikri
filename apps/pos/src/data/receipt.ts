@@ -60,6 +60,8 @@ export type PrinterKv = {
   copies?: number;
   /** Default on. */
   print_logo?: boolean;
+  /** Print the day-close Z-report automatically. Default on. */
+  print_day_close?: boolean;
   /** Open the drawer for sales with cash. Default on. */
   drawer?: boolean;
 };
