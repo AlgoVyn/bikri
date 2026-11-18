@@ -4,7 +4,7 @@ import {
   assertSqlDump,
   backupDate,
   buildManifest,
-  countQueries,
+  countDumpRows,
   parseWranglerJson,
 } from './export.mjs';
 import { BACKUP_TABLES, PLATFORM_TABLES } from './tables.mjs';
@@ -78,10 +78,42 @@ describe('nightly D1 export', () => {
     expect(Object.keys(manifest.tenants.t1.tables)).toEqual(BACKUP_TABLES);
   });
 
-  it('splits counts into compound queries D1 accepts', () => {
-    const queries = countQueries();
-    expect(queries.length).toBeGreaterThan(1);
-    for (const query of queries)
-      expect(query.split(' UNION ALL ').length).toBeLessThanOrEqual(5);
+  it('counts tenant rows from the dump instead of a second D1 pass', () => {
+    const sql = [
+      'CREATE TABLE "sales" (tenant_id TEXT, id TEXT, note TEXT);',
+      `INSERT INTO "sales" ("tenant_id","id","note") VALUES('t1','s1','a, b (c); d');`,
+      `INSERT INTO "sales" ("id","tenant_id") VALUES('s2','t1');`,
+      `INSERT INTO "sales" ("tenant_id","id","note") VALUES('t1','s3','line\n two');`,
+      `INSERT INTO "expenses" ("tenant_id","id") VALUES('t2','e1'),('t2','e2');`,
+      `INSERT INTO "tenants" ("id") VALUES('t1');`,
+    ].join('\n');
+    expect(
+      countDumpRows(sql).sort((a, b) =>
+        `${a.tbl}:${a.tenant_id}`.localeCompare(`${b.tbl}:${b.tenant_id}`),
+      ),
+    ).toEqual([
+      { tbl: 'expenses', tenant_id: 't2', n: 2 },
+      { tbl: 'sales', tenant_id: 't1', n: 3 },
+    ]);
+  });
+
+  it('ignores SQL comments that contain quotes or semicolons', () => {
+    const sql = [
+      `CREATE TABLE "sales" ( -- 'read_only' is a status; don't split`,
+      ' tenant_id TEXT, id TEXT);',
+      `INSERT INTO "sales" ("tenant_id","id") VALUES('t1','s1');`,
+    ].join('\n');
+    expect(countDumpRows(sql)).toEqual([
+      { tbl: 'sales', tenant_id: 't1', n: 1 },
+    ]);
+  });
+
+  it('refuses an unparseable INSERT for a tenant table', () => {
+    expect(() => countDumpRows(`INSERT INTO "sales" VALUES('t1');`)).toThrow(
+      'cannot parse INSERT for sales',
+    );
+    expect(() =>
+      countDumpRows(`INSERT INTO "sales" ("tenant_id","id") VALUES('t1');`),
+    ).toThrow('row has 1 values for 2 columns');
   });
 });

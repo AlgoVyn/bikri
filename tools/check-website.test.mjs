@@ -6,6 +6,7 @@ import {
   checkSite,
   formatReport,
   parseSitemap,
+  sameOriginImports,
 } from './check-website.mjs';
 
 // Sample-based tests for the go-live gate (docs/10-testing.md §7, 01 §5.5).
@@ -55,6 +56,15 @@ describe('analyzeHtml', () => {
     );
     expect(levels(findings)).toEqual(['fail:third-party-script']);
   });
+
+  it('collects same-origin imports from inline scripts', () => {
+    const { sameOriginScripts } = analyzeHtml(
+      '<script>import("./lazy.js")</script>',
+      PAGE,
+      HOST,
+    );
+    expect(sameOriginScripts).toEqual(['https://algovyn.com/lazy.js']);
+  });
 });
 
 describe('analyzeJs', () => {
@@ -79,6 +89,24 @@ describe('analyzeJs', () => {
     expect(
       levels(analyzeJs('navigator.serviceWorker.register(url)', PAGE, HOST)),
     ).toEqual(['fail:service-worker']);
+  });
+});
+
+describe('sameOriginImports', () => {
+  it('resolves relative and absolute same-host imports and skips bare specifiers', () => {
+    const js = [
+      "import './a.js';",
+      "import('/nested/b.js');",
+      "export { x } from '../c.js';",
+      "import('https://esm.sh/react');",
+      "import('react');",
+      "importScripts('//cdn.example/worker.js');",
+    ].join('\n');
+    expect(sameOriginImports(js, PAGE, HOST)).toEqual([
+      'https://algovyn.com/a.js',
+      'https://algovyn.com/nested/b.js',
+      'https://algovyn.com/c.js',
+    ]);
   });
 });
 
@@ -108,7 +136,11 @@ describe('checkSite', () => {
       '/marksocial': { type: 'text/html', body: sample('tailwind-cdn.html') },
       '/assets/site.js': {
         type: 'text/javascript',
-        body: "import('https://cdn.example/a.js')",
+        body: "import('https://cdn.example/a.js'); import('./nested.js');",
+      },
+      '/assets/nested.js': {
+        type: 'text/javascript',
+        body: "import('https://cdn.example/nested.js')",
       },
       '/assets/menu.js': {
         type: 'text/javascript',
@@ -122,6 +154,7 @@ describe('checkSite', () => {
       .map((f) => `${f.rule} ${f.page}`);
     expect(fails.sort()).toEqual(
       [
+        'third-party-import https://algovyn.com/assets/nested.js',
         'third-party-import https://algovyn.com/assets/site.js',
         'third-party-script https://algovyn.com/marksocial',
       ].sort(),
@@ -168,6 +201,25 @@ describe('checkSite', () => {
     const findings = await checkSite('https://algovyn.com', fetchImpl);
     expect(findings).toEqual([]);
     expect(formatReport(findings)).toContain('pass');
+  });
+
+  it('follows a script import cycle without looping', async () => {
+    const fetchImpl = site({
+      '/': {
+        type: 'text/html',
+        body: '<script src="/assets/a.js"></script>',
+      },
+      '/assets/a.js': {
+        type: 'text/javascript',
+        body: "import './b.js'",
+      },
+      '/assets/b.js': {
+        type: 'text/javascript',
+        body: "import './a.js'",
+      },
+    });
+    const findings = await checkSite('https://algovyn.com', fetchImpl);
+    expect(findings).toEqual([]);
   });
 });
 

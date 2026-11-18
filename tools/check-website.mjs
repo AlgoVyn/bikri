@@ -8,6 +8,7 @@
 //   node tools/check-website.mjs --site=https://example.test
 
 const MAX_PAGES = 50;
+const MAX_SCRIPTS = 200;
 const ROOT_SW_PATHS = [
   '/sw.js',
   '/service-worker.js',
@@ -15,6 +16,8 @@ const ROOT_SW_PATHS = [
   '/worker.js',
 ];
 const BIKRI_PREFIX = '/bikri/';
+const IMPORT_RE =
+  /\b(?:import\s*\(\s*|importScripts\s*\(\s*|import\s+(?:[\w*{}\s,]+\s+from\s+)?|export\s+[\w*{}\s,]+\s+from\s+)["'`]([^"'`]+)["'`]/g;
 
 /** @typedef {{ level: 'fail' | 'warn', page: string, rule: string, detail: string }} Finding */
 
@@ -52,9 +55,7 @@ function attr(tag, name) {
 export function analyzeJs(js, sourceUrl, host) {
   /** @type {Finding[]} */
   const findings = [];
-  const importRe =
-    /\b(?:import\s*\(\s*|importScripts\s*\(\s*|import\s+(?:[\w*{}\s,]+\s+from\s+)?|export\s+[\w*{}\s,]+\s+from\s+)["'`]([^"'`]+)["'`]/g;
-  for (const m of js.matchAll(importRe)) {
+  for (const m of js.matchAll(IMPORT_RE)) {
     const spec = m[1] ?? '';
     if (!/^(?:https?:)?\/\//i.test(spec)) continue;
     const url = resolveUrl(spec, sourceUrl);
@@ -81,6 +82,33 @@ export function analyzeJs(js, sourceUrl, host) {
     }
   }
   return findings;
+}
+
+/**
+ * Same-origin script imports, resolved against the importing file. Bare module specifiers
+ * are skipped: the browser resolves them through an import map, not as a path on this host.
+ * @param {string} js
+ * @param {string} sourceUrl
+ * @param {string} host
+ * @returns {string[]}
+ */
+export function sameOriginImports(js, sourceUrl, host) {
+  /** @type {string[]} */
+  const out = [];
+  for (const m of js.matchAll(IMPORT_RE)) {
+    const spec = (m[1] ?? '').trim();
+    if (
+      !spec.startsWith('/') &&
+      !spec.startsWith('./') &&
+      !spec.startsWith('../') &&
+      !spec.startsWith('//') &&
+      !/^https?:\/\//iu.test(spec)
+    )
+      continue;
+    const url = resolveUrl(spec, sourceUrl);
+    if (url && url.host === host) out.push(url.href);
+  }
+  return out;
 }
 
 /**
@@ -123,6 +151,7 @@ export function analyzeHtml(html, pageUrl, host) {
       type !== 'application/json'
     ) {
       findings.push(...analyzeJs(body, pageUrl, host));
+      sameOriginScripts.push(...sameOriginImports(body, pageUrl, host));
     }
   }
 
@@ -272,6 +301,8 @@ export async function checkSite(site, fetchImpl = fetch) {
   const seen = new Set();
   /** @type {Set<string>} */
   const seenJs = new Set();
+  /** @type {string[]} */
+  const jsQueue = [];
   let homeAnalysed = false;
   while (queue.length > 0 && seen.size < MAX_PAGES) {
     const url = /** @type {string} */ (queue.shift());
@@ -307,18 +338,38 @@ export async function checkSite(site, fetchImpl = fetch) {
     // Follow every page, not just Home: a third-party script can live on a page
     // reached only through a sitemap or a second-level link.
     queue.push(...result.links);
-    for (const js of result.sameOriginScripts) {
-      if (seenJs.has(js) || isBikriPath(new URL(js).pathname)) continue;
-      seenJs.add(js);
-      try {
-        const file = await get(js);
-        if (file.status === 200)
-          findings.push(...analyzeJs(file.text, js, host));
-      } catch {
-        // unreachable script: the browser would not run it either
-      }
-    }
+    jsQueue.push(...result.sameOriginScripts);
   }
+
+  // Follow same-origin imports in the scripts that pages load, not just the scripts
+  // referenced by an HTML tag. A visited set handles cycles and the cap bounds the crawl.
+  while (jsQueue.length > 0 && seenJs.size < MAX_SCRIPTS) {
+    const js = /** @type {string} */ (jsQueue.shift());
+    const jsUrl = new URL(js);
+    if (seenJs.has(js) || isBikriPath(jsUrl.pathname)) continue;
+    seenJs.add(js);
+    let file;
+    try {
+      file = await get(js);
+    } catch {
+      // unreachable script: the browser would not run it either
+      continue;
+    }
+    if (file.status !== 200) continue;
+    const type = (file.type ?? '').toLowerCase();
+    const scriptPath = /\.(?:m?js|cjs)$/iu.test(jsUrl.pathname);
+    if (!scriptPath && !/javascript|ecmascript/u.test(type)) continue;
+    if (/text\/html|text\/css|application\/json/u.test(type)) continue;
+    findings.push(...analyzeJs(file.text, js, host));
+    jsQueue.push(...sameOriginImports(file.text, js, host));
+  }
+  if (jsQueue.length > 0)
+    findings.push({
+      level: 'warn',
+      page: home,
+      rule: 'script-limit',
+      detail: `stopped after ${MAX_SCRIPTS} same-origin scripts`,
+    });
 
   if (
     !homeAnalysed &&

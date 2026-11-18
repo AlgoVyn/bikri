@@ -3,6 +3,7 @@ docs/reference/dukaan/
 
 node_modules/
 dist/
+.tsbuild/
 .wrangler/
 .dev.vars*
 coverage/

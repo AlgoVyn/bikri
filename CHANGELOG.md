@@ -21,6 +21,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 - The till checks for a new service worker hourly and again when it becomes visible, with a five-minute minimum gap, so an always-open standalone window no longer waits for the manual Settings → About check (16 Nov performance review §12, D-251).
 
+### Tooling
+
+- The website release gate follows same-origin JavaScript imports recursively with a visited set and a 200-script cap, closing the one-hop third-party import gap (7 Nov P3-34, D-254).
+- Nightly backups count tenant rows from the D1 dump instead of a second `COUNT(*)` pass; an unparseable tenant `INSERT` fails the backup instead of writing a zero count (16 Nov review §11, D-254).
+- POS declaration output moves to `.tsbuild/`, and the post-build removes legacy `dist/types`/`dist/types-node`, so ~1 MB of TypeScript declarations is no longer uploaded as static assets (16 Nov review §11, D-254).
+
 ### Design
 - The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer section with the “Expected · since last close” cash hint and a full-width Day close row (D-249, D-250, D-252, D-253).
 
