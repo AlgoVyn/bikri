@@ -29,6 +29,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Design
 - The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer footer on a subtle band with the “Expected · since last close” cash hint and a full-width Day close row. The phone credit-bill count is a horizontal label/value row, the count uses a lighter 18 px weight, the bill-count pill drops its icon, and negative profit uses the danger tone only while amounts are visible (D-249, D-250, D-252, D-253, D-255).
+- The Home Today card no longer shows **Profit today**; sold and the bill count stay the hero, and profit remains in Reports for `cost.view` users (D-260).
+
+### Receipts
+- Settings → Shop profile & receipt gains a shop-level **Show logo on receipts** switch (migration `0025`, schema 8). It hides the uploaded logo from every receipt without deleting it; the live preview follows immediately, and Printer → **Print logo on this device** remains a device override (D-261, D-262).
+
+### Terminology
+- User-facing **Void** is renamed to **Cancel** and **Paid** is shown as **Completed** throughout the till — status, action, dialog, errors, statement badge and report labels. Internal `void`/`paid` status values and schema stay unchanged; the Sales CSV maps them to `completed`/`cancelled`, and the Staff report CSV exports `cancelled_bills,cancelled_amount` (D-259, D-262, D-263).
+
+### Statements
+- Customer statement exports always include each bill's item lines and leave out cancelled bills; the till's history still shows a cancelled bill with a **Cancelled** pill and its reversing row so the balance stays auditable (D-257, D-258).
 
 ## [1.1.0] — 2026-11-16
 

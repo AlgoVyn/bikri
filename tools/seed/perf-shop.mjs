@@ -1041,6 +1041,7 @@ function main() {
       rev: 1,
       updated_by: owner.id,
       show_shop_name_on_receipt: 1,
+      show_logo_on_receipt: 1,
     };
     insert('shop', { tenant_id: tenantId, ...shop });
 

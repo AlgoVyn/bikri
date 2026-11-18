@@ -59,7 +59,7 @@ export function pushShopHeader(
   labels: ReceiptLabels,
   printLogo: boolean,
 ): void {
-  if (printLogo) {
+  if (printLogo && shop.showLogo !== false) {
     blocks.push({ t: 'logo' });
   }
   const name = shop.showShopName === false ? '' : shop.name.trim();

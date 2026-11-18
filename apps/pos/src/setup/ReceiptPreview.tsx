@@ -23,6 +23,7 @@ export type PreviewShop = {
   tax_label?: string;
   receipt_language?: string;
   show_shop_name_on_receipt?: boolean;
+  show_logo_on_receipt?: boolean;
 };
 
 const SAMPLE_PRICE = 4_200_000;
@@ -41,7 +42,8 @@ export function previewBlocks(shop: PreviewShop, uiLanguage = 'en'): Block[] {
     shop.tax_rate_bp > 0 && !shop.inclusive
       ? mulDivRound(SAMPLE_PRICE, shop.tax_rate_bp, 10_000)
       : 0;
-  const blocks: Block[] = [{ t: 'logo' }];
+  const blocks: Block[] =
+    shop.show_logo_on_receipt !== false ? [{ t: 'logo' }] : [];
   if (shop.show_shop_name_on_receipt !== false && shop.name.trim())
     blocks.push({
       t: 'text',
@@ -126,6 +128,7 @@ export function ReceiptPreview({
 }) {
   const { t, i18n } = useTranslation();
   const chars = charsPerLine ?? (paperMm === 58 ? 32 : 48);
+  const showLogo = shop.show_logo_on_receipt !== false;
   const lines = receiptTextLines(previewBlocks(shop, i18n.language), {
     charsPerLine: chars,
     itemLayout: itemLayoutFor(chars, paperMm),
@@ -148,7 +151,7 @@ export function ReceiptPreview({
         className="mx-auto max-w-full font-mono text-receipt"
         style={{ width: `${chars}ch` }}
       >
-        {logoUrl ? (
+        {showLogo && logoUrl ? (
           <img
             src={logoUrl}
             alt={t('setup.logo_preview')}

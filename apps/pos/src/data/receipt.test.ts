@@ -273,6 +273,19 @@ describe('sale receipt from local rows (screens/07)', () => {
     );
   });
 
+  it('maps the shop logo switch into the receipt input', async () => {
+    const shown = await soldShop('rcpt-logo-on');
+    expect((await loadSaleReceipt(shown.db, shown.saleId))?.shop.showLogo).toBe(
+      true,
+    );
+    const hidden = await soldShop('rcpt-logo-off', {
+      show_logo_on_receipt: 0,
+    });
+    expect(
+      (await loadSaleReceipt(hidden.db, hidden.saleId))?.shop.showLogo,
+    ).toBe(false);
+  });
+
   it('print jobs: queue, latest, retry', async () => {
     const { db, saleId } = await soldShop();
     const first = await queueSalePrint(db, saleId, { now: NOW });

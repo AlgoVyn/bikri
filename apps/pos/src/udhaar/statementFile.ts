@@ -15,7 +15,7 @@ export type StatementFileRow = {
   debit: number;
   credit: number;
   balance: number;
-  /** Opt-in sale-line details for a detailed export. */
+  /** Sale-line details for the always-detailed statement exports. */
   items?: readonly StatementItem[];
 };
 

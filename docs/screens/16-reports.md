@@ -23,7 +23,7 @@ Tabs:
 2. **Products**: best sellers by qty and revenue, slow movers (no sale in 30 days with stock > 0), profit by product (`cost.view`), by category, by brand.
 3. **Stock**: stock value (avg cost), low stock, out of stock, negative stock exceptions, stock movement summary by reason, supplier returns (count, credit, return difference — informational, not in profit).
 4. **Udhaar**: total owed, aging buckets (same as chase list), top debtors.
-5. **Staff**: bills, sold, discounts given, refunds, voids by cashier.
+5. **Staff**: bills, sold, discounts given, refunds, cancellations by cashier.
 6. **Day closes**: list of closes with expected, counted, difference; totals of shorts/overs.
 7. **Expenses**: by category.
 
@@ -41,7 +41,7 @@ Table headers and cells share one start alignment (left in English/Roman Urdu, r
 | Products | `product,sku,qty_sold,revenue,cost,profit,margin_pct` (without `cost.view`: `product,sku,qty_sold,revenue`) |
 | Stock | `product,sku,on_hand,min_stock,avg_cost,stock_value,status` (without `cost.view`: `product,sku,on_hand,min_stock,status`) |
 | Udhaar | `bucket,name,phone,balance,age_days,promise_date` |
-| Staff | `cashier,bills,sold,discounts,refunds,refunded_amount,voids,voided_amount,net_sold` |
+| Staff | `cashier,bills,sold,discounts,refunds,refunded_amount,cancelled_bills,cancelled_amount,net_sold` |
 | Day closes | `date,device,cashier,expected,counted,difference,note` |
 | Expenses | `category,amount,share_pct` |
 

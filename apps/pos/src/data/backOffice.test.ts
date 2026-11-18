@@ -685,11 +685,14 @@ describe('back-office branch coverage', () => {
     const history = await salesHistory(db, day);
     const csv = salesCsv(history.rows, 'Asia/Karachi');
     expect(csv).toContain(
-      'A-A-s1,2026-10-27,14:00,,1,100,0,0,100,50,50,0,0,0,paid,Adnan,Counter 1',
+      'A-A-s1,2026-10-27,14:00,,1,100,0,0,100,50,50,0,0,0,completed,Adnan,Counter 1',
     );
     expect(csv).toContain('A-A-s6,2026-10-27,14:00,Gone');
     expect(csv).toContain(
-      'A-A-s5,2026-10-27,14:00,,1,100,0,0,100,100,0,0,0,0,paid,,',
+      'A-A-s5,2026-10-27,14:00,,1,100,0,0,100,100,0,0,0,0,completed,,',
+    );
+    expect(csv).toContain(
+      'A-A-s4,2026-10-27,14:00,,1,100,0,0,100,0,0,0,0,0,cancelled,Adnan,Counter 1',
     );
   });
 });

@@ -171,8 +171,8 @@ export function reportCsv(
         'discounts',
         'refunds',
         'refunded_amount',
-        'voids',
-        'voided_amount',
+        'cancelled_bills',
+        'cancelled_amount',
         'net_sold',
       ],
       bundle.staff.map((row) => [

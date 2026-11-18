@@ -73,7 +73,6 @@ export function CustomerStatement({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
-  const [includeItems, setIncludeItems] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   // Render one layout: the card list and the table both mapped every entry and
   // formatted two dates per row, even when CSS hid one of them (D-231).
@@ -181,6 +180,7 @@ export function CustomerStatement({
       debit: row.debit,
       credit: row.credit,
       balance: row.balance,
+      voided: row.voided,
       items: row.items,
     }));
   const rows = mapRows(statement);
@@ -229,13 +229,16 @@ export function CustomerStatement({
       }),
     },
   };
+  // Every export carries the bill's item lines and leaves out voided bills and
+  // their reversing rows; only the screen shows the full history.
   const fullStatement = () =>
     customerStatement(
       getDb(),
       customerId,
       range,
       Number.POSITIVE_INFINITY,
-      includeItems,
+      true,
+      false,
     );
   const fullMeta = async () => {
     const full = await fullStatement();
@@ -526,18 +529,6 @@ export function CustomerStatement({
         >
           {t('office.udhaar.jump_latest')}
         </button>
-        {can('export.data') ? (
-          <label className="flex min-h-11 items-center gap-2 text-small">
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={includeItems}
-              data-testid="statement-include-items"
-              onChange={(event) => setIncludeItems(event.target.checked)}
-            />
-            {t('office.udhaar.include_bill_details')}
-          </label>
-        ) : null}
       </div>
 
       {!wide ? (
@@ -572,7 +563,7 @@ export function CustomerStatement({
                     <MoneyText paisa={row.balance} />
                   </span>
                 </div>
-                <p className="mt-1">
+                <p className="mt-1 flex flex-wrap items-center gap-2">
                   {row.saleId ? (
                     <Link
                       to="/sales/$id"
@@ -584,6 +575,11 @@ export function CustomerStatement({
                   ) : (
                     rows[index]?.description
                   )}
+                  {rows[index]?.voided ? (
+                    <span className="rounded-full bg-danger-subtle px-2 text-caption font-medium text-danger-subtle-ink">
+                      {t('office.udhaar.voided_bill')}
+                    </span>
+                  ) : null}
                 </p>
                 <dl className="mt-2 grid grid-cols-2 gap-2">
                   <div>
@@ -658,17 +654,24 @@ export function CustomerStatement({
                       )}
                     </td>
                     <td className="p-2">
-                      {row.saleId ? (
-                        <Link
-                          to="/sales/$id"
-                          params={{ id: row.saleId }}
-                          className="underline"
-                        >
-                          {rows[index]?.description}
-                        </Link>
-                      ) : (
-                        rows[index]?.description
-                      )}
+                      <span className="flex flex-wrap items-center gap-2">
+                        {row.saleId ? (
+                          <Link
+                            to="/sales/$id"
+                            params={{ id: row.saleId }}
+                            className="underline"
+                          >
+                            {rows[index]?.description}
+                          </Link>
+                        ) : (
+                          rows[index]?.description
+                        )}
+                        {rows[index]?.voided ? (
+                          <span className="rounded-full bg-danger-subtle px-2 text-caption font-medium text-danger-subtle-ink">
+                            {t('office.udhaar.voided_bill')}
+                          </span>
+                        ) : null}
+                      </span>
                     </td>
                     <td className="p-2 text-start">
                       {row.debit > 0 ? <MoneyText paisa={row.debit} /> : '—'}

@@ -5,6 +5,8 @@ export type ReceiptShop = {
   name: string;
   /** Default on; off when the uploaded logo already contains the shop name. */
   showShopName?: boolean;
+  /** Default on; off when the shop hides the logo on printed receipts. */
+  showLogo?: boolean;
   address: string;
   phone: string;
   receiptHeader: string;

@@ -126,7 +126,7 @@ describe('udhaar data', () => {
     });
   });
 
-  it('optionally includes sale item lines in the statement export', async () => {
+  it('loads sale item lines for a detailed statement export', async () => {
     const { db, ctx } = await setup('statement-items');
     const ali = await customer(db);
     await udhaarSale(db, ctx, ali.id, 300000, NOW, 'Galaxy A15');
@@ -814,7 +814,7 @@ describe('udhaar branch coverage', () => {
     ).toBe(0);
   });
 
-  it('statement shows refund, void and adjustment entries and a range opening', async () => {
+  it('statement shows voided bills in the UI and leaves them out of exports', async () => {
     const { db, ctx } = await setup('statement-kinds');
     const ali = await customer(db);
     const product = await saveNewProduct(
@@ -883,16 +883,39 @@ describe('udhaar branch coverage', () => {
       business_date: TODAY,
       created_at: NOW + 4000,
     });
-    const statement = await customerStatement(db, ali.id);
-    expect(statement.rows.map((row) => row.kind)).toEqual([
+    const ui = await customerStatement(db, ali.id);
+    expect(ui.rows.map((row) => row.kind)).toEqual([
       'sale',
       'refund',
       'sale',
       'void',
       'adjustment',
     ]);
-    expect(statement.rows[1]?.invoiceNo).toBe('A-A-1');
-    expect(statement.rows[3]?.invoiceNo).toBeDefined();
+    expect(ui.rows.map((row) => row.voided)).toEqual([
+      false,
+      false,
+      true,
+      false,
+      false,
+    ]);
+    expect(ui.rows[1]?.invoiceNo).toBe('A-A-1');
+
+    const exported = await customerStatement(
+      db,
+      ali.id,
+      undefined,
+      Number.POSITIVE_INFINITY,
+      false,
+      false,
+    );
+    expect(exported.rows.map((row) => row.kind)).toEqual([
+      'sale',
+      'refund',
+      'adjustment',
+    ]);
+    expect(exported.rows.some((row) => row.kind === 'void')).toBe(false);
+    expect(exported.rows.some((row) => row.voided)).toBe(false);
+
     const later = await customerStatement(db, ali.id, {
       from: businessDate(NOW + 5 * 86_400_000, TZ),
       to: businessDate(NOW + 6 * 86_400_000, TZ),
@@ -904,6 +927,104 @@ describe('udhaar branch coverage', () => {
       'group,name,phone,balance,age_days,last_payment',
     );
     expect(reminderLink('not-a-phone', 'x')).toBeNull();
+  });
+
+  it('marks a voided bill in the UI while pages and ranges can omit it', async () => {
+    const { db, ctx } = await setup('statement-void');
+    const ali = await customer(db);
+    const normalSale = await udhaarSale(db, ctx, ali.id, 100000);
+    const voidedSale = await udhaarSale(
+      db,
+      ctx,
+      ali.id,
+      300000,
+      NOW - 86_400_000,
+      'Voided item',
+    );
+    await voidSale(
+      db,
+      { voidId: 'statement-void', saleId: voidedSale, reason: 'Wrong item' },
+      ctx,
+      NOW + 2000,
+    );
+
+    const ui = await customerStatement(
+      db,
+      ali.id,
+      undefined,
+      Number.POSITIVE_INFINITY,
+    );
+    expect(ui.rows.map((row) => row.kind)).toEqual(['sale', 'sale', 'void']);
+    expect(ui.rows.map((row) => row.voided)).toEqual([true, false, false]);
+    expect(ui.rows.map((row) => row.balance)).toEqual([300000, 400000, 100000]);
+    expect(ui.balance).toBe(100000);
+
+    const exported = await customerStatement(
+      db,
+      ali.id,
+      undefined,
+      Number.POSITIVE_INFINITY,
+      false,
+      false,
+    );
+    expect(exported.rows.map((row) => row.saleId)).toEqual([normalSale]);
+    expect(exported.rows[0]?.balance).toBe(100000);
+    expect(exported.openingBalance).toBe(0);
+
+    // The export page filters before the limit so `hasMore` counts only rows
+    // that will actually be written.
+    const uiPage = await customerStatement(db, ali.id, undefined, 2);
+    expect(uiPage.rows.map((row) => row.kind)).toEqual(['sale', 'void']);
+    expect(uiPage.hasMore).toBe(true);
+    const exportPage = await customerStatement(
+      db,
+      ali.id,
+      undefined,
+      2,
+      false,
+      false,
+    );
+    expect(exportPage.rows.map((row) => row.saleId)).toEqual([normalSale]);
+    expect(exportPage.hasMore).toBe(false);
+
+    const yesterday = businessDate(NOW - 86_400_000, TZ);
+    const oldUi = await customerStatement(db, ali.id, {
+      from: yesterday,
+      to: yesterday,
+    });
+    expect(oldUi.rows.map((row) => [row.kind, row.voided])).toEqual([
+      ['sale', true],
+    ]);
+    expect(oldUi.openingBalance).toBe(0);
+    const oldExport = await customerStatement(
+      db,
+      ali.id,
+      { from: yesterday, to: yesterday },
+      Number.POSITIVE_INFINITY,
+      false,
+      false,
+    );
+    expect(oldExport.rows).toEqual([]);
+    expect(oldExport.openingBalance).toBe(0);
+
+    const todayUi = await customerStatement(db, ali.id, {
+      from: TODAY,
+      to: TODAY,
+    });
+    expect(todayUi.rows.map((row) => row.kind)).toEqual(['sale', 'void']);
+    expect(todayUi.rows.map((row) => row.balance)).toEqual([400000, 100000]);
+    expect(todayUi.openingBalance).toBe(300000);
+    const todayExport = await customerStatement(
+      db,
+      ali.id,
+      { from: TODAY, to: TODAY },
+      Number.POSITIVE_INFINITY,
+      false,
+      false,
+    );
+    expect(todayExport.rows.map((row) => row.saleId)).toEqual([normalSale]);
+    expect(todayExport.rows[0]?.balance).toBe(100000);
+    expect(todayExport.openingBalance).toBe(0);
   });
 
   it('returns an empty statement for a customer with no ledger', async () => {

@@ -52,6 +52,14 @@ describe('shop header', () => {
     expect(name).toMatchObject({ align: 'center', bold: true });
   });
 
+  it('omits the logo when the shop hides it from receipts', () => {
+    const input = variant((i) => {
+      i.shop.showLogo = false;
+    });
+    const blocks = buildSaleReceipt(input, { printLogo: true });
+    expect(blocks.some((b) => b.t === 'logo')).toBe(false);
+  });
+
   it('prints a sale remark near the bottom of the receipt', () => {
     const input = variant((i) => {
       i.sale.note = 'Deliver after 6 pm';

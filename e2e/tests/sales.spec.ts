@@ -213,8 +213,8 @@ test.describe('Void and reissue (T-042)', () => {
       .getByTestId('sales-detail')
       .getByTestId('page-actions-more')
       .click();
-    await page.getByRole('button', { name: 'Void & reissue' }).click();
-    const reissue = page.getByRole('dialog', { name: 'Void & reissue' });
+    await page.getByRole('button', { name: 'Cancel & reissue' }).click();
+    const reissue = page.getByRole('dialog', { name: 'Cancel & reissue' });
     await reissue.getByRole('button', { name: 'Wrong price' }).click();
     await reissue.getByRole('button', { name: 'Open Sell' }).click();
     await expect(page.getByTestId('reissue-banner')).toContainText(
@@ -232,7 +232,7 @@ test.describe('Void and reissue (T-042)', () => {
     await page.evaluate(() => window.__bikriTest?.navigate('/sales'));
     await expect(page.getByRole('link', { name: /A-A-1/ })).toBeVisible();
     await page.getByRole('link', { name: /A-A-1/ }).click();
-    await expect(page.getByTestId('bill-status')).toHaveText('Void');
+    await expect(page.getByTestId('bill-status')).toHaveText('Cancelled');
     await expect(page.getByText('Replaced by A-A-2')).toBeVisible();
     await expect(
       page.getByTestId('sales-detail').getByRole('link', { name: 'A-A-2' }),
@@ -257,15 +257,15 @@ test.describe('Void and reissue (T-042)', () => {
       .getByTestId('sales-detail')
       .getByTestId('page-actions-more')
       .click();
-    await page.getByRole('button', { name: 'Void', exact: true }).click();
-    const voidDialog = page.getByRole('dialog', { name: 'Void this bill?' });
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    const voidDialog = page.getByRole('dialog', { name: 'Cancel this bill?' });
     await expect(voidDialog).toContainText('Return Rs 3,500 to the customer');
     await expect(voidDialog).toContainText('Put 1 back in stock');
     await voidDialog
       .getByRole('button', { name: 'Customer cancelled' })
       .click();
-    await voidDialog.getByRole('button', { name: 'Void bill' }).click();
-    await expect(page.getByTestId('bill-status')).toHaveText('Void');
+    await voidDialog.getByRole('button', { name: 'Yes, cancel bill' }).click();
+    await expect(page.getByTestId('bill-status')).toHaveText('Cancelled');
     const latest = await idbAll<Row>(page, 'sales');
     const voided = latest.find(
       (s) => s.status === 'void' && s.id !== voids[0]?.sale_id,

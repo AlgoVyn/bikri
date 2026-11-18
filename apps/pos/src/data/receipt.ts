@@ -241,6 +241,7 @@ export async function receiptShop(
     shop: {
       name: text(row?.name),
       showShopName: Number(row?.show_shop_name_on_receipt ?? 1) !== 0,
+      showLogo: Number(row?.show_logo_on_receipt ?? 1) !== 0,
       address: text(row?.address),
       phone: text(row?.phone),
       receiptHeader: text(row?.receipt_header),

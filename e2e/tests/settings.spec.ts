@@ -134,6 +134,21 @@ test.describe('Settings (T-050)', () => {
       await receiptLogo.evaluate((img: HTMLImageElement) => img.naturalWidth),
     ).toBe(576);
 
+    // The logo stays uploaded but can be hidden from printed receipts.
+    await page.getByLabel('Show logo on receipts').uncheck();
+    await expect(receiptLogo).toHaveCount(0);
+    await page
+      .getByRole('button', { name: 'Save', exact: true })
+      .first()
+      .click();
+    await expect(page.getByText('Settings saved.')).toBeVisible();
+    await page.goto('/bikri/settings/activity');
+    await page.goto('/bikri/settings/shop');
+    await expect(page.getByLabel('Show logo on receipts')).not.toBeChecked();
+    await expect(logoPreview).toBeVisible();
+    await expect(receiptLogo).toHaveCount(0);
+    await page.getByLabel('Show logo on receipts').check();
+
     // Removing the logo is also saved by the same section button.
     await page.getByRole('button', { name: 'Remove logo' }).click();
     await expect(logoPreview).toHaveCount(0);

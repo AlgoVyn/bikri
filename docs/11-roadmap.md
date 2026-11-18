@@ -11,7 +11,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 | M0 Foundations | 1 | Monorepo, CI, deploy of an empty PWA + Worker at `https://algovyn.com/bikri/` |
 | M1 Local till | 2–4 | Multi-tenant schema (T-008), then products, Sell, Pay, receipts, offline-only (single device, one tenant's local database) |
 | M2 Sync, devices and tenants | 5–7 | Tenant-scoped enrolment and sync, PIN, multi-till, operator console (tenants, onboarding), owner email sign-in, shop admin on admin devices, per-shop quotas, read-only shops, operator support access |
-| M3 Back office | 8–9 | Refunds (incl. udhaar split), void/reissue, udhaar, suppliers, returns to supplier, barcode labels, expenses, day close, reports, exports, owner's server export |
+| M3 Back office | 8–9 | Refunds (incl. udhaar split), cancel/reissue, udhaar, suppliers, returns to supplier, barcode labels, expenses, day close, reports, exports, owner's server export |
 | M4 Hardening | 10–11 | Backups, per-tenant export/restore/deletion, performance, a11y, Urdu polish, hardware checklist, v1.0.0 release |
 | v1.1 Bundles | after v1.0.0 | Fixed-recipe product bundles: one bundle price, component sale lines, whole-bundle returns only |
 | v2 | later | Branches, IMEI/serials, batches & expiry, Bluetooth printing, FBR, direct label-printer commands, product variants |

@@ -558,6 +558,13 @@ function timeText(at: number, timeZone: string): string {
   return formatter.format(at);
 }
 
+/** CSV status names follow the till labels, while the stored lifecycle values stay `paid`/`void`. */
+function csvStatus(status: string): string {
+  if (status === 'paid') return 'completed';
+  if (status === 'void') return 'cancelled';
+  return status;
+}
+
 /**
  * CSV for the filtered list (screens/10 AC 4): one row per bill, amounts in rupees, exact header.
  */
@@ -607,7 +614,7 @@ export function salesCsv(
           rupeesCsv(row.applied.bank_wallet),
           rupeesCsv(n(sale.udhaar_amount)),
           rupeesCsv(row.refunded),
-          String(sale.status),
+          csvStatus(String(sale.status)),
           row.staffName,
           row.deviceName,
         ]

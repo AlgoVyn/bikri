@@ -154,15 +154,13 @@ describe('app shell', () => {
     expect(rail.querySelector('a[title^="Sell ("]')).not.toBeNull();
   });
 
-  it('hides profit and drawer cash from a cashier but shows them to the owner', async () => {
+  it('shows sold and drawer cash to the owner but hides the drawer from a cashier', async () => {
     await seedTodaySales();
     await renderAt(`${BASE_PATH}/`);
     expect((await screen.findByTestId('today-sold')).textContent).toContain(
       '1,000',
     );
-    expect((await screen.findByTestId('today-profit')).textContent).toContain(
-      '400',
-    );
+    expect(screen.queryByTestId('today-profit')).toBeNull();
     expect((await screen.findByTestId('today-cash')).textContent).toContain(
       '750',
     );
@@ -172,7 +170,7 @@ describe('app shell', () => {
     expect(screen.getByText('A-A-2')).toBeTruthy();
   });
 
-  it('cashier Home has no profit or cash cards', async () => {
+  it('cashier Home has no drawer cash card and no profit', async () => {
     await seedTodaySales();
     await unlockAs('cashier');
     await renderAt(`${BASE_PATH}/`);
