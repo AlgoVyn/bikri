@@ -56,6 +56,7 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     expect(await summary(db, day)).toEqual({
       sold: 100000,
       bills: 2,
+      creditBills: 1,
       grossProfit: 40000,
       udhaarGiven: 30000,
       udhaarReceived: 10000,
@@ -69,12 +70,44 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     ).toMatchObject({ sold: 0 });
   });
 
+  it('counts a credit bill as activity even when fully refunded the same day', async () => {
+    const db = await readyDb('rep-credit-refund');
+    await seedSampleDay(db, '2026-10-27', NOW);
+    const sale = (await db.sales.toArray()).find(
+      (row) => row.invoice_seq === 2,
+    );
+    if (!sale) throw new Error('missing credit sale');
+    await db.refunds.add({
+      id: 'refund-credit',
+      sale_id: sale.id,
+      kind: 'whole',
+      reason: 'Returned',
+      method: null,
+      exact_amount: 30000,
+      udhaar_part: 30000,
+      rounding: 0,
+      amount: 0,
+      branch_id: String(sale.branch_id),
+      device_id: String(sale.device_id),
+      staff_id: String(sale.staff_id),
+      business_date: '2026-10-27',
+      created_at: NOW + 10,
+    } as never);
+    const result = await summary(db, {
+      from: '2026-10-27',
+      to: '2026-10-27',
+    });
+    expect(result.udhaarGiven).toBe(0);
+    expect(result.creditBills).toBe(1);
+  });
+
   it('handles an empty range', async () => {
     const db = await readyDb('rep-empty');
     expect(await summary(db, { from: '2026-01-01', to: '2026-01-02' })).toEqual(
       {
         sold: 0,
         bills: 0,
+        creditBills: 0,
         grossProfit: 0,
         udhaarGiven: 0,
         udhaarReceived: 0,
@@ -128,6 +161,7 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     ).toMatchObject({
       sold: 50000,
       bills: 1,
+      creditBills: 0,
       udhaarGiven: 0,
     });
   });
@@ -262,6 +296,7 @@ describe('two shops on one till (I-till)', () => {
     expect(await summary(b, day)).toEqual({
       sold: 0,
       bills: 0,
+      creditBills: 0,
       grossProfit: 0,
       udhaarGiven: 0,
       udhaarReceived: 0,

@@ -166,6 +166,9 @@ describe('app shell', () => {
     expect((await screen.findByTestId('today-cash')).textContent).toContain(
       '750',
     );
+    expect(screen.getByTestId('today-credit-bills').textContent).toContain(
+      '1 of 2',
+    );
     expect(screen.getByText('A-A-2')).toBeTruthy();
   });
 

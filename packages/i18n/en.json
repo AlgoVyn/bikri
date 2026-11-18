@@ -302,6 +302,8 @@
     "recent_bills": "Recent bills",
     "run_till": "Run the till",
     "sold_today": "Sold today",
+    "credit_bills": "Credit bills",
+    "credit_bills_value": "{{credit}} of {{total}}",
     "suggested": "Add from suggested list",
     "udhaar_given": "Credit given",
     "udhaar_received": "Credit received",

@@ -14,6 +14,7 @@ export type ReportRange = { from: string; to: string; deviceId?: string };
 export type Summary = {
   sold: number;
   bills: number;
+  creditBills: number;
   grossProfit: number;
   udhaarGiven: number;
   udhaarReceived: number;
@@ -100,6 +101,7 @@ export async function summary(
   const out: Summary = {
     sold: 0,
     bills: sales.length,
+    creditBills: 0,
     grossProfit: 0,
     udhaarGiven: 0,
     udhaarReceived: 0,
@@ -116,6 +118,9 @@ export async function summary(
   for (const sale of sales) {
     out.sold += n(sale.total);
     out.udhaarGiven += n(sale.udhaar_amount);
+    // Credit bills are activity: a bill that used udhaar today remains counted if it
+    // is refunded later today. The two money figures above stay net of refunds.
+    if (n(sale.udhaar_amount) > 0) out.creditBills += 1;
   }
   for (const line of saleLines) {
     const sale = saleById.get(String(line.sale_id));
