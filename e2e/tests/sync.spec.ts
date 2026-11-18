@@ -35,7 +35,9 @@ test('two tills of one shop: enrol, owner sign-in, add a till, data syncs, revok
   await expect(a.page).toHaveURL(/\/bikri\/setup/);
   await a.page.waitForFunction(() => window.__bikriTest !== undefined);
   await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
-  await a.page.goto('/bikri/');
+  // Client-side navigation: a full load would abort the setup push and leave its rows
+  // in `sending` for the stale-reclaim window, so the sync below would fail without them.
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   // Wrong PIN shows tries left; the right one opens the app.
   await a.page
     .getByTestId('lock-screen')
@@ -216,7 +218,8 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
   await enrol(a.page, shop.owner_code.code, 'Counter 1');
   await a.page.waitForFunction(() => window.__bikriTest !== undefined);
   await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
-  await a.page.goto('/bikri/');
+  // Client-side navigation keeps the setup push alive (see journey 6 in journeys.spec).
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await unlock(a.page);
   await a.page.evaluate(() =>
     window.__bikriTest?.seedProducts([

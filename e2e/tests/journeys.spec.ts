@@ -23,7 +23,11 @@ async function ownerTill(page: Page, code: string) {
   await enrol(page, code);
   await page.waitForFunction(() => window.__bikriTest !== undefined);
   await page.evaluate(() => window.__bikriTest?.finishSetupHere());
-  await page.goto('/bikri/');
+  // Client-side navigation, not a reload: finishSetupHere queues the shop/staff/branch
+  // rows and an automatic push. A full load here aborts that push and leaves the rows in
+  // `sending` for the two-minute stale-reclaim window, so the next push sends the product
+  // before its owner staff row and the server rejects it with FORBIDDEN.
+  await page.evaluate(() => window.__bikriTest?.navigate('/'));
   await unlock(page);
 }
 
