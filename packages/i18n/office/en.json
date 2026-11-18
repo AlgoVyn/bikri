@@ -745,7 +745,8 @@
       "voided_amount": "Cancelled amount",
       "voids": "Cancelled bills",
       "subtitle": "Sales, profit and stock trends",
-      "not_enough_days": "Not enough days for a trend yet."
+      "not_enough_days": "Not enough days for a trend yet.",
+      "note": "Note"
     },
     "backup": {
       "building": "Building export…",

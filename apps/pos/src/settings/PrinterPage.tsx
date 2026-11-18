@@ -279,6 +279,11 @@ export function PrinterPage() {
             onChange={(v) => update({ print_logo: v })}
           />
           <Toggle
+            label={t('printer.print_day_close')}
+            checked={printer.print_day_close !== false}
+            onChange={(v) => update({ print_day_close: v })}
+          />
+          <Toggle
             label={t('printer.print_qr')}
             checked={printer.qr === true}
             onChange={(v) => update({ qr: v })}
