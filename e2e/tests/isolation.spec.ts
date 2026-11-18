@@ -26,7 +26,10 @@ async function setUpTill(
   await enrol(page, code);
   await page.waitForFunction(() => window.__bikriTest !== undefined);
   await page.evaluate(() => window.__bikriTest?.finishSetupHere());
-  await page.goto('/bikri/');
+  // Client-side navigation, not a reload: finishSetupHere queues the shop/staff/branch
+  // rows and an automatic push. A full load here aborts that push and leaves the rows in
+  // `sending` until the stale-reclaim window, so later syncs leave the outbox at 3.
+  await page.evaluate(() => window.__bikriTest?.navigate('/'));
   await unlock(page);
   await page.evaluate(
     ([name, p]) =>
