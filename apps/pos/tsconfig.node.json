@@ -5,9 +5,9 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
-    "outDir": "dist/types-node",
+    "outDir": ".tsbuild/types-node",
     "rootDir": ".",
-    "tsBuildInfoFile": "dist/types-node/tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": ".tsbuild/types-node/tsconfig.tsbuildinfo",
     "types": ["node"],
     "lib": ["ES2024"]
   },

@@ -866,6 +866,7 @@ function RegisterCard({
 }) {
   const { t, i18n } = useTranslation();
   const globalPrivacy = usePrivacyActive();
+  const privacyActive = globalPrivacy || hidden;
   const lastSale = data.recent[0]?.sale;
   const lastWhen = lastSale
     ? formatTimestamp(
@@ -919,7 +920,7 @@ function RegisterCard({
           </p>
         ) : null}
       </div>
-      <PrivacyProvider active={globalPrivacy || hidden}>
+      <PrivacyProvider active={privacyActive}>
         <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
           <div className="min-w-0" data-testid="today-sold">
             <p className="text-small text-text-muted">{t('home.sold_today')}</p>
@@ -927,10 +928,7 @@ function RegisterCard({
               <p className="text-figure font-semibold tabular-nums leading-none">
                 <MoneyText paisa={data.today.sold} />
               </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
-                <span aria-hidden="true" className="[&>svg]:size-3.5">
-                  <SalesIcon />
-                </span>
+              <span className="inline-flex rounded-full bg-surface-2 px-2.5 py-1 text-small font-medium text-text-muted">
                 {t('home.bills_count', { count: data.today.bills })}
               </span>
             </div>
@@ -940,7 +938,13 @@ function RegisterCard({
               <p className="text-small text-text-muted">
                 {t('home.profit_today')}
               </p>
-              <p className="mt-1 text-title font-semibold tabular-nums">
+              <p
+                className={`mt-1 text-title font-semibold tabular-nums ${
+                  data.today.grossProfit < 0 && !privacyActive
+                    ? 'text-danger'
+                    : ''
+                }`}
+              >
                 <MoneyText paisa={data.today.grossProfit} />
               </p>
             </div>
@@ -955,18 +959,23 @@ function RegisterCard({
               testId={metric.testId}
             />
           ))}
-          <Metric
-            className="col-span-2 sm:col-span-1"
-            label={t('home.credit_bills')}
-            value={t('home.credit_bills_value', {
-              credit: data.today.creditBills,
-              total: data.today.bills,
-            })}
-            testId="today-credit-bills"
-          />
+          <div
+            className="col-span-2 flex items-baseline justify-between gap-3 sm:col-span-1 sm:block"
+            data-testid="today-credit-bills"
+          >
+            <p className="text-small text-text-muted">
+              {t('home.credit_bills')}
+            </p>
+            <p className="text-h2 font-semibold tabular-nums">
+              {t('home.credit_bills_value', {
+                credit: data.today.creditBills,
+                total: data.today.bills,
+              })}
+            </p>
+          </div>
         </div>
         {showCash || canClose ? (
-          <div className="mt-4 border-t border-border pt-3">
+          <div className="-mx-4 -mb-4 mt-4 rounded-b-card bg-surface-2 px-4 pb-4 pt-3">
             {showCash ? (
               <div
                 className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1"
@@ -988,7 +997,7 @@ function RegisterCard({
             {canClose ? (
               <Link
                 to="/day-close"
-                className={`-mx-4 -mb-4 flex min-h-11 items-center justify-between rounded-b-card px-4 text-small font-medium text-primary transition-colors duration-150 hover:bg-surface-2 ${
+                className={`-mx-4 -mb-4 flex min-h-11 items-center justify-between rounded-b-card px-4 text-small font-medium text-primary transition-colors duration-150 hover:bg-surface ${
                   showCash ? 'mt-2' : ''
                 }`}
               >

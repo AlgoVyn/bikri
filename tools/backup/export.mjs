@@ -62,21 +62,177 @@ export function assertSqlDump(sql) {
     throw new Error('D1 export does not contain tenant data');
 }
 
-/** D1 limits compound SELECT terms, so counts go in small batches. */
-export function countQueries(tables = BACKUP_TABLES, chunkSize = 5) {
-  const out = [];
-  for (let i = 0; i < tables.length; i += chunkSize) {
-    out.push(
-      tables
-        .slice(i, i + chunkSize)
-        .map(
-          (table) =>
-            `SELECT '${table}' AS tbl, tenant_id, COUNT(*) AS n FROM "${table}" GROUP BY tenant_id`,
-        )
-        .join(' UNION ALL '),
-    );
+/**
+ * Split a SQL dump into statements without being confused by semicolons inside quoted
+ * values. D1 writes one INSERT per row, but values can contain commas, parentheses and
+ * newlines, so the count parser cannot work line by line.
+ * @param {string} sql
+ * @returns {Generator<string>}
+ */
+function* sqlStatements(sql) {
+  let start = 0;
+  let quote = '';
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (quote !== '') {
+      if (ch === quote) {
+        if (sql[i + 1] === quote) i += 1;
+        else quote = '';
+      }
+      continue;
+    }
+    if (ch === '-' && sql[i + 1] === '-') {
+      const newline = sql.indexOf('\n', i + 2);
+      i = newline === -1 ? sql.length : newline;
+      continue;
+    }
+    if (ch === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      i = end === -1 ? sql.length : end + 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    else if (ch === ';') {
+      yield sql.slice(start, i + 1);
+      start = i + 1;
+    }
   }
+  if (sql.slice(start).trim() !== '') yield sql.slice(start);
+}
+
+/**
+ * Split the body of one VALUES tuple on top-level commas, respecting quotes and nested
+ * parentheses.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function splitSqlValues(text) {
+  /** @type {string[]} */
+  const out = [];
+  let start = 0;
+  let quote = '';
+  let depth = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote !== '') {
+      if (ch === quote) {
+        if (text[i + 1] === quote) i += 1;
+        else quote = '';
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    else if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      out.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  out.push(text.slice(start).trim());
   return out;
+}
+
+/**
+ * Parse the `(…), (…)` part of an INSERT into one value list per row.
+ * @param {string} text
+ * @returns {string[][]}
+ */
+function parseSqlTuples(text) {
+  /** @type {string[][]} */
+  const rows = [];
+  let i = 0;
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/u.test(text[i])) i += 1;
+    if (i >= text.length) break;
+    if (text[i] !== '(') throw new Error('expected a VALUES tuple');
+    let depth = 1;
+    let quote = '';
+    let j = i + 1;
+    for (; j < text.length; j += 1) {
+      const ch = text[j];
+      if (quote !== '') {
+        if (ch === quote) {
+          if (text[j + 1] === quote) j += 1;
+          else quote = '';
+        }
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+    if (depth !== 0) throw new Error('unterminated VALUES tuple');
+    rows.push(splitSqlValues(text.slice(i + 1, j)));
+    i = j + 1;
+  }
+  return rows;
+}
+
+/** @param {string} value */
+function unquoteSql(value) {
+  const text = value.trim();
+  if (text.startsWith("'") && text.endsWith("'"))
+    return text.slice(1, -1).replaceAll("''", "'");
+  if (text.startsWith('"') && text.endsWith('"'))
+    return text.slice(1, -1).replaceAll('""', '"');
+  return text;
+}
+
+/**
+ * Counts tenant rows directly from the export dump. This replaces the second full-table
+ * `COUNT(*)` pass over D1; the manifest still has exact per-tenant counts for a restore
+ * drill. A backup INSERT for a known tenant table that cannot be parsed is an error, not a
+ * silent zero.
+ * @param {string} sql
+ * @returns {{ tbl: string, tenant_id: string, n: number }[]}
+ */
+export function countDumpRows(sql) {
+  const wanted = new Set(BACKUP_TABLES);
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  for (const statement of sqlStatements(sql)) {
+    const text = statement.trim();
+    if (!/^INSERT\s+INTO/iu.test(text)) continue;
+    const head = /^INSERT\s+INTO\s+["`[]?([A-Za-z0-9_]+)["`\]]?/iu.exec(text);
+    const table = head?.[1]?.toLowerCase();
+    if (!table || !wanted.has(table)) continue;
+    const parsed =
+      /^INSERT\s+INTO\s+["`[]?[A-Za-z0-9_]+["`\]]?\s*\(([^)]*)\)\s*VALUES\s*([\s\S]*)$/iu.exec(
+        text,
+      );
+    if (!parsed)
+      throw new Error(`backup dump: cannot parse INSERT for ${table}`);
+    const columns = parsed[1].split(',').map((column) =>
+      column
+        .trim()
+        .replace(/^["`[]/u, '')
+        .replace(/["`\]]$/u, '')
+        .toLowerCase(),
+    );
+    const tenantIndex = columns.indexOf('tenant_id');
+    if (tenantIndex < 0)
+      throw new Error(`backup dump: ${table} INSERT has no tenant_id column`);
+    const rows = parseSqlTuples(parsed[2].replace(/;\s*$/u, ''));
+    for (const values of rows) {
+      if (values.length !== columns.length)
+        throw new Error(
+          `backup dump: ${table} row has ${values.length} values for ${columns.length} columns`,
+        );
+      const tenantId = unquoteSql(values[tenantIndex] ?? '');
+      if (!tenantId || tenantId === 'NULL')
+        throw new Error(`backup dump: ${table} row has no tenant_id`);
+      const key = `${table}\u0000${tenantId}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  return [...counts].map(([key, n]) => {
+    const [tbl, tenant_id] = key.split('\u0000');
+    return { tbl, tenant_id, n };
+  });
 }
 
 export function buildTenantManifest(tenants, counts) {
@@ -165,7 +321,8 @@ export async function main(argv = process.argv.slice(2)) {
   ]);
 
   const sql = readFileSync(sqlPath);
-  assertSqlDump(sql.toString('utf8'));
+  const sqlText = sql.toString('utf8');
+  assertSqlDump(sqlText);
   const size = statSync(sqlPath).size;
 
   const tenants = parseWranglerJson(
@@ -179,22 +336,7 @@ export async function main(argv = process.argv.slice(2)) {
       'SELECT id, slug, status FROM tenants ORDER BY id',
     ]),
   );
-  const counts = [];
-  for (const sql of countQueries()) {
-    counts.push(
-      ...parseWranglerJson(
-        wrangler([
-          'd1',
-          'execute',
-          database,
-          local ? '--local' : '--remote',
-          '--json',
-          '--command',
-          sql,
-        ]),
-      ),
-    );
-  }
+  const counts = countDumpRows(sqlText);
 
   const manifest = buildManifest({
     date,

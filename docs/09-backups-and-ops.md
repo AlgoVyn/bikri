@@ -24,7 +24,7 @@ Schedule `cron: "5 0 * * *"` (UTC) = **05:05 Asia/Karachi** daily, after the D1 
 Steps:
 1. Checkout, setup Node 24, `pnpm i --filter tools`.
 2. `wrangler d1 export bikri --remote --output=bikri-YYYY-MM-DD.sql` (date in Asia/Karachi).
-3. Sanity check: the dump contains `CREATE TABLE` for **every** table in `tools/backup/tables.mjs` plus `meta`/`tenants`, and at least one `INSERT INTO tenants`; a partial dump is refused. Row counts per tenant via `wrangler d1 execute bikri --remote --json --command "SELECT tenant_id, count(*) FROM sales GROUP BY tenant_id"` etc. are written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`).
+3. Sanity check: the dump contains `CREATE TABLE` for **every** table in `tools/backup/tables.mjs` plus `meta`/`tenants`, and at least one `INSERT INTO tenants`; a partial dump is refused. Row counts per tenant are computed **from the dump itself** (no second `COUNT(*)` pass over D1) and written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`). An `INSERT` for a known tenant table that cannot be parsed fails the backup rather than writing a zero count.
 4. `gzip -9` → upload to R2 bucket `bikri-backups`: `d1/YYYY-MM-DD.sql.gz` + `d1/YYYY-MM-DD.manifest.json` (`wrangler r2 object put bikri-backups/d1/… --remote`).
 5. Encrypt `age -r $BACKUP_AGE_RECIPIENT` → upload as workflow artifact `backup-YYYY-MM-DD` (retention 90 days).
 6. Retention in R2: keep 30 daily and one backup per month for the last 12 months (the 1st when present, otherwise the earliest available date); delete older (script lists and deletes).
