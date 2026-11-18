@@ -1682,6 +1682,26 @@ WHERE avg_cost = 0
 Data-only migration: `SCHEMA_VERSION` stays 7. New products are initialised at insert
 by `applyOps`; this repairs rows created before that change.
 
+### 2.24 Show or hide the logo on receipts (migration `0025_show_logo_on_receipt.sql`)
+
+```sql
+-- Shops can hide the logo from printed receipts without removing the uploaded image
+-- (screens/17). Default 1 keeps existing and new receipts unchanged.
+ALTER TABLE shop ADD COLUMN show_logo_on_receipt INTEGER NOT NULL DEFAULT 1
+  CHECK (show_logo_on_receipt IN (0,1));
+
+-- New wire field: the till and Worker must agree on schema 8.
+UPDATE meta SET value = '8' WHERE key = 'schema_version';
+```
+
+Default `1` keeps every existing receipt unchanged. When `0`, the shared receipt
+header (`pushShopHeader`) omits its logo block while keeping the shop name,
+address, phone and tax numbers; the uploaded logo and `kv.logo_bitmap` stay in
+place, so turning it back on needs no re-upload. It is a shop-level setting in
+Settings → Shop profile & receipt. This is a column/wire change, so
+`SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` both become 8; the Dexie schema is
+unchanged because `shop` stores every column without an index on this one.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

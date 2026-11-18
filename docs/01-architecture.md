@@ -250,7 +250,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   ],
   "vars": {
     "APP_VERSION": "1.0.0",
-    "SCHEMA_VERSION": "7",
+    "SCHEMA_VERSION": "8",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain

@@ -82,7 +82,7 @@ Seed loader: `pnpm seed --tenant=algovyn-mobiles --fixture=shop-basic,catalog-el
 6. Offline: go offline (Playwright `context.setOffline(true)`), make 5 sales, reload, go online → all 5 on server, badge Synced.
 7. Two devices (two browser contexts with different tokens): concurrent price edit → field merge; concurrent sale of last unit → stock −1 on both after sync.
 8. Partial refund (R1) → cash Rs 3,460 → bill Part refunded → refund receipt.
-9. Void & reissue.
+9. Cancel & reissue.
 10. Udhaar: sale → reminder URL (intercept popup) → receive payment → statement balances → promise kept.
 11. Delivery with paid now cash → day close D1 → short Rs 40 → Z-report.
 12. Reports: profit equals the T2 expectation; CSV export file content.

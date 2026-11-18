@@ -20,7 +20,7 @@ The tax label and printer are configured later in Settings → Shop and Settings
 - The till locks after 10 minutes (change it in Settings → Display), with `Ctrl+L`, or from the avatar menu.
 - Pick your name, type your PIN. Wrong PINs lock that profile for a few minutes.
 - **Settings → Cashiers** (owner only): add a manager or cashier, set their PIN, role, maximum discount and permissions. Deactivate a person who leaves; their history stays.
-- A manager can approve an action the current cashier may not do (refund, large discount, void) with their own PIN. The approval is recorded in Activity.
+- A manager can approve an action the current cashier may not do (refund, large discount, cancellation) with their own PIN. The approval is recorded in Activity.
 - Keep at least one active owner. The app refuses to deactivate the last one.
 
 ## 3. Selling
@@ -33,11 +33,11 @@ The tax label and printer are configured later in Settings → Shop and Settings
 
 The three cart tabs keep separate sales; **Hold** parks a bill and **Resume** brings it back. A held bill expires after 7 days.
 
-## 4. Refunds, voids and exchanges
+## 4. Refunds, cancellations and exchanges
 
 - **Sales → open a bill → Refund** (`R` on the bill): choose the quantity returned per line, whether it goes back into stock, and how the money is returned. A part-udhaar bill returns cash first, then reduces the khata.
-- **Void** cancels a bill that has no refunds. A manager may void only today's bill; older bills need another manager/owner approval. **Void & reissue** opens a new cart with the same lines.
-- Refunds and voids are append-only: the original bill and every correction stay in the history and in reports.
+- **Cancel bill** reverses a bill that has no refunds. A manager may cancel only today's bill; older bills need another manager/owner approval. **Cancel & reissue** opens a new cart with the same lines.
+- Refunds and cancellations are append-only: the original bill and every correction stay in the history and in reports.
 
 ### Recording a missed sale
 

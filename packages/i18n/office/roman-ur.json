@@ -251,7 +251,7 @@
       "short_payment": "Payment · {{method}}",
       "short_payment_plain": "Payment",
       "short_refund": "Refund {{invoice}}",
-      "short_void": "Void {{invoice}}",
+      "short_void": "Cancel {{invoice}}",
       "short_opening": "Opening",
       "short_adjustment": "Tarmeem",
       "export_csv": "CSV download",
@@ -269,7 +269,6 @@
       "group_promise": "Aaj / guzishta wada",
       "hard_limit": "Sakht hadd",
       "in_credit": "{{amount}} jama",
-      "include_bill_details": "Bill ki tafseel shamil karein",
       "jump_latest": "Taza tareen par jayein",
       "show_older": "Purani dikhayein",
       "limit": "Hadd",
@@ -352,6 +351,7 @@
       "to": "Tak",
       "total": "Total",
       "total_owed": "Total wasool karna hai",
+      "voided_bill": "Mansookh",
       "subtitle": "Gahak ka udhaar aur yaad dehaniyan",
       "select_customer": "Gahak muntakhib karein",
       "select_customer_hint": "Un ka khata aur baqaya yahan nazar aayega."
@@ -850,7 +850,8 @@
       "logo": "Dukaan ka logo",
       "subtitle": "Dukaan, device aur data",
       "choose": "Koi setting muntakhib karein",
-      "choose_hint": "Muntakhib kiya gaya hissa yahan khulega, fehrist hamesha ek click par rahegi."
+      "choose_hint": "Muntakhib kiya gaya hissa yahan khulega, fehrist hamesha ek click par rahegi.",
+      "show_logo": "Receipt par logo"
     },
     "staff": {
       "active": "Active",
@@ -931,7 +932,7 @@
       "action_price_change": "Price change",
       "action_product_delete": "Product delete",
       "action_refund": "Wapsi",
-      "action_reissue": "Void aur dobara jari",
+      "action_reissue": "Cancel aur dobara jari",
       "action_shop_change": "Dukan settings",
       "action_staff_change": "Staff changes",
       "action_stock_count": "Stock ginti",

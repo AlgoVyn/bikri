@@ -205,7 +205,7 @@ describe('sales history (screens/10)', () => {
     );
     expect(lines).toHaveLength(3);
     expect(lines[1]).toContain(
-      'A-A-2,2026-10-27,14:00,Ali Raza,1,42000,0,0,42000,0,42000,0,0,0,paid,Adnan,Counter 1',
+      'A-A-2,2026-10-27,14:00,Ali Raza,1,42000,0,0,42000,0,42000,0,0,0,completed,Adnan,Counter 1',
     );
     expect(lines[2]).toContain(
       'A-A-1,2026-10-27,14:00,,2,43500,2500,0,43000,43000,0,0,0,3460,part_refunded,Adnan,Counter 1',

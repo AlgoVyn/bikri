@@ -23,7 +23,7 @@ Copy text in specs is the English source string; the implementer adds `en`, `ur`
 | 07 | Sale complete | `/sell` (modal) | [07-sale-complete.md](07-sale-complete.md) |
 | 08 | Products, product detail, add/edit, import, categories | `/products…` | [08-products.md](08-products.md) |
 | 09 | Stock adjust and stock count | `/products/:id/adjust`, `/stock/count` | [09-stock-adjust.md](09-stock-adjust.md) |
-| 10 | Sales history and bill detail (void/reissue) | `/sales`, `/sales/:id` | [10-sales-and-bill-detail.md](10-sales-and-bill-detail.md) |
+| 10 | Sales history and bill detail (cancel/reissue) | `/sales`, `/sales/:id` | [10-sales-and-bill-detail.md](10-sales-and-bill-detail.md) |
 | 11 | Refund | `/sales/:id/refund` (modal) | [11-refund.md](11-refund.md) |
 | 12 | Udhaar: customers, statement, receive payment, chase list | `/udhaar…` | [12-udhaar.md](12-udhaar.md) |
 | 13 | Suppliers and deliveries (purchases) | `/suppliers…` | [13-suppliers-and-purchases.md](13-suppliers-and-purchases.md) |

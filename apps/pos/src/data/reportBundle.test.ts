@@ -1044,7 +1044,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       'bucket,name,phone,balance,age_days,promise_date',
     );
     expect(reportCsv('staff', bundle).split('\r\n')[0]).toBe(
-      'cashier,bills,sold,discounts,refunds,refunded_amount,voids,voided_amount,net_sold',
+      'cashier,bills,sold,discounts,refunds,refunded_amount,cancelled_bills,cancelled_amount,net_sold',
     );
     expect(reportCsv('day_closes', bundle).split('\r\n')[0]).toBe(
       'date,device,cashier,expected,counted,difference,note',

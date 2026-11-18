@@ -120,6 +120,7 @@ function ShopForm() {
       tax_label: form.tax_label,
       receipt_language: form.receipt_language,
       show_shop_name_on_receipt: form.show_shop_name_on_receipt,
+      show_logo_on_receipt: form.show_logo_on_receipt,
     }),
     [form],
   );
@@ -509,6 +510,19 @@ function ShopForm() {
           {t('office.settings.applies_new')}
         </p>
         <div className="grid gap-1 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-small">
+            <input
+              type="checkbox"
+              checked={form.show_logo_on_receipt}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  show_logo_on_receipt: event.target.checked,
+                })
+              }
+            />
+            {t('office.settings.show_logo')}
+          </label>
           <label className="flex items-center gap-2 text-small">
             <input
               type="checkbox"

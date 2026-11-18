@@ -79,7 +79,7 @@ export type StatementKind =
   | 'opening'
   | 'adjustment';
 
-/** One sale line included in an opt-in detailed statement export. */
+/** One sale line included in a detailed statement export. */
 export type StatementItem = {
   name: string;
   qtyMilli: number;
@@ -105,7 +105,9 @@ export type StatementEntry = {
   debit: number;
   credit: number;
   balance: number;
-  /** Only filled when the caller asks for detailed export rows. */
+  /** The bill this row belongs to was voided (the UI badges the bill row). */
+  voided: boolean;
+  /** Only filled for export rows; the on-screen statement stays compact. */
   items?: StatementItem[];
 };
 
@@ -385,6 +387,7 @@ export async function customerStatement(
   range?: { from: string; to: string },
   limit = Number.POSITIVE_INFINITY,
   withItems = false,
+  includeVoids = true,
 ): Promise<Statement> {
   const from = range?.from ?? '0000-01-01';
   const to = range?.to ?? '9999-12-31';
@@ -395,14 +398,84 @@ export async function customerStatement(
     ['customer', customerId, from, 0],
     ['customer', customerId, to, Number.MAX_SAFE_INTEGER],
   ] as const;
+  // The UI shows a voided bill with its reversing row and a Cancelled badge; the
+  // export leaves both out because the pair only adds noise. Look up `sale_voids`
+  // only for the sale rows this statement actually loads, never the whole table.
+  const voidedSaleIdsFor = async (
+    rows: readonly SyncedRow[],
+  ): Promise<Set<string>> => {
+    const saleIds = [
+      ...new Set(
+        rows
+          .filter((entry) => entry.source_type === 'sale' && entry.source_id)
+          .map((entry) => String(entry.source_id)),
+      ),
+    ];
+    if (saleIds.length === 0) return new Set();
+    const voidRows = await rowsAnyOfTable<SyncedRow>(
+      src.table('sale_voids') as Table<SyncedRow>,
+      'sale_id',
+      saleIds,
+      (row) => String(row.sale_id),
+      // Never fall back to a whole-table scan: the point of this lookup is to
+      // stay scoped to the rows the statement already loaded.
+      Number.POSITIVE_INFINITY,
+    );
+    return new Set(voidRows.map((row) => String(row.sale_id)));
+  };
+  const voidRelated = (
+    entry: SyncedRow,
+    voidedIds: ReadonlySet<string>,
+  ): boolean =>
+    entry.source_type === 'void' ||
+    (entry.source_type === 'sale' &&
+      entry.source_id !== null &&
+      entry.source_id !== undefined &&
+      voidedIds.has(String(entry.source_id)));
+  const visible = (
+    rows: readonly SyncedRow[],
+    voidedIds: ReadonlySet<string>,
+  ): SyncedRow[] =>
+    includeVoids
+      ? [...rows]
+      : rows.filter((entry) => !voidRelated(entry, voidedIds));
   const paged = range === undefined && Number.isFinite(limit);
-  const page = paged
-    ? await base
+  const take = Math.max(1, Math.floor(limit)) + 1;
+  let page: SyncedRow[] = [];
+  let pageVoidedSaleIds = new Set<string>();
+  if (!paged) {
+    const raw = await base.between(bounds[0], bounds[1]).toArray();
+    pageVoidedSaleIds = await voidedSaleIdsFor(raw);
+    page = visible(raw, pageVoidedSaleIds);
+  } else if (includeVoids) {
+    const raw = await base
+      .between(bounds[0], bounds[1])
+      .reverse()
+      .limit(take)
+      .toArray();
+    pageVoidedSaleIds = await voidedSaleIdsFor(raw);
+    page = raw;
+  } else {
+    // The export path is normally unbounded, but keep a finite page correct:
+    // widen the raw window until enough non-voided rows are visible or the
+    // collection is exhausted.
+    let window = take;
+    for (;;) {
+      const raw = await base
         .between(bounds[0], bounds[1])
         .reverse()
-        .limit(Math.max(1, Math.floor(limit)) + 1)
-        .toArray()
-    : await base.between(bounds[0], bounds[1]).toArray();
+        .limit(window)
+        .toArray();
+      const voidedIds = await voidedSaleIdsFor(raw);
+      const shown = raw.filter((entry) => !voidRelated(entry, voidedIds));
+      if (shown.length >= take || raw.length < window) {
+        page = shown.slice(0, take);
+        pageVoidedSaleIds = voidedIds;
+        break;
+      }
+      window *= 2;
+    }
+  }
   const hasMore = paged && page.length > limit;
   const entries = (hasMore ? page.slice(0, limit) : page)
     .reverse()
@@ -418,13 +491,15 @@ export async function customerStatement(
       customerId,
     ])
   )?.balance;
-  const allEntries = () =>
-    base
+  const allEntries = async (): Promise<SyncedRow[]> => {
+    const raw = await base
       .between(
         ['customer', customerId, '0000-01-01', 0],
         ['customer', customerId, '9999-12-31', Number.MAX_SAFE_INTEGER],
       )
       .toArray();
+    return visible(raw, await voidedSaleIdsFor(raw));
+  };
   const balance =
     cachedBalance ??
     (hasMore || range !== undefined
@@ -480,14 +555,16 @@ export async function customerStatement(
   if (range !== undefined) {
     // A historical range needs the balance before its first row. Reading the
     // entries before `from` is bounded by the range the user chose.
-    openingBalance = (
-      await base
-        .between(
-          ['customer', customerId, '0000-01-01', 0],
-          ['customer', customerId, range.from, -1],
-        )
-        .toArray()
-    ).reduce((sum, entry) => sum + n(entry.amount), 0);
+    const before = await base
+      .between(
+        ['customer', customerId, '0000-01-01', 0],
+        ['customer', customerId, range.from, -1],
+      )
+      .toArray();
+    openingBalance = visible(before, await voidedSaleIdsFor(before)).reduce(
+      (sum, entry) => sum + n(entry.amount),
+      0,
+    );
     let running = openingBalance;
     balances = entries.map((entry) => {
       running += n(entry.amount);
@@ -512,12 +589,16 @@ export async function customerStatement(
     let saleId: string | null = null;
     let lineCount = 0;
     let method: string | null = null;
+    let voided = false;
     if (entry.source_type === 'sale') {
       const sale = sourceId ? await saleOf(sourceId) : undefined;
       kind = 'sale';
       invoiceNo = sale ? String(sale.invoice_no) : null;
       saleId = sale ? String(sale.id) : null;
       lineCount = sale ? n(sale.line_count) : 0;
+      voided =
+        pageVoidedSaleIds.has(sourceId) ||
+        String(sale?.status ?? '') === 'void';
     } else if (entry.source_type === 'payment') {
       kind = 'payment';
       method = payments.get(sourceId)
@@ -556,6 +637,7 @@ export async function customerStatement(
       debit: Math.max(0, amount),
       credit: Math.max(0, -amount),
       balance: balances[index] ?? 0,
+      voided,
     });
   }
 

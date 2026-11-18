@@ -224,7 +224,7 @@ A bundle at 58 mm uses the same block: the bundle name and its amount on the hea
 | Document | Title line | Differences |
 |---|---|---|
 | Refund receipt | `REFUND RECEIPT` | Shows original bill no and date, refunded lines with qty, exact amount, rounding, money paid back and method (omitted when 0), `Taken off khata` and `Khata balance now` when there is an udhaar part, reason. A whole-bundle return prints one bundle-name header with the returned whole-bundle quantity and the group refund amount, with the component names/quantities underneath; component prices and the word `Bundle` are omitted. Components cannot appear as separate refund lines for a bundle |
-| Void notice | `BILL CANCELLED` | Original bill no, reason, replacement bill no if reissued |
+| Cancellation notice | `BILL CANCELLED` | Original bill no, reason, replacement bill no if reissued |
 | Day close summary | `DAY CLOSE` | Device, staff, period, each formula line, expected, counted, difference, denominations |
 | Customer statement | `KHATA STATEMENT` | Customer name/phone, period, each entry (date, description, +/−, balance), closing balance. Usually shared as image, printable |
 | Supplier payment slip | `PAYMENT TO SUPPLIER` | Supplier, amount, method, note, balance after |
@@ -235,7 +235,7 @@ A bundle at 58 mm uses the same block: the bundle name and its amount on the hea
 ### 4.4 "Powered by AlgoVyn" line (D-085)
 
 Owner decision (27 Oct 2026, supersedes the "no vendor branding" part of REQ-B03): every **customer receipt** ends with one small line `Powered by AlgoVyn`, centred, after the footer and the optional QR, before the feed and cut.
-- Documents: sale receipt (also reprints and the reissued bill of a void-and-reissue), refund receipt, void notice, and their shared image and A4 versions. Not on internal slips (day close, supplier payment and return slips), barcode labels or the test page.
+- Documents: sale receipt (also reprints and the reissued bill of a cancel-and-reissue), refund receipt, cancellation notice, and their shared image and A4 versions. Not on internal slips (day close, supplier payment and return slips), barcode labels or the test page.
 - ESC/POS: block `{ t: 'text', text: 'Powered by AlgoVyn', align: 'center', size: 'small' }` → `1B 61 01`, `1B 4D 01`, text, `0A`, `1B 4D 00`, `1B 61 00`. Same on 58 mm and 80 mm (18 characters fit every width).
 - Raster receipts (Urdu, §6): the same line drawn in Inter at about 70 % of the body size, centred, as the last row of the bitmap.
 - Browser print (`window.print` fallback, §5.3) and the Settings preview: `<p class="powered-by">Powered by AlgoVyn</p>` with `.powered-by { text-align: center; font-size: 8px; margin-top: 2mm }` (58 mm and 80 mm CSS) and 9 pt on A4.
@@ -296,7 +296,7 @@ v1 does not implement a Bluetooth transport. Android users use System printing w
 
 - Before drawing, `await document.fonts.load('24px "Noto Naskh Arabic UI"')` (and Inter); canvas text silently falls back to a system font if the web font is not loaded yet. Render on the main thread's `OffscreenCanvas` (fonts loaded in the document are available there; a worker would need its own `FontFace`).
 - `renderReceiptBitmap(model, { dots, font })` draws the receipt on an `OffscreenCanvas` `dots` wide: Inter for Latin, Noto Naskh Arabic UI for Urdu (line height 1.7), black on white, RTL text aligned right.
-- Logo (REQ-B03): uploaded in Settings → Receipt; on device it is converted to greyscale, scaled to max 60% of `dots` width and max 160 px height, then **Floyd–Steinberg dithered** to 1-bit and cached in `kv.logo_bitmap` (Uint8Array + width/height) so printing does not re-process it.
+- Logo (REQ-B03): uploaded in Settings → Receipt; on device it is converted to greyscale, scaled to max 60% of `dots` width and max 160 px height, then **Floyd–Steinberg dithered** to 1-bit and cached in `kv.logo_bitmap` (Uint8Array + width/height) so printing does not re-process it. The shop-level **Show logo on receipts** switch can hide it from every receipt without deleting the upload.
 - Text rasters use a simple threshold at 50% luminance (crisper than dithering).
 - 1-bit conversion: each row packed MSB-first, 1 = black, row length = `dots/8` bytes. Sent as `GS v 0` bands of at most 255 rows.
 - Mode rules: `language = 'ur'` → whole receipt as image. `language = 'en'` or `'roman-ur'` → text mode + logo raster; any line containing non-ASCII characters (e.g. an Urdu product name) is rendered as a raster line in place.
@@ -321,7 +321,7 @@ Wizard steps:
 
 If a USB `claimInterface` fails on Windows, the wizard explains the driver issue (§5.1) and offers Serial or System printing instead of failing.
 
-Other fields: auto-print after sale (default on), copies (1–3), print logo (on), QR on receipt (off), drawer pin, cut type, preview at the chosen width.
+Other fields: auto-print after sale (default on), copies (1–3), print logo on this device (on; the shop-level receipt switch can also hide it), QR on receipt (off), drawer pin, cut type, preview at the chosen width.
 
 ## 9. Print job lifecycle and errors
 

@@ -218,7 +218,7 @@ test.describe('Credit (T-043, T-044)', () => {
     expect(ali).toBeTruthy();
   });
 
-  test('statement export can include the individual sale items', async ({
+  test('statement export always includes the individual sale items', async ({
     page,
   }) => {
     await openReadyShop(page, '/bikri/udhaar');
@@ -232,22 +232,18 @@ test.describe('Credit (T-043, T-044)', () => {
     expect(bilal).toBeTruthy();
     await page.goto(`/bikri/udhaar/${bilal?.id}`);
     await expect(page.getByTestId('statement-balance')).toBeVisible();
+    await expect(page.getByTestId('statement-include-items')).toHaveCount(0);
 
-    const exportCsv = async () => {
-      await page
-        .getByTestId('udhaar-detail')
-        .getByRole('button', { name: 'Export', exact: true })
-        .click();
-      const [file] = await Promise.all([
-        page.waitForEvent('download'),
-        page.getByRole('menuitem', { name: 'CSV' }).click(),
-      ]);
-      return readFile((await file.path()) ?? '', 'utf8');
-    };
-    expect(await exportCsv()).not.toContain('Charger');
-    await page.getByTestId('statement-include-items').check();
-    const detailed = await exportCsv();
-    expect(detailed).toContain('Charger × 1 · Rs 500 each — Rs 500');
+    await page
+      .getByTestId('udhaar-detail')
+      .getByRole('button', { name: 'Export', exact: true })
+      .click();
+    const [file] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'CSV' }).click(),
+    ]);
+    const csv = await readFile((await file.path()) ?? '', 'utf8');
+    expect(csv).toContain('Charger × 1 · Rs 500 each — Rs 500');
   });
 
   test('AC 2/3/6: new customer with a limit and opening balance; no phone disables the reminder', async ({

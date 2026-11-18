@@ -62,6 +62,7 @@ export type ShopSettings = {
   show_payment_details: boolean;
   show_cashier_on_receipt: boolean;
   show_shop_name_on_receipt: boolean;
+  show_logo_on_receipt: boolean;
   show_you_saved: boolean;
   print_warranty: boolean;
 };
@@ -72,6 +73,7 @@ const BOOLEAN_SHOP_FIELDS: ReadonlySet<string> = new Set([
   'show_payment_details',
   'show_cashier_on_receipt',
   'show_shop_name_on_receipt',
+  'show_logo_on_receipt',
   'show_you_saved',
   'print_warranty',
 ]);
@@ -96,6 +98,7 @@ const SHOP_FIELDS: (keyof ShopSettings)[] = [
   'show_payment_details',
   'show_cashier_on_receipt',
   'show_shop_name_on_receipt',
+  'show_logo_on_receipt',
   'show_you_saved',
   'print_warranty',
 ];
@@ -146,6 +149,7 @@ function shopValues(row: SyncedRow | undefined): ShopSettings {
     show_cashier_on_receipt: Number(row?.show_cashier_on_receipt ?? 1) !== 0,
     show_shop_name_on_receipt:
       Number(row?.show_shop_name_on_receipt ?? 1) !== 0,
+    show_logo_on_receipt: Number(row?.show_logo_on_receipt ?? 1) !== 0,
     show_you_saved: Number(row?.show_you_saved ?? 0) === 1,
     print_warranty: Number(row?.print_warranty ?? 1) === 1,
   };

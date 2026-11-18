@@ -171,6 +171,7 @@ describe('settings helpers', () => {
       show_payment_details: true,
       show_cashier_on_receipt: true,
       show_shop_name_on_receipt: true,
+      show_logo_on_receipt: true,
       show_you_saved: false,
       print_warranty: true,
     });
@@ -185,6 +186,7 @@ describe('settings helpers', () => {
         show_payment_details: 0,
         show_cashier_on_receipt: 0,
         show_shop_name_on_receipt: 0,
+        show_logo_on_receipt: 0,
         show_you_saved: 1,
         print_warranty: 1,
       } as SyncedRow),
@@ -197,6 +199,7 @@ describe('settings helpers', () => {
       show_payment_details: false,
       show_cashier_on_receipt: false,
       show_shop_name_on_receipt: false,
+      show_logo_on_receipt: false,
       show_you_saved: true,
       print_warranty: true,
     });

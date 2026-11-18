@@ -27,7 +27,7 @@ test.describe('Home and shell (T-013)', () => {
     ).toBeVisible();
     await expect(page.getByTestId('today-sold')).toContainText('1,000');
     await expect(page.getByTestId('today-sold')).toContainText('2 bills');
-    await expect(page.getByTestId('today-profit')).toContainText('400');
+    await expect(page.getByTestId('today-profit')).toHaveCount(0);
     await expect(page.getByTestId('today-cash')).toContainText('750');
     await expect(page.getByTestId('today-udhaar-given')).toContainText(
       'Rs 300',
@@ -248,7 +248,7 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page).toHaveURL(/\/bikri\/settings\/sync$/);
   });
 
-  test('a cashier sees no profit or drawer cash, can view suppliers, and is turned away from owner pages', async ({
+  test('a cashier sees no drawer cash, can view suppliers, and is turned away from owner pages', async ({
     page,
   }) => {
     await openWithSales(page);

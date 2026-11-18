@@ -497,7 +497,6 @@ export function HomePage() {
                   data={data}
                   cash={cash}
                   showCash={can('dayclose.view_expected')}
-                  showProfit={can('cost.view')}
                   canClose={can('dayclose.create') && !readOnly}
                   today={today}
                   timeZone={timeZone}
@@ -847,7 +846,6 @@ function RegisterCard({
   data,
   cash,
   showCash,
-  showProfit,
   canClose,
   today,
   timeZone,
@@ -857,7 +855,6 @@ function RegisterCard({
   data: HomeData;
   cash: number;
   showCash: boolean;
-  showProfit: boolean;
   canClose: boolean;
   today: string;
   timeZone: string;
@@ -933,22 +930,6 @@ function RegisterCard({
               </span>
             </div>
           </div>
-          {showProfit ? (
-            <div className="min-w-0 text-end" data-testid="today-profit">
-              <p className="text-small text-text-muted">
-                {t('home.profit_today')}
-              </p>
-              <p
-                className={`mt-1 text-title font-semibold tabular-nums ${
-                  data.today.grossProfit < 0 && !privacyActive
-                    ? 'text-danger'
-                    : ''
-                }`}
-              >
-                <MoneyText paisa={data.today.grossProfit} />
-              </p>
-            </div>
-          ) : null}
         </div>
         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_auto]">
           {metrics.map((metric) => (
