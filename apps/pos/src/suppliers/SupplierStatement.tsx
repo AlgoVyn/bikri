@@ -2,15 +2,16 @@ import { businessDate } from '@bikri/core';
 import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { type KeyboardEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { DateField } from '../components/DateField.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
-import { SuppliersIcon } from '../components/icons.tsx';
+import { ChevronRightIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -30,6 +31,7 @@ import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { statementPdf, statementPng } from '../udhaar/statementFile.ts';
+import { DeliveryDetailDialog } from './DeliveryDetailDialog.tsx';
 import {
   dateText,
   supplierBalanceTone,
@@ -55,10 +57,17 @@ export function SupplierStatement({
   const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
   // One layout at a time; the hidden one still mapped every entry and formatted
   // its dates (D-231).
   const wide = useMediaQuery('(min-width: 640px)');
+  const range =
+    from || to
+      ? { from: from || '0000-01-01', to: to || '9999-12-31' }
+      : undefined;
   const data = useLiveQuery(async () => {
     const db = getDb();
     const supplier = await db.suppliers.get(supplierId);
@@ -67,7 +76,7 @@ export function SupplierStatement({
     const shop = await db.shop.get('shop');
     return {
       supplier,
-      statement: await supplierStatement(db, supplierId, visibleRows),
+      statement: await supplierStatement(db, supplierId, visibleRows, range),
       balance: await supplierBalance(db, supplierId),
       tz,
       shopName: String(shop?.name ?? ''),
@@ -76,7 +85,11 @@ export function SupplierStatement({
       logo: ((await db.kv.get('logo_bitmap'))?.value ??
         null) as RasterSource | null,
     };
-  }, [supplierId, visibleRows]);
+  }, [supplierId, from, to, visibleRows]);
+
+  // A new supplier or date filter starts again at the newest page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter changes
+  useEffect(() => setVisibleRows(STATEMENT_PAGE), [supplierId, from, to]);
 
   useHotkey(
     plainKey('d'),
@@ -119,10 +132,29 @@ export function SupplierStatement({
       debit: row.got,
       credit: row.paid,
       balance: row.balance,
+      items: row.items,
     }));
   const rows = mapRows(statement);
   // The data layer returns the newest page; CSV/PDF/share load every row separately.
   const shownRows = statement.rows;
+  const shownOpening = statement.openingBalance;
+  const openDelivery = (purchaseId: string | null) => {
+    if (purchaseId) setDeliveryId(purchaseId);
+  };
+  const onDeliveryKeyDown = (
+    event: KeyboardEvent<HTMLElement>,
+    purchaseId: string | null,
+  ) => {
+    if (!purchaseId || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    setDeliveryId(purchaseId);
+  };
+  const periodValue =
+    from || to
+      ? `${from ? dateText(from, i18n.language, tz) : '…'} – ${
+          to ? dateText(to, i18n.language, tz) : '…'
+        }`
+      : t('office.suppliers.all_time');
   const meta = {
     shopName,
     shopAddress,
@@ -131,14 +163,15 @@ export function SupplierStatement({
     customerName: name,
     phone: String(supplier.phone ?? ''),
     balance,
-    from: null,
-    to: null,
+    from: from || null,
+    to: to || null,
     rows: rows.map((row) => ({
       date: row.date,
       description: row.description,
       debit: row.got,
       credit: row.paid,
       balance: row.balance,
+      items: row.items,
     })),
     openingBalance: statement.openingBalance,
     lang: i18n.language,
@@ -147,7 +180,7 @@ export function SupplierStatement({
       customer: t('office.suppliers.statement_supplier'),
       phone: t('office.suppliers.phone'),
       period: t('office.suppliers.statement_period'),
-      periodValue: t('office.suppliers.all_time'),
+      periodValue,
       date: t('office.suppliers.date'),
       description: t('office.suppliers.description'),
       debit: t('office.suppliers.statement_debit'),
@@ -165,7 +198,13 @@ export function SupplierStatement({
     },
   };
   const fullStatement = () =>
-    supplierStatement(getDb(), supplierId, Number.POSITIVE_INFINITY);
+    supplierStatement(
+      getDb(),
+      supplierId,
+      Number.POSITIVE_INFINITY,
+      range,
+      true,
+    );
   const fullMeta = async () => {
     const full = await fullStatement();
     return {
@@ -309,66 +348,118 @@ export function SupplierStatement({
         </div>
       </section>
 
+      <div className="flex flex-wrap items-end gap-2">
+        <DateField
+          className="w-[9.5rem]"
+          label={t('office.suppliers.from')}
+          value={from}
+          max={to}
+          onChange={setFrom}
+        />
+        <DateField
+          className="w-[9.5rem]"
+          label={t('office.suppliers.to')}
+          value={to}
+          min={from}
+          onChange={setTo}
+        />
+        {from || to ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => {
+              setFrom('');
+              setTo('');
+            }}
+          >
+            {t('office.suppliers.all_time')}
+          </button>
+        ) : null}
+      </div>
+
       {!wide ? (
         <ul className="flex flex-col gap-2">
+          {shownOpening !== 0 ? (
+            <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
+              <span>{t('office.suppliers.entry_opening')}</span>
+              <span className="font-medium">
+                <MoneyText paisa={shownOpening} />
+              </span>
+            </li>
+          ) : null}
           {rows.length === 0 ? (
             <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
               {t('office.suppliers.no_entries')}
             </li>
           ) : (
-            shownRows.map((row, index) => (
-              <li
-                key={row.entry.id}
-                className="rounded-card border border-border bg-surface p-3 text-small"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-text-muted">
-                    {dateText(
-                      String(row.entry.business_date),
-                      i18n.language,
-                      tz,
-                    )}
-                  </span>
-                  <span className="font-medium">
-                    <MoneyText paisa={row.balance} />
-                  </span>
-                </div>
-                <p className="mt-1">
-                  {rows[index]?.description}
-                  {row.kind === 'purchase' &&
-                  row.entry.source_id &&
-                  can('purchase.create') &&
-                  !readOnly ? (
-                    <Link
-                      to="/suppliers/$supplierId/return/new"
-                      params={{ supplierId }}
-                      search={{ purchase: String(row.entry.source_id) }}
-                      className="ms-2 text-small underline"
-                    >
-                      {t('office.suppliers.return_items')}
-                    </Link>
-                  ) : null}
-                </p>
-                <dl className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <dt className="text-text-muted">
-                      {t('office.suppliers.got')}
-                    </dt>
-                    <dd className="text-start">
-                      {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
-                    </dd>
+            shownRows.map((row, index) => {
+              const purchaseId =
+                can('purchase.create') || can('cost.view')
+                  ? row.kind === 'purchase' && row.entry.source_id
+                    ? String(row.entry.source_id)
+                    : null
+                  : null;
+              return (
+                <li
+                  key={row.entry.id}
+                  role={purchaseId ? 'button' : undefined}
+                  tabIndex={purchaseId ? 0 : undefined}
+                  aria-label={
+                    purchaseId
+                      ? `${t('office.suppliers.view_delivery')}: ${rows[index]?.description}`
+                      : undefined
+                  }
+                  onClick={
+                    purchaseId ? () => openDelivery(purchaseId) : undefined
+                  }
+                  onKeyDown={
+                    purchaseId
+                      ? (event) => onDeliveryKeyDown(event, purchaseId)
+                      : undefined
+                  }
+                  className={`rounded-card border border-border bg-surface p-3 text-small ${
+                    purchaseId ? 'cursor-pointer hover:bg-surface-2' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-text-muted">
+                      {dateText(
+                        String(row.entry.business_date),
+                        i18n.language,
+                        tz,
+                      )}
+                    </span>
+                    <span className="font-medium">
+                      <MoneyText paisa={row.balance} />
+                    </span>
                   </div>
-                  <div>
-                    <dt className="text-text-muted">
-                      {t('office.suppliers.paid')}
-                    </dt>
-                    <dd className="text-start">
-                      {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
-                    </dd>
-                  </div>
-                </dl>
-              </li>
-            ))
+                  <p className="mt-1 flex items-center gap-1">
+                    {rows[index]?.description}
+                    {purchaseId ? (
+                      <ChevronRightIcon className="size-3.5 shrink-0 rtl:rotate-180" />
+                    ) : null}
+                  </p>
+                  <dl className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <dt className="text-text-muted">
+                        {t('office.suppliers.got')}
+                      </dt>
+                      <dd className="text-start">
+                        {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-text-muted">
+                        {t('office.suppliers.paid')}
+                      </dt>
+                      <dd className="text-start">
+                        {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })
           )}
         </ul>
       ) : null}
@@ -394,6 +485,17 @@ export function SupplierStatement({
               </tr>
             </thead>
             <tbody>
+              {shownOpening !== 0 ? (
+                <tr className="border-b border-border">
+                  <td className="p-2" />
+                  <td className="p-2">{t('office.suppliers.entry_opening')}</td>
+                  <td className="p-2" />
+                  <td className="p-2" />
+                  <td className="p-2 text-start">
+                    <MoneyText paisa={shownOpening} />
+                  </td>
+                </tr>
+              ) : null}
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-4 text-center text-text-muted">
@@ -401,45 +503,56 @@ export function SupplierStatement({
                   </td>
                 </tr>
               ) : (
-                shownRows.map((row, index) => (
-                  <tr
-                    key={row.entry.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="p-2 whitespace-nowrap">
-                      {dateText(
-                        String(row.entry.business_date),
-                        i18n.language,
-                        tz,
-                      )}
-                    </td>
-                    <td className="p-2">
-                      {rows[index]?.description}
-                      {row.kind === 'purchase' &&
-                      row.entry.source_id &&
-                      can('purchase.create') &&
-                      !readOnly ? (
-                        <Link
-                          to="/suppliers/$supplierId/return/new"
-                          params={{ supplierId }}
-                          search={{ purchase: String(row.entry.source_id) }}
-                          className="ms-2 text-small underline"
-                        >
-                          {t('office.suppliers.return_items')}
-                        </Link>
-                      ) : null}
-                    </td>
-                    <td className="p-2 text-start">
-                      {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
-                    </td>
-                    <td className="p-2 text-start">
-                      {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
-                    </td>
-                    <td className="p-2 text-start font-medium">
-                      <MoneyText paisa={row.balance} />
-                    </td>
-                  </tr>
-                ))
+                shownRows.map((row, index) => {
+                  const purchaseId =
+                    can('purchase.create') || can('cost.view')
+                      ? row.kind === 'purchase' && row.entry.source_id
+                        ? String(row.entry.source_id)
+                        : null
+                      : null;
+                  return (
+                    <tr
+                      key={row.entry.id}
+                      tabIndex={purchaseId ? 0 : undefined}
+                      onClick={
+                        purchaseId ? () => openDelivery(purchaseId) : undefined
+                      }
+                      onKeyDown={
+                        purchaseId
+                          ? (event) => onDeliveryKeyDown(event, purchaseId)
+                          : undefined
+                      }
+                      className={`border-b border-border last:border-0 ${
+                        purchaseId ? 'cursor-pointer hover:bg-surface-2' : ''
+                      }`}
+                    >
+                      <td className="p-2 whitespace-nowrap">
+                        {dateText(
+                          String(row.entry.business_date),
+                          i18n.language,
+                          tz,
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <span className="inline-flex items-center gap-1">
+                          {rows[index]?.description}
+                          {purchaseId ? (
+                            <ChevronRightIcon className="size-3.5 shrink-0 rtl:rotate-180" />
+                          ) : null}
+                        </span>
+                      </td>
+                      <td className="p-2 text-start">
+                        {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}
+                      </td>
+                      <td className="p-2 text-start">
+                        {row.paid > 0 ? <MoneyText paisa={row.paid} /> : '—'}
+                      </td>
+                      <td className="p-2 text-start font-medium">
+                        <MoneyText paisa={row.balance} />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -467,6 +580,13 @@ export function SupplierStatement({
         open={editOpen}
         onOpenChange={setEditOpen}
         supplier={supplier}
+      />
+      <DeliveryDetailDialog
+        purchaseId={deliveryId}
+        open={deliveryId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeliveryId(null);
+        }}
       />
     </div>
   );

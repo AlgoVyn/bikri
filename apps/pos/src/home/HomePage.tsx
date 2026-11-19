@@ -19,6 +19,7 @@ import {
   ProductsIcon,
   SalesIcon,
   SellIcon,
+  StoreIcon,
 } from '../components/icons.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -335,19 +336,38 @@ export function HomePage() {
 
   return (
     <div className={pageClass('standard', 'gap-6')}>
-      <header>
-        <h1 className="text-h1 font-semibold">
-          {t('home.greeting', { name: String(staff?.name ?? '') })}
-        </h1>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-text-muted">
-          <span>{dateText}</span>
+      <header className="relative overflow-hidden rounded-card border border-border bg-surface px-4 py-5 shadow-card sm:px-6 sm:py-6">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -end-14 -top-24 size-56 rounded-full bg-primary-subtle/70"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 end-24 size-44 rounded-full border border-accent/30"
+        />
+        <div className="relative flex flex-wrap items-start justify-between gap-x-6 gap-y-4 sm:items-center">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-caption font-semibold uppercase tracking-[0.16em] text-primary-subtle-ink">
+              <span
+                aria-hidden="true"
+                className="size-1.5 shrink-0 rounded-full bg-accent"
+              />
+              {t('home.overview')}
+            </p>
+            <h1 className="mt-2 text-h1 font-semibold tracking-tight">
+              {t('home.welcome', { name: String(staff?.name ?? '') })}
+            </h1>
+            <p className="mt-1.5 text-small text-text-muted">{dateText}</p>
+          </div>
           {data?.branchName ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>{data.branchName}</span>
-            </>
+            <span className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border bg-surface-2 px-3 text-small font-medium text-text">
+              <span aria-hidden="true" className="shrink-0 text-primary">
+                <StoreIcon />
+              </span>
+              <span className="truncate">{data.branchName}</span>
+            </span>
           ) : null}
-        </p>
+        </div>
       </header>
 
       {justSetUp ? (

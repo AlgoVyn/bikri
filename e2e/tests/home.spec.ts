@@ -23,7 +23,7 @@ test.describe('Home and shell (T-013)', () => {
   }) => {
     await openWithSales(page);
     await expect(
-      page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
+      page.getByRole('heading', { name: 'Welcome back, Adnan' }),
     ).toBeVisible();
     await expect(page.getByTestId('today-sold')).toContainText('1,000');
     await expect(page.getByTestId('today-sold')).toContainText('2 bills');
@@ -110,7 +110,7 @@ test.describe('Home and shell (T-013)', () => {
     );
     await page.getByTestId('staff-menu').click();
     await expect(
-      page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
+      page.getByRole('heading', { name: 'Welcome back, Adnan' }),
     ).toBeVisible();
     await expectNoSeriousAxe(page);
 
@@ -135,7 +135,7 @@ test.describe('Home and shell (T-013)', () => {
     await setLanguage(page, 'ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(
-      page.getByRole('heading', { name: 'السلام علیکم، Adnan' }),
+      page.getByRole('heading', { name: 'خوش آمدید، Adnan' }),
     ).toBeVisible();
     await expect(page.getByTestId('today-sold')).toContainText('1,000');
     await expect(page.getByText('آج کی فروخت')).toBeVisible();
@@ -154,10 +154,10 @@ test.describe('Home and shell (T-013)', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'roman-ur');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(
-      page.getByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' }),
+      page.getByRole('heading', { name: 'Khush aamdeed, Adnan' }),
     ).toBeVisible();
     await expect(page.getByText('Aaj ki farokht')).toBeVisible();
-    await expect(page.getByText('home.greeting')).toHaveCount(0);
+    await expect(page.getByText('home.welcome')).toHaveCount(0);
     await setLanguage(page, 'en');
   });
 
@@ -254,7 +254,7 @@ test.describe('Home and shell (T-013)', () => {
     await openWithSales(page);
     await page.evaluate(() => window.__bikriTest?.unlockAs('cashier', 'Sana'));
     await expect(
-      page.getByRole('heading', { name: 'Assalam-o-Alaikum, Sana' }),
+      page.getByRole('heading', { name: 'Welcome back, Sana' }),
     ).toBeVisible();
     await expect(page.getByTestId('today-profit')).toHaveCount(0);
     await expect(page.getByTestId('today-cash')).toHaveCount(0);

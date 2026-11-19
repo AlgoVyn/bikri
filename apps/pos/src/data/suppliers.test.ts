@@ -2,6 +2,7 @@ import { businessDate } from '@bikri/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import {
+  deliveryDetail,
   paySupplier,
   SupplierPaymentError,
   saveDelivery,
@@ -103,6 +104,34 @@ describe('suppliers and deliveries (T-045)', () => {
         balance: 600000,
       },
     ]);
+  });
+
+  it('auto-generates a delivery number when the supplier invoice is blank', async () => {
+    const { db, ctx } = await setup('supplier-auto-invoice');
+    const item = await product(db, ctx);
+    const supplier = await createSupplier(
+      db,
+      { name: 'Auto Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const purchase = await saveDelivery(
+      db,
+      {
+        purchaseId: 'auto-invoice-1',
+        supplierId: supplier.id,
+        invoiceNo: '   ',
+        date: TODAY,
+        lines: [{ productId: item.id, qtyMilli: 1000, unitCost: 100000 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 1000 },
+    );
+    expect(purchase.supplier_invoice_no).toMatch(/^BKR-\d{8}-[A-Z0-9]{6}$/u);
+    expect(String(purchase.supplier_invoice_no).length).toBeLessThanOrEqual(30);
   });
 
   it('the header total ignores the search and the statement follows business dates', async () => {
@@ -894,6 +923,245 @@ describe('supplier branches', () => {
     expect(page.hasMore).toBe(false);
     expect(page.balance).toBe(2000);
     expect(page.openingBalance).toBe(0);
+  });
+
+  it('filters the supplier statement by business date and keeps the opening balance', async () => {
+    const { db, ctx } = await setup('supplier-range');
+    const item = await product(db, ctx);
+    const supplier = await createSupplier(
+      db,
+      { name: 'Range Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const earlier = businessDate(NOW - 5 * 86_400_000, TZ);
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'range-old',
+        supplierId: supplier.id,
+        invoiceNo: 'OLD-1',
+        date: earlier,
+        lines: [{ productId: item.id, qtyMilli: 2000, unitCost: 100000 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 1000 },
+    );
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'range-today',
+        supplierId: supplier.id,
+        invoiceNo: 'NEW-1',
+        date: TODAY,
+        lines: [{ productId: item.id, qtyMilli: 5000, unitCost: 120000 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 2000 },
+    );
+
+    const all = await supplierStatement(db, supplier.id);
+    expect(all.rows).toHaveLength(2);
+    expect(all.openingBalance).toBe(0);
+
+    const today = await supplierStatement(db, supplier.id, 200, {
+      from: TODAY,
+      to: TODAY,
+    });
+    expect(today.rows).toHaveLength(1);
+    expect(today.rows[0]).toMatchObject({
+      invoiceNo: 'NEW-1',
+      got: 600000,
+      balance: 800000,
+    });
+    expect(today.openingBalance).toBe(200000);
+    expect(today.hasMore).toBe(false);
+  });
+
+  it('adds delivery item lines to detailed statement exports', async () => {
+    const { db, ctx } = await setup('supplier-items');
+    const phone = await product(db, ctx, 'Phone', 110000);
+    const cable = await product(db, ctx, 'Cable', 40000);
+    const supplier = await createSupplier(
+      db,
+      { name: 'Items Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'items-1',
+        supplierId: supplier.id,
+        invoiceNo: 'ITEMS-1',
+        date: TODAY,
+        lines: [
+          { productId: phone.id, qtyMilli: 5000, unitCost: 120000 },
+          { productId: cable.id, qtyMilli: 3000, unitCost: 50000 },
+        ],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 1000 },
+    );
+
+    const detail = await deliveryDetail(db, 'items-1');
+    expect(detail?.lines).toMatchObject([
+      {
+        name: 'Phone',
+        unit: 'pc',
+        qtyMilli: 5000,
+        unitCost: 120000,
+        lineTotal: 600000,
+        returnedMilli: 0,
+      },
+      {
+        name: 'Cable',
+        unit: 'pc',
+        qtyMilli: 3000,
+        unitCost: 50000,
+        lineTotal: 150000,
+        returnedMilli: 0,
+      },
+    ]);
+    expect(detail?.balance).toBe(750000);
+
+    const compact = await supplierStatement(db, supplier.id);
+    expect(compact.rows[0]?.items).toBeUndefined();
+
+    const detailed = await supplierStatement(
+      db,
+      supplier.id,
+      Number.POSITIVE_INFINITY,
+      undefined,
+      true,
+    );
+    expect(detailed.rows[0]?.items).toEqual([
+      { name: 'Phone', qtyMilli: 5000, unitPrice: 120000, amount: 600000 },
+      { name: 'Cable', qtyMilli: 3000, unitPrice: 50000, amount: 150000 },
+    ]);
+    const csv = supplierStatementCsv(
+      detailed.rows.map((row) => ({
+        date: String(row.entry.business_date),
+        description: row.kind,
+        got: row.got,
+        paid: row.paid,
+        balance: row.balance,
+        items: row.items,
+      })),
+    );
+    expect(csv).toContain('Phone × 5 · Rs 1,200 each — Rs 6,000');
+    expect(csv).toContain('Cable × 3 · Rs 500 each — Rs 1,500');
+  });
+
+  it('returns a delivery detail with linked return quantities', async () => {
+    const { db, ctx } = await setup('supplier-detail-returns');
+    const item = await product(db, ctx);
+    const supplier = await createSupplier(
+      db,
+      { name: 'Return Detail Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'detail-return-1',
+        supplierId: supplier.id,
+        invoiceNo: 'DETAIL-1',
+        date: TODAY,
+        lines: [{ productId: item.id, qtyMilli: 5000, unitCost: 100000 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today: TODAY, now: NOW + 1000 },
+    );
+    const [line] = await db.purchase_lines.toArray();
+    await db.supplier_returns.add({
+      id: 'detail-return-ret',
+      supplier_id: supplier.id,
+      purchase_id: 'detail-return-1',
+      reason: 'Faulty',
+      total: 200000,
+      refund_received: 0,
+      refund_method: null,
+      line_count: 1,
+      note: '',
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      created_at: NOW + 2000,
+      updated_at: NOW + 2000,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    await db.supplier_return_lines.add({
+      id: 'detail-return-line',
+      return_id: 'detail-return-ret',
+      line_no: 1,
+      product_id: item.id,
+      purchase_line_id: line?.id ?? null,
+      qty_milli: 2000,
+      unit_credit: 100000,
+      line_total: 200000,
+      cost_snapshot: 100000,
+      created_at: NOW + 2000,
+      updated_at: NOW + 2000,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    await db.supplier_return_lines.add({
+      id: 'detail-return-unlinked',
+      return_id: 'detail-return-ret',
+      line_no: 2,
+      product_id: item.id,
+      purchase_line_id: null,
+      qty_milli: 1000,
+      unit_credit: 100000,
+      line_total: 100000,
+      cost_snapshot: 100000,
+      created_at: NOW + 2000,
+      updated_at: NOW + 2000,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+
+    const detail = await deliveryDetail(db, 'detail-return-1');
+    expect(detail?.lines[0]?.returnedMilli).toBe(2000);
+    expect(detail?.returns).toMatchObject([
+      { reason: 'Faulty', total: 200000 },
+    ]);
+    expect(await deliveryDetail(db, 'missing-delivery')).toBeNull();
+    await db.purchases.add({
+      id: 'orphan-purchase',
+      supplier_id: 'missing-supplier',
+      supplier_invoice_no: 'ORPHAN',
+      other_charges: 0,
+      total: 1000,
+      paid_now: 0,
+      paid_method: null,
+      line_count: 0,
+      note: '',
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    expect(await deliveryDetail(db, 'orphan-purchase')).toBeNull();
   });
 
   it('returns an empty statement for a supplier with no ledger', async () => {

@@ -7,18 +7,18 @@
 
 # Bikri POS
 
-Bikri (Urdu: بکری, "sale") is an open-source, offline-first point-of-sale PWA. It runs many independent shops on one Cloudflare deployment; every shop's data is isolated and can be exported at any time.
+Bikri is an open-source, offline-first point-of-sale PWA. It runs many independent shops on one Cloudflare deployment; every shop's data is isolated and can be exported at any time.
 
 **Live:** <https://algovyn.com/bikri/>
 
 ## Features
 
-- **Sell fast** — scan or tap items, take cash/card/wallet/udhaar, print ESC/POS receipts and open the cash drawer.
+- **Sell fast** — scan or tap items, take cash, card, wallet or credit, print ESC/POS receipts and open the cash drawer.
 - **Offline first** — every till keeps a full IndexedDB copy and syncs through an outbox when online.
-- **Udhaar khata** — customer credit with limits, part payments, promises, a chase list and WhatsApp reminders.
+- **Customer credit** — balances, limits, part payments, promises, a follow-up list and WhatsApp reminders.
 - **Stock and suppliers** — deliveries, supplier returns and ledger, stock adjustments, weighted-average cost and Code 128 labels.
 - **Day close and reports** — cash-drawer reconciliation and CSV/PDF exports.
-- **Three languages** — English, Urdu (RTL) and Roman Urdu.
+- **Three languages** — English, Urdu and Roman Urdu, with a full right-to-left layout.
 - **Printer-agnostic** — WebUSB, Web Serial or browser print; 58 mm and 80 mm.
 
 ## Stack

@@ -3,9 +3,11 @@ import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, rupeesCsv } from '../lib/csv.ts';
 import type { SortDirection } from '../lib/sort.ts';
+import { rowsAnyOfTable } from './bulk.ts';
 import type { TableSource } from './caches.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
+import { type StatementItem, statementItemLabel } from './udhaar.ts';
 import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
@@ -73,6 +75,8 @@ export type SupplierStatementEntry = {
   got: number;
   paid: number;
   balance: number;
+  /** Delivery line details; only filled for detailed exports. */
+  items?: StatementItem[];
 };
 
 export type SupplierStatement = {
@@ -324,26 +328,24 @@ export async function supplierStatement(
   src: TableSource,
   supplierId: string,
   limit = Number.POSITIVE_INFINITY,
+  range?: { from: string; to: string },
+  withItems = false,
 ): Promise<SupplierStatement> {
   const base = (src.table('ledger_entries') as Table<SyncedRow>).where(
     '[party_type+party_id+business_date+created_at]',
   );
-  const page = Number.isFinite(limit)
-    ? await base
-        .between(
-          ['supplier', supplierId, '0000-01-01', 0],
-          ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
-        )
-        .reverse()
-        .limit(Math.max(1, Math.floor(limit)) + 1)
-        .toArray()
-    : await base
-        .between(
-          ['supplier', supplierId, '0000-01-01', 0],
-          ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
-        )
-        .toArray();
-  const hasMore = Number.isFinite(limit) && page.length > limit;
+  const from = range?.from ?? '0000-01-01';
+  const to = range?.to ?? '9999-12-31';
+  const bounds = [
+    ['supplier', supplierId, from, 0],
+    ['supplier', supplierId, to, Number.MAX_SAFE_INTEGER],
+  ] as const;
+  const paged = range === undefined && Number.isFinite(limit);
+  const take = Math.max(1, Math.floor(limit)) + 1;
+  const page = paged
+    ? await base.between(bounds[0], bounds[1]).reverse().limit(take).toArray()
+    : await base.between(bounds[0], bounds[1]).toArray();
+  const hasMore = paged && page.length > limit;
   const entries = (hasMore ? page.slice(0, limit) : page)
     .reverse()
     .sort(
@@ -358,27 +360,46 @@ export async function supplierStatement(
       supplierId,
     ])
   )?.balance;
+  const allEntries = async (): Promise<SyncedRow[]> =>
+    base
+      .between(
+        ['supplier', supplierId, '0000-01-01', 0],
+        ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
+      )
+      .toArray();
   const balance =
     cachedBalance ??
-    (hasMore
-      ? (
-          await base
-            .between(
-              ['supplier', supplierId, '0000-01-01', 0],
-              ['supplier', supplierId, '9999-12-31', Number.MAX_SAFE_INTEGER],
-            )
-            .toArray()
-        ).reduce((sum, entry) => sum + n(entry.amount), 0)
+    (hasMore || range !== undefined
+      ? (await allEntries()).reduce((sum, entry) => sum + n(entry.amount), 0)
       : entries.reduce((sum, entry) => sum + n(entry.amount), 0));
-  // Start from the party's current balance and walk the page backwards, so a page
-  // shows the same running balances without reading every earlier entry.
-  const balances = new Array<number>(entries.length);
-  let running = balance;
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    balances[index] = running;
-    running -= n(entries[index]?.amount);
+  let balances: number[];
+  let openingBalance: number;
+  if (range !== undefined) {
+    // A historical range starts from the balance before its first row, so the
+    // running balances on screen and in the exports match the selected period.
+    const before = await base
+      .between(
+        ['supplier', supplierId, '0000-01-01', 0],
+        ['supplier', supplierId, range.from, -1],
+      )
+      .toArray();
+    openingBalance = before.reduce((sum, entry) => sum + n(entry.amount), 0);
+    let running = openingBalance;
+    balances = entries.map((entry) => {
+      running += n(entry.amount);
+      return running;
+    });
+  } else {
+    // Start from the party's current balance and walk the page backwards, so a page
+    // shows the same running balances without reading every earlier entry.
+    balances = new Array<number>(entries.length);
+    let running = balance;
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      balances[index] = running;
+      running -= n(entries[index]?.amount);
+    }
+    openingBalance = running;
   }
-  const openingBalance = running;
   const idsFor = (type: string): string[] => [
     ...new Set(
       entries
@@ -438,6 +459,64 @@ export async function supplierStatement(
       balance: balances[index] ?? 0,
     });
   }
+
+  if (withItems) {
+    const purchaseIds = [
+      ...new Set(
+        all
+          .filter((row) => row.kind === 'purchase' && row.entry.source_id)
+          .map((row) => String(row.entry.source_id)),
+      ),
+    ];
+    const lines = await rowsAnyOfTable<SyncedRow>(
+      src.table('purchase_lines') as Table<SyncedRow, string>,
+      'purchase_id',
+      purchaseIds,
+      (row) => String(row.purchase_id),
+    );
+    const productIds = [
+      ...new Set(lines.map((line) => String(line.product_id))),
+    ];
+    const products = new Map(
+      (
+        await (src.table('products') as Table<MasterRow, string>).bulkGet(
+          productIds,
+        )
+      )
+        .filter((row): row is MasterRow => row !== undefined)
+        .map((row) => [String(row.id), row]),
+    );
+    const byPurchase = new Map<
+      string,
+      { lineNo: number; item: StatementItem }[]
+    >();
+    for (const line of lines) {
+      const purchaseId = String(line.purchase_id);
+      const product = products.get(String(line.product_id));
+      const group = byPurchase.get(purchaseId) ?? [];
+      group.push({
+        lineNo: n(line.line_no),
+        item: {
+          // No name snapshot on purchase_lines: use the current catalogue name.
+          name:
+            String(product?.name_en ?? '').trim() ||
+            String(product?.name_ur ?? '').trim() ||
+            String(line.product_id),
+          qtyMilli: n(line.qty_milli),
+          unitPrice: n(line.unit_cost),
+          amount: n(line.line_total),
+        },
+      });
+      byPurchase.set(purchaseId, group);
+    }
+    for (const row of all) {
+      if (row.kind !== 'purchase' || !row.entry.source_id) continue;
+      row.items = (byPurchase.get(String(row.entry.source_id)) ?? [])
+        .sort((a, b) => a.lineNo - b.lineNo)
+        .map((entry) => entry.item);
+    }
+  }
+
   return { rows: all, openingBalance, balance, hasMore };
 }
 
@@ -448,22 +527,28 @@ export function supplierStatementCsv(
     got: number;
     paid: number;
     balance: number;
+    items?: readonly StatementItem[];
   }[],
 ): string {
   const header = ['date', 'description', 'got', 'paid', 'balance'];
+  const lines = rows.flatMap((row) => {
+    const main = [
+      row.date,
+      row.description,
+      rupeesCsv(row.got),
+      rupeesCsv(row.paid),
+      rupeesCsv(row.balance),
+    ];
+    const items = (row.items ?? []).map((item) => [
+      '',
+      `  ${statementItemLabel(item)}`,
+      '',
+      '',
+      '',
+    ]);
+    return [main, ...items];
+  });
   return [header.join(',')]
-    .concat(
-      rows.map((row) =>
-        [
-          row.date,
-          row.description,
-          rupeesCsv(row.got),
-          rupeesCsv(row.paid),
-          rupeesCsv(row.balance),
-        ]
-          .map(csvCell)
-          .join(','),
-      ),
-    )
+    .concat(lines.map((line) => line.map(csvCell).join(',')))
     .join('\r\n');
 }

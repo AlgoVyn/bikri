@@ -28,6 +28,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - POS declaration output moves to `.tsbuild/`, and the post-build removes legacy `dist/types`/`dist/types-node`, so ~1 MB of TypeScript declarations is no longer uploaded as static assets (16 Nov review §11, D-254).
 
 ### Design
+- Owner sign-in and shop-invite emails now use an Algovyn-branded HTML layout with the Bikri POS lockup, a large code block, shop/device details and a plain-text alternative; the Home header is a "Welcome back" overview card with the business date and a branch chip.
 - The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer footer on a subtle band with the “Expected · since last close” cash hint and a full-width Day close row. The phone credit-bill count is a horizontal label/value row, the count uses a lighter 18 px weight, the bill-count pill drops its icon, and negative profit uses the danger tone only while amounts are visible (D-249, D-250, D-252, D-253, D-255).
 - The Home Today card no longer shows **Profit today**; sold and the bill count stay the hero, and profit remains in Reports for `cost.view` users (D-260).
 
@@ -39,6 +40,8 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Statements
 - Customer statement exports always include each bill's item lines and leave out cancelled bills; the till's history still shows a cancelled bill with a **Cancelled** pill and its reversing row so the balance stays auditable (D-257, D-258).
+- Supplier statements gain `From` / `To` date filters with the correct opening balance; CSV, PDF and PNG exports include each delivery's item lines.
+- Clicking a supplier delivery opens a read-only detail with item lines, linked returns, totals and CSV/PDF/share export; print labels uses the remaining quantity after linked returns. A delivery saved without a supplier invoice number gets a generated `BKR-YYYYMMDD-XXXXXX` reference. Delivery line names use the current catalogue name because purchase lines have no name snapshot.
 
 ### Day close
 - Reports → Day closes now shows the note recorded with each short/over close, and Printer settings gain **Print Z-report after day close** (per device, default on). The manual **Print Z-report** button still queues a report when automatic printing is off (D-264).
