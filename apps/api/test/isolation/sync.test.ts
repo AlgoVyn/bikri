@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { READ_ONLY_GRACE_MS } from '../../src/routes/sync.ts';
 import { SNAPSHOT_TABLES } from '../../src/sync/tables.ts';
 import {
+  addBundleFixture,
   addSupportDevice,
   api,
   IDS,
@@ -12,6 +13,7 @@ import {
   setStatus,
 } from '../helpers/fixtures.ts';
 import {
+  bundleSaleOps,
   op,
   productRow,
   pullAll,
@@ -20,7 +22,7 @@ import {
   saleOps,
 } from '../helpers/ops.ts';
 
-// Cross-tenant isolation of sync (10 §8 I1–I6, I13, I14, I21, I24; 03 §9 cases 21–25).
+// Cross-tenant isolation of sync (10 §8 I1–I6, I13, I14, I21, I24–I26; 03 §9 cases 21–25).
 
 async function snapshotRows(
   token: string,
@@ -245,7 +247,160 @@ describe('sync isolation', () => {
     });
   });
 
-  it('I25: M3 purchases, returns, refunds and day closes stay inside their tenant', async () => {
+  it('I25: bundles and recipes stay inside their tenant', async () => {
+    const a = await seedShop('Iso bundle A');
+    const b = await seedShop('Iso bundle B');
+    await addBundleFixture(a, 'A');
+    await addBundleFixture(b, 'B');
+    const rename = (
+      shop: Awaited<ReturnType<typeof seedShop>>,
+      label: string,
+    ) =>
+      pushOk(shop.till, [
+        op(
+          'products',
+          'upsert',
+          productRow(IDS.bundle, {
+            name_en: `${label} bundle pulled`,
+            sku: 'BND-0001',
+            price: 200000,
+            kind: 'bundle',
+            track_stock: 0,
+          }),
+          { base_rev: 1, changed_fields: ['name_en'] },
+        ),
+      ]);
+    await rename(a, 'A');
+    await rename(b, 'B');
+    const setItemQty = (
+      shop: Awaited<ReturnType<typeof seedShop>>,
+      qty: number,
+    ) =>
+      pushOk(shop.till, [
+        op(
+          'bundle_items',
+          'upsert',
+          {
+            id: IDS.bundleItem1,
+            bundle_id: IDS.bundle,
+            component_product_id: IDS.product,
+            qty_milli: qty,
+            sort_order: 0,
+            deleted_at: null,
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            rev: 1,
+            updated_by: IDS.owner,
+          },
+          { base_rev: 1, changed_fields: ['qty_milli'] },
+        ),
+      ]);
+    await setItemQty(a, 3000);
+    await setItemQty(b, 2000);
+
+    const pulled = await pullAll(b.till);
+    expect(
+      pulled.some(
+        (change) =>
+          change.tbl === 'products' &&
+          change.row.id === IDS.bundle &&
+          change.row.name_en === 'A bundle pulled',
+      ),
+    ).toBe(false);
+    expect(
+      pulled.find(
+        (change) =>
+          change.tbl === 'bundle_items' && change.row.id === IDS.bundleItem1,
+      )?.row.qty_milli,
+    ).toBe(2000);
+    const snap = await snapshotRows(b.till.token);
+    expect(snap.get('bundle_items')).toHaveLength(4);
+    const products = snap.get('products') ?? [];
+    expect(products.find((row) => row.id === IDS.bundle)?.name_en).toBe(
+      'B bundle pulled',
+    );
+    expect(products.find((row) => row.id === IDS.component2)?.name_en).toBe(
+      'B component 2',
+    );
+    expect(products.find((row) => row.id === IDS.product)?.name_en).toBe(
+      'Iso bundle B phone',
+    );
+    const ownItems = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1',
+    )
+      .bind(b.tenantId)
+      .first<{ n: number }>();
+    expect(snap.get('bundle_items')?.length).toBe(ownItems?.n);
+  });
+
+  it('I26: B cannot write a recipe or bundle sale that names an A-only bundle', async () => {
+    const a = await seedShop('Iso bundle owner A');
+    const b = await seedShop('Iso bundle owner B');
+    await addBundleFixture(a, 'A');
+    const now = Date.now();
+    const item = await pushOk(b.till, [
+      op(
+        'bundle_items',
+        'upsert',
+        {
+          id: newId(now),
+          bundle_id: IDS.bundle,
+          component_product_id: IDS.product,
+          qty_milli: 1000,
+          sort_order: 0,
+          deleted_at: null,
+          created_at: now,
+          updated_at: now,
+          rev: 1,
+          updated_by: IDS.owner,
+        },
+        { base_rev: 0, changed_fields: [] },
+      ),
+    ]);
+    expect(item.results[0]?.result).toBe('rejected');
+    expect(['CONSTRAINT_FAILED', 'FOREIGN_KEY']).toContain(
+      item.results[0]?.error_code,
+    );
+
+    const sale = bundleSaleOps(b, b.till, 1, {
+      bundleId: IDS.bundle,
+      componentIds: [
+        IDS.product,
+        IDS.component2,
+        IDS.component3,
+        IDS.component4,
+      ],
+      itemIds: [
+        IDS.bundleItem1,
+        IDS.bundleItem2,
+        IDS.bundleItem3,
+        IDS.bundleItem4,
+      ],
+    });
+    const saleResult = await pushOk(b.till, sale);
+    expect(saleResult.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+    for (const tbl of ['bundle_items', 'sales']) {
+      expect(
+        await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1`,
+        )
+          .bind(b.tenantId)
+          .first<{ n: number }>(),
+      ).toEqual({ n: 0 });
+    }
+    expect(
+      await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1',
+      )
+        .bind(a.tenantId)
+        .first<{ n: number }>(),
+    ).toEqual({ n: 4 });
+  });
+
+  it('M3 tables: purchases, returns, refunds and day closes stay inside their tenant', async () => {
     const a = await seedShop('M3 A');
     const b = await seedShop('M3 B');
     const now = Date.now();
@@ -680,7 +835,7 @@ describe('sync isolation', () => {
     expect(Number(sales?.n ?? 0)).toBe(0);
   });
 
-  it('I25: the daily read cap is charged to one tenant only', async () => {
+  it('read cap: the daily read cap is charged to one tenant only', async () => {
     const a = await seedShop('Cap A');
     const b = await seedShop('Cap B');
     const day = new Date().toISOString().slice(0, 10);
@@ -697,7 +852,7 @@ describe('sync isolation', () => {
     ).toBe(200);
   });
 
-  it('I24 / 25: support devices cannot push, can pull and snapshot, stop at expires_at', async () => {
+  it('I24: support devices cannot push, can pull and snapshot, stop at expires_at', async () => {
     const a = await seedShop('Sup A');
     const live = await addSupportDevice(a, Date.now() + 3_600_000);
     const res = await push(live, saleOps(a, live, 1));

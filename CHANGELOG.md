@@ -4,6 +4,17 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Security and sync hardening — 20 Nov 2026 review, PR 1
+- A replacement bill must be paired with its `sale_voids` row in the same push, so `replaces_sale_id` can no longer skip the bundle price/recipe checks.
+- Bundle discounts are measured against the pre-discount bundle price: a 100% bundle discount no longer bypasses `max_discount_bp`, and 51–99% no longer rejects even the owner.
+- A simple-product edit or a purchase delivery of a bundle component is no longer rejected just because a bundle sale in the same push uses it.
+- A concurrent retry of the same push re-checks `applied_ops`, guards the master UPDATE, and guards every server-authored stock/audit/cost side effect, so a retry cannot double-deduct stock or duplicate ledger/audit rows.
+- The manager same-day void rule uses the void's own business date (`businessDate(created_at)`), not a client-supplied date; a sale line's date must match its parent sale.
+- Product/staff/shop lookups used by later transactions update only `changed_fields`, matching the D1 write and closing the cost-only-upsert price-smuggling path.
+- A void repairs stock once per product, not once per line; duplicate `refund_lines` for one sale line are rejected.
+- `import-ops` refuses support devices and invalidates the usage cache.
+- Migration `0026` rebuilds `sales_append_only_update` with `bundle_discount_total`; the bundle isolation cases `I25`–`I27` and the cron/static coverage gaps are now in the suite.
+
 ### Fixed — 17 Nov 2026 whole-app review
 - Sync keeps running while the tab is hidden; only a 30 s grace after the sale-complete **Share** opens WhatsApp defers requests, and `pagehide` flushes pending ops (M1, D-238).
 - `/bikri/icons/*` and `/bikri/fonts/*` revalidate daily instead of caching for a year; only content-hashed `/assets/*` stays immutable (M2, D-237).

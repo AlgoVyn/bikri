@@ -22,6 +22,14 @@ export const IDS = {
   barcode: '01JB0000000000000000000005',
   customer: '01JB0000000000000000000006',
   supplier: '01JB0000000000000000000007',
+  bundle: '01JB0000000000000000000008',
+  component2: '01JB0000000000000000000009',
+  component3: '01JB0000000000000000000010',
+  component4: '01JB0000000000000000000011',
+  bundleItem1: '01JB0000000000000000000012',
+  bundleItem2: '01JB0000000000000000000013',
+  bundleItem3: '01JB0000000000000000000014',
+  bundleItem4: '01JB0000000000000000000015',
 } as const;
 
 export type Shop = {
@@ -183,6 +191,66 @@ export async function seedShop(
     ownerCode: owner_code.code,
     ownerEmail: tenant.owner_email,
   };
+}
+
+export type BundleFixture = {
+  bundleId: string;
+  componentIds: [string, string, string, string];
+  itemIds: [string, string, string, string];
+};
+
+/**
+ * Adds the four-component bundle every fixture tenant uses in the isolation suite
+ * (10 §8 I25–I27). The ids collide across tenants on purpose; the customer/product
+ * names carry the shop name so a leak is visible even when the ids match.
+ */
+export async function addBundleFixture(
+  shop: Shop,
+  label = 'Bundle',
+): Promise<BundleFixture> {
+  const now = Date.now();
+  const componentIds: BundleFixture['componentIds'] = [
+    IDS.product,
+    IDS.component2,
+    IDS.component3,
+    IDS.component4,
+  ];
+  const itemIds: BundleFixture['itemIds'] = [
+    IDS.bundleItem1,
+    IDS.bundleItem2,
+    IDS.bundleItem3,
+    IDS.bundleItem4,
+  ];
+  const statements = [
+    env.DB.prepare(
+      `INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, last_cost, created_at, updated_at, rev)
+       VALUES (?1, ?2, ?3, 'BND-0001', 200000, 'bundle', 0, 0, ?4, ?4, 1)`,
+    ).bind(shop.tenantId, IDS.bundle, `${label} bundle`, now),
+  ];
+  for (const [index, id] of componentIds.slice(1).entries()) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO products (tenant_id, id, name_en, sku, price, last_cost, created_at, updated_at, rev)
+         VALUES (?1, ?2, ?3, ?4, 50000, 0, ?5, ?5, 1)`,
+      ).bind(
+        shop.tenantId,
+        id,
+        `${label} component ${index + 2}`,
+        `CMP-000${index + 2}`,
+        now,
+      ),
+    );
+  }
+  for (const [index, id] of itemIds.entries()) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO bundle_items (tenant_id, id, bundle_id, component_product_id, qty_milli, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 1000, ?5, ?6, ?6)`,
+      ).bind(shop.tenantId, id, IDS.bundle, componentIds[index], index, now),
+    );
+  }
+  await env.DB.batch(statements);
+  return { bundleId: IDS.bundle, componentIds, itemIds };
 }
 
 export async function setStatus(

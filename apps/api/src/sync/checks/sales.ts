@@ -134,6 +134,27 @@ export function checkSaleInsert(
   } else if (ledger.length !== 0) {
     throw new Reject('CONSTRAINT_FAILED');
   }
+
+  // A replacement bill is only valid together with the void it replaces (the client
+  // writes both in one transaction). Without this pairing a till could set
+  // `replaces_sale_id` on any bill to skip the bundle price/recipe checks.
+  const replaces = row.replaces_sale_id;
+  if (replaces !== null && replaces !== undefined) {
+    if (
+      typeof replaces !== 'string' ||
+      replaces.length === 0 ||
+      replaces === row.id
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    const voids = group.filter(
+      (candidate) =>
+        candidate.tbl === 'sale_voids' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.sale_id === replaces &&
+        candidate.row?.replacement_sale_id === row.id,
+    );
+    if (voids.length !== 1) throw new Reject('CONSTRAINT_FAILED');
+  }
 }
 
 /** Recompute price/tax/discount policy instead of trusting the client totals. */
@@ -372,10 +393,15 @@ export function checkSalePolicy(
     n(row.item_discount_total) + bill - bundleResidual + bundleDiscountTotal;
   if (discount > 0) {
     if (!allowed('sale.discount')) throw new Reject('FORBIDDEN');
-    const share =
-      n(row.gross_total) === 0
-        ? 0
-        : mulDivRound(discount, 10_000, n(row.gross_total));
+    // `gross_total` already has the whole-bundle discount subtracted (priceBundle
+    // allocates the post-discount total to the component lines), so measuring the
+    // discount against it can both hide a 100% bundle discount (0/0) and reject a
+    // legitimate 51–99% one (>10,000 bp). Measure against the pre-discount base:
+    // component gross minus their rounding residual equals the bundle net, and
+    // adding the bundle discount back restores the bundle price.
+    const base = n(row.gross_total) - bundleResidual + bundleDiscountTotal;
+    if (base < 0) throw new Reject('CONSTRAINT_FAILED');
+    const share = base === 0 ? 10_000 : mulDivRound(discount, 10_000, base);
     const maxBp = staff?.max_discount_bp ?? 0;
     // The limit governs the sale when it was rung, not a later staff edit.
     const limitFresh = !staff || entryAt >= staff.updated_at;

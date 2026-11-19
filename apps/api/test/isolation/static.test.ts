@@ -13,7 +13,7 @@ const SOURCES: Record<string, string> = import.meta.glob('../../src/**/*.ts', {
 const RAW_DB =
   /\b(?:env|c\.env|this\.env)\s*(?:\.\s*DB\b|\[\s*['"`]DB['"`]\s*\])|\bDB\s*\.\s*(?:prepare|batch|exec)\b/;
 const SQL_LITERAL =
-  /(['"`])((?:SELECT|INSERT|UPDATE|DELETE|WITH|REPLACE)\b(?:(?!\1)[\s\S])*)\1/gi;
+  /(['"`])\s*((?:SELECT|INSERT|UPDATE|DELETE|WITH|REPLACE)\b(?:(?!\1)[\s\S])*)\1/gi;
 
 function rel(path: string): string {
   return path.replace(/^(\.\.\/)+src\//, '');
@@ -100,6 +100,11 @@ describe('I19 static check', () => {
       "db.select('SELECT * FROM products WHERE tenant_id = ?1 AND id = ?2', id)";
     expect(RAW_DB.test(good)).toBe(false);
     for (const sql of sqlLiterals(good)) assertTenantScoped(sql);
+    // A multiline template that starts with whitespace must not bypass I19.
+    const leading = 'db.prepare(`\n  SELECT * FROM products WHERE id = ?2`)';
+    expect(() => {
+      for (const sql of sqlLiterals(leading)) assertTenantScoped(sql);
+    }).toThrow(/tenant_id = \?1/);
     const placeholder = '$' + '{tbl}';
     expect(
       unscopedInterpolated(

@@ -489,13 +489,19 @@ export function bundleResidualDiscount(cart: Cart, totals: CartResult): number {
 
 /** Manual discount share in basis points, excluding bundle rounding residuals. */
 export function manualDiscountBp(cart: Cart, totals: CartResult): number {
+  const residual = bundleResidualDiscount(cart, totals);
+  const bundleDiscount = bundleDiscountTotal(cart);
   const manual =
     totals.item_discount_total +
     totals.bill_discount -
-    bundleResidualDiscount(cart, totals) +
-    bundleDiscountTotal(cart);
-  if (manual <= 0 || totals.gross_total === 0) return 0;
-  return mulDivRound(manual, 10_000, totals.gross_total);
+    residual +
+    bundleDiscount;
+  // `gross_total` is the post-bundle-discount net of the component lines. Add the
+  // whole-bundle discount back so 100% is a 10,000 bp discount (not 0/0) and 51–99%
+  // stays below 10,000 bp instead of exceeding it.
+  const base = totals.gross_total - residual + bundleDiscount;
+  if (manual <= 0 || base <= 0) return 0;
+  return mulDivRound(manual, 10_000, base);
 }
 
 /** Quick sale: no product, no stock movement, cost 0 (screens/05). */

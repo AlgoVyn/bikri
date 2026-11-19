@@ -11,6 +11,11 @@ import {
 } from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import {
+  insertIfNotAppliedSql,
+  type Row,
+  type TenantTable,
+} from '../db/tenantDb.ts';
+import {
   type ApplyContext,
   type CostState,
   changeLog,
@@ -30,6 +35,31 @@ export {
   writableColumns,
 } from './applyOpsShared.ts';
 
+/** A prepared insert that is skipped when this op id is already in `applied_ops`. */
+function guardedInsert(
+  ctx: ApplyContext,
+  table: TenantTable,
+  row: Record<string, unknown>,
+  opId: string,
+): D1PreparedStatement {
+  const [sql, params] = insertIfNotAppliedSql(table, row as Row, opId);
+  return ctx.db.prepare(sql, ...params);
+}
+
+/** Appends the same op guard to an UPDATE; `params` are its already-bound values. */
+function guardedUpdate(
+  ctx: ApplyContext,
+  sql: string,
+  params: (string | number | null)[],
+  opId: string,
+): D1PreparedStatement {
+  return ctx.db.prepare(
+    `${sql} AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${params.length + 2})`,
+    ...params,
+    opId,
+  );
+}
+
 /** Derived values the server owns: sales.status, products.avg_cost, conflicts (03 §4.1, §5). */
 export function sideEffects(
   ctx: ApplyContext,
@@ -37,11 +67,13 @@ export function sideEffects(
   row: Record<string, unknown>,
   avg: Map<string, CostState>,
   group: PushOp[],
+  opId: string,
 ): D1PreparedStatement[] {
   const { db, now } = ctx;
   const out: D1PreparedStatement[] = [];
   const saleStatus = (saleId: string) => [
-    db.prepare(
+    guardedUpdate(
+      ctx,
       `UPDATE sales SET status = CASE
          WHEN EXISTS (SELECT 1 FROM sale_voids v WHERE v.tenant_id = ?1 AND v.sale_id = ?2) THEN 'void'
          WHEN NOT EXISTS (
@@ -57,9 +89,10 @@ export function sideEffects(
          WHEN EXISTS (SELECT 1 FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?2) THEN 'part_refunded'
          ELSE 'paid' END
        WHERE tenant_id = ?1 AND id = ?2`,
-      saleId,
+      [saleId],
+      opId,
     ),
-    changeLog(db, 'sales', saleId, 'upsert', null, now, false),
+    changeLog(db, 'sales', saleId, 'upsert', null, now, true),
   ];
   const conflictLog = (conflictId: string) =>
     db.prepare(
@@ -71,11 +104,12 @@ export function sideEffects(
     const conflictId = newId(now);
     out.push(
       db.prepare(
-        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'refunds', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM sale_voids WHERE tenant_id = ?1 AND sale_id = ?4)",
+        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'refunds', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM sale_voids WHERE tenant_id = ?1 AND sale_id = ?4) AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)",
         conflictId,
         String(row.id),
         String(row.sale_id),
         now,
+        opId,
       ),
     );
     out.push(conflictLog(conflictId));
@@ -86,11 +120,12 @@ export function sideEffects(
     const conflictId = newId(now);
     out.push(
       db.prepare(
-        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'sale_voids', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM refunds WHERE tenant_id = ?1 AND sale_id = ?4)",
+        "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'sale_voids', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM refunds WHERE tenant_id = ?1 AND sale_id = ?4) AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)",
         conflictId,
         String(row.id),
         String(row.sale_id),
         now,
+        opId,
       ),
     );
     out.push(conflictLog(conflictId));
@@ -105,12 +140,14 @@ export function sideEffects(
              ?5 - (s.paid_total - COALESCE((SELECT SUM(r.amount) FROM refunds r WHERE r.tenant_id = ?1 AND r.sale_id = ?4 AND r.id <> ?3), 0))),
            'needs_owner', ?6
          FROM sales s WHERE s.tenant_id = ?1 AND s.id = ?4
-           AND ?5 > (s.paid_total - COALESCE((SELECT SUM(r2.amount) FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?4 AND r2.id <> ?3), 0))`,
+           AND ?5 > (s.paid_total - COALESCE((SELECT SUM(r2.amount) FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?4 AND r2.id <> ?3), 0))
+           AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?7)`,
         conflictId,
         String(row.id),
         String(row.sale_id),
         Number(row.amount ?? 0),
         now,
+        opId,
       ),
     );
     out.push(conflictLog(conflictId));
@@ -126,11 +163,13 @@ export function sideEffects(
              (SELECT SUM(rl.qty_milli) FROM refund_lines rl WHERE rl.tenant_id = ?1 AND rl.sale_line_id = ?4) - sl.qty_milli),
            'needs_owner', ?5
          FROM sale_lines sl WHERE sl.tenant_id = ?1 AND sl.id = ?4
-           AND (SELECT SUM(rl2.qty_milli) FROM refund_lines rl2 WHERE rl2.tenant_id = ?1 AND rl2.sale_line_id = ?4) > sl.qty_milli`,
+           AND (SELECT SUM(rl2.qty_milli) FROM refund_lines rl2 WHERE rl2.tenant_id = ?1 AND rl2.sale_line_id = ?4) > sl.qty_milli
+           AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)`,
         conflictId,
         String(row.id),
         String(row.sale_line_id),
         now,
+        opId,
       ),
     );
     out.push(conflictLog(conflictId));
@@ -167,11 +206,13 @@ export function sideEffects(
              (SELECT SUM(r.qty_milli) FROM supplier_return_lines r WHERE r.tenant_id = ?1 AND r.purchase_line_id = ?4) - pl.qty_milli),
            'needs_owner', ?5
          FROM purchase_lines pl WHERE pl.tenant_id = ?1 AND pl.id = ?4
-           AND (SELECT SUM(r2.qty_milli) FROM supplier_return_lines r2 WHERE r2.tenant_id = ?1 AND r2.purchase_line_id = ?4) > pl.qty_milli`,
+           AND (SELECT SUM(r2.qty_milli) FROM supplier_return_lines r2 WHERE r2.tenant_id = ?1 AND r2.purchase_line_id = ?4) > pl.qty_milli
+           AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)`,
         conflictId,
         String(row.id),
         row.purchase_line_id,
         now,
+        opId,
       ),
     );
     out.push(conflictLog(conflictId));
@@ -203,11 +244,11 @@ export function sideEffects(
         );
         state.pushed = true;
         out.push(
-          db.prepare(
+          guardedUpdate(
+            ctx,
             'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
-            state.avg_cost,
-            row.product_id,
-            Number(row.unit_cost),
+            [state.avg_cost, String(row.product_id), Number(row.unit_cost)],
+            opId,
           ),
           changeLog(db, 'products', row.product_id, 'upsert', null, now, true),
         );
@@ -220,10 +261,11 @@ export function sideEffects(
   }
   if (tbl === 'sales' && Number.isSafeInteger(row.invoice_seq)) {
     out.push(
-      db.prepare(
+      guardedUpdate(
+        ctx,
         'UPDATE devices SET last_invoice_seq = ?2 WHERE tenant_id = ?1 AND id = ?3 AND last_invoice_seq < ?2',
-        Number(row.invoice_seq),
-        ctx.device.id,
+        [Number(row.invoice_seq), ctx.device.id],
+        opId,
       ),
     );
   }
@@ -240,6 +282,7 @@ export function moneyAuditStatements(
   group: PushOp[],
   tbl: string,
   row: Record<string, unknown>,
+  opId: string,
 ): D1PreparedStatement[] {
   const n = (value: unknown): number => Number(value ?? 0);
   const id = String(row.id);
@@ -367,7 +410,7 @@ export function moneyAuditStatements(
     created_at: n(row.created_at),
   };
   return [
-    ctx.db.insert('audit_log', auditRow),
+    guardedInsert(ctx, 'audit_log', auditRow, opId),
     changeLog(
       ctx.db,
       'audit_log',
@@ -392,6 +435,7 @@ export function stockRepairStatements(
   tbl: string,
   row: Record<string, unknown>,
   avg: Map<string, CostState>,
+  opId: string,
 ): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];
   const number = (value: unknown): number => Number(value ?? 0);
@@ -442,7 +486,7 @@ export function stockRepairStatements(
       created_at: createdAt,
     };
     out.push(
-      ctx.db.insert('stock_movements', movement),
+      guardedInsert(ctx, 'stock_movements', movement, opId),
       changeLog(
         ctx.db,
         'stock_movements',
@@ -459,7 +503,9 @@ export function stockRepairStatements(
       unitCost !== null &&
       Number.isSafeInteger(unitCost)
     )
-      out.push(...sideEffects(ctx, 'stock_movements', movement, avg, group));
+      out.push(
+        ...sideEffects(ctx, 'stock_movements', movement, avg, group, opId),
+      );
   };
   const grouped = (
     lines: Record<string, unknown>[],
@@ -602,22 +648,28 @@ export function stockRepairStatements(
       seen.add(id);
       return true;
     });
+    // One repair per product, not per line: a product can appear on several lines of
+    // the same sale (for example standalone and inside a bundle), and `sold` is the
+    // whole sale's movement for that product.
+    const products = new Set<string>();
     for (const line of lines) {
-      if (!line.product_id) continue;
+      if (line.product_id) products.add(line.product_id);
+    }
+    for (const productId of products) {
       const sold =
-        (look.saleMoved.get(saleId)?.get(line.product_id) ?? 0) +
-        movements('sale', saleId, line.product_id).reduce(
+        (look.saleMoved.get(saleId)?.get(productId) ?? 0) +
+        movements('sale', saleId, productId).reduce(
           (sum, movement) => sum - number(movement.row?.qty_delta_milli),
           0,
         );
       if (sold <= 0) continue;
-      const moved = movements('void_return', id, line.product_id).reduce(
+      const moved = movements('void_return', id, productId).reduce(
         (sum, movement) => sum + number(movement.row?.qty_delta_milli),
         0,
       );
       const missing = sold - moved;
       if (missing > 0)
-        addMovement(line.product_id, missing, 'void_return', 'void', id, null);
+        addMovement(productId, missing, 'void_return', 'void', id, null);
     }
   }
   return out;

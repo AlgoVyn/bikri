@@ -2,7 +2,7 @@
 import type { TenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import { takeRowsRead } from '../platform/readCounter.ts';
-import { usageStatement } from '../platform/tenants.ts';
+import { invalidateUsage, usageStatement } from '../platform/tenants.ts';
 import { assertQuota } from '../routes/sync.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
 import { applyOps, CallBudget } from './applyOps.ts';
@@ -41,6 +41,12 @@ export async function importOps(
       403,
       'Only a revoked device’s ops can be imported',
     );
+  if (device.kind === 'support')
+    throw new ApiError(
+      'FORBIDDEN',
+      403,
+      'Support access is view-only; its ops cannot be imported',
+    );
   await assertQuota(env, tenant, now);
   const eligible =
     tenant.status === 'read_only' && tenant.status_changed_at !== null
@@ -60,6 +66,7 @@ export async function importOps(
       rows_read: outcome.rowsRead + takeRowsRead(tenant.id),
     }),
   ]);
+  invalidateUsage(tenant.id);
   return {
     results: outcome.results,
     server_time: now,

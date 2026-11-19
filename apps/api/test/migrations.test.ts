@@ -900,6 +900,30 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
       await insert('products', { ...row, id: 'p4' }).run();
     });
 
+    it('protects every non-status sales column, including bundle_discount_total (0026)', async () => {
+      const trigger = await db
+        .prepare(
+          "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'sales_append_only_update'",
+        )
+        .first<{ sql: string }>();
+      expect(trigger?.sql).toBeTruthy();
+      const columns = await db
+        .prepare("PRAGMA table_info('sales')")
+        .all<{ name: string }>();
+      for (const column of columns.results) {
+        if (column.name === 'status') continue;
+        expect(trigger?.sql, column.name).toContain(column.name);
+      }
+      await expectRejected(
+        db
+          .prepare(
+            'UPDATE sales SET bundle_discount_total = 1 WHERE tenant_id = ?1 AND id = ?2',
+          )
+          .bind(A.id, 's1'),
+        /sales is append-only/,
+      );
+    });
+
     it('rejects a malformed staff verifier and an empty shop time zone (0012)', async () => {
       const staff = {
         tenant_id: A.id,

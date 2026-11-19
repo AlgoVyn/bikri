@@ -1,12 +1,26 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { verifyAccessJwt } from '../src/auth/access.ts';
 import { base64url } from '../src/auth/crypto.ts';
 import { statusChangeStatements } from '../src/platform/tenantAdmin.ts';
 import type { TenantRow } from '../src/types.ts';
-import { api, IDS, json, seedShop, setStatus } from './helpers/fixtures.ts';
-import { op, productRow, pushOk, saleOps } from './helpers/ops.ts';
+import {
+  addBundleFixture,
+  addSupportDevice,
+  api,
+  IDS,
+  json,
+  seedShop,
+  setStatus,
+} from './helpers/fixtures.ts';
+import {
+  bundleSaleOps,
+  op,
+  productRow,
+  pushOk,
+  saleOps,
+} from './helpers/ops.ts';
 
 const n = async (sql: string, ...p: unknown[]) =>
   Number(
@@ -421,15 +435,59 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
   it('purges self-referencing sales and expenses without rewriting their links first', async () => {
     const shop = await seedShop('Purge refs');
     const firstSale = saleOps(shop, shop.till, 1);
-    const secondSale = saleOps(shop, shop.till, 2);
-    // Build the reissue link in the insert itself; ledger rows are append-only and
-    // cannot be updated by a test (or any other caller) after the fact.
-    secondSale[0]!.row = {
-      ...secondSale[0]!.row,
-      replaces_sale_id: firstSale[0]!.row?.id,
-    };
+    const secondSale = saleOps(shop, shop.till, 2, {
+      replacesSaleId: String(firstSale[0]?.row?.id ?? ''),
+    });
     await pushOk(shop.till, firstSale);
-    await pushOk(shop.till, secondSale);
+    // A replacement bill is valid only with its void in the same transaction.
+    const tx = String(secondSale[0]?.tx_id ?? '');
+    const now = Date.now();
+    const today = businessDate(now);
+    await pushOk(shop.till, [
+      ...secondSale,
+      op(
+        'sale_voids',
+        'insert',
+        {
+          id: newId(),
+          sale_id: firstSale[0]?.row?.id,
+          reason: 'Reissue',
+          replacement_sale_id: secondSale[0]?.row?.id,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: today,
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+      op(
+        'payments',
+        'insert',
+        {
+          id: newId(),
+          direction: 'out',
+          method: 'cash',
+          purpose: 'void',
+          amount: 150000,
+          cash_tendered: null,
+          change_given: null,
+          reference: '',
+          sale_id: firstSale[0]?.row?.id,
+          refund_id: null,
+          purchase_id: null,
+          supplier_return_id: null,
+          party_type: null,
+          party_id: null,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: today,
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    ]);
     const sales = await env.DB.prepare(
       'SELECT id, invoice_seq, replaces_sale_id FROM sales WHERE tenant_id = ?1 ORDER BY invoice_seq',
     )
@@ -586,6 +644,31 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     ).toBe(1);
   });
 
+  it('import-ops refuses a revoked support device (view-only)', async () => {
+    const shop = await seedShop('Imp support');
+    const support = await addSupportDevice(shop, Date.now() + 3_600_000);
+    await env.DB.prepare(
+      'UPDATE devices SET revoked_at = ?2 WHERE tenant_id = ?1 AND id = ?3',
+    )
+      .bind(shop.tenantId, Date.now(), support.id)
+      .run();
+    const res = await api(`/admin/tenants/${shop.tenantId}/import-ops`, {
+      method: 'POST',
+      json: {
+        device_id: support.id,
+        ops: saleOps(shop, support, 1),
+      },
+    });
+    expect(res.status).toBe(403);
+    expect((await json<Err>(res)).error.code).toBe('FORBIDDEN');
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(0);
+  });
+
   it('import-ops: only a revoked device of that tenant', async () => {
     const a = await seedShop('Imp A');
     const b = await seedShop('Imp B');
@@ -620,7 +703,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
   });
 });
 
-describe('operator export and restore (I17, I18)', () => {
+describe('operator export and restore (I17, I18, I27)', () => {
   it('I17: export of A returns only A rows and writes operator_export in A only', async () => {
     const a = await seedShop('Exp A');
     const b = await seedShop('Exp B');
@@ -647,6 +730,82 @@ describe('operator export and restore (I17, I18)', () => {
     expect(devs.rows.every((r) => !('token_hash' in r))).toBe(true);
     expect(await auditCount(a.tenantId, 'operator_export')).toBe(1);
     expect(await auditCount(b.tenantId, 'operator_export')).toBe(0);
+  });
+
+  it('I27: export/restore includes A bundle rows and sale-line bundle fields; B unchanged', async () => {
+    const a = await seedShop('Bnd exp A');
+    const b = await seedShop('Bnd exp B');
+    const bundleA = await addBundleFixture(a, 'A');
+    await addBundleFixture(b, 'B');
+    // Make B's recipe distinguishable from A's colliding ids.
+    await env.DB.prepare(
+      'UPDATE bundle_items SET qty_milli = 2000 WHERE tenant_id = ?1',
+    )
+      .bind(b.tenantId)
+      .run();
+    await pushOk(a.till, bundleSaleOps(a, a.till, 1, bundleA));
+    const cutoff = Date.now();
+    const exportTable = async (tenantId: string, tbl: string) =>
+      (
+        await json<{ rows: Record<string, unknown>[] }>(
+          await api(
+            `/admin/tenants/${tenantId}/export?tbl=${tbl}&limit=1000&before=${cutoff}`,
+          ),
+        )
+      ).rows;
+    const items = await exportTable(a.tenantId, 'bundle_items');
+    expect(items).toHaveLength(4);
+    const bItemsBefore = await exportTable(b.tenantId, 'bundle_items');
+    expect(bItemsBefore).toHaveLength(4);
+    expect(bItemsBefore.every((row) => row.qty_milli === 2000)).toBe(true);
+
+    const lines = await exportTable(a.tenantId, 'sale_lines');
+    expect(lines).toHaveLength(4);
+    for (const line of lines) {
+      expect(line).toMatchObject({
+        bundle_id: IDS.bundle,
+        bundle_qty: 1,
+        bundle_price: 200000,
+        bundle_discount: 0,
+        bundle_component_qty_milli: 1000,
+      });
+      expect(typeof line.bundle_group).toBe('string');
+    }
+
+    const bBefore = await n(
+      'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1',
+      b.tenantId,
+    );
+    await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true },
+    });
+    await env.DB.prepare('DELETE FROM bundle_items WHERE tenant_id = ?1')
+      .bind(a.tenantId)
+      .run();
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+    ).toBe(0);
+    const restored = await api(`/admin/tenants/${a.tenantId}/import`, {
+      method: 'POST',
+      json: { tbl: 'bundle_items', rows: items, reason: 'restore drill' },
+    });
+    expect(restored.status, await restored.clone().text()).toBe(200);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1 AND qty_milli = 1000',
+        a.tenantId,
+      ),
+    ).toBe(4);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1 AND qty_milli = 2000',
+        b.tenantId,
+      ),
+    ).toBe(bBefore);
   });
 
   it('I18: restore of A (purge + import) leaves B unchanged and B pushes during maintenance apply', async () => {

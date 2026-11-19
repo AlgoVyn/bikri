@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
 import { op, pushOk, saleOps } from './helpers/ops.ts';
@@ -153,7 +153,7 @@ describe('client/server sync contract regressions', () => {
           replacement_sale_id: null,
           device_id: shop.till.id,
           staff_id: IDS.cashier,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
         },
         { tx_id: tx },
@@ -180,7 +180,7 @@ describe('client/server sync contract regressions', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.cashier,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
         },
         { tx_id: tx },
@@ -200,7 +200,7 @@ describe('client/server sync contract regressions', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.cashier,
-          business_date: '2026-10-27',
+          business_date: businessDate(now),
           created_at: now,
         },
         { tx_id: tx },

@@ -2,8 +2,10 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { pruneAll } from '../../src/platform/prune.ts';
 import {
+  addBundleFixture,
   addSupportDevice,
   api,
+  IDS,
   json,
   seedShop,
   setStatus,
@@ -152,8 +154,29 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
   it('I16: deleting D removes only D rows and t/<D>/ objects; then D is a tombstone', async () => {
     const a = await seedShop('Del A');
     const d = await seedShop('Del D');
+    await addBundleFixture(d, 'D');
     await pushOk(d.till, saleOps(d, d.till, 1));
     await pushOk(a.till, saleOps(a, a.till, 1));
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
+       VALUES (?1, 'del-owner-code', ?2, ?3, ?4, ?5, ?6)`,
+    )
+      .bind(
+        d.tenantId,
+        d.till.id,
+        IDS.owner,
+        'f'.repeat(64),
+        now,
+        now + 600_000,
+      )
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO shop_requests (id, shop_name, owner_name, email, status, tenant_id, created_at, updated_at)
+       VALUES ('del-request', 'Del D', 'Owner', 'del-d@example.com', 'approved', ?1, ?2, ?2)`,
+    )
+      .bind(d.tenantId, now)
+      .run();
     await env.FILES.put(`t/${d.tenantId}/shop/logo-x.png`, 'x');
     await env.FILES.put(`t/${a.tenantId}/shop/logo-x.png`, 'x');
     const aBefore = await n(
@@ -175,12 +198,18 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     expect(tenant?.owner_email).toBeNull();
     for (const tbl of [
       'sales',
+      'sale_lines',
       'products',
+      'bundle_items',
       'devices',
       'change_log',
+      'applied_ops',
       'branches',
       'shop',
       'staff',
+      'enrolment_codes',
+      'owner_email_codes',
+      'tenant_usage',
     ]) {
       expect(
         await n(
@@ -190,6 +219,12 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
         tbl,
       ).toBe(0);
     }
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM shop_requests WHERE tenant_id = ?1',
+        d.tenantId,
+      ),
+    ).toBe(0);
     expect(
       await n(
         'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
@@ -202,23 +237,133 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     ).not.toBeNull();
   });
 
-  it('ends expired support access once, with an audit row', async () => {
+  it('ends expired support access once, with an audit row, without touching another tenant', async () => {
+    const now = Date.now();
     const a = await seedShop('Sup cron');
-    await addSupportDevice(a, Date.now() - 1);
+    const b = await seedShop('Sup cron B');
+    await addSupportDevice(a, now - 1);
+    const liveB = await addSupportDevice(b, now + 3_600_000);
     await env.DB.prepare(
       "UPDATE tenants SET support_until = ?2, support_reason = 'x' WHERE id = ?1",
     )
-      .bind(a.tenantId, Date.now() - 1)
+      .bind(a.tenantId, now - 1)
       .run();
-    const r = await pruneAll(env, Date.now());
+    await env.DB.prepare(
+      "UPDATE tenants SET support_until = ?2, support_reason = 'y' WHERE id = ?1",
+    )
+      .bind(b.tenantId, now + 3_600_000)
+      .run();
+    const r = await pruneAll(env, now);
     expect(r.support_ended).toContain(a.tenantId);
+    expect(r.support_ended).not.toContain(b.tenantId);
     expect(
       await n(
         "SELECT COUNT(*) AS n FROM audit_log WHERE tenant_id = ?1 AND action = 'support_access_end'",
         a.tenantId,
       ),
     ).toBe(1);
-    const r2 = await pruneAll(env, Date.now());
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM audit_log WHERE tenant_id = ?1 AND action = 'support_access_end'",
+        b.tenantId,
+      ),
+    ).toBe(0);
+    expect(
+      await env.DB.prepare(
+        'SELECT revoked_at FROM devices WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(b.tenantId, liveB.id)
+        .first<{ revoked_at: number | null }>(),
+    ).toEqual({ revoked_at: null });
+    const r2 = await pruneAll(env, now);
     expect(r2.support_ended).not.toContain(a.tenantId);
+  });
+
+  it('prunes expired codes and old requests without touching fresh rows', async () => {
+    const shop = await seedShop('Retention');
+    const other = await seedShop('Retention other');
+    const now = Date.now();
+    const old = now - 100 * DAY;
+    await env.DB.prepare(
+      `INSERT INTO enrolment_codes (code_hash, tenant_id, device_name, branch_id, grants_admin, created_by, created_at, expires_at)
+       VALUES ('old-code', ?1, 'Old', ?2, 0, 'test', ?3, ?3)`,
+    )
+      .bind(shop.tenantId, shop.branchId, old)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO enrolment_codes (code_hash, tenant_id, device_name, branch_id, grants_admin, created_by, created_at, expires_at)
+       VALUES ('fresh-code', ?1, 'Fresh', ?2, 0, 'test', ?3, ?4)`,
+    )
+      .bind(shop.tenantId, shop.branchId, now, now + 600_000)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
+       VALUES (?1, 'old-owner', ?2, ?3, 'old-owner-hash', ?4, ?4)`,
+    )
+      .bind(shop.tenantId, shop.till.id, IDS.owner, old)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
+       VALUES (?1, 'fresh-owner', ?2, ?3, 'fresh-owner-hash', ?4, ?5)`,
+    )
+      .bind(shop.tenantId, shop.till.id, IDS.owner, now, now + 600_000)
+      .run();
+    const oldDay = new Date(old).toISOString().slice(0, 10);
+    await env.DB.prepare(
+      'INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read) VALUES (?1, ?2, 0, 0, 0)',
+    )
+      .bind(other.tenantId, oldDay)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO shop_requests (id, shop_name, owner_name, email, status, created_at, updated_at)
+       VALUES ('old-rejected', 'Old', 'Owner', 'old-rejected@example.com', 'rejected', ?1, ?1)`,
+    )
+      .bind(old)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO shop_requests (id, shop_name, owner_name, email, status, created_at, updated_at)
+       VALUES ('fresh-rejected', 'Fresh', 'Owner', 'fresh-rejected@example.com', 'rejected', ?1, ?1)`,
+    )
+      .bind(now)
+      .run();
+
+    await pruneAll(env, now);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM enrolment_codes WHERE code_hash = 'old-code'",
+      ),
+    ).toBe(0);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM enrolment_codes WHERE code_hash = 'fresh-code'",
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM owner_email_codes WHERE id = 'old-owner'",
+      ),
+    ).toBe(0);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM owner_email_codes WHERE id = 'fresh-owner'",
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+        other.tenantId,
+        oldDay,
+      ),
+    ).toBe(0);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM shop_requests WHERE id = 'old-rejected'",
+      ),
+    ).toBe(0);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM shop_requests WHERE id = 'fresh-rejected'",
+      ),
+    ).toBe(1);
   });
 });

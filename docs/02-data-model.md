@@ -1702,6 +1702,34 @@ Settings → Shop profile & receipt. This is a column/wire change, so
 `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` both become 8; the Dexie schema is
 unchanged because `shop` stores every column without an index on this one.
 
+### 2.25 Append-only sales trigger includes the bundle discount (migration `0026_sales_append_only_bundle_discount.sql`)
+
+```sql
+-- 0026_sales_append_only_bundle_discount.sql
+--
+-- 0019 added `sales.bundle_discount_total` with ALTER TABLE, but the append-only
+-- trigger from 0010 lists its protected columns explicitly and was not rebuilt, so a
+-- direct UPDATE of the new column slipped past the database-level guard. Recreate the
+-- trigger with the full column list. Trigger-only change: the wire schema is unchanged.
+DROP TRIGGER sales_append_only_update;
+
+CREATE TRIGGER sales_append_only_update
+BEFORE UPDATE OF tenant_id, id, invoice_no, invoice_seq, branch_id, device_id,
+  staff_id, customer_id, business_date, created_at, line_count, items_qty_milli,
+  gross_total, item_discount_total, subtotal, bill_discount_type,
+  bill_discount_value, bill_discount, tax_rate_bp, tax, tax_inclusive, rounding,
+  total, paid_total, udhaar_amount, cash_tendered, change_given, replaces_sale_id,
+  bundle_discount_total, note
+ON sales
+BEGIN
+  SELECT RAISE(ABORT, 'sales is append-only');
+END;
+```
+
+Trigger-only migration: `SCHEMA_VERSION` stays 8. `sales.status` remains the only
+mutable column; every other column, including `bundle_discount_total`, is protected
+by the database as well as the Worker.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

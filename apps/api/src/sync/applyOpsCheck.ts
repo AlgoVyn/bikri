@@ -377,11 +377,23 @@ export function checkOp(
           look.staff,
         );
         if (!allowed('sale.void') && !over) throw new Reject('FORBIDDEN');
+        // The void's business date is its own event date, not a client-chosen field:
+        // a manager must not be able to void a 30-day-old bill by copying that bill's
+        // date. It also cannot be in the future.
+        const tz = look.shop?.timezone || 'Asia/Karachi';
+        const createdAt = Number(row.created_at);
+        const voidDate = String(row.business_date);
+        if (
+          !Number.isSafeInteger(createdAt) ||
+          voidDate !== businessDate(createdAt, tz) ||
+          voidDate > businessDate(ctx.now, tz)
+        )
+          throw new Reject('CONSTRAINT_FAILED');
         // 05 §5: a manager voids only bills of the same business day (D-044).
         if (staff?.role === 'manager' && !over) {
           const saleId = String(row.sale_id);
           const saleDate = saleOf(look, group, saleId)?.business_date;
-          if (saleDate !== undefined && saleDate !== row.business_date)
+          if (saleDate !== undefined && saleDate !== voidDate)
             throw new Reject('FORBIDDEN');
         }
         checkVoid(look, group, row);
@@ -396,6 +408,13 @@ export function checkOp(
           )
         )
           throw new Reject('CONSTRAINT_FAILED');
+        // Older clients omit `business_date` (applyOps fills it from the parent); a
+        // supplied value must still be the parent sale's date, never a backdated hop.
+        if (row.business_date !== undefined && row.business_date !== null) {
+          const parent = saleOf(look, group, String(row.sale_id));
+          if (!parent || parent.business_date !== row.business_date)
+            throw new Reject('CONSTRAINT_FAILED');
+        }
         if (row.below_cost === 1) {
           const sale = group.find(
             (o) => o.tbl === 'sales' && o.row?.id === row.sale_id,
@@ -937,8 +956,12 @@ export function checkOp(
   }
   if (
     op.tbl === 'products' &&
-    (row.deleted_at != null || row.kind === 'bundle' || row.kind === 'simple')
+    (row.deleted_at != null || row.kind === 'bundle')
   ) {
+    // Deleting a component or turning it into a bundle is forbidden while a recipe
+    // uses it. A normal simple-product upsert (price, name, last_cost, …) must stay
+    // allowed: a bundle sale in the same push must not reject the component edit or
+    // a purchase delivery that updates its cost.
     const productId = String(row.id);
     for (const bundleId of look.bundleOfComponent.get(productId) ?? []) {
       if (productDeletedInGroup(look, group, bundleId)) continue;
