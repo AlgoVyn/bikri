@@ -1,4 +1,9 @@
-import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
+import {
+  APP_VERSION,
+  DEFAULT_TIME_ZONE,
+  isTimeZone,
+  SYNC_EXPORT_ORDER,
+} from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { ZipStoreWriter } from '../admin/zip.ts';
 import { SyncHttpError } from '../sync/client.ts';
@@ -138,6 +143,11 @@ async function buildOnce(
       (rank.get(left.tbl) ?? Number.MAX_SAFE_INTEGER) -
       (rank.get(right.tbl) ?? Number.MAX_SAFE_INTEGER),
   );
+  const shop = await db.shop.get('shop');
+  const storedTimeZone = String(shop?.timezone ?? '');
+  const timeZone = isTimeZone(storedTimeZone)
+    ? storedTimeZone
+    : DEFAULT_TIME_ZONE;
   const writer = new ZipStoreWriter(session.exported_at);
   const encoder = new TextEncoder();
   const counts: { tbl: string; rows: number }[] = [];
@@ -173,11 +183,13 @@ async function buildOnce(
       after = result.next_after;
     }
     writer.add(`json/${table.tbl}.json`, encoder.encode(JSON.stringify(rows)));
-    writer.add(`csv/${table.tbl}.csv`, encoder.encode(tableCsv(rows)));
+    writer.add(
+      `csv/${table.tbl}.csv`,
+      encoder.encode(tableCsv(rows, timeZone)),
+    );
     counts.push({ tbl: table.tbl, rows: rows.length });
   }
   const tenant = await tenantInfo(db);
-  const shop = await db.shop.get('shop');
   const displayName =
     tenant?.display_name || String(shop?.name ?? '') || 'Shop';
   const now = session.exported_at;
@@ -197,7 +209,7 @@ async function buildOnce(
   );
   return {
     blob: writer.finish(),
-    filename: shopExportFilename(displayName, now),
+    filename: shopExportFilename(displayName, now, timeZone),
     manifest,
   };
 }

@@ -13,6 +13,13 @@ export type BuiltExport = {
   tables: { tbl: string; rows: number }[];
 };
 
+class ExportStuck extends Error {
+  constructor() {
+    super('export page guard');
+    this.name = 'ExportStuck';
+  }
+}
+
 async function readTable(
   tenantId: string,
   tbl: string,
@@ -26,6 +33,7 @@ async function readTable(
   }
   const rows: Record<string, unknown>[] = [];
   let after = '';
+  let complete = false;
   for (let guard = 0; guard < 100_000; guard += 1) {
     const page = await exportPage(tenantId, tbl, after, EXPORT_PAGE, before);
     rows.push(...page.rows);
@@ -35,10 +43,12 @@ async function readTable(
       total: Math.max(total, rows.length),
     });
     if (!page.has_more || page.rows.length === 0 || page.next_after === after) {
+      complete = true;
       break;
     }
     after = page.next_after;
   }
+  if (!complete) throw new ExportStuck();
   return rows;
 }
 

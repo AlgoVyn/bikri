@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AdminApiError, createTenant, getUsage, loginRedirect } from './api.ts';
+import {
+  AdminApiError,
+  adminErrorMessage,
+  createTenant,
+  getUsage,
+  loginRedirect,
+  PartialImportError,
+} from './api.ts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -14,6 +21,18 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('admin api client', () => {
+  it('keeps a localized partial-import message instead of the generic fallback', () => {
+    expect(
+      adminErrorMessage(
+        new PartialImportError('2 rejected, 1 missing'),
+        'generic',
+      ),
+    ).toBe('2 rejected, 1 missing');
+    expect(adminErrorMessage(new Error('technical'), 'generic')).toBe(
+      'generic',
+    );
+  });
+
   it('reloads on 401 and does not settle', async () => {
     const reload = vi
       .spyOn(loginRedirect, 'reload')

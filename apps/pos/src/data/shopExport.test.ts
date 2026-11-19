@@ -117,6 +117,30 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     expect(laterLines.map((line) => line.id)).not.toContain('late-line');
   });
 
+  it('uses the shop time zone for CSV timestamps and keeps hidden columns out', async () => {
+    const db = await readyDb('shop-export-tz');
+    await addShop(db, { name: 'Bikri Mobile', timezone: 'Asia/Kathmandu' });
+    await seedSampleDay(db, TODAY, NOW);
+    const exported = await buildShopExport(db, { now: NOW + 1000 });
+    const entries = await unzip(
+      new Uint8Array(await exported.blob.arrayBuffer()),
+    );
+    const text = new TextDecoder();
+    const salesCsv = text
+      .decode(entries.find((entry) => entry.name === 'csv/sales.csv')?.data)
+      .replace(/^\uFEFF/u, '');
+    expect(salesCsv).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:45/u);
+    const products = JSON.parse(
+      text.decode(
+        entries.find((entry) => entry.name === 'json/products.json')?.data,
+      ),
+    ) as Record<string, unknown>[];
+    for (const product of products) {
+      expect(product).not.toHaveProperty('on_hand_milli');
+      expect(product).not.toHaveProperty('cost_changed_at');
+    }
+  });
+
   it('hardens CSV cells and converts percent, paisa and timestamp fields', () => {
     const csv = tableCsv([
       {
@@ -126,6 +150,10 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
         discount_value: 1000,
         amount: -12345,
         cost_snapshot: 500,
+        bundle_discount_total: 600,
+        card_total: 700,
+        bank_total: 800,
+        udhaar_given: 900,
         created_at: NOW,
         deleted_at: null,
         details: { a: 1 },
@@ -137,6 +165,10 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
     expect(row).toContain(',10.00,');
     expect(row).toContain(',-123.45,');
     expect(row).toContain(',5.00,');
+    expect(row).toContain(',6.00,');
+    expect(row).toContain(',7.00,');
+    expect(row).toContain(',8.00,');
+    expect(row).toContain(',9.00,');
     expect(row).toContain('""a"":1');
     expect(row).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:00/u);
   });

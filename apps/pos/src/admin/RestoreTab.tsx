@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -43,6 +43,16 @@ class RestoreStuck extends Error {
   }
 }
 
+class RestoreLoop extends Error {
+  constructor() {
+    super('loop');
+    this.name = 'RestoreLoop';
+  }
+}
+
+/** One restore at a time, even if the tab that started it was unmounted. */
+let activeRestore: string | null = null;
+
 function slicesOf(zip: ParsedExport): { tbl: string; count: number }[] {
   return zip.tables.map((table) => ({
     tbl: table.tbl,
@@ -81,6 +91,14 @@ export function RestoreTab({
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const abortRef = useRef(false);
+  // Switching tabs unmounts this component; stop the async loop instead of letting a
+  // second RestoreTab start another restore against the same tenant.
+  useEffect(
+    () => () => {
+      abortRef.current = true;
+    },
+    [],
+  );
   const current = stepIndex(state.phase, zip !== null);
 
   const commit = (next: RestoreState) => {
@@ -222,7 +240,12 @@ export function RestoreTab({
                 setError(t('admin.restore_need_file'));
                 return;
               }
+              if (activeRestore === tenantId) {
+                toast.push(t('admin.restore_busy'), 'info');
+                return;
+              }
               const loaded = zip;
+              activeRestore = tenantId;
               abortRef.current = false;
               setRunning(true);
               setError(null);
@@ -338,6 +361,9 @@ export function RestoreTab({
                     return;
                   }
                 }
+                // The state machine never reached done/halt: do not exit silently
+                // with a partially restored shop.
+                throw new RestoreLoop();
               })()
                 .catch((err: unknown) => {
                   if (
@@ -353,12 +379,18 @@ export function RestoreTab({
                     toast.push(t('admin.restore_stuck'), 'error');
                     return;
                   }
+                  if (err instanceof RestoreLoop) {
+                    setError(t('admin.restore_loop'));
+                    toast.push(t('admin.restore_loop'), 'error');
+                    return;
+                  }
                   toast.push(
                     adminErrorMessage(err, t('admin.err_generic')),
                     'error',
                   );
                 })
                 .finally(() => {
+                  if (activeRestore === tenantId) activeRestore = null;
                   setRunning(false);
                 });
             }}

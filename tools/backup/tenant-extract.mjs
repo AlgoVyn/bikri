@@ -11,88 +11,28 @@ import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  DEFAULT_TIME_ZONE,
+  isTimeZone,
+} from '../../packages/core/src/dates.ts';
+import {
+  EXPORT_HIDDEN_COLUMNS,
+  MONEY_FIELDS,
+  TIME_FIELDS,
+} from '../../packages/core/src/exportFields.ts';
+import { APP_VERSION as CORE_APP_VERSION } from '../../packages/core/src/version.ts';
 import { EXPORT_TABLES } from './tables.mjs';
 import { zipStore } from './zip.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PAGE = 500;
-const APP_VERSION = process.env.APP_VERSION ?? '1.0.0';
-const HIDDEN = { devices: ['token_hash', 'enrolled_by'] };
+export const APP_VERSION = process.env.APP_VERSION ?? CORE_APP_VERSION;
 
-const MONEY_FIELDS = new Set([
-  'amount',
-  'avg_cost',
-  'bill_discount',
-  'bill_discount_alloc',
-  'bill_discount_value',
-  'cash_expenses',
-  'cash_refunds',
-  'cash_sales',
-  'cash_tendered',
-  'change_given',
-  'charges_alloc',
-  'counted_cash',
-  'credit_limit',
-  'default_credit_limit',
-  'difference',
-  'discount',
-  'discount_value',
-  'exact_amount',
-  'expected_cash',
-  'gross',
-  'gross_total',
-  'item_discount_total',
-  'landed_unit_cost',
-  'last_cost',
-  'line_total',
-  'net',
-  'opening_cash',
-  'other_charges',
-  'paid_now',
-  'paid_total',
-  'pay_ins',
-  'pay_outs',
-  'price',
-  'refund_received',
-  'round_total_to',
-  'rounding',
-  'rounding_alloc',
-  'subtotal',
-  'supplier_cash_in',
-  'supplier_cash_out',
-  'tax',
-  'tax_alloc',
-  'total',
-  'udhaar_amount',
-  'udhaar_cash_in',
-  'udhaar_part',
-  'unit_cost',
-  'unit_cost_snapshot',
-  'unit_credit',
-  'unit_price',
-  'cost_snapshot',
-]);
-const TIME_FIELDS = new Set([
-  'created_at',
-  'deleted_at',
-  'enrolled_at',
-  'expires_at',
-  'last_seen_at',
-  'period_end',
-  'period_start',
-  'read_only_seen_at',
-  'oldest_pending_at',
-  'revoked_at',
-  'setup_completed_at',
-  'updated_at',
-  'at',
-]);
-
-/** The backup's restore point: the nightly dump starts at 02:30 Asia/Karachi. */
+/** The backup's restore point: the nightly dump starts at 05:05 Asia/Karachi. */
 export function backupExportedAt(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(date))
     throw new Error('--backup-date must be YYYY-MM-DD');
-  const at = Date.parse(`${date}T02:30:00+05:00`);
+  const at = Date.parse(`${date}T05:05:00+05:00`);
   const actual = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Karachi',
     year: 'numeric',
@@ -107,13 +47,23 @@ export function backupExportedAt(date) {
 export function stripRow(table, row) {
   const copy = { ...row };
   delete copy.tenant_id;
-  for (const field of HIDDEN[table] ?? []) delete copy[field];
+  for (const field of EXPORT_HIDDEN_COLUMNS[table] ?? []) delete copy[field];
   return copy;
 }
 
-function localIso(at) {
+function zoneOffset(at, timeZone) {
+  const part = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'longOffset',
+  })
+    .formatToParts(new Date(at))
+    .find((entry) => entry.type === 'timeZoneName')?.value;
+  return /^GMT([+-]\d{2}:\d{2})$/u.exec(part ?? '')?.[1] ?? '+00:00';
+}
+
+function localIso(at, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -123,13 +73,13 @@ function localIso(at) {
     hourCycle: 'h23',
   }).formatToParts(new Date(at));
   const get = (type) => parts.find((part) => part.type === type)?.value ?? '00';
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+05:00`;
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}${zoneOffset(at, timeZone)}`;
 }
 
-function csvValue(field, value, row) {
+function csvValue(field, value, row, timeZone) {
   if (value === null || value === undefined) return '';
   if (TIME_FIELDS.has(field) && typeof value === 'number')
-    return localIso(value);
+    return localIso(value, timeZone);
   if (
     typeof value === 'number' &&
     ((field === 'discount_value' && row.discount_type === 'pct') ||
@@ -153,7 +103,8 @@ function csvCell(value) {
   return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function tableCsv(rows) {
+export function tableCsv(rows, timeZone = DEFAULT_TIME_ZONE) {
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
   if (rows.length === 0) return '\uFEFF';
   const fields = [];
   for (const row of rows)
@@ -163,7 +114,7 @@ export function tableCsv(rows) {
   for (const row of rows)
     lines.push(
       fields
-        .map((field) => csvCell(csvValue(field, row[field], row)))
+        .map((field) => csvCell(csvValue(field, row[field], row, zone)))
         .join(','),
     );
   return `\uFEFF${lines.join('\r\n')}\r\n`;
@@ -266,6 +217,16 @@ export async function main(argv = process.argv.slice(2)) {
     sql: `SELECT id, slug, display_name FROM tenants WHERE id = ${sqlString(tenantId)}`,
   });
   if (!tenant) throw new Error(`tenant ${tenantId} not found in ${db}`);
+  const [shop] = query({
+    db,
+    local,
+    sql: `SELECT timezone FROM shop WHERE tenant_id = ${sqlString(tenantId)}`,
+  });
+  const storedTimeZone =
+    typeof shop?.timezone === 'string' ? shop.timezone : '';
+  const timeZone = isTimeZone(storedTimeZone)
+    ? storedTimeZone
+    : DEFAULT_TIME_ZONE;
 
   const encoder = new TextEncoder();
   const files = [];
@@ -279,7 +240,7 @@ export async function main(argv = process.argv.slice(2)) {
     });
     files.push({
       name: `csv/${table}.csv`,
-      data: encoder.encode(tableCsv(rowsPage)),
+      data: encoder.encode(tableCsv(rowsPage, timeZone)),
     });
   }
   const now = Date.now();

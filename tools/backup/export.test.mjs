@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import {
+  EXPORT_HIDDEN_COLUMNS,
+  MONEY_FIELDS,
+  TIME_FIELDS,
+} from '../../packages/core/src/exportFields.ts';
 import { TABLE_COLUMNS } from '../../packages/db/src/tables.ts';
 import {
   assertSqlDump,
@@ -56,6 +61,38 @@ describe('nightly D1 export', () => {
         ].includes(table),
     );
     expect([...BACKUP_TABLES].sort()).toEqual(expected.sort());
+  });
+
+  it('classifies every money/time column and hides server-only fields', () => {
+    const columns = new Set(Object.values(TABLE_COLUMNS).flat());
+    for (const field of MONEY_FIELDS)
+      expect(columns.has(field), `money field ${field}`).toBe(true);
+    for (const field of TIME_FIELDS)
+      expect(columns.has(field), `time field ${field}`).toBe(true);
+    // A future `_at`/period column must be added to TIME_FIELDS, not left as epoch ms.
+    for (const field of columns) {
+      if (
+        field === 'at' ||
+        field.endsWith('_at') ||
+        field === 'period_start' ||
+        field === 'period_end'
+      )
+        expect(TIME_FIELDS.has(field), `time field ${field}`).toBe(true);
+    }
+    for (const [table, hidden] of Object.entries(EXPORT_HIDDEN_COLUMNS)) {
+      expect(TABLE_COLUMNS[table], table).toBeDefined();
+      for (const field of hidden)
+        expect(TABLE_COLUMNS[table], `${table}.${field}`).toContain(field);
+    }
+    for (const field of [
+      'bundle_discount_total',
+      'bundle_price',
+      'bundle_discount',
+      'card_total',
+      'bank_total',
+      'udhaar_given',
+    ])
+      expect(MONEY_FIELDS.has(field), field).toBe(true);
   });
 
   it('builds per-tenant counts with every table present and zero-filled', () => {

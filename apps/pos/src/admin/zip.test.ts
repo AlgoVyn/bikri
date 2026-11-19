@@ -5,6 +5,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   crc32,
+  MAX_ENTRY_BYTES,
   unzip,
   writeZip,
   ZipError,
@@ -23,11 +24,28 @@ if (typeof globalThis.DecompressionStream === 'undefined') {
 const text = new TextEncoder();
 
 async function deflateRaw(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new CompressionStream('deflate-raw');
-  const writer = stream.writable.getWriter();
-  await writer.write(data as Uint8Array<ArrayBuffer>);
-  await writer.close();
-  return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+  const transform = new CompressionStream('deflate-raw');
+  const writer = transform.writable.getWriter();
+  const reader = transform.readable.getReader();
+  const writing = writer
+    .write(data as Uint8Array<ArrayBuffer>)
+    .then(() => writer.close());
+  const chunks: Uint8Array[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+  await writing;
+  const out = new Uint8Array(
+    chunks.reduce((sum, chunk) => sum + chunk.length, 0),
+  );
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
 }
 
 describe('zip', () => {
@@ -96,6 +114,40 @@ describe('zip', () => {
     expect(new TextDecoder().decode(back[0]?.data ?? new Uint8Array())).toBe(
       'hello hello hello hello',
     );
+  });
+
+  it('inflates an entry larger than the transform stream buffer', async () => {
+    const raw = new Uint8Array(1024 * 1024);
+    for (let i = 0; i < raw.length; i += 1) raw[i] = i % 251;
+    const bytes = writeZip([
+      {
+        name: 'large.bin',
+        data: raw,
+        method: 8,
+        compressed: await deflateRaw(raw),
+      },
+    ]);
+    const back = await unzip(bytes);
+    expect(back).toHaveLength(1);
+    expect(back[0]?.data.length).toBe(raw.length);
+    expect(back[0]?.data[500_000]).toBe(raw[500_000]);
+  });
+
+  it('refuses an entry whose declared size exceeds the inflation cap', async () => {
+    const raw = text.encode('small');
+    const bytes = writeZip([
+      {
+        name: 'small.txt',
+        data: raw,
+        method: 8,
+        compressed: await deflateRaw(raw),
+      },
+    ]);
+    const view = new DataView(bytes.buffer);
+    let central = 0;
+    while (view.getUint32(central, true) !== 0x02014b50) central += 1;
+    view.setUint32(central + 24, MAX_ENTRY_BYTES + 1, true);
+    await expect(unzip(bytes)).rejects.toBeInstanceOf(ZipError);
   });
 
   it('refuses a truncated archive and a bad CRC', async () => {
