@@ -82,12 +82,15 @@ export function checkRefund(
         bundle_component_qty_milli: candidate.row.bundle_component_qty_milli,
       });
   }
-  const refundQty = new Map(
-    lines.map((line) => [
-      String(line.sale_line_id),
-      Number(line.qty_milli ?? 0),
-    ]),
-  );
+  // One refund line per sale line. Duplicate rows used to overwrite each other in this
+  // map, so 500 + 1000 on a 1000-per-bundle component passed the whole-bundle check
+  // while refunding 1.5 bundles. Reject the document instead of guessing.
+  const refundQty = new Map<string, number>();
+  for (const line of lines) {
+    const saleLineId = String(line.sale_line_id);
+    if (refundQty.has(saleLineId)) throw new Reject('CONSTRAINT_FAILED');
+    refundQty.set(saleLineId, Number(line.qty_milli ?? 0));
+  }
   const bundleGroups = new Map<string, string[]>();
   for (const [id, line] of allSaleLines) {
     if (typeof line.bundle_group !== 'string') continue;
@@ -193,6 +196,23 @@ export function checkVoid(
   const saleId = String(row.sale_id);
   const sale = saleOf(look, group, saleId);
   if (!sale) throw new Reject('CONSTRAINT_FAILED');
+  const replacementId = row.replacement_sale_id;
+  if (replacementId !== null && replacementId !== undefined) {
+    if (
+      typeof replacementId !== 'string' ||
+      replacementId.length === 0 ||
+      replacementId === saleId
+    )
+      throw new Reject('CONSTRAINT_FAILED');
+    const replacement = group.find(
+      (candidate) =>
+        candidate.tbl === 'sales' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.id === replacementId,
+    )?.row;
+    if (!replacement || replacement.replaces_sale_id !== saleId)
+      throw new Reject('CONSTRAINT_FAILED');
+  }
   const pays = [
     ...linkedInGroup(group, 'payments', 'sale_id', saleId)
       .filter((p) => p.purpose === 'void' && p.direction === 'out')

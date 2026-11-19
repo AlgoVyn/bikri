@@ -1,8 +1,15 @@
 import { env } from 'cloudflare:workers';
 import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
-import { api, IDS, json, seedShop } from './helpers/fixtures.ts';
 import {
+  addBundleFixture,
+  api,
+  IDS,
+  json,
+  seedShop,
+} from './helpers/fixtures.ts';
+import {
+  bundleSaleOps,
   op,
   productRow,
   pullAll,
@@ -60,6 +67,44 @@ describe('push (03 §4.1, §9)', () => {
       .bind(shop.tenantId, shop.till.id)
       .first<{ last_invoice_seq: number }>();
     expect(dev?.last_invoice_seq).toBe(1);
+  });
+
+  it('1c: two concurrent retries of the same sale write one document and one side-effect set', async () => {
+    const shop = await seedShop('Idem race');
+    const ops = saleOps(shop, shop.till, 1);
+    const [a, b] = await Promise.all([
+      pushOk(shop.till, ops),
+      pushOk(shop.till, ops),
+    ]);
+    for (const res of [a, b]) {
+      expect(res.results.map((row) => row.error_code ?? null)).toEqual([
+        null,
+        null,
+        null,
+      ]);
+    }
+    for (const [tbl, n] of [
+      ['sales', 1],
+      ['sale_lines', 1],
+      ['payments', 1],
+      ['stock_movements', 1],
+      ['applied_ops', 3],
+    ] as const) {
+      expect(
+        await count(
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1`,
+          shop.tenantId,
+        ),
+        tbl,
+      ).toBe(n);
+    }
+    expect(
+      await env.DB.prepare(
+        'SELECT last_invoice_seq FROM devices WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, shop.till.id)
+        .first<{ last_invoice_seq: number }>(),
+    ).toEqual({ last_invoice_seq: 1 });
   });
 
   it('1b: an older client line gets the parent sale business date', async () => {
@@ -481,8 +526,13 @@ describe('void rules (05 §5, D-044)', () => {
     )
       .bind(shop.tenantId, manager, 'a'.repeat(44), 'a'.repeat(24), Date.now())
       .run();
-    const sales = [1, 2].map((seq) => saleOps(shop, shop.till, seq));
-    await pushOk(shop.till, sales.flat());
+    const oldNow = Date.now() - 30 * 86_400_000;
+    const oldSale = saleOps(shop, shop.till, 1, { now: oldNow });
+    const todaySale = saleOps(shop, shop.till, 2);
+    await pushOk(shop.till, [...oldSale, ...todaySale]);
+    const sales = [oldSale, todaySale];
+    const today = businessDate(Date.now());
+    const oldDate = businessDate(oldNow);
     const voidOf = (seq: number, staff: string, date: string) => {
       const saleId = String(sales[seq - 1]?.[0]?.row?.id ?? '');
       const tx = newId();
@@ -531,13 +581,104 @@ describe('void rules (05 §5, D-044)', () => {
         ),
       ];
     };
-    const today = businessDate(Date.now());
-    const late = await pushOk(shop.till, voidOf(1, manager, '2099-01-01'));
-    expect(late.results[0]?.error_code).toBe('FORBIDDEN');
-    const same = await pushOk(shop.till, voidOf(1, manager, today));
-    expect(same.results[0]?.error_code ?? null).toBeNull();
+    // The void date is its own event date, not a client-chosen field.
+    const future = await pushOk(shop.till, voidOf(1, manager, '2099-01-01'));
+    expect(future.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    const copiedOldDate = await pushOk(shop.till, voidOf(1, manager, oldDate));
+    expect(copiedOldDate.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    // A manager still cannot void a 30-day-old bill with a valid same-day void date.
+    const oldSaleResult = await pushOk(shop.till, voidOf(1, manager, today));
+    expect(oldSaleResult.results[0]?.error_code).toBe('FORBIDDEN');
+    // The owner may void any day; the void's business date is today.
     const owner = await pushOk(shop.till, voidOf(2, IDS.owner, today));
     expect(owner.results[0]?.error_code ?? null).toBeNull();
+  });
+
+  it('a replacement bill needs its sale_voids row; a valid reissue passes', async () => {
+    const shop = await seedShop('Reissue link');
+    const original = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, original);
+    const oldId = String(original[0]?.row?.id ?? '');
+    const replacementFor = (seq: number) =>
+      saleOps(shop, shop.till, seq, {
+        saleId: newId(),
+        replacesSaleId: oldId,
+        staffId: IDS.owner,
+      });
+    const missing = replacementFor(2);
+    const rejected = await pushOk(shop.till, missing);
+    expect(rejected.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1 AND replaces_sale_id = ?2',
+        shop.tenantId,
+        oldId,
+      ),
+    ).toBe(0);
+
+    const replacement = replacementFor(3);
+    const replacementId = String(replacement[0]?.row?.id ?? '');
+    const tx = String(replacement[0]?.tx_id ?? '');
+    const today = businessDate(Date.now());
+    const now = Date.now();
+    const voidRow = op(
+      'sale_voids',
+      'insert',
+      {
+        id: newId(),
+        sale_id: oldId,
+        reason: 'Wrong item',
+        replacement_sale_id: replacementId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: today,
+        created_at: now,
+      },
+      { tx_id: tx },
+    );
+    const voidPayment = op(
+      'payments',
+      'insert',
+      {
+        id: newId(),
+        direction: 'out',
+        method: 'cash',
+        purpose: 'void',
+        amount: 150000,
+        cash_tendered: null,
+        change_given: null,
+        reference: '',
+        sale_id: oldId,
+        refund_id: null,
+        purchase_id: null,
+        supplier_return_id: null,
+        party_type: null,
+        party_id: null,
+        note: '',
+        branch_id: shop.branchId,
+        device_id: shop.till.id,
+        staff_id: IDS.owner,
+        business_date: today,
+        created_at: now,
+      },
+      { tx_id: tx },
+    );
+    const applied = await pushOk(shop.till, [
+      ...replacement,
+      voidRow,
+      voidPayment,
+    ]);
+    expect(applied.results.map((r) => r.error_code ?? null)).toEqual(
+      replacement.map(() => null).concat([null, null]),
+    );
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1 AND id = ?2 AND replaces_sale_id = ?3',
+        shop.tenantId,
+        replacementId,
+        oldId,
+      ),
+    ).toBe(1);
   });
 
   it('T-035 AC: a cashier refund needs an owner override in the same push', async () => {
@@ -609,6 +750,135 @@ describe('void rules (05 §5, D-044)', () => {
     ]);
   });
 
+  it('repairs a void return once per product when a sale repeats it on two lines', async () => {
+    const shop = await seedShop('Void dedupe');
+    const now = Date.now();
+    const tx = newId(now);
+    const saleId = newId(now);
+    const sale = {
+      id: saleId,
+      invoice_no: `INV-${shop.till.code}-1`,
+      invoice_seq: 1,
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.cashier,
+      customer_id: null,
+      business_date: businessDate(now),
+      created_at: now,
+      line_count: 2,
+      items_qty_milli: 2000,
+      gross_total: 300000,
+      item_discount_total: 0,
+      bundle_discount_total: 0,
+      subtotal: 300000,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      rounding: 0,
+      total: 300000,
+      paid_total: 300000,
+      udhaar_amount: 0,
+      cash_tendered: 300000,
+      change_given: 0,
+      replaces_sale_id: null,
+      note: '',
+    };
+    const line = (lineNo: number) => ({
+      id: newId(now),
+      sale_id: saleId,
+      line_no: lineNo,
+      product_id: IDS.product,
+      business_date: sale.business_date,
+      name_snapshot: 'Phone',
+      sku_snapshot: 'PHN-0001',
+      qty_milli: 1000,
+      unit_price: 150000,
+      gross: 150000,
+      discount_type: null,
+      discount_value: 0,
+      discount: 0,
+      net: 150000,
+      bill_discount_alloc: 0,
+      tax_alloc: 0,
+      rounding_alloc: 0,
+      unit_cost_snapshot: 0,
+      below_cost: 0,
+      serial: '',
+      warranty_until: null,
+      created_at: now,
+    });
+    const payment = {
+      id: newId(now),
+      direction: 'in',
+      method: 'cash',
+      purpose: 'sale',
+      amount: 300000,
+      cash_tendered: 300000,
+      change_given: 0,
+      reference: '',
+      sale_id: saleId,
+      refund_id: null,
+      purchase_id: null,
+      supplier_return_id: null,
+      party_type: null,
+      party_id: null,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.cashier,
+      business_date: sale.business_date,
+      created_at: now,
+    };
+    await pushOk(shop.till, [
+      op('sales', 'insert', sale, { tx_id: tx }),
+      op('sale_lines', 'insert', line(1), { tx_id: tx }),
+      op('sale_lines', 'insert', line(2), { tx_id: tx }),
+      op('payments', 'insert', payment, { tx_id: tx }),
+    ]);
+    const voidTx = newId(now);
+    await pushOk(shop.till, [
+      op(
+        'sale_voids',
+        'insert',
+        {
+          id: newId(now),
+          sale_id: saleId,
+          reason: 'Wrong bill',
+          replacement_sale_id: null,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: sale.business_date,
+          created_at: now,
+        },
+        { tx_id: voidTx },
+      ),
+      op(
+        'payments',
+        'insert',
+        {
+          ...payment,
+          id: newId(now),
+          direction: 'out',
+          purpose: 'void',
+          amount: 300000,
+          cash_tendered: null,
+          change_given: null,
+          staff_id: IDS.owner,
+        },
+        { tx_id: voidTx },
+      ),
+    ]);
+    const returned = await env.DB.prepare(
+      "SELECT COALESCE(SUM(qty_delta_milli), 0) AS qty, COUNT(*) AS n FROM stock_movements WHERE tenant_id = ?1 AND ref_type = 'void' AND product_id = ?2 AND reason_code = 'void_return'",
+    )
+      .bind(shop.tenantId, IDS.product)
+      .first<{ qty: number; n: number }>();
+    expect(returned).toEqual({ qty: 2000, n: 1 });
+  });
+
   it('a void arriving after a refund is accepted and flagged for the owner', async () => {
     const shop = await seedShop('Void after refund');
     const sale = saleOps(shop, shop.till, 1);
@@ -648,6 +918,7 @@ describe('void rules (05 §5, D-044)', () => {
     ]);
     const voidId = newId();
     const voidTx = newId();
+    const voidNow = Date.now();
     const res = await pushOk(shop.till, [
       op(
         'sale_voids',
@@ -659,8 +930,8 @@ describe('void rules (05 §5, D-044)', () => {
           replacement_sale_id: null,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(voidNow),
+          created_at: voidNow,
         },
         { tx_id: voidTx },
       ),
@@ -686,8 +957,8 @@ describe('void rules (05 §5, D-044)', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(voidNow),
+          created_at: voidNow,
         },
         { tx_id: voidTx },
       ),
@@ -785,6 +1056,71 @@ describe('sale policy (07 §6)', () => {
     ]);
   });
 
+  it('does not let a cost-only product upsert smuggle a price into a later sale', async () => {
+    const shop = await seedShop('Cost-only price');
+    const now = Date.now();
+    const tx = newId(now);
+    const purchaseId = newId(now);
+    const purchase = {
+      id: purchaseId,
+      supplier_id: IDS.supplier,
+      supplier_invoice_no: '',
+      other_charges: 0,
+      total: 0,
+      paid_now: 0,
+      paid_method: null,
+      line_count: 1,
+      note: '',
+      branch_id: shop.branchId,
+      device_id: shop.till.id,
+      staff_id: IDS.owner,
+      business_date: businessDate(now),
+      created_at: now,
+    };
+    const line = {
+      id: newId(now),
+      purchase_id: purchaseId,
+      line_no: 1,
+      product_id: IDS.product,
+      qty_milli: 1000,
+      unit_cost: 0,
+      line_total: 0,
+      charges_alloc: 0,
+      landed_unit_cost: 0,
+      created_at: now,
+    };
+    const costOnly = op(
+      'products',
+      'upsert',
+      productRow(IDS.product, {
+        sku: 'PHN-0001',
+        category_id: IDS.category,
+        price: 0,
+        last_cost: 0,
+        updated_by: IDS.cashier,
+      }),
+      { tx_id: tx, base_rev: 3, changed_fields: ['last_cost'] },
+    );
+    const sale = saleOps(shop, shop.till, 1, { total: 0 });
+    const res = await pushOk(shop.till, [
+      op('purchases', 'insert', purchase, { tx_id: tx }),
+      op('purchase_lines', 'insert', line, { tx_id: tx }),
+      costOnly,
+      ...sale,
+    ]);
+    expect(
+      res.results.find((row) => sale.some((entry) => entry.op_id === row.op_id))
+        ?.error_code,
+    ).toBe('FORBIDDEN');
+    expect(
+      await env.DB.prepare(
+        'SELECT price FROM products WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, IDS.product)
+        .first(),
+    ).toEqual({ price: 150000 });
+  });
+
   it('does not use a rejected pending price edit for a later sale', async () => {
     const shop = await seedShop('Rejected price edit');
     const now = Date.now();
@@ -843,7 +1179,102 @@ describe('sale policy (07 §6)', () => {
   });
 });
 
+describe('bundle discount limit', () => {
+  it('measures the whole-bundle discount against the pre-discount bundle price', async () => {
+    const shop = await seedShop('Bundle policy');
+    await addBundleFixture(shop);
+    await env.DB.prepare(
+      'UPDATE staff SET max_discount_bp = 10000 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.owner)
+      .run();
+    const bundle = {
+      bundleId: IDS.bundle,
+      componentIds: [
+        IDS.product,
+        IDS.component2,
+        IDS.component3,
+        IDS.component4,
+      ] as [string, string, string, string],
+      itemIds: [
+        IDS.bundleItem1,
+        IDS.bundleItem2,
+        IDS.bundleItem3,
+        IDS.bundleItem4,
+      ] as [string, string, string, string],
+    };
+
+    const pushDiscount = (seq: number, staffId: string, discount: number) =>
+      pushOk(
+        shop.till,
+        bundleSaleOps(shop, shop.till, seq, bundle, {
+          staffId,
+          bundleDiscount: discount,
+        }),
+      );
+    expect(
+      (await pushDiscount(1, IDS.owner, 100000)).results[0]?.error_code ?? null,
+    ).toBeNull();
+    expect(
+      (await pushDiscount(2, IDS.owner, 120000)).results[0]?.error_code ?? null,
+    ).toBeNull();
+    expect(
+      (await pushDiscount(3, IDS.cashier, 200000)).results[0],
+    ).toMatchObject({
+      result: 'rejected',
+      error_code: 'FORBIDDEN',
+    });
+  });
+});
+
 describe('bundle recipe guards', () => {
+  it('allows a simple component edit alongside a bundle sale', async () => {
+    const shop = await seedShop('Bundle edit');
+    await addBundleFixture(shop);
+    const sale = bundleSaleOps(
+      shop,
+      shop.till,
+      1,
+      {
+        bundleId: IDS.bundle,
+        componentIds: [
+          IDS.product,
+          IDS.component2,
+          IDS.component3,
+          IDS.component4,
+        ],
+        itemIds: [
+          IDS.bundleItem1,
+          IDS.bundleItem2,
+          IDS.bundleItem3,
+          IDS.bundleItem4,
+        ],
+      },
+      { staffId: IDS.owner },
+    );
+    const edit = op(
+      'products',
+      'upsert',
+      productRow(IDS.product, {
+        sku: 'PHN-0001',
+        category_id: IDS.category,
+        price: 150000,
+        kind: 'simple',
+        name_en: 'Edited component',
+      }),
+      { base_rev: 3, changed_fields: ['name_en'] },
+    );
+    const res = await pushOk(shop.till, [...sale, edit]);
+    expect(res.results.at(-1)?.error_code ?? null).toBeNull();
+    expect(
+      await env.DB.prepare(
+        'SELECT name_en FROM products WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, IDS.product)
+        .first(),
+    ).toEqual({ name_en: 'Edited component' });
+  });
+
   it('requires catalog.edit for recipe deletes and keeps at least one item', async () => {
     const shop = await seedShop('Bundle guard');
     const bundleId = newId();
@@ -1152,6 +1583,28 @@ describe('refund payment rows and split (04 §5)', () => {
         ['payments', refundPayment(shop, good)],
       ]),
     ).toBeNull();
+    // Two refund lines for the same sale line are ambiguous: the old map kept only
+    // the last quantity, so a bundle refund could over-refund. Reject the document.
+    const duplicate = base({});
+    const duplicateTx = newId();
+    const firstLine = {
+      ...lineFor(duplicate),
+      qty_milli: 500,
+      amount: 500,
+    };
+    const secondLine = { ...firstLine, id: newId() };
+    const duplicateRes = await pushOk(shop.till, [
+      op('refunds', 'insert', duplicate, { tx_id: duplicateTx }),
+      op('refund_lines', 'insert', firstLine, { tx_id: duplicateTx }),
+      op('refund_lines', 'insert', secondLine, { tx_id: duplicateTx }),
+      op(
+        'payments',
+        'insert',
+        refundPayment(shop, duplicate, { amount: 1000 }),
+        { tx_id: duplicateTx },
+      ),
+    ]);
+    expect(duplicateRes.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
     // Udhaar part: needs exactly one customer ledger row of −udhaar_part.
     const khata = base({
       method: null,

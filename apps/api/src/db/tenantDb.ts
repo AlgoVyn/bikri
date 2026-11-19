@@ -207,6 +207,23 @@ export function insertSql(table: TenantTable, row: Row): [string, SqlValue[]] {
   return [sql, cols.map((c) => row[c] ?? null)];
 }
 
+/**
+ * INSERT that is skipped when `op_id` is already in `applied_ops`. Server-authored
+ * side effects (stock movements, audit rows, conflict rows) use this so a retried
+ * push that races the first request cannot write them twice.
+ */
+export function insertIfNotAppliedSql(
+  table: TenantTable,
+  row: Row,
+  opId: string,
+): [string, SqlValue[]] {
+  assertTable(table);
+  const cols = columnsOf(row);
+  const placeholders = cols.map((_, i) => `?${i + 2}`);
+  const sql = `INSERT INTO ${table} (tenant_id${cols.map((c) => `, ${c}`).join('')}) SELECT ?1${placeholders.map((p) => `, ${p}`).join('')} WHERE NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${cols.length + 2})`;
+  return [sql, [...cols.map((c) => row[c] ?? null), opId]];
+}
+
 /** Upsert keyed by `(tenant_id, id)`: insert, or overwrite every given column. */
 export function upsertSql(table: TenantTable, row: Row): [string, SqlValue[]] {
   const [insert, params] = insertSql(table, row);

@@ -645,6 +645,7 @@ describe('review fixes', () => {
     await pushOk(shop.till, sale);
 
     const refundId = newId();
+    const refundNow = Date.now();
     let tx = newId();
     const refund = await pushOk(shop.till, [
       op(
@@ -663,8 +664,8 @@ describe('review fixes', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(refundNow),
+          created_at: refundNow,
         },
         { tx_id: tx },
       ),
@@ -704,8 +705,8 @@ describe('review fixes', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(refundNow),
+          created_at: refundNow,
         },
         { tx_id: tx },
       ),
@@ -724,6 +725,7 @@ describe('review fixes', () => {
     ).toEqual({ qty_delta_milli: 1000 });
 
     const voidId = newId();
+    const voidNow = Date.now();
     tx = newId();
     const voided = await pushOk(shop.till, [
       op(
@@ -736,8 +738,8 @@ describe('review fixes', () => {
           replacement_sale_id: null,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(voidNow),
+          created_at: voidNow,
         },
         { tx_id: tx },
       ),
@@ -763,8 +765,8 @@ describe('review fixes', () => {
           branch_id: shop.branchId,
           device_id: shop.till.id,
           staff_id: IDS.owner,
-          business_date: '2026-10-27',
-          created_at: Date.now(),
+          business_date: businessDate(voidNow),
+          created_at: voidNow,
         },
         { tx_id: tx },
       ),

@@ -159,6 +159,28 @@ describe('bundle cart edge cases', () => {
     expect(bundleQtyOf(cart, group)).toBe(0);
   });
 
+  it('measures a whole-bundle discount against the pre-discount bundle price', () => {
+    const base = addBundle(emptyCart('c1'), bundle, recipe, 1, 'avg');
+    const group = String(base.lines[0]?.bundle_group);
+    const products = new Map([[a.id, a]]);
+    for (const [bp, expected] of [
+      [6_000, 6_000],
+      [10_000, 10_000],
+    ] as const) {
+      const cart = setBundleDiscount(
+        base,
+        group,
+        'percent',
+        bp,
+        products,
+        'avg',
+      );
+      expect(manualDiscountBp(cart, cartTotals(cart, shopMoney(null)))).toBe(
+        expected,
+      );
+    }
+  });
+
   it('handles missing product fields and groups without bundles', () => {
     const bare = {
       id: 'bare',

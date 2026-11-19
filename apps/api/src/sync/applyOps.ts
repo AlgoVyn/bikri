@@ -70,10 +70,11 @@ function planOp(
           op,
           stmts: [
             db.prepare(
-              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL`,
+              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?5)`,
               now,
               op.updated_by ?? null,
               id,
+              op.op_id,
             ),
             appliedOp(db, op, deviceId, now, 'applied', null, false),
             changeLog(db, tbl, id, 'delete', deviceId, now, true),
@@ -93,11 +94,12 @@ function planOp(
       op,
       stmts: [
         db.prepare(
-          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL`,
+          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)`,
           now,
           op.updated_by ?? null,
           id,
           cur.rev,
+          op.op_id,
         ),
         appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'delete', deviceId, now, true),
@@ -181,8 +183,7 @@ function planOp(
         ...insertValues,
       ),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
-      appliedOp(db, op, deviceId, now, 'applied', null, false),
-      ...sideEffects(ctx, tbl, row, avg, group),
+      ...sideEffects(ctx, tbl, row, avg, group, op.op_id),
     ];
     if (
       tbl === 'sales' ||
@@ -191,14 +192,19 @@ function planOp(
       tbl === 'refunds' ||
       tbl === 'sale_voids'
     )
-      stmts.push(...stockRepairStatements(ctx, look, group, tbl, row, avg));
+      stmts.push(
+        ...stockRepairStatements(ctx, look, group, tbl, row, avg, op.op_id),
+      );
     if (
       tbl === 'refunds' ||
       tbl === 'sale_voids' ||
       tbl === 'supplier_returns' ||
       tbl === 'day_closes'
     )
-      stmts.push(...moneyAuditStatements(ctx, group, tbl, row));
+      stmts.push(...moneyAuditStatements(ctx, group, tbl, row, op.op_id));
+    // Last: the guards above look for a missing `applied_ops` row. Writing it first
+    // would make every side effect skip itself in the request that is applying the op.
+    stmts.push(appliedOp(db, op, deviceId, now, 'applied', null, false));
     return {
       op,
       stmts,
@@ -245,12 +251,14 @@ function planOp(
     ...set.map((c, i) => `${c} = ?${i + 4}`),
     'rev = rev + 1',
   ].join(', ');
+  const guardParam = set.length + 4;
   const stmts: D1PreparedStatement[] = [
     db.prepare(
-      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3`,
+      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${guardParam})`,
       id,
       cur.rev,
       ...set.map((c) => sqlValue(row[c])),
+      op.op_id,
     ),
   ];
   if (merge) {
@@ -445,17 +453,33 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
     )
       continue;
     const previous = look.products.get(op.row.id);
+    if (!previous) {
+      look.products.set(op.row.id, {
+        price: Number(op.row.price ?? 0),
+        avg_cost: Number(op.row.last_cost ?? 0),
+        last_cost: Number(op.row.last_cost ?? 0),
+        track_stock: Number(op.row.track_stock ?? 0),
+        updated_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
+        kind: String(op.row.kind ?? 'simple'),
+      });
+      continue;
+    }
+    // planOp writes only `changed_fields` (plus updated_at/updated_by) for an existing
+    // row. The in-memory state used by later transactions must follow the same list;
+    // otherwise a permitted `last_cost` upsert could smuggle `price: 0` into a sale
+    // later in the same push.
+    const changed = new Set(op.changed_fields ?? []);
+    const pick = <K extends keyof typeof previous>(field: K) =>
+      changed.has(field) && op.row?.[field] !== undefined
+        ? op.row[field]
+        : previous[field];
     look.products.set(op.row.id, {
-      price: Number(op.row.price ?? previous?.price ?? 0),
-      avg_cost: previous?.avg_cost ?? Number(op.row.last_cost ?? 0),
-      last_cost: Number(op.row.last_cost ?? previous?.last_cost ?? 0),
-      // Keep the persisted tracking mode for an existing row: a tracking change in a
-      // later transaction must not make an earlier sale look tracked.
-      track_stock: previous?.track_stock ?? Number(op.row.track_stock ?? 0),
-      updated_at: Number(
-        op.row.updated_at ?? previous?.updated_at ?? op.row.created_at ?? 0,
-      ),
-      kind: String(op.row.kind ?? previous?.kind ?? 'simple'),
+      price: Number(pick('price')),
+      avg_cost: previous.avg_cost,
+      last_cost: Number(pick('last_cost')),
+      track_stock: Number(pick('track_stock')),
+      updated_at: Number(op.row.updated_at ?? previous.updated_at),
+      kind: String(pick('kind')),
     });
   }
 }
@@ -504,11 +528,14 @@ function applyStaffChanges(look: Lookups, ops: PushOp[]): void {
     }
     if (current.deleted_at !== null) continue;
     const changed = new Set(op.changed_fields ?? []);
-    const merge = current.rev !== (op.base_rev ?? 0);
     const pick = (field: keyof StaffRow): unknown => {
       const raw = op.row?.[field];
-      if (merge && !changed.has(field)) return current[field];
-      return raw === undefined ? current[field] : raw;
+      // Match planOp: only the changed columns (plus its always-written updated_at)
+      // reach D1. A field carried in the full client row but not in changed_fields
+      // must not leak into later transactions of this push.
+      if (field === 'updated_at' || changed.has(field))
+        return raw === undefined ? current[field] : raw;
+      return current[field];
     };
     const deleted = pick('deleted_at');
     look.staff.set(id, {
@@ -531,11 +558,12 @@ function applyShopChanges(look: Lookups, ops: PushOp[]): void {
     if (op.tbl !== 'shop' || op.kind !== 'upsert' || !op.row) continue;
     const current = look.shop;
     const changed = new Set(op.changed_fields ?? []);
-    const merge = current !== null && (op.base_rev ?? 0) !== 0;
     const pick = (field: keyof ShopRules): unknown => {
       const raw = op.row?.[field];
-      if (merge && !changed.has(field)) return current?.[field];
-      return raw === undefined ? current?.[field] : raw;
+      if (current === null) return raw;
+      if (field === 'updated_at' || changed.has(field))
+        return raw === undefined ? current[field] : raw;
+      return current[field];
     };
     const taxMode = String(pick('tax_mode') ?? 'exclusive');
     const costMethod = String(pick('cost_method') ?? 'avg');
@@ -595,6 +623,19 @@ export async function applyOps(
   // Foreign-key safety inside one request is provided by the statement sort in `run()` below.
   for (let round = 0; round < 2 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
+    if (round > 0) {
+      // A previous round lost a guarded write. The most likely cause is a concurrent
+      // retry of the same op: it may have committed between our first `applied_ops`
+      // read and the batch. Re-read before planning again, so a replay is answered
+      // from `applied_ops` instead of being merged a second time.
+      const again = await alreadyApplied(ctx, pending.flat());
+      rowsRead += again.rowsRead;
+      for (const [id, result] of again.seen) final.set(id, result);
+      pending = pending
+        .map((ops) => ops.filter((op) => !again.seen.has(op.op_id)))
+        .filter((ops) => ops.length > 0);
+      if (pending.length === 0) break;
+    }
     const look = await loadLookups(ctx, pending.flat());
     rowsRead += look.rowsRead;
     const avg = new Map<string, CostState>();
