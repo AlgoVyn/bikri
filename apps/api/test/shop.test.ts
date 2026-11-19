@@ -57,6 +57,8 @@ describe('owner email sign-in (T-028, 05 §3.2)', () => {
     expect(mail?.subject).not.toMatch(/\d{6}/);
     expect(mail?.text).toContain('Sign A');
     expect(mail?.text).toContain('10');
+    expect(mail?.html).toContain('Your Bikri sign-in code');
+    expect(mail?.html).toContain(lastCode('ali@gmail.com'));
     const code = lastCode('ali@gmail.com');
     const wrong = await api('/shop/owner-signin/verify', {
       method: 'POST',

@@ -4,6 +4,7 @@
 //   maskable.svg  full-bleed tile with the book inside the 80% safe circle (also the Apple
 //                 touch icon, which iOS rounds itself)
 //   favicon.svg   small-size master: a wider tick cut and heavier total line for 16-48 px
+// It also renders the horizontal Bikri POS lockup that the transactional emails reference.
 // Run with `node scripts/generate-icons.ts` from apps/pos after changing a master.
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -54,6 +55,21 @@ await mkdir(iconsDir, { recursive: true });
 const appIcon = await master('app-icon.svg');
 const maskable = await master('maskable.svg');
 const favicon = await master('favicon.svg');
+
+// The transactional emails (05 §3.2) cannot use the SVG master, so serve a 3x PNG at a
+// stable public URL and display it at 240 px. Gmail blocks data-URI images.
+const brandPublicDir = join(publicDir, 'brand');
+await mkdir(brandPublicDir, { recursive: true });
+const emailLockup = await readFile(
+  join(here, '../../../docs/brand/bikri-pos-horizontal-fullcolour-light.svg'),
+);
+await writeFile(
+  join(brandPublicDir, 'bikri-pos-email.png'),
+  await sharp(emailLockup, { density: 300 })
+    .resize({ width: 720 })
+    .png({ compressionLevel: 9 })
+    .toBuffer(),
+);
 
 await writeFile(join(iconsDir, 'app-icon-192.png'), await png(appIcon, 192));
 await writeFile(join(iconsDir, 'app-icon-512.png'), await png(appIcon, 512));

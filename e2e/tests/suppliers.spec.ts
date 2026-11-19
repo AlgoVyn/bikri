@@ -114,6 +114,33 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await expect(labels.getByLabel('Copies Phone X')).toHaveValue('5');
     await labels.getByRole('button', { name: 'Cancel' }).click();
 
+    await page
+      .getByText(/Delivery #SUP-552, 1 item/)
+      .first()
+      .click();
+    const delivery = page.getByRole('dialog', { name: 'Delivery #SUP-552' });
+    await expect(delivery).toBeVisible();
+    await expect(delivery).toContainText('Phone X');
+    await delivery.getByRole('button', { name: 'Export', exact: true }).click();
+    const [deliveryCsv] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'CSV' }).click(),
+    ]);
+    const deliveryText = await readFile(
+      (await deliveryCsv.path()) ?? '',
+      'utf8',
+    );
+    expect(deliveryText).toContain('invoice_no,date,supplier,product');
+    expect(deliveryText).toContain('Phone X');
+    await delivery.getByRole('button', { name: 'Export', exact: true }).click();
+    const [deliveryPdf] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('menuitem', { name: 'PDF' }).click(),
+    ]);
+    const deliveryPdfBytes = await readFile((await deliveryPdf.path()) ?? '');
+    expect(deliveryPdfBytes.subarray(0, 8).toString('latin1')).toBe('%PDF-1.4');
+    await delivery.getByRole('button', { name: 'Close', exact: true }).click();
+
     await expect(page.getByTestId('supplier-balance')).toContainText(
       'You owe Rs 500',
     );
@@ -240,6 +267,19 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       'utf8',
     );
     expect(statementText).toContain('date,description,got,paid,balance');
+    expect(statementText).toContain('Phone X × 5');
+    expect(statementText).toContain('Rs 1,200 each — Rs 6,000');
+
+    const [purchaseRow] = await idbAll<{ business_date: string }>(
+      page,
+      'purchases',
+    );
+    const after = new Date(`${purchaseRow?.business_date}T00:00:00Z`);
+    after.setUTCDate(after.getUTCDate() + 1);
+    await page.getByLabel('From').fill(after.toISOString().slice(0, 10));
+    await expect(page.getByText('No entries yet.')).toBeVisible();
+    await page.getByRole('button', { name: 'All time' }).click();
+    await expect(page.getByText(/Delivery #SUP-552, 1 item/)).toBeVisible();
 
     await page.getByRole('link', { name: 'Back to suppliers' }).click();
     await expect(page.getByText('Total you owe suppliers')).toBeVisible();
@@ -285,6 +325,11 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await expect(page.getByTestId('supplier-balance')).toContainText(
       'You owe Rs 9,300',
     );
+    const [purchase] = await idbAll<{ supplier_invoice_no: string }>(
+      page,
+      'purchases',
+    );
+    expect(purchase?.supplier_invoice_no).toMatch(/^BKR-\d{8}-[A-Z0-9]{6}$/u);
     const lines = await idbAll<{
       charges_alloc: number;
       landed_unit_cost: number;

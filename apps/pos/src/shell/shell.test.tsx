@@ -43,7 +43,7 @@ describe('app shell', () => {
       // First render of the file loads the lazy routes: allow a slow CI runner.
       await screen.findByRole(
         'heading',
-        { name: 'Assalam-o-Alaikum, Adnan' },
+        { name: 'Welcome back, Adnan' },
         { timeout: 5000 },
       ),
     ).toBeTruthy();
@@ -51,7 +51,7 @@ describe('app shell', () => {
     await user.click(screen.getByTestId('staff-menu'));
     await user.click(screen.getByRole('radio', { name: 'اردو' }));
     expect(
-      await screen.findByRole('heading', { name: 'السلام علیکم، Adnan' }),
+      await screen.findByRole('heading', { name: 'خوش آمدید، Adnan' }),
     ).toBeTruthy();
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.documentElement.lang).toBe('ur');
@@ -62,7 +62,9 @@ describe('app shell', () => {
   it('loads Roman Urdu instead of raw keys', async () => {
     await renderAt(`${BASE_PATH}/`);
     await setLanguage('roman-ur');
-    expect(i18n.t('home.greeting', { name: 'Adnan' })).toContain('Assalam');
+    expect(i18n.t('home.welcome', { name: 'Adnan' })).toContain(
+      'Khush aamdeed',
+    );
     expect(document.documentElement.lang).toBe('roman-ur');
     expect(document.documentElement.dir).toBe('ltr');
   });
@@ -182,7 +184,7 @@ describe('app shell', () => {
   it('opens Sell with N and focuses search with /', async () => {
     const user = userEvent.setup();
     await renderAt(`${BASE_PATH}/`);
-    await screen.findByRole('heading', { name: 'Assalam-o-Alaikum, Adnan' });
+    await screen.findByRole('heading', { name: 'Welcome back, Adnan' });
     await user.keyboard('/');
     expect(document.activeElement?.id).toBe('global-search');
     await user.keyboard('A-A');

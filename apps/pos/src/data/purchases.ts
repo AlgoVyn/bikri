@@ -37,6 +37,27 @@ export type DeliveryOptions = {
   now?: number;
 };
 
+export type DeliveryDetailLine = {
+  line: SyncedRow;
+  name: string;
+  unit: string;
+  qtyMilli: number;
+  unitCost: number;
+  lineTotal: number;
+  chargesAlloc: number;
+  landedUnitCost: number;
+  /** Quantity already returned against this line through a linked supplier return. */
+  returnedMilli: number;
+};
+
+export type DeliveryDetail = {
+  purchase: SyncedRow;
+  supplier: MasterRow;
+  lines: DeliveryDetailLine[];
+  returns: SyncedRow[];
+  balance: number;
+};
+
 export class DeliveryError extends Error {
   readonly code:
     | 'supplier'
@@ -57,6 +78,16 @@ export class DeliveryError extends Error {
 }
 
 const MAX_LINES = MAX_LINES_PER_DOCUMENT;
+
+/** Stable internal reference used when the supplier did not give an invoice number. */
+export function generatedInvoiceNo(purchaseId: string, date: string): string {
+  const suffix =
+    purchaseId
+      .replace(/[^a-z0-9]/giu, '')
+      .slice(-6)
+      .toUpperCase() || '000000';
+  return `BKR-${date.replaceAll('-', '')}-${suffix}`;
+}
 
 function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -146,7 +177,9 @@ export async function saveDelivery(
       const purchase: SyncedRow = {
         id: input.purchaseId,
         supplier_id: input.supplierId,
-        supplier_invoice_no: (input.invoiceNo ?? '').trim().slice(0, 30),
+        supplier_invoice_no:
+          (input.invoiceNo ?? '').trim().slice(0, 30) ||
+          generatedInvoiceNo(input.purchaseId, date),
         other_charges: input.otherCharges,
         total: result.total,
         paid_now: input.paidNow,
@@ -320,6 +353,73 @@ export async function saveDelivery(
       ),
     },
   );
+}
+
+/** Read a saved delivery with its lines, linked returns and current supplier balance. */
+export async function deliveryDetail(
+  db: BikriDb,
+  purchaseId: string,
+): Promise<DeliveryDetail | null> {
+  const purchase = await db.purchases.get(purchaseId);
+  if (!purchase) return null;
+  const supplier = await db.suppliers.get(String(purchase.supplier_id));
+  if (!supplier) return null;
+  const lines = (
+    await db.purchase_lines.where('purchase_id').equals(purchaseId).toArray()
+  ).sort((a, b) => Number(a.line_no) - Number(b.line_no));
+  const products = new Map(
+    (await db.products.bulkGet(lines.map((line) => String(line.product_id))))
+      .filter((row): row is MasterRow => row !== undefined)
+      .map((row) => [String(row.id), row]),
+  );
+  const returns = (
+    await db.supplier_returns.where('purchase_id').equals(purchaseId).toArray()
+  ).sort((a, b) => Number(a.created_at) - Number(b.created_at));
+  const returnedByLine = new Map<string, number>();
+  const returnIds = returns.map((row) => String(row.id));
+  if (returnIds.length > 0) {
+    const returnLines = await db.supplier_return_lines
+      .where('return_id')
+      .anyOf(returnIds)
+      .toArray();
+    for (const line of returnLines) {
+      if (!line.purchase_line_id) continue;
+      const id = String(line.purchase_line_id);
+      returnedByLine.set(
+        id,
+        (returnedByLine.get(id) ?? 0) + Number(line.qty_milli),
+      );
+    }
+  }
+  const balance =
+    (await db.party_balances.get(['supplier', String(supplier.id)]))?.balance ??
+    0;
+  return {
+    purchase,
+    supplier,
+    lines: lines.map((line) => {
+      const product = products.get(String(line.product_id));
+      return {
+        line,
+        // purchase_lines has no name snapshot; delivery history reads the current
+        // catalogue name (documented in screens/13).
+        name:
+          String(product?.name_en ?? '').trim() ||
+          String(product?.name_ur ?? '').trim() ||
+          String(product?.sku ?? '').trim() ||
+          String(line.product_id),
+        unit: String(product?.unit ?? 'pc'),
+        qtyMilli: Number(line.qty_milli),
+        unitCost: Number(line.unit_cost),
+        lineTotal: Number(line.line_total),
+        chargesAlloc: Number(line.charges_alloc),
+        landedUnitCost: Number(line.landed_unit_cost),
+        returnedMilli: returnedByLine.get(String(line.id)) ?? 0,
+      };
+    }),
+    returns,
+    balance,
+  };
 }
 
 export type SupplierPaymentInput = {

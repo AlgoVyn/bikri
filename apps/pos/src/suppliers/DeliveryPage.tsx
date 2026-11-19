@@ -233,6 +233,9 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             value={invoiceNo}
             onChange={(e) => setInvoiceNo(e.target.value)}
           />
+          <span className="text-caption text-text-muted">
+            {t('office.suppliers.auto_invoice_hint')}
+          </span>
         </label>
         <DateField
           label={t('office.suppliers.delivery_date')}

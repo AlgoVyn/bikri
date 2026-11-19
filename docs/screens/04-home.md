@@ -26,7 +26,7 @@
 
 ## Home layout
 
-1. **Greeting row**: "Assalam-o-Alaikum, {name}" + business date + branch.
+1. **Welcome header**: a shop-overview eyebrow, "Welcome back, {name}" and the business date, with the branch as a chip at the end edge.
 2. **Setup strip**: a compact **Get started** card with progress, the next incomplete step and its action, shown above the hero once the catalogue exists; the full three-step card is used only while the catalogue is empty.
 3. **New sale hero** (right column on ≥ 1024 px; first on phones): a large primary-subtle card with a receipt icon, `New sale`, the hint "Tap to ring up items or scan a barcode" and a chevron; opens Sell. On desktop it is the compact quick action beside the register; on phones it leads the page.
 4. **Quick actions** (left/main column below Today on ≥ 1024 px; after Today on phones; 1 column on phones / 2 from 640 px): Day close, Products, Sales, Udhaar, Suppliers, Expenses, Reports. Each is a card with an icon, title and a short description ("Scan a barcode", "Manage stock", "Bills & refunds", …); shortcuts are in the tooltip and the `?` shortcut sheet. Settings is not repeated here; it opens from the staff menu.
