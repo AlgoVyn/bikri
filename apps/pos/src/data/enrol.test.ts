@@ -101,6 +101,7 @@ describe('enrolDevice', () => {
     expect(activeTenantId({})).toBe('t-enrol');
     expect(await getKv(db, 'device_token', null)).toBe('secret-token');
     expect(await getKv(db, 'invoice_seq', 0)).toBe(7);
+    expect(await getKv(db, 'shop_setup_completed', false)).toBe(true);
     expect(await getKv(db, 'poll_after_ms', 0)).toBe(30_000);
     expect(await isReadOnly(db)).toBe(true);
     // screens/02 AC 5: never in localStorage.
@@ -108,6 +109,19 @@ describe('enrolDevice', () => {
       const k = localStorage.key(i) ?? '';
       expect(localStorage.getItem(k)).not.toContain('secret-token');
     }
+    db.close();
+  });
+
+  it('persists a not-yet-set-up shop flag for the gate', async () => {
+    server.override = (req) =>
+      req.path === '/devices/enrol'
+        ? {
+            status: 201,
+            json: { ...enrolResponse('t-enrol'), shop_setup_completed: false },
+          }
+        : undefined;
+    const { db } = await enrolDevice('ABCDEFGH', 'Counter 2');
+    expect(await getKv(db, 'shop_setup_completed', true)).toBe(false);
     db.close();
   });
 

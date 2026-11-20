@@ -18,6 +18,7 @@ import {
   syncNow,
 } from './engine.ts';
 import { FakeServer } from './fakeServer.ts';
+import { uploadQueued } from './files.ts';
 import { refreshMe } from './me.ts';
 import {
   fixInvoiceSeq,
@@ -149,6 +150,55 @@ describe('client', () => {
     expect(await pendingHeader(db)).toBe('5000;0');
     // anyOf('pending','sending').count() took ~7.7 s here in fake-indexeddb.
     expect(performance.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe('file upload queue (SYNC-M2)', () => {
+  const queued = (db: Awaited<ReturnType<typeof readyDb>>) =>
+    db.file_queue.add({
+      kind: 'product_image',
+      target_id: 'p1',
+      blob: new Blob(['photo']),
+      sha256: 'a'.repeat(64),
+      staff_id: 'st-1',
+      status: 'pending',
+      created_at: 1,
+    } as never);
+
+  it('keeps auth/schema failures pending for the engine, with Retry-After', async () => {
+    const db = await enrolled('files-auth');
+    await queued(db);
+    server.override = ({ method, path }) =>
+      method === 'PUT' && path.startsWith('/files/')
+        ? {
+            status: 403,
+            json: { error: { code: 'DEVICE_REVOKED', message: 'gone' } },
+            headers: { 'retry-after': '30' },
+          }
+        : undefined;
+    await expect(uploadQueued(db)).rejects.toMatchObject({
+      code: 'DEVICE_REVOKED',
+      retryAfter: 30,
+    });
+    expect(await db.file_queue.where('status').equals('pending').count()).toBe(
+      1,
+    );
+  });
+
+  it('marks a real client error failed instead of retrying it forever', async () => {
+    const db = await enrolled('files-bad');
+    await queued(db);
+    server.override = ({ method, path }) =>
+      method === 'PUT' && path.startsWith('/files/')
+        ? {
+            status: 400,
+            json: { error: { code: 'PAYLOAD_INVALID', message: 'bad' } },
+          }
+        : undefined;
+    await uploadQueued(db);
+    expect(await db.file_queue.where('status').equals('failed').count()).toBe(
+      1,
+    );
   });
 });
 
@@ -372,6 +422,59 @@ describe('push (03 §3, §4.1)', () => {
     expect(await db.outbox.count()).toBe(0);
   });
 
+  it('flushes a visible till with a full cycle only when the outbox has work', async () => {
+    const db = await enrolled('visible-full');
+    const engine = new SyncEngine(db);
+    const kinds: string[] = [];
+    (
+      engine as unknown as {
+        cycle: (kind: string) => Promise<void>;
+        flushOnVisible: () => Promise<void>;
+      }
+    ).cycle = async (kind: string) => {
+      kinds.push(kind);
+    };
+    await (
+      engine as unknown as { flushOnVisible: () => Promise<void> }
+    ).flushOnVisible();
+    expect(kinds).toEqual(['pull']);
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: newId(),
+      tbl: 'categories',
+      kind: 'insert',
+      row_id: 'c-visible',
+      row: { id: 'c-visible', name_en: 'Visible' },
+      created_at: 1,
+      status: 'pending',
+      attempts: 0,
+    });
+    await (
+      engine as unknown as { flushOnVisible: () => Promise<void> }
+    ).flushOnVisible();
+    expect(kinds).toEqual(['pull', 'full']);
+    engine.stop();
+  });
+
+  it('serialises a pull through the per-tenant pull lock', async () => {
+    const db = await enrolled('pull-lock');
+    const names: string[] = [];
+    vi.stubGlobal('navigator', {
+      ...globalThis.navigator,
+      locks: {
+        request: async (
+          name: string,
+          fn: () => Promise<unknown>,
+        ): Promise<unknown> => {
+          names.push(name);
+          return fn();
+        },
+      },
+    });
+    await pullAll(db);
+    expect(names).toContain(`bikri-pull-${db.tenantId}`);
+  });
+
   it('serialises a push through navigator.locks when the browser provides it', async () => {
     const db = await enrolled('push-lock');
     let used = false;
@@ -451,6 +554,93 @@ describe('push (03 §3, §4.1)', () => {
     const body = pushes[0]?.body as { ops: { tbl: string }[] };
     expect(body.ops.map((op) => op.tbl)).toEqual(['categories', 'products']);
     expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('reclaims a fresh sending claim immediately under the cross-tab lock', async () => {
+    const db = await enrolled('claim-lock');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-lock', name_en: 'Lock' }),
+      { now: 42 },
+    );
+    await db.outbox
+      .toCollection()
+      .modify({ status: 'sending', sending_at: Date.now() });
+    await writeAction(
+      db,
+      (w) =>
+        w.create('products', {
+          name_en: 'After',
+          sku: 'SKU-LOCK',
+          price: 100,
+        }),
+      { now: 43 },
+    );
+    vi.stubGlobal('navigator', {
+      ...globalThis.navigator,
+      locks: {
+        request: async (
+          _name: string,
+          fn: () => Promise<unknown>,
+        ): Promise<unknown> => fn(),
+      },
+    });
+    server.log = [];
+    await pushAll(db);
+    const pushes = server.log.filter((l) => l.path === '/sync/push');
+    expect(pushes).toHaveLength(1);
+    const body = pushes[0]?.body as { ops: { tbl: string }[] };
+    expect(body.ops.map((op) => op.tbl)).toEqual(['categories', 'products']);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('does not leapfrog a fresh sending claim without a lock', async () => {
+    const db = await enrolled('claim-no-lock');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-no-lock', name_en: 'Wait' }),
+      { now: 42 },
+    );
+    await db.outbox
+      .toCollection()
+      .modify({ status: 'sending', sending_at: Date.now() });
+    await writeAction(
+      db,
+      (w) =>
+        w.create('products', {
+          name_en: 'After',
+          sku: 'SKU-NOLOCK',
+          price: 100,
+        }),
+      { now: 43 },
+    );
+    vi.stubGlobal('navigator', { ...globalThis.navigator, locks: undefined });
+    server.log = [];
+    await pushAll(db);
+    expect(server.log.filter((l) => l.path === '/sync/push')).toHaveLength(0);
+    expect(await db.outbox.where('status').equals('sending').count()).toBe(1);
+    expect(await db.outbox.where('status').equals('pending').count()).toBe(1);
+  });
+
+  it('applies a pulled server shadow when a conflict_merged push settles', async () => {
+    const db = await enrolled('shadow-merged');
+    const category = await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'Local' }),
+      { now: NOW },
+    );
+    await db.pull_shadow.put({
+      tbl: 'categories',
+      id: category.id,
+      source: 'server',
+      row: { ...category, name_en: 'Server merged', rev: 2 },
+    });
+    server.results = () => ({ result: 'conflict_merged', server_rev: 2 });
+    await pushAll(db);
+    expect((await db.categories.get(category.id))?.name_en).toBe(
+      'Server merged',
+    );
+    expect(await db.pull_shadow.count()).toBe(0);
   });
 
   it('discards an empty set and a local create without a server shadow', async () => {

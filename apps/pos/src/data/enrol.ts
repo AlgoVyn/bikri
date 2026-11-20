@@ -125,6 +125,10 @@ export async function enrolDevice(
     },
     { key: 'invoice_seq', value: res.device.last_invoice_seq },
     { key: 'pull_cursor', value: 0 },
+    // The server tells a fresh device whether this shop is already live. Keep it even
+    // if the first snapshot is interrupted, so the gate resumes the download instead
+    // of showing the setup wizard for an existing shop.
+    { key: 'shop_setup_completed', value: res.shop_setup_completed },
     { key: 'enrolled_at', value: Date.now() },
   ]);
   await clearTenantFiles(res.tenant.id).catch(() => undefined);

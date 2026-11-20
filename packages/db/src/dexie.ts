@@ -381,7 +381,13 @@ export class BikriDb extends Dexie {
   stock_levels!: Rows<StockLevel>;
   party_balances!: Table<PartyBalance, [PartyType, string]>;
   pull_shadow!: Table<
-    { tbl: string; id: string; row: OpRow },
+    {
+      tbl: string;
+      id: string;
+      row: OpRow;
+      /** `server` shadows must be applied when the local op settles; `local` ones are restore points. */
+      source?: 'local' | 'server';
+    },
     [string, string]
   >;
 

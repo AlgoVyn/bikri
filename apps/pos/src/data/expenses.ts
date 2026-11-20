@@ -231,6 +231,10 @@ export async function createExpense(
   return writeAction(
     db,
     async (w) => {
+      const duplicate = (await w.table('expenses').get(input.expenseId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
       const row: SyncedRow = {
         id: input.expenseId,
         category_id: input.categoryId,
@@ -342,8 +346,12 @@ export async function cashMove(
     throw new ExpenseError('reason');
   return writeAction(
     db,
-    (w) =>
-      w.insert('cash_moves', {
+    async (w) => {
+      const duplicate = (await w.table('cash_moves').get(input.cashMoveId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
+      return w.insert('cash_moves', {
         id: input.cashMoveId,
         kind: input.kind,
         amount: input.amount,
@@ -353,7 +361,8 @@ export async function cashMove(
         staff_id: ctx.staff_id,
         business_date: businessDate(now, ctx.timeZone),
         created_at: now,
-      }),
+      });
+    },
     { now, actor: ctx.staff_id, tables: writeScope('cash_moves') },
   );
 }

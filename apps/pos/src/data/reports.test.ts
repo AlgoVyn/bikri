@@ -183,6 +183,22 @@ describe('Today figures (07 §9, screens/04 AC 1)', () => {
     });
     expect(await expectedCash(db, 'dev-1', NOW + 10)).toBe(74000);
   });
+
+  it('keeps the latest close after a backwards clock correction', async () => {
+    const db = await readyDb();
+    const future = NOW + 86_400_000;
+    await db.day_closes.add({
+      id: 'dc-future',
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+      business_date: '2026-10-28',
+      period_start: 0,
+      period_end: future,
+      counted_cash: 74_000,
+      created_at: future,
+    });
+    expect(await expectedCash(db, 'dev-1', NOW)).toBe(74000);
+  });
 });
 
 describe('Home attention and recent bills (screens/04)', () => {

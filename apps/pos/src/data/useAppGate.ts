@@ -8,6 +8,21 @@ import { DEV_TENANT_ID } from './tenant.ts';
 
 export type AppGate = 'loading' | 'enrol' | 'setup' | 'ready';
 
+/** Pure gate decision, separated so the interrupted-download/cleared-DB cases are testable. */
+export function appGate(input: {
+  done: boolean;
+  enrolled: boolean;
+  devTenant: boolean;
+  setupCompleted: boolean;
+}): AppGate {
+  if (!input.enrolled && !input.devTenant) return 'enrol';
+  if (input.done) return 'ready';
+  // An enrolled live shop is still downloading its first snapshot: keep waiting (the
+  // sync engine resumes it) instead of sending the owner through setup again.
+  if (input.enrolled && input.setupCompleted) return 'loading';
+  return 'setup';
+}
+
 /** Which top-level screen the till may show: enrol (T-034), the setup wizard, or the app. */
 export type GateInfo = {
   gate: AppGate;
@@ -37,27 +52,38 @@ export function useAppGate(): GateInfo {
   );
   const device = useLiveQuery(async () => {
     if (!db) return undefined;
-    const [token, revoked, tenant] = await Promise.all([
+    const [token, revoked, tenant, setup] = await Promise.all([
       db.kv.get('device_token'),
       db.kv.get('revoked'),
       db.kv.get('tenant'),
+      db.kv.get('shop_setup_completed'),
     ]);
     return {
       enrolled: Boolean(token?.value),
       revoked: Boolean(revoked?.value),
+      setupCompleted: setup?.value === true,
       shopName:
         (tenant?.value as { display_name?: string } | undefined)
           ?.display_name ?? null,
     };
   }, [db]);
-  const none = { revoked: false, enrolled: false, shopName: null };
+  const none = {
+    revoked: false,
+    enrolled: false,
+    setupCompleted: false,
+    shopName: null,
+  };
   if (noTenant) return { gate: 'enrol', db: null, ...none };
   if (!db || done === undefined || device === undefined)
     return { gate: 'loading', db, ...none };
-  // A database with a completed shop but no device token (e.g. IndexedDB was partially
-  // cleared) must enrol again; otherwise it can write unsyncable local sales. The dev/e2e
-  // shop intentionally has no token.
-  if (done && !device.enrolled && db.tenantId !== DEV_TENANT_ID)
-    return { gate: 'enrol', db, ...device };
-  return { gate: done ? 'ready' : 'setup', db, ...device };
+  return {
+    gate: appGate({
+      done,
+      enrolled: device.enrolled,
+      devTenant: db.tenantId === DEV_TENANT_ID,
+      setupCompleted: device.setupCompleted,
+    }),
+    db,
+    ...device,
+  };
 }

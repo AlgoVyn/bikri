@@ -4,6 +4,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS offline sync and locks — 20 Nov 2026 review, PR 4
+- A pulled server row parked while a local op was pending is now applied when that op settles as `applied`/`conflict_merged`, instead of being deleted with the cursor already past it.
+- Inside the exclusive push Web Lock every orphaned `sending` claim is reclaimed; without Web Locks a fresh claim stops the push instead of letting newer ops leapfrog it.
+- Pull, snapshot and restore recovery share a per-tenant Web Lock, and restore recovery re-checks the restore epoch before clearing tables.
+- Enrolment stores `shop_setup_completed`; an interrupted first download waits/resumes instead of showing Setup Wizard, and a missing device token returns to enrolment.
+- Auto-lock checks wall-clock idle time on visibility/focus and reads timeout changes live.
+- File uploads rethrow auth/schema/suspension failures and honour `Retry-After`.
+- Repository idempotency checks repeat inside `writeAction`; deliveries and supplier returns reject bundles/soft-deleted products.
+- Day close and expected cash keep the latest close when a backwards clock correction leaves it after `now`.
+
 ### Core money, permissions and i18n — 20 Nov 2026 review, PR 3
 - `parseMoneyToPaisa('Rs. 50')` now returns 5,000 paisa (Rs 50), not 50 paisa; `PKR 250`, `Rs. 100` and `−Rs. 500` are covered.
 - Inclusive tax falls back to the post-bill-discount bases when a large bill discount would otherwise make `line.revenue` negative.

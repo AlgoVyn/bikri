@@ -1778,7 +1778,7 @@ export const DEXIE_SCHEMA_V1 = {
   print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, status, [status+created_at], created_at', // V1 'id, status, created_at'; V2 adds sale_id/refund_id; V3 adds day_close/supplier ids; V6 adds [status+created_at]
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at }
-  pull_shadow: '[tbl+id]',        // server rows skipped while a local edit was pending (03 §4.2)
+  pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
 };
 ```
 

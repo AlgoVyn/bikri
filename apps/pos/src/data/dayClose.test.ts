@@ -139,6 +139,23 @@ describe('day close (T-047)', () => {
     });
   });
 
+  it('keeps a close recorded while the clock was ahead after a backwards correction', async () => {
+    const { db } = await setup('clock-skew');
+    const future = NOW + 86_400_000;
+    await db.day_closes.add({
+      id: 'future-close',
+      device_id: 'dev-1',
+      period_end: future,
+      counted_cash: 50_000,
+      created_at: future,
+    } as never);
+    const data = await dayCloseData(db, 'dev-1', NOW);
+    expect(data.lastClose?.id).toBe('future-close');
+    expect(data.periodStart).toBe(future);
+    expect(data.periodEnd).toBe(future);
+    expect(data.openingCash).toBe(50_000);
+  });
+
   it('first close without an opening override opens at zero', async () => {
     const { db } = await setup('first-zero');
     const data = await dayCloseData(db, 'dev-1', NOW);

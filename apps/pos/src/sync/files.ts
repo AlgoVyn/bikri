@@ -54,14 +54,19 @@ export async function uploadQueued(db: BikriDb, max = 30): Promise<number> {
       res.status === 425 ||
       res.status === 429 ||
       code === 'TENANT_READ_ONLY' ||
-      code === 'TENANT_QUOTA'
+      code === 'TENANT_QUOTA' ||
+      code === 'UNAUTHENTICATED' ||
+      code === 'DEVICE_REVOKED' ||
+      code === 'TENANT_SUSPENDED' ||
+      code === 'SCHEMA_OUTDATED'
     ) {
+      const retry = Number(res.headers.get('retry-after'));
       throw new SyncHttpError(
         code,
         res.status,
         body?.error?.message ?? '',
         {},
-        null,
+        Number.isFinite(retry) && retry > 0 ? retry : null,
       );
     }
     await db.file_queue.update(e.id, { status: 'failed' });

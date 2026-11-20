@@ -655,6 +655,53 @@ describe('suppliers and deliveries (T-045)', () => {
 });
 
 describe('supplier branches', () => {
+  it('rejects a bundle or soft-deleted product in a delivery', async () => {
+    const { db, ctx } = await setup('supplier-bundle');
+    const supplier = await createSupplier(
+      db,
+      { name: 'Hall Road' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const item = await product(db, ctx);
+    await db.products.put({
+      id: 'bundle-1',
+      name_en: 'Pack',
+      sku: 'PACK-1',
+      price: 1000,
+      kind: 'bundle',
+      track_stock: 0,
+      unit: 'set',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    const delivery = (id: string, productId: string) =>
+      saveDelivery(
+        db,
+        {
+          purchaseId: id,
+          supplierId: supplier.id,
+          invoiceNo: '',
+          date: TODAY,
+          lines: [{ productId, qtyMilli: 1000, unitCost: 1000 }],
+          otherCharges: 0,
+          paidNow: 0,
+        },
+        ctx,
+        { today: TODAY, now: NOW },
+      );
+    await expect(delivery('bundle-delivery', 'bundle-1')).rejects.toMatchObject(
+      { code: 'product' },
+    );
+    await db.products.update(item.id, { deleted_at: NOW });
+    await expect(delivery('deleted-delivery', item.id)).rejects.toMatchObject({
+      code: 'product',
+    });
+  });
+
   it('covers search, price updates, invoices, returns and invalid lines', async () => {
     const { db, ctx } = await setup('branches');
     const item = await product(db, ctx, 'Item', 100000);

@@ -325,21 +325,23 @@ export async function saveStaff(
     throw new SettingsError('discount');
   if (input.pin && ![4, 5, 6].includes(Number(input.pin.pin_length)))
     throw new SettingsError('pin');
-  const existing = input.id ? await db.staff.get(input.id) : undefined;
-  const owners = (await db.staff.toArray()).filter(
-    (row) => !row.deleted_at && row.role === 'owner' && row.active === 1,
-  );
-  const wasOwner =
-    existing?.role === 'owner' && existing.active === 1 && !existing.deleted_at;
-  const willBeOwner = input.role === 'owner' && input.active;
-  if (wasOwner && !willBeOwner && owners.length <= 1)
-    throw new SettingsError('last_owner');
   const device = await deviceInfo(db);
   const deviceId = String(device?.id ?? '');
   return writeAction(
     db,
     async (w) => {
-      const before = existing;
+      const staff = w.table<MasterRow, string>('staff');
+      const before = input.id ? await staff.get(input.id) : undefined;
+      // Repeat the last-owner guard inside the transaction: two rapid demotions can
+      // both pass an optimistic read and leave the shop without an owner.
+      const owners = (await staff.toArray()).filter(
+        (row) => !row.deleted_at && row.role === 'owner' && row.active === 1,
+      );
+      const wasOwner =
+        before?.role === 'owner' && before.active === 1 && !before.deleted_at;
+      const willBeOwner = input.role === 'owner' && input.active;
+      if (wasOwner && !willBeOwner && owners.length <= 1)
+        throw new SettingsError('last_owner');
       const fields: Record<string, unknown> = {
         name,
         role: input.role,

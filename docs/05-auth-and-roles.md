@@ -112,7 +112,7 @@ Owner's choice: **email sign-in** is the stronger sign-in for shop owners. It is
 - PIN: 4 digits by default (owner can allow 4–6 per person). Stored as PBKDF2-SHA256, 150,000 iterations, 16-byte random salt, 32-byte output, base64 (`staff.pin_hash`, `pin_salt`, `pin_iterations`). Hashing happens in the browser with WebCrypto.
 - Weak PINs rejected at creation: `0000`, `1111`…`9999`, `1234`, `4321`, `1212`, the year `19xx/20xx` patterns, and any PIN already used by another active staff member of this shop (tenant). Staff of different shops are unrelated.
 - Unlock: pick profile chip → type PIN → compare hash locally. On success set `session = { staff_id, role, unlocked_at }` in memory (not persisted).
-- Auto-lock: after 10 minutes without input (configurable 2–60, or "never" for owner), and on `Ctrl+L` / rail avatar → Lock.
+- Auto-lock: after 10 minutes without input by wall clock (configurable 2–60, or "never" for owner), checked again on visibility/focus so OS sleep cannot leave the till unlocked, and on `Ctrl+L` / rail avatar → Lock.
 - Switching cashier keeps carts and held bills; new lines and the eventual sale record the staff who is unlocked at payment time.
 - Lockout: 5 wrong PINs → 5 min lock for that profile; 10 → 30 min; each further 5 doubles up to 1 h. Stored in `kv.pin_failures`.
 - Forgotten PIN: an owner resets a staff PIN in Settings → Cashiers; a forgotten **owner** PIN is reset as in §3.

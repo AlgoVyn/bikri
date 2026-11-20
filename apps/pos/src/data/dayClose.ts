@@ -117,7 +117,7 @@ export async function dayCloseData(
   const closes = (
     await (src.table('day_closes') as Table<SyncedRow>)
       .where('[device_id+period_end]')
-      .between([deviceId, 0], [deviceId, now])
+      .between([deviceId, 0], [deviceId, Number.MAX_SAFE_INTEGER])
       .toArray()
   ).sort((a, b) => n(a.period_end) - n(b.period_end));
   const last = closes.at(-1) ?? null;
@@ -125,7 +125,10 @@ export async function dayCloseData(
     deviceId,
   );
   const periodStart = last ? n(last.period_end) : n(deviceRow?.created_at);
-  const payments = await sumPayments(src, deviceId, periodStart, now);
+  // A close recorded while the clock was ahead may be later than `now` after a
+  // correction. Keep the period valid instead of hiding that close and double-counting.
+  const periodEnd = Math.max(now, periodStart);
+  const payments = await sumPayments(src, deviceId, periodStart, periodEnd);
   const cash = payments.filter((p) => p.method === 'cash');
   const pick = (direction: string, purposes: string[], rows = cash) =>
     rows
@@ -138,20 +141,20 @@ export async function dayCloseData(
   const moves = (
     await (src.table('cash_moves') as Table<SyncedRow>)
       .where('[device_id+created_at]')
-      .between([deviceId, periodStart], [deviceId, now], false, true)
+      .between([deviceId, periodStart], [deviceId, periodEnd], false, true)
       .toArray()
   ).filter((m) => m.kind === 'pay_in' || m.kind === 'pay_out');
   const expenses = (
     await (src.table('expenses') as Table<SyncedRow>)
       .where('[device_id+created_at]')
-      .between([deviceId, periodStart], [deviceId, now], false, true)
+      .between([deviceId, periodStart], [deviceId, periodEnd], false, true)
       .toArray()
   ).filter((e) => e.method === 'cash');
   const cashExpenses = expenses.reduce(
     (sum, row) => sum + n(row.amount) * (row.reverses_id ? -1 : 1),
     0,
   );
-  const info = await dayCloseInfo(src, deviceId, periodStart, now);
+  const info = await dayCloseInfo(src, deviceId, periodStart, periodEnd);
   const components: DayCloseComponents = {
     opening_cash: last ? n(last.counted_cash) : (openingOverride ?? 0),
     cash_sales: pick('in', ['sale']),
@@ -177,7 +180,7 @@ export async function dayCloseData(
     components,
     deviceId,
     periodStart,
-    periodEnd: now,
+    periodEnd,
     openingCash: components.opening_cash,
     firstClose: !last,
     lastClose: last,
@@ -217,6 +220,10 @@ export async function closeDay(
   const row = await writeAction(
     db,
     async (w) => {
+      const duplicate = (await w.table('day_closes').get(input.dayCloseId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
       const data = await dayCloseData(w, ctx.device_id, now, input.openingCash);
       // Two tabs can prepare the same period. If a close finished after this form
       // captured its period, return that close instead of appending an empty period
