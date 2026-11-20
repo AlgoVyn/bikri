@@ -1730,6 +1730,28 @@ Trigger-only migration: `SCHEMA_VERSION` stays 8. `sales.status` remains the onl
 mutable column; every other column, including `bundle_discount_total`, is protected
 by the database as well as the Worker.
 
+### 2.26 Self-reference index for restore purge and tenant deletion (migration `0027_sales_replaces_index.sql`)
+
+```sql
+-- D-231 / fifth performance review P0: index the self-reference used by restore purge
+-- and tenant deletion.
+--
+-- `sales.replaces_sale_id` references `sales(tenant_id, id)`. Both the operator purge
+-- and the nightly tenant delete remove replacement bills first, so SQLite must check
+-- for children on every deleted row. Without an index on the child column that check
+-- scans every bill in the tenant: deleting 2,000 of 20,000 bills measured 4-14 s.
+--
+-- The index is partial because `replaces_sale_id` is NULL on virtually every bill, so
+-- normal sales write no index entry. Additive only; SCHEMA_VERSION is unchanged.
+CREATE INDEX sales_replaces
+  ON sales (tenant_id, replaces_sale_id)
+  WHERE replaces_sale_id IS NOT NULL;
+```
+
+The partial index covers both the operator purge's "replacement bills first" pass and
+the nightly tenant delete. Normal bills write no index entry because their
+`replaces_sale_id` is NULL.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
