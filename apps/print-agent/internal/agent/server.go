@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -33,20 +35,26 @@ type Server struct {
 	version string
 	logPath string
 	started time.Time
+	// Per-process CSRF nonce for the local unpair form. A cross-origin page can
+	// neither read this page nor guess the nonce.
+	csrfToken string
+	limits    *rateLimiter
 }
 
 // NewServer wires the agent dependencies.
 func NewServer(cfg *Config, cfgPath string, auth *Auth, jobs *Manager, b backend.Backend, log *slog.Logger, version, logPath string) *Server {
 	return &Server{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		auth:    auth,
-		jobs:    jobs,
-		backend: b,
-		log:     log,
-		version: version,
-		logPath: logPath,
-		started: time.Now(),
+		cfg:       cfg,
+		cfgPath:   cfgPath,
+		auth:      auth,
+		jobs:      jobs,
+		backend:   b,
+		log:       log,
+		version:   version,
+		logPath:   logPath,
+		started:   time.Now(),
+		csrfToken: randomID(),
+		limits:    newRateLimiter(time.Minute),
 	}
 }
 
@@ -81,7 +89,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 			return
 		}
 		origin := r.Header.Get("Origin")
-		if origin != "" && !s.allowedOrigin(origin) {
+		if origin != "" && !s.allowedOrigin(origin, r.Host) {
 			writeError(w, http.StatusForbidden, "FORBIDDEN_ORIGIN", "origin is not allowed")
 			return
 		}
@@ -104,7 +112,12 @@ func (s *Server) security(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) allowedOrigin(origin string) bool {
+func (s *Server) allowedOrigin(origin, host string) bool {
+	// The local page itself is same-origin with the request Host. The listener
+	// only binds a loopback address and validHost already rejected anything else.
+	if strings.EqualFold(origin, "http://"+host) {
+		return true
+	}
 	if origin == "http://127.0.0.1:"+strconv.Itoa(s.cfg.Port) ||
 		origin == "http://localhost:"+strconv.Itoa(s.cfg.Port) {
 		return true
@@ -135,6 +148,11 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func requestToken(r *http.Request) string {
+	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return hashToken(strings.TrimSpace(token))
 }
 
 type healthResponse struct {
@@ -168,6 +186,10 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
+	if !s.limits.allow("pair:"+remoteIP(r.RemoteAddr), 5) {
+		writeError(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "too many pairing attempts")
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
 	var body struct {
 		Code       string `json:"code"`
@@ -214,12 +236,53 @@ func (s *Server) unpair(w http.ResponseWriter, r *http.Request) {
 // loopback-only (the security middleware checks Host and Origin) so a user who
 // lost the Bikri-side token can pair the till again.
 func (s *Server) uiUnpair(w http.ResponseWriter, r *http.Request) {
+	if !s.validUIAction(w, r) {
+		return
+	}
 	s.auth.Unpair()
 	if err := s.auth.Persist(s.cfgPath); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// validUIAction ties the local reset form to this page load: the request must
+// come from a loopback origin, be a same-origin browser navigation, and carry
+// the per-process nonce rendered in the form. Without all three, a page on an
+// allowed API origin could unpair the agent and hijack the fresh pairing code.
+func (s *Server) validUIAction(w http.ResponseWriter, r *http.Request) bool {
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+		http.Error(w, "cross-site request refused", http.StatusForbidden)
+		return false
+	}
+	if !sameLoopbackOrigin(r.Header.Get("Origin"), r.Host) {
+		http.Error(w, "invalid origin", http.StatusForbidden)
+		return false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return false
+	}
+	nonce := r.PostFormValue("csrf")
+	if subtle.ConstantTimeCompare([]byte(nonce), []byte(s.csrfToken)) != 1 {
+		http.Error(w, "invalid request token", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func sameLoopbackOrigin(origin, host string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || !strings.EqualFold(parsed.Host, host) {
+		return false
+	}
+	name, _, err := net.SplitHostPort(parsed.Host)
+	if err != nil {
+		return false
+	}
+	return name == "127.0.0.1" || name == "localhost" || name == "::1"
 }
 
 func (s *Server) printers(w http.ResponseWriter, r *http.Request) {
@@ -235,6 +298,10 @@ func (s *Server) printers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
+	if !s.limits.allow("jobs:"+requestToken(r), 60) {
+		writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many print jobs; try again in a minute")
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	var req JobRequest
 	decoder := json.NewDecoder(r.Body)
@@ -254,7 +321,9 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) job(w http.ResponseWriter, r *http.Request) {
-	job, ok := s.jobs.Get(r.Context(), r.PathValue("id"))
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	job, ok := s.jobs.Get(ctx, r.PathValue("id"))
 	if !ok {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "job not found")
 		return
@@ -263,7 +332,9 @@ func (s *Server) job(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
-	job, found, err := s.jobs.Cancel(r.Context(), r.PathValue("id"))
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	job, found, err := s.jobs.Cancel(ctx, r.PathValue("id"))
 	if !found {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "job not found")
 		return
@@ -290,6 +361,10 @@ type diagnostics struct {
 }
 
 func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
+	if !s.limits.allow("diagnostics:"+requestToken(r), 10) {
+		writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many diagnostics requests; try again in a minute")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	list, _ := s.backend.ListPrinters(ctx)
@@ -309,6 +384,7 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 
 type uiData struct {
 	Paired       bool
+	CSRF         string
 	Code         string
 	Version      string
 	Protocol     int
@@ -331,6 +407,7 @@ func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	data := uiData{
 		Paired:       s.auth.Paired(),
+		CSRF:         s.csrfToken,
 		Code:         s.auth.PairingCode(),
 		Version:      s.version,
 		Protocol:     Protocol,

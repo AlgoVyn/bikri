@@ -31,19 +31,38 @@ type Config struct {
 	CreatedAt int64    `json:"createdAt"`
 }
 
+// developerOrigins were shipped in older builds. A local dev server is an
+// allowed browser origin only for the API, and keeping it in a production
+// config would let any page on that port drive the agent. Remove it on load;
+// developers can add it for one run with --allow-origin.
+var developerOrigins = map[string]bool{
+	"http://localhost:5173": true,
+	"http://127.0.0.1:5173": true,
+}
+
 // DefaultConfig returns a fresh, unpaired configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Version: Protocol,
-		AgentID: randomID(),
-		Port:    DefaultPort,
-		Origins: []string{
-			"https://algovyn.com",
-			"http://localhost:5173",
-			"http://127.0.0.1:5173",
-		},
+		Version:   Protocol,
+		AgentID:   randomID(),
+		Port:      DefaultPort,
+		Origins:   []string{"https://algovyn.com"},
 		CreatedAt: time.Now().UnixMilli(),
 	}
+}
+
+func sanitizeOrigins(origins []string) []string {
+	out := make([]string, 0, len(origins))
+	for _, origin := range origins {
+		if developerOrigins[origin] {
+			continue
+		}
+		out = append(out, origin)
+	}
+	if len(out) == 0 {
+		out = append(out, "https://algovyn.com")
+	}
+	return out
 }
 
 // DefaultPath is the per-user config path on Windows, Linux and macOS.
@@ -81,18 +100,22 @@ func LoadConfig(path string) (*Config, error) {
 	if len(cfg.Origins) == 0 {
 		cfg.Origins = DefaultConfig().Origins
 	}
+	cfg.Origins = sanitizeOrigins(cfg.Origins)
 	if cfg.AgentID == "" {
 		cfg.AgentID = randomID()
 	}
 	return &cfg, nil
 }
 
-// SaveConfig writes the config atomically with owner-only permissions.
+// SaveConfig writes the config atomically with owner-only permissions. Developer
+// origins added with --allow-origin are transient and never written to disk.
 func SaveConfig(path string, cfg *Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	saved := *cfg
+	saved.Origins = sanitizeOrigins(cfg.Origins)
+	data, err := json.MarshalIndent(&saved, "", "  ")
 	if err != nil {
 		return err
 	}

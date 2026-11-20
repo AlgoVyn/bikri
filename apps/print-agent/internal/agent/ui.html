@@ -40,6 +40,7 @@
     <p class="ok">Paired with Bikri</p>
     <p class="muted">Bikri can print silently to the printer you selected. Unpair from Bikri if this till changes owner.</p>
     <form method="post" action="/ui/unpair">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
       <button type="submit">Unpair this computer</button>
     </form>
   {{else}}

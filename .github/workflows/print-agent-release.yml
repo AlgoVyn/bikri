@@ -73,6 +73,11 @@ jobs:
         with:
           name: windows-installer
           path: apps/print-agent/dist
+      - name: Add the Windows installer to SHA256SUMS
+        working-directory: .
+        run: |
+          test -s apps/print-agent/dist/bikri-print-agent-setup.exe
+          (cd apps/print-agent/dist && sha256sum bikri-print-agent-setup.exe >> SHA256SUMS)
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

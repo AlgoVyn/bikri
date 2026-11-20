@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,6 +27,7 @@ var version = "dev"
 func main() {
 	configFlag := flag.String("config", "", "path to config.json (default: user config directory)")
 	portFlag := flag.Int("port", 0, "override the loopback port")
+	allowOrigin := flag.String("allow-origin", "", "extra comma-separated CORS origin (development only)")
 	versionFlag := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -54,6 +56,12 @@ func main() {
 			os.Exit(1)
 		}
 		cfg.Port = *portFlag
+	}
+	for _, origin := range strings.Split(*allowOrigin, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			cfg.Origins = append(cfg.Origins, origin)
+		}
 	}
 
 	logPath := agent.DefaultLogPath()
@@ -93,6 +101,8 @@ func main() {
 	httpServer := &http.Server{
 		Handler:           server.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      45 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -117,6 +127,13 @@ func main() {
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdown)
+		// Shutdown closes the listener, so Serve returns; wait for it instead of
+		// letting main exit under a handler that is still flushing a response.
+		select {
+		case <-done:
+		case <-shutdown.Done():
+			logger.Warn("shutdown timed out waiting for the HTTP server")
+		}
 	}
 }
 

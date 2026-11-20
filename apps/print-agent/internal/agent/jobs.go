@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +12,13 @@ import (
 
 	"github.com/algovyn/bikri/apps/print-agent/internal/backend"
 )
+
+const (
+	maxJobs  = 100
+	maxJobID = 80
+)
+
+var jobIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,80}$`)
 
 // JobRequest is the JSON body of POST /v1/jobs.
 type JobRequest struct {
@@ -48,17 +56,37 @@ type Manager struct {
 	mu      sync.Mutex
 	backend backend.Backend
 	jobs    map[string]*jobRecord
-	ttl     time.Duration
-	now     func() time.Time
+	// One print at a time per queue, so two receipts cannot interleave their
+	// raw bytes on the same spooler handle.
+	printerLocks map[string]chan struct{}
+	ttl          time.Duration
+	now          func() time.Time
 }
 
 // NewManager creates a job manager.
 func NewManager(b backend.Backend) *Manager {
 	return &Manager{
-		backend: b,
-		jobs:    map[string]*jobRecord{},
-		ttl:     24 * time.Hour,
-		now:     time.Now,
+		backend:      b,
+		jobs:         map[string]*jobRecord{},
+		printerLocks: map[string]chan struct{}{},
+		ttl:          24 * time.Hour,
+		now:          time.Now,
+	}
+}
+
+func (m *Manager) lockPrinter(ctx context.Context, printer string) (func(), error) {
+	m.mu.Lock()
+	lock := m.printerLocks[printer]
+	if lock == nil {
+		lock = make(chan struct{}, 1)
+		m.printerLocks[printer] = lock
+	}
+	m.mu.Unlock()
+	select {
+	case lock <- struct{}{}:
+		return func() { <-lock }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 
@@ -96,11 +124,14 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 	m.mu.Unlock()
 
 	// Only print to a queue the agent has enumerated. A stale or hand-written client
-	// could otherwise select any queue on the machine. If enumeration itself fails, keep
-	// the old behaviour and let the backend report the real spool error: a transient
-	// `lpstat` failure must not block printing.
-	if printers, err := m.backend.ListPrinters(ctx); err == nil &&
-		!installedPrinter(printers, req.Printer) {
+	// could otherwise select any queue on the machine. Fail closed when enumeration
+	// fails: passing an unvalidated name to `lp -d` is exactly the injection path.
+	printers, err := m.backend.ListPrinters(ctx)
+	if err != nil {
+		m.update(rec, "failed", "SPOOL_ERROR", "the printer list is unavailable: "+err.Error())
+		return m.copy(rec), nil
+	}
+	if !installedPrinter(printers, req.Printer) {
 		m.update(rec, "failed", "UNKNOWN_PRINTER", "the printer is not installed")
 		return m.copy(rec), nil
 	}
@@ -110,6 +141,12 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 		m.update(rec, "failed", "PAYLOAD_INVALID", err.Error())
 		return m.copy(rec), nil
 	}
+	unlock, err := m.lockPrinter(ctx, req.Printer)
+	if err != nil {
+		m.update(rec, "failed", "BUSY", "another job is still printing to this printer")
+		return m.copy(rec), nil
+	}
+	defer unlock()
 	copies := req.Copies
 	if copies < 1 {
 		copies = 1
@@ -261,14 +298,29 @@ func (m *Manager) cleanupLocked() {
 			delete(m.jobs, id)
 		}
 	}
+	// Keep memory and the diagnostics list bounded even on a busy day (100 jobs
+	// per docs/14 §7). Drop the oldest first, regardless of its terminal state.
+	for len(m.jobs) >= maxJobs {
+		var oldestID string
+		var oldestAt int64
+		for id, rec := range m.jobs {
+			if oldestID == "" || rec.CreatedAt < oldestAt {
+				oldestID, oldestAt = id, rec.CreatedAt
+			}
+		}
+		delete(m.jobs, oldestID)
+	}
 }
 
 func validateRequest(req JobRequest) error {
-	if strings.TrimSpace(req.JobID) == "" || len(req.JobID) > 80 {
-		return errors.New("jobId is required (max 80 characters)")
+	if !jobIDPattern.MatchString(req.JobID) || len(req.JobID) > maxJobID {
+		return errors.New("jobId must be 1-80 letters, digits, dot, underscore or hyphen")
 	}
 	if strings.TrimSpace(req.Printer) == "" {
 		return errors.New("printer is required")
+	}
+	if !backend.ValidPrinterName(req.Printer) {
+		return errors.New("printer contains invalid characters")
 	}
 	if req.Mode != "raw" && req.Mode != "driver" {
 		return errors.New(`mode must be "raw" or "driver"`)

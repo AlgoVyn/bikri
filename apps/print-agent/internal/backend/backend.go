@@ -5,7 +5,25 @@
 // compatibility path sends a rendered image through the installed driver.
 package backend
 
-import "context"
+import (
+	"context"
+	"strings"
+)
+
+// ValidPrinterName rejects names that could be parsed as command-line options
+// or that carry control characters. A printer must still match an enumerated
+// queue; this only blocks unsafe values before they reach an OS backend.
+func ValidPrinterName(name string) bool {
+	if name == "" || len(name) > 256 || strings.HasPrefix(name, "-") {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
 
 // Printer is one installed OS print queue.
 type Printer struct {

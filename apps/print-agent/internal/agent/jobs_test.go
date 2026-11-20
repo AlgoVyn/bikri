@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/algovyn/bikri/apps/print-agent/internal/backend"
 )
@@ -12,6 +13,9 @@ import (
 type fakeBackend struct {
 	mu          sync.Mutex
 	printCalls  int
+	inFlight    int
+	maxInFlight int
+	printDelay  time.Duration
 	printErr    error
 	spoolID     string
 	status      backend.Status
@@ -33,10 +37,22 @@ func (f *fakeBackend) ListPrinters(context.Context) ([]backend.Printer, error) {
 
 func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.printCalls++
-	if f.printErr != nil {
-		return "", f.printErr
+	f.inFlight++
+	if f.inFlight > f.maxInFlight {
+		f.maxInFlight = f.inFlight
+	}
+	delay := f.printDelay
+	printErr := f.printErr
+	f.mu.Unlock()
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	f.mu.Lock()
+	f.inFlight--
+	f.mu.Unlock()
+	if printErr != nil {
+		return "", printErr
 	}
 	return f.spoolID, nil
 }
@@ -117,7 +133,7 @@ func TestManagerRejectsUnknownPrinter(t *testing.T) {
 	}
 }
 
-func TestManagerPrintsWhenEnumerationFails(t *testing.T) {
+func TestManagerFailsClosedWhenEnumerationFails(t *testing.T) {
 	fake := &fakeBackend{
 		spoolID:     "42",
 		printersErr: errors.New("cups unavailable"),
@@ -127,8 +143,100 @@ func TestManagerPrintsWhenEnumerationFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if job.Status != "spooled" || fake.printCalls != 1 {
-		t.Fatalf("job = %+v, print calls = %d", job, fake.printCalls)
+	if job.Status != "failed" || job.Error != "SPOOL_ERROR" {
+		t.Fatalf("job = %+v", job)
+	}
+	if fake.printCalls != 0 {
+		t.Fatalf("unvalidated printer was printed %d times", fake.printCalls)
+	}
+}
+
+func TestManagerValidatesJobIDAndPrinter(t *testing.T) {
+	manager := NewManager(&fakeBackend{spoolID: "42"})
+	for _, update := range []func(*JobRequest){
+		func(req *JobRequest) { req.JobID = "" },
+		func(req *JobRequest) { req.JobID = "job id with spaces" },
+		func(req *JobRequest) { req.JobID = "job/1" },
+		func(req *JobRequest) { req.Printer = "-a" },
+		func(req *JobRequest) { req.Printer = "Bixolon\n-evil" },
+	} {
+		req := validRequest()
+		update(&req)
+		if _, err := manager.Submit(context.Background(), req); err == nil {
+			t.Fatalf("invalid request was accepted: %+v", req)
+		}
+	}
+}
+
+func TestManagerCapsJobs(t *testing.T) {
+	manager := NewManager(&fakeBackend{spoolID: "42"})
+	for i := 0; i < maxJobs+5; i++ {
+		req := validRequest()
+		req.JobID = "job-" + leftPad(int64(i), 3)
+		if _, err := manager.Submit(context.Background(), req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := len(manager.Recent(500)); got != maxJobs {
+		t.Fatalf("stored jobs = %d, want %d", got, maxJobs)
+	}
+}
+
+func TestManagerSerialisesJobsPerPrinter(t *testing.T) {
+	fake := &fakeBackend{
+		spoolID:    "42",
+		printDelay: 10 * time.Millisecond,
+		printers: []backend.Printer{
+			{Name: "Bixolon"},
+			{Name: "Office"},
+		},
+	}
+	manager := NewManager(fake)
+	// Same queue: the manager must not overlap its raw writes.
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req := validRequest()
+			req.JobID = "same-" + leftPad(int64(i), 2)
+			if _, err := manager.Submit(context.Background(), req); err != nil {
+				t.Errorf("submit: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	if fake.maxInFlight != 1 {
+		t.Fatalf("same-printer jobs overlapped: max=%d", fake.maxInFlight)
+	}
+
+	// Different queues may proceed independently.
+	fake.mu.Lock()
+	fake.maxInFlight = 0
+	fake.mu.Unlock()
+	for i := 0; i < 2; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			req := validRequest()
+			req.JobID = "bix-" + leftPad(int64(i), 2)
+			if _, err := manager.Submit(context.Background(), req); err != nil {
+				t.Errorf("submit: %v", err)
+			}
+		}(i)
+		go func(i int) {
+			defer wg.Done()
+			req := validRequest()
+			req.JobID = "office-" + leftPad(int64(i), 2)
+			req.Printer = "Office"
+			if _, err := manager.Submit(context.Background(), req); err != nil {
+				t.Errorf("submit: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	if fake.maxInFlight != 2 {
+		t.Fatalf("different printers did not overlap: max=%d", fake.maxInFlight)
 	}
 }
 

@@ -22,7 +22,10 @@ type cupsBackend struct {
 	printersAt time.Time
 }
 
-var requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
+var (
+	requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
+	spoolIDPattern   = regexp.MustCompile(`^[A-Za-z0-9._-]+-[0-9]+$`)
+)
 
 func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	// `/v1/jobs` verifies the requested queue, and health/printers/diagnostics
@@ -72,8 +75,8 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 }
 
 func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
-	if strings.TrimSpace(job.Printer) == "" {
-		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no printer name"}
+	if !ValidPrinterName(job.Printer) {
+		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
 	}
 	ext := ".bin"
 	if job.Encoding == "png" {
@@ -109,20 +112,27 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 		// fit-to-page it (which would ignore the 1:1 dot width).
 		args = append(args, "-o", "scaling=100")
 	}
-	args = append(args, path)
+	// `--` ends options: a file name or queue that begins with `-` can never be
+	// interpreted as another lp flag.
+	args = append(args, "--", path)
 	out, err := run(ctx, "lp", args...)
 	if err != nil {
 		return "", &Error{Code: "SPOOL_ERROR", Message: err.Error()}
 	}
-	if id := parseRequestID(out); id != "" {
-		return id, nil
-	}
-	return job.ID, nil
+	// Never fall back to the client-supplied id: `cancel` would later run against
+	// that value and could interpret it as an option (e.g. `-a` cancels every job).
+	// An unparsed id is uncancelable but the job has still been spooled.
+	return parseRequestID(out), nil
 }
 
 func (b *cupsBackend) Status(ctx context.Context, printer, spoolID string) (Status, error) {
-	if printer == "" {
+	if !ValidPrinterName(printer) {
 		return Status{State: "failed", Error: "UNKNOWN_PRINTER"}, nil
+	}
+	if spoolID == "" {
+		// The spool succeeded but CUPS did not print a request id; there is nothing
+		// to poll, so treat the job as accepted instead of leaving it "printing".
+		return Status{State: "done"}, nil
 	}
 	active, err := run(ctx, "lpstat", "-W", "not-completed", "-o", printer)
 	if err != nil {
@@ -142,17 +152,32 @@ func (b *cupsBackend) Status(ctx context.Context, printer, spoolID string) (Stat
 }
 
 func (b *cupsBackend) Cancel(ctx context.Context, printer, spoolID string) error {
-	if printer == "" || spoolID == "" {
-		return &Error{Code: "CANCEL_FAILED", Message: "missing printer or job id"}
+	if !ValidPrinterName(printer) || !spoolIDPattern.MatchString(spoolID) {
+		return &Error{Code: "CANCEL_FAILED", Message: "invalid printer or job id"}
 	}
-	if _, err := run(ctx, "cancel", spoolID); err != nil {
+	if _, err := run(ctx, "cancel", "--", spoolID); err != nil {
 		return &Error{Code: "CANCEL_FAILED", Message: err.Error()}
 	}
 	return nil
 }
 
+// cupsEnv forces the C locale so lp/lpstat output is parseable on non-English
+// desktops. Replacing an inherited LC_ALL/LANG avoids duplicate variables where
+// libc would otherwise keep the first (localized) value.
+func cupsEnv(env []string) []string {
+	out := make([]string, 0, len(env)+2)
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "LC_ALL=") || strings.HasPrefix(entry, "LANG=") {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, "LC_ALL=C", "LANG=C")
+}
+
 func run(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = cupsEnv(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		text := strings.TrimSpace(string(out))
