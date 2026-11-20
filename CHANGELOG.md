@@ -4,6 +4,10 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Print agent 0.1.4 — 21 Nov 2026
+- The Windows print agent enumerates printers natively with `EnumPrintersW`/`GetDefaultPrinterW` instead of spawning PowerShell/CIM every 10 s, CUPS enumeration is singleflighted with a stale fallback, the dead completed-job `lpstat` call is removed, synchronous prints return `done` without a spool id, and the GDI path uses a top-down DIB from the existing RGBA buffer.
+- Wizard download links, the installer default and the build fallback move to `print-agent-v0.1.4`. The agent protocol stays 1, so 0.1.3 agents keep working until updated.
+
 ### Admin, prune and device-code budget hardening — 21 Nov 2026 review
 - Migration `0028` adds the server-only `branch_device_codes` registry (backfilled once from devices, code history and existing invoice numbers), drops the `sales_branch_invoice` index and adds `tenant_usage_day`. Device enrolment now reads a handful of branch codes instead of every invoice number in the branch, and reserves the chosen code.
 - Operator purge skips empty tables with one probe and returns `remaining` as 0/1 instead of running two 29-table `COUNT(*)` batches on every 5k chunk; the console shows a plain "Purge in progress" note and detects a stuck purge from `deleted`.
