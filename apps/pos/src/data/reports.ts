@@ -223,17 +223,20 @@ export async function expectedCash(
 ): Promise<number> {
   const closes = await db.day_closes
     .where('[device_id+period_end]')
-    .between([deviceId, 0], [deviceId, now])
+    .between([deviceId, 0], [deviceId, Number.MAX_SAFE_INTEGER])
     .toArray();
   const last = closes.at(-1);
   const device = await db.devices.get(deviceId);
   const start = last ? n(last.period_end) : n(device?.created_at);
+  // A backwards clock correction can leave the last close after `now`; include it so
+  // the drawer calculation starts from the real latest close instead of double-counting.
+  const end = Math.max(now, start);
   const since = <T extends SyncedRow>(rows: T[]) =>
-    rows.filter((r) => n(r.created_at) > start && n(r.created_at) <= now);
+    rows.filter((r) => n(r.created_at) > start && n(r.created_at) <= end);
   const payments = since(
     await db.payments
       .where('[device_id+created_at]')
-      .between([deviceId, start], [deviceId, now], false, true)
+      .between([deviceId, start], [deviceId, end], false, true)
       .toArray(),
   ).filter((p) => p.method === 'cash');
   const sum = (rows: SyncedRow[]) => rows.reduce((s, r) => s + n(r.amount), 0);
@@ -247,13 +250,13 @@ export async function expectedCash(
   const moves = since(
     await db.cash_moves
       .where('[device_id+created_at]')
-      .between([deviceId, start], [deviceId, now], false, true)
+      .between([deviceId, start], [deviceId, end], false, true)
       .toArray(),
   );
   const expenses = since(
     await db.expenses
       .where('[device_id+created_at]')
-      .between([deviceId, start], [deviceId, now], false, true)
+      .between([deviceId, start], [deviceId, end], false, true)
       .toArray(),
   ).filter((e) => e.method === 'cash');
   return computeDayClose({

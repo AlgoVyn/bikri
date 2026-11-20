@@ -320,6 +320,10 @@ export async function refundSale(
   const result = await writeAction(
     db,
     async (w) => {
+      const duplicate = await (
+        w.table('refunds') as Table<SyncedRow, string>
+      ).get(input.refundId);
+      if (duplicate) return { refund: duplicate, plan: null, created: false };
       const plan = await computeRefund(
         w,
         input.saleId,
@@ -487,14 +491,14 @@ export async function refundSale(
       await (w.table('sales') as Table<SyncedRow>).update(input.saleId, {
         status: fullyRefunded ? 'refunded' : 'part_refunded',
       });
-      return { refundRow, plan };
+      return { refund: refundRow, plan, created: true };
     },
     { now, actor: ctx.staff_id, tables: REFUND_WRITE_TABLES },
   );
 
   // The refund is already committed; a print-queue failure must not make the money
   // action look failed (a retry would reuse the refund id and still print nothing).
-  if (input.print)
+  if (input.print && result.created)
     await queueRefundPrint(db, input.refundId, { now }).catch(() => undefined);
-  return { refund: result.refundRow, plan: result.plan, created: true };
+  return result;
 }

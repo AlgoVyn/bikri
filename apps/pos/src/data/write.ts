@@ -174,7 +174,7 @@ export async function writeAction<T>(
     const master = (tbl: MasterTable) =>
       tx.table(tbl) as Table<MasterRow, string>;
     const shadows = tx.table('pull_shadow') as Table<
-      { tbl: string; id: string; row: SyncedRow },
+      { tbl: string; id: string; row: SyncedRow; source?: 'local' | 'server' },
       [string, string]
     >;
     // Keep the pre-edit copy until the server answers. A rejected action is discarded by
@@ -187,7 +187,7 @@ export async function writeAction<T>(
       row: MasterRow,
     ): Promise<void> => {
       if (await shadows.get([tbl, row.id])) return;
-      await shadows.put({ tbl, id: row.id, row });
+      await shadows.put({ tbl, id: row.id, row, source: 'local' });
     };
 
     const writer: Writer = {

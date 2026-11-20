@@ -1,5 +1,7 @@
 import { businessDate, newId } from '@bikri/core';
 import type { BikriDb, MasterRow, PartyBalance } from '@bikri/db';
+import type { Table } from 'dexie';
+import type { TableSource } from './caches.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction, writeScope } from './write.ts';
@@ -103,14 +105,17 @@ export async function findCustomers(
 }
 
 async function assertPhoneFree(
-  db: BikriDb,
+  src: TableSource,
   phone: string,
   excludeId?: string,
 ): Promise<void> {
   if (!phone) return;
-  const same = (await db.customers.where('phone').equals(phone).toArray()).find(
-    (c) => !c.deleted_at && c.id !== excludeId,
-  );
+  const same = (
+    await (src.table('customers') as Table<MasterRow, string>)
+      .where('phone')
+      .equals(phone)
+      .toArray()
+  ).find((c) => !c.deleted_at && c.id !== excludeId);
   if (same) throw new DuplicatePhoneError(String(same.name), same.id);
 }
 
@@ -226,9 +231,15 @@ export async function updateCustomer(
   return writeAction(
     db,
     async (w) => {
+      const before = (await w.table('customers').get(id)) as
+        | MasterRow
+        | undefined;
+      if (!before || before.deleted_at)
+        throw new RangeError('customer not found');
+      await assertPhoneFree(w, fields.phone, id);
       const row = await w.update('customers', id, fields);
       if (
-        Number(current.credit_limit ?? -1) !== Number(fields.credit_limit ?? -1)
+        Number(before.credit_limit ?? -1) !== Number(fields.credit_limit ?? -1)
       ) {
         await w.insert('audit_log', {
           id: newId(now),
@@ -236,7 +247,7 @@ export async function updateCustomer(
           entity: 'customers',
           entity_id: id,
           before_json: JSON.stringify({
-            credit_limit: current.credit_limit ?? null,
+            credit_limit: before.credit_limit ?? null,
           }),
           after_json: JSON.stringify({ credit_limit: fields.credit_limit }),
           device_id: ctx.device_id,

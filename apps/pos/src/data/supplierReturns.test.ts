@@ -231,7 +231,7 @@ describe('return to supplier (screens/13 ACs 6–8, 07 §10)', () => {
     ).toBe('total');
     expect(
       await code({ ...base, lines: [{ productId: 'gone', qtyMilli: 1000 }] }),
-    ).toBe('supplier');
+    ).toBe('product');
     expect(
       await code({ ...base, lines: [{ productId: 'free', qtyMilli: 0 }] }),
     ).toBe('qty');
@@ -431,5 +431,37 @@ describe('return to supplier (screens/13 ACs 6–8, 07 §10)', () => {
         refundMethod: null,
       }),
     ).rejects.toMatchObject({ code: 'reason' });
+  });
+
+  it('rejects a bundle or soft-deleted product', async () => {
+    const { db } = await setup('return-product');
+    await db.products.add({
+      ...product('pack', 'Pack', 1000, 0),
+      kind: 'bundle',
+      track_stock: 0,
+    } as never);
+    const input = {
+      supplierId: 'sup-1',
+      lines: [{ productId: 'pack', qtyMilli: 1000 }],
+      reason: 'Unsold',
+      refundReceived: 0,
+      refundMethod: null,
+    };
+    await expect(planSupplierReturn(db, input)).rejects.toMatchObject({
+      code: 'product',
+    });
+    const { on_hand_milli: _stock, ...simple } = product(
+      'deleted',
+      'Deleted',
+      1000,
+      0,
+    );
+    await db.products.add({ ...simple, deleted_at: NOW } as never);
+    await expect(
+      planSupplierReturn(db, {
+        ...input,
+        lines: [{ productId: 'deleted', qtyMilli: 1000 }],
+      }),
+    ).rejects.toMatchObject({ code: 'product' });
   });
 });

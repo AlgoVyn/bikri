@@ -68,9 +68,19 @@ export class SyncEngine {
       // that was deferred here, so its promise does not include the new ops.
       void this.run('full', true);
     } else {
-      void this.run('pull');
+      // A pull only would leave a lost/merged push unresolved until the next poll. If
+      // anything is waiting, settle the outbox first and pull afterwards.
+      void this.flushOnVisible().catch(() => undefined);
     }
   };
+
+  private async flushOnVisible(): Promise<void> {
+    const [pending, sending] = await Promise.all([
+      this.db.outbox.where('status').equals('pending').count(),
+      this.db.outbox.where('status').equals('sending').count(),
+    ]);
+    await this.run(pending + sending > 0 ? 'full' : 'pull');
+  }
 
   /** Hidden by the Share sheet, where a fresh request may be suspended. */
   private shareHidden(): boolean {
@@ -279,7 +289,11 @@ export class SyncEngine {
       error: error instanceof Error ? error.message : String(error),
       progress: null,
     });
-    await this.scheduleNext(backoffDelay(this.failures));
+    const retryAfter =
+      error instanceof SyncHttpError && error.retryAfter !== null
+        ? Math.min(error.retryAfter * 1000, 3_600_000)
+        : null;
+    await this.scheduleNext(retryAfter ?? backoffDelay(this.failures));
   }
 }
 

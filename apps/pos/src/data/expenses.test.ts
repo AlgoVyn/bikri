@@ -82,6 +82,24 @@ describe('expenses and cash moves (T-046)', () => {
     expect(list.days).toHaveLength(1);
   });
 
+  it('is idempotent for two concurrent saves with the same cash-move id', async () => {
+    const { db, ctx } = await setup('expenses-idem');
+    const input = {
+      cashMoveId: 'cm-idem',
+      kind: 'pay_in' as const,
+      amount: 10_000,
+      reason: 'Float',
+    };
+    const [first, second] = await Promise.all([
+      cashMove(db, input, ctx, NOW),
+      cashMove(db, input, ctx, NOW),
+    ]);
+    expect(first.id).toBe('cm-idem');
+    expect(second.id).toBe('cm-idem');
+    expect(await db.cash_moves.count()).toBe(1);
+    expect(await db.outbox.count()).toBe(1);
+  });
+
   it('AC 3: a cashier over Rs 2,000 needs the manager override', async () => {
     const { db, ctx } = await setup('limit');
     await expect(

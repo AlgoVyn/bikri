@@ -102,14 +102,15 @@ export async function pushAll(
   const locks = globalThis.navigator?.locks;
   if (locks?.request)
     return locks.request('bikri-push', () =>
-      pushAllUnlocked(db, maxRounds),
+      pushAllUnlocked(db, maxRounds, true),
     ) as Promise<PushOutcome>;
-  return pushAllUnlocked(db, maxRounds);
+  return pushAllUnlocked(db, maxRounds, false);
 }
 
 async function pushAllUnlocked(
   db: BikriDb,
   maxRounds = 20,
+  exclusive = false,
 ): Promise<PushOutcome> {
   const device = await deviceInfo(db);
   const out: PushOutcome = {
@@ -119,24 +120,36 @@ async function pushAllUnlocked(
     serverTime: null,
   };
   if (!device) return out;
-  // A reload, a closed tab or a stopped engine can leave rows in `sending` forever. That is
-  // not just a delay: pending ops behind them would be sent without their prerequisites
-  // (a product before its owner staff row is a real example), so the server would reject
-  // them. Reclaim every unfinished claim now. A second push of the same op is safe: the
-  // server answers from `applied_ops`, and this tab then settles the row itself.
-  // Only reclaim a claim that is older than a live request. A second tab's in-flight
-  // claim must never be stolen: the two requests could arrive out of order and a
-  // dependent transaction (staff create then sale) would be rejected.
-  const staleBefore = Date.now() - CLAIM_STALE_MS;
-  await db.outbox
-    .where('status')
-    .equals('sending')
-    .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
-    .modify({
+  // A reload, a closed tab or a stopped engine can leave rows in `sending` forever. That
+  // is not just a delay: pending ops behind them would be sent without their
+  // prerequisites (a product before its owner staff row is a real example), so the server
+  // would reject them. A second push of the same op is safe: the server answers from
+  // `applied_ops`, and this tab then settles the row itself.
+  if (exclusive) {
+    // The Web Lock proves no other tab is pushing, so every claim is orphaned (ours from
+    // before a reload included); reclaim all of them, not just old ones.
+    await db.outbox.where('status').equals('sending').modify({
       status: 'pending',
       sending_at: undefined,
       claim_token: undefined,
     });
+  } else {
+    // No cross-tab lock: only reclaim a claim older than a live request. If a fresh
+    // `sending` row remains, stop instead of leapfrogging newer `pending` ops past their
+    // unclaimed prerequisite.
+    const staleBefore = Date.now() - CLAIM_STALE_MS;
+    await db.outbox
+      .where('status')
+      .equals('sending')
+      .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
+      .modify({
+        status: 'pending',
+        sending_at: undefined,
+        claim_token: undefined,
+      });
+    if ((await db.outbox.where('status').equals('sending').count()) > 0)
+      return out;
+  }
   for (let round = 0; round < maxRounds; round += 1) {
     let batch: OutboxEntry[] = [];
     let seqs: number[] = [];
@@ -248,6 +261,7 @@ async function pushAllUnlocked(
                 await db.pull_shadow.put({
                   tbl: entry.tbl,
                   id: entry.row_id,
+                  source: 'local',
                   row: {
                     ...(local ?? {}),
                     ...entry.row,
@@ -257,6 +271,27 @@ async function pushAllUnlocked(
                 });
               }
             } else {
+              const shadow = await db.pull_shadow.get([
+                entry.tbl,
+                entry.row_id,
+              ]);
+              if (shadow?.source === 'server') {
+                // A pull parked a newer server row while this local op was pending.
+                // The cursor is already past that change, so apply it now; deleting the
+                // shadow would strand the till on stale fields/rev until another edit.
+                const local = (await db.table(entry.tbl).get(entry.row_id)) as
+                  | Record<string, unknown>
+                  | undefined;
+                const localRev = Number(local?.rev ?? 0);
+                const shadowRev = Number(shadow.row.rev ?? 0);
+                // Only apply a shadow that is at least the revision this push
+                // produced. An older pre-merge pull is stale; the follow-up pull
+                // fetches the merged row.
+                const serverRev =
+                  typeof r.server_rev === 'number' ? r.server_rev : shadowRev;
+                if (local && shadowRev > localRev && shadowRev >= serverRev)
+                  await db.table(entry.tbl).put(shadow.row);
+              }
               await db.pull_shadow.delete([entry.tbl, entry.row_id]);
             }
             // Keep the local optimistic revision current; otherwise the next edit of

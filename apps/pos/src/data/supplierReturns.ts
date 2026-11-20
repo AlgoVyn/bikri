@@ -28,7 +28,8 @@ export class SupplierReturnError extends Error {
     | 'total'
     | 'refund'
     | 'method'
-    | 'purchase';
+    | 'purchase'
+    | 'product';
   constructor(code: SupplierReturnError['code']) {
     super(code);
     this.name = 'SupplierReturnError';
@@ -219,7 +220,12 @@ export async function planSupplierReturn(
   }> = [];
   for (const line of input.lines) {
     const product = products.get(line.productId);
-    if (!product) throw new SupplierReturnError('supplier');
+    if (
+      !product ||
+      product.deleted_at ||
+      String(product.kind ?? 'simple') === 'bundle'
+    )
+      throw new SupplierReturnError('product');
     if (!Number.isSafeInteger(line.qtyMilli) || line.qtyMilli <= 0)
       throw new SupplierReturnError('qty');
     let linkedCost: number | null = null;
@@ -331,6 +337,10 @@ export async function createSupplierReturn(
   return writeAction(
     db,
     async (w) => {
+      const duplicate = (await w
+        .table('supplier_returns')
+        .get(input.returnId)) as SyncedRow | undefined;
+      if (duplicate) return duplicate;
       const plan = await planSupplierReturn(w, input);
       const row: SyncedRow = {
         id: input.returnId,

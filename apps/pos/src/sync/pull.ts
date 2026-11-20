@@ -35,6 +35,20 @@ type PullResponse = {
 
 export type Progress = (done: number, total: number) => void;
 
+/**
+ * Serialises pull/snapshot/restore across tabs of the same shop. The lock name is
+ * per-tenant so another shop in the same browser is unaffected.
+ */
+async function withPullLock<T>(
+  db: BikriDb,
+  task: () => Promise<T>,
+): Promise<T> {
+  const locks = globalThis.navigator?.locks;
+  if (locks?.request)
+    return locks.request(`bikri-pull-${db.tenantId}`, task) as Promise<T>;
+  return task();
+}
+
 export type SnapshotState = {
   seq: number;
   tables: { tbl: string; rows: number }[];
@@ -48,8 +62,15 @@ export async function pullAll(
   db: BikriDb,
   onSnapshot?: Progress,
 ): Promise<number | null> {
+  return withPullLock(db, () => pullAllUnlocked(db, onSnapshot));
+}
+
+async function pullAllUnlocked(
+  db: BikriDb,
+  onSnapshot?: Progress,
+): Promise<number | null> {
   if (await getKv<SnapshotState | null>(db, 'snapshot_state', null)) {
-    await runSnapshot(db, onSnapshot);
+    await runSnapshotUnlocked(db, onSnapshot);
   }
   let serverTime: number | null = null;
   for (let page = 0; page < 200; page += 1) {
@@ -62,7 +83,7 @@ export async function pullAll(
       );
     } catch (e) {
       if (e instanceof SyncHttpError && e.code === 'SNAPSHOT_REQUIRED') {
-        await runSnapshot(db, onSnapshot);
+        await runSnapshotUnlocked(db, onSnapshot);
         continue;
       }
       throw e;
@@ -73,7 +94,7 @@ export async function pullAll(
     if (epoch === null) {
       await setKv(db, 'restore_epoch', res.restore_epoch);
     } else if (epoch !== res.restore_epoch) {
-      await restoreRecovery(
+      await restoreRecoveryUnlocked(
         db,
         res.restore_point_at,
         res.restore_epoch,
@@ -283,6 +304,13 @@ async function mergeSnapshotPage(
  * local edits survive; caches are rebuilt at the end; then the pull continues from snapshot_seq.
  */
 export async function runSnapshot(
+  db: BikriDb,
+  onProgress?: Progress,
+): Promise<void> {
+  return withPullLock(db, () => runSnapshotUnlocked(db, onProgress));
+}
+
+async function runSnapshotUnlocked(
   db: BikriDb,
   onProgress?: Progress,
 ): Promise<void> {
@@ -677,7 +705,19 @@ export async function restoreRecovery(
   restoreEpoch: string,
   onProgress?: Progress,
 ): Promise<void> {
+  return withPullLock(db, () =>
+    restoreRecoveryUnlocked(db, restorePointAt, restoreEpoch, onProgress),
+  );
+}
+
+async function restoreRecoveryUnlocked(
+  db: BikriDb,
+  restorePointAt: number,
+  restoreEpoch: string,
+  onProgress?: Progress,
+): Promise<void> {
   const device = await deviceInfo(db);
+  const startingEpoch = await getKv<string | null>(db, 'restore_epoch', null);
   const now = Date.now();
   if (device) {
     const start = await tillRequest<
@@ -697,6 +737,10 @@ export async function restoreRecovery(
   }
   try {
     await db.transaction('rw', db.tables, async () => {
+      // Another tab may have completed a recovery while this one waited for the pull
+      // lock (or on a browser without Web Locks). Do not clear its fresh snapshot.
+      const storedEpoch = (await db.kv.get('restore_epoch'))?.value ?? null;
+      if (storedEpoch !== startingEpoch) return;
       const recoveredRows: RecoveredOp[] = [];
       const outbox = await db.outbox.toArray();
       // A row that is still queued will be pushed by its original op. Re-enqueueing it
@@ -947,5 +991,5 @@ export async function restoreRecovery(
     throw error;
   }
   // Resumes the snapshot state saved before the clear, even if the previous attempt failed.
-  await runSnapshot(db, onProgress);
+  await runSnapshotUnlocked(db, onProgress);
 }

@@ -122,19 +122,24 @@ export async function mergeRows(
   }
 
   const applied: ServerRow[] = [];
-  const shadows: { tbl: string; id: string; row: SyncedRow }[] = [];
+  const shadows: {
+    tbl: string;
+    id: string;
+    row: SyncedRow;
+    source: 'server';
+  }[] = [];
   for (const { tbl, row } of rows) {
     if (!isPulledTable(tbl)) continue;
     assertServerRow(tbl, row);
     if (pendingKeys.has(`${tbl}\u0000${row.id}`)) {
-      shadows.push({ tbl, id: row.id, row });
+      shadows.push({ tbl, id: row.id, row, source: 'server' });
       continue;
     }
     applied.push({ tbl, row });
   }
   if (shadows.length > 0) {
     const shadowTable = tx.table('pull_shadow') as Table<
-      { tbl: string; id: string; row: SyncedRow },
+      { tbl: string; id: string; row: SyncedRow; source?: 'local' | 'server' },
       [string, string]
     >;
     if (shadows.length === 1)

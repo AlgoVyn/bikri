@@ -756,6 +756,10 @@ export async function receivePayment(
   return writeAction(
     db,
     async (w) => {
+      const duplicate = (await w.table('payments').get(input.paymentId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
       const payment: SyncedRow = {
         id: input.paymentId,
         direction: 'in',

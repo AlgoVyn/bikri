@@ -149,8 +149,15 @@ export async function saveDelivery(
       .filter((p): p is MasterRow => p !== undefined)
       .map((p) => [p.id, p]),
   );
-  if (input.lines.some((line) => !products.has(line.productId)))
-    throw new DeliveryError('product');
+  for (const line of input.lines) {
+    const product = products.get(line.productId);
+    if (
+      !product ||
+      product.deleted_at ||
+      String(product.kind ?? 'simple') === 'bundle'
+    )
+      throw new DeliveryError('product');
+  }
   // A delivery is one document and cannot be split across transactions. Refuse up front when the
   // worst case (line + movement + product update + price audit) would exceed the action limit.
   const worstOps =
@@ -174,6 +181,10 @@ export async function saveDelivery(
   return writeAction(
     db,
     async (w) => {
+      const duplicate = (await w.table('purchases').get(input.purchaseId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
       const purchase: SyncedRow = {
         id: input.purchaseId,
         supplier_id: input.supplierId,
@@ -460,6 +471,10 @@ export async function paySupplier(
   return writeAction(
     db,
     async (w) => {
+      const duplicate = (await w.table('payments').get(input.paymentId)) as
+        | SyncedRow
+        | undefined;
+      if (duplicate) return duplicate;
       const payment: SyncedRow = {
         id: input.paymentId,
         direction: 'out',

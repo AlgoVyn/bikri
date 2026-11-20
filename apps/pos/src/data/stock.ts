@@ -3,7 +3,7 @@
  * REQ-C03); costed stock-in also moves the provisional avg / last cost (07 §7).
  */
 import { businessDate, mulDivRound, newId, nextAvgCost } from '@bikri/core';
-import type { BikriDb, MasterRow } from '@bikri/db';
+import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import type { LedgerContext } from './products.ts';
 import { type Writer, writeAction, writeScope } from './write.ts';
 
@@ -173,6 +173,12 @@ export async function adjustStock(
   return writeAction(
     db,
     async (w) => {
+      if (input.adjustmentId) {
+        const duplicate = (await w
+          .table('stock_movements')
+          .get(input.adjustmentId)) as SyncedRow | undefined;
+        if (duplicate) return duplicate;
+      }
       const product = await w
         .table<MasterRow, string>('products')
         .get(input.productId);
