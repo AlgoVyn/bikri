@@ -3,9 +3,9 @@ import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CloseIcon } from '../components/icons.tsx';
 
-const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-text/40';
+const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-scrim';
 const base =
-  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal border border-border bg-surface p-4 text-text shadow-modal';
 const SIZES = {
   normal: `${base} w-[min(32rem,calc(100%-2rem))]`,
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,
@@ -82,7 +82,9 @@ export function Modal({
             />
           ) : null}
           <div className="flex flex-wrap items-baseline justify-between gap-2 pe-12">
-            <Dialog.Title className="text-title">{title}</Dialog.Title>
+            <Dialog.Title className="text-title font-semibold">
+              {title}
+            </Dialog.Title>
             {header}
           </div>
           <Dialog.Close asChild>

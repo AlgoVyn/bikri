@@ -271,9 +271,6 @@ export function OverviewPage() {
                   {formatCount(usage.over_80.length, lang)}
                 </span>
               </div>
-              <p className="mt-0.5 text-small text-text-muted">
-                {t('admin.over_80_hint')}
-              </p>
               {usage.over_80.length === 0 ? (
                 <p className="mt-2 text-small text-text-muted">
                   {t('admin.over_80_none')}
@@ -286,7 +283,7 @@ export function OverviewPage() {
                       <li key={id}>
                         <a
                           href={adminHref(`/admin/tenants/${id}`)}
-                          className="flex min-h-9 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
+                          className="flex min-h-11 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
                         >
                           <span className="truncate">
                             {tenant?.display_name ?? id}
@@ -328,7 +325,7 @@ export function OverviewPage() {
                     <li key={row.id}>
                       <a
                         href={adminHref(`/admin/tenants/${row.id}`)}
-                        className="flex min-h-9 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
+                        className="flex min-h-11 items-center justify-between gap-2 rounded-control px-1 text-small font-medium text-primary hover:bg-surface-2"
                       >
                         <span className="truncate">{row.name}</span>
                         <span className="shrink-0 tabular-nums text-text-muted">
@@ -342,7 +339,7 @@ export function OverviewPage() {
             </section>
 
             {quiet ? (
-              <p className="flex items-center gap-2 pt-4 text-small font-medium text-success-subtle-ink">
+              <p className="flex items-center gap-2 pt-4 text-small font-medium text-success">
                 <span
                   aria-hidden="true"
                   className="size-2 rounded-full bg-success"

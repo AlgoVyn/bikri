@@ -11,25 +11,31 @@ export function PageHeader({
   actions,
   tone = 'bg-primary-subtle text-primary-subtle-ink',
   headingLevel = 'h1',
+  titleSize,
   hideTitleOnPhone = false,
   subtitleOnPhone = false,
 }: {
   icon?: ReactNode;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   tone?: string;
   headingLevel?: 'h1' | 'h2';
+  /** Keep the semantic level while matching a different visual scale. */
+  titleSize?: 'h1' | 'h2' | 'title';
   /** Shop list pages already show this title in the phone top bar. */
   hideTitleOnPhone?: boolean;
   /** Keep the subtitle below the phone top bar even when the title is hidden. */
   subtitleOnPhone?: boolean;
 }) {
   const Heading = headingLevel;
-  const titleSize =
-    headingLevel === 'h1'
+  const size = titleSize ?? (headingLevel === 'h1' ? 'h1' : 'h2');
+  const titleClass =
+    size === 'h1'
       ? `text-h1${hideTitleOnPhone ? ' max-lg:sr-only' : ''}`
-      : 'text-h2';
+      : size === 'title'
+        ? 'text-title'
+        : 'text-h2';
   return (
     <header className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start">
       <div className="flex min-w-0 items-start gap-3 md:flex-1">
@@ -43,7 +49,7 @@ export function PageHeader({
         ) : null}
         <div className="min-w-0 flex-1">
           <Heading
-            className={`text-balance ${titleSize} font-semibold tracking-[-0.01em]`}
+            className={`text-balance ${titleClass} font-semibold tracking-[-0.01em]`}
           >
             {title}
           </Heading>

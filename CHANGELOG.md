@@ -4,6 +4,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Visual design review fixes — 20 Nov 2026
+- Graphite overlays use a semantic dark scrim instead of the inverted `bg-text/40`, modal panels get a border, and the dark payment mix gives Credit a violet distinct from Card.
+- Command Palette rows span the dialog with the selected-row ink and a Lock icon; the Shops 768 px table fade is no longer reversed, and phone strips fade only an edge with hidden content.
+- Urdu times are bidi-isolated, the Product detail Urdu subtitle aligns with the title stack, and bundle names/components use the Latin face when needed; `bundle_count`/`bundle_sold` are pluralised in all three locales.
+- Settings keeps its `h2` semantics at the `h1` scale, Display aligns with its header and gets 44 px checkbox rows; Home's read-only card is a neutral action surface so the shell banner is the only amber warning, and Run the till uses three columns.
+- Desktop Sell actions return to the documented 48 px; bundle tiles use a shorter left label, component costs are labelled, and embedded Bill detail drops the duplicate Qty/On bill lines and trails More after quiet Print.
+- Product detail/form loading, router pending, page-level Admin error `h1` (tab errors keep the page heading), Backups error/inline manifest-error states and StatCard sizes, responsive `HourlyChart` labels, textarea padding, semantic step circles, card-title weights, rail geometry, token pairings, touch targets, toast placement and owner email/phone bidi isolation are fixed. The Product detail Urdu subtitle is now isolated in a page-direction paragraph, and the Reports active tab scrolls only its strip.
+
 ### CI security, tooling and docs hygiene — 20 Nov 2026 review, PR 8
 - `deploy.yml` no longer exposes `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` to `pnpm install` or `pnpm build`; both secrets are attached only to the four Cloudflare steps.
 - PR CI now runs `tools/check-migrations-safe.mjs` before build, so destructive D1 DDL is rejected before merge.

@@ -292,7 +292,7 @@ export function SupplierList({
                   aria-current={
                     row.supplier.id === selectedId ? 'page' : undefined
                   }
-                  className={`${SUPPLIER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
+                  className={`${SUPPLIER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle text-primary-subtle-ink' : 'border-s-transparent'}`}
                 >
                   <span className="col-span-2 min-w-0 sm:col-span-1">
                     <span className="block truncate font-medium">

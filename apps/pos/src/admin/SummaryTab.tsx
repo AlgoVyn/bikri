@@ -171,7 +171,7 @@ export function SummaryTab({
                 {t('admin.shop_name')}
               </dt>
               <dd className="font-medium">
-                {detail.shop_name ?? t('admin.setup_pending')}
+                {detail.shop_name ?? t('admin.shop_name_pending')}
               </dd>
             </div>
             <div>

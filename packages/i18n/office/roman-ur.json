@@ -130,6 +130,7 @@
       "change": "Baqaya {{amount}}",
       "recorded_late": "Der se darj · sale date {{date}} · {{staff}} ki taraf se. Wajah: {{reason}}",
       "bundle": "Bundle: {{name}}",
+      "bundle_label": "Bundle:",
       "totals_bundle_discount": "Bundle discount"
     },
     "void": {
@@ -196,6 +197,8 @@
       "title_plain": "Raqam wapas",
       "choose_reason": "Jaari rakhne ke liye wajah aur miqdar chunein.",
       "bundle_sold": "{{qty}} bundle bike",
+      "bundle_sold_one": "{{qty}} bundle bike",
+      "bundle_sold_other": "{{qty}} bundle bike",
       "bundle_already": "pehle {{qty}} wapas",
       "bundle_qty": "Wapas karne ke bundle",
       "bundle_restock": "Tamam {{count}} cheezein stock mein wapas dalein",

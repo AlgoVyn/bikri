@@ -33,12 +33,16 @@ export function PageActions({
   secondary,
   more = [],
   moreLabel,
+  primaryLast = true,
 }: {
   primary?: ReactNode;
   secondary?: ReactNode;
   more?: readonly PageActionItem[];
   /** Accessible name for the More trigger; falls back to the shared “More” label. */
   moreLabel?: string;
+  /** Desktop order: primary trails the secondaries and More (default). Set false
+   * when the primary is quiet inside a detail pane and More should trail it. */
+  primaryLast?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -108,7 +112,9 @@ export function PageActions({
   return (
     <div className="relative flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
       {primary !== undefined ? (
-        <div className="order-first md:order-last">{primary}</div>
+        <div className={`order-first ${primaryLast ? 'md:order-last' : ''}`}>
+          {primary}
+        </div>
       ) : null}
       {secondary}
       {more.length > 0 ? (

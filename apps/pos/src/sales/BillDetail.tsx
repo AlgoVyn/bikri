@@ -466,6 +466,7 @@ export function BillDetail({
           </>
         }
         more={moreActions}
+        primaryLast={!(embedded && masterDetailWide)}
       />
 
       {canVoid && blocker === 'same_day' ? (
@@ -605,9 +606,14 @@ export function BillDetail({
                       <tr className="border-b border-border bg-surface-2">
                         <td colSpan={7} className="p-2">
                           <span className="flex flex-wrap items-center gap-2 font-medium">
-                            {t('office.bill.bundle', {
-                              name: String(line.bundle_name ?? ''),
-                            })}
+                            <span>
+                              {t('office.bill.bundle_label')}{' '}
+                              <span
+                                className={`data-name ${isLatinName(String(line.bundle_name ?? '')) ? 'ltr-name' : ''}`}
+                              >
+                                {String(line.bundle_name ?? '')}
+                              </span>
+                            </span>
                             <span className="rounded-full bg-surface px-1.5 text-caption font-medium text-text-muted">
                               {t('sell.bundle_pill')}
                             </span>
@@ -631,30 +637,28 @@ export function BillDetail({
                         >
                           {String(line.name_snapshot)}
                         </span>
-                        <span
-                          className={
-                            embedded
-                              ? 'block text-text-muted'
-                              : 'block text-text-muted sm:hidden'
-                          }
-                        >
-                          {t('office.bill.qty_price', {
-                            qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
-                            price: money(Number(line.unit_price)),
-                          })}
-                        </span>
-                        <span
-                          className={
-                            embedded
-                              ? 'block text-small text-text-muted'
-                              : 'block text-small text-text-muted sm:hidden'
-                          }
-                        >
-                          {refundedMilli > 0
-                            ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
-                            : ''}
-                          {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
-                        </span>
+                        {embedded ? null : (
+                          <span className="block text-text-muted sm:hidden">
+                            {t('office.bill.qty_price', {
+                              qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
+                              price: money(Number(line.unit_price)),
+                            })}
+                          </span>
+                        )}
+                        {!embedded || refundedMilli > 0 ? (
+                          <span
+                            className={
+                              embedded
+                                ? 'block text-small text-text-muted'
+                                : 'block text-small text-text-muted sm:hidden'
+                            }
+                          >
+                            {refundedMilli > 0
+                              ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
+                              : ''}
+                            {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="p-2 text-start tabular-nums">
                         {qty / 1000} {t(`unit.${unit}`)}
@@ -721,7 +725,9 @@ export function BillDetail({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <section className="rounded-card border border-border bg-surface p-3 text-small">
-          <h2 className="mb-2 text-title">{t('office.bill.totals')}</h2>
+          <h2 className="mb-2 text-title font-semibold">
+            {t('office.bill.totals')}
+          </h2>
           <Row
             label={t('office.bill.totals_subtotal')}
             value={<MoneyText paisa={Number(sale.subtotal)} />}
@@ -788,7 +794,9 @@ export function BillDetail({
         </section>
 
         <section className="rounded-card border border-border bg-surface p-3 text-small">
-          <h2 className="mb-2 text-title">{t('office.bill.payments')}</h2>
+          <h2 className="mb-2 text-title font-semibold">
+            {t('office.bill.payments')}
+          </h2>
           {detail.payments.filter((p) => p.direction === 'in').length === 0 ? (
             <p className="text-text-muted">{t('office.bill.no_payments')}</p>
           ) : (
@@ -857,7 +865,9 @@ export function BillDetail({
 
       {detail.refunds.length > 0 ? (
         <section className="rounded-card border border-border bg-surface p-3 text-small">
-          <h2 className="mb-2 text-title">{t('office.bill.refunds')}</h2>
+          <h2 className="mb-2 text-title font-semibold">
+            {t('office.bill.refunds')}
+          </h2>
           <ul className="flex flex-col gap-3">
             {detail.refunds.map(({ refund, lines, staffName }) => (
               <li
@@ -916,7 +926,7 @@ export function BillDetail({
                 ) : null}
                 <button
                   type="button"
-                  className="mt-1 underline"
+                  className="mt-1 inline-flex min-h-11 items-center underline"
                   onClick={() => {
                     void queueRefundPrint(getDb(), String(refund.id), {
                       reprint: true,

@@ -239,10 +239,10 @@ export function DayClosePage() {
                 <span
                   className={
                     Number(closed.difference) === 0
-                      ? 'text-success-subtle-ink'
+                      ? 'text-success'
                       : Number(closed.difference) < 0
                         ? 'text-danger'
-                        : 'text-warning-subtle-ink'
+                        : 'text-warning'
                   }
                 >
                   {Number(closed.difference) === 0
@@ -500,10 +500,10 @@ export function DayClosePage() {
             <span
               className={
                 result.difference === 0
-                  ? 'text-success-subtle-ink'
+                  ? 'text-success'
                   : result.difference < 0
                     ? 'text-danger'
-                    : 'text-warning-subtle-ink'
+                    : 'text-warning'
               }
             >
               {result.difference === 0
@@ -552,9 +552,7 @@ export function DayClosePage() {
         </p>
       ) : null}
       {data.recentClose ? (
-        <p className="text-small text-warning-subtle-ink">
-          {t('office.dayclose.recent')}
-        </p>
+        <p className="text-small text-warning">{t('office.dayclose.recent')}</p>
       ) : null}
 
       <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur max-lg:bottom-tabbar xl:-mx-6 xl:px-6">
@@ -567,10 +565,10 @@ export function DayClosePage() {
                 blind
                   ? 'font-semibold text-text-muted'
                   : result.difference === 0
-                    ? 'font-semibold text-success-subtle-ink'
+                    ? 'font-semibold text-success'
                     : result.difference < 0
                       ? 'font-semibold text-danger'
-                      : 'font-semibold text-warning-subtle-ink'
+                      : 'font-semibold text-warning'
               }
             >
               {blind

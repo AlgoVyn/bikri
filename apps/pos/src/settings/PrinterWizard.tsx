@@ -30,7 +30,7 @@ type Answer = 'yes' | 'no' | null;
 const BAUDS = [9600, 19200, 38400, 115200] as const;
 
 const choice = (on: boolean) =>
-  `flex min-h-14 flex-1 flex-col items-start justify-center rounded-card border-2 p-3 text-start ${on ? 'border-primary bg-primary-subtle' : 'border-border bg-surface'}`;
+  `flex min-h-14 flex-1 flex-col items-start justify-center rounded-card border-2 p-3 text-start ${on ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`;
 
 /** Compact radio choice for options nested under a paper width. */
 const charsChoice = (on: boolean) =>

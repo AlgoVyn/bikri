@@ -52,7 +52,7 @@ function AboutContent() {
         </div>
       </section>
       <details className="rounded-card border border-border bg-surface p-4">
-        <summary className="cursor-pointer">
+        <summary className="min-h-11 cursor-pointer">
           <h2 className="inline text-title font-semibold">
             {t('office.about.terms')}
           </h2>

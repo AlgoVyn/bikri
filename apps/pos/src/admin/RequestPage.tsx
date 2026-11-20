@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { textareaClass } from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -58,7 +59,7 @@ function Field({
   className = '',
 }: {
   label: string;
-  value: string | number | null;
+  value: ReactNode;
   className?: string;
 }) {
   return (
@@ -194,7 +195,11 @@ export function RequestPage({ id }: { id: string }) {
       <PageHeader
         icon={<StoreIcon />}
         title={request.shop_name}
-        subtitle={`${request.owner_name} · ${request.email}`}
+        subtitle={
+          <>
+            {request.owner_name} · <bdi dir="ltr">{request.email}</bdi>
+          </>
+        }
         actions={
           <a href={adminHref('/admin/requests')} className={quietBtn}>
             {t('admin.request_back')}
@@ -236,8 +241,14 @@ export function RequestPage({ id }: { id: string }) {
               label={t('admin.request_owner')}
               value={request.owner_name}
             />
-            <Field label={t('admin.request_email')} value={request.email} />
-            <Field label={t('admin.request_phone')} value={request.phone} />
+            <Field
+              label={t('admin.request_email')}
+              value={<bdi dir="ltr">{request.email}</bdi>}
+            />
+            <Field
+              label={t('admin.request_phone')}
+              value={<bdi dir="ltr">{request.phone}</bdi>}
+            />
             <Field label={t('admin.request_city')} value={request.city} />
             <Field
               label={t('admin.request_business_type')}
@@ -503,7 +514,7 @@ export function RequestPage({ id }: { id: string }) {
         <label className="flex flex-col gap-1 text-small">
           <span>{t('admin.request_email_manual_note')}</span>
           <textarea
-            className={`${inputClass} min-h-20`}
+            className={`${textareaClass} min-h-20`}
             data-testid="request-email-manual-note"
             value={manualNote}
             maxLength={200}

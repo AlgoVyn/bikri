@@ -132,7 +132,12 @@ export function TenantPage({ id }: { id: string }) {
           </p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
             <span>
-              {t('admin.owner_email')}: {tenant.owner_email ?? t('admin.never')}
+              {t('admin.owner_email')}:{' '}
+              {tenant.owner_email ? (
+                <bdi dir="ltr">{tenant.owner_email}</bdi>
+              ) : (
+                t('admin.never')
+              )}
             </span>
             <span>
               {t('admin.devices_count', {

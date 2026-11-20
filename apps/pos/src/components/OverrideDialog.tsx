@@ -4,9 +4,9 @@ import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet, fieldClass } from './classes.ts';
 
-const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-text/40';
+const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-scrim';
 const contentClass =
-  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal border border-border bg-surface p-4 text-text shadow-modal';
 
 const PIN_PATTERN = /^\d{4,6}$/u;
 
@@ -82,7 +82,9 @@ export function OverrideDialog({
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content className={contentClass}>
-          <Dialog.Title className="text-title">{titleText}</Dialog.Title>
+          <Dialog.Title className="text-title font-semibold">
+            {titleText}
+          </Dialog.Title>
           <Dialog.Description>{bodyText}</Dialog.Description>
           <form
             className="flex flex-col gap-3"

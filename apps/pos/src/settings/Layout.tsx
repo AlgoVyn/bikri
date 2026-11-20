@@ -41,7 +41,11 @@ export function SettingsPageLayout({
       <div className={pageClass('standard', 'gap-6')}>
         <div className="grid gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] xl:items-start">
           <div className="hidden min-w-0 xl:block">
-            <SettingsNav activePath={activePath} headingLevel="h2" />
+            <SettingsNav
+              activePath={activePath}
+              headingLevel="h2"
+              titleSize="h1"
+            />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
             <SubpageHeader

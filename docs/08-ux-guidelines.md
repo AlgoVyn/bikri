@@ -157,8 +157,8 @@ Shop screens use one of the four widths below through `pageClass()`; `MasterDeta
 | Width | Class | Used by |
 |---|---|---|
 | Focused | 896 px | setup, enrol, lock, single-column forms |
-| Standard | 1152 px | Home, lists, statements, reports, expenses, day close, forms with line items |
-| Wide | 1440 px | Settings master–detail |
+| Standard | 1152 px | Home, lists, statements, reports, expenses, day close, forms with line items, Settings index/section pages |
+| Wide | 1440 px | Reserved for a future single wide column; no current screen |
 | Workspace | 1720 px | list + detail workspaces (`MasterDetail`) |
 
 Widths are explicit pixels because the document root is 15 px, so Tailwind's `max-w-6xl` would resolve to 1080 px, not 1152 px.

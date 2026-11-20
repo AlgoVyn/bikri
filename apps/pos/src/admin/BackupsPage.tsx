@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CloudIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
-import { useToast } from '../components/Toast.tsx';
 import { adminErrorMessage, listBackups, readBackupManifest } from './api.ts';
 import {
   formatBytes,
@@ -12,7 +11,7 @@ import {
   manifestKeyFor,
 } from './format.ts';
 import type { BackupManifest, BackupObject } from './types.ts';
-import { Panel, StatCard } from './ui.tsx';
+import { AdminErrorState, Panel, quietBtn, StatCard } from './ui.tsx';
 
 type Row = BackupObject & { manifest: BackupManifest | null | undefined };
 
@@ -36,12 +35,19 @@ function manifestTotals(manifest: BackupManifest | null | undefined): {
 
 export function BackupsPage() {
   const { t, i18n } = useTranslation();
-  const toast = useToast();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const lang = i18n.language;
+  const retryLoad = () => {
+    setError(null);
+    setRetry((value) => value + 1);
+  };
 
   useEffect(() => {
+    // `retry` is only a trigger; reading it keeps the dependency honest.
+    void retry;
+    setError(null);
     let cancelled = false;
     void listBackups()
       .then(async (list) => {
@@ -67,17 +73,15 @@ export function BackupsPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const message = adminErrorMessage(err, t('admin.err_generic'));
-        setError(message);
-        toast.push(message, 'error');
+        setError(adminErrorMessage(err, t('admin.err_generic')));
       });
     return () => {
       cancelled = true;
     };
-  }, [t, toast]);
+  }, [t, retry]);
 
   if (error !== null && rows === null) {
-    return <p className="text-text-muted">{error}</p>;
+    return <AdminErrorState message={error} onRetry={retryLoad} />;
   }
   if (rows === null) return <p className="sr-only">{t('common.loading')}</p>;
 
@@ -91,6 +95,19 @@ export function BackupsPage() {
         title={t('admin.backups_title')}
         subtitle={t('admin.backups_subtitle')}
       />
+
+      {error !== null ? (
+        <div
+          role="alert"
+          data-testid="backups-error"
+          className="flex flex-wrap items-center gap-3 rounded-card border border-danger-subtle bg-danger-subtle p-3 text-small text-danger-subtle-ink"
+        >
+          <p className="min-w-0 flex-1">{error}</p>
+          <button type="button" className={quietBtn} onClick={retryLoad}>
+            {t('admin.retry')}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex items-start gap-3 rounded-card border border-info-subtle bg-info-subtle p-4 text-info-subtle-ink">
         <span
@@ -113,7 +130,6 @@ export function BackupsPage() {
               ? t('admin.never')
               : formatWhen(latest.uploaded, lang)
           }
-          compact
         />
         <StatCard
           label={t('admin.backup_count')}
@@ -173,7 +189,7 @@ export function BackupsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <a
-                        className="inline-flex min-h-9 items-center rounded-control border border-border-strong bg-surface px-3 font-medium text-text hover:bg-surface-2"
+                        className="inline-flex min-h-11 items-center rounded-control border border-border-strong bg-surface px-3 font-medium text-text hover:bg-surface-2"
                         href={`${API_BASE}/admin/backups/download?key=${encodeURIComponent(row.key)}`}
                       >
                         {t('admin.download')}

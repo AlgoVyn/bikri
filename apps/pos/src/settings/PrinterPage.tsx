@@ -163,7 +163,7 @@ export function PrinterPage() {
         className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4"
         aria-labelledby="printer-status"
       >
-        <h2 id="printer-status" className="font-semibold">
+        <h2 id="printer-status" className="text-title font-semibold">
           {t('printer.status')}
         </h2>
         <p data-testid="printer-summary">
@@ -265,7 +265,7 @@ export function PrinterPage() {
           className="flex flex-col gap-1 rounded-card border border-border bg-surface p-4"
           aria-labelledby="printer-options"
         >
-          <h2 id="printer-options" className="font-semibold">
+          <h2 id="printer-options" className="text-title font-semibold">
             {t('printer.options')}
           </h2>
           <Toggle
@@ -344,7 +344,7 @@ export function PrinterPage() {
         aria-labelledby="recent-prints"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 id="recent-prints" className="font-semibold">
+          <h2 id="recent-prints" className="text-title font-semibold">
             {t('printer.recent')}
           </h2>
           {queued > 0 ? (

@@ -2,7 +2,11 @@ import { API_BASE, BASE_PATH } from '@bikri/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
-import { buttonPrimary, fieldClass } from '../components/classes.ts';
+import {
+  buttonPrimary,
+  fieldClass,
+  textareaClass,
+} from '../components/classes.ts';
 import { StoreIcon } from '../components/icons.tsx';
 import { LanguageSelect } from '../components/LanguageSelect.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
@@ -199,7 +203,7 @@ function RequestShop() {
             <span>{t('register.note')}</span>
             <textarea
               data-testid="register-note"
-              className={`${fieldClass} min-h-24 resize-y`}
+              className={`${textareaClass} min-h-24 resize-y`}
               maxLength={500}
               value={form.note}
               onChange={(event) => set('note', event.target.value)}
@@ -230,7 +234,7 @@ function RequestShop() {
       <p className="text-center text-small text-text-muted">
         {t('register.already_have_code')}{' '}
         <a
-          className="text-primary underline underline-offset-2"
+          className="inline-flex min-h-11 items-center text-primary underline underline-offset-2"
           href={`${BASE_PATH}/enrol`}
         >
           {t('register.connect_device')}

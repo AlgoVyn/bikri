@@ -285,7 +285,7 @@ export function TenantsPage() {
               </div>
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-linear-to-r from-surface to-transparent rtl:bg-linear-to-l lg:hidden"
+                className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-linear-to-l from-surface to-transparent rtl:bg-linear-to-r lg:hidden"
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">

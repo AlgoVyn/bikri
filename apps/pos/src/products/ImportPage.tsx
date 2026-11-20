@@ -153,6 +153,11 @@ export function ImportPage() {
             (stage.step === 'done'
               ? 3
               : ['choose', 'map', 'preview', 'importing'].indexOf(stage.step));
+          const circleTone = active
+            ? 'bg-primary-ink/15'
+            : done
+              ? 'bg-success/15'
+              : 'bg-surface-2';
           return (
             <li
               key={s}
@@ -165,7 +170,9 @@ export function ImportPage() {
                     : 'border-border bg-surface text-text-muted'
               }`}
             >
-              <span className="flex size-5 items-center justify-center rounded-full bg-white/20 text-caption font-semibold">
+              <span
+                className={`flex size-5 items-center justify-center rounded-full ${circleTone} text-caption font-semibold`}
+              >
                 {done ? <CheckIcon className="size-3.5" /> : i + 1}
               </span>
               {t(`import.step_${s}`)}

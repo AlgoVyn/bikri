@@ -98,6 +98,9 @@
   --color-info-subtle: #f0f9ff;
   --color-info-subtle-ink: #00497a;
   --color-focus: #006bb3;
+  /* Modal/search backdrops. The scrim stays dark in both themes; `bg-text/40`
+     inverted to off-white fog in Graphite (D-217). */
+  --color-scrim: rgb(15 23 42 / 0.4);
   --color-tile-ink: #ffffff;
   --color-t1: #006bb3;
   --color-t2: #182e55;
@@ -160,8 +163,10 @@
   --dark-rail-active-bg: rgb(255 255 255 / 0.1);
   --dark-rail-active-ink: #e8eef6;
   --dark-brand-mark: #e8eef6;
-  --dark-chart-udhaar: #4bc2bf;
+  /* Distinct from Card (#4BC2BF) and Cash (#5EA5D4) in the dark payment mix. */
+  --dark-chart-udhaar: #a78bfa;
   --dark-focus: #5ea5d4;
+  --dark-scrim: rgb(0 0 0 / 0.65);
   /* Elevation in dark comes from lighter surfaces; drop shadows only stay on modals. */
   --dark-shadow-card: none;
   --dark-shadow-card-hover: none;
@@ -216,6 +221,7 @@
   --color-info-subtle-ink: var(--dark-info-subtle-ink);
   --color-chart-udhaar: var(--dark-chart-udhaar);
   --color-focus: var(--dark-focus);
+  --color-scrim: var(--dark-scrim);
   --shadow-card: var(--dark-shadow-card);
   --shadow-card-hover: var(--dark-shadow-card-hover);
   --shadow-topbar: var(--dark-shadow-topbar);
@@ -265,6 +271,7 @@
     --color-info-subtle-ink: var(--dark-info-subtle-ink);
     --color-chart-udhaar: var(--dark-chart-udhaar);
     --color-focus: var(--dark-focus);
+    --color-scrim: var(--dark-scrim);
     --shadow-card: var(--dark-shadow-card);
     --shadow-card-hover: var(--dark-shadow-card-hover);
     --shadow-topbar: var(--dark-shadow-topbar);

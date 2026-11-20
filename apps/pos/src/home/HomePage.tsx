@@ -405,6 +405,7 @@ export function HomePage() {
 
       {data &&
       role === 'owner' &&
+      !readOnly &&
       data.products > 0 &&
       !onboardingDismissed &&
       !(data.products > 0 && data.printer && data.salesCount > 0) ? (
@@ -468,7 +469,7 @@ export function HomePage() {
             </div>
           </section>
           <div className="flex flex-col gap-6">
-            <QuickActions tiles={runTiles} label="home.run_till" columns={2} />
+            <QuickActions tiles={runTiles} label="home.run_till" columns={3} />
             <QuickActions tiles={manageTiles} label="home.manage" />
           </div>
           <RecentBillsCard data={data} timeText={timeText} />
@@ -479,7 +480,7 @@ export function HomePage() {
             {readOnly ? (
               <section
                 aria-labelledby="read-only-heading"
-                className="order-1 flex flex-col gap-3 rounded-card border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-ink shadow-card"
+                className="order-1 flex flex-col gap-3 rounded-card border border-border bg-surface p-4 text-text shadow-card"
               >
                 <div className="flex items-start gap-3">
                   <span
@@ -495,7 +496,9 @@ export function HomePage() {
                     >
                       {t('home.read_only_title')}
                     </h2>
-                    <p className="sr-only">{t('home.read_only_hint')}</p>
+                    <p className="mt-0.5 text-small">
+                      {t('home.read_only_hint')}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -530,7 +533,7 @@ export function HomePage() {
               <QuickActions
                 tiles={runTiles}
                 label="home.run_till"
-                columns={2}
+                columns={3}
               />
               <QuickActions tiles={manageTiles} label="home.manage" />
             </div>
@@ -575,7 +578,7 @@ export function HomePage() {
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-white/5"
+                  className="pointer-events-none absolute -end-8 -top-12 size-40 rounded-full bg-rail-hover"
                 />
                 <span
                   aria-hidden="true"
@@ -933,7 +936,10 @@ function RegisterCard({
         </button>
         {lastWhen ? (
           <p className="ms-auto min-w-0 truncate text-small text-text-muted">
-            {t('home.last_bill', { time: lastWhen })}
+            {t('home.last_bill_label')}{' '}
+            <bdi dir="ltr" className="tabular-nums">
+              {lastWhen}
+            </bdi>
           </p>
         ) : null}
       </div>
@@ -1089,9 +1095,9 @@ function attentionKey(kind: string): string {
 
 function attentionTone(item: AttentionItem): string {
   if (item.kind === 'sync_stale')
-    return item.severe ? 'text-danger' : 'text-warning-subtle-ink';
+    return item.severe ? 'text-danger' : 'text-warning';
   if (item.kind === 'clock_wrong' || item.kind === 'sync_pending_old')
-    return 'text-warning-subtle-ink';
+    return 'text-warning';
   return '';
 }
 

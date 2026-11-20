@@ -18,7 +18,7 @@ import { useToast } from '../components/Toast.tsx';
 import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 
 const dialogClass =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border-0 bg-surface p-4 text-text shadow-modal backdrop:bg-text/40';
+  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border border-border bg-surface p-4 text-text shadow-modal backdrop:bg-scrim';
 
 /** Native dialog so the operator pages do not pull Radix into the till bundle. */
 export function Modal({
@@ -72,7 +72,7 @@ export function Modal({
         event.preventDefault();
       }}
     >
-      <h2 id={titleId} className="text-title">
+      <h2 id={titleId} className="text-title font-semibold">
         {title}
       </h2>
       {description !== undefined ? <p id={bodyId}>{description}</p> : null}
@@ -222,6 +222,7 @@ export function Panel({
   children,
   className = '',
   bodyClassName = 'p-4',
+  headingLevel = 'h2',
 }: {
   title?: string;
   description?: string;
@@ -229,8 +230,10 @@ export function Panel({
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  headingLevel?: 'h1' | 'h2';
 }) {
   const id = useId();
+  const Heading = headingLevel;
   return (
     <section
       className={`rounded-card border border-border bg-surface shadow-card ${className}`}
@@ -239,9 +242,9 @@ export function Panel({
       {title !== undefined ? (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <h2 id={id} className="text-title font-semibold">
+            <Heading id={id} className="text-title font-semibold">
               {title}
-            </h2>
+            </Heading>
             {description !== undefined ? (
               <p className="mt-0.5 text-small text-text-muted">{description}</p>
             ) : null}
@@ -260,14 +263,18 @@ export function Panel({
 export function AdminErrorState({
   message,
   onRetry,
+  headingLevel = 'h1',
 }: {
   message: string;
   onRetry: () => void;
+  /** Page-level errors own the h1; tab-level errors keep the page h1. */
+  headingLevel?: 'h1' | 'h2';
 }) {
   const { t } = useTranslation();
   return (
     <Panel
       title={t('admin.err_title')}
+      headingLevel={headingLevel}
       actions={
         <button type="button" className={buttonPrimary} onClick={onRetry}>
           {t('admin.retry')}
