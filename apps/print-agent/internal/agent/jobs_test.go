@@ -77,6 +77,20 @@ func validRequest() JobRequest {
 	}
 }
 
+func TestManagerMarksSynchronousPrintDone(t *testing.T) {
+	// Driver-mode Windows (and CUPS without a request id) return no spool id after
+	// the document has already been accepted; the till must not poll and wait.
+	fake := &fakeBackend{spoolID: ""}
+	manager := NewManager(fake)
+	job, err := manager.Submit(context.Background(), validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "done" {
+		t.Fatalf("job = %+v", job)
+	}
+}
+
 func TestManagerSubmitIsIdempotent(t *testing.T) {
 	fake := &fakeBackend{spoolID: "42", status: backend.Status{State: "done"}}
 	manager := NewManager(fake)

@@ -5,15 +5,12 @@ package backend
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
-	"os/exec"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -44,15 +41,17 @@ var (
 	winspool = syscall.NewLazyDLL("winspool.drv")
 	gdi32    = syscall.NewLazyDLL("gdi32.dll")
 
-	procOpenPrinterW     = winspool.NewProc("OpenPrinterW")
-	procClosePrinter     = winspool.NewProc("ClosePrinter")
-	procStartDocPrinterW = winspool.NewProc("StartDocPrinterW")
-	procStartPagePrinter = winspool.NewProc("StartPagePrinter")
-	procWritePrinter     = winspool.NewProc("WritePrinter")
-	procEndPagePrinter   = winspool.NewProc("EndPagePrinter")
-	procEndDocPrinter    = winspool.NewProc("EndDocPrinter")
-	procGetJobW          = winspool.NewProc("GetJobW")
-	procSetJobW          = winspool.NewProc("SetJobW")
+	procOpenPrinterW      = winspool.NewProc("OpenPrinterW")
+	procClosePrinter      = winspool.NewProc("ClosePrinter")
+	procStartDocPrinterW  = winspool.NewProc("StartDocPrinterW")
+	procStartPagePrinter  = winspool.NewProc("StartPagePrinter")
+	procWritePrinter      = winspool.NewProc("WritePrinter")
+	procEndPagePrinter    = winspool.NewProc("EndPagePrinter")
+	procEndDocPrinter     = winspool.NewProc("EndDocPrinter")
+	procGetJobW           = winspool.NewProc("GetJobW")
+	procSetJobW           = winspool.NewProc("SetJobW")
+	procEnumPrintersW     = winspool.NewProc("EnumPrintersW")
+	procGetDefaultPrinter = winspool.NewProc("GetDefaultPrinterW")
 
 	procCreateDCW     = gdi32.NewProc("CreateDCW")
 	procDeleteDC      = gdi32.NewProc("DeleteDC")
@@ -122,6 +121,12 @@ type bitmapInfoHeader struct {
 	biClrImportant  uint32
 }
 
+type printerInfo4 struct {
+	pPrinterName *uint16
+	pServerName  *uint16
+	attributes   uint32
+}
+
 func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	b.printersMu.Lock()
 	if b.printers != nil && time.Since(b.printersAt) < 10*time.Second {
@@ -142,59 +147,88 @@ func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	return list, nil
 }
 
-// listWindowsPrinters asks the OS through CIM instead of parsing EnumPrinters
-// buffers with unsafe pointers. Printer enumeration must never be able to take
-// the agent down; a crashed health check on Windows is worse than a slow one.
+// listWindowsPrinters asks the spooler directly. The old PowerShell/CIM probe took
+// 0.5-2.5 s on a shop PC and ran again whenever the 10 s cache expired, stalling
+// every receipt; EnumPrintersW is a local call and finishes in well under 20 ms.
 func listWindowsPrinters(ctx context.Context) ([]Printer, error) {
-	const script = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; ConvertTo-Json -Compress -InputObject @(Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default)`
-	cmd := exec.CommandContext(
-		ctx,
-		"powershell.exe",
-		"-NoProfile",
-		"-NonInteractive",
-		"-Command",
-		script,
-	)
-	// The agent is a GUI-subsystem process; do not flash a console window for
-	// every printer-list refresh.
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	out, err := cmd.Output()
-	if err != nil {
-		detail := err.Error()
-		if exit, ok := err.(*exec.ExitError); ok && len(exit.Stderr) > 0 {
-			detail = strings.TrimSpace(string(exit.Stderr))
-		}
-		return nil, &Error{Code: "SPOOL_ERROR", Message: detail}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	text := strings.TrimSpace(string(out))
-	text = strings.TrimPrefix(text, "\ufeff")
-	if text == "" || text == "null" {
+	const errorInsufficientBuffer = 122
+	flags := uint32(printerEnumLocal | printerEnumConnections)
+	var needed, returned uint32
+	r1, _, callErr := procEnumPrintersW.Call(
+		uintptr(flags),
+		0,
+		4,
+		0,
+		0,
+		uintptr(unsafe.Pointer(&needed)),
+		uintptr(unsafe.Pointer(&returned)),
+	)
+	if r1 == 0 && errorNumberOf(callErr) != errorInsufficientBuffer {
+		return nil, &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+	}
+	if needed == 0 {
 		return []Printer{}, nil
 	}
-	var rows []struct {
-		Name    string `json:"Name"`
-		Default bool   `json:"Default"`
+	buf := make([]byte, needed)
+	r1, _, callErr = procEnumPrintersW.Call(
+		uintptr(flags),
+		0,
+		4,
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(needed),
+		uintptr(unsafe.Pointer(&needed)),
+		uintptr(unsafe.Pointer(&returned)),
+	)
+	if r1 == 0 {
+		return nil, &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
-	if err := json.Unmarshal([]byte(text), &rows); err != nil {
-		// ConvertTo-Json emits a single object if a future PowerShell version
-		// ignores the array wrapper.
-		var one struct {
-			Name    string `json:"Name"`
-			Default bool   `json:"Default"`
-		}
-		if json.Unmarshal([]byte(text), &one) != nil {
-			return nil, &Error{Code: "SPOOL_ERROR", Message: "could not read the printer list"}
-		}
-		rows = append(rows, one)
+	entrySize := int(unsafe.Sizeof(printerInfo4{}))
+	if int(returned)*entrySize > len(buf) {
+		return nil, &Error{Code: "SPOOL_ERROR", Message: "the spooler returned an invalid printer list"}
 	}
-	printers := make([]Printer, 0, len(rows))
-	for _, row := range rows {
-		if strings.TrimSpace(row.Name) == "" {
+	defaultName := defaultPrinterName()
+	printers := make([]Printer, 0, returned)
+	for i := 0; i < int(returned); i++ {
+		info := (*printerInfo4)(unsafe.Pointer(&buf[i*entrySize]))
+		name := utf16PtrString(info.pPrinterName)
+		if name == "" {
 			continue
 		}
-		printers = append(printers, Printer{Name: row.Name, IsDefault: row.Default})
+		printers = append(printers, Printer{Name: name, IsDefault: name == defaultName})
+	}
+	// utf16PtrString copied every name; the buffer can be released now.
+	runtime.KeepAlive(buf)
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return printers, nil
+}
+
+func defaultPrinterName() string {
+	var needed uint32
+	r1, _, _ := procGetDefaultPrinter.Call(0, uintptr(unsafe.Pointer(&needed)))
+	if r1 == 0 || needed == 0 {
+		return ""
+	}
+	buf := make([]uint16, needed)
+	r1, _, _ = procGetDefaultPrinter.Call(
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(unsafe.Pointer(&needed)),
+	)
+	if r1 == 0 {
+		return ""
+	}
+	return syscall.UTF16ToString(buf)
+}
+
+func errorNumberOf(err error) uint32 {
+	if errno, ok := err.(syscall.Errno); ok {
+		return uint32(errno)
+	}
+	return 0
 }
 
 func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
@@ -389,19 +423,13 @@ func (b *windowsBackend) printImage(job Job) error {
 	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Src)
 	width := rgba.Bounds().Dx()
 	height := rgba.Bounds().Dy()
-	// Bottom-up BGRA DIB for StretchDIBits.
-	bits := make([]byte, width*height*4)
-	for y := 0; y < height; y++ {
-		src := (height - 1 - y) * rgba.Stride
-		dst := y * width * 4
-		for x := 0; x < width; x++ {
-			o := src + x*4
-			bits[dst+x*4+0] = rgba.Pix[o+2]
-			bits[dst+x*4+1] = rgba.Pix[o+1]
-			bits[dst+x*4+2] = rgba.Pix[o+0]
-			bits[dst+x*4+3] = 0
-		}
+	// StretchDIBits reads 32-bit BGRA. Swap R and B in place and pass a top-down
+	// DIB (negative height), so the old bottom-up copy - a third full-size bitmap,
+	// up to 192 MB across the three - is not allocated.
+	for i := 0; i+3 < len(rgba.Pix); i += 4 {
+		rgba.Pix[i], rgba.Pix[i+2] = rgba.Pix[i+2], rgba.Pix[i]
 	}
+	bits := rgba.Pix
 	printerName, err := syscall.UTF16PtrFromString(job.Printer)
 	if err != nil {
 		return &Error{Code: "UNKNOWN_PRINTER", Message: err.Error()}
@@ -452,7 +480,7 @@ func (b *windowsBackend) printImage(job Job) error {
 		bmi := bitmapInfoHeader{
 			biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
 			biWidth:       int32(width),
-			biHeight:      int32(height),
+			biHeight:      -int32(height),
 			biPlanes:      1,
 			biBitCount:    32,
 			biCompression: 0, // BI_RGB

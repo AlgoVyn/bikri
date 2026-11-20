@@ -168,7 +168,12 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 	}
 	m.mu.Lock()
 	rec.spoolID = spoolID
-	if rec.Status == "received" {
+	if spoolID == "" {
+		// Driver-mode Windows and some CUPS queues finish synchronously and return
+		// no spool id. There is nothing to poll; reporting "spooled" made the till
+		// sleep 400 ms and then ask for a status that was already done.
+		rec.Status = "done"
+	} else if rec.Status == "received" {
 		rec.Status = "spooled"
 	}
 	rec.UpdatedAt = m.now().UnixMilli()
