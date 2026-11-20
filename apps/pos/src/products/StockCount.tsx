@@ -2,7 +2,7 @@ import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useId, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -22,14 +22,20 @@ import {
   type CountScope,
   discardCount,
   finishCount,
+  flushCountDraft,
   loadCountDraft,
   startCount,
   updateCount,
 } from '../data/stock.ts';
 import { beep } from '../sell/beep.ts';
+import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { isLatinName } from './format.ts';
+
+const ROW_PX_WIDE = 72;
+const ROW_PX_PHONE = 136;
+const OVERSCAN = 8;
 
 /** Stock count (screens/09): scope → counted list → Finish count. */
 export function StockCountPage() {
@@ -37,15 +43,10 @@ export function StockCountPage() {
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
-  const draft = useLiveQuery(() => loadCountDraft(getDb()), []);
-  const products = useLiveQuery(async () => {
-    const d = await loadCountDraft(getDb());
-    if (!d) return [] as MasterRow[];
-    const rows = await getDb().products.bulkGet(Object.keys(d.expected));
-    return rows
-      .filter((p): p is MasterRow => Boolean(p))
-      .sort((a, b) => String(a.name_en).localeCompare(String(b.name_en)));
-  }, [draft?.started_at]);
+  const wide = useMediaQuery('(min-width: 640px)');
+  const stored = useLiveQuery(() => loadCountDraft(getDb()), []);
+  const [draft, setDraft] = useState<CountDraft | null | undefined>(undefined);
+  const [products, setProducts] = useState<MasterRow[] | null>(null);
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [scopeKind, setScopeKind] = useState<CountScope['kind']>('all');
   const [categoryId, setCategoryId] = useState('');
@@ -53,16 +54,75 @@ export function StockCountPage() {
   const [scan, setScan] = useState('');
   const scanId = useId();
 
+  // The live query is the cross-tab/initial source; our own edits update `draft`
+  // synchronously so a scan or +1 never waits for the debounced kv write.
+  useEffect(() => {
+    if (stored === undefined) return;
+    setDraft((current) => {
+      if (current === undefined) return stored;
+      if (stored === null) return null;
+      if (current?.started_at !== stored.started_at) return stored;
+      return current;
+    });
+  }, [stored]);
+
+  // Load the products once per count. Do not read db.kv inside this query: Dexie's
+  // liveQuery would then subscribe it to every draft write and reload 5,000 rows +
+  // sort after each +1 tap. The expected set is frozen when the count starts;
+  // `started_at` identifies it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload only for a new count
+  useEffect(() => {
+    if (draft === undefined) return;
+    if (draft === null) {
+      setProducts([]);
+      return;
+    }
+    let alive = true;
+    void (async () => {
+      const rows = await getDb().products.bulkGet(Object.keys(draft.expected));
+      if (!alive) return;
+      setProducts(
+        rows
+          .filter((p): p is MasterRow => Boolean(p))
+          .sort((a, b) => String(a.name_en).localeCompare(String(b.name_en))),
+      );
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [draft?.started_at]);
+
+  // A hidden tab or a route change must not lose the last few debounced taps.
+  useEffect(() => {
+    const db = getDb();
+    const flush = () => {
+      void flushCountDraft(db).catch(() => undefined);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, []);
+
+  const setCounted = useCallback(async (id: string, milli: number | null) => {
+    const updated = await updateCount(getDb(), id, () => milli);
+    if (updated) setDraft(updated);
+  }, []);
+  const onCounted = useCallback(
+    (id: string, milli: number | null) => {
+      void setCounted(id, milli);
+    },
+    [setCounted],
+  );
+
   if (!can('stock.adjust') || readOnly) return <Navigate to="/" replace />;
   if (draft === undefined) return null;
-
-  const setCounted = async (
-    _d: CountDraft,
-    id: string,
-    milli: number | null,
-  ) => {
-    await updateCount(getDb(), id, () => milli);
-  };
 
   if (!draft) {
     return (
@@ -139,8 +199,11 @@ export function StockCountPage() {
   const counted = Object.keys(draft.counted).length;
   const finish = async () => {
     try {
+      await flushCountDraft(getDb());
       const ctx = await ledgerContext(getDb(), staff?.id ?? '');
       const r = await finishCount(getDb(), draft, { zeroUncounted: zero }, ctx);
+      setDraft(null);
+      setProducts([]);
       toast.push(t('count.finished', { count: r.movements }), 'info');
     } catch {
       toast.push(t('count.save_failed'), 'error');
@@ -153,7 +216,12 @@ export function StockCountPage() {
       return;
     }
     beep();
-    await updateCount(getDb(), product.id, (current) => (current ?? 0) + 1000);
+    const updated = await updateCount(
+      getDb(),
+      product.id,
+      (current) => (current ?? 0) + 1000,
+    );
+    if (updated) setDraft(updated);
   };
 
   return (
@@ -188,71 +256,16 @@ export function StockCountPage() {
           autoComplete="off"
         />
       </form>
-      <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
-        {products?.map((p) => {
-          const unit = String(p.unit ?? 'pc') as QtyUnit;
-          const expected = draft.expected[p.id] ?? 0;
-          const value = Object.hasOwn(draft.counted, p.id)
-            ? (draft.counted[p.id] ?? 0)
-            : null;
-          const diff = value === null ? null : value - expected;
-          return (
-            <li
-              key={p.id}
-              data-testid="count-row"
-              className="flex flex-col gap-2 p-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem_minmax(11rem,13rem)_6rem] sm:items-start sm:gap-3"
-            >
-              <span
-                className={`data-name font-medium ${isLatinName(String(p.name_en)) ? 'ltr-name' : ''}`}
-              >
-                {String(p.name_en)}
-              </span>
-              <span className="flex items-baseline gap-2 text-small sm:block">
-                <span className="text-text-muted sm:mb-1 sm:block">
-                  {t('count.expected')}
-                </span>
-                <bdi
-                  dir="ltr"
-                  className="font-mono sm:flex sm:h-9 sm:items-center"
-                  data-testid="count-expected"
-                >
-                  {formatQtyFromMilli(expected, unit)}
-                </bdi>
-              </span>
-              <QtyInput
-                dense
-                label={t('count.counted')}
-                ariaLabel={t('count.counted_for', { name: String(p.name_en) })}
-                unit={unit}
-                value={value}
-                onChange={(v) => void setCounted(draft, p.id, v)}
-              />
-              <span className="flex items-baseline gap-2 text-small sm:block">
-                <span className="text-text-muted sm:mb-1 sm:block">
-                  {t('count.difference')}
-                </span>
-                <bdi
-                  dir="ltr"
-                  className={`font-mono sm:flex sm:h-9 sm:items-center ${
-                    diff === null
-                      ? ''
-                      : diff < 0
-                        ? 'text-danger'
-                        : diff > 0
-                          ? 'text-success'
-                          : ''
-                  }`}
-                  data-testid="count-diff"
-                >
-                  {diff === null
-                    ? '—'
-                    : `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${formatQtyFromMilli(Math.abs(diff), unit)}`}
-                </bdi>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      {products === null ? (
+        <p className="text-text-muted">{t('common.loading')}</p>
+      ) : (
+        <VirtualCountRows
+          rows={products}
+          draft={draft}
+          wide={wide}
+          onChange={onCounted}
+        />
+      )}
       <label className="flex min-h-11 items-center gap-2">
         <input
           type="checkbox"
@@ -272,7 +285,12 @@ export function StockCountPage() {
         <button
           type="button"
           className={buttonQuiet}
-          onClick={() => void discardCount(getDb())}
+          onClick={() => {
+            void discardCount(getDb()).then(() => {
+              setDraft(null);
+              setProducts([]);
+            });
+          }}
         >
           {t('count.discard')}
         </button>
@@ -280,3 +298,194 @@ export function StockCountPage() {
     </div>
   );
 }
+
+/** Window-scrolled list: only the rows near the viewport are mounted (5,000 products). */
+function VirtualCountRows({
+  rows,
+  draft,
+  wide,
+  onChange,
+}: {
+  rows: readonly MasterRow[];
+  draft: CountDraft;
+  wide: boolean;
+  onChange: (id: string, milli: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const rowPx = wide ? ROW_PX_WIDE : ROW_PX_PHONE;
+  const ref = useRef<HTMLUListElement>(null);
+  const [range, setRange] = useState({ start: 0, end: 40 });
+  useEffect(() => {
+    const update = () => {
+      const list = ref.current;
+      if (!list) return;
+      const top = list.getBoundingClientRect().top;
+      const start = Math.max(0, Math.floor(-top / rowPx) - OVERSCAN);
+      const end = Math.min(
+        rows.length,
+        Math.max(
+          start + 1,
+          Math.ceil((window.innerHeight - top) / rowPx) + OVERSCAN,
+        ),
+      );
+      setRange((current) =>
+        current.start === start && current.end === end
+          ? current
+          : { start, end },
+      );
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [rows.length, rowPx]);
+  const visible = rows.slice(range.start, range.end);
+  return (
+    <ul
+      ref={ref}
+      className="relative rounded-card border border-border bg-surface"
+      style={{ height: rows.length * rowPx }}
+      aria-label={t('count.title')}
+    >
+      {visible.map((product, index) => (
+        <CountRow
+          key={product.id}
+          product={product}
+          expected={draft.expected[product.id] ?? 0}
+          value={
+            Object.hasOwn(draft.counted, product.id)
+              ? (draft.counted[product.id] ?? 0)
+              : null
+          }
+          position={range.start + index}
+          setSize={rows.length}
+          rowPx={rowPx}
+          wide={wide}
+          onChange={onChange}
+        />
+      ))}
+    </ul>
+  );
+}
+
+const CountRow = memo(function CountRow({
+  product,
+  expected,
+  value,
+  position,
+  setSize,
+  rowPx,
+  wide,
+  onChange,
+}: {
+  product: MasterRow;
+  expected: number;
+  value: number | null;
+  position: number;
+  setSize: number;
+  rowPx: number;
+  wide: boolean;
+  onChange: (id: string, milli: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const unit = String(product.unit ?? 'pc') as QtyUnit;
+  const diff = value === null ? null : value - expected;
+  const diffText =
+    diff === null
+      ? '—'
+      : `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${formatQtyFromMilli(Math.abs(diff), unit)}`;
+  const name = (
+    <span
+      className={`data-name line-clamp-2 min-w-0 font-medium ${isLatinName(String(product.name_en)) ? 'ltr-name' : ''}`}
+      title={String(product.name_en)}
+    >
+      {String(product.name_en)}
+    </span>
+  );
+  const qty = (
+    <QtyInput
+      dense
+      label={t('count.counted')}
+      ariaLabel={t('count.counted_for', { name: String(product.name_en) })}
+      unit={unit}
+      value={value}
+      onChange={(milli) => onChange(String(product.id), milli)}
+    />
+  );
+  return (
+    <li
+      data-testid="count-row"
+      className="absolute inset-x-0 border-b border-border last:border-b-0"
+      style={{ top: position * rowPx, height: rowPx }}
+      aria-setsize={setSize}
+      aria-posinset={position + 1}
+    >
+      {wide ? (
+        <div className="grid h-full grid-cols-[minmax(0,1fr)_6rem_minmax(11rem,13rem)_6rem] items-center gap-3 px-3">
+          {name}
+          <span className="text-small">
+            <span className="mb-1 block text-text-muted">
+              {t('count.expected')}
+            </span>
+            <bdi dir="ltr" className="font-mono" data-testid="count-expected">
+              {formatQtyFromMilli(expected, unit)}
+            </bdi>
+          </span>
+          {qty}
+          <span className="text-small">
+            <span className="mb-1 block text-text-muted">
+              {t('count.difference')}
+            </span>
+            <bdi
+              dir="ltr"
+              className={`font-mono ${
+                diff === null
+                  ? ''
+                  : diff < 0
+                    ? 'text-danger'
+                    : diff > 0
+                      ? 'text-success'
+                      : ''
+              }`}
+              data-testid="count-diff"
+            >
+              {diffText}
+            </bdi>
+          </span>
+        </div>
+      ) : (
+        <div className="grid h-full grid-cols-[minmax(0,1fr)_10.5rem] grid-rows-[auto_auto_auto] items-center gap-x-3 gap-y-0.5 px-3">
+          <span className="col-start-1 row-start-1">{name}</span>
+          <span className="col-start-1 row-start-2 flex items-baseline gap-2 text-small">
+            <span className="text-text-muted">{t('count.expected')}</span>
+            <bdi dir="ltr" className="font-mono" data-testid="count-expected">
+              {formatQtyFromMilli(expected, unit)}
+            </bdi>
+          </span>
+          <span className="col-start-1 row-start-3 flex items-baseline gap-2 text-small">
+            <span className="text-text-muted">{t('count.difference')}</span>
+            <bdi
+              dir="ltr"
+              className={`font-mono ${
+                diff === null
+                  ? ''
+                  : diff < 0
+                    ? 'text-danger'
+                    : diff > 0
+                      ? 'text-success'
+                      : ''
+              }`}
+              data-testid="count-diff"
+            >
+              {diffText}
+            </bdi>
+          </span>
+          <div className="col-start-2 row-span-3 row-start-1">{qty}</div>
+        </div>
+      )}
+    </li>
+  );
+});

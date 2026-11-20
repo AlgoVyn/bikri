@@ -280,26 +280,91 @@ export async function startCount(
     counted: {},
     applied: [],
   };
-  await db.kv.put({ key: DRAFT_KEY, value: draft });
+  cancelScheduledSave(db);
+  await saveCountDraft(db, draft);
   return draft;
 }
 
+/**
+ * The draft is read once per count; the Products screen keeps its own copy while the
+ * draft is being edited. A pending write is newer than `kv`, so return it first.
+ */
 export async function loadCountDraft(db: BikriDb): Promise<CountDraft | null> {
-  return ((await db.kv.get(DRAFT_KEY))?.value ?? null) as CountDraft | null;
+  // A save may still be in flight after the timer fired; read after it settles so
+  // the live query never observes the older draft.
+  await saveChain.catch(() => undefined);
+  const stored =
+    ((await db.kv.get(DRAFT_KEY))?.value as CountDraft | undefined) ?? null;
+  // Read kv even when a newer draft is pending: Dexie's liveQuery must keep
+  // subscribing to the draft key for cross-tab/other-screen changes.
+  const pending = pendingDrafts.get(db);
+  if (pending !== undefined) return pending.draft;
+  draftCache.set(db, stored);
+  return stored;
 }
 
 export async function saveCountDraft(
   db: BikriDb,
   draft: CountDraft,
 ): Promise<void> {
-  await db.kv.put({ key: DRAFT_KEY, value: draft });
+  cancelScheduledSave(db);
+  draftCache.set(db, draft);
+  // Serialise writes: a debounced save and a Finish flush must land in call order.
+  const run = saveChain.then(() => db.kv.put({ key: DRAFT_KEY, value: draft }));
+  saveChain = run.catch(() => undefined);
+  await run;
+}
+
+let saveChain: Promise<unknown> = Promise.resolve();
+
+/** Copy retained while a count is open, so a tap never re-reads the 250 KB draft. */
+const draftCache = new WeakMap<BikriDb, CountDraft | null>();
+/** A draft waiting for the debounced write; the UI already shows it. */
+const pendingDrafts = new WeakMap<
+  BikriDb,
+  { draft: CountDraft; timer: ReturnType<typeof setTimeout> }
+>();
+const DRAFT_WRITE_DELAY_MS = 350;
+
+function cancelScheduledSave(db: BikriDb): void {
+  const pending = pendingDrafts.get(db);
+  if (pending === undefined) return;
+  clearTimeout(pending.timer);
+  pendingDrafts.delete(db);
+}
+
+/**
+ * Writes the pending draft now. The screen calls this on hide/unmount and before
+ * Finish, so a last tap is never lost; the timer keeps a fast count from rewriting
+ * the whole draft on every digit.
+ */
+export async function flushCountDraft(db: BikriDb): Promise<void> {
+  const pending = pendingDrafts.get(db);
+  if (pending === undefined) return;
+  pendingDrafts.delete(db);
+  clearTimeout(pending.timer);
+  await saveCountDraft(db, pending.draft);
+}
+
+function scheduleCountDraft(db: BikriDb, draft: CountDraft): CountDraft {
+  cancelScheduledSave(db);
+  draftCache.set(db, draft);
+  const timer = setTimeout(() => {
+    const pending = pendingDrafts.get(db);
+    if (pending === undefined) return;
+    pendingDrafts.delete(db);
+    void saveCountDraft(db, pending.draft).catch(() => undefined);
+  }, DRAFT_WRITE_DELAY_MS);
+  pendingDrafts.set(db, { draft, timer });
+  return draft;
 }
 
 let draftChain: Promise<unknown> = Promise.resolve();
 
 /**
  * Serialised read-modify-write of one product's count on the stored draft, so fast scans
- * never lose a +1 (each change reads the latest draft, not a rendered copy).
+ * never lose a +1 (each change reads the latest draft, not a rendered copy). The write
+ * is coalesced; Finish flushes it first.
  */
 export function updateCount(
   db: BikriDb,
@@ -307,22 +372,31 @@ export function updateCount(
   next: (current: number | undefined) => number | null,
 ): Promise<CountDraft | null> {
   const run = draftChain.then(async () => {
-    const draft = await loadCountDraft(db);
+    let draft: CountDraft | null | undefined = pendingDrafts.get(db)?.draft;
+    if (draft === undefined)
+      draft = draftCache.has(db)
+        ? (draftCache.get(db) ?? null)
+        : await loadCountDraft(db);
     if (!draft) return null;
     const counted = { ...draft.counted };
     const value = next(counted[productId]);
     if (value === null) delete counted[productId];
     else counted[productId] = value;
-    const updated = { ...draft, counted };
-    await saveCountDraft(db, updated);
-    return updated;
+    return scheduleCountDraft(db, { ...draft, counted });
   });
   draftChain = run.catch(() => undefined);
   return run;
 }
 
 export async function discardCount(db: BikriDb): Promise<void> {
-  await db.kv.delete(DRAFT_KEY);
+  cancelScheduledSave(db);
+  draftCache.set(db, null);
+  await draftChain.catch(() => undefined);
+  // Queue the delete behind any draft write that is already in flight, otherwise a
+  // slow save could recreate the draft after it was discarded.
+  const run = saveChain.then(() => db.kv.delete(DRAFT_KEY));
+  saveChain = run.catch(() => undefined);
+  await run;
 }
 
 export type CountResult = {
