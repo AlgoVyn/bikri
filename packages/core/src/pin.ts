@@ -72,7 +72,16 @@ export async function hashPin(
   };
 }
 
-const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/u;
+const BASE64 =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+
+function decodedLength(value: string): number | null {
+  try {
+    return fromBase64(value).length;
+  } catch {
+    return null;
+  }
+}
 
 /** Shape every stored verifier must have, regardless of its iteration count. */
 function verifierShape(stored: {
@@ -108,8 +117,12 @@ export function isPinVerifierValid(stored: {
   pin_salt?: unknown;
   pin_iterations?: unknown;
 }): boolean {
+  if (!verifierShape(stored)) return false;
+  // The documented verifier is exactly 16 salt bytes and 32 hash bytes; a shorter
+  // value would pass the loose shape check and then fail every verifyPin attempt.
   return (
-    verifierShape(stored) &&
+    decodedLength(stored.pin_salt as string) === 16 &&
+    decodedLength(stored.pin_hash as string) === 32 &&
     Number(stored.pin_iterations) >= 100_000 &&
     Number(stored.pin_iterations) <= 1_000_000
   );

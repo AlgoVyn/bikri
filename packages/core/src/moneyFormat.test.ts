@@ -6,6 +6,10 @@ describe('parseMoneyToPaisa', () => {
     expect(parseMoneyToPaisa('43000')).toBe(4_300_000);
     expect(parseMoneyToPaisa('43,000')).toBe(4_300_000);
     expect(parseMoneyToPaisa('Rs 43,000')).toBe(4_300_000);
+    expect(parseMoneyToPaisa('Rs. 50')).toBe(5_000);
+    expect(parseMoneyToPaisa('Rs. 100')).toBe(10_000);
+    expect(parseMoneyToPaisa('PKR 250')).toBe(25_000);
+    expect(parseMoneyToPaisa('rs.50')).toBe(5_000);
     expect(parseMoneyToPaisa('3,459.77')).toBe(345_977);
     expect(parseMoneyToPaisa('43.7')).toBe(4_370);
     expect(parseMoneyToPaisa('.5')).toBe(50);
@@ -23,6 +27,7 @@ describe('parseMoneyToPaisa', () => {
     expect(parseMoneyToPaisa('43.777')).toBeNull();
     expect(parseMoneyToPaisa('12.3.4')).toBeNull();
     expect(parseMoneyToPaisa('abc')).toBeNull();
+    expect(parseMoneyToPaisa('1rs2')).toBeNull();
     expect(parseMoneyToPaisa('')).toBeNull();
     expect(parseMoneyToPaisa('-')).toBeNull();
   });
@@ -32,6 +37,9 @@ describe('parseMoneyToPaisa', () => {
     expect(parseMoneyToPaisa('−500')).toBeNull();
     expect(parseMoneyToPaisa('-500', { allowNegative: true })).toBe(-50_000);
     expect(parseMoneyToPaisa('−Rs 500', { allowNegative: true })).toBe(-50_000);
+    expect(parseMoneyToPaisa('−Rs. 500', { allowNegative: true })).toBe(
+      -50_000,
+    );
   });
 });
 

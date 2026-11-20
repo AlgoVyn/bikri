@@ -75,5 +75,15 @@ describe('PIN rules (05 §4)', () => {
         pin_iterations: 150_000,
       }),
     ).toBe(false);
+    const good = await hashPin('4826', 100_000);
+    expect(isPinVerifierValid({ ...good, pin_salt: 'a'.repeat(17) })).toBe(
+      false,
+    );
+    expect(isPinVerifierValid({ ...good, pin_hash: 'a'.repeat(16) })).toBe(
+      false,
+    );
+    expect(isPinVerifierValid({ ...good, pin_hash: 'a'.repeat(44) })).toBe(
+      false,
+    );
   });
 });

@@ -17,7 +17,10 @@ export function parseMoneyToPaisa(
   let text = normaliseNumericText(raw).trim().toLowerCase();
   text = text.replaceAll(TRUE_MINUS, '-');
   text = text.replaceAll(',', '').replaceAll(' ', '');
-  text = text.replaceAll('rs', '');
+  // Only a leading currency prefix is text: stripping every "rs" also turned the
+  // standard "Rs. 50" into ".50" (Rs 0.50) and "1rs2" into "12". Keep a leading minus
+  // so "−Rs 500" still parses as a negative amount.
+  text = text.replace(/^(-?)(?:rs\.?|pkr)\s*/u, '$1');
   if (text === '' || text === '-' || text === '.' || text === '-.') {
     return null;
   }

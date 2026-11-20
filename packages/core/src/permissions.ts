@@ -61,7 +61,9 @@ const CASHIER_ALLOWED: ReadonlySet<Permission> = new Set([
 export function roleAllows(role: Role, permission: Permission): boolean {
   if (role === 'owner') return true;
   if (role === 'manager') return !MANAGER_DENIED.has(permission);
-  return CASHIER_ALLOWED.has(permission);
+  if (role === 'cashier') return CASHIER_ALLOWED.has(permission);
+  // A corrupt or future role string must not inherit cashier permissions.
+  return false;
 }
 
 /** Role default, overridden by `{"refund.create": true}`-style entries in permissions_json. */
@@ -70,13 +72,21 @@ export function can(
   permissionsJson: string,
   permission: Permission,
 ): boolean {
+  // The owner stays in control even if a hand-edited restore or an old bug wrote a
+  // deny override into permissions_json (05 §6).
+  if (role === 'owner') return true;
   try {
-    const overrides = JSON.parse(permissionsJson || '{}') as Record<
-      string,
-      unknown
-    >;
-    const value = overrides[permission];
-    if (typeof value === 'boolean') return value;
+    const parsed: unknown = JSON.parse(permissionsJson || '{}');
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed)
+    ) {
+      if (Object.hasOwn(parsed, permission)) {
+        const value = (parsed as Record<string, unknown>)[permission];
+        if (typeof value === 'boolean') return value;
+      }
+    }
   } catch {
     // Bad JSON falls back to the role default.
   }

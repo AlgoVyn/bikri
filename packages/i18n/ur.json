@@ -748,7 +748,7 @@
     "stock_out": "ختم",
     "stock_untracked": "ٹریک نہیں",
     "stock_value": "اسٹاک کی مالیت",
-    "track_min_change": "کم اسٹاک الرٹ {{from}} → {{to}}",
+    "track_min_change": "کم اسٹاک الرٹ \u2068{{from}}\u2069 ← \u2068{{to}}\u2069",
     "title": "مصنوعات",
     "print_label": "لیبل پرنٹ کریں",
     "select": "منتخب کریں",

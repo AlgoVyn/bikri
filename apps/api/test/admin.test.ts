@@ -11,6 +11,7 @@ import {
   api,
   IDS,
   json,
+  SEED_PIN_HASH,
   seedShop,
   setStatus,
 } from './helpers/fixtures.ts';
@@ -606,8 +607,8 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       method: 'POST',
       json: {
         staff_id: '01JB0000000000000000000001',
-        pin_hash: 'x'.repeat(44),
-        pin_salt: 'y'.repeat(24),
+        pin_hash: `${'x'.repeat(43)}=`,
+        pin_salt: `${'y'.repeat(22)}==`,
         pin_iterations: 150000,
         pin_length: 4,
       },
@@ -624,8 +625,8 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       method: 'POST',
       json: {
         staff_id: '01JB0000000000000000000002',
-        pin_hash: 'x'.repeat(44),
-        pin_salt: 'y'.repeat(24),
+        pin_hash: `${'x'.repeat(43)}=`,
+        pin_salt: `${'y'.repeat(22)}==`,
         pin_iterations: 150000,
         pin_length: 4,
       },
@@ -639,7 +640,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       await n(
         "SELECT COUNT(*) AS n FROM staff WHERE tenant_id = ?1 AND id = '01JB0000000000000000000001' AND pin_hash = ?2",
         b.tenantId,
-        'a'.repeat(44),
+        SEED_PIN_HASH,
       ),
     ).toBe(1);
   });

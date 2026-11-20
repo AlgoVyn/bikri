@@ -59,6 +59,35 @@ describe('priceBundle', () => {
     expect(plain.lines.map((line) => line.net)).toEqual([6, 3]);
   });
 
+  it('handles a cost weight that exceeds the JS safe-integer range', () => {
+    const result = priceBundle({
+      bundle_price: 1_000,
+      bundle_qty: 1,
+      components: [
+        {
+          qty_milli: 10_000_000,
+          unit_cost: 1_000_000_000,
+          unit_price: 0,
+        },
+      ],
+    });
+    expect(result.total_net).toBe(1_000);
+    expect(result.lines[0]?.net).toBe(1_000);
+    expect(result.lines[0]?.below_cost).toBe(true);
+  });
+
+  it('rejects a unit price that would overflow the safe-integer range', () => {
+    expect(() =>
+      priceBundle({
+        bundle_price: Number.MAX_SAFE_INTEGER,
+        bundle_qty: 1,
+        components: [
+          { qty_milli: 1, unit_cost: 0, unit_price: Number.MAX_SAFE_INTEGER },
+        ],
+      }),
+    ).toThrow(/safe integer/);
+  });
+
   it('rejects malformed input', () => {
     const component = { qty_milli: 1000, unit_cost: 1, unit_price: 1 };
     expect(() =>
@@ -103,6 +132,17 @@ describe('planBundleRefund', () => {
     { qty_per_bundle: 1000, line_final: 72000 },
     { qty_per_bundle: 1000, line_final: 48000 },
   ];
+
+  it('rejects a component quantity product beyond the safe-integer range', () => {
+    expect(() =>
+      planBundleRefund({
+        bundle_qty: 1_000_000_000,
+        prev_refunded_bundles: 0,
+        refund_bundles: 1,
+        components: [{ qty_per_bundle: 10_000_000, line_final: 1_000 }],
+      }),
+    ).toThrow(/sold component quantity/);
+  });
 
   it('rejects out-of-range bundle counts', () => {
     const base = {

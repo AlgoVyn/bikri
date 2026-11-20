@@ -66,12 +66,21 @@ Per-line allocations (stored on `sale_lines`, used for refunds and per-line prof
 ```
 bill_discount_alloc = allocate(bill_discount, nets)
 tax_alloc           = allocate(tax, nets)
+-- inclusive only: if any net − bill_discount_alloc − tax_alloc < 0, re-allocate
+-- tax against the post-bill-discount bases net − bill_discount_alloc
 rounding_alloc      = allocate(rounding, nets)
 exclusive:  line_final   = net − bill_discount_alloc + tax_alloc + rounding_alloc   (Σ line_final = total)
             line_revenue = net − bill_discount_alloc                              (excl. tax and rounding; used for profit)
 inclusive:  line_final   = net − bill_discount_alloc + rounding_alloc             (Σ line_final = total)
             line_revenue = net − bill_discount_alloc − tax_alloc                  (ex-tax, so profit never includes tax)
 ```
+
+Both allocations use the pre-discount `nets` with ties to the lower index. When a bill
+discount nearly exhausts the subtotal, the same line can receive the last paisa of
+both `bill_discount_alloc` and `tax_alloc`, making `line_revenue = −1`. In inclusive
+mode, if that would happen, tax is allocated against the post-bill-discount bases
+`net − bill_discount_alloc`; their sum is `taxable ≥ tax`, so every tax share still
+fits inside its line. The exclusive mode is unchanged.
 
 When a negative `rounding` would take a line below zero, the allocation switches to
 `allocateRounding(rounding, bases)` (bases = net − bill discount + tax for exclusive,

@@ -4,6 +4,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Core money, permissions and i18n — 20 Nov 2026 review, PR 3
+- `parseMoneyToPaisa('Rs. 50')` now returns 5,000 paisa (Rs 50), not 50 paisa; `PKR 250`, `Rs. 100` and `−Rs. 500` are covered.
+- Inclusive tax falls back to the post-bill-discount bases when a large bill discount would otherwise make `line.revenue` negative.
+- `priceBundle` uses BigInt recipe weights and a guarded scaled `ceilDiv`, so `q_i × cost_i` and `net × 1000` cannot overflow the JS safe-integer range; bundle price/refund property tests added.
+- `isPinVerifierValid` requires canonical base64 with exactly a 16-byte salt and 32-byte hash.
+- Unknown roles fail closed, the owner cannot be locked out by `permissions_json`, and overrides use `Object.hasOwn`.
+- Urdu admin paths/status values are LTR-isolated, the stock transition arrow is consistent, and the missing support-access sentence is in both Urdu terms catalogs.
+- The CSP gains `form-action 'self'; object-src 'none'`, and `/bikri/brand/*` gets the stable-asset cache policy.
+- Dexie tests cover V6→V9 and V7→V9 upgrades; `DEXIE_SCHEMA_V9` and `CartReissue` are exported, and the V7 backfill streams sales instead of loading them all.
+
 ### Operator restore and export integrity — 20 Nov 2026 review, PR 2
 - The restore ZIP reader pipes decompression concurrently instead of awaiting `writer.write()` before the readable side, and caps each inflated entry at 64 MiB so a crafted archive cannot hang or exhaust the browser.
 - `RestoreTab` aborts its async loop on unmount, and the restore/export pagination guards now raise a visible error instead of returning silently with partial data.

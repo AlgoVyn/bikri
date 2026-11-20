@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { planBundleRefund, priceBundle } from './bundles.ts';
 import { allocate } from './money.ts';
 import type { RefundRounding } from './refunds.ts';
 import { computeRefundLine, refundedRevenue, splitRefund } from './refunds.ts';
@@ -128,6 +129,76 @@ describe('money properties', () => {
           expect(refunded).toBe(lineFinal);
           expect(revenue).toBe(lineFinal);
           expect(prev).toBe(sold);
+        },
+      ),
+      { numRuns: RUNS },
+    );
+  });
+
+  it('conserves every paisa of a bundle price across its component lines', () => {
+    const componentArb = fc.record({
+      qty_milli: fc.integer({ min: 1, max: 5_000 }),
+      unit_cost: fc.integer({ min: 0, max: 1_000_000 }),
+      unit_price: fc.integer({ min: 0, max: 1_000_000 }),
+    });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 1_000_000 }),
+        fc.integer({ min: 1, max: 20 }),
+        fc.array(componentArb, { minLength: 1, maxLength: 10 }),
+        (price, qty, components) => {
+          const result = priceBundle({
+            bundle_price: price,
+            bundle_qty: qty,
+            components,
+          });
+          expect(result.total_net).toBe(price * qty);
+          expect(sum(result.lines.map((line) => line.net))).toBe(price * qty);
+          expect(result.total_cost).toBe(
+            sum(result.lines.map((line) => line.cost_total)),
+          );
+          for (const line of result.lines) {
+            expect(line.qty_milli).toBeGreaterThan(0);
+            expect(line.gross).toBe(line.net + line.discount);
+            expect(line.unit_price).toBeGreaterThanOrEqual(0);
+          }
+        },
+      ),
+      { numRuns: RUNS },
+    );
+  });
+
+  it('refunds whole bundles without losing a paisa across repeated calls', () => {
+    const components = [
+      { qty_per_bundle: 500, line_final: 72_000 },
+      { qty_per_bundle: 1000, line_final: 48_000 },
+      { qty_per_bundle: 250, line_final: 12_000 },
+    ];
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 20 }),
+        fc.integer({ min: 0, max: 20 }),
+        fc.integer({ min: 1, max: 20 }),
+        (sold, priorSeed, refundSeed) => {
+          const prior = priorSeed % (sold + 1);
+          const remaining = sold - prior;
+          fc.pre(remaining > 0);
+          const count = 1 + (refundSeed % remaining);
+          const result = planBundleRefund({
+            bundle_qty: sold,
+            prev_refunded_bundles: prior,
+            refund_bundles: count,
+            components,
+          });
+          expect(sum(result.lines.map((line) => line.amount))).toBe(
+            result.exact_amount,
+          );
+          for (const [index, line] of result.lines.entries()) {
+            expect(line.qty_milli).toBe(
+              (components[index]?.qty_per_bundle ?? 0) * count,
+            );
+            expect(line.amount).toBeGreaterThanOrEqual(0);
+          }
         },
       ),
       { numRuns: RUNS },

@@ -144,6 +144,27 @@ describe('computeCart edges', () => {
     expect(allocateRounding(1, [1, 1])).toEqual([1, 0]);
   });
 
+  it('never makes an inclusive line revenue negative when a bill discount nearly exhausts the subtotal', () => {
+    const cart = computeCart({
+      lines: [
+        { qty_milli: 1000, unit_price: 10_000 },
+        { qty_milli: 1000, unit_price: 10_000 },
+        { qty_milli: 1000, unit_price: 10_000 },
+      ],
+      bill_discount: { type: 'rs', value: 29_998 },
+      tax_rate_bp: 5_000,
+      tax_mode: 'inclusive',
+      round_total_to: 1,
+    });
+    expect(cart.lines.every((line) => line.revenue >= 0)).toBe(true);
+    expect(cart.lines.reduce((sum, line) => sum + line.revenue, 0)).toBe(
+      cart.taxable - cart.tax,
+    );
+    expect(cart.lines.reduce((sum, line) => sum + line.final, 0)).toBe(
+      cart.total,
+    );
+  });
+
   it('rejects a tax rate or rounding step outside the shop schema', () => {
     expect(() =>
       computeCart({

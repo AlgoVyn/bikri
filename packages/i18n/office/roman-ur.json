@@ -989,7 +989,7 @@
       "terms": "Terms of use",
       "terms_1": "Bikri kaun chalata hai. Algovyn kai dukanon ke liye yeh Bikri chalata hai. Aap ki dukan doosri dukanon se alag rakhi jati hai.",
       "terms_2": "Algovyn kya dekh sakta hai. Database aur backup key Algovyn ke paas hai, is liye woh technically aap ka data parh sakta hai. Woh sirf service chalane, restore ya aap ki madad par dekhta hai.",
-      "terms_3": "Aap ko hamesha kya nazar aayega. Har export, import, restore, dukan status change ya support access Settings → Activity mein wajah ke saath aata hai.",
+      "terms_3": "Aap ko hamesha kya nazar aayega. Har export, import, restore, dukan status change ya support access Settings → Activity mein wajah ke saath aata hai. Support access waqt ki had tak hoti hai aur aap ke tillon par dikhai jati hai.",
       "terms_4": "Read-only. Dukan read-only ho to bhi reports aur export milte hain, nayi sale ya tabdeeli nahi.",
       "terms_5": "Aap ki copy. Aap kabhi bhi till se mukammal export, ya din mein ek baar server se download kar sakte hain.",
       "terms_6": "Backup aur delete. Har raat encrypted backup hota hai. Dukan delete hone par live database se hat jati hai; copies 30 din daily, 12 mahine monthly aur 90 din off-site rehti hain.",
