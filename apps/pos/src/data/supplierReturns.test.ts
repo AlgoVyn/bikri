@@ -184,6 +184,10 @@ describe('return to supplier (screens/13 ACs 6–8, 07 §10)', () => {
     const printId = await queueSupplierReturnPrint(db, 'ret-s1', NOW + 2);
     const job = await db.print_jobs.get(printId);
     expect(job ? await jobReceipt(db, job) : null).not.toBeNull();
+    // A reprint is a fresh job; the agent deduplicates a reused id for 24 h.
+    const reprintId = await queueSupplierReturnPrint(db, 'ret-s1', NOW + 3);
+    expect(reprintId).not.toBe(printId);
+    expect(await db.print_jobs.count()).toBe(2);
     const again = await createSupplierReturn(
       db,
       { ...input, returnId: 'ret-s1' },

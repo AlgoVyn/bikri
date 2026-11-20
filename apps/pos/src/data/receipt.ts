@@ -9,6 +9,7 @@ import {
   formatReceiptDate,
   formatReceiptMoney,
   type ItemLayout,
+  type ReceiptLine,
   type ReceiptPayment,
   receiptLabelsFor,
   resolvePaper,
@@ -199,9 +200,10 @@ export async function loadSaleReceipt(
       bundleGroup: l.bundle_group ? String(l.bundle_group) : null,
       bundleName: l.bundle_name ? String(l.bundle_name) : null,
       bundleQty: l.bundle_qty ? Number(l.bundle_qty) : null,
-      bundlePrice: l.bundle_price
-        ? Number(l.bundle_price) - Number(l.bundle_discount ?? 0)
-        : null,
+      bundlePrice:
+        l.bundle_price !== null && l.bundle_price !== undefined
+          ? Number(l.bundle_price) - Number(l.bundle_discount ?? 0)
+          : null,
     })),
     payments: payments.map(
       (p): ReceiptPayment => ({
@@ -310,6 +312,42 @@ export function receiptShareText(input: SaleReceiptInput): string {
   const { shop, sale } = input;
   const money = (p: number) => formatReceiptMoney(p, shop.numberGrouping);
   const labels = input.labels ?? receiptLabelsFor('en');
+  const qtyText = (qtyMilli: number) =>
+    qtyMilli % 1000 === 0
+      ? String(qtyMilli / 1000)
+      : (qtyMilli / 1000).toFixed(3);
+  const items: string[] = [];
+  for (let index = 0; index < input.lines.length; index += 1) {
+    const line = input.lines[index] as ReceiptLine;
+    if (line.bundleGroup) {
+      const group: ReceiptLine[] = [];
+      let next = index;
+      while (
+        next < input.lines.length &&
+        input.lines[next]?.bundleGroup === line.bundleGroup
+      ) {
+        group.push(input.lines[next] as ReceiptLine);
+        next += 1;
+      }
+      const bundleQty = line.bundleQty ?? 1;
+      const bundleTotal =
+        line.bundlePrice != null
+          ? line.bundlePrice * bundleQty
+          : group.reduce((sum, component) => sum + component.net, 0);
+      items.push(
+        `${line.bundleName?.trim() || labels.bundle || 'Bundle'} × ${bundleQty}  ${money(bundleTotal)}`,
+      );
+      // Component prices are an internal allocation (D-229); the message shows names and
+      // quantities only, like the receipt picture.
+      for (const component of group)
+        items.push(`  ${component.name} × ${qtyText(component.qtyMilli)}`);
+      index = next - 1;
+      continue;
+    }
+    items.push(
+      `${line.name} × ${qtyText(line.qtyMilli)}  ${money(line.final ?? line.net)}`,
+    );
+  }
   const rows = [
     ...(shop.showShopName === false ? [] : [shop.name]),
     `${labels.bill} ${sale.invoiceNo} · ${
@@ -317,13 +355,7 @@ export function receiptShareText(input: SaleReceiptInput): string {
         ? formatIsoDate(sale.businessDate)
         : formatReceiptDate(sale.createdAt, shop.timeZone)
     }`,
-    ...input.lines.map((l) => {
-      const qty =
-        l.qtyMilli % 1000 === 0
-          ? String(l.qtyMilli / 1000)
-          : (l.qtyMilli / 1000).toFixed(3);
-      return `${l.name} × ${qty}  ${money(l.final ?? l.net)}`;
-    }),
+    ...items,
     `${labels.total} ${money(sale.total)}`,
   ];
   if (sale.udhaarAmount > 0) {

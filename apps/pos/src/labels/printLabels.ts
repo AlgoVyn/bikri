@@ -56,7 +56,31 @@ export function printLabelHtml(
     .value{font-family:"JetBrains Mono",monospace;font-size:7pt;line-height:1.1;white-space:nowrap;max-width:100%;overflow:hidden}
   </style></head><body><div class="sheet">${skip}${labels.join('')}</div></body></html>`);
   doc.close();
-  frame.contentWindow?.focus();
-  frame.contentWindow?.print();
-  setTimeout(() => frame.remove(), 60_000);
+  const win = frame.contentWindow;
+  if (!win) {
+    frame.remove();
+    return;
+  }
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const cleanup = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    frame.remove();
+  };
+  const start = () => {
+    win.addEventListener('afterprint', cleanup, { once: true });
+    // Fallback for browsers that never fire afterprint; the sheet itself has
+    // already been handed to the print dialog at that point.
+    timer = setTimeout(cleanup, 60_000);
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      cleanup();
+    }
+  };
+  // The iframe loads its own @font-face rules; wait so the driver rasterises
+  // the Urdu/Inter glyphs instead of a fallback font.
+  const ready = doc.fonts?.ready ?? Promise.resolve();
+  void ready.then(start, start);
 }

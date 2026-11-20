@@ -4,6 +4,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS printing, receipts and Urdu raster — 20 Nov 2026 review, PR 6
+- Bundle receipt headers no longer multiply the component-net fallback by the bundle quantity, and a free bundle (`bundle_price = 0`) keeps its zero price.
+- WhatsApp share text groups bundle components under one priced header; component allocation prices are no longer exposed.
+- Control characters are replaced before `formatPair`/`formatColumnHeader`/`formatItemLines` can reach ESC/POS text mode; column layout requires at least 24 characters and truncation is grapheme-safe for Urdu and emoji.
+- Web Serial closes and reopens when baud/flow settings change and aborts the writer and closes the port on timeout; WebUSB releases the interface and closes the device on timeout/error.
+- Urdu raster lines keep their deliberate indentation and are constrained instead of clipped; centred Urdu stays centred in shared PNG/PDF images, and transparent logo pixels are blended over white.
+- Day-close and supplier-return headers use the receipt-language `Tel:`/NTN/STRN labels; a missing printer config no longer queues a phantom Z-report; supplier-return reprints use fresh job ids; cancellation notices use the receipt language.
+- System printing waits for `afterprint` (with a fallback) before removing the iframe; barcode labels wait for their fonts and remove the iframe promptly.
+- The print-agent client allows 35 s for job submission (the agent allows 30 s) and the wizard rejects an agent whose protocol is not 1; the download tag moves to `print-agent-v0.1.3`.
+
 ### Go print agent security and release — 20 Nov 2026 review, PR 5
 - The CUPS backend forces the C locale, validates job and queue ids, uses `--` before file/argument operands, and never falls back to a client job id as a cancel target (which could have run `cancel -a`).
 - A failed printer enumeration now fails the job closed instead of passing an unvalidated queue name to `lp`; job ids are limited to `[A-Za-z0-9._-]` and printer names reject leading dashes/control characters.

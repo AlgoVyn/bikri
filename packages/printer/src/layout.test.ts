@@ -16,6 +16,12 @@ import {
 
 const WIDTHS = [24, 32, 40, 42, 48, 69] as const;
 
+const hasControl = (text: string): boolean =>
+  [...text].some((char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code < 32 || code === 127;
+  });
+
 describe('wrapText', () => {
   it('breaks on spaces and hard-breaks long tokens', () => {
     expect(wrapText('USB-C cable 1m braided', 10)).toEqual([
@@ -53,6 +59,29 @@ describe('formatPair', () => {
     ).toEqual(['Customer', '  Muhammad Bilal Hussain Qureshi']);
     expect(formatPair('', 'Rs 5', 8)).toEqual(['    Rs 5']);
     expect(formatPair('Only label', '', 8)).toEqual(['Only', 'label']);
+  });
+
+  it('replaces control characters before the short-line fast path', () => {
+    const [line] = formatPair('Cus\tomer', 'Rs\r5', 20);
+    expect(line).toContain('Cus omer');
+    expect(hasControl(line ?? '')).toBe(false);
+    const header = formatColumnHeader(
+      { item: 'IT\nEM', qty: 'Q\tTY', amount: 'AM\rOUNT' },
+      24,
+    );
+    expect(hasControl(header)).toBe(false);
+    for (const line of formatItemLines(
+      {
+        name: 'Rice\tbag',
+        qty: '1\r',
+        amount: 'Rs\n5',
+        detail: 'line\nbreak',
+        breakdown: '1\tx 5',
+      },
+      48,
+      'columns',
+    ))
+      expect(hasControl(line)).toBe(false);
   });
 });
 
@@ -107,6 +136,29 @@ describe('item columns (06 §4.1)', () => {
     expect(lines[1]?.endsWith('...')).toBe(true);
     expect(lines[1]?.length).toBeLessThanOrEqual(28);
     expect(lines[2]).toBe('  Rs 42,000 each - less Rs 2,000');
+  });
+
+  it('truncates non-ASCII names and amounts without splitting surrogates', () => {
+    const lines = formatItemLines(
+      {
+        name: `${'😀'.repeat(40)}`,
+        qty: '1',
+        amount: 'Rs 5',
+      },
+      24,
+      'columns',
+    );
+    for (const line of lines) {
+      expect(line.isWellFormed()).toBe(true);
+      expect([...line].length).toBeLessThanOrEqual(24);
+    }
+    expect(lines.some((line) => line.endsWith('...'))).toBe(true);
+    const header = formatColumnHeader(
+      { item: 'آئٹم', qty: '😀'.repeat(10), amount: 'رقم' },
+      24,
+    );
+    expect(header.isWellFormed()).toBe(true);
+    expect([...header]).toHaveLength(24);
   });
 
   it('stacks name then breakdown/amount at 58 mm (06 §4.2)', () => {

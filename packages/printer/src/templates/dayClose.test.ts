@@ -69,6 +69,20 @@ describe('day close slip (screens/15 AC 7)', () => {
       expect(line.length).toBeLessThanOrEqual(48);
   });
 
+  it('uses the receipt-language Tel label on the shared shop header', () => {
+    const blocks = buildDayClose({
+      ...input(3924000),
+      shop: { ...shop, phone: '+923001234567' },
+      shopLabels: { telPrefix: 'ٹیلی فون:' },
+    });
+    const text = renderReceiptText(blocks, {
+      charsPerLine: 48,
+      itemLayout: 'columns',
+    });
+    expect(text).toContain('ٹیلی فون:');
+    expect(text).not.toContain('Tel:');
+  });
+
   it('reports a short drawer and fits 32 columns at 58 mm', () => {
     const blocks = buildDayClose(input(3920000), {
       paperMm: 58,

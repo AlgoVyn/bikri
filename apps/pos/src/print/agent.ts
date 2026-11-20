@@ -5,8 +5,10 @@
  */
 
 export const AGENT_URL = 'http://127.0.0.1:17890';
+/** The only agent API version this PWA speaks (docs/14-print-agent.md §6). */
+export const AGENT_PROTOCOL = 1;
 /** Update this tag when publishing a new print-agent release. */
-export const AGENT_RELEASE_TAG = 'print-agent-v0.1.2';
+export const AGENT_RELEASE_TAG = 'print-agent-v0.1.3';
 export const AGENT_RELEASE_URL = `https://github.com/AlgoVyn/bikri/releases/tag/${AGENT_RELEASE_TAG}`;
 const releaseAsset = (name: string) =>
   `https://github.com/AlgoVyn/bikri/releases/download/${AGENT_RELEASE_TAG}/${name}`;
@@ -126,6 +128,9 @@ export class AgentRequestError extends Error {
 
 const HEALTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
+// The agent allows a spooler up to 30 s for POST /v1/jobs; aborting at 15 s
+// made a slow but healthy queue look like DISCONNECTED.
+const PRINT_TIMEOUT_MS = 35_000;
 const STATUS_TIMEOUT_MS = 3000;
 
 function base(url: string): string {
@@ -219,7 +224,7 @@ export const httpAgentClient: AgentClient = {
         headers: headers(token, true),
         body: JSON.stringify(body),
       },
-      REQUEST_TIMEOUT_MS,
+      PRINT_TIMEOUT_MS,
     );
   },
   job(url, token, id) {

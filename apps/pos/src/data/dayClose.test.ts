@@ -165,6 +165,10 @@ describe('day close (T-047)', () => {
 
   it('AC 1: vector D1 stores the exact components and difference', async () => {
     const { db, ctx } = await setup();
+    await db.kv.put({
+      key: 'printer',
+      value: { transport: 'system', print_day_close: true },
+    });
     await db.payments.bulkAdd([
       payment('sale-cash', { amount: 4300000, purpose: 'sale' }),
       payment('udhaar-in', { amount: 50000, purpose: 'customer_payment' }),
@@ -315,6 +319,27 @@ describe('day close (T-047)', () => {
       .filter((j) => j.day_close_id === 'close-d1')
       .first();
     expect(job ? await jobReceipt(db, job) : null).not.toBeNull();
+  });
+
+  it('does not queue a Z-report when no printer is configured', async () => {
+    const { db, ctx } = await setup('no-printer');
+    await closeDay(db, { dayCloseId: 'no-printer-1', countedCash: 0 }, ctx, {
+      now: NOW + 1000,
+    });
+    expect(await db.print_jobs.count()).toBe(0);
+    // A configured transport without an explicit flag keeps the default (on).
+    await db.kv.put({
+      key: 'printer',
+      value: { transport: 'system' },
+    });
+    await closeDay(db, { dayCloseId: 'no-printer-2', countedCash: 0 }, ctx, {
+      now: NOW + 2000,
+    });
+    expect(
+      await db.print_jobs
+        .filter((j) => j.day_close_id === 'no-printer-2')
+        .count(),
+    ).toBe(1);
   });
 
   it('can skip the automatic Z-report from the printer setting', async () => {

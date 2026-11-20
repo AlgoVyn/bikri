@@ -41,6 +41,9 @@ describe('printHtmlViaSystem', () => {
       const win = frame.contentWindow as Window;
       win.print = () => {
         printed.push(frame.srcdoc);
+        // Chromium fires afterprint before print() resolves; keep the test frame
+        // cleanup path identical to a real dialog.
+        win.dispatchEvent(new Event('afterprint'));
       };
       frame.dispatchEvent(new Event('load'));
     });
@@ -48,6 +51,26 @@ describe('printHtmlViaSystem', () => {
     expect(result).toEqual({ ok: true });
     expect(printed).toHaveLength(1);
     expect(printed[0]).toContain('Powered by AlgoVyn');
+    expect(
+      document.querySelector('[data-testid="system-print-frame"]'),
+    ).toBeNull();
+  });
+
+  it('keeps the frame until afterprint so an async dialog is not cancelled', async () => {
+    const captured: { win: Window | null } = { win: null };
+    const append = document.body.append.bind(document.body);
+    vi.spyOn(document.body, 'append').mockImplementation((...nodes) => {
+      append(...nodes);
+      const frame = nodes[0] as HTMLIFrameElement;
+      captured.win = frame.contentWindow as Window;
+      captured.win.print = () => undefined;
+      frame.dispatchEvent(new Event('load'));
+    });
+    expect(await printHtmlViaSystem(receiptHtml(), 80)).toEqual({ ok: true });
+    expect(
+      document.querySelector('[data-testid="system-print-frame"]'),
+    ).not.toBeNull();
+    captured.win?.dispatchEvent(new Event('afterprint'));
     expect(
       document.querySelector('[data-testid="system-print-frame"]'),
     ).toBeNull();

@@ -1,6 +1,8 @@
 import { newId } from '@bikri/core';
 import type { SyncedRow } from '@bikri/db';
+import { renderReceiptText } from '@bikri/printer';
 import { afterEach, describe, expect, it } from 'vitest';
+import { voidReceipt } from '../print/receiptFiles.ts';
 import {
   addProduct,
   addQuickSale,
@@ -15,7 +17,14 @@ import { createCustomer } from './customers.ts';
 import { refundSale } from './refunds.ts';
 import { completeSale, startReissue } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
-import { NOW, readyDb, sale, shopWithStock, t2Cart } from './testShop.ts';
+import {
+  addShop,
+  NOW,
+  readyDb,
+  sale,
+  shopWithStock,
+  t2Cart,
+} from './testShop.ts';
 import { voidBlocker, voidSale } from './voids.ts';
 
 afterEach(dropTestDbs);
@@ -60,6 +69,34 @@ describe('void recipe (02 §5)', () => {
       .equals(['sale_voids', 'void-1'])
       .toArray();
     expect(audit).toMatchObject([{ action: 'void' }]);
+  });
+
+  it('prints the cancellation notice with the receipt-language labels', async () => {
+    const { db, ctx, phone, buds } = await shopWithStock('void-label');
+    await addShop(db, { receipt_language: 'ur' });
+    const saleId = 'sale-void-label';
+    await completeSale(
+      db,
+      sale(t2Cart(phone, buds), [{ method: 'cash', amount: 5000000 }], {
+        saleId,
+      }),
+      ctx,
+      NOW,
+    );
+    await voidSale(
+      db,
+      { voidId: 'void-label', saleId, reason: 'Wrong item' },
+      ctx,
+      NOW + 1000,
+    );
+    const print = await voidReceipt(db, saleId);
+    expect(print).not.toBeNull();
+    const text = renderReceiptText(print?.blocks ?? [], {
+      charsPerLine: 48,
+      itemLayout: 'columns',
+    });
+    expect(text).toContain('بل منسوخ');
+    expect(text).not.toContain('BILL CANCELLED');
   });
 
   it('reverses the udhaar ledger row and refuses a bill with refunds', async () => {

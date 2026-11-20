@@ -10,6 +10,8 @@ export type SystemPrintResult =
   | { ok: false; code: 'NO_PRINT' | 'TIMEOUT' };
 
 const LOAD_TIMEOUT_MS = 8000;
+/** Safety net for browsers that never fire afterprint (the dialog is already gone). */
+const CLEANUP_TIMEOUT_MS = 60_000;
 
 export async function printHtmlViaSystem(
   html: string,
@@ -42,6 +44,8 @@ export async function printHtmlViaSystem(
   });
   frame.srcdoc = html;
   doc.body.append(frame);
+  let printed = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   try {
     if (!(await loaded)) return { ok: false, code: 'TIMEOUT' };
     const win = frame.contentWindow;
@@ -72,10 +76,23 @@ export async function printHtmlViaSystem(
       win.document.documentElement.scrollHeight,
     );
     win.document.head.append(style);
+    // Safari/Firefox/mobile may show the dialog asynchronously; removing the
+    // frame immediately cancels it. Keep it until afterprint (or a safe fallback).
+    const cleanup = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      frame.remove();
+    };
+    win.addEventListener('afterprint', cleanup, { once: true });
+    timer = setTimeout(cleanup, CLEANUP_TIMEOUT_MS);
     win.focus();
     win.print(); // blocks until the dialog closes in Chromium
+    printed = true;
     return { ok: true };
   } finally {
-    frame.remove();
+    if (!printed) {
+      if (timer !== null) clearTimeout(timer);
+      frame.remove();
+    }
   }
 }

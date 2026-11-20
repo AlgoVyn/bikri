@@ -1,5 +1,9 @@
 import type { BikriDb } from '@bikri/db';
-import { type DayCloseReceipt, urduDayCloseLabels } from '@bikri/printer';
+import {
+  type DayCloseReceipt,
+  receiptLabelsFor,
+  urduDayCloseLabels,
+} from '@bikri/printer';
 import { dayCloseInfo } from './dayClose.ts';
 import { receiptShop } from './receipt.ts';
 
@@ -58,6 +62,7 @@ export async function loadDayCloseReceipt(
   }
   return {
     shop,
+    shopLabels: receiptLabelsFor(receiptLanguage),
     ...(receiptLanguage === 'ur' ? { labels: urduDayCloseLabels } : {}),
     staffName: staff ? String(staff.name) : null,
     deviceName: device ? String(device.name ?? device.code ?? '') : '',

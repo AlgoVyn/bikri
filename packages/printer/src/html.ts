@@ -62,11 +62,30 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * The system fallback writes the receipt into a same-origin `srcdoc` iframe, so a
+ * `javascript:`/SVG data URL in the logo would execute. Only raster data URLs and
+ * plain same-origin paths are allowed; anything else is omitted.
+ */
+function safeLogoUrl(url: string): string | null {
+  const value = url.trim();
+  if (/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/u.test(value))
+    return value;
+  if (
+    value.length > 0 &&
+    !value.startsWith('//') &&
+    /^[A-Za-z0-9._~%/-]+(?:[?#][A-Za-z0-9._~%=&/-]*)?$/u.test(value)
+  )
+    return value;
+  return null;
+}
+
+/**
  * `@page` rule that sizes the page to the rendered receipt: `80mm auto` is not valid CSS
  * (Chromium ignores it), so the printing code measures the body and appends this (D-087).
  */
 export function fitPageCss(widthMm: 58 | 80, contentHeightPx: number): string {
-  const heightMm = Math.max(20, Math.ceil((contentHeightPx * 25.4) / 96) + 2);
+  const heightPx = Number.isFinite(contentHeightPx) ? contentHeightPx : 0;
+  const heightMm = Math.max(20, Math.ceil((heightPx * 25.4) / 96) + 2);
   return `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0 }`;
 }
 
@@ -85,16 +104,18 @@ export function renderReceiptHtml(
     itemLayout: options.itemLayout,
   })) {
     switch (command.kind) {
-      case 'logo':
-        if (options.logoUrl) {
+      case 'logo': {
+        const logoUrl = options.logoUrl ? safeLogoUrl(options.logoUrl) : null;
+        if (logoUrl) {
           const widthPct = Math.round(
             Math.min(1, Math.max(0.1, options.logoWidthPct ?? 0.6)) * 100,
           );
           body.push(
-            `<div class="logo-wrap"><img class="logo" style="max-width:${widthPct}%" alt="" src="${escapeHtml(options.logoUrl)}"></div>`,
+            `<div class="logo-wrap"><img class="logo" style="max-width:${widthPct}%" alt="" src="${escapeHtml(logoUrl)}"></div>`,
           );
         }
         break;
+      }
       case 'text': {
         if (command.text === POWERED_BY) {
           body.push(`<p class="powered-by">${POWERED_BY}</p>`);
@@ -126,6 +147,8 @@ export function renderReceiptHtml(
         for (let i = 0; i < command.lines; i += 1)
           body.push('<div class="feed"></div>');
         break;
+      // The HTML fallback v1 has no arbitrary-image renderer (the shop logo is the
+      // only image); cut and drawer have no HTML equivalent.
       case 'image':
       case 'cut':
       case 'drawer':

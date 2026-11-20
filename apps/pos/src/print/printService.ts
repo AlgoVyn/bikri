@@ -43,7 +43,6 @@ import {
   sendSerial,
   sendUsb,
   type UsbLike,
-  withTimeout,
 } from './transports.ts';
 
 export type PrintDeps = {
@@ -237,16 +236,18 @@ export async function printBlocks(
     const device = await findUsb(deps.usb, printer.usb);
     if (!device)
       throw new PrintError(deps.usb ? 'DISCONNECTED' : 'UNSUPPORTED');
-    await withTimeout(sendUsb(device, bytes), timeout);
+    await sendUsb(device, bytes, timeout);
     return;
   }
   const port = await findSerial(deps.serial, printer.serial);
   if (!port) throw new PrintError(deps.serial ? 'DISCONNECTED' : 'UNSUPPORTED');
-  await withTimeout(
-    sendSerial(port, bytes, {
+  await sendSerial(
+    port,
+    bytes,
+    {
       baudRate: printer.serial?.baudRate ?? 9600,
       flowControl: printer.serial?.flowControl ?? 'none',
-    }),
+    },
     timeout,
   );
 }

@@ -42,7 +42,7 @@ export function buildSupplierReturn(
     blocks,
     shop,
     paper.charsPerLine,
-    labelsFrom(),
+    labelsFrom(input.shopLabels),
     settings.printLogo !== false,
   );
   blocks.push({ t: 'rule', char: '=' });

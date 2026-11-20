@@ -24,7 +24,7 @@ import {
   processQueue,
   runJob,
 } from './printService.ts';
-import { chunks, PrintError, withTimeout } from './transports.ts';
+import { chunks, PrintError, sendSerial, withTimeout } from './transports.ts';
 
 afterEach(dropTestDbs);
 
@@ -209,6 +209,37 @@ describe('transports (06 §10)', () => {
     expect(usb.device.sent.every((c) => c.length <= 4096)).toBe(true);
   });
 
+  it('reopens serial for a config change and releases a timed-out write', async () => {
+    const serial = fakeSerial();
+    await sendSerial(
+      serial.port,
+      new Uint8Array([1]),
+      { baudRate: 9600, flowControl: 'none' },
+      100,
+    );
+    expect(serial.port.openedWith).toMatchObject({ baudRate: 9600 });
+    await sendSerial(
+      serial.port,
+      new Uint8Array([2]),
+      { baudRate: 19200, flowControl: 'none' },
+      100,
+    );
+    expect(serial.port.openedWith).toMatchObject({ baudRate: 19200 });
+    expect(joined(serial.port.sent)).toEqual(new Uint8Array([1, 2]));
+
+    const hanging = fakeSerial({ hang: true });
+    await expect(
+      sendSerial(
+        hanging.port,
+        new Uint8Array([3]),
+        { baudRate: 9600, flowControl: 'none' },
+        10,
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(hanging.port.aborted).toBe(true);
+    expect(hanging.port.writable).toBeNull();
+  });
+
   it('timeout → TIMEOUT; claim refused → PERMISSION; cable out → DISCONNECTED; the sale is kept', async () => {
     await expect(
       withTimeout(new Promise(() => undefined), 10),
@@ -222,6 +253,8 @@ describe('transports (06 §10)', () => {
     expect(
       await runJob(db, job, { usb, serial: null, timeoutMs: 20 }),
     ).toMatchObject({ status: 'failed', error: 'TIMEOUT' });
+    // The timed-out interface is released and the device closed for the retry.
+    expect(usb.device.opened).toBe(false);
     const refused = fakeUsb();
     refused.device.claimFail = 'SecurityError';
     expect(await runJob(db, job, { usb: refused, serial: null })).toMatchObject(

@@ -60,7 +60,12 @@ export function receiptRows(blocks: Block[], options: ImageOptions): Row[] {
         rows.push({
           kind: 'text',
           text: c.text,
-          align: rtl ? 'right' : (c.align ?? 'left'),
+          // Only plain left-aligned Urdu flips to right; centred headers and
+          // titles stay centred in the picture.
+          align:
+            rtl && (c.align ?? 'left') === 'left'
+              ? 'right'
+              : (c.align ?? 'left'),
           bold: c.bold ?? false,
           size,
           height: Math.round(line * scale * (rtl ? 1.4 : 1)),
@@ -101,16 +106,27 @@ export function receiptRows(blocks: Block[], options: ImageOptions): Row[] {
   return rows;
 }
 
-function toImageData(
+export function toImageData(
   ctx: CanvasRenderingContext2D,
   source: RasterSource,
 ): ImageData {
   const out = ctx.createImageData(source.width, source.height);
   for (let i = 0; i < source.width * source.height; i += 1) {
-    const v = source.format === 'gray' ? (source.data[i] ?? 255) : null;
-    out.data[i * 4] = v ?? source.data[i * 4] ?? 255;
-    out.data[i * 4 + 1] = v ?? source.data[i * 4 + 1] ?? 255;
-    out.data[i * 4 + 2] = v ?? source.data[i * 4 + 2] ?? 255;
+    if (source.format === 'gray') {
+      const value = source.data[i] ?? 255;
+      out.data[i * 4] = value;
+      out.data[i * 4 + 1] = value;
+      out.data[i * 4 + 2] = value;
+      out.data[i * 4 + 3] = 255;
+      continue;
+    }
+    // PNG logos often have transparent pixels. Blend over the receipt's white
+    // background instead of forcing alpha to 255 (which painted them black).
+    const alpha = (source.data[i * 4 + 3] ?? 255) / 255;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const value = source.data[i * 4 + channel] ?? 255;
+      out.data[i * 4 + channel] = Math.round(value * alpha + 255 * (1 - alpha));
+    }
     out.data[i * 4 + 3] = 255;
   }
   return out;
@@ -187,11 +203,14 @@ export async function renderReceiptCanvas(
           : row.align === 'right'
             ? leftPad + options.dots
             : leftPad;
+      // Keep deliberate indentation and let the canvas condense an over-wide
+      // line instead of clipping it at the paper edge.
+      const maxWidth = Math.max(1, options.dots);
       if (row.size === 'double-height') {
         ctx.translate(0, y);
         ctx.scale(1, 2);
-        ctx.fillText(rtl ? row.text.trim() : row.text, x, 0);
-      } else ctx.fillText(rtl ? row.text.trim() : row.text, x, y);
+        ctx.fillText(row.text, x, 0, maxWidth);
+      } else ctx.fillText(row.text, x, y, maxWidth);
       ctx.restore();
     }
     y += row.height;

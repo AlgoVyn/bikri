@@ -155,6 +155,15 @@ describe('sale receipt from local rows (screens/07)', () => {
     expect(out).toContain('Galaxy A15');
     expect(out).toContain('Earbuds');
     expect(out).toContain('Rs 79,000');
+    const share = receiptShareText(loaded as NonNullable<typeof loaded>);
+    const shareLines = share.split('\n');
+    expect(shareLines).toContain('Starter Pack × 2  Rs 79,000');
+    expect(shareLines).toContain('  Galaxy A15 × 2');
+    expect(shareLines).toContain('  Earbuds × 2');
+    // Component allocation prices stay out of the shared message (D-229).
+    expect(
+      shareLines.filter((line) => line.startsWith('  ') && line.includes('Rs')),
+    ).toEqual([]);
   });
 
   it('falls back when a saved bundle snapshot has no name or price', async () => {
@@ -204,6 +213,9 @@ describe('sale receipt from local rows (screens/07)', () => {
     const out = text(loaded as NonNullable<typeof loaded>);
     expect(out).not.toContain('Bundle:');
     expect(out).toContain('Rs 30,000');
+    const share = receiptShareText(loaded as NonNullable<typeof loaded>);
+    expect(share).toContain('Bundle × 1  Rs 30,000');
+    expect(share).toContain('  Galaxy A15 × 1');
   });
 
   it('Urdu receipts print Urdu labels; Powered by AlgoVyn stays as is', async () => {
