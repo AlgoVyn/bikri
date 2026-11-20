@@ -1,7 +1,7 @@
 import { businessDate, isQtyUnit, newId } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
@@ -65,7 +65,9 @@ export function RefundDialog({
   const [refundId, setRefundId] = useState(() => newId());
   const [approving, setApproving] = useState(false);
   const [pending, setPending] = useState(false);
+  const savingRef = useRef(false);
   const [done, setDone] = useState<string | null>(null);
+  const modeInitialized = useRef(false);
 
   const detail = useLiveQuery(() => billDetail(getDb(), saleId), [saleId]);
   const today = useLiveQuery(
@@ -90,10 +92,13 @@ export function RefundDialog({
     setQty({});
     setBundleChoice({});
     setRestock({});
+    savingRef.current = false;
+    modeInitialized.current = false;
   }, [open]);
 
   useEffect(() => {
-    if (!detail || done) return;
+    if (!detail || done || modeInitialized.current) return;
+    modeInitialized.current = true;
     const groups = new Set<string>();
     for (const { line, keptMilli } of detail.lines)
       if (keptMilli > 0)
@@ -231,7 +236,8 @@ export function RefundDialog({
   }, [detail]);
 
   const save = async (approvedBy: string | null) => {
-    if (!plan || !canSave) return;
+    if (!plan || !canSave || savingRef.current) return;
+    savingRef.current = true;
     setPending(true);
     try {
       const db = getDb();
@@ -260,6 +266,7 @@ export function RefundDialog({
       }
       toast.push(t('errors.generic'), 'error');
     } finally {
+      savingRef.current = false;
       setPending(false);
     }
   };
@@ -321,9 +328,9 @@ export function RefundDialog({
             type="button"
             className={buttonQuiet}
             onClick={() => {
-              void queueRefundPrint(getDb(), done).then(() =>
-                toast.push(t('office.bill.print_queued')),
-              );
+              void queueRefundPrint(getDb(), done)
+                .then(() => toast.push(t('office.bill.print_queued')))
+                .catch(() => toast.push(t('errors.generic'), 'error'));
             }}
           >
             {t('office.bill.print_refund')}
@@ -643,6 +650,7 @@ export function RefundDialog({
           <input
             className={`${fieldClass} mt-2`}
             maxLength={120}
+            aria-label={t('office.refund.reason_other_label')}
             placeholder={t('office.refund.reason_other_label')}
             value={reasonText}
             onChange={(e) => setReasonText(e.target.value)}

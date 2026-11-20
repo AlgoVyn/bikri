@@ -75,6 +75,8 @@ export const pwaOptions = {
       '**/admin.lazy-*.js',
       '**/backups.lazy-*.js',
       '**/useAdminQuery-*.js',
+      // Email/brand images are served from the website, not needed offline.
+      '**/brand/**',
     ],
   },
   devOptions: {

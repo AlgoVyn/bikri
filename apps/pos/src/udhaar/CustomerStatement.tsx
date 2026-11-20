@@ -31,6 +31,11 @@ import {
 import { downloadText } from '../lib/download.ts';
 import { errorCode } from '../print/printService.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
+import {
+  closeShareWindow,
+  navigateShareWindow,
+  openShareWindow,
+} from '../print/shareWindow.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
@@ -106,8 +111,7 @@ export function CustomerStatement({
       range,
       visibleRows,
     );
-    const balance = (await db.party_balances.get(['customer', customerId]))
-      ?.balance;
+    const balanceRow = await db.party_balances.get(['customer', customerId]);
     const promise = (
       await db.promises.where('customer_id').equals(customerId).toArray()
     )
@@ -121,9 +125,8 @@ export function CustomerStatement({
       statement,
       tz,
       today,
-      balance: balance ?? statement.balance,
-      oldest: (await db.party_balances.get(['customer', customerId]))
-        ?.oldest_unpaid_at,
+      balance: balanceRow?.balance ?? statement.balance,
+      oldest: balanceRow?.oldest_unpaid_at,
       promise: promise ?? null,
       shopName: String(shop?.name ?? ''),
       shopAddress: String(shop?.address ?? ''),
@@ -250,17 +253,25 @@ export function CustomerStatement({
   };
 
   const exportCsv = async () => {
-    const full = await fullStatement();
-    downloadText(
-      `statement-${name.replace(/\s+/gu, '-')}.csv`,
-      statementCsv(mapRows(full)),
-    );
+    try {
+      const full = await fullStatement();
+      downloadText(
+        `statement-${name.replace(/\s+/gu, '-')}.csv`,
+        statementCsv(mapRows(full)),
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const exportPdf = async () => {
-    downloadBlob(
-      await statementPdf(await fullMeta()),
-      `statement-${name.replace(/\s+/gu, '-')}.pdf`,
-    );
+    try {
+      downloadBlob(
+        await statementPdf(await fullMeta()),
+        `statement-${name.replace(/\s+/gu, '-')}.pdf`,
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const printStatement = async () => {
     try {
@@ -270,6 +281,9 @@ export function CustomerStatement({
     }
   };
   const share = async () => {
+    // Pre-open the WhatsApp tab during the click; opening it after the PNG awaits
+    // is blocked as a popup.
+    const shareWindow = reminder ? openShareWindow() : null;
     try {
       const png = await statementPng(await fullMeta());
       const file = new File([png], `statement-${name}.png`, {
@@ -278,8 +292,12 @@ export function CustomerStatement({
       // With a phone, hand the picture to WhatsApp the same way the reminder does.
       if (reminder) {
         downloadBlob(png, file.name);
-        window.open(reminder, '_blank', 'noopener');
-        toast.push(t('done.image_saved'));
+        if (navigateShareWindow(shareWindow, reminder))
+          toast.push(t('done.image_saved'));
+        else {
+          closeShareWindow(shareWindow);
+          toast.push(t('done.share_blocked'), 'error');
+        }
       } else if (navigator.canShare?.({ files: [file] }))
         await navigator.share({ files: [file], title: name });
       else {
@@ -287,6 +305,7 @@ export function CustomerStatement({
         toast.push(t('done.image_saved'));
       }
     } catch (err) {
+      closeShareWindow(shareWindow);
       if ((err as Error).name !== 'AbortError')
         toast.push(t('done.share_failed'), 'error');
     }
@@ -397,7 +416,7 @@ export function CustomerStatement({
                       : []),
                   ]
                 : []),
-              ...(can('sale.create')
+              ...(can('sale.create') && !readOnly
                 ? [
                     {
                       label: t('office.udhaar.sell_to', { name }),
@@ -517,18 +536,20 @@ export function CustomerStatement({
             {t('office.udhaar.all_time')}
           </button>
         ) : null}
-        <button
-          type="button"
-          className={buttonQuiet}
-          onClick={() =>
-            tableRef.current?.scrollTo({
-              top: tableRef.current.scrollHeight,
-              behavior: 'smooth',
-            })
-          }
-        >
-          {t('office.udhaar.jump_latest')}
-        </button>
+        {wide ? (
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() =>
+              tableRef.current?.scrollTo({
+                top: tableRef.current.scrollHeight,
+                behavior: 'smooth',
+              })
+            }
+          >
+            {t('office.udhaar.jump_latest')}
+          </button>
+        ) : null}
       </div>
 
       {!wide ? (

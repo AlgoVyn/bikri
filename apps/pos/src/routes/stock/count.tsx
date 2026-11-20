@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { StockCountPage } from '../../products/StockCount.tsx';
+import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/stock/count')({
-  component: StockCountPage,
+  component: lazyRouteComponent(
+    () => import('../../products/StockCount.tsx'),
+    'StockCountPage',
+  ),
 });

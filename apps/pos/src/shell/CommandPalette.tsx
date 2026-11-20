@@ -30,9 +30,10 @@ import {
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { useSession } from '../state/session.ts';
 import { loadDevicePrefs, togglePrivacyMode } from './devicePrefs.ts';
-import { ignoresHotkey } from './hotkeys.ts';
+import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 
 const RECENT_KEY = 'bikri.recent_commands';
 
@@ -63,6 +64,7 @@ export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const lock = useSession((state) => state.lock);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'commands' | 'shortcuts'>('commands');
@@ -193,6 +195,11 @@ export function CommandPalette() {
       },
     ];
     return items.filter((item) => {
+      if (
+        readOnly &&
+        ['sell', 'udhaar', 'expenses', 'day-close'].includes(item.id)
+      )
+        return false;
       if (item.id === 'sell') return can('sale.create');
       if (item.id === 'udhaar') return can('payment.receive');
       if (item.id === 'suppliers')
@@ -203,7 +210,7 @@ export function CommandPalette() {
       if (item.id === 'cashiers') return can('settings.staff');
       return true;
     });
-  }, [can, lock, navigate, privacyEnabled, t]);
+  }, [can, lock, navigate, privacyEnabled, readOnly, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -243,6 +250,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || composing(event)) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setMode('commands');
@@ -251,7 +259,7 @@ export function CommandPalette() {
         setOpen(true);
         return;
       }
-      if (event.key === '?' && !ignoresHotkey(event.target)) {
+      if (event.key === '?' && !dialogOpen() && !ignoresHotkey(event.target)) {
         event.preventDefault();
         setMode('shortcuts');
         setActive(0);
@@ -337,6 +345,7 @@ export function CommandPalette() {
                     setActive(0);
                   }}
                   onKeyDown={(event) => {
+                    if (composing(event)) return;
                     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                       event.preventDefault();
                       if (ordered.length === 0) return;
@@ -346,12 +355,19 @@ export function CommandPalette() {
                       );
                     } else if (event.key === 'Enter') {
                       event.preventDefault();
-                      ordered[active]?.run();
+                      const command = ordered[active];
+                      if (command) {
+                        remember(command.id);
+                        command.run();
+                      }
                     }
                   }}
                   placeholder={t('shell.commands_placeholder')}
+                  role="combobox"
                   aria-label={t('shell.commands_placeholder')}
                   aria-controls={listId}
+                  aria-expanded
+                  aria-autocomplete="list"
                   aria-activedescendant={
                     ordered[active]
                       ? `${listId}-${ordered[active].id}`
@@ -377,7 +393,8 @@ export function CommandPalette() {
                 className="flex flex-col gap-0.5 overflow-y-auto p-1"
               >
                 {query.trim() === '' && recentCommands.length > 0 ? (
-                  <div>
+                  // biome-ignore lint/a11y/useSemanticElements: an ARIA listbox group, not a form fieldset
+                  <div role="group" aria-label={t('shell.recent_commands')}>
                     <p
                       aria-hidden="true"
                       className="px-3 pb-1 pt-2 text-caption font-semibold uppercase tracking-[0.12em] text-text-muted"
@@ -389,7 +406,8 @@ export function CommandPalette() {
                     )}
                   </div>
                 ) : null}
-                <div>
+                {/* biome-ignore lint/a11y/useSemanticElements: an ARIA listbox group, not a form fieldset */}
+                <div role="group" aria-label={t('shell.commands')}>
                   {(query.trim() === ''
                     ? commands.filter(
                         (command) =>

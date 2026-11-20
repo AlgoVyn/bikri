@@ -60,16 +60,6 @@
   },
   "overrides": [
     {
-      "includes": ["apps/pos/src/suppliers/SupplierStatement.tsx"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noNoninteractiveTabindex": "off"
-          }
-        }
-      }
-    },
-    {
       "includes": ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
       "linter": {
         "rules": {

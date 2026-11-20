@@ -1,3 +1,4 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDeferredValue, useEffect, useId, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { seesAllDates } from '../state/reportScope.ts';
-import { ignoresHotkey } from './hotkeys.ts';
+import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { useGlobalSearch } from './searchStore.ts';
 
 /** Rail or top-bar trigger for the global search overlay (screens/04). */
@@ -92,28 +93,11 @@ export function GlobalSearchHost() {
   }, [active, open, listId]);
 
   useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(timer);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      closeSearch();
-      setQuery('');
-      setActive(0);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, closeSearch]);
-
-  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
+        composing(event) ||
+        dialogOpen() ||
         event.key !== '/' ||
         event.altKey ||
         event.ctrlKey ||
@@ -127,8 +111,6 @@ export function GlobalSearchHost() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openSearch]);
-
-  if (!open) return null;
 
   const close = () => {
     closeSearch();
@@ -155,126 +137,140 @@ export function GlobalSearchHost() {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center px-3 pt-20 lg:pt-6">
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={t('common.close')}
-        className="absolute inset-0 bg-text/35"
-        onClick={close}
-      />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('shell.search_label')}
-        className="relative flex h-fit max-h-[calc(100dvh-7rem)] w-full max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface shadow-modal"
-      >
-        <div className="flex min-h-14 items-center gap-2 border-b border-border px-3">
-          <SearchIcon className="shrink-0 text-text-muted" />
-          <input
-            ref={inputRef}
-            id="global-search"
-            type="search"
-            role="combobox"
-            aria-label={t('shell.search_label')}
-            aria-expanded={query.trim() !== ''}
-            aria-controls={listId}
-            aria-activedescendant={
-              query.trim() !== '' && hits[active] ? optionId(active) : undefined
-            }
-            aria-autocomplete="list"
-            autoComplete="off"
-            placeholder={t('shell.search_label')}
-            className="bikri-focus-wrapper search-no-cancel h-12 min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-muted"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setActive(0);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                close();
-              } else if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setActive((i) => Math.min(i + 1, Math.max(hits.length - 1, 0)));
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setActive((i) => Math.max(i - 1, 0));
-              } else if (event.key === 'Enter') {
-                const hit = hits[active];
-                if (hit) {
-                  event.preventDefault();
-                  go(hit);
-                }
-              }
-            }}
-          />
-          <KeyBadge keys="Esc" always />
-          <button
-            type="button"
-            className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
-            aria-label={t('common.close')}
-            onClick={close}
-          >
-            <CloseIcon className="size-5" />
-          </button>
-        </div>
-        <div
-          id={listId}
-          role="listbox"
-          aria-label={t('shell.search_label')}
-          className="max-h-[60dvh] overflow-y-auto py-1"
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) close();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="bikri-overlay fixed inset-0 z-40 bg-text/35" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            inputRef.current?.focus();
+          }}
+          className="bikri-dialog fixed inset-x-3 top-20 z-50 mx-auto flex h-fit max-h-[calc(100dvh-7rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal lg:top-6"
         >
-          {query.trim() !== '' && hits.length === 0 ? (
-            <p className="px-3 py-2 text-text-muted">
-              {t('shell.search_none')}
-            </p>
-          ) : null}
-          {groups.map((group) => {
-            const inGroup = hits.filter((h) => h.kind === group.kind);
-            if (inGroup.length === 0) return null;
-            return (
-              // biome-ignore lint/a11y/useSemanticElements: an ARIA listbox group, not a form fieldset
-              <div key={group.kind} role="group" aria-label={group.label}>
-                <p className="px-3 pt-2 text-small text-text-muted">
-                  {group.label}
-                </p>
-                {inGroup.map((hit) => {
-                  const index = hits.indexOf(hit);
-                  return (
-                    <div
-                      key={`${hit.kind}-${hit.id}`}
-                      id={optionId(index)}
-                      role="option"
-                      tabIndex={-1}
-                      aria-selected={index === active}
-                      className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        go(hit);
-                      }}
-                    >
-                      <span className="truncate">{hit.title}</span>
-                      <span className="flex shrink-0 items-baseline gap-2">
-                        {hit.kind === 'product' && hit.price !== undefined ? (
-                          <span className="font-medium tabular-nums">
-                            <MoneyText paisa={hit.price} />
-                          </span>
-                        ) : hit.detail ? (
-                          <bdi dir="ltr" className="text-small text-text-muted">
-                            {hit.detail}
-                          </bdi>
-                        ) : null}
-                      </span>
-                    </div>
+          <Dialog.Title className="sr-only">
+            {t('shell.search_label')}
+          </Dialog.Title>
+          <div className="flex min-h-14 items-center gap-2 border-b border-border px-3">
+            <SearchIcon className="shrink-0 text-text-muted" />
+            <input
+              ref={inputRef}
+              id="global-search"
+              type="search"
+              role="combobox"
+              aria-label={t('shell.search_label')}
+              aria-expanded={query.trim() !== ''}
+              aria-controls={listId}
+              aria-activedescendant={
+                query.trim() !== '' && hits[active]
+                  ? optionId(active)
+                  : undefined
+              }
+              aria-autocomplete="list"
+              autoComplete="off"
+              placeholder={t('shell.search_label')}
+              className="bikri-focus-wrapper search-no-cancel h-12 min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-muted"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActive(0);
+              }}
+              onKeyDown={(event) => {
+                if (composing(event)) return;
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  close();
+                } else if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setActive((i) =>
+                    Math.min(i + 1, Math.max(hits.length - 1, 0)),
                   );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </div>
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setActive((i) => Math.max(i - 1, 0));
+                } else if (event.key === 'Enter') {
+                  const hit = hits[active];
+                  if (hit) {
+                    event.preventDefault();
+                    go(hit);
+                  }
+                }
+              }}
+            />
+            <KeyBadge keys="Esc" always />
+            <button
+              type="button"
+              className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text"
+              aria-label={t('common.close')}
+              onClick={close}
+            >
+              <CloseIcon className="size-5" />
+            </button>
+          </div>
+          <div
+            id={listId}
+            role="listbox"
+            aria-label={t('shell.search_label')}
+            className="max-h-[60dvh] overflow-y-auto py-1"
+          >
+            {query.trim() !== '' && hits.length === 0 ? (
+              <p className="px-3 py-2 text-text-muted">
+                {t('shell.search_none')}
+              </p>
+            ) : null}
+            {groups.map((group) => {
+              const inGroup = hits.filter((h) => h.kind === group.kind);
+              if (inGroup.length === 0) return null;
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: an ARIA listbox group, not a form fieldset
+                <div key={group.kind} role="group" aria-label={group.label}>
+                  <p className="px-3 pt-2 text-small text-text-muted">
+                    {group.label}
+                  </p>
+                  {inGroup.map((hit) => {
+                    const index = hits.indexOf(hit);
+                    return (
+                      <div
+                        key={`${hit.kind}-${hit.id}`}
+                        id={optionId(index)}
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={index === active}
+                        className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          go(hit);
+                        }}
+                      >
+                        <span className="truncate">{hit.title}</span>
+                        <span className="flex shrink-0 items-baseline gap-2">
+                          {hit.kind === 'product' && hit.price !== undefined ? (
+                            <span className="font-medium tabular-nums">
+                              <MoneyText paisa={hit.price} />
+                            </span>
+                          ) : hit.detail ? (
+                            <bdi
+                              dir="ltr"
+                              className="text-small text-text-muted"
+                            >
+                              {hit.detail}
+                            </bdi>
+                          ) : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

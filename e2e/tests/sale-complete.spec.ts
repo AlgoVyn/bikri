@@ -144,7 +144,7 @@ test.describe('Sale complete (T-018)', () => {
     await tile(page, 'Galaxy A15').click();
     await page.keyboard.press('F8');
     await modal(page)
-      .getByRole('tab', { name: /Credit/ })
+      .getByRole('radio', { name: /Credit/ })
       .click();
     await modal(page).getByRole('button', { name: 'Choose customer' }).click();
     await page

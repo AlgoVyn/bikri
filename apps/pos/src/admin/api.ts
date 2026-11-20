@@ -1,4 +1,5 @@
 import { API_BASE } from '@bikri/core';
+import { i18n } from '../i18n/i18n.ts';
 import type {
   ApproveShopRequestResult,
   BackupManifest,
@@ -76,8 +77,8 @@ async function readError(response: Response): Promise<AdminApiError> {
     typeof body?.error?.message === 'string'
       ? body.error.message
       : response.status >= 500
-        ? 'The server is unavailable. Check your connection and try again.'
-        : `Request failed (${response.status})`;
+        ? i18n.t('admin.err_server')
+        : i18n.t('admin.err_request', { status: response.status });
   return new AdminApiError(
     code,
     response.status,

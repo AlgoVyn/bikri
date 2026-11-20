@@ -11,7 +11,11 @@ export type ReportTab =
   | 'day_closes'
   | 'expenses';
 
-type CsvOptions = { includeCost: boolean };
+type CsvOptions = {
+  includeCost: boolean;
+  /** Localized label for expense rows without a category. */
+  uncategorizedLabel?: string;
+};
 
 const total = (values: readonly number[]): number =>
   values.reduce((sum, value) => sum + value, 0);
@@ -215,7 +219,13 @@ export function reportCsv(
   return lines(
     ['category', 'amount', 'share_pct'],
     bundle.expenses.rows.map((row) => [
-      csvCell(String(row.category?.name_en ?? 'Uncategorized')),
+      csvCell(
+        String(
+          row.category?.name_en ??
+            options.uncategorizedLabel ??
+            'Uncategorized',
+        ),
+      ),
       money(row.amount),
       percent(row.shareBp),
     ]),

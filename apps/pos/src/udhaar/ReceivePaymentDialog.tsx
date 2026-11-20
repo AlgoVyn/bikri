@@ -21,11 +21,11 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 type PayMethod = 'cash' | 'card' | 'bank_wallet';
 const METHODS: PayMethod[] = ['cash', 'bank_wallet', 'card'];
 const PROVIDERS = [
-  'JazzCash',
-  'Easypaisa',
-  'NayaPay',
-  'Bank transfer',
-  'Other',
+  { value: 'JazzCash', key: 'pay.provider_jazzcash' },
+  { value: 'Easypaisa', key: 'pay.provider_easypaisa' },
+  { value: 'NayaPay', key: 'pay.provider_nayapay' },
+  { value: 'Bank transfer', key: 'pay.provider_bank_transfer' },
+  { value: 'Other', key: 'pay.provider_other' },
 ] as const;
 
 const field =
@@ -51,12 +51,13 @@ export function ReceivePaymentDialog({
   const { staff, role, can } = useCurrentStaff();
   const [amount, setAmount] = useState<number | null>(null);
   const [method, setMethod] = useState<PayMethod>('cash');
-  const [provider, setProvider] = useState<string>(PROVIDERS[0]);
+  const [provider, setProvider] = useState<string>(PROVIDERS[0].value);
   const [reference, setReference] = useState('');
   const [date, setDate] = useState(businessDate(Date.now()));
   const [note, setNote] = useState('');
   const [paymentId, setPaymentId] = useState(() => newId());
   const [pending, setPending] = useState(false);
+  const savingRef = useRef(false);
   const [overpay, setOverpay] = useState(false);
   const zones = useLiveQuery(async () => {
     const tz = await shopTimeZone(getDb());
@@ -79,20 +80,29 @@ export function ReceivePaymentDialog({
     if (!open) return;
     setAmount(Math.max(0, balanceAtOpen.current));
     setMethod('cash');
-    setProvider(PROVIDERS[0]);
+    setProvider(PROVIDERS[0].value);
     setReference('');
     setDate(todayAtOpen.current);
     setNote('');
     setPaymentId(newId());
     setOverpay(false);
     setPending(false);
+    savingRef.current = false;
   }, [open]);
 
   const after = balance - (amount ?? 0);
   const over = (amount ?? 0) > Math.max(0, balance);
 
   const save = async () => {
-    if (!amount || amount <= 0 || pending || !can('payment.receive')) return;
+    if (
+      !amount ||
+      amount <= 0 ||
+      savingRef.current ||
+      pending ||
+      !can('payment.receive')
+    )
+      return;
+    savingRef.current = true;
     setPending(true);
     try {
       const db = getDb();
@@ -122,6 +132,7 @@ export function ReceivePaymentDialog({
         toast.push(t(`office.udhaar.payment_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      savingRef.current = false;
       setPending(false);
     }
   };
@@ -195,8 +206,8 @@ export function ReceivePaymentDialog({
                   onChange={(e) => setProvider(e.target.value)}
                 >
                   {PROVIDERS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
+                    <option key={p.value} value={p.value}>
+                      {t(p.key)}
                     </option>
                   ))}
                 </select>

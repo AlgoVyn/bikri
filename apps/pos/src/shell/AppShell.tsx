@@ -1,6 +1,12 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary } from '../components/classes.ts';
@@ -22,7 +28,7 @@ import {
   togglePrivacyMode,
 } from './devicePrefs.ts';
 import { GlobalSearchHost, GlobalSearchTrigger } from './GlobalSearch.tsx';
-import { dialogOpen, ignoresHotkey } from './hotkeys.ts';
+import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
@@ -71,6 +77,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [compactRail, setCompactRail] = useState(readCompactRail);
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMoreOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [moreOpen]);
   const openPriceCheck = usePriceCheck((s) => s.setOpen);
   const privacyEnabled = useLiveQuery(
     async () => (await loadDevicePrefs(getDb())).privacyMode,
@@ -186,14 +211,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       void pruneLocalHistoryIfDue(getDb()).catch(() => undefined);
     };
     let timer: number | undefined;
+    let idle: number | undefined;
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(run, { timeout: 5_000 });
+      idle = window.requestIdleCallback(run, { timeout: 5_000 });
     } else {
       timer = window.setTimeout(run, 3_000);
     }
     const daily = window.setInterval(run, 24 * 60 * 60 * 1_000);
     return () => {
       if (timer) window.clearTimeout(timer);
+      if (idle !== undefined) window.cancelIdleCallback?.(idle);
       window.clearInterval(daily);
     };
   }, []);
@@ -219,6 +246,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Re-bound every render so the handler sees the current permissions.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (composing(event)) return;
       // Hide amounts is a display action: it must also work in a field or an open dialog.
       if (
         !event.defaultPrevented &&
@@ -380,7 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </div>
         {more.length > 0 ? (
-          <div className="relative flex min-w-0 flex-1 lg:hidden">
+          <div ref={moreRef} className="relative flex min-w-0 flex-1 lg:hidden">
             <button
               type="button"
               className={`${navLink} ${

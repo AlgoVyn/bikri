@@ -1,4 +1,4 @@
-import { mulDivRound } from '@bikri/core';
+import { mulDivRound, parsePercentToBp } from '@bikri/core';
 import type { CartLine } from '@bikri/db';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,10 +9,8 @@ import { formatShopMoney } from '../lib/money';
 
 /** Percent text ("5", "12.5") to basis points, or null. */
 export function percentToBp(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d{1,3}(\.\d{1,2})?$/u.test(trimmed)) return null;
-  const bp = Math.round(Number(trimmed) * 100);
-  return bp <= 10000 ? bp : null;
+  const bp = parsePercentToBp(text);
+  return bp !== null && bp >= 0 && bp <= 10000 ? bp : null;
 }
 
 export function DiscountToggle({

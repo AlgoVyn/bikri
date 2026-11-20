@@ -1,4 +1,4 @@
-import { normaliseNumericText, parseMoneyToPaisa } from '@bikri/core';
+import { parseMoneyToPaisa, parsePercentToBp } from '@bikri/core';
 import { Navigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useState } from 'react';
@@ -33,12 +33,7 @@ type Kind = PriceChange['kind'];
 
 /** `10`, `-5`, `2.5` → basis points; null when not a number. */
 export function percentToBp(raw: string): number | null {
-  const text = normaliseNumericText(raw)
-    .trim()
-    .replace('\u2212', '-')
-    .replace('%', '');
-  if (!/^-?\d+(?:\.\d{1,2})?$/u.test(text)) return null;
-  return Math.round(Number(text) * 100);
+  return parsePercentToBp(raw);
 }
 
 function changeOf(kind: Kind, raw: string): PriceChange | null {

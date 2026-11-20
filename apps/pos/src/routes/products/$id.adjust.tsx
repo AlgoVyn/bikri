@@ -1,7 +1,15 @@
-import { createFileRoute, Navigate } from '@tanstack/react-router';
-import { ProductWorkspace } from '../../products/ProductWorkspace.tsx';
+import {
+  createFileRoute,
+  lazyRouteComponent,
+  Navigate,
+} from '@tanstack/react-router';
 import { useCurrentStaff } from '../../state/currentStaff.ts';
 import { useReadOnly } from '../../state/readOnly.ts';
+
+const ProductWorkspace = lazyRouteComponent(
+  () => import('../../products/ProductWorkspace.tsx'),
+  'ProductWorkspace',
+);
 
 export const Route = createFileRoute('/products/$id/adjust')({
   component: Adjust,

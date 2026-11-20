@@ -1,5 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { ProductWorkspace } from '../../products/ProductWorkspace.tsx';
+import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
+
+const ProductWorkspace = lazyRouteComponent(
+  () => import('../../products/ProductWorkspace.tsx'),
+  'ProductWorkspace',
+);
 
 export const Route = createFileRoute('/products/$id/')({
   component: ProductRoute,

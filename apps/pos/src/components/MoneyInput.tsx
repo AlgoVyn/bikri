@@ -1,5 +1,5 @@
 import { normaliseNumericText, parseMoneyToPaisa } from '@bikri/core';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const TRUE_MINUS = '\u2212';
@@ -86,6 +86,14 @@ export function MoneyInput({
   const errorId = `${inputId}-error`;
   const [draft, setDraft] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const lastEmitted = useRef(value);
+  const justFocused = useRef(false);
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    // The parent changed the amount externally; drop an old/invalid draft.
+    lastEmitted.current = value;
+    setDraft(null);
+  }, [value]);
   const shown = draft ?? (value === null ? '' : formatEditable(value));
   const parsed =
     shown.trim() === '' ? null : parseMoneyToPaisa(shown, { allowNegative });
@@ -126,9 +134,14 @@ export function MoneyInput({
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
           onFocus={(event) => {
+            justFocused.current = true;
             event.currentTarget.select();
           }}
           onMouseUp={(event) => {
+            // Suppress only the mouseup that immediately follows focus/select;
+            // later clicks must be able to place the caret.
+            if (!justFocused.current) return;
+            justFocused.current = false;
             event.preventDefault();
           }}
           onBlur={() => {
@@ -142,12 +155,13 @@ export function MoneyInput({
           }}
           onChange={(event) => {
             const next = filterMoneyDraft(event.target.value, allowNegative);
-            setDraft(next);
-            onChange(
+            const parsedNext =
               next.trim() === ''
                 ? null
-                : parseMoneyToPaisa(next, { allowNegative }),
-            );
+                : parseMoneyToPaisa(next, { allowNegative });
+            lastEmitted.current = parsedNext;
+            setDraft(next);
+            onChange(parsedNext);
           }}
         />
       </div>

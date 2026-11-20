@@ -41,6 +41,7 @@ export function PaySupplierDialog({
   const [note, setNote] = useState('');
   const [paymentId, setPaymentId] = useState(() => newId());
   const [pending, setPending] = useState(false);
+  const savingRef = useRef(false);
 
   // The balance is a default for a new payment, not a form value: a pull that
   // updates it must not wipe what the owner is typing (or the payment id).
@@ -54,10 +55,12 @@ export function PaySupplierDialog({
     setNote('');
     setPaymentId(newId());
     setPending(false);
+    savingRef.current = false;
   }, [open]);
 
   const save = async () => {
-    if (!amount || amount <= 0 || pending) return;
+    if (!amount || amount <= 0 || savingRef.current || pending) return;
+    savingRef.current = true;
     setPending(true);
     try {
       const db = getDb();
@@ -79,6 +82,7 @@ export function PaySupplierDialog({
         toast.push(t(`office.suppliers.payment_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      savingRef.current = false;
       setPending(false);
     }
   };
