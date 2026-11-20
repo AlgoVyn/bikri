@@ -115,6 +115,7 @@ How the daily row budget is shared:
 - Downloads are also bounded so one shop cannot consume the account-wide read allowance: pull, snapshot and owner export refuse after **max(1,000,000, 50 × `daily_write_budget`) D1 rows read in the UTC day** with the same `503 TENANT_QUOTA`/`Retry-After`. The count is `tenant_usage.rows_read` plus this isolate's unflushed pull/snapshot pages; it is best-effort across isolates, but a normal reference shop (≈300,000 rows for a full snapshot) stays far below the 1,000,000 floor.
 - Pull frequency: `/api/me` and pull responses carry `poll_after_ms` (default 60,000; the operator can raise it per tenant, and the Worker doubles it while the tenant is above 80 % of its write budget).
 - The account-wide limit is still the hard stop: if D1 itself refuses (`D1_LIMIT`), every tenant waits for 00:00 UTC. The console shows Σ usage across tenants against 100,000.
+- The nightly prune reads Σ `rows_written` for the day and stops before **90,000** (10,000 reserve), shrinking its chunks and skipping empty tables; a tenant delete that does not finish resumes the next night ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)).
 
 ## 7. Tenant lifecycle
 

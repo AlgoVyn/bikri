@@ -8,6 +8,7 @@ import {
   initialRestoreState,
   missingRestoreTables,
   parseExport,
+  RESTORE_CHUNK,
   type RestoreState,
   readRestoreState,
   reduceRestore,
@@ -61,12 +62,26 @@ describe('restore step machine', () => {
       tbl: 'staff',
       tableIndex: 2,
       from: 0,
-      to: 500,
+      to: RESTORE_CHUNK,
     });
-    state = reduceRestore(state, { type: 'imported', count: 500 }, tables);
+    state = reduceRestore(
+      state,
+      { type: 'imported', count: RESTORE_CHUNK },
+      tables,
+    );
     expect(restoreAction(state, tables)).toMatchObject({
       tbl: 'staff',
-      from: 500,
+      from: RESTORE_CHUNK,
+      to: RESTORE_CHUNK * 2,
+    });
+    state = reduceRestore(
+      state,
+      { type: 'imported', count: RESTORE_CHUNK },
+      tables,
+    );
+    expect(restoreAction(state, tables)).toMatchObject({
+      tbl: 'staff',
+      from: RESTORE_CHUNK * 2,
       to: 600,
     });
     state = reduceRestore(state, { type: 'imported', count: 100 }, tables);
@@ -83,19 +98,19 @@ describe('restore step machine', () => {
       ...initialRestoreState(),
       phase: 'import',
       tableIndex: 2,
-      rowOffset: 500,
+      rowOffset: RESTORE_CHUNK,
     };
     state = reduceRestore(state, { type: 'abort' }, tables);
     expect(state.aborted).toBe(true);
     expect(state.tableIndex).toBe(2);
-    expect(state.rowOffset).toBe(500);
+    expect(state.rowOffset).toBe(RESTORE_CHUNK);
     expect(restoreAction(state, tables)).toEqual({ type: 'halt' });
     state = reduceRestore(state, { type: 'resume' }, tables);
     expect(restoreAction(state, tables)).toMatchObject({
       type: 'import',
       tbl: 'staff',
-      from: 500,
-      to: 600,
+      from: RESTORE_CHUNK,
+      to: RESTORE_CHUNK * 2,
     });
     const done = reduceRestore(
       { ...initialRestoreState(), phase: 'done' },

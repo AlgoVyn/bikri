@@ -2,7 +2,7 @@ import { SYNC_EXPORT_ORDER, SYNC_IMPORT_ORDER } from '@bikri/core';
 import type { ExportRow } from './types.ts';
 
 /** Rows per `POST /admin/tenants/:id/import` call (04 §3.7). */
-export const RESTORE_CHUNK = 500;
+export const RESTORE_CHUNK = 250;
 
 export type RestorePhase =
   | 'maintenance_on'
