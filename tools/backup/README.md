@@ -12,7 +12,7 @@ Nightly whole-database backup for [docs/09 §2](../../docs/09-backups-and-ops.md
 | `zip.mjs` | Dependency-free STORE zip writer for the extract |
 | `tables.mjs` | Tenant tables counted in the manifest (checked against `packages/db/src/tables.ts`) |
 
-The nightly workflow is `.github/workflows/backup.yml`; it runs at 02:30 Asia/Karachi (21:30 UTC) and on demand. It needs the repository secrets `CLOUDFLARE_API_TOKEN` (D1 + R2 edit), `CLOUDFLARE_ACCOUNT_ID` and `BACKUP_AGE_RECIPIENT` (the operator's `age` public key). The plain dump goes only to the private `bikri-backups` R2 bucket; the GitHub artifact is always `age`-encrypted and kept for 90 days.
+The nightly workflow is `.github/workflows/backup.yml`; it runs at 05:05 Asia/Karachi (00:05 UTC) and on demand. It needs the repository secrets `CLOUDFLARE_API_TOKEN` (D1 + R2 edit), `CLOUDFLARE_ACCOUNT_ID` and `BACKUP_AGE_RECIPIENT` (the operator's `age` public key). The plain dump goes only to the private `bikri-backups` R2 bucket; the GitHub artifact is always `age`-encrypted and kept for 90 days.
 
 `files-backup.yml` runs weekly (Sunday 22:45 UTC = Monday 03:45 Asia/Karachi) and copies every object under `t/` in `bikri-files` (shop logos, product photos). It uses the same three secrets; the token needs R2 read on `bikri-files`. The runner writes `files/` plus `files-YYYY-MM-DD.manifest.json`, tars and `age`-encrypts it, and uploads `files-YYYY-MM-DD.tar.gz.age` for 90 days. Logs contain counts only, never keys or tenant ids.
 

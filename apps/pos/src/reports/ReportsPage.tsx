@@ -165,12 +165,13 @@ export function ReportsPage() {
   const limited = role === 'cashier' && !support;
   const cost = can('cost.view');
   const exportable = can('export.data');
+  const timeZone = useShopTimeZone();
   const [stored] = useState(() =>
     readDateFilter(
       'reports',
       limited ? (['today'] as Preset[]) : REPORT_PRESET_IDS,
       'today',
-      businessDate(Date.now()),
+      businessDate(Date.now(), timeZone),
     ),
   );
   const [preset, setPreset] = useState<Preset>(stored.preset);
@@ -189,7 +190,6 @@ export function ReportsPage() {
   const requestId = useRef(0);
   const firstRequest = useRef(true);
   const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
-  const timeZone = useShopTimeZone();
   // Rerun the live query when the business date passes midnight on an idle screen.
   const { today: businessToday } = useBusinessDates(timeZone);
 
@@ -360,7 +360,7 @@ export function ReportsPage() {
           onPreset={setPreset}
           custom={custom}
           onCustom={setCustom}
-          today={businessDate(Date.now())}
+          today={businessDate(Date.now(), timeZone)}
           first={firstDay}
         />
         <p

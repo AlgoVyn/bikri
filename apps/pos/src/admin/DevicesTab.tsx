@@ -7,6 +7,7 @@ import {
   importOps,
   issueCode,
   listDevices,
+  PartialImportError,
   revokeDevice,
 } from './api.ts';
 import { formatCount, formatWhen } from './format.ts';
@@ -344,7 +345,7 @@ export function DevicesTab({
                   ).length;
                   const missing = slice.length - results.length;
                   if (rejected > 0 || missing > 0)
-                    throw new Error(
+                    throw new PartialImportError(
                       t('admin.import_partial', {
                         rejected: formatCount(rejected, lang),
                         missing: formatCount(missing, lang),

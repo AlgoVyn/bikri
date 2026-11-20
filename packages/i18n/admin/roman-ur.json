@@ -152,6 +152,8 @@
     "restore_run": "Chalayein",
     "restore_steps": "Qadam",
     "restore_stuck": "Safai kam nahi hui. Dukaan maintenance mein rehti hai.",
+    "restore_loop": "Bahali bohat se marahil ke baad bhi mukammal nahi hui. Dukaan maintenance mein rehti hai.",
+    "restore_busy": "Ek bahali pehle hi chal rahi hai. Iske rukne ka intezar karein.",
     "restore_wrong_shop": "Yeh export doosri dukaan ki hai.",
     "restore_incomplete": "Is export mein kuch tables ghayab hain; mehfooz restore mumkin nahin.",
     "retry": "Dobara",

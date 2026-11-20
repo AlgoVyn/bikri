@@ -1,81 +1,16 @@
-import { APP_VERSION, SYNC_EXPORT_ORDER } from '@bikri/core';
+import {
+  APP_VERSION,
+  DEFAULT_TIME_ZONE,
+  EXPORT_HIDDEN_COLUMNS,
+  isTimeZone,
+  MONEY_FIELDS,
+  SYNC_EXPORT_ORDER,
+  TIME_FIELDS,
+} from '@bikri/core';
 import { type BikriDb, LOCAL_ONLY_TABLES } from '@bikri/db';
 import { ZipStoreWriter } from '../admin/zip.ts';
 import { csvCell } from '../lib/csv.ts';
 import { tenantInfo } from './localTenant.ts';
-
-/** Money columns in 02 (all paisa) — the full export CSV shows rupees with two decimals. */
-const MONEY_FIELDS = new Set([
-  'amount',
-  'avg_cost',
-  'bill_discount',
-  'bill_discount_alloc',
-  'bill_discount_value',
-  'bundle_discount',
-  'bundle_discount_total',
-  'bundle_price',
-  'cash_expenses',
-  'cash_refunds',
-  'cash_sales',
-  'cash_tendered',
-  'change_given',
-  'cost_snapshot',
-  'charges_alloc',
-  'counted_cash',
-  'credit_limit',
-  'default_credit_limit',
-  'difference',
-  'discount',
-  'discount_value',
-  'exact_amount',
-  'expected_cash',
-  'gross',
-  'gross_total',
-  'item_discount_total',
-  'landed_unit_cost',
-  'last_cost',
-  'line_total',
-  'net',
-  'opening_cash',
-  'other_charges',
-  'paid_now',
-  'paid_total',
-  'pay_ins',
-  'pay_outs',
-  'price',
-  'rounding',
-  'rounding_alloc',
-  'subtotal',
-  'supplier_cash_in',
-  'supplier_cash_out',
-  'tax',
-  'tax_alloc',
-  'total',
-  'udhaar_amount',
-  'udhaar_cash_in',
-  'udhaar_part',
-  'unit_cost',
-  'unit_cost_snapshot',
-  'unit_credit',
-  'unit_price',
-  'refund_received',
-  'round_total_to',
-]);
-
-const TIME_FIELDS = new Set([
-  'created_at',
-  'deleted_at',
-  'enrolled_at',
-  'oldest_pending_at',
-  'expires_at',
-  'last_seen_at',
-  'period_end',
-  'period_start',
-  'read_only_seen_at',
-  'revoked_at',
-  'setup_completed_at',
-  'updated_at',
-]);
 
 const localOnly = new Set<string>(LOCAL_ONLY_TABLES);
 
@@ -119,9 +54,21 @@ function slugify(value: string): string {
   );
 }
 
-function localIso(at: number): string {
+/** `+05:00`-style offset for the shop's zone at `at` (DST-safe). */
+function zoneOffset(at: number, timeZone: string): string {
+  const part = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'longOffset',
+  })
+    .formatToParts(new Date(at))
+    .find((entry) => entry.type === 'timeZoneName')?.value;
+  const match = /^GMT([+-]\d{2}:\d{2})$/u.exec(part ?? '');
+  return match?.[1] ?? '+00:00';
+}
+
+function localIso(at: number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -132,17 +79,18 @@ function localIso(at: number): string {
   }).formatToParts(new Date(at));
   const get = (type: string) =>
     parts.find((part) => part.type === type)?.value ?? '00';
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+05:00`;
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}${zoneOffset(at, timeZone)}`;
 }
 
 function csvValue(
   field: string,
   value: unknown,
   row: Record<string, unknown>,
+  timeZone: string,
 ): string {
   if (value === null || value === undefined) return '';
   if (TIME_FIELDS.has(field) && typeof value === 'number')
-    return localIso(value);
+    return localIso(value, timeZone);
   // Discount values are basis points when the same row says `pct`; showing paisa there
   // would silently divide a percentage by 100.
   if (
@@ -157,7 +105,11 @@ function csvValue(
   return String(value);
 }
 
-export function tableCsv(rows: readonly Record<string, unknown>[]): string {
+export function tableCsv(
+  rows: readonly Record<string, unknown>[],
+  timeZone = DEFAULT_TIME_ZONE,
+): string {
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
   if (rows.length === 0) return '\uFEFF';
   const fields: string[] = [];
   const seen = new Set<string>();
@@ -172,16 +124,16 @@ export function tableCsv(rows: readonly Record<string, unknown>[]): string {
   for (const row of rows) {
     lines.push(
       fields
-        .map((field) => csvCell(csvValue(field, row[field], row)))
+        .map((field) => csvCell(csvValue(field, row[field], row, zone)))
         .join(','),
     );
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }
 
-function exportStamp(now: number): string {
+function exportStamp(now: number, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -194,8 +146,13 @@ function exportStamp(now: number): string {
     .slice(0, 12);
 }
 
-export function shopExportFilename(displayName: string, now: number): string {
-  return `bikri-export-${slugify(displayName)}-${exportStamp(now)}.zip`;
+export function shopExportFilename(
+  displayName: string,
+  now: number,
+  timeZone = DEFAULT_TIME_ZONE,
+): string {
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  return `bikri-export-${slugify(displayName)}-${exportStamp(now, zone)}.zip`;
 }
 
 /** All of this shop's synced tables as a `bikri-export` v2 zip (09 §3.3). */
@@ -209,6 +166,10 @@ export async function buildShopExport(
   const now = options.now ?? Date.now();
   const tenant = await tenantInfo(db);
   const shop = await db.shop.get('shop');
+  const storedTimeZone = String(shop?.timezone ?? '');
+  const timeZone = isTimeZone(storedTimeZone)
+    ? storedTimeZone
+    : DEFAULT_TIME_ZONE;
   const displayName =
     tenant?.display_name || String(shop?.name ?? '') || 'Shop';
   const manifest: ShopExportManifest = {
@@ -231,9 +192,11 @@ export async function buildShopExport(
     const rows = all.filter(
       (row) => typeof row.created_at !== 'number' || row.created_at <= now,
     );
+    const hidden = new Set(EXPORT_HIDDEN_COLUMNS[table] ?? []);
     const clean = rows.map((row) => {
       const copy = { ...row };
       delete copy.tenant_id;
+      for (const field of hidden) delete copy[field];
       return copy;
     });
     manifest.tables[table] = clean.length;
@@ -244,7 +207,7 @@ export async function buildShopExport(
       rows: clean.length,
     });
     writer.add(`json/${table}.json`, encoder.encode(JSON.stringify(clean)));
-    writer.add(`csv/${table}.csv`, encoder.encode(tableCsv(clean)));
+    writer.add(`csv/${table}.csv`, encoder.encode(tableCsv(clean, timeZone)));
     // Drop this table's rows before reading the next one; its bytes are already in parts.
     if (index % 4 === 3) await new Promise((resolve) => setTimeout(resolve, 0));
   }
@@ -254,7 +217,7 @@ export async function buildShopExport(
   );
   return {
     blob: writer.finish(),
-    filename: shopExportFilename(displayName, now),
+    filename: shopExportFilename(displayName, now, timeZone),
     manifest,
   };
 }

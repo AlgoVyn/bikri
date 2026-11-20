@@ -5,6 +5,8 @@ const SIG_CENTRAL = 0x02014b50;
 const SIG_EOCD = 0x06054b50;
 const FLAG_UTF8 = 0x0800;
 const VERSION = 20;
+/** A corrupt/crafted archive must not inflate one entry without bound. */
+export const MAX_ENTRY_BYTES = 64 * 1024 * 1024;
 
 const CRC_TABLE = new Uint32Array(256);
 for (let n = 0; n < 256; n += 1) {
@@ -302,13 +304,52 @@ function findEocd(bytes: Uint8Array): number {
   throw new ZipError();
 }
 
-async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new DecompressionStream('deflate-raw');
-  const writer = stream.writable.getWriter();
-  await writer.write(data as Uint8Array<ArrayBuffer>);
-  await writer.close();
-  const buffer = await new Response(stream.readable).arrayBuffer();
-  return new Uint8Array(buffer);
+async function inflateRaw(
+  data: Uint8Array,
+  expected: number,
+): Promise<Uint8Array> {
+  if (expected > MAX_ENTRY_BYTES) throw new ZipError('entry too large');
+  let transform: DecompressionStream;
+  try {
+    transform = new DecompressionStream('deflate-raw');
+  } catch {
+    throw new ZipError('deflate unavailable');
+  }
+  const writer = transform.writable.getWriter();
+  const reader = transform.readable.getReader();
+  // Start the write but do not await it before reading: a full transform buffer would
+  // leave writer.write() pending forever.
+  const writing = writer
+    .write(data as Uint8Array<ArrayBuffer>)
+    .then(() => writer.close());
+  void writing.catch(() => undefined);
+  const out = new Uint8Array(expected);
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      if (
+        total + value.length > expected ||
+        total + value.length > MAX_ENTRY_BYTES
+      ) {
+        await reader.cancel().catch(() => undefined);
+        throw new ZipError('entry too large');
+      }
+      out.set(value, total);
+      total += value.length;
+    }
+    await writing;
+  } catch (error) {
+    await writer.abort().catch(() => undefined);
+    if (error instanceof ZipError) throw error;
+    throw new ZipError('bad deflate');
+  } finally {
+    reader.releaseLock();
+  }
+  if (total !== expected) throw new ZipError('size mismatch');
+  return out;
 }
 
 async function readEntry(
@@ -330,7 +371,7 @@ async function readEntry(
   const compressed = bytes.subarray(start, end);
   let data: Uint8Array;
   if (method === 0) data = compressed.slice();
-  else if (method === 8) data = await inflateRaw(compressed);
+  else if (method === 8) data = await inflateRaw(compressed, rawSize);
   else throw new ZipError('unsupported method');
   if (data.length !== rawSize) throw new ZipError('size mismatch');
   if (crc32(data) !== crc) throw new ZipError('crc mismatch');

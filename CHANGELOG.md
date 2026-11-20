@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Operator restore and export integrity — 20 Nov 2026 review, PR 2
+- The restore ZIP reader pipes decompression concurrently instead of awaiting `writer.write()` before the readable side, and caps each inflated entry at 64 MiB so a crafted archive cannot hang or exhaust the browser.
+- `RestoreTab` aborts its async loop on unmount, and the restore/export pagination guards now raise a visible error instead of returning silently with partial data.
+- A partial unsynced-ops import shows the localized rejected/missing counts instead of the generic admin error.
+- The till export and the nightly tenant extract share one `MONEY_FIELDS`/`TIME_FIELDS`/`EXPORT_HIDDEN_COLUMNS` definition in `@bikri/core`; the missing bundle, card/bank/credit and `sync_conflicts.at` columns are fixed, and products’ server-only cache columns stay out of exports.
+- `tenant-extract` stamps the real `05:05 Asia/Karachi` backup restore point and uses the current `APP_VERSION`; its CSV timestamps and the till/server exports follow the shop time zone with a DST-safe offset.
+
 ### Security and sync hardening — 20 Nov 2026 review, PR 1
 - A replacement bill must be paired with its `sale_voids` row in the same push, so `replaces_sale_id` can no longer skip the bundle price/recipe checks.
 - Bundle discounts are measured against the pre-discount bundle price: a 100% bundle discount no longer bypasses `max_discount_bp`, and 51–99% no longer rejects even the owner.

@@ -46,8 +46,18 @@ export class AdminApiError extends Error {
   }
 }
 
+/** A localized, user-facing message from a partial operator import. */
+export class PartialImportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PartialImportError';
+  }
+}
+
 export function adminErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof AdminApiError ? error.message : fallback;
+  return error instanceof AdminApiError || error instanceof PartialImportError
+    ? error.message
+    : fallback;
 }
 
 function never(): Promise<never> {
