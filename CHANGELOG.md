@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Performance P0 batch — 21 Nov 2026 review
+- Migration `0027` adds the partial `sales_replaces` index so restore purge and nightly tenant deletion no longer scan every bill for each deleted reissue; the API perf suite now deletes 2,000 of 20,000 reissued bills and gates the plan, rows read and elapsed time.
+- Reports slow movers read a bounded 30-day `sale_lines` range plus one indexed reverse seek per remaining candidate instead of walking every stock movement ever written; the Products tab receives the list from the coalesced report-worker bundle, so it never runs on the counter's main thread. A 1,000-candidate/20,000-line perf test guards the budget.
+- Stock count renders a windowed list (only rows near the viewport are mounted), loads the 5,000 products once per count instead of on every draft change, and debounces the whole-draft `kv` write by 350 ms with a flush on hide, unmount and Finish; taps update the screen immediately.
+- Print agent: Windows printer enumeration uses `EnumPrintersW`/`GetDefaultPrinterW` (no PowerShell per refresh), CUPS enumeration is singleflighted and serves the last known list on a transient error, the dead completed-job `lpstat` call is gone, a synchronous print returns `done` immediately when there is no spool id, the GDI path uses a top-down DIB from the existing RGBA buffer, and CI runs `go test -race ./...`.
+
 ### Visual design review fixes — 20 Nov 2026
 - Graphite overlays use a semantic dark scrim instead of the inverted `bg-text/40`, modal panels get a border, and the dark payment mix gives Credit a violet distinct from Card.
 - Command Palette rows span the dialog with the selected-row ink and a Lock icon; the Shops 768 px table fade is no longer reversed, and phone strips fade only an edge with hidden content.
