@@ -227,7 +227,7 @@ export type ReportOptions = {
    * previous-period comparison, which renders one number and needs no stock or party scans.
    */
   summaryOnly?: boolean;
-  /** Set false for the Summary tab: the slow-mover walk covers every movement ever made. */
+  /** Defaults to true; the Reports tabs other than Products set false. */
   slowMovers?: boolean;
 };
 
@@ -858,60 +858,73 @@ async function productReports(
 }
 
 /**
- * Products with stock that have not sold for 30 days. This walks every sale movement
- * ever written, so the Summary tab skips it and the Products tab loads it separately.
+ * Products with stock that have not sold for 30 days. The recent window is read from
+ * the `sale_lines.business_date` index; only the few candidates left after that are
+ * probed one at a time with the `[product_id+business_date]` index. Walking every
+ * movement the shop ever wrote blocked the counter for seconds (fifth review P0).
  */
 export async function slowMoversReport(
   db: BikriDb,
   today: string,
 ): Promise<SlowMover[]> {
-  const allProducts = (await db.products.toArray()).filter(
-    (product) => !product.deleted_at,
-  );
+  const slowCutoff = addDays(today, -30);
+  const products = (
+    await db.products.where('track_stock').equals(1).toArray()
+  ).filter((product) => !product.deleted_at);
+  const [levelRows, voidRows] = await Promise.all([
+    db.stock_levels.bulkGet(products.map((product) => String(product.id))),
+    db.sale_voids.toArray(),
+  ]);
   const levels = new Map(
-    (
-      await db.stock_levels.bulkGet(
-        allProducts.map((product) => String(product.id)),
-      )
-    )
+    levelRows
       .filter(
         (level): level is { product_id: string; on_hand_milli: number } =>
           level !== undefined,
       )
       .map((level) => [level.product_id, level.on_hand_milli]),
   );
-  const lastSales = new Map<string, string>();
-  const voidedSales = new Set(
-    (await db.sale_voids.toArray()).map((voidRow) => String(voidRow.sale_id)),
-  );
-  await db.stock_movements
+  const voided = new Set(voidRows.map((row) => String(row.sale_id)));
+  // One bounded range over the last 30 business days. A sale voided after a sync is
+  // excluded here, and the per-product probe below skips it too. `toArray` is much
+  // faster than one cursor step per row on fake-indexeddb/older WebViews; the range
+  // is bounded by 30 days, not by the shop's lifetime.
+  const recentLines = await db.sale_lines
     .where('business_date')
-    .belowOrEqual(today)
-    .each((movement) => {
-      // A voided sale still has its original `sale` movement; it must not keep a
-      // product out of the slow movers list.
-      if (
-        movement.reason_code !== 'sale' ||
-        voidedSales.has(String(movement.ref_id))
-      )
-        return;
-      const productId = String(movement.product_id);
-      const date = String(movement.business_date);
-      if (!lastSales.has(productId) || date > String(lastSales.get(productId)))
-        lastSales.set(productId, date);
-    });
-  const slowCutoff = addDays(today, -30);
-  return allProducts
-    .filter((product) => product.track_stock === 1)
-    .map((product) => {
-      const onHand = levels.get(String(product.id)) ?? 0;
-      const lastSale = lastSales.get(String(product.id)) ?? null;
-      return { product, onHand, lastSale };
-    })
-    .filter(
-      (row) =>
-        row.onHand > 0 && (row.lastSale === null || row.lastSale <= slowCutoff),
-    )
+    .between(addDays(today, -29), today, true, true)
+    .toArray();
+  const soldRecently = new Set<string>();
+  for (const line of recentLines) {
+    if (!line.product_id || voided.has(String(line.sale_id))) continue;
+    soldRecently.add(String(line.product_id));
+  }
+  const candidates = products.filter(
+    (product) =>
+      (levels.get(String(product.id)) ?? 0) > 0 &&
+      !soldRecently.has(String(product.id)),
+  );
+  const rows = await Promise.all(
+    candidates.map(async (product): Promise<SlowMover> => {
+      const id = String(product.id);
+      // Newest first; the compound index makes this one bounded reverse seek and
+      // the filter stops at the first non-voided sale (voids are rare).
+      const last = await db.sale_lines
+        .where('[product_id+business_date]')
+        .between([id, ''], [id, '\uffff'], true, true)
+        .reverse()
+        .filter((line) => !voided.has(String(line.sale_id)))
+        .first();
+      return {
+        product,
+        onHand: levels.get(id) ?? 0,
+        lastSale:
+          last && typeof last.business_date === 'string'
+            ? last.business_date
+            : null,
+      };
+    }),
+  );
+  return rows
+    .filter((row) => row.lastSale === null || row.lastSale <= slowCutoff)
     .sort(
       (a, b) =>
         String(a.lastSale ?? '').localeCompare(String(b.lastSale ?? '')) ||

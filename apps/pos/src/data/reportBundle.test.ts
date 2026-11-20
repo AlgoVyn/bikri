@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { seedSampleDay } from '../dev/sampleDay.ts';
 import { i18n, initI18n } from '../i18n/i18n.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
-import { reportBundle, reportDays } from './reportBundle.ts';
+import { addDays, reportBundle, reportDays } from './reportBundle.ts';
 import { reportCsv, reportTotal } from './reportCsv.ts';
 import { completeSale } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
@@ -130,6 +130,66 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
     );
     expect(bundle.products.slowMovers.map((row) => row.product.id)).toContain(
       'slow-1',
+    );
+  });
+
+  it('finds slow movers from indexed sale lines, not a lifetime movement scan', async () => {
+    const db = await readyDb('report-slow-lines');
+    await addShop(db, { timezone: TZ });
+    const old = addDays(TODAY, -45);
+    const recent = addDays(TODAY, -10);
+    const product = (id: string, name: string) =>
+      ({
+        id,
+        name_en: name,
+        sku: id.toUpperCase(),
+        price: 1000,
+        avg_cost: 500,
+        track_stock: 1,
+        created_at: NOW,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      }) as never;
+    await db.products.bulkAdd([
+      product('slow-lines', 'Old sale'),
+      product('recent-lines', 'Recent sale'),
+    ]);
+    await db.stock_levels.bulkPut([
+      { product_id: 'slow-lines', on_hand_milli: 1000 },
+      { product_id: 'recent-lines', on_hand_milli: 1000 },
+    ]);
+    const line = (id: string, productId: string, date: string) =>
+      ({
+        id,
+        sale_id: `sale-${id}`,
+        product_id: productId,
+        business_date: date,
+        qty_milli: 1000,
+        unit_price: 1000,
+        gross: 1000,
+        discount: 0,
+        net: 1000,
+        unit_cost_snapshot: 500,
+        created_at: NOW,
+      }) as never;
+    // Deliberately no stock_movements rows: the last-sale dates must come from the
+    // indexed sale lines, so this test fails if the function starts walking every
+    // movement again.
+    await db.sale_lines.bulkAdd([
+      line('old-line', 'slow-lines', old),
+      line('recent-line', 'recent-lines', recent),
+    ]);
+    const bundle = await reportBundle(
+      db,
+      { from: TODAY, to: TODAY },
+      { now: NOW, today: TODAY, timeZone: TZ },
+    );
+    const slow = bundle.products.slowMovers;
+    expect(slow.map((row) => row.product.id)).toContain('slow-lines');
+    expect(slow.map((row) => row.product.id)).not.toContain('recent-lines');
+    expect(slow.find((row) => row.product.id === 'slow-lines')?.lastSale).toBe(
+      old,
     );
   });
 

@@ -1,6 +1,6 @@
 import type { SyncedRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
-import { reportBundle } from './reportBundle.ts';
+import { addDays, reportBundle, slowMoversReport } from './reportBundle.ts';
 import { dropTestDbs } from './testDb.ts';
 import { addShop, readyDb } from './testShop.ts';
 
@@ -131,6 +131,55 @@ describe('reports performance (screens/16 AC 5)', () => {
     // Isolated this is ~0.9 s; the reference browser target is <2 s, so keep
     // scheduling headroom here.
     expect(elapsed).toBeLessThan(4_000);
+  });
+
+  it('finds a thousand slow movers in the worker budget', {
+    timeout: 30_000,
+  }, async () => {
+    const db = await readyDb('perf-slow');
+    await addShop(db);
+    const old = addDays('2026-10-27', -45);
+    const products = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `slow-${index}`,
+      name_en: `Slow ${index}`,
+      sku: `SLOW-${index}`,
+      price: 10_000,
+      avg_cost: 5_000,
+      track_stock: 1,
+      created_at: BASE,
+      updated_at: BASE,
+      deleted_at: null,
+      rev: 1,
+    }));
+    await db.products.bulkAdd(products as never);
+    await db.stock_levels.bulkPut(
+      products.map((product) => ({
+        product_id: product.id,
+        on_hand_milli: 1_000,
+      })),
+    );
+    await db.sale_lines.bulkAdd(
+      products.map((product, index) => ({
+        id: `slow-line-${index}`,
+        sale_id: `slow-sale-${index}`,
+        product_id: product.id,
+        business_date: old,
+        qty_milli: 1_000,
+        unit_price: 10_000,
+        gross: 10_000,
+        discount: 0,
+        net: 10_000,
+        unit_cost_snapshot: 5_000,
+        created_at: BASE,
+      })) as never,
+    );
+    const started = performance.now();
+    const rows = await slowMoversReport(db, '2026-10-27');
+    // The reference browser target is <300 ms; fake-indexeddb is slower and CI
+    // shares the runner, so this gate catches the per-candidate/lifetime blow-up.
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(rows).toHaveLength(1_000);
+    expect(rows[0]?.lastSale).toBe(old);
   });
 
   it('reads sale lines by business date, never by sale id over history', {
