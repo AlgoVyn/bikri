@@ -6,6 +6,7 @@ import { setKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
 import {
   AGENT_DOWNLOADS,
+  AGENT_PROTOCOL,
   AGENT_RELEASE_URL,
   AGENT_SHA256_URL,
   AGENT_URL,
@@ -160,6 +161,10 @@ export function PrinterWizard({
       if (cancelled) return;
       setAgentHealth(health);
       setAgentChecking(false);
+      if (health.protocol !== AGENT_PROTOCOL) {
+        setAgentError('agent_outdated');
+        return;
+      }
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
       if (health.paired && current?.agent?.token) {
@@ -185,6 +190,10 @@ export function PrinterWizard({
       const health = await agent.health(url);
       setAgentHealth(health);
       setAgentChecking(false);
+      if (health.protocol !== AGENT_PROTOCOL) {
+        setAgentError('agent_outdated');
+        return;
+      }
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
       if (health.paired) {
@@ -230,12 +239,16 @@ export function PrinterWizard({
       try {
         const health = await agent.health(url);
         setAgentHealth(health);
+        if (health.protocol !== AGENT_PROTOCOL) {
+          setAgentError('agent_outdated');
+          return;
+        }
       } catch {
         setAgentHealth((health) => ({
           ...(health ?? {
             app: 'bikri-print-agent',
             version: '',
-            protocol: 1,
+            protocol: AGENT_PROTOCOL,
             platform: '',
             paired: true,
             printers: 0,

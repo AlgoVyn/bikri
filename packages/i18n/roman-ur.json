@@ -570,6 +570,7 @@
     "agent_select_printer": "Printer chunein",
     "agent_stopped": "Print service nahin chal rahi",
     "agent_unpair": "Yeh computer unpair karein",
+    "agent_outdated": "Yeh print service purani hai. Neeche diye link se update karein.",
     "agent_unreachable": "Print service tak nahin pohanch sake. Ise shuru karein aur dobara koshish karein.",
     "agent_version": "Version {{version}}",
     "back": "Wapas",

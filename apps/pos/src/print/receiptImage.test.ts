@@ -1,6 +1,6 @@
 import { buildSaleReceipt, saleBasicInput } from '@bikri/printer';
 import { describe, expect, it } from 'vitest';
-import { jpegToPdf, receiptRows } from './receiptImage.ts';
+import { jpegToPdf, receiptRows, toImageData } from './receiptImage.ts';
 
 describe('receipt picture (screens/07 AC 2)', () => {
   it('uses the thermal line layout: title, REPRINT, Powered by line', () => {
@@ -23,6 +23,36 @@ describe('receipt picture (screens/07 AC 2)', () => {
     expect(texts.at(-1)).toBe('Powered by AlgoVyn');
     expect(rows[0]?.kind).toBe('raster');
     expect(rows.every((r) => r.height > 0)).toBe(true);
+  });
+
+  it('keeps centred Urdu centred and blends transparent logo pixels over white', () => {
+    const centred = receiptRows(
+      [{ t: 'text', text: 'رسید', align: 'center' }],
+      { dots: 576, charsPerLine: 48, itemLayout: 'columns', logo: null },
+    );
+    expect(centred[0]).toMatchObject({ kind: 'text', align: 'center' });
+    const left = receiptRows([{ t: 'text', text: 'رسید', align: 'left' }], {
+      dots: 576,
+      charsPerLine: 48,
+      itemLayout: 'columns',
+      logo: null,
+    });
+    expect(left[0]).toMatchObject({ kind: 'text', align: 'right' });
+
+    const ctx = {
+      createImageData: (width: number, height: number) => ({
+        width,
+        height,
+        data: new Uint8ClampedArray(width * height * 4),
+      }),
+    } as unknown as CanvasRenderingContext2D;
+    const out = toImageData(ctx, {
+      width: 2,
+      height: 1,
+      format: 'rgba',
+      data: new Uint8Array([0, 0, 0, 0, 255, 0, 0, 128]),
+    });
+    expect([...out.data]).toEqual([255, 255, 255, 255, 255, 127, 127, 255]);
   });
 
   it('draws a QR as a scannable row, not as its payload text', () => {

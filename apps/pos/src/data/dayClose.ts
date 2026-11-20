@@ -320,7 +320,9 @@ export async function closeDay(
     try {
       const printer = ((await db.kv.get('printer'))?.value ??
         null) as PrinterKv | null;
-      if (printer?.print_day_close !== false)
+      // A missing printer config is not a configured printer: queueing a phantom
+      // job here would print an old Z-report once a printer is finally added.
+      if (printer?.transport && printer.print_day_close !== false)
         await queueDayClosePrint(db, String(row.id), { now });
     } catch {
       // Printing is optional; the close itself is already saved.

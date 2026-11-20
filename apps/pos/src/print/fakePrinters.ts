@@ -62,6 +62,10 @@ export function fakeUsb(
       if (device.claimFail)
         throw Object.assign(new Error('claim'), { name: device.claimFail });
     },
+    async releaseInterface() {},
+    async close() {
+      device.opened = false;
+    },
     async transferOut(endpoint, data) {
       if (device.hang) return new Promise(() => undefined);
       if (device.fail)
@@ -83,10 +87,14 @@ export function fakeUsb(
 }
 
 export type FakeSerial = SerialLike & {
-  port: SerialPortLike & { sent: Uint8Array[]; openedWith?: unknown };
+  port: SerialPortLike & {
+    sent: Uint8Array[];
+    openedWith?: unknown;
+    aborted?: boolean;
+  };
 };
 
-export function fakeSerial(): FakeSerial {
+export function fakeSerial(options: { hang?: boolean } = {}): FakeSerial {
   const sent: Uint8Array[] = [];
   const port: FakeSerial['port'] = {
     sent,
@@ -97,12 +105,20 @@ export function fakeSerial(): FakeSerial {
       port.openedWith = o;
       port.writable = {
         getWriter: () => ({
-          write: async (b: Uint8Array) => {
+          write: (b: Uint8Array) => {
+            if (options.hang) return new Promise(() => undefined);
             sent.push(new Uint8Array(b));
+            return Promise.resolve();
+          },
+          abort: async () => {
+            port.aborted = true;
           },
           releaseLock: () => undefined,
         }),
       } as unknown as WritableStream<Uint8Array>;
+    },
+    async close() {
+      port.writable = null;
     },
   };
   return {

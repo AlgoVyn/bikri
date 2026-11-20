@@ -43,8 +43,10 @@ export type UsbDeviceLike = {
   opened: boolean;
   configuration: { interfaces: UsbInterfaceLike[] } | null;
   open(): Promise<void>;
+  close(): Promise<void>;
   selectConfiguration(n: number): Promise<void>;
   claimInterface(n: number): Promise<void>;
+  releaseInterface(n: number): Promise<void>;
   transferOut(
     endpoint: number,
     data: BufferSource,
@@ -68,6 +70,7 @@ export type SerialPortLike = {
     parity?: string;
     flowControl?: string;
   }): Promise<void>;
+  close(): Promise<void>;
   forget?(): Promise<void>;
 };
 export type SerialLike = {
@@ -115,6 +118,37 @@ export function withTimeout<T>(
   });
 }
 
+/**
+ * Like withTimeout, but runs a cleanup (abort/close) when the deadline wins so a
+ * stuck WebUSB/Web Serial write cannot keep the interface or writer locked.
+ */
+export function withDeadline<T>(
+  promise: Promise<T>,
+  ms: number,
+  onTimeout: () => Promise<void> | void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      try {
+        void Promise.resolve(onTimeout()).catch(() => undefined);
+      } catch {
+        // Cleanup is best-effort; the TIMEOUT error still reaches the caller.
+      }
+      reject(new PrintError('TIMEOUT'));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export function chunks(bytes: Uint8Array, size = USB_CHUNK): Uint8Array[] {
   const out: Uint8Array[] = [];
   for (let i = 0; i < bytes.length; i += size)
@@ -156,15 +190,45 @@ function printerEndpoint(
     : null;
 }
 
-const claimed = new WeakMap<UsbDeviceLike, { endpoint: number }>();
+const claimed = new WeakMap<
+  UsbDeviceLike,
+  { iface: number; endpoint: number }
+>();
+
+async function releaseUsb(
+  device: UsbDeviceLike,
+  state: { iface: number } | undefined,
+): Promise<void> {
+  claimed.delete(device);
+  if (state) {
+    try {
+      await device.releaseInterface(state.iface);
+    } catch {
+      // Already disconnected; close below is still best-effort.
+    }
+  }
+  try {
+    await device.close();
+  } catch {
+    // The device may already be gone.
+  }
+}
 
 export async function sendUsb(
   device: UsbDeviceLike,
   bytes: Uint8Array,
+  ms = JOB_TIMEOUT_MS,
 ): Promise<void> {
+  let state = claimed.get(device);
+  let cleanupPromise: Promise<void> | null = null;
+  const cleanup = (): Promise<void> => {
+    cleanupPromise ??= releaseUsb(device, state);
+    return cleanupPromise;
+  };
   try {
-    let state = claimed.get(device);
     if (!state || !device.opened) {
+      state = undefined;
+      claimed.delete(device);
       if (!device.opened) await device.open();
       if (device.configuration === null) await device.selectConfiguration(1);
       const target = printerEndpoint(device);
@@ -178,29 +242,55 @@ export async function sendUsb(
           throw new PrintError('PERMISSION');
         throw err;
       }
-      state = { endpoint: target.endpoint };
+      state = { iface: target.iface, endpoint: target.endpoint };
       claimed.set(device, state);
     }
     for (const chunk of chunks(bytes)) {
-      const result = await device.transferOut(
-        state.endpoint,
-        chunk as BufferSource,
+      // A stuck transferOut otherwise leaves the interface claimed forever.
+      const result = await withDeadline(
+        device.transferOut(state.endpoint, chunk as BufferSource),
+        ms,
+        cleanup,
       );
       if (result.status !== 'ok') throw new PrintError('FAILED', result.status);
     }
   } catch (err) {
-    claimed.delete(device);
+    await cleanup();
     throw mapError(err);
+  }
+}
+
+type SerialOptions = Pick<SerialSaved, 'baudRate' | 'flowControl'>;
+
+/** Options the port was opened with; a settings change closes and reopens it. */
+const serialOpen = new WeakMap<SerialPortLike, SerialOptions>();
+
+async function closeSerial(port: SerialPortLike): Promise<void> {
+  serialOpen.delete(port);
+  try {
+    await port.close();
+  } catch {
+    // Already closed or never opened.
   }
 }
 
 export async function sendSerial(
   port: SerialPortLike,
   bytes: Uint8Array,
-  options: Pick<SerialSaved, 'baudRate' | 'flowControl'>,
+  options: SerialOptions,
+  ms = JOB_TIMEOUT_MS,
 ): Promise<void> {
+  const current = serialOpen.get(port);
+  if (
+    port.writable &&
+    (!current ||
+      current.baudRate !== options.baudRate ||
+      current.flowControl !== options.flowControl)
+  )
+    await closeSerial(port);
+  let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   try {
-    if (!port.writable)
+    if (!port.writable) {
       await port.open({
         baudRate: options.baudRate,
         dataBits: 8,
@@ -208,15 +298,31 @@ export async function sendSerial(
         parity: 'none',
         flowControl: options.flowControl,
       });
-    if (!port.writable) throw new PrintError('DISCONNECTED');
-    const writer = port.writable.getWriter();
-    try {
-      await writer.write(bytes);
-    } finally {
-      writer.releaseLock();
+      serialOpen.set(port, {
+        baudRate: options.baudRate,
+        flowControl: options.flowControl,
+      });
     }
+    if (!port.writable) throw new PrintError('DISCONNECTED');
+    writer = port.writable.getWriter();
+    // A timed-out write would otherwise keep the WritableStream locked until reload.
+    await withDeadline(writer.write(bytes), ms, async () => {
+      try {
+        await writer?.abort();
+      } catch {
+        // The stream may already be errored.
+      }
+      await closeSerial(port);
+    });
   } catch (err) {
+    await closeSerial(port);
     throw mapError(err);
+  } finally {
+    try {
+      writer?.releaseLock();
+    } catch {
+      // abort() already released it in some browsers.
+    }
   }
 }
 

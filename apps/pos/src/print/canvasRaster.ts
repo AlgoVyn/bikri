@@ -51,7 +51,9 @@ export function createCanvasRasterRenderer(
         align === 'center' ? o.dots / 2 : align === 'right' ? o.dots : 0;
       ctx.save();
       ctx.scale(1, tall);
-      ctx.fillText(text.trim(), x, height / tall / 2);
+      // Keep deliberate leading spaces (bundle component indentation); maxWidth
+      // condenses a too-wide Urdu line instead of clipping it.
+      ctx.fillText(text, x, height / tall / 2, Math.max(1, o.dots));
       ctx.restore();
       const data = ctx.getImageData(0, 0, o.dots, height).data;
       return { width: o.dots, height, data, format: 'rgba' };

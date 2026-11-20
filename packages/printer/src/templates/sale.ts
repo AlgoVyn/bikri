@@ -96,14 +96,17 @@ function pushItems(
         next += 1;
       }
       const bundleQty = line.bundleQty ?? 1;
-      const bundlePrice =
-        line.bundlePrice ??
-        group.reduce((sum, component) => sum + component.net, 0);
+      // The component nets are already the total for every bundle in the group;
+      // multiplying them by bundleQty again doubled the fallback header.
+      const bundleTotal =
+        line.bundlePrice != null
+          ? line.bundlePrice * bundleQty
+          : group.reduce((sum, component) => sum + component.net, 0);
       blocks.push({
         t: 'item',
         name: (line.bundleName ?? '').trim(),
         qty: `${bundleQty}`,
-        amount: money(bundlePrice * bundleQty),
+        amount: money(bundleTotal),
         breakdown: ` ${bundleQty}`,
         bold: true,
       });

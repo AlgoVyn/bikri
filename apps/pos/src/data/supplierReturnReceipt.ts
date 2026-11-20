@@ -1,5 +1,7 @@
+import { newId } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import {
+  receiptLabelsFor,
   type SupplierReturnReceipt,
   urduSupplierReturnLabels,
 } from '@bikri/printer';
@@ -45,6 +47,7 @@ export async function loadSupplierReturnReceipt(
   );
   return {
     shop,
+    shopLabels: receiptLabelsFor(receiptLanguage),
     ...(receiptLanguage === 'ur' ? { labels: urduSupplierReturnLabels } : {}),
     supplierName: String(supplier.name),
     purchaseInvoice: purchase
@@ -78,7 +81,9 @@ export async function queueSupplierReturnPrint(
   returnId: string,
   now = Date.now(),
 ): Promise<string> {
-  const id = `sr-print-${returnId}`;
+  // A reprint is a new print job. The agent deduplicates by jobId for 24 h, so a
+  // deterministic id would silently skip every reprint of the same return.
+  const id = newId(now);
   await db.print_jobs.put({
     id,
     supplier_return_id: returnId,

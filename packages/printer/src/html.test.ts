@@ -77,5 +77,34 @@ describe('renderReceiptHtml (06 §5.3)', () => {
   it('sizes the page to the content height', () => {
     expect(fitPageCss(80, 960)).toBe('@page { size: 80mm 256mm; margin: 0 }');
     expect(fitPageCss(58, 10)).toBe('@page { size: 58mm 20mm; margin: 0 }');
+    expect(fitPageCss(80, Number.NaN)).toBe(
+      '@page { size: 80mm 20mm; margin: 0 }',
+    );
+    expect(fitPageCss(80, Number.POSITIVE_INFINITY)).toBe(
+      '@page { size: 80mm 20mm; margin: 0 }',
+    );
+  });
+
+  it('drops unsafe logo URLs from the print iframe', () => {
+    const render = (logoUrl: string) =>
+      renderReceiptHtml([{ t: 'logo' }], {
+        widthMm: 80,
+        charsPerLine: 48,
+        itemLayout: 'columns',
+        logoUrl,
+      });
+    for (const unsafe of [
+      'javascript:alert(1)',
+      'data:image/svg+xml,<svg onload=alert(1)>',
+      '//evil.example/logo.png',
+      'https://evil.example/logo.png',
+    ])
+      expect(render(unsafe)).not.toContain('<img');
+    expect(render('brand/logo.png')).toContain(
+      '<img class="logo" style="max-width:60%" alt="" src="brand/logo.png">',
+    );
+    expect(render('/bikri/brand/logo.png')).toContain(
+      'src="/bikri/brand/logo.png"',
+    );
   });
 });

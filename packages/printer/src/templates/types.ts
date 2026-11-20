@@ -176,6 +176,7 @@ export type VoidReceipt = {
   voidCreatedAt: number;
   reason: string;
   replacementInvoiceNo: string | null;
+  labels?: Partial<ReceiptLabels>;
 };
 
 /** Day close / Z-report (screens/15); an internal slip, so no "Powered by AlgoVyn". */
@@ -205,6 +206,8 @@ export type DayCloseReceipt = {
   refunds: number;
   note: string;
   labels?: Partial<DayCloseLabels>;
+  /** Tel/NTN/STRN prefixes for the shop header in the receipt language. */
+  shopLabels?: Partial<ReceiptLabels>;
 };
 
 export type DayCloseLabels = {
@@ -251,6 +254,8 @@ export type SupplierReturnReceipt = {
   note: string;
   balanceAfter: number;
   labels?: Partial<SupplierReturnLabels>;
+  /** Tel/NTN/STRN prefixes for the shop header in the receipt language. */
+  shopLabels?: Partial<ReceiptLabels>;
 };
 
 export type SupplierReturnLabels = {

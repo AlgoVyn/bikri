@@ -275,7 +275,8 @@ Baud choices: 9600 (default), 19200, 38400, 115200; flow control none (default) 
 
 ### 5.3 System printing (fallback; also for A4/office printers)
 
-- Render `renderReceiptHtml(model, { widthMm })` into a hidden iframe and call `iframe.contentWindow.print()` (i.e. `window.print()` of the receipt document).
+- Render `renderReceiptHtml(model, { widthMm })` into a hidden iframe and call `iframe.contentWindow.print()` (i.e. `window.print()` of the receipt document). The iframe stays mounted until the window fires `afterprint` (or a 60 s fallback), because removing it immediately cancels the asynchronous print dialog on Safari/Firefox/mobile.
+- `logoUrl` accepts only a PNG/JPEG/WebP base64 data URL or a same-origin path; the iframe is same-origin, so `javascript:` and SVG data URLs are dropped.
 - CSS by paper width, embedded by `renderReceiptHtml` (`packages/printer/src/html.ts`); the font size is `body width ÷ (chars_per_line × 0.6)` so exactly `chars_per_line` monospace columns fit, and before printing the till appends `fitPageCss()` so the page is as long as the receipt (`80mm auto` is not valid CSS) (D-087):
   ```css
   /* 80 mm */ @page { size: 80mm 297mm; margin: 0 } body { width: 72mm; margin: 0 4mm; font: 2.5mm/1.35 'JetBrains Mono', monospace }  /* 72mm ÷ (48 × 0.6) */

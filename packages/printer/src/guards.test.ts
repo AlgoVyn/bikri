@@ -106,6 +106,8 @@ describe('layout guards', () => {
       }),
     ).toThrow(/rule/);
     expect(() => columnWidths(19)).toThrow();
+    expect(() => columnWidths(23)).toThrow();
+    expect(columnWidths(24)).toEqual({ name: 4, qty: 5, amount: 15 });
     expect(() => formatPair('a', 'b', 0)).toThrow();
     expect(() => resolvePaper({ charsPerLine: 0 })).toThrow();
     expect(() => resolvePaper({ dots: 1.5 })).toThrow();

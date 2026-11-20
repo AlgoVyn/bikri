@@ -53,8 +53,9 @@ export function buildDayClose(
   const money = (paisa: number): string =>
     formatReceiptMoney(paisa, shop.numberGrouping);
   const blocks: Block[] = [];
-  // The shared shop header uses receipt labels; only the shop fields are needed here.
-  const receiptLabels = labelsFrom();
+  // The shared shop header prints Tel/NTN/STRN; use the receipt-language labels so
+  // an Urdu slip does not fall back to the English "Tel:".
+  const receiptLabels = labelsFrom(input.shopLabels);
   pushShopHeader(
     blocks,
     shop,

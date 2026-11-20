@@ -114,6 +114,74 @@ describe('bundle receipts (06 §4, v1.1)', () => {
     expect(t).toMatch(/^ {2}Galaxy A15 +2 +$/m);
   });
 
+  it('does not multiply the component fallback by bundle quantity', () => {
+    const input = variant((i) => {
+      i.lines = [
+        {
+          name: 'Galaxy A15',
+          qtyMilli: 2000,
+          unitPrice: 2_000_000,
+          discount: 0,
+          net: 4_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: null,
+        },
+        {
+          name: 'Charger',
+          qtyMilli: 2000,
+          unitPrice: 500_000,
+          discount: 0,
+          net: 1_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: null,
+        },
+      ];
+    });
+    const t = text80(buildSaleReceipt(input));
+    // Component nets already cover both bundles: 5,000,000 paisa = Rs 50,000.
+    expect(t).toMatch(/^Starter Pack +2 +Rs 50,000$/m);
+    expect(t).not.toMatch(/^Starter Pack +2 +Rs 1,00,000$/m);
+  });
+
+  it('keeps a free bundle at zero instead of using the component fallback', () => {
+    const input = variant((i) => {
+      i.lines = [
+        {
+          name: 'Galaxy A15',
+          qtyMilli: 2000,
+          unitPrice: 2_000_000,
+          discount: 4_000_000,
+          net: 0,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Free Pack',
+          bundleQty: 2,
+          bundlePrice: 0,
+        },
+        {
+          name: 'Charger',
+          qtyMilli: 2000,
+          unitPrice: 500_000,
+          discount: 1_000_000,
+          net: 0,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Free Pack',
+          bundleQty: 2,
+          bundlePrice: 0,
+        },
+      ];
+    });
+    const t = text80(buildSaleReceipt(input));
+    expect(t).toMatch(/^Free Pack +2 +Rs 0$/m);
+  });
+
   it('groups a whole-bundle refund under one header', () => {
     const base = saleBasicInput();
     const t = text80(

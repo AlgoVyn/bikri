@@ -134,6 +134,35 @@ function graphemes(text: string): string[] {
   return Array.from(text);
 }
 
+/** Printable length: grapheme clusters for non-ASCII, code units otherwise. */
+function textWidth(text: string): number {
+  return hasNonAscii(text) ? graphemes(text).length : text.length;
+}
+
+/** Cut from the start without splitting a surrogate pair or Urdu cluster. */
+function clipStart(text: string, width: number): string {
+  if (textWidth(text) <= width) return text;
+  const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  return units.slice(0, Math.max(0, width)).join('');
+}
+
+/** Cut from the end without splitting a surrogate pair or Urdu cluster. */
+function clipEnd(text: string, width: number): string {
+  if (textWidth(text) <= width) return text;
+  const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  return units.slice(Math.max(0, units.length - Math.max(0, width))).join('');
+}
+
+/** Replace ASCII control characters with spaces; they crash ESC/POS text mode. */
+export function sanitizeInline(text: string): string {
+  let out = '';
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    out += code < 32 || code === 127 ? ' ' : char;
+  }
+  return out;
+}
+
 export function wrapText(text: string, width: number): string[] {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
@@ -191,16 +220,16 @@ function limitWrappedLines(
   const ellipsis = '...';
   const lastIndex = maxLines - 1;
   const last = kept[lastIndex] ?? '';
-  const room = width - ellipsis.length;
-  const base = last.length > room ? last.slice(0, room) : last;
-  kept[lastIndex] = `${base}${ellipsis}`;
+  const room = Math.max(0, width - ellipsis.length);
+  kept[lastIndex] = `${clipStart(last, room)}${ellipsis}`;
   return kept;
 }
 
 function rightAlign(text: string, width: number): string[] {
-  return wrapText(text, width).map((line) =>
-    line.length >= width ? line : `${' '.repeat(width - line.length)}${line}`,
-  );
+  return wrapText(text, width).map((line) => {
+    const length = textWidth(line);
+    return length >= width ? line : `${' '.repeat(width - length)}${line}`;
+  });
 }
 
 /**
@@ -215,17 +244,19 @@ export function formatPair(
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
   }
-  if (right.length === 0) {
-    return wrapText(left, width);
+  const cleanLeft = sanitizeInline(left);
+  const cleanRight = sanitizeInline(right);
+  if (cleanRight.length === 0) {
+    return wrapText(cleanLeft, width);
   }
-  if (left.length === 0) {
-    return rightAlign(right, width);
+  if (cleanLeft.length === 0) {
+    return rightAlign(cleanRight, width);
   }
-  if (left.length + 1 + right.length <= width) {
-    const gap = width - left.length - right.length;
-    return [`${left}${' '.repeat(gap)}${right}`];
+  if (cleanLeft.length + 1 + cleanRight.length <= width) {
+    const gap = width - cleanLeft.length - cleanRight.length;
+    return [`${cleanLeft}${' '.repeat(gap)}${cleanRight}`];
   }
-  return [...wrapText(left, width), ...rightAlign(right, width)];
+  return [...wrapText(cleanLeft, width), ...rightAlign(cleanRight, width)];
 }
 
 /** Columns: qty is 5, amount is 15, the name takes the rest. 48 → 28/5/15. */
@@ -234,8 +265,8 @@ export function columnWidths(charsPerLine: number): {
   qty: number;
   amount: number;
 } {
-  if (!Number.isInteger(charsPerLine) || charsPerLine < 20) {
-    throw new Error('column layout needs at least 20 characters per line');
+  if (!Number.isInteger(charsPerLine) || charsPerLine < 24) {
+    throw new Error('column layout needs at least 24 characters per line');
   }
   const qty = 5;
   const amount = 15;
@@ -243,23 +274,25 @@ export function columnWidths(charsPerLine: number): {
 }
 
 function padEnd(text: string, width: number): string {
-  if (text.length === width) {
+  const length = textWidth(text);
+  if (length === width) {
     return text;
   }
-  if (text.length > width) {
-    return text.slice(0, width);
+  if (length > width) {
+    return clipStart(text, width);
   }
-  return text + ' '.repeat(width - text.length);
+  return text + ' '.repeat(width - length);
 }
 
 function fitEnd(text: string, width: number): string {
-  if (text.length === width) {
+  const length = textWidth(text);
+  if (length === width) {
     return text;
   }
-  if (text.length > width) {
-    return text.slice(text.length - width);
+  if (length > width) {
+    return clipEnd(text, width);
   }
-  return ' '.repeat(width - text.length) + text;
+  return ' '.repeat(width - length) + text;
 }
 
 export function formatColumnHeader(
@@ -268,9 +301,9 @@ export function formatColumnHeader(
 ): string {
   const widths = columnWidths(charsPerLine);
   return (
-    padEnd(labels.item, widths.name) +
-    fitEnd(labels.qty, widths.qty) +
-    fitEnd(labels.amount, widths.amount)
+    padEnd(sanitizeInline(labels.item), widths.name) +
+    fitEnd(sanitizeInline(labels.qty), widths.qty) +
+    fitEnd(sanitizeInline(labels.amount), widths.amount)
   );
 }
 
@@ -294,31 +327,30 @@ export function formatItemLines(
   if (!Number.isInteger(charsPerLine) || charsPerLine < 1) {
     throw new Error('charsPerLine must be a positive integer');
   }
+  const name = sanitizeInline(item.name);
+  const qty = sanitizeInline(item.qty);
+  const amount = sanitizeInline(item.amount);
+  const detail =
+    item.detail === undefined ? undefined : sanitizeInline(item.detail);
+  const breakdown =
+    item.breakdown === undefined ? undefined : sanitizeInline(item.breakdown);
   if (mode === 'stacked') {
-    const lines = wrapText(item.name, charsPerLine);
-    const left = item.breakdown ?? ` ${item.qty}`;
-    lines.push(...formatPair(left, item.amount, charsPerLine));
+    const lines = wrapText(name, charsPerLine);
+    lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
     return lines;
   }
   const widths = columnWidths(charsPerLine);
-  if (item.qty.length > widths.qty || item.amount.length > widths.amount) {
-    const lines = wrapText(item.name, charsPerLine);
-    lines.push(
-      ...formatPair(
-        item.breakdown ?? ` ${item.qty}`,
-        item.amount,
-        charsPerLine,
-      ),
-    );
-    if (item.detail !== undefined && item.detail.length > 0) {
+  if (qty.length > widths.qty || amount.length > widths.amount) {
+    const lines = wrapText(name, charsPerLine);
+    lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
+    if (detail !== undefined && detail.length > 0) {
       const detailWidth = Math.max(1, charsPerLine - 2);
-      for (const detailLine of wrapText(item.detail, detailWidth))
+      for (const detailLine of wrapText(detail, detailWidth))
         lines.push(`  ${detailLine}`);
     }
     return lines;
   }
-  const wrapped =
-    item.name.length === 0 ? [''] : wrapText(item.name, widths.name);
+  const wrapped = name.length === 0 ? [''] : wrapText(name, widths.name);
   const names = limitWrappedLines(wrapped, 2, widths.name);
   const lines: string[] = [];
   for (let index = 0; index < names.length; index += 1) {
@@ -326,8 +358,8 @@ export function formatItemLines(
     if (index === 0) {
       lines.push(
         padEnd(nameLine, widths.name) +
-          fitEnd(item.qty, widths.qty) +
-          fitEnd(item.amount, widths.amount),
+          fitEnd(qty, widths.qty) +
+          fitEnd(amount, widths.amount),
       );
       continue;
     }
@@ -335,9 +367,9 @@ export function formatItemLines(
       lines.push(nameLine);
     }
   }
-  if (item.detail !== undefined && item.detail.length > 0) {
+  if (detail !== undefined && detail.length > 0) {
     const detailWidth = Math.max(1, charsPerLine - 2);
-    for (const detailLine of wrapText(item.detail, detailWidth)) {
+    for (const detailLine of wrapText(detail, detailWidth)) {
       lines.push(`  ${detailLine}`);
     }
   }

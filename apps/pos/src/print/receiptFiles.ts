@@ -12,6 +12,7 @@ import {
   type RasterSource,
   type ReceiptLabels,
   type RefundReceipt,
+  receiptLabelsFor,
   type SaleReceiptInput,
   type SupplierReturnReceipt,
   type VoidReceipt,
@@ -113,9 +114,10 @@ export async function voidReceipt(
   const staff = voidRow.staff_id
     ? await db.staff.get(String(voidRow.staff_id))
     : undefined;
-  const { shop } = await receiptShop(db);
+  const { shop, receiptLanguage } = await receiptShop(db);
   const input: VoidReceipt = {
     shop,
+    labels: receiptLabelsFor(receiptLanguage),
     staffName: staff ? String(staff.name) : null,
     originalInvoiceNo: String(sale.invoice_no),
     originalCreatedAt: Number(sale.created_at),

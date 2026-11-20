@@ -570,6 +570,7 @@
     "agent_select_printer": "Choose a printer",
     "agent_stopped": "Print service not running",
     "agent_unpair": "Unpair this computer",
+    "agent_outdated": "This print service is an older version. Update it from the download link below.",
     "agent_unreachable": "Can't reach the print service. Start it and try again.",
     "agent_version": "Version {{version}}",
     "back": "Back",

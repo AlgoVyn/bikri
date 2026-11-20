@@ -52,6 +52,19 @@ describe('supplier return slip (screens/13 AC 6–8)', () => {
       expect(line.length).toBeLessThanOrEqual(48);
   });
 
+  it('uses the receipt-language Tel label on the shared shop header', () => {
+    const text = renderReceiptText(
+      buildSupplierReturn({
+        ...input,
+        shop: { ...shop, phone: '+923001234567' },
+        shopLabels: { telPrefix: 'ٹیلی فون:' },
+      }),
+      { charsPerLine: 48, itemLayout: 'columns' },
+    );
+    expect(text).toContain('ٹیلی فون:');
+    expect(text).not.toContain('Tel:');
+  });
+
   it('fits 32 columns at 58 mm', () => {
     const text = renderReceiptText(
       buildSupplierReturn(input, { paperMm: 58, charsPerLine: 32 }),
