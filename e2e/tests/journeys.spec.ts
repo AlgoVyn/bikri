@@ -151,6 +151,12 @@ test('journey 7 + 15: two tills merge price edits and oversell the last unit; a 
   ).toBeVisible();
 
   // Both offline: A changes the price, B the brand, and both sell the last unit.
+  // Product edit is a lazy route, so wait for the precache to control both new
+  // contexts before cutting the network.
+  for (const till of [a, b])
+    await till.page.evaluate(
+      async () => (await navigator.serviceWorker.ready).active?.state,
+    );
   await a.ctx.setOffline(true);
   await b.ctx.setOffline(true);
   await a.page.evaluate(

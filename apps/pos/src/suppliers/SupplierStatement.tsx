@@ -418,12 +418,20 @@ export function SupplierStatement({
                       <MoneyText paisa={row.balance} />
                     </span>
                   </div>
-                  <p className="mt-1 flex items-center gap-1">
-                    {rows[index]?.description}
-                    {purchaseId ? (
+                  {purchaseId ? (
+                    <button
+                      type="button"
+                      className="mt-1 flex items-center gap-1 text-start underline-offset-2 hover:underline"
+                      onClick={() => openDelivery(purchaseId)}
+                    >
+                      {rows[index]?.description}
                       <ChevronRightIcon className="size-3.5 shrink-0 rtl:rotate-180" />
-                    ) : null}
-                  </p>
+                    </button>
+                  ) : (
+                    <p className="mt-1 flex items-center gap-1">
+                      {rows[index]?.description}
+                    </p>
+                  )}
                   <dl className="mt-2 grid grid-cols-2 gap-2">
                     <div>
                       <dt className="text-text-muted">
@@ -442,14 +450,6 @@ export function SupplierStatement({
                       </dd>
                     </div>
                   </dl>
-                  {purchaseId ? (
-                    <button
-                      type="button"
-                      aria-label={`${t('office.suppliers.view_delivery')}: ${rows[index]?.description}`}
-                      className="absolute inset-0 rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      onClick={() => openDelivery(purchaseId)}
-                    />
-                  ) : null}
                 </li>
               );
             })
