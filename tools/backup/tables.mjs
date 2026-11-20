@@ -15,6 +15,7 @@ export const BACKUP_TABLES = [
   'applied_ops',
   'sync_conflicts',
   'devices',
+  'branch_device_codes',
   'enrolment_codes',
   'owner_email_codes',
   'shop',
