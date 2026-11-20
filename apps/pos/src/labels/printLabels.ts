@@ -62,10 +62,14 @@ export function printLabelHtml(
     return;
   }
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let removal: ReturnType<typeof setTimeout> | null = null;
   const cleanup = () => {
+    if (removal !== null) return;
     if (timer !== null) clearTimeout(timer);
     timer = null;
-    frame.remove();
+    // Some browsers fire afterprint as soon as print() returns, before the
+    // spooler has read the sheet. Keep the hidden frame for a short grace period.
+    removal = setTimeout(() => frame.remove(), 2_000);
   };
   const start = () => {
     win.addEventListener('afterprint', cleanup, { once: true });
