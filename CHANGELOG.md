@@ -4,6 +4,15 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### CI security, tooling and docs hygiene — 20 Nov 2026 review, PR 8
+- `deploy.yml` no longer exposes `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` to `pnpm install` or `pnpm build`; both secrets are attached only to the four Cloudflare steps.
+- PR CI now runs `tools/check-migrations-safe.mjs` before build, so destructive D1 DDL is rejected before merge.
+- `print-agent-release.yml` is read-only workflow-wide with `contents: write` only on the release job, uses the same `upload-artifact` SHA as the other workflows, and all pinned action SHAs carry version comments.
+- E2E declaration output moves from `e2e/dist/` to the ignored `e2e/.tsbuild/`, stale scratch specs are removed, and temp-spec patterns are ignored.
+- `check-bundle-size.mjs` fails closed on empty/missing output and uses `BASE_PATH`; `brand/**` stays out of the offline precache.
+- `docs/04-api.md` drops duplicate/phantom endpoints, adds `files/gc` and `OWNER_EMAIL_MISSING`, and updates the version/schema examples; `docs/decisions.md` gains the PR #54 entry (D-265), the print-agent release becomes D-266, and D-242 is back in numeric order.
+- Architecture/testing/printing docs replace stale Drizzle references, show `APP_VERSION` 1.1.0 and the `print_agent` CI job, list the Print Agent connection and `kv.printer` fields, and fix stale e2e/seed paths.
+
 ### POS UI/UX, accessibility and operator polish — 20 Nov 2026 review, PR 7
 - Day-close denomination counts are whole numbers (Urdu/Arabic-Indic digits supported, no float paisa), and a synchronous ref plus a stable close id prevent double-clicks creating two closes. `ConfirmDialog` also disables its confirm button on the first click.
 - Reports falls back to the main thread when its Web Worker fails to load or crashes, instead of staying on the loading spinner; report CSV/PDF exports surface failures.
@@ -102,7 +111,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Design
 - Owner sign-in and shop-invite emails now use an Algovyn-branded HTML layout with the Bikri POS lockup, a large code block, shop/device details and a plain-text alternative; the Home header is a "Welcome back" overview card with the business date and a branch chip.
-- The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, profit beside the sold figure, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer footer on a subtle band with the “Expected · since last close” cash hint and a full-width Day close row. The phone credit-bill count is a horizontal label/value row, the count uses a lighter 18 px weight, the bill-count pill drops its icon, and negative profit uses the danger tone only while amounts are visible (D-249, D-250, D-252, D-253, D-255).
+- The desktop Today register is recomposed for the wide main column: a 20 px title, a 32 px sold figure with the bill count beside it, a credit row with given/received/credit-bills, the last-bill time in the title row, and a separate drawer footer on a subtle band with the “Expected · since last close” cash hint and a full-width Day close row. The phone credit-bill count is a horizontal label/value row, the count uses a lighter 18 px weight, and the bill-count pill drops its icon (D-249, D-250, D-252, D-253, D-255).
 - The Home Today card no longer shows **Profit today**; sold and the bill count stay the hero, and profit remains in Reports for `cost.view` users (D-260).
 
 ### Receipts

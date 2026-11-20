@@ -110,7 +110,6 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 | ulidx | 2.4 | core | `monotonicFactory()` |
 | zod | 4.6 | api | HTTP request envelopes only; no per-table row schemas ([D-170](decisions.md#decisions-log)) |
 | hono | 4.13 | api | |
-| drizzle-orm / drizzle-kit | 0.45 / 0.31 | db, api | typed D1 queries; drafts later migrations. `0001_init.sql` is hand-written from [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) and is the source of truth (CHECKs, partial unique indexes); the Drizzle schema must mirror it, checked by `drizzle-kit generate` producing no diff in CI |
 | wrangler | 4.152 | api | |
 | @cloudflare/workers-types | 2026-10 | api | |
 | papaparse | 5.7 | pos | CSV import/export |
@@ -125,7 +124,7 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 ### 3.1 TypeScript 7 notes (decision D-024)
 
 - Pin `"typescript": "7.0.2"` (exact) in the root `devDependencies`; `pnpm typecheck` = `tsc -b` (project references). TS 7.0 is the native Go port: same language, much faster `tsc`, but **7.0 ships no programmatic compiler API** (Microsoft expects a new API in 7.1).
-- Tools in this stack that only *transpile* or run `tsc` as a CLI are unaffected: Vite (own transform pipeline, no type checking), Vitest, Biome (own parser; we use Biome, not ESLint), wrangler/esbuild, drizzle-kit, TanStack Router's route generator.
+- Tools in this stack that only *transpile* or run `tsc` as a CLI are unaffected: Vite (own transform pipeline, no type checking), Vitest, Biome (own parser; we use Biome, not ESLint), wrangler/esbuild, TanStack Router's route generator.
 - If a tool ever needs to `import 'typescript'` (e.g. typescript-eslint, which as of Oct 2026 still declares `typescript <6.1`), do **not** downgrade: use Microsoft's side-by-side aliases and record it in `docs/decisions.md`:
   ```json
   "devDependencies": {
@@ -179,7 +178,7 @@ bikri/
 │   └─ print-agent/       Go companion service: loopback HTTP, Windows spooler/CUPS, raw ESC/POS + driver image (14-print-agent)
 ├─ packages/
 │   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/ (op/table metadata)
-│   ├─ db/                drizzle schema (D1), migrations/*.sql, dexie.ts (Dexie schema), tables.ts (shared table metadata)
+│   ├─ db/                migrations/*.sql (plain D1 SQL), dexie.ts (Dexie schema), tables.ts (shared table metadata)
 │   ├─ printer/           layout.ts, escpos.ts, raster.ts, templates/, transports/webusb.ts, transports/webserial.ts, labels/ (code128.ts, label layouts, screens/20)
 │   └─ i18n/              en.json, ur.json, roman-ur.json, check-keys.ts
 ├─ tools/backup/          export.sh, encrypt.sh, tenant-extract.mjs (one tenant from a backup, 09 §3.4), README.md
@@ -249,7 +248,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // operator API only
   ],
   "vars": {
-    "APP_VERSION": "1.0.0",
+    "APP_VERSION": "1.1.0",
     "SCHEMA_VERSION": "8",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
@@ -373,7 +372,7 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 
 ### 7.2 CI/CD
 
-- `ci.yml` (PR): a fast `quality` job runs `pnpm biome ci` → `pnpm typecheck` → `pnpm test` → i18n/contrast/docs checks → build → bundle size, in parallel with four Playwright shards against `wrangler dev` with local D1 (one worker per shard, so the timing budgets still measure the app). The `ci` aggregator job passes only when both are green; use it as the required check.
+- `ci.yml` (PR): a fast `quality` job runs `pnpm biome ci` → `pnpm typecheck` → `pnpm test` → i18n/contrast/docs checks → destructive-migration check → build → bundle size, in parallel with four Playwright shards against `wrangler dev` with local D1 (one worker per shard, so the timing budgets still measure the app) and a `print_agent` job (`gofmt`/`go vet`/Go tests plus Windows, macOS and Linux cross-builds). The `ci` aggregator job passes only when all three are green; use it as the required check.
 - `deploy.yml` (successful `ci` workflow_run for a **push** to this repository's `main`; fork PR runs are rejected): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy` → smoke test. The deploy job runs only when the repository variable `DEPLOY_ENABLED` is `true` (set after §7.1) and refuses the placeholder `database_id`; the website check runs on every push to `main` regardless (D-060). A preview environment (`bikri-preview`, separate D1 `bikri-preview`, URL `https://bikri-preview.<account>.workers.dev/bikri/`, no routes on `algovyn.com`) deploys on PRs with label `preview`; its origin is added to `ALLOWED_ORIGINS` for that environment only.
 - Migrations live in `packages/db/migrations/000N_<name>.sql` (the `migrations_dir` in `wrangler.jsonc`). They must stay backward compatible with tills running the previous app version for at least **14 days** (add columns nullable or with defaults; never rename/drop in v1), because tills may run the old cached app for a while. Bump `SCHEMA_VERSION` when a migration changes columns or the wire shape; index-only migrations (e.g. T-062's `0003_perf_indexes.sql`) do not need a client version bump. Raise `MIN_CLIENT_SCHEMA` only for a breaking change ([03 §4.1](03-sync.md#41-push--post-apisyncpush)). Dexie schema versions are bumped in the same PR (`db.version(n).stores(...)` with an `upgrade()` when local data must change).
 

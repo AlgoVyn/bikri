@@ -78,10 +78,9 @@ const largestLocale = locales.reduce(
   (best, rel) => (best === null || gz(rel) > gz(best) ? rel : best),
   null,
 );
-if (locales.length < 3)
-  problems.push(
-    `expected at least 3 language catalogs, found ${locales.length}`,
-  );
+for (const locale of ['en', 'roman-ur', 'ur'])
+  if (!locales.some((rel) => rel.startsWith(`assets/${locale}-`)))
+    problems.push(`no ${locale} language catalog chunk found`);
 if (largestLocale !== null && !initial.has(largestLocale))
   initialTotal += gz(largestLocale);
 if (initialTotal > INITIAL_BUDGET) {
