@@ -22,3 +22,5 @@ docs/reviews/
 e2e/*.mjs
 # Temporary local tests, never committed.
 **/*.tmp.test.ts
+**/*.tmp.spec.ts
+e2e/tests/_tmp-*.spec.ts

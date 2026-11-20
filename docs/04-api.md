@@ -37,7 +37,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/admin/shop-requests/:id/approve` | Access | Require a verified email, create the tenant + owner code, send the invite |
 | POST | `/admin/shop-requests/:id/reject` | Access | Reject with a reason; no tenant |
 | POST | `/admin/shop-requests/:id/reopen` | Access | Reopen a rejected request (audited) |
-| GET | `/admin/usage` | Access | Account-wide usage today: Σ `tenant_usage`, per tenant, vs free-tier limits |
+| GET | `/admin/usage` | Access | Account overview: per-tenant usage vs free-tier limits, tenants by status, gross D1 usage, last backup, shops over 80 % of their budget, and open sync conflicts grouped by tenant (D-105, D-136) |
 | GET/POST | `/admin/tenants` | Access | List tenants; create a tenant (+ default branch, expense categories, owner pairing code) |
 | GET/PATCH | `/admin/tenants/:id` | Access | Tenant detail; edit display name, budget, poll interval, note |
 | POST | `/admin/tenants/:id/read-only`, `/suspend`, `/reactivate`, `/delete` | Access | Lifecycle with a required reason ([13 §7](13-multi-tenancy.md#7-tenant-lifecycle)) |
@@ -52,21 +52,18 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/admin/tenants/:id/restore-epoch` | Access | `{ restore_point_at }` set a new `restore_epoch` for the tenant |
 | POST | `/admin/tenants/:id/import-ops` | Access | Import a revoked device's unsynced ops |
 | POST | `/admin/tenants/:id/reset-owner-pin` | Access | Set a new owner PIN when no other owner can |
+| POST | `/admin/tenants/:id/files/gc` | Access | Delete unreferenced tenant R2 objects (`dry_run` defaults to true; audited as `operator_file_gc`) |
 | GET | `/admin/backups` | Access | List backup objects in R2 |
-| GET | `/admin/backups/*key` | Access | Download a backup |
-| GET | `/admin/usage` | Access | Account overview: tenants by status, gross D1 usage, last backup, shops over 80 % of their budget, and open sync conflicts grouped by tenant (D-105, D-136) |
-| GET | `/admin/slug-available?slug=` | Access | Whether a slug is free (D-105) |
-| GET | `/admin/tenants/:id/devices` | Access | A shop's devices (D-105) |
-| POST | `/admin/tenants/:id/devices/:deviceId/revoke` | Access | Revoke one of a shop's devices (D-105) |
-| GET | `/admin/tenants/:id/owners` | Access | A shop's owner staff, for PIN reset (D-105) |
 | GET | `/admin/backups/download?key=` | Access | Download a backup by query key (D-105) |
+| GET | `/admin/slug-available?slug=` | Access | Whether a slug is free (D-105) |
+| GET | `/admin/tenants/:id/owners` | Access | A shop's owner staff, for PIN reset (D-105) |
 
 ## 2. Conventions
 
 - **Auth header (device):** `Authorization: Bearer <device_token>` where the token is 43 base64url chars (32 random bytes).
 - **Auth (shop admin):** device token of an admin device plus `X-Bikri-Staff: <owner staff id>` ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) plus `X-Bikri-Owner-Session: <token>` from the owner email sign-in ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)), except where the table above says otherwise.
 - **Auth (operator):** Cloudflare Access adds `Cf-Access-Jwt-Assertion`; the Worker verifies it ([05 §3.1](05-auth-and-roles.md#31-platform-operator-via-cloudflare-access)).
-- **Version headers:** the till sends `X-Bikri-App: 1.0.0` and `X-Bikri-Schema: 2` on every request.
+- **Version headers:** the till sends `X-Bikri-App: 1.1.0` and `X-Bikri-Schema: 8` on every request.
 - **Times** are epoch ms. **Money** is paisa integers.
 - **Error shape** (all non-2xx):
 
@@ -96,7 +93,8 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 503 | `MAINTENANCE` | Worker var `MAINTENANCE=1` (whole deployment) or the caller's tenant has `status = 'maintenance'` (restore of that shop); client keeps ops, retries after `Retry-After: 300` |
 | 503 | `TENANT_QUOTA` | The caller's tenant reached its `daily_write_budget` for the UTC day ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)); `Retry-After` = seconds to 00:00 UTC; client keeps ops |
 | 503 | `D1_LIMIT` | D1 daily free limit of the account reached (all tenants); client keeps ops and retries after `Retry-After` |
-| 503 | `EMAIL_UNAVAILABLE` | The owner sign-in email could not be sent (owner email missing or not a verified destination address, or Cloudflare error) |
+| 503 | `OWNER_EMAIL_MISSING` | The shop has no owner email, so owner email sign-in cannot start |
+| 503 | `EMAIL_UNAVAILABLE` | The owner sign-in email could not be sent (owner email not a verified destination address, or Cloudflare error) |
 | 503 | `EMAIL_ROUTING_NOT_CONFIGURED` | The shop-request email action has no `EMAIL_ROUTING_TOKEN`; use the audited manual fallback |
 | 502 | `EMAIL_ROUTING_FAILED` | Cloudflare Email Routing API refused or failed the add/check |
 | 507 | `TENANT_STORAGE_FULL` | The caller's tenant reached its 1 GB R2 file cap; the till marks the upload failed instead of retrying forever (it never blocks other files) |
@@ -113,7 +111,7 @@ Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNI
 ### 3.2 `POST /api/devices/enrol`
 Request:
 ```json
-{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "1.0.0", "device_name": "Counter 2" }
+{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "1.1.0", "device_name": "Counter 2" }
 ```
 `device_name` is optional (≤ 40); without it the device gets the name on the code (D-107). The response also carries `tenant_status`, `support` and `poll_after_ms` (D-105).
 

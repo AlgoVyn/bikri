@@ -311,14 +311,14 @@ v1 does not implement a Bluetooth transport. Android users use System printing w
 
 ## 8. Printer setup and test print (per device)
 
-Settings → Printer (layout and copy in [screens/17](screens/17-settings.md#printer)) has tabs **USB**, **Serial**, **System**, **A4** and a **Set up printer** wizard that is also offered from the setup wizard's last step and from the first failed print.
+Settings → Printer (layout and copy in [screens/17](screens/17-settings.md#printer)) offers **Print service**, **USB**, **Serial**, **System** and **A4** connection choices, plus a **Set up printer** wizard that is also offered from the setup wizard's last step and from the first failed print.
 
 Wizard steps:
 
 1. **Paper width:** 80 mm (recommended) or 58 mm, with a picture of each roll; sets chars/line 48/32 and dots 576/384.
 2. **Connection:** `Print service (recommended)` → local agent, OS print queue (raw ESC/POS or driver image); `USB (direct)` → WebUSB `requestDevice({ filters: [{ classCode: 7 }] })`, with "Show all USB devices" if nothing appears; `Serial / COM port` → `navigator.serial.requestPort()` + baud; `No direct connection` → System printing. Browsers without WebUSB/Web Serial (Firefox, Safari) see only System printing, with a note to use Chrome or Edge.
 3. **Test print:** sends the test page (§4.3): ruler `1234567890…` exactly `chars_per_line` wide, bold/double sample, logo, Urdu raster line, QR, cut, then drawer kick if enabled. The screen asks three yes/no questions: *Did the ruler fit on one line?* (no → offer 42 chars / 512 dots for 80 mm, or the 58 mm preset), *Is the Urdu line readable?* (no → raster unsupported: switch receipt language to English and note it), *Did the paper cut / drawer open?* (no → set cut to none / check drawer pin 2↔5).
-4. **Save:** stores `kv.printer = { transport: 'usb'|'serial'|'system', paper_mm, chars_per_line, dots, usb?: {vendorId, productId, serialNumber}, serial?: {usbVendorId, usbProductId, baudRate, flowControl}, cut: 'partial'|'full'|'none', qr: boolean, drawer_pin: 2|5, status_query: boolean }`.
+4. **Save:** stores `kv.printer = { transport: 'usb'|'serial'|'system'|'agent', paper_mm, chars_per_line, dots, usb?: {vendorId, productId, serialNumber}, serial?: {usbVendorId, usbProductId, baudRate, flowControl}, agent?: {url, token, agentId, printerName, mode: 'raw'|'driver'}, cut: 'partial'|'full'|'none', qr: boolean, drawer_pin: 2|5, status_query: boolean, auto_print: boolean, copies: 1|2|3, print_logo: boolean, print_day_close: boolean }`.
 
 If a USB `claimInterface` fails on Windows, the wizard explains the driver issue (§5.1) and offers Serial or System printing instead of failing.
 
@@ -332,7 +332,7 @@ REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 2. Print service picks jobs FIFO; status `printing`; timeout 8 s per job.
 3. Success → `done`. Failure → `failed` with error code (`NO_PRINTER`, `PERMISSION`, `DISCONNECTED`, `TIMEOUT`, `PAPER_OUT` if status known).
 4. UI on failure: a non-blocking toast "Receipt didn't print — <reason>" with **Retry** and **Print later**; the success sheet stays usable for the next sale.
-5. Settings → Printer → Recent prints lists the last 50 jobs with Retry for failed jobs and Cancel for jobs still **Waiting**. A job left in `printing` by a closed tab is marked `INTERRUPTED` on the next start and can be retried.. Cancelling deletes only that local queued job; a job that has started printing cannot be cancelled. The section also offers Cancel waiting (N) for all queued jobs.
+5. Settings → Printer → Recent prints lists the last 50 jobs with Retry for failed jobs and Cancel for jobs still **Waiting**. A job left in `printing` by a closed tab is marked `INTERRUPTED` on the next start and can be retried. Cancelling deletes only that local queued job; a job that has started printing cannot be cancelled. The section also offers Cancel waiting (N) for all queued jobs.
 6. Reprint from Sales → bill detail at any time; reprints print `REPRINT` under the title.
 
 ## 10. Tests
