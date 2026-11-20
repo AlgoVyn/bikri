@@ -1,27 +1,29 @@
-import { codeOfInvoice, nextDeviceCode } from '../auth/deviceCodes.ts';
+import { nextDeviceCode } from '../auth/deviceCodes.ts';
 import type { TenantDb } from '../db/tenantDb.ts';
 import type { DeviceRow } from '../types.ts';
 
 /**
- * Next device code in a branch: after every code a device of that branch has, or that appears in
- * the branch's invoice numbers (a device moved away keeps its old bills), so codes are never
- * reused (04 §3.8).
+ * Next device code in a branch: after every code in the branch registry and every code a
+ * branch device still carries. The registry is backfilled once from invoice numbers; this
+ * used to fetch and regex-parse every bill in the branch on each enrolment.
  */
 export async function allocateDeviceCode(
   db: TenantDb,
   branchId: string,
 ): Promise<string> {
-  const [devices, invoices] = await db.batch([
+  const [registry, devices] = await db.batch([
+    db.prepare(
+      'SELECT device_code FROM branch_device_codes WHERE tenant_id = ?1 AND branch_id = ?2',
+      branchId,
+    ),
     db.prepare(
       'SELECT device_code, device_code_history FROM devices WHERE tenant_id = ?1 AND branch_id = ?2',
       branchId,
     ),
-    db.prepare(
-      'SELECT DISTINCT invoice_no FROM sales WHERE tenant_id = ?1 AND branch_id = ?2',
-      branchId,
-    ),
   ]);
   const used: string[] = [];
+  for (const r of (registry?.results ?? []) as { device_code: string }[])
+    used.push(r.device_code);
   for (const r of (devices?.results ?? []) as {
     device_code: string;
     device_code_history: string;
@@ -33,11 +35,14 @@ export async function allocateDeviceCode(
         .filter(Boolean),
     );
   }
-  for (const r of (invoices?.results ?? []) as { invoice_no: string }[]) {
-    const code = codeOfInvoice(r.invoice_no);
-    if (code) used.push(code);
-  }
-  return nextDeviceCode(used);
+  const code = nextDeviceCode(used);
+  // Reserve the code even if the device write later fails; a code is never reused.
+  await db.run(
+    'INSERT OR IGNORE INTO branch_device_codes (tenant_id, branch_id, device_code) VALUES (?1, ?2, ?3)',
+    branchId,
+    code,
+  );
+  return code;
 }
 
 /** The device as a till sees it (04 §3.2–3.3). */
