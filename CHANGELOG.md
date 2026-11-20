@@ -4,6 +4,16 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Go print agent security and release — 20 Nov 2026 review, PR 5
+- The CUPS backend forces the C locale, validates job and queue ids, uses `--` before file/argument operands, and never falls back to a client job id as a cancel target (which could have run `cancel -a`).
+- A failed printer enumeration now fails the job closed instead of passing an unvalidated queue name to `lp`; job ids are limited to `[A-Za-z0-9._-]` and printer names reject leading dashes/control characters.
+- The Windows GDI path checks the PNG header before decoding (bounded dimensions/pixels), treats every `<= 0` GDI result as failure with `AbortDoc`, and retries partial `WritePrinter` writes; UTF-16 conversion and buffer lifetimes are checked.
+- The local unpair form uses a per-process CSRF nonce plus loopback `Origin`/`Sec-Fetch-Site` checks; the `:5173` development origins are removed from saved configs and available only through `--allow-origin`.
+- Rate limits cover pairing, jobs and diagnostics; print jobs are serialised per queue and the in-memory job map is capped at 100.
+- The agent sets HTTP read/write timeouts, waits for the server goroutine on shutdown, and gives status/cancel requests 5-second contexts.
+- Linux, macOS and Windows installers handle special `$HOME` paths, restart upgraded agents, use the modern `launchctl` commands, avoid world-writable logs, remove the config on uninstall, and restart the agent after a silent upgrade.
+- The release workflow adds the Windows installer to `SHA256SUMS`.
+
 ### POS offline sync and locks — 20 Nov 2026 review, PR 4
 - A pulled server row parked while a local op was pending is now applied when that op settles as `applied`/`conflict_merged`, instead of being deleted with the cursor already past it.
 - Inside the exclusive push Web Lock every orphaned `sending` claim is reclaimed; without Web Locks a fresh claim stops the push instead of letting newer ops leapfrog it.

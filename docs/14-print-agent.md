@@ -212,7 +212,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 
 ### Error codes
 
-`UNAUTHORIZED`, `FORBIDDEN_ORIGIN`, `FORBIDDEN_HOST`, `NOT_PAIRED`, `UNKNOWN_PRINTER`, `RAW_UNSUPPORTED`, `SPOOL_ERROR`, `PRINTER_OFFLINE`, `PAPER_OUT`, `TIMEOUT`, `BUSY`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_VERSION`, `CANCELED`.
+`UNAUTHORIZED`, `FORBIDDEN_ORIGIN`, `FORBIDDEN_HOST`, `NOT_PAIRED`, `UNKNOWN_PRINTER`, `RAW_UNSUPPORTED`, `SPOOL_ERROR`, `PRINTER_OFFLINE`, `PAPER_OUT`, `TIMEOUT`, `BUSY`, `RATE_LIMITED`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_VERSION`, `CANCELED`.
 
 ### Versioning
 
@@ -234,7 +234,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 ### Controls
 
 - **Bind to `127.0.0.1:17890` only.** No `0.0.0.0`, no firewall rule, no mDNS advertisement.
-- **Origin allowlist:** `https://algovyn.com` (production), `http://localhost:5173` and `http://127.0.0.1:5173` (development). Echo only an allowed Origin; `Vary: Origin`.
+- **Origin allowlist:** `https://algovyn.com` in production. The local page is same-origin with its request `Host`. Development origins are never written to a production config: pass `--allow-origin http://localhost:5173` for one run. Echo only an allowed Origin; `Vary: Origin`.
 - **CORS:** allow `Authorization`, `Content-Type`, `Idempotency-Key`; methods `GET, POST, DELETE, OPTIONS`; `Access-Control-Allow-Private-Network: true` for the Private Network Access preflight.
 - **Host check:** accept only `127.0.0.1:17890` and `localhost:17890`; reject anything else (DNS rebinding).
 - **Pairing:** 6-digit code, 2-minute TTL, 5 attempts, constant-time compare. On success return a 32-byte random token (base64url); store only its SHA-256 hash. Rotate on unpair.
@@ -242,7 +242,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - **Rate limits:** pairing 5/min/IP, jobs 60/min/token, diagnostics 10/min.
 - **Limits:** 5 MiB body, 30 s job timeout, 100 queued jobs, 1 concurrent job per printer, 24 h idempotency window.
 - **No receipt contents in logs.** Log job id, printer, mode, byte count, duration, status and error code only. Rotate logs at 10 MB, keep 7 days.
-- **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing.
+- **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. The unpair form carries a per-process CSRF nonce and accepts only a same-origin POST from the loopback page; `Origin`, `Sec-Fetch-Site` and the nonce are checked before the token is revoked. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing.
 
 ### Browser constraints to validate in Phase 0
 

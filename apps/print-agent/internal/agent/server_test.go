@@ -238,13 +238,39 @@ func TestUIUnpairResetsPairing(t *testing.T) {
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	req, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/ui/unpair", nil)
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
+	nonce := uiNonce(t, httpServer.URL)
+	post := func(origin, site, csrf string) *http.Response {
+		t.Helper()
+		form := strings.NewReader("csrf=" + csrf)
+		req, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/ui/unpair", form)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		if site != "" {
+			req.Header.Set("Sec-Fetch-Site", site)
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res
 	}
-	res.Body.Close()
-	if res.StatusCode != http.StatusSeeOther {
+	if res := post(httpServer.URL, "same-origin", ""); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("missing nonce status = %d", res.StatusCode)
+	}
+	if res := post("https://evil.example", "same-origin", nonce); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("bad origin status = %d", res.StatusCode)
+	}
+	if res := post(httpServer.URL, "cross-site", nonce); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site status = %d", res.StatusCode)
+	}
+	// A refused request must not have unpaired the agent.
+	if !s.auth.Verify(token) {
+		t.Fatal("token stopped working after refused unpair requests")
+	}
+	if res := post(httpServer.URL, "same-origin", nonce); res.StatusCode != http.StatusSeeOther {
 		t.Fatalf("unpair status = %d", res.StatusCode)
 	}
 	if s.auth.Verify(token) {
@@ -253,4 +279,46 @@ func TestUIUnpairResetsPairing(t *testing.T) {
 	if s.cfg.Paired {
 		t.Fatal("config still says paired")
 	}
+}
+
+func TestSameLoopbackOrigin(t *testing.T) {
+	cases := []struct {
+		origin string
+		host   string
+		want   bool
+	}{
+		{"http://127.0.0.1:17890", "127.0.0.1:17890", true},
+		{"http://localhost:17890", "localhost:17890", true},
+		{"http://[::1]:17890", "[::1]:17890", true},
+		{"https://127.0.0.1:17890", "127.0.0.1:17890", false},
+		{"http://127.0.0.1:5173", "127.0.0.1:17890", false},
+		{"http://evil.example", "127.0.0.1:17890", false},
+		{"", "127.0.0.1:17890", false},
+	}
+	for _, tc := range cases {
+		if got := sameLoopbackOrigin(tc.origin, tc.host); got != tc.want {
+			t.Fatalf("sameLoopbackOrigin(%q, %q) = %v, want %v", tc.origin, tc.host, got, tc.want)
+		}
+	}
+}
+
+func uiNonce(t *testing.T, base string) string {
+	t.Helper()
+	res, err := http.Get(base + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	const marker = `name="csrf" value="`
+	at := bytes.Index(body, []byte(marker))
+	if at < 0 {
+		t.Fatal("CSRF input not found")
+	}
+	rest := body[at+len(marker):]
+	end := bytes.IndexByte(rest, '"')
+	if end < 0 {
+		t.Fatal("CSRF value is not terminated")
+	}
+	return string(rest[:end])
 }

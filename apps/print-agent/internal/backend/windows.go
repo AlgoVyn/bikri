@@ -60,6 +60,7 @@ var (
 	procStartPage     = gdi32.NewProc("StartPage")
 	procEndPage       = gdi32.NewProc("EndPage")
 	procEndDoc        = gdi32.NewProc("EndDoc")
+	procAbortDoc      = gdi32.NewProc("AbortDoc")
 	procSetMapMode    = gdi32.NewProc("SetMapMode")
 	procStretchDIBits = gdi32.NewProc("StretchDIBits")
 )
@@ -197,6 +198,9 @@ func listWindowsPrinters(ctx context.Context) ([]Printer, error) {
 }
 
 func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
+	if !ValidPrinterName(job.Printer) {
+		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
+	}
 	if job.Mode == "driver" {
 		// GDI's StartDoc does not return the spooler job id, so the compatibility
 		// path is reported done once EndDoc accepts the document. Raw jobs keep
@@ -216,14 +220,23 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 	}
 	defer procClosePrinter.Call(uintptr(handle))
 
-	docName, _ := syscall.UTF16PtrFromString("Bikri " + job.ID)
-	dataType, _ := syscall.UTF16PtrFromString("RAW")
+	docName, err := syscall.UTF16PtrFromString("Bikri " + job.ID)
+	if err != nil {
+		return "", &Error{Code: "SPOOL_ERROR", Message: "invalid job id: " + err.Error()}
+	}
+	dataType, err := syscall.UTF16PtrFromString("RAW")
+	if err != nil {
+		return "", &Error{Code: "SPOOL_ERROR", Message: "invalid datatype: " + err.Error()}
+	}
 	doc := docInfo1{pDocName: docName, pDatatype: dataType}
 	jobID, _, callErr := procStartDocPrinterW.Call(
 		uintptr(handle),
 		1,
 		uintptr(unsafe.Pointer(&doc)),
 	)
+	runtime.KeepAlive(docName)
+	runtime.KeepAlive(dataType)
+	runtime.KeepAlive(doc)
 	if jobID == 0 {
 		if isRawUnsupported(callErr) {
 			b.mu.Lock()
@@ -245,15 +258,24 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 		for at := 0; at < len(job.Data); at += 4096 {
 			end := min(at+4096, len(job.Data))
 			chunk := job.Data[at:end]
-			var written uint32
-			r1, _, callErr = procWritePrinter.Call(
-				uintptr(handle),
-				uintptr(unsafe.Pointer(&chunk[0])),
-				uintptr(len(chunk)),
-				uintptr(unsafe.Pointer(&written)),
-			)
-			if r1 == 0 {
-				return "", &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+			// The spooler may accept fewer bytes than offered. Keep feeding the
+			// remainder; dropping it corrupts raster/QR streams mid-command.
+			for len(chunk) > 0 {
+				var written uint32
+				r1, _, callErr = procWritePrinter.Call(
+					uintptr(handle),
+					uintptr(unsafe.Pointer(&chunk[0])),
+					uintptr(len(chunk)),
+					uintptr(unsafe.Pointer(&written)),
+				)
+				runtime.KeepAlive(chunk)
+				if r1 == 0 {
+					return "", &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+				}
+				if written == 0 || int(written) > len(chunk) {
+					return "", &Error{Code: "SPOOL_ERROR", Message: "the spooler accepted no data"}
+				}
+				chunk = chunk[written:]
 			}
 		}
 	}
@@ -306,6 +328,8 @@ func (b *windowsBackend) Status(ctx context.Context, printer, spoolID string) (S
 	info := (*jobInfo1)(unsafe.Pointer(&buf[0]))
 	status := info.Status
 	detail := utf16PtrString(info.pStatus)
+	// pStatus points into buf; keep the allocation alive until it is copied.
+	runtime.KeepAlive(buf)
 	switch {
 	case status&jobStatusPrinted != 0 || status&jobStatusComplete != 0:
 		return Status{State: "done"}, nil
@@ -348,6 +372,15 @@ func (b *windowsBackend) Cancel(ctx context.Context, printer, spoolID string) er
 }
 
 func (b *windowsBackend) printImage(job Job) error {
+	config, err := png.DecodeConfig(bytes.NewReader(job.Data))
+	if err != nil {
+		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
+	}
+	// Reject the header before Decode allocates the bitmap. A tiny PNG can
+	// describe a multi-gigabyte canvas; the agent must not OOM on it.
+	if !validImageSize(config.Width, config.Height) {
+		return &Error{Code: "SPOOL_ERROR", Message: "image dimensions are too large"}
+	}
 	img, err := png.Decode(bytes.NewReader(job.Data))
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
@@ -356,9 +389,6 @@ func (b *windowsBackend) printImage(job Job) error {
 	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Src)
 	width := rgba.Bounds().Dx()
 	height := rgba.Bounds().Dy()
-	if width <= 0 || height <= 0 {
-		return &Error{Code: "SPOOL_ERROR", Message: "empty image"}
-	}
 	// Bottom-up BGRA DIB for StretchDIBits.
 	bits := make([]byte, width*height*4)
 	for y := 0; y < height; y++ {
@@ -372,31 +402,50 @@ func (b *windowsBackend) printImage(job Job) error {
 			bits[dst+x*4+3] = 0
 		}
 	}
-	printerName, _ := syscall.UTF16PtrFromString(job.Printer)
-	driverName, _ := syscall.UTF16PtrFromString("WINSPOOL")
+	printerName, err := syscall.UTF16PtrFromString(job.Printer)
+	if err != nil {
+		return &Error{Code: "UNKNOWN_PRINTER", Message: err.Error()}
+	}
+	driverName, err := syscall.UTF16PtrFromString("WINSPOOL")
+	if err != nil {
+		return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
+	}
 	hdc, _, callErr := procCreateDCW.Call(
 		uintptr(unsafe.Pointer(driverName)),
 		uintptr(unsafe.Pointer(printerName)),
 		0,
 		0,
 	)
+	runtime.KeepAlive(driverName)
+	runtime.KeepAlive(printerName)
 	if hdc == 0 {
 		return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
 	defer procDeleteDC.Call(hdc)
-	docName, _ := syscall.UTF16PtrFromString("Bikri " + job.ID)
+	docName, err := syscall.UTF16PtrFromString("Bikri " + job.ID)
+	if err != nil {
+		return &Error{Code: "SPOOL_ERROR", Message: "invalid job id: " + err.Error()}
+	}
 	doc := docInfo{
 		cbSize:      uint32(unsafe.Sizeof(docInfo{})),
 		lpszDocName: docName,
 	}
 	r1, _, callErr := procStartDocW.Call(hdc, uintptr(unsafe.Pointer(&doc)))
-	if r1 == 0 {
+	runtime.KeepAlive(docName)
+	runtime.KeepAlive(doc)
+	// StartDocW, StartPage and EndPage return a value <= 0 on failure (SP_ERROR
+	// is -1), so `== 0` would miss every failure and keep drawing into a document
+	// that was never started.
+	if !gdiSucceeded(r1) {
 		return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
-	defer procEndDoc.Call(hdc)
+	abort := func() {
+		_, _, _ = procAbortDoc.Call(hdc)
+	}
 	for i := 0; i < max(1, job.Copies); i++ {
 		r1, _, callErr = procStartPage.Call(hdc)
-		if r1 == 0 {
+		if !gdiSucceeded(r1) {
+			abort()
 			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 		}
 		_, _, _ = procSetMapMode.Call(hdc, 1) // MM_TEXT
@@ -418,14 +467,21 @@ func (b *windowsBackend) printImage(job Job) error {
 			0,          // DIB_RGB_COLORS
 			0x00CC0020, // SRCCOPY
 		)
-		if r1 == 0 {
-			_, _, _ = procEndPage.Call(hdc)
+		runtime.KeepAlive(bits)
+		runtime.KeepAlive(bmi)
+		if !gdiSucceeded(r1) {
+			abort()
 			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 		}
 		r1, _, callErr = procEndPage.Call(hdc)
-		if r1 == 0 {
+		if !gdiSucceeded(r1) {
+			abort()
 			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 		}
+	}
+	r1, _, callErr = procEndDoc.Call(hdc)
+	if !gdiSucceeded(r1) {
+		return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
 	runtime.KeepAlive(bits)
 	return nil
@@ -442,6 +498,7 @@ func openPrinter(name string) (syscall.Handle, error) {
 		uintptr(unsafe.Pointer(&handle)),
 		0,
 	)
+	runtime.KeepAlive(ptr)
 	if r1 == 0 {
 		return 0, &Error{Code: "UNKNOWN_PRINTER", Message: lastError(callErr)}
 	}

@@ -51,8 +51,12 @@ The binaries are unsigned until the Authenticode/notarization certificate is add
 ## Run (development)
 
 ```bash
-go run ./cmd/bikri-print-agent --config /tmp/bikri-print-agent.json
+go run ./cmd/bikri-print-agent --config /tmp/bikri-print-agent.json \
+  --allow-origin http://localhost:5173
 ```
+
+`--allow-origin` is comma-separated and applies to the current run only; developer
+origins are deliberately not saved to the production config.
 
 In Bikri, open **Settings → Printer → Set up printer → Print service**; the wizard fetches and fills the pairing code from the agent automatically. The agent page at <http://127.0.0.1:17890/> is a fallback for troubleshooting and for unpairing a lost Bikri token.
 
