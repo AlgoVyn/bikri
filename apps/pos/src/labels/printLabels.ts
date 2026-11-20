@@ -76,7 +76,8 @@ export function printLabelHtml(
       win.focus();
       win.print();
     } catch {
-      cleanup();
+      // Headless/embedded browsers can refuse window.print(); keep the frame
+      // until the fallback timer so the sheet can still be inspected/printed.
     }
   };
   // The iframe loads its own @font-face rules; wait so the driver rasterises

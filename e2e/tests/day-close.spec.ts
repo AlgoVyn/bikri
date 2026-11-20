@@ -15,6 +15,14 @@ test.describe('Day close (T-047)', () => {
   }) => {
     await openReadyShop(page, '/bikri/');
     await page.evaluate(() => window.__bikriTest?.seedTodaySales());
+    // A configured printer is what enables the automatic Z-report (M6); without
+    // one the close must not queue a phantom job.
+    await page.evaluate(() =>
+      window.__bikriTest?.setKv('printer', {
+        transport: 'system',
+        print_day_close: true,
+      }),
+    );
     await page.goto('/bikri/day-close');
     await expect(page.getByText('Expected in drawer')).toBeVisible();
     await counted(page, '750');
