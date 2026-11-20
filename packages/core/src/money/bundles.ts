@@ -1,4 +1,4 @@
-import { allocate, assertSafeInteger, mulDivRound } from './money.ts';
+import { assertSafeInteger, mulDivRound, subSafe, sumSafe } from './money.ts';
 import { computeRefundLine } from './refunds.ts';
 
 export type BundleComponentInput = {
@@ -38,12 +38,56 @@ export type BundlePriceResult = {
   saving: number;
 };
 
-function ceilDiv(numerator: number, denominator: number): number {
-  assertSafeInteger(numerator, 'numerator');
+function ceilDivProduct(
+  value: number,
+  factor: number,
+  denominator: number,
+): number {
+  assertSafeInteger(value, 'value');
+  assertSafeInteger(factor, 'factor');
   assertSafeInteger(denominator, 'denominator');
-  return Number(
-    (BigInt(numerator) + BigInt(denominator) - 1n) / BigInt(denominator),
+  const quotient =
+    (BigInt(value) * BigInt(factor) + BigInt(denominator) - 1n) /
+    BigInt(denominator);
+  if (quotient > BigInt(Number.MAX_SAFE_INTEGER))
+    throw new RangeError('ceilDiv result exceeds safe integer');
+  return Number(quotient);
+}
+
+/**
+ * Largest-remainder split with BigInt weights. The recipe weights (`q_i × cost_i`)
+ * can exceed 2^53 even though the bundle revenue and its paisa shares are safe.
+ */
+function allocateBigInt(amount: bigint, weights: readonly bigint[]): number[] {
+  // `priceBundle` rejects an empty recipe and falls back to quantity weights, so the
+  // list is non-empty and its total is positive.
+  let totalWeight = 0n;
+  for (const weight of weights) totalWeight += weight;
+  const bases: bigint[] = [];
+  const remainders: { remainder: bigint; index: number }[] = [];
+  let baseSum = 0n;
+  for (const [index, weight] of weights.entries()) {
+    const product = amount * weight;
+    const base = product / totalWeight;
+    bases.push(base);
+    remainders.push({ remainder: product % totalWeight, index });
+    baseSum += base;
+  }
+  let leftover = amount - baseSum;
+  remainders.sort((left, right) =>
+    left.remainder === right.remainder
+      ? left.index - right.index
+      : left.remainder > right.remainder
+        ? -1
+        : 1,
   );
+  const extras = new Array<bigint>(weights.length).fill(0n);
+  for (const row of remainders) {
+    if (leftover === 0n) break;
+    extras[row.index] = 1n;
+    leftover -= 1n;
+  }
+  return bases.map((base, index) => Number(base + (extras[index] as bigint)));
 }
 
 /** Moves paisa from the largest surplus to lines below their component cost. */
@@ -95,25 +139,26 @@ export function priceBundle(input: BundlePriceInput): BundlePriceResult {
   const costs = components.map((component, index) =>
     mulDivRound(quantities[index] as number, component.unit_cost, 1000),
   );
-  const totalCost = costs.reduce((sum, cost) => sum + cost, 0);
+  const totalCost = sumSafe(costs);
   const revenue = price * count;
   assertSafeInteger(revenue, 'bundle revenue');
 
   // Cost-weighted, then shelf price, then plain quantity for an all-free recipe.
+  // Weights use the per-bundle quantity (07 §3.4) and BigInt so q_i × cost_i cannot
+  // overflow the JS safe-integer range.
   let weights = components.map(
-    (component, index) => (quantities[index] as number) * component.unit_cost,
+    (component) => BigInt(component.qty_milli) * BigInt(component.unit_cost),
   );
-  if (weights.every((weight) => weight === 0)) {
+  if (weights.every((weight) => weight === 0n)) {
     weights = components.map(
-      (component, index) =>
-        (quantities[index] as number) * component.unit_price,
+      (component) => BigInt(component.qty_milli) * BigInt(component.unit_price),
     );
   }
-  if (weights.every((weight) => weight === 0)) {
-    weights = quantities.slice();
+  if (weights.every((weight) => weight === 0n)) {
+    weights = components.map((component) => BigInt(component.qty_milli));
   }
 
-  const shares = allocate(revenue, weights);
+  const shares = allocateBigInt(BigInt(revenue), weights);
 
   // A profitable bundle must not show a false below-cost line because of rounding.
   // Move paisa from the largest surplus to a line below its cost until every line
@@ -127,13 +172,16 @@ export function priceBundle(input: BundlePriceInput): BundlePriceResult {
     const qty = quantities[index] as number;
     const net = shares[index] as number;
     const cost = costs[index] as number;
-    const unitPrice = ceilDiv(net * 1000, qty);
+    const unitPrice = ceilDivProduct(net, 1000, qty);
     const gross = mulDivRound(qty, unitPrice, 1000);
-    const discount = gross - net;
+    const discount = subSafe(gross, net);
     const lineBelow = net < cost;
     belowCost ||= lineBelow;
-    totalNet += net;
-    itemsTotal += mulDivRound(qty, component.unit_price, 1000);
+    totalNet = sumSafe([totalNet, net]);
+    itemsTotal = sumSafe([
+      itemsTotal,
+      mulDivRound(qty, component.unit_price, 1000),
+    ]);
     return {
       qty_milli: qty,
       unit_price: unitPrice,
@@ -152,7 +200,7 @@ export function priceBundle(input: BundlePriceInput): BundlePriceResult {
     total_cost: totalCost,
     below_cost: belowCost,
     items_total: itemsTotal,
-    saving: itemsTotal - revenue,
+    saving: subSafe(itemsTotal, revenue),
   };
 }
 
@@ -218,13 +266,16 @@ export function planBundleRefund(input: BundleRefundInput): BundleRefundResult {
     const soldMilli = component.qty_per_bundle * sold;
     const priorMilli = component.qty_per_bundle * prior;
     const refundMilli = component.qty_per_bundle * count;
+    assertSafeInteger(soldMilli, 'sold component quantity');
+    assertSafeInteger(priorMilli, 'previous refund quantity');
+    assertSafeInteger(refundMilli, 'refund quantity');
     const amount = computeRefundLine(
       component.line_final,
       soldMilli,
       priorMilli,
       refundMilli,
     );
-    exact += amount;
+    exact = sumSafe([exact, amount]);
     return { qty_milli: refundMilli, amount };
   });
   return { lines, exact_amount: exact };

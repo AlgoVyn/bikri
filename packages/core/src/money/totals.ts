@@ -250,7 +250,25 @@ export function computeCart(input: CartInput): CartResult {
   const rounding = total - preRound;
   const nets = priced.map((line) => line.net);
   const billAlloc = allocate(billDiscount, nets);
-  const taxAlloc = allocate(tax, nets);
+  let taxAlloc = allocate(tax, nets);
+  // Inclusive tax is part of the net, so a line can only absorb tax up to what is left
+  // after its bill-discount share. The unadjusted largest-remainder split can give the
+  // same low-index line the last paisa of both allocations and make revenue = -1.
+  // Allocate inclusive tax against the post-bill-discount bases if that would happen;
+  // `sum(net - billPart) = taxable >= tax` guarantees every share fits.
+  if (
+    taxMode === 'inclusive' &&
+    priced.some(
+      (line, index) =>
+        line.net - (billAlloc[index] as number) - (taxAlloc[index] as number) <
+        0,
+    )
+  ) {
+    taxAlloc = allocate(
+      tax,
+      nets.map((net, index) => net - (billAlloc[index] as number)),
+    );
+  }
   const bases = priced.map((line, index) => {
     const billPart = billAlloc[index] as number;
     const taxPart = taxAlloc[index] as number;

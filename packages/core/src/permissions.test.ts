@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, PERMISSIONS, roleAllows } from './permissions.ts';
+import { can, PERMISSIONS, type Role, roleAllows } from './permissions.ts';
 
 describe('permission matrix (05 §6)', () => {
   it('owner has everything', () => {
@@ -41,5 +41,12 @@ describe('permission matrix (05 §6)', () => {
     expect(can('manager', '{"cost.view": false}', 'cost.view')).toBe(false);
     expect(can('cashier', 'not json', 'sale.create')).toBe(true);
     expect(can('cashier', '', 'cost.view')).toBe(false);
+  });
+  it('unknown roles fail closed and the owner cannot be locked out', () => {
+    expect(roleAllows('supervisor' as Role, 'sale.create')).toBe(false);
+    expect(can('owner', '{"sale.create": false}', 'sale.create')).toBe(true);
+    expect(
+      can('cashier', '{"__proto__": {"cost.view": true}}', 'cost.view'),
+    ).toBe(false);
   });
 });

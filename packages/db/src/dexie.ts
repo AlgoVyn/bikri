@@ -398,17 +398,18 @@ export class BikriDb extends Dexie {
       .stores(DEXIE_SCHEMA_V7)
       .upgrade(async (tx) => {
         // One-time local backfill for a V6 database. New rows carry the date from the
-        // sale write; pulled rows carry it from the server.
-        const sales = (await tx.table('sales').toArray()) as Array<
-          Record<string, unknown>
-        >;
+        // sale write; pulled rows carry it from the server. Stream the sales instead of
+        // materialising a multi-year shop in one array while the upgrade transaction
+        // holds every store.
         const dates = new Map<string, string>();
-        for (const sale of sales) {
+        await (
+          tx.table('sales') as Table<Record<string, unknown>, string>
+        ).each((sale) => {
           const id = sale.id;
           const date = sale.business_date;
           if (typeof id === 'string' && typeof date === 'string')
             dates.set(id, date);
-        }
+        });
         const lines = tx.table('sale_lines') as Table<
           Record<string, unknown>,
           string

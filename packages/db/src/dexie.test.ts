@@ -4,7 +4,9 @@ import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearTenantDb,
-  DEXIE_SCHEMA_V8,
+  DEXIE_SCHEMA_V6,
+  DEXIE_SCHEMA_V7,
+  DEXIE_SCHEMA_V9,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -36,7 +38,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V8).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V9).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -46,6 +48,65 @@ describe('Dexie schema (02 §3)', () => {
         ...LOCAL_ONLY_TABLES,
       ].sort(),
     );
+  });
+
+  it('upgrades a V6 database: backfills line dates and product kind, then adds V9 indexes', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v6'));
+    old.version(6).stores(DEXIE_SCHEMA_V6);
+    await old.open();
+    await old.table('sales').add({
+      id: 's1',
+      invoice_no: 'INV-A-1',
+      business_date: '2026-10-27',
+    });
+    await old.table('sale_lines').add({
+      id: 'l1',
+      sale_id: 's1',
+      product_id: 'p1',
+    });
+    await old.table('products').add({
+      id: 'p1',
+      sku: 'P1',
+      name_en: 'Phone',
+    });
+    old.close();
+
+    const db = open('upgrade-v6');
+    await db.open();
+    expect((await db.sale_lines.get('l1'))?.business_date).toBe('2026-10-27');
+    expect((await db.products.get('p1'))?.kind).toBe('simple');
+    expect(
+      db.products.schema.indexes.some((index) => index.name === 'track_stock'),
+    ).toBe(true);
+    expect(db.tables.map((table) => table.name)).toContain('bundle_items');
+  });
+
+  it('upgrades a V7 database without losing line dates and backfills product kind', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v7'));
+    old.version(7).stores(DEXIE_SCHEMA_V7);
+    await old.open();
+    await old.table('products').add({
+      id: 'p1',
+      sku: 'P1',
+      name_en: 'Phone',
+    });
+    await old.table('sale_lines').add({
+      id: 'l1',
+      sale_id: 's1',
+      product_id: 'p1',
+      business_date: '2026-10-27',
+    });
+    old.close();
+
+    const db = open('upgrade-v7');
+    await db.open();
+    expect((await db.products.get('p1'))?.kind).toBe('simple');
+    expect((await db.sale_lines.get('l1'))?.business_date).toBe('2026-10-27');
+    expect(
+      db.sync_conflicts.schema.indexes.some(
+        (index) => index.name === 'resolution',
+      ),
+    ).toBe(true);
   });
 
   it('opens with the expected indexes and no tenant_id anywhere', async () => {

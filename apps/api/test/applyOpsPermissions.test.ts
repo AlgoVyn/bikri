@@ -496,8 +496,8 @@ describe('verifier and time-zone guards (05 §4, 02 §2)', () => {
     const base = {
       name: 'Bad PIN',
       role: 'cashier',
-      pin_hash: 'a'.repeat(44),
-      pin_salt: 'a'.repeat(24),
+      pin_hash: `${'a'.repeat(43)}=`,
+      pin_salt: `${'a'.repeat(22)}==`,
       pin_iterations: 150000,
       pin_length: 4,
       active: 1,

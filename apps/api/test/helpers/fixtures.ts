@@ -32,6 +32,10 @@ export const IDS = {
   bundleItem4: '01JB0000000000000000000015',
 } as const;
 
+/** Canonical base64 for a 32-byte hash and 16-byte salt, as hashPin() produces. */
+export const SEED_PIN_HASH = `${'a'.repeat(43)}=`;
+export const SEED_PIN_SALT = `${'a'.repeat(22)}==`;
+
 export type Shop = {
   tenantId: string;
   slug: string;
@@ -144,8 +148,8 @@ export async function seedShop(
       id,
       role === 'owner' ? 'Owner' : 'Cashier',
       role,
-      'a'.repeat(44),
-      'a'.repeat(24),
+      SEED_PIN_HASH,
+      SEED_PIN_SALT,
       now,
     );
   }
