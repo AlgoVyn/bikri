@@ -197,7 +197,7 @@ export function LockScreen() {
                 key={String(p.id)}
                 type="button"
                 aria-pressed={chosen?.id === p.id}
-                className={`flex min-h-14 items-center gap-2 rounded-full border px-3 ${chosen?.id === p.id ? 'border-primary bg-primary-subtle' : 'border-border bg-surface'}`}
+                className={`flex min-h-14 items-center gap-2 rounded-full border px-3 ${chosen?.id === p.id ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`}
                 onClick={() => {
                   setChosen(p);
                   setPin('');

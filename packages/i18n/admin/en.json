@@ -167,6 +167,7 @@
     "setup_at": "Setup completed",
     "setup_done": "Done",
     "setup_pending": "Not yet",
+    "shop_name_pending": "Not set up yet",
     "share_70": "70% shop share: {{value}}",
     "shop_name": "Shop name",
     "signed_in": "Signed in as {{email}}",

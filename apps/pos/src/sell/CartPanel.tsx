@@ -154,7 +154,7 @@ export function CartPanel(p: CartPanelProps) {
               type="button"
               role="tab"
               aria-selected={active}
-              className={`relative flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-control border px-2 py-1 text-small transition-colors duration-150 lg:min-h-10 ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
+              className={`relative flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-control border px-2 py-1 text-small transition-colors duration-150 lg:min-h-12 ${active ? 'border-primary bg-primary font-medium text-primary-ink' : 'border-border bg-surface-2 text-text-muted hover:bg-surface'}`}
               onClick={() => p.onTab(id)}
             >
               <span className="truncate font-medium">
@@ -180,7 +180,7 @@ export function CartPanel(p: CartPanelProps) {
         })}
       </div>
 
-      <div className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 lg:min-h-10">
+      <div className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 lg:min-h-12">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink [&_svg]:size-4">
           <UdhaarIcon />
         </span>
@@ -204,7 +204,7 @@ export function CartPanel(p: CartPanelProps) {
         </div>
         <button
           type="button"
-          className="min-h-11 px-2 text-small text-primary lg:min-h-9"
+          className="min-h-11 px-2 text-small text-primary lg:min-h-12"
           onClick={p.onCustomer}
         >
           {t('sell.change_customer')}
@@ -375,7 +375,7 @@ export function CartPanel(p: CartPanelProps) {
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          className={`${buttonQuiet} max-sm:px-3 lg:min-h-9 lg:px-3 lg:text-small`}
+          className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
           disabled={cart.lines.length === 0}
           onClick={p.onHold}
         >
@@ -383,14 +383,14 @@ export function CartPanel(p: CartPanelProps) {
         </button>
         <button
           type="button"
-          className={`${buttonQuiet} max-sm:px-3 lg:min-h-9 lg:px-3 lg:text-small`}
+          className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
           onClick={p.onHeld}
         >
           {t('sell.held_bills', { count: p.heldCount })}
         </button>
         <button
           type="button"
-          className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-9 lg:px-3 lg:text-small`}
+          className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
           disabled={isEmptyCart(cart)}
           onClick={p.onClear}
         >
@@ -398,7 +398,7 @@ export function CartPanel(p: CartPanelProps) {
         </button>
         <button
           type="button"
-          className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-9 lg:px-3`}
+          className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
           onClick={isEmptyCart(cart) ? p.onAddItem : p.onPay}
         >
           {isEmptyCart(cart) ? t('sell.add_items') : t('sell.take_payment')}
@@ -496,7 +496,7 @@ function BundleRows({
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span
-                className="data-name min-w-0 truncate font-medium"
+                className={`data-name min-w-0 truncate font-medium ${isLatinName(String(first.bundle_name ?? first.name)) ? 'ltr-name' : ''}`}
                 data-testid="line-name"
               >
                 {String(first.bundle_name ?? first.name)}
@@ -549,7 +549,11 @@ function BundleRows({
               className="flex items-baseline justify-between gap-2 px-3 ps-8 text-small text-text-muted"
               data-testid="bundle-component"
             >
-              <span className="min-w-0 truncate">{line.name}</span>
+              <span
+                className={`data-name min-w-0 truncate ${isLatinName(line.name) ? 'ltr-name' : ''}`}
+              >
+                {line.name}
+              </span>
               <span className="shrink-0 whitespace-nowrap">
                 {qtyWithUnit(t, line.qty_milli, (line.unit ?? 'pc') as QtyUnit)}
               </span>

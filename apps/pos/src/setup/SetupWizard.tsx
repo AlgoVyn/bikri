@@ -535,7 +535,7 @@ export function SetupWizard() {
               <button
                 type="button"
                 aria-expanded={showMore}
-                className="self-start text-small text-primary"
+                className="inline-flex min-h-11 items-center self-start text-small text-primary"
                 onClick={() => setShowMore(!showMore)}
               >
                 {t('setup.more')}

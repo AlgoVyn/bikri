@@ -130,6 +130,7 @@
       "change": "Change {{amount}}",
       "recorded_late": "Recorded late · sale date {{date}} · made by {{staff}}. Reason: {{reason}}",
       "bundle": "Bundle: {{name}}",
+      "bundle_label": "Bundle:",
       "totals_bundle_discount": "Bundle discount"
     },
     "void": {
@@ -196,6 +197,8 @@
       "title_plain": "Refund",
       "choose_reason": "Choose a reason and quantity to continue.",
       "bundle_sold": "Sold {{qty}} bundles",
+      "bundle_sold_one": "Sold {{qty}} bundle",
+      "bundle_sold_other": "Sold {{qty}} bundles",
       "bundle_already": "already refunded {{qty}}",
       "bundle_qty": "Bundles to return",
       "bundle_restock": "Put all {{count}} items back in stock",

@@ -15,7 +15,7 @@ import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
-import { scrollStrip } from '../components/ScrollStrip.tsx';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -190,7 +190,7 @@ export function ExpensesPage() {
         }
       />
 
-      <div className={scrollStrip}>
+      <ScrollStrip>
         {PRESETS.map((p) => (
           <button
             key={p}
@@ -202,7 +202,7 @@ export function ExpensesPage() {
             {t(`office.expenses.range_${p}`)}
           </button>
         ))}
-      </div>
+      </ScrollStrip>
       {preset === 'custom' ? (
         <div className="flex flex-wrap items-end gap-2">
           <DateField

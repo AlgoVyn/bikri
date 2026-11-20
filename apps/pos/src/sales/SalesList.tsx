@@ -23,7 +23,7 @@ import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
-import { scrollStrip } from '../components/ScrollStrip.tsx';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { useToast } from '../components/Toast.tsx';
@@ -369,7 +369,7 @@ export function SalesList({
           {t('office.sales.cashier_limited')}
         </p>
       ) : (
-        <div className={`${scrollStrip} items-center`}>
+        <ScrollStrip className="items-center">
           {PRESETS.map((p) => (
             <button
               key={p.id}
@@ -381,7 +381,7 @@ export function SalesList({
               {t(p.key)}
             </button>
           ))}
-        </div>
+        </ScrollStrip>
       )}
       {!limited && preset === 'custom' ? (
         <div className="flex flex-wrap items-end gap-2">
@@ -417,7 +417,7 @@ export function SalesList({
         <ListSurface
           toolbar={
             <search className="flex flex-wrap items-end gap-2">
-              <label className="flex min-w-0 flex-[3_1_16rem] flex-col">
+              <label className="flex min-w-0 flex-[2_1_14rem] flex-col">
                 <span className="mb-1 text-small">
                   {t('office.sales.search')}
                 </span>
@@ -448,7 +448,7 @@ export function SalesList({
                 ) : null}
               </button>
               <div className={filtersOpen ? 'contents' : 'hidden lg:contents'}>
-                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                <label className="flex min-w-0 flex-[0_1_8rem] flex-col">
                   <span className="mb-1 text-small">
                     {t('office.sales.filter_method')}
                   </span>
@@ -469,7 +469,7 @@ export function SalesList({
                     ))}
                   </select>
                 </label>
-                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                <label className="flex min-w-0 flex-[0_1_8rem] flex-col">
                   <span className="mb-1 text-small">
                     {t('office.sales.filter_status')}
                   </span>
@@ -488,7 +488,7 @@ export function SalesList({
                     ))}
                   </select>
                 </label>
-                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                <label className="flex min-w-0 flex-[0_1_8rem] flex-col">
                   <span className="mb-1 text-small">
                     {t('office.sales.filter_cashier')}
                   </span>
@@ -505,7 +505,7 @@ export function SalesList({
                     ))}
                   </select>
                 </label>
-                <label className="flex min-w-0 flex-[0_1_9rem] flex-col">
+                <label className="flex min-w-0 flex-[0_1_8rem] flex-col">
                   <span className="mb-1 text-small">
                     {t('office.sales.filter_device')}
                   </span>
@@ -522,7 +522,7 @@ export function SalesList({
                     ))}
                   </select>
                 </label>
-                <div className="flex min-w-0 flex-[0_1_11rem] flex-col">
+                <div className="flex min-w-0 flex-[0_1_10rem] flex-col">
                   <span className="mb-1 text-small">
                     {t('office.sales.sort')}
                   </span>
@@ -777,7 +777,9 @@ const SaleRow = memo(function SaleRow({
         className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} min-h-11 focus-visible:outline-offset-[-2px] px-2 py-2 pe-12 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
       >
         <span className="tabular-nums text-small text-text-muted">
-          {timeText(Number(sale.created_at), i18n.language, timeZone)}
+          <bdi dir="ltr">
+            {timeText(Number(sale.created_at), i18n.language, timeZone)}
+          </bdi>
         </span>
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-1">

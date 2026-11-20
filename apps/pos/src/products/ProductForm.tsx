@@ -16,6 +16,7 @@ import {
 import { CloseIcon, ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -308,7 +309,7 @@ export function ProductFormPage({
     },
   );
 
-  if (draft === null) return null;
+  if (draft === null) return <PageLoading compact />;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => (d ? { ...d, [key]: value } : d));

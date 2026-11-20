@@ -144,7 +144,7 @@ export function GlobalSearchHost() {
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="bikri-overlay fixed inset-0 z-40 bg-text/35" />
+        <Dialog.Overlay className="bikri-overlay fixed inset-0 z-40 bg-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
           onOpenAutoFocus={(event) => {
@@ -241,7 +241,7 @@ export function GlobalSearchHost() {
                         role="option"
                         tabIndex={-1}
                         aria-selected={index === active}
-                        className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle"
+                        className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink"
                         onMouseDown={(event) => {
                           event.preventDefault();
                           go(hit);

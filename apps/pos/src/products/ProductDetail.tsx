@@ -13,6 +13,7 @@ import { EmptyState } from '../components/EmptyState.tsx';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   addBundle,
@@ -105,7 +106,7 @@ export function ProductDetailPage({
     },
   );
 
-  if (detail === undefined) return null;
+  if (detail === undefined) return <PageLoading compact />;
   if (detail === null) {
     return (
       <EmptyState
@@ -297,8 +298,10 @@ export function ProductDetailPage({
             ) : null}
           </h1>
           {p.name_ur ? (
-            <p lang="ur" dir="rtl" className="font-urdu">
-              {String(p.name_ur)}
+            <p className="text-start font-urdu">
+              <bdi lang="ur" dir="rtl">
+                {String(p.name_ur)}
+              </bdi>
             </p>
           ) : null}
           <p className="text-text-muted">
@@ -594,7 +597,7 @@ export function ProductDetailPage({
                 <Link
                   to="/products/$id"
                   params={{ id: item.product.id }}
-                  className="min-w-0 font-medium underline-offset-2 hover:underline"
+                  className={`data-name inline-flex min-h-11 min-w-0 items-center font-medium underline-offset-2 hover:underline ${isLatinName(String(item.product.name_en)) ? 'ltr-name' : ''}`}
                 >
                   {String(item.product.name_en)}
                 </Link>
@@ -611,6 +614,7 @@ export function ProductDetailPage({
                   <MoneyText paisa={Number(item.product.price)} />
                   {showCost ? (
                     <span className="ms-2 text-text-muted">
+                      <span className="me-1">{t('products.bundle_cost')}</span>
                       <MoneyText
                         paisa={componentCost(
                           item.product,

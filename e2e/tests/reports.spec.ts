@@ -156,5 +156,14 @@ test.describe('Reports (T-048)', () => {
       .boundingBox();
     expect(actions?.y ?? 0).toBeGreaterThan((title?.y ?? 0) + 20);
     await expectNoHorizontalScroll(page);
+
+    // A desktop selection followed by a phone-width resize keeps the active
+    // tab inside the strip, not scrolled away at the start.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('tab', { name: 'Day closes' }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(
+      page.getByRole('tab', { name: 'Day closes' }),
+    ).toBeInViewport();
   });
 });

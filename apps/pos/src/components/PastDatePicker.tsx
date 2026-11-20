@@ -110,7 +110,7 @@ export function PastDatePicker({
             type="button"
             data-testid={`backdate-preset-${preset.id}`}
             aria-pressed={value === preset.date}
-            className={`min-h-9 rounded-full border px-3 text-small transition-colors ${
+            className={`min-h-11 rounded-full border px-3 text-small transition-colors ${
               value === preset.date
                 ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
                 : 'border-border bg-surface text-text-muted hover:bg-surface-2'

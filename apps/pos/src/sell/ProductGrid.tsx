@@ -163,9 +163,7 @@ function Tile({
           }
         : {
             text: row.bundle
-              ? t('products.bundle_count', {
-                  count: row.bundle.availability ?? 0,
-                })
+              ? t('sell.left', { qty: row.bundle.availability ?? 0 })
               : t('sell.left', { qty: formatQtyFromMilli(row.onHand, unit) }),
             cls:
               row.stockState === 'low'
@@ -209,7 +207,7 @@ function Tile({
         </span>
       ) : null}
       <span className="mt-auto flex w-full shrink-0 flex-wrap items-center justify-between gap-x-1 gap-y-0.5 text-small">
-        <span className="min-w-0 text-body font-semibold">
+        <span className="min-w-0 whitespace-nowrap text-body font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />
         </span>
         {pill ? (

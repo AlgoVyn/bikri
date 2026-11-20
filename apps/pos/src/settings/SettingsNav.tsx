@@ -32,13 +32,19 @@ const rowLink = 'flex min-h-14 items-center gap-3 p-3';
 export function SettingsNav({
   activePath,
   headingLevel = 'h1',
+  titleSize,
 }: {
   activePath?: string;
   headingLevel?: 'h1' | 'h2';
+  titleSize?: 'h1' | 'h2' | 'title';
 }) {
   return (
     <AreaStrings area="office">
-      <SettingsNavContent activePath={activePath} headingLevel={headingLevel} />
+      <SettingsNavContent
+        activePath={activePath}
+        headingLevel={headingLevel}
+        titleSize={titleSize}
+      />
     </AreaStrings>
   );
 }
@@ -46,9 +52,11 @@ export function SettingsNav({
 function SettingsNavContent({
   activePath,
   headingLevel,
+  titleSize,
 }: {
   activePath?: string;
   headingLevel: 'h1' | 'h2';
+  titleSize?: 'h1' | 'h2' | 'title';
 }) {
   const { t } = useTranslation();
   const { role, can, support } = useCurrentStaff();
@@ -204,6 +212,7 @@ function SettingsNavContent({
         title={t('nav.settings')}
         subtitle={t('office.settings.subtitle')}
         headingLevel={headingLevel}
+        titleSize={titleSize}
         hideTitleOnPhone
       />
       <section

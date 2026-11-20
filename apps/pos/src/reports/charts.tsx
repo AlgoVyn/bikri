@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PrivacyCurtain, usePrivacyActive } from '../components/privacy.tsx';
 import type {
@@ -15,6 +15,32 @@ const COLORS: Record<keyof PaymentMix, string> = {
   bank_wallet: 'var(--color-warning)',
   udhaar: 'var(--color-chart-udhaar)',
 };
+
+/**
+ * SVG font sizes are in viewBox units, so compensate for the rendered width:
+ * labels stay around 11–12 CSS px on a phone instead of shrinking to 4–5 px.
+ */
+function useChartLabelFont(
+  svgRef: RefObject<SVGSVGElement | null>,
+  width: number,
+  enabled: boolean,
+): number {
+  const [renderedWidth, setRenderedWidth] = useState(width);
+  useEffect(() => {
+    if (!enabled) return;
+    const element = svgRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const update = () => setRenderedWidth(element.clientWidth || width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [enabled, svgRef, width]);
+  return Math.min(
+    24,
+    Math.max(8, Math.round((12 * width) / Math.max(1, renderedWidth))),
+  );
+}
 
 /** Simple responsive bars + profit line, no chart library (screens/16). */
 export function DailyChart({
@@ -66,24 +92,8 @@ export function DailyChart({
     .map((point, index) => `${x(index)},${y(point.grossProfit)}`)
     .join(' ');
   const svgRef = useRef<SVGSVGElement>(null);
-  const [renderedWidth, setRenderedWidth] = useState(width);
-  useEffect(() => {
-    if (privacy) return;
-    const element = svgRef.current;
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    const update = () => setRenderedWidth(element.clientWidth || width);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [privacy]);
+  const labelFont = useChartLabelFont(svgRef, width, !privacy);
   if (privacy) return <PrivacyCurtain className="h-52" />;
-  // SVG font sizes are in viewBox units, so compensate for the rendered width: labels stay
-  // around 11–12 CSS px on a phone instead of shrinking to 4 px.
-  const labelFont = Math.min(
-    24,
-    Math.max(8, Math.round((12 * width) / Math.max(1, renderedWidth))),
-  );
   const summary = points
     .map((point) => `${shortDate(point.date, lang)} ${money(point.sold)}`)
     .join('; ');
@@ -271,10 +281,12 @@ export function HourlyChart({
 }) {
   const money = useDisplayMoney();
   const privacy = usePrivacyActive();
-  if (privacy) return <PrivacyCurtain className="h-40" />;
   const width = 720;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const labelFont = useChartLabelFont(svgRef, width, !privacy);
+  if (privacy) return <PrivacyCurtain className="h-40" />;
   const height = 180;
-  const padX = 40;
+  const padX = 56;
   const padY = 24;
   const values = points.map((point) => point.sold);
   const min = Math.min(0, ...values);
@@ -292,6 +304,7 @@ export function HourlyChart({
   return (
     <div className="flex flex-col gap-2">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`${t('office.reports.hourly_chart')}: ${label}`}
@@ -310,7 +323,7 @@ export function HourlyChart({
             <text
               x={4}
               y={y(value) + 3}
-              fontSize={10}
+              fontSize={labelFont}
               fill="var(--color-text-muted)"
             >
               {money(value)}
@@ -343,7 +356,7 @@ export function HourlyChart({
             x={padX + hour * slot + slot / 2}
             y={height - 4}
             textAnchor="middle"
-            fontSize={10}
+            fontSize={labelFont}
             fill="var(--color-text-muted)"
           >
             {String(hour).padStart(2, '0')}

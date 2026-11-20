@@ -132,7 +132,11 @@ export function DevicesTab({
 
   if (query.data === null) {
     return query.error !== null ? (
-      <AdminErrorState message={query.error} onRetry={query.reload} />
+      <AdminErrorState
+        message={query.error}
+        onRetry={query.reload}
+        headingLevel="h2"
+      />
     ) : (
       <p className="sr-only">{t('common.loading')}</p>
     );

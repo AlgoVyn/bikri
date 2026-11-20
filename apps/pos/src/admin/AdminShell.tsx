@@ -10,6 +10,7 @@ import {
   UserIcon,
 } from '../components/icons.tsx';
 import { LanguageMenu, LanguageSelect } from '../components/LanguageSelect.tsx';
+import { useScrollStripMask } from '../components/ScrollStrip.tsx';
 import { useAreaStrings } from '../i18n/areas.tsx';
 import { applyStoredTheme } from '../shell/devicePrefs.ts';
 import { getSession } from './api.ts';
@@ -32,7 +33,7 @@ function readCompactRail(): boolean {
 }
 
 const railLink =
-  'relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-control px-1 py-2 text-small text-rail-muted transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink aria-[current=page]:bg-rail-active-bg aria-[current=page]:text-rail-active-ink';
+  'relative flex min-h-11 w-full flex-col items-center justify-center gap-0.5 px-1 py-2 text-small text-rail-muted transition-colors duration-150 hover:bg-rail-hover hover:text-rail-ink aria-[current=page]:bg-rail-active-bg aria-[current=page]:text-rail-active-ink';
 
 const mobileNavLink =
   'relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-control px-2 text-small text-text-muted hover:bg-surface-2 aria-[current=page]:bg-primary-subtle aria-[current=page]:font-medium aria-[current=page]:text-primary-subtle-ink [&>svg]:size-4';
@@ -47,6 +48,7 @@ export function AdminShell() {
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
+  const mobileNavScroll = useScrollStripMask<HTMLElement>();
 
   useEffect(() => {
     applyStoredTheme();
@@ -148,8 +150,10 @@ export function AdminShell() {
           </div>
         </div>
         <nav
+          ref={mobileNavScroll.ref}
+          style={mobileNavScroll.style}
           aria-label={t('admin.title')}
-          className="flex gap-1 overflow-x-auto px-3 pb-2 [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
+          className="scroll-strip flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
         >
           {NAV.map((item) => (
             <Link
@@ -189,7 +193,7 @@ export function AdminShell() {
 
         <nav
           aria-label={t('admin.title')}
-          className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {NAV.map((item) => {
             const active =

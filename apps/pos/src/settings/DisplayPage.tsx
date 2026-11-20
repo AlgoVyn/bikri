@@ -70,7 +70,7 @@ function DisplayContent() {
       title={t('office.display.title')}
       icon={<DisplayIcon />}
     >
-      <section className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-card border border-border bg-surface p-4">
+      <section className="flex w-full flex-col gap-3 rounded-card border border-border bg-surface p-4">
         <label className="flex flex-col gap-1 text-small">
           {t('office.display.language')}
           <select
@@ -151,10 +151,10 @@ function DisplayContent() {
             </option>
           </select>
         </label>
-        <label className="flex items-start gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
-            className="mt-1"
+            className="size-5 shrink-0"
             checked={form.privacyMode}
             data-testid="privacy-setting"
             onChange={(event) => {
@@ -188,33 +188,37 @@ function DisplayContent() {
             }
           />
         </label>
-        <label className="flex items-center gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5 shrink-0"
             checked={form.camera}
             onChange={(event) => change({ camera: event.target.checked })}
           />
           {t('office.display.camera')}
         </label>
-        <label className="flex items-center gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5 shrink-0"
             checked={form.suffixEnter}
             onChange={(event) => change({ suffixEnter: event.target.checked })}
           />
           {t('office.display.suffix_enter')}
         </label>
-        <label className="flex items-center gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5 shrink-0"
             checked={form.saleSound}
             onChange={(event) => change({ saleSound: event.target.checked })}
           />
           {t('office.display.sale_sound')}
         </label>
-        <label className="flex items-center gap-2 text-small">
+        <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"
+            className="size-5 shrink-0"
             checked={form.autoClose}
             onChange={(event) => change({ autoClose: event.target.checked })}
           />

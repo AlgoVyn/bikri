@@ -57,23 +57,10 @@
   }
 }
 
-/* A soft edge on phone strips hints that there is more to scroll. */
+/* Phone strips get an edge-aware fade from `ScrollStrip.tsx`; only the scroll
+   snap/padding lives in CSS so a strip at `scrollLeft = 0` keeps its first chip. */
 @media (max-width: 1023.98px) {
   .scroll-strip {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      black 24px,
-      black calc(100% - 24px),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      black 24px,
-      black calc(100% - 24px),
-      transparent
-    );
     scroll-padding-inline: 24px;
     scroll-snap-type: x proximity;
   }

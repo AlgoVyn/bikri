@@ -130,6 +130,7 @@
       "change": "بقایا {{amount}}",
       "recorded_late": "دیر سے درج · فروخت کی تاریخ {{date}} · {{staff}} کی طرف سے۔ وجہ: {{reason}}",
       "bundle": "بنڈل: {{name}}",
+      "bundle_label": "بنڈل:",
       "totals_bundle_discount": "بنڈل رعایت"
     },
     "void": {
@@ -196,6 +197,8 @@
       "title_plain": "رقم واپس",
       "choose_reason": "جاری رکھنے کے لیے وجہ اور مقدار چنیں۔",
       "bundle_sold": "{{qty}} بنڈل بکے",
+      "bundle_sold_one": "{{qty}} بنڈل بکا",
+      "bundle_sold_other": "{{qty}} بنڈل بکے",
       "bundle_already": "پہلے {{qty}} واپس",
       "bundle_qty": "واپس کرنے کے بنڈل",
       "bundle_restock": "تمام {{count}} اشیاء اسٹاک میں واپس ڈالیں",

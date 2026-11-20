@@ -449,6 +449,7 @@ export function RefundDialog({
                     <span className="text-small text-text-muted">
                       {t('office.refund.bundle_sold', {
                         qty: soldBundles,
+                        count: soldBundles,
                       })}
                       {already > 0
                         ? ` · ${t('office.refund.bundle_already', {

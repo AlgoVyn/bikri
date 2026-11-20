@@ -16,6 +16,7 @@ import {
   ExpensesIcon,
   EyeIcon,
   EyeOffIcon,
+  LockIcon,
   PrinterIcon,
   ProductsIcon,
   ReportsIcon,
@@ -188,6 +189,7 @@ export function CommandPalette() {
         label: t('shell.lock'),
         hint: t('shell.staff_menu'),
         keys: 'Ctrl+L',
+        icon: <LockIcon />,
         run: () => {
           setOpen(false);
           lock();
@@ -303,8 +305,8 @@ export function CommandPalette() {
         remember(command.id);
         command.run();
       }}
-      className={`flex min-h-11 items-center gap-3 rounded-control px-3 text-start ${
-        index === active ? 'bg-primary-subtle' : ''
+      className={`flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-start ${
+        index === active ? 'bg-primary-subtle text-primary-subtle-ink' : ''
       }`}
     >
       <span className="flex size-5 shrink-0 items-center justify-center text-text-muted">
@@ -325,12 +327,12 @@ export function CommandPalette() {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="bikri-overlay fixed inset-0 z-50 bg-text/40" />
+        <Dialog.Overlay className="bikri-overlay fixed inset-0 z-50 bg-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
           className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal"
         >
-          <Dialog.Title className="sr-only">
+          <Dialog.Title className="sr-only font-semibold">
             {mode === 'commands' ? t('shell.commands') : t('shell.shortcuts')}
           </Dialog.Title>
           {mode === 'commands' ? (

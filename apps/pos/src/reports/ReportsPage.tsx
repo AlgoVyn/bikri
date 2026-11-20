@@ -18,7 +18,7 @@ import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { PrivacyValue } from '../components/privacy.tsx';
-import { scrollStrip } from '../components/ScrollStrip.tsx';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import {
@@ -121,7 +121,7 @@ function ReportRangeControls({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className={`${scrollStrip} items-center`}>
+        <ScrollStrip className="items-center">
           {(limited
             ? PRESETS.filter((item) => item.id === 'today')
             : PRESETS
@@ -136,7 +136,7 @@ function ReportRangeControls({
               {t(item.key)}
             </button>
           ))}
-        </div>
+        </ScrollStrip>
         {rangeLabel}
       </div>
       {preset === 'custom' && !limited ? (
@@ -203,6 +203,27 @@ export function ReportsPage() {
   useEffect(() => {
     if (!limited) rememberDateFilter('reports', preset, custom.from, custom.to);
   }, [preset, custom.from, custom.to, limited]);
+
+  // Keep the selected tab visible when the strip is scrollable (phone) or when
+  // the viewport shrinks after a desktop selection. Only the strip scrolls:
+  // scrollIntoView would also move the page when the keyboard/orientation
+  // resizes the viewport.
+  useEffect(() => {
+    const scrollActive = () => {
+      const active = document.getElementById(`report-tab-${tab}`);
+      const strip = active?.closest<HTMLElement>('.scroll-strip');
+      if (!active || !strip) return;
+      const tabRect = active.getBoundingClientRect();
+      const stripRect = strip.getBoundingClientRect();
+      const left = tabRect.left - stripRect.left;
+      const right = tabRect.right - stripRect.right;
+      if (left >= 0 && right <= 0) return;
+      strip.scrollLeft += left < 0 ? left : right;
+    };
+    scrollActive();
+    window.addEventListener('resize', scrollActive);
+    return () => window.removeEventListener('resize', scrollActive);
+  }, [tab]);
 
   useEffect(() => {
     let worker: Worker;
@@ -583,11 +604,10 @@ export function ReportsPage() {
         </p>
       ) : null}
 
-      <div
+      <ScrollStrip
         role="tablist"
         aria-label={t('office.reports.title')}
         aria-orientation="horizontal"
-        className={scrollStrip}
         onKeyDown={onTabKeyDown}
       >
         {TABS.map((item) => (
@@ -608,7 +628,7 @@ export function ReportsPage() {
             {t(item.key)}
           </button>
         ))}
-      </div>
+      </ScrollStrip>
 
       <section
         role="tabpanel"

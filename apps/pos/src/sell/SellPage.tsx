@@ -861,7 +861,7 @@ export function SellPage() {
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
           </label>
-          <div className="flex h-12 items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:h-10">
+          <div className="flex h-12 items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:h-12">
             <SearchIcon />
             <input
               id="sell-search"
