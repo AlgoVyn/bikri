@@ -133,10 +133,10 @@ const HOT_QUERIES: Array<{
     index: 'audit_log_status',
   },
   {
-    name: 'audit by time',
-    sql: 'SELECT id FROM audit_log WHERE tenant_id = ? AND created_at BETWEEN ? AND ?',
-    args: ['t', 0, 1],
-    index: 'audit_log_time',
+    name: 'purge replacement sales',
+    sql: 'SELECT rowid FROM sales WHERE tenant_id = ? AND replaces_sale_id IS NOT NULL LIMIT ?',
+    args: ['t', 2000],
+    index: 'sales_replaces',
   },
 ];
 
@@ -446,6 +446,84 @@ describe('T-062 performance', () => {
     // A 500-recipe shop must not pay for the recipes on a normal sale.
     expect(Number(usage?.rows_read ?? 0)).toBeLessThan(400);
   }, 60_000);
+
+  it('deletes reissued bills through the sales_replaces index', async () => {
+    const shop = await seedShop('Perf purge', { budget: 100_000 });
+    const now = Date.now();
+    const day = businessDate(now);
+    // 20,000 bills, 2,000 of them reissues of the first 2,000. The purge and the
+    // nightly tenant delete remove the reissues first; without a child index SQLite
+    // scans every bill for each deleted row (O(N²)).
+    for (let chunk = 0; chunk < 10; chunk += 1) {
+      await env.DB.prepare(
+        `WITH RECURSIVE seq(n) AS (
+           SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 2000
+         )
+         INSERT INTO sales
+           (tenant_id, id, invoice_no, invoice_seq, branch_id, device_id, staff_id,
+            business_date, created_at, line_count, items_qty_milli, gross_total,
+            item_discount_total, subtotal, total, paid_total, replaces_sale_id)
+         SELECT ?1, printf('purge-s%05d', ?2 + n), printf('PRG-%05d', ?2 + n),
+           ?2 + n, ?3, ?4, ?5, ?6, ?7, 1, 1000, 100, 0, 100, 100, 100,
+           CASE WHEN ?2 + n BETWEEN 2001 AND 4000
+             THEN printf('purge-s%05d', ?2 + n - 2000) END
+         FROM seq`,
+      )
+        .bind(
+          shop.tenantId,
+          chunk * 2_000,
+          shop.branchId,
+          shop.till.id,
+          IDS.owner,
+          day,
+          now,
+        )
+        .run();
+    }
+    expect(
+      (
+        await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM sales WHERE tenant_id = ?1',
+        )
+          .bind(shop.tenantId)
+          .first<{ n: number }>()
+      )?.n,
+    ).toBe(20_000);
+    // The append-only delete guard allows removal only while the shop is in
+    // maintenance/deleting, which is exactly when purge runs.
+    await env.DB.prepare(
+      "UPDATE tenants SET status = 'maintenance', status_changed_at = ?2 WHERE id = ?1",
+    )
+      .bind(shop.tenantId, now)
+      .run();
+
+    const deleteSql = `DELETE FROM sales
+      WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL
+        AND rowid IN (
+          SELECT rowid FROM sales
+          WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL LIMIT ?2
+        )`;
+    const plan = await env.DB.prepare(`EXPLAIN QUERY PLAN ${deleteSql}`)
+      .bind(shop.tenantId, 2_000)
+      .all<{ detail: string }>();
+    expect(plan.results.map((row) => row.detail).join('\n')).toContain(
+      'sales_replaces',
+    );
+
+    const started = Date.now();
+    const deleted = await env.DB.prepare(deleteSql)
+      .bind(shop.tenantId, 2_000)
+      .run();
+    const elapsed = Date.now() - started;
+    expect(deleted.meta.changes).toBe(2_000);
+    // With the index the FK check reads the replacement rows, not all 20,000 bills.
+    // 100k leaves headroom for index/table probes while still catching the O(N²)
+    // regression (which reads tens of millions of rows and takes seconds). Older
+    // local runtimes omit meta.rows_read; the plan and elapsed checks still gate it.
+    const rowsRead = Number(deleted.meta.rows_read);
+    if (Number.isFinite(rowsRead)) expect(rowsRead).toBeLessThan(100_000);
+    expect(elapsed).toBeLessThan(2_000);
+  }, 120_000);
 
   it('still guards a component delete while allowing a normal edit', async () => {
     const shop = await seedShop('Perf component', { budget: 100_000 });

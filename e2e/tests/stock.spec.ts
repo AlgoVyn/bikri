@@ -170,15 +170,18 @@ test.describe('Stock adjust (T-021)', () => {
     await expect(page.getByTestId('count-progress')).toHaveText(
       '2 of 2 counted',
     );
-    const kv = await idbAll<{
-      key: string;
-      value: { counted: Record<string, number> };
-    }>(page, 'kv');
-    expect(
-      kv.find((k) => k.key === 'stock_count_draft')?.value.counted[
-        cable as string
-      ],
-    ).toBe(2000);
+    // The draft write is debounced; the screen keeps the tapped value immediately.
+    await expect
+      .poll(async () => {
+        const rows = await idbAll<{
+          key: string;
+          value: { counted: Record<string, number> };
+        }>(page, 'kv');
+        return rows.find((k) => k.key === 'stock_count_draft')?.value.counted[
+          cable as string
+        ];
+      })
+      .toBe(2000);
     await page.getByRole('button', { name: 'Finish count' }).click();
     await expect(
       page.getByText('Count saved: 1 product changed.'),

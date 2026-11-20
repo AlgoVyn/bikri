@@ -27,7 +27,6 @@ import {
   type ReportOptions,
   type ReportSummary,
   reportBundle,
-  slowMoversReport,
 } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import {
@@ -273,13 +272,13 @@ export function ReportsPage() {
       ...range,
       deviceId: deviceId || undefined,
     };
-    // The slow-mover walk scans every movement in the shop; the Products tab loads it
-    // separately so the Summary and other tabs do not pay for it.
+    // Slow movers are only needed by the Products tab. The bundle (and the scan)
+    // stays in the worker, and the existing 250 ms coalescing below debounces it.
     const options: ReportOptions = {
       now,
       today,
       timeZone,
-      slowMovers: false,
+      slowMovers: tab === 'products',
     };
     const span = daysBetween(range.from, range.to) + 1;
     const previousRange: ReportRange | undefined =
@@ -296,6 +295,7 @@ export function ReportsPage() {
     // on a shop with tens of thousands of sales and movements.
     await Promise.all([
       db.sales.toCollection().first(),
+      db.sale_lines.toCollection().first(),
       db.payments.toCollection().first(),
       db.refunds.toCollection().first(),
       db.sale_voids.toCollection().first(),
@@ -392,6 +392,9 @@ export function ReportsPage() {
       timeZone,
       devices,
       shopName: String(shop?.name ?? ''),
+      // The previous bundle can be on screen while the Products bundle is still
+      // being computed; only then is the slow-movers table still loading.
+      slowMoversReady: options.slowMovers === true,
     };
   }, [
     preset,
@@ -402,6 +405,7 @@ export function ReportsPage() {
     workerState,
     timeZone,
     businessToday,
+    tab,
   ]);
 
   if (!can('report.view'))
@@ -649,7 +653,7 @@ export function ReportsPage() {
             bundle={bundle}
             cost={cost}
             lang={lang}
-            today={data.today}
+            slowMoversReady={data.slowMoversReady}
           />
         ) : null}
         {tab === 'stock' ? (
@@ -1089,21 +1093,16 @@ function ProductsTab({
   bundle,
   cost,
   lang,
-  today,
+  slowMoversReady,
 }: {
   bundle: ReportBundle;
   cost: boolean;
   lang: string;
-  today: string;
+  slowMoversReady: boolean;
 }) {
   const { t } = useTranslation();
   const products = bundle.products;
-  // Only this tab needs the slow-mover walk over every movement, so it loads after the
-  // tables above are already on screen.
-  const slowMovers = useLiveQuery(
-    () => slowMoversReport(getDb(), today),
-    [today],
-  );
+  const slowMovers = products.slowMovers;
   const name = (row: { name: string; nameUr?: string }) =>
     groupName({ name: row.name, nameUr: row.nameUr ?? '' }, lang);
   return (
@@ -1209,9 +1208,9 @@ function ProductsTab({
             : t('office.reports.never_sold'),
         ])}
         empty={
-          slowMovers === undefined
-            ? t('office.loading')
-            : t('office.reports.no_slow_movers')
+          slowMoversReady
+            ? t('office.reports.no_slow_movers')
+            : t('office.loading')
         }
       />
     </>

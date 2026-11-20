@@ -2,7 +2,62 @@
 
 package backend
 
-import "testing"
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestListPrintersCachesAndServesStale(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "lpstat")
+	write := func(body string) {
+		if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("#!/bin/sh\ncase \"$1\" in\n  -e) echo Bixolon ;;\n  -d) echo 'system default destination: Bixolon' ;;\n  -v) echo 'device for Bixolon: usb://BIXOLON/SRP-350III' ;;\nesac\n")
+	// Keep only the fake command on PATH: after it is removed the refresh must fail
+	// (a system lpstat would otherwise answer successfully with no printers).
+	t.Setenv("PATH", dir)
+	// The process environment cache may have been populated by another test.
+	cupsEnvOnce = sync.Once{}
+	cupsEnvCache = nil
+
+	b := &cupsBackend{}
+	list, err := b.ListPrinters(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Name != "Bixolon" || !list[0].IsDefault {
+		t.Fatalf("printers = %#v", list)
+	}
+
+	// A second call is served from the cache even with the command gone.
+	if err := os.Remove(script); err != nil {
+		t.Fatal(err)
+	}
+	list, err = b.ListPrinters(context.Background())
+	if err != nil || len(list) != 1 {
+		t.Fatalf("cached list = %#v, err = %v", list, err)
+	}
+
+	// An expired cache with a failed refresh keeps the last known list, so a
+	// transient lpstat failure does not empty the printer wizard.
+	b.printersMu.Lock()
+	b.printersAt = time.Now().Add(-2 * cupsPrinterTTL)
+	b.printersMu.Unlock()
+	list, err = b.ListPrinters(context.Background())
+	if err != nil {
+		t.Fatalf("stale refresh failed: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "Bixolon" {
+		t.Fatalf("stale list = %#v", list)
+	}
+}
 
 func TestParseQueueNames(t *testing.T) {
 	got := parseQueueNames("Bixolon\n\nOffice  \n")

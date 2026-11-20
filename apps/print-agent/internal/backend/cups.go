@@ -17,10 +17,17 @@ import (
 // Linux and macOS and never needs root: the agent runs as the logged-in user and
 // CUPS policy decides whether that user may print.
 type cupsBackend struct {
-	printersMu sync.Mutex
-	printers   []Printer
-	printersAt time.Time
+	printersMu  sync.Mutex
+	printers    []Printer
+	printersAt  time.Time
+	refreshing  bool
+	refreshDone chan struct{}
+	refreshErr  error
 }
+
+// CUPS enumeration is three fast local commands; a short TTL keeps a newly added
+// queue visible while singleflight prevents one refresh per waiter.
+const cupsPrinterTTL = 10 * time.Second
 
 var (
 	requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
@@ -29,27 +36,65 @@ var (
 
 func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	// `/v1/jobs` verifies the requested queue, and health/printers/diagnostics
-	// each list again. Without this cache every print spawned 1–3 `lpstat`
-	// processes (the Windows backend already caches for 10 s).
+	// each list again. One refresh serves every waiter, and a transient lpstat
+	// failure keeps the last known list instead of emptying the wizard.
 	b.printersMu.Lock()
-	if b.printers != nil && time.Since(b.printersAt) < 10*time.Second {
+	if b.printers != nil && time.Since(b.printersAt) < cupsPrinterTTL {
 		list := append([]Printer(nil), b.printers...)
 		b.printersMu.Unlock()
 		return list, nil
 	}
+	if b.refreshing {
+		done := b.refreshDone
+		b.printersMu.Unlock()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		b.printersMu.Lock()
+		list := append([]Printer(nil), b.printers...)
+		refreshErr := b.refreshErr
+		b.printersMu.Unlock()
+		if list == nil && refreshErr != nil {
+			return nil, refreshErr
+		}
+		return list, nil
+	}
+	b.refreshing = true
+	b.refreshDone = make(chan struct{})
+	done := b.refreshDone
+	hasStale := b.printers != nil
+	stale := append([]Printer(nil), b.printers...)
 	b.printersMu.Unlock()
+
+	list, err := b.enumerate(ctx)
+
+	b.printersMu.Lock()
+	if err == nil {
+		// Keep an empty result non-nil so "no printers" is cached too.
+		b.printers = append([]Printer{}, list...)
+		b.printersAt = time.Now()
+	}
+	b.refreshErr = err
+	b.refreshing = false
+	b.refreshDone = nil
+	close(done)
+	b.printersMu.Unlock()
+	if err != nil && hasStale {
+		return stale, nil
+	}
+	return list, err
+}
+
+func (b *cupsBackend) enumerate(ctx context.Context) ([]Printer, error) {
 	namesOut, err := run(ctx, "lpstat", "-e")
 	if err != nil {
 		return nil, &Error{Code: "CUPS_UNAVAILABLE", Message: err.Error()}
 	}
 	names := parseQueueNames(namesOut)
 	if len(names) == 0 {
-		empty := []Printer{}
-		b.printersMu.Lock()
-		b.printers = empty
-		b.printersAt = time.Now()
-		b.printersMu.Unlock()
-		return empty, nil
+		return []Printer{}, nil
 	}
 	defaultName := ""
 	if out, err := run(ctx, "lpstat", "-d"); err == nil {
@@ -67,10 +112,6 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 			IsDefault: name == defaultName,
 		})
 	}
-	b.printersMu.Lock()
-	b.printers = append([]Printer(nil), printers...)
-	b.printersAt = time.Now()
-	b.printersMu.Unlock()
 	return printers, nil
 }
 
@@ -138,16 +179,14 @@ func (b *cupsBackend) Status(ctx context.Context, printer, spoolID string) (Stat
 	if err != nil {
 		return Status{}, &Error{Code: "CUPS_UNAVAILABLE", Message: err.Error()}
 	}
-	if spoolID == "" || containsJob(active, spoolID) {
+	if containsJob(active, spoolID) {
 		return Status{State: "printing"}, nil
-	}
-	completed, err := run(ctx, "lpstat", "-W", "completed", "-o", printer)
-	if err == nil && containsJob(completed, spoolID) {
-		return Status{State: "done"}, nil
 	}
 	// CUPS removes completed jobs from the short listing after a while. If the
 	// job is no longer active, treat it as done rather than leaving the till
 	// waiting forever; a failed job normally remains active with a reason.
+	// (Polling `lpstat -W completed` only to ignore its answer was a wasted
+	// subprocess on every finished job.)
 	return Status{State: "done"}, nil
 }
 
@@ -175,9 +214,20 @@ func cupsEnv(env []string) []string {
 	return append(out, "LC_ALL=C", "LANG=C")
 }
 
+var (
+	cupsEnvOnce  sync.Once
+	cupsEnvCache []string
+)
+
+// The process environment does not change while the agent runs.
+func cachedCupsEnv() []string {
+	cupsEnvOnce.Do(func() { cupsEnvCache = cupsEnv(os.Environ()) })
+	return cupsEnvCache
+}
+
 func run(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = cupsEnv(os.Environ())
+	cmd.Env = cachedCupsEnv()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		text := strings.TrimSpace(string(out))

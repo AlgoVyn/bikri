@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@bikri/core';
+import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { READ_ONLY_GRACE_MS } from '../../src/routes/sync.ts';
 import { SNAPSHOT_TABLES } from '../../src/sync/tables.ts';
@@ -773,10 +773,19 @@ describe('sync isolation', () => {
       .bind(r.tenantId, r.till.id)
       .first<{ read_only_seen_at: number }>();
     expect(seen?.read_only_seen_at).toBeGreaterThan(0);
-    const seenAt = seen?.read_only_seen_at ?? 0;
+    // Keep the fixture away from the Karachi midnight: the "1 hour later" op must
+    // stay on the same business day, otherwise the server correctly rejects a
+    // future business date (or treats it as a backdated sale). Noon is safe.
+    const businessToday = businessDate(Date.now(), 'Asia/Karachi');
+    const pinnedSeenAt = Date.parse(`${businessToday}T12:00:00+05:00`);
+    await env.DB.prepare(
+      'UPDATE devices SET read_only_seen_at = ?2 WHERE tenant_id = ?1 AND id = ?3',
+    )
+      .bind(r.tenantId, pinnedSeenAt, r.till.id)
+      .run();
     // A forged push: one old tx (applied) and one 1 hour later (omitted).
-    const old = saleOps(r, r.till, 31, { now: seenAt + 60_000 });
-    const late = saleOps(r, r.till, 32, { now: seenAt + 3_600_000 });
+    const old = saleOps(r, r.till, 31, { now: pinnedSeenAt + 60_000 });
+    const late = saleOps(r, r.till, 32, { now: pinnedSeenAt + 3_600_000 });
     const mixed = await pushOk(r.till, [...old, ...late]);
     expect(mixed.results.map((x) => x.op_id)).toEqual(old.map((o) => o.op_id));
     const onlyLate = await push(r.till, late);
