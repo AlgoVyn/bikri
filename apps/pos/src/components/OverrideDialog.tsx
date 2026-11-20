@@ -1,3 +1,4 @@
+import { normaliseNumericText } from '@bikri/core';
 import * as Dialog from '@radix-ui/react-dialog';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +56,7 @@ export function OverrideDialog({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     if (!PIN_PATTERN.test(pin)) {
       setError(t('errors.pin_required'));
       return;
@@ -129,7 +131,11 @@ export function OverrideDialog({
                 aria-invalid={error !== null || undefined}
                 aria-describedby={error !== null ? errorId : undefined}
                 onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/gu, '').slice(0, 6));
+                  setPin(
+                    normaliseNumericText(event.target.value)
+                      .replace(/\D/gu, '')
+                      .slice(0, 6),
+                  );
                 }}
               />
               {error !== null ? (

@@ -1,4 +1,10 @@
-import { type CartResult, can as canDo, cashChips, newId } from '@bikri/core';
+import {
+  type CartResult,
+  can as canDo,
+  cashChips,
+  newId,
+  normaliseNumericText,
+} from '@bikri/core';
 import type { Cart, SyncedRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -362,20 +368,18 @@ function PayStep({
       ) : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <div className="order-2 flex flex-col gap-4 lg:order-none">
-          <div
-            role="tablist"
-            aria-label={t('pay.method')}
-            className="grid grid-cols-2 gap-2"
-          >
+          <fieldset className="grid grid-cols-2 gap-2 border-0 p-0">
+            <legend className="sr-only">{t('pay.method')}</legend>
             {PAY_METHODS.map((m) => {
               const Icon = METHOD_ICON[m];
               const active = row?.method === m;
               return (
+                // biome-ignore lint/a11y/useSemanticElements: styled payment-method tile, radio semantics
                 <button
                   key={m}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
+                  role="radio"
+                  aria-checked={active}
                   className={`flex min-h-20 items-center gap-2 rounded-control border p-3 text-start ${
                     active
                       ? 'border-primary bg-primary-subtle text-primary-subtle-ink'
@@ -413,7 +417,7 @@ function PayStep({
                 </button>
               );
             })}
-          </div>
+          </fieldset>
 
           {row ? (
             <MethodPanel
@@ -727,7 +731,11 @@ function MethodPanel({
             maxLength={4}
             value={row.last4 ?? ''}
             onChange={(e) =>
-              onChange({ last4: e.target.value.replace(/\D/gu, '') })
+              onChange({
+                last4: normaliseNumericText(e.target.value)
+                  .replace(/\D/gu, '')
+                  .slice(0, 4),
+              })
             }
           />
         </div>

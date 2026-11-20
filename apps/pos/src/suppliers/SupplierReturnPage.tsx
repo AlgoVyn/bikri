@@ -74,6 +74,7 @@ export function SupplierReturnPage({
   );
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
+  const savingRef = useRef(false);
   const [returnId] = useState(() => newId());
 
   const data = useLiveQuery(async () => {
@@ -201,7 +202,8 @@ export function SupplierReturnPage({
   };
 
   const save = async () => {
-    if (!data || !canSave) return;
+    if (!data || !canSave || savingRef.current) return;
+    savingRef.current = true;
     setPending(true);
     try {
       const db = getDb();
@@ -252,6 +254,7 @@ export function SupplierReturnPage({
         'error',
       );
     } finally {
+      savingRef.current = false;
       setPending(false);
     }
   };

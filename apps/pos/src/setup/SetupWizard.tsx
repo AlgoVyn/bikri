@@ -3,6 +3,7 @@ import {
   isWeakPin,
   normaliseNumericText,
   parsePkPhone,
+  parseQtyToMilli,
 } from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -244,9 +245,7 @@ export function SetupWizard() {
                 barcodes: product.barcode ? [product.barcode] : [],
                 cost: product.cost,
                 price: product.price,
-                opening_milli: Math.round(
-                  Number(normaliseNumericText(product.opening) || '0') * 1000,
-                ),
+                opening_milli: parseQtyToMilli(product.opening, 'pc') ?? 0,
               }
             : null,
       };

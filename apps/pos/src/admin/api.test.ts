@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { loadAreaCatalog } from '@bikri/i18n';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { i18n, initI18n } from '../i18n/i18n.ts';
 import {
   AdminApiError,
   adminErrorMessage,
@@ -7,6 +9,15 @@ import {
   loginRedirect,
   PartialImportError,
 } from './api.ts';
+
+beforeAll(async () => {
+  await initI18n('en');
+  i18n.addResourceBundle(
+    'en',
+    'translation',
+    await loadAreaCatalog('admin', 'en'),
+  );
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

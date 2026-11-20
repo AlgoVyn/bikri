@@ -1,3 +1,4 @@
+import { parsePercentToBp } from '@bikri/core';
 import { Link } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -63,6 +64,7 @@ function ShopForm() {
     };
   }, []);
   const [form, setForm] = useState<ShopSettings>(() => shopSettings(undefined));
+  const [taxText, setTaxText] = useState('0');
   const [branch, setBranch] = useState<BranchSettings>({
     name: '',
     bill_prefix: '',
@@ -85,7 +87,9 @@ function ShopForm() {
   useEffect(() => {
     if (!data?.shop || loaded.current) return;
     loaded.current = true;
-    setForm(shopSettings(data.shop));
+    const settings = shopSettings(data.shop);
+    setForm(settings);
+    setTaxText(String(settings.tax_rate_bp / 100));
     if (data.branch)
       setBranch({
         name: String(data.branch.name ?? ''),
@@ -381,21 +385,21 @@ function ShopForm() {
           <label className="flex flex-col gap-1 text-small">
             {t('setup.tax')}
             <input
-              type="number"
-              min={0}
-              max={50}
-              step={0.01}
+              type="text"
+              inputMode="decimal"
               className={fieldClass}
-              value={form.tax_rate_bp / 100}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  tax_rate_bp: Math.round(
-                    Math.max(0, Math.min(50, Number(event.target.value) || 0)) *
-                      100,
-                  ),
-                })
-              }
+              value={taxText}
+              onChange={(event) => {
+                const text = event.target.value;
+                setTaxText(text);
+                const bp = parsePercentToBp(text);
+                if (bp !== null)
+                  setForm({
+                    ...form,
+                    tax_rate_bp: Math.max(0, Math.min(5000, bp)),
+                  });
+              }}
+              onBlur={() => setTaxText(String(form.tax_rate_bp / 100))}
             />
           </label>
           <label className="flex flex-col gap-1 text-small">

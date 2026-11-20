@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type KeyboardEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeftIcon, StoreIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -84,6 +84,23 @@ export function TenantPage({ id }: { id: string }) {
   const maintenance = tenant.status === 'maintenance';
   const lang = i18n.language;
   const tone = tenantTone(tenant.id);
+  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const current = TABS.findIndex((item) => item.id === tab);
+    let next = current;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
+      next = (current + 1) % TABS.length;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+      next = (current - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = TABS.length - 1;
+    else return;
+    event.preventDefault();
+    const target = TABS[next];
+    if (target) {
+      setTab(target.id);
+      document.getElementById(`tenant-tab-${target.id}`)?.focus();
+    }
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -156,14 +173,21 @@ export function TenantPage({ id }: { id: string }) {
       <div
         role="tablist"
         aria-label={tenant.display_name}
+        aria-orientation="horizontal"
         className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-1 shadow-card"
+        onKeyDown={onTabKeyDown}
       >
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
+            id={`tenant-tab-${item.id}`}
             aria-selected={tab === item.id}
+            aria-controls={
+              tab === item.id ? `tenant-panel-${item.id}` : undefined
+            }
+            tabIndex={tab === item.id ? 0 : -1}
             className="inline-flex min-h-11 items-center rounded-control px-3 text-small font-medium text-text-muted hover:bg-surface-2 hover:text-text aria-selected:bg-primary aria-selected:text-primary-ink"
             onClick={() => setTab(item.id)}
           >
@@ -171,31 +195,38 @@ export function TenantPage({ id }: { id: string }) {
           </button>
         ))}
       </div>
-      {tab === 'summary' ? (
-        <SummaryTab detail={detail} onChanged={query.reload} />
-      ) : null}
-      {tab === 'devices' ? (
-        <DevicesTab tenantId={tenant.id} shopName={tenant.display_name} />
-      ) : null}
-      {tab === 'pin' ? <PinTab tenantId={tenant.id} /> : null}
-      {tab === 'export' ? <ExportTab tenantId={tenant.id} /> : null}
-      {tab === 'restore' ? (
-        <RestoreTab
-          tenantId={tenant.id}
-          onChanged={() => {
-            query.reload();
-            bump();
-          }}
-          onState={bump}
-        />
-      ) : null}
-      {tab === 'delete' ? (
-        <DeleteTab
-          tenant={tenant}
-          onChanged={query.reload}
-          onExport={() => setTab('export')}
-        />
-      ) : null}
+      <div
+        role="tabpanel"
+        id={`tenant-panel-${tab}`}
+        aria-labelledby={`tenant-tab-${tab}`}
+        className="flex flex-col gap-3"
+      >
+        {tab === 'summary' ? (
+          <SummaryTab detail={detail} onChanged={query.reload} />
+        ) : null}
+        {tab === 'devices' ? (
+          <DevicesTab tenantId={tenant.id} shopName={tenant.display_name} />
+        ) : null}
+        {tab === 'pin' ? <PinTab tenantId={tenant.id} /> : null}
+        {tab === 'export' ? <ExportTab tenantId={tenant.id} /> : null}
+        {tab === 'restore' ? (
+          <RestoreTab
+            tenantId={tenant.id}
+            onChanged={() => {
+              query.reload();
+              bump();
+            }}
+            onState={bump}
+          />
+        ) : null}
+        {tab === 'delete' ? (
+          <DeleteTab
+            tenant={tenant}
+            onChanged={query.reload}
+            onExport={() => setTab('export')}
+          />
+        ) : null}
+      </div>
       <AdminConfirm
         open={offOpen}
         onOpenChange={setOffOpen}

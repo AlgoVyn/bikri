@@ -1,7 +1,9 @@
 import { businessDate } from '@bikri/core';
 import type { SyncedRow } from '@bikri/db';
-import { afterEach, describe, expect, it } from 'vitest';
+import { loadAreaCatalog } from '@bikri/i18n';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { seedSampleDay } from '../dev/sampleDay.ts';
+import { i18n, initI18n } from '../i18n/i18n.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { reportBundle, reportDays } from './reportBundle.ts';
 import { reportCsv, reportTotal } from './reportCsv.ts';
@@ -15,6 +17,15 @@ import {
   shopWithStock,
   t2Cart,
 } from './testShop.ts';
+
+beforeAll(async () => {
+  await initI18n('en');
+  i18n.addResourceBundle(
+    'en',
+    'translation',
+    await loadAreaCatalog('office', 'en'),
+  );
+});
 
 afterEach(dropTestDbs);
 

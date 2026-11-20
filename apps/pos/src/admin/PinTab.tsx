@@ -1,4 +1,9 @@
-import { hashPin, isWeakPin, PIN_ITERATIONS } from '@bikri/core';
+import {
+  hashPin,
+  isWeakPin,
+  normaliseNumericText,
+  PIN_ITERATIONS,
+} from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
@@ -123,7 +128,11 @@ export function PinTab({ tenantId }: { tenantId: string }) {
               maxLength={6}
               aria-describedby="pin-new-hint"
               onChange={(event) => {
-                setPin(event.target.value);
+                setPin(
+                  normaliseNumericText(event.target.value)
+                    .replace(/\D/gu, '')
+                    .slice(0, 6),
+                );
               }}
             />
           </Field>
@@ -137,7 +146,11 @@ export function PinTab({ tenantId }: { tenantId: string }) {
               value={again}
               maxLength={6}
               onChange={(event) => {
-                setAgain(event.target.value);
+                setAgain(
+                  normaliseNumericText(event.target.value)
+                    .replace(/\D/gu, '')
+                    .slice(0, 6),
+                );
               }}
             />
           </Field>

@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonDanger, buttonQuiet } from './classes.ts';
 
@@ -27,6 +27,13 @@ export function ConfirmDialog({
   const { t } = useTranslation();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const clickedRef = useRef(false);
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    clickedRef.current = false;
+    setConfirming(false);
+  }, [open]);
   const titleText = title ?? t('ui.confirm_title');
   const bodyText = body ?? t('ui.confirm_body');
   const confirmText = confirmLabel ?? t('ui.confirm_action');
@@ -61,7 +68,12 @@ export function ConfirmDialog({
               ref={confirmRef}
               type="button"
               className={buttonDanger}
+              disabled={confirming}
               onClick={() => {
+                // Reject a second click before React can re-render `disabled`.
+                if (clickedRef.current) return;
+                clickedRef.current = true;
+                setConfirming(true);
                 onConfirm();
                 onOpenChange(false);
               }}

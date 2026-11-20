@@ -49,6 +49,10 @@ async function visit(page: import('@playwright/test').Page, path: string) {
   await expect(page.getByText('This page is not available.')).toHaveCount(0);
   await expect(page.locator('main')).toBeVisible();
   await expect(page.locator('main')).not.toBeEmpty();
+  // Let a Radix dialog from the previous route finish its aria-hidden cleanup
+  // before axe runs. Routes with an intended open dialog keep their own hidden
+  // background, so this is a settle delay rather than an assertion.
+  await page.waitForTimeout(500);
   await expectNoHorizontalScroll(page);
 }
 

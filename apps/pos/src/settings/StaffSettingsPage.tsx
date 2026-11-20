@@ -1,8 +1,10 @@
 import {
   hashPin,
   isWeakPin,
+  normaliseNumericText,
   PERMISSIONS,
   type Permission,
+  parsePercentToBp,
   type Role,
   roleAllows,
 } from '@bikri/core';
@@ -160,6 +162,7 @@ function StaffDialog({
   const [role, setRole] = useState<Role>('cashier');
   const [active, setActive] = useState(true);
   const [maxDiscountBp, setMaxDiscountBp] = useState(500);
+  const [discountText, setDiscountText] = useState('5');
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
@@ -171,12 +174,12 @@ function StaffDialog({
     setName(row ? String(row.name) : '');
     setRole(nextRole);
     setActive(row ? row.active === 1 : true);
-    setMaxDiscountBp(
-      Number(
-        row?.max_discount_bp ??
-          (nextRole === 'owner' ? 10000 : nextRole === 'manager' ? 2000 : 500),
-      ),
+    const discountBp = Number(
+      row?.max_discount_bp ??
+        (nextRole === 'owner' ? 10000 : nextRole === 'manager' ? 2000 : 500),
     );
+    setMaxDiscountBp(discountBp);
+    setDiscountText(String(discountBp / 100));
     try {
       setOverrides(
         JSON.parse(String(row?.permissions_json ?? '{}')) as Record<
@@ -290,20 +293,18 @@ function StaffDialog({
         <label className="flex flex-col gap-1 text-small">
           {t('office.staff.max_discount')}
           <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.5}
+            type="text"
+            inputMode="decimal"
             className={field}
-            value={maxDiscountBp / 100}
-            onChange={(event) =>
-              setMaxDiscountBp(
-                Math.round(
-                  Math.max(0, Math.min(100, Number(event.target.value) || 0)) *
-                    100,
-                ),
-              )
-            }
+            value={discountText}
+            onChange={(event) => {
+              const text = event.target.value;
+              setDiscountText(text);
+              const bp = parsePercentToBp(text);
+              if (bp !== null)
+                setMaxDiscountBp(Math.max(0, Math.min(10000, bp)));
+            }}
+            onBlur={() => setDiscountText(String(maxDiscountBp / 100))}
           />
         </label>
         <label className="flex items-center gap-2 self-end text-small">
@@ -325,7 +326,11 @@ function StaffDialog({
             maxLength={6}
             value={pin}
             onChange={(event) =>
-              setPin(event.target.value.replace(/[^0-9]/gu, ''))
+              setPin(
+                normaliseNumericText(event.target.value)
+                  .replace(/\D/gu, '')
+                  .slice(0, 6),
+              )
             }
           />
         </label>
@@ -339,7 +344,11 @@ function StaffDialog({
             maxLength={6}
             value={pin2}
             onChange={(event) =>
-              setPin2(event.target.value.replace(/[^0-9]/gu, ''))
+              setPin2(
+                normaliseNumericText(event.target.value)
+                  .replace(/\D/gu, '')
+                  .slice(0, 6),
+              )
             }
           />
         </label>

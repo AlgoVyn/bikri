@@ -1,4 +1,9 @@
-import { businessDate, computeDayClose, newId } from '@bikri/core';
+import {
+  businessDate,
+  computeDayClose,
+  newId,
+  normaliseNumericText,
+} from '@bikri/core';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -35,6 +40,12 @@ import { useReadOnly } from '../state/readOnly.ts';
 
 const COMMEMORATIVE = 75;
 
+/** A denomination count is a whole non-negative number, never a decimal. */
+export function denominationCount(raw: string): number {
+  const digits = normaliseNumericText(raw).replace(/\D/gu, '');
+  return digits === '' ? 0 : Math.min(1_000_000, Number.parseInt(digits, 10));
+}
+
 export function DayClosePage() {
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
@@ -56,6 +67,8 @@ export function DayClosePage() {
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [pending, setPending] = useState(false);
   const periodStartRef = useRef<number | null>(null);
+  const closingRef = useRef(false);
+  const dayCloseIdRef = useRef<string | null>(null);
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -112,6 +125,8 @@ export function DayClosePage() {
     setCountTouched(false);
     setOpening(data?.firstClose ? data.openingCash : 0);
     periodStartRef.current = null;
+    dayCloseIdRef.current = null;
+    closingRef.current = false;
   };
   const noteNeeded =
     !blind && Math.abs(result.difference) >= 10_000 && note.trim() === '';
@@ -119,19 +134,23 @@ export function DayClosePage() {
     formatTimestamp(at, i18n.language, data.tz, 'weekdayTime');
 
   const close = async (force = false) => {
-    if (pending || noteNeeded) return;
+    // A synchronous lock: two clicks can land before React re-renders `pending`.
+    if (closingRef.current || pending || noteNeeded) return;
     if (data.recentClose && !force) {
       setConfirmAgain(true);
       return;
     }
+    closingRef.current = true;
     setPending(true);
+    const dayCloseId = dayCloseIdRef.current ?? newId();
+    dayCloseIdRef.current = dayCloseId;
     try {
       const db = getDb();
       const ctx = await ledgerContext(db, staff?.id ?? '');
       const row = await closeDay(
         db,
         {
-          dayCloseId: newId(),
+          dayCloseId,
           countedCash: counted,
           denominations: mode === 'notes' ? notes : null,
           note,
@@ -148,28 +167,46 @@ export function DayClosePage() {
     } catch {
       toast.push(t('errors.generic'), 'error');
     } finally {
+      closingRef.current = false;
       setPending(false);
       setConfirmAgain(false);
     }
   };
 
+  const printZ = async () => {
+    if (!closed) return;
+    try {
+      await queueDayClosePrint(getDb(), String(closed.id));
+      toast.push(t('office.dayclose.print_queued'));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
+  };
   const exportCsv = async () => {
     if (!closed) return;
-    const receipt = await loadDayCloseReceipt(getDb(), String(closed.id));
-    if (!receipt) return;
-    downloadText(
-      `day-close-${String(closed.business_date)}.csv`,
-      dayCloseCsv(receipt, String(closed.business_date), data.tz),
-    );
+    try {
+      const receipt = await loadDayCloseReceipt(getDb(), String(closed.id));
+      if (!receipt) return;
+      downloadText(
+        `day-close-${String(closed.business_date)}.csv`,
+        dayCloseCsv(receipt, String(closed.business_date), data.tz),
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const exportPdf = async () => {
     if (!closed) return;
-    const receipt = await dayCloseReceipt(getDb(), String(closed.id));
-    if (!receipt) return;
-    downloadBlob(
-      await receiptPdf(receipt),
-      `day-close-${String(closed.business_date)}.pdf`,
-    );
+    try {
+      const receipt = await dayCloseReceipt(getDb(), String(closed.id));
+      if (!receipt) return;
+      downloadBlob(
+        await receiptPdf(receipt),
+        `day-close-${String(closed.business_date)}.pdf`,
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
 
   if (closed) {
@@ -220,11 +257,7 @@ export function DayClosePage() {
           <button
             type="button"
             className={buttonPrimary}
-            onClick={() =>
-              void queueDayClosePrint(getDb(), String(closed.id)).then(() =>
-                toast.push(t('office.dayclose.print_queued')),
-              )
-            }
+            onClick={() => void printZ()}
           >
             {t('office.dayclose.print_z')}
           </button>
@@ -341,19 +374,17 @@ export function DayClosePage() {
                         <label className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] items-center gap-2 text-small">
                           <span className="text-end">{value}</span>
                           <input
-                            type="number"
-                            min={0}
+                            type="text"
                             inputMode="numeric"
+                            pattern="[0-9]*"
                             className="h-11 w-20 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-end"
                             value={notes[value] ?? ''}
                             onChange={(e) => {
                               setCountTouched(true);
+                              const count = denominationCount(e.target.value);
                               setNotes((current) => ({
                                 ...current,
-                                [value]: Math.max(
-                                  0,
-                                  Number(e.target.value) || 0,
-                                ),
+                                [value]: count,
                               }));
                             }}
                           />

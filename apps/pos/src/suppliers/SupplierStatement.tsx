@@ -2,7 +2,7 @@ import { businessDate } from '@bikri/core';
 import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type KeyboardEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -141,14 +141,6 @@ export function SupplierStatement({
   const openDelivery = (purchaseId: string | null) => {
     if (purchaseId) setDeliveryId(purchaseId);
   };
-  const onDeliveryKeyDown = (
-    event: KeyboardEvent<HTMLElement>,
-    purchaseId: string | null,
-  ) => {
-    if (!purchaseId || (event.key !== 'Enter' && event.key !== ' ')) return;
-    event.preventDefault();
-    setDeliveryId(purchaseId);
-  };
   const periodValue =
     from || to
       ? `${from ? dateText(from, i18n.language, tz) : '…'} – ${
@@ -214,17 +206,25 @@ export function SupplierStatement({
     };
   };
   const exportCsv = async () => {
-    const full = await fullStatement();
-    downloadText(
-      `supplier-${name.replace(/\s+/gu, '-')}.csv`,
-      supplierStatementCsv(mapRows(full)),
-    );
+    try {
+      const full = await fullStatement();
+      downloadText(
+        `supplier-${name.replace(/\s+/gu, '-')}.csv`,
+        supplierStatementCsv(mapRows(full)),
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const exportPdf = async () => {
-    downloadBlob(
-      await statementPdf(await fullMeta()),
-      `supplier-${name.replace(/\s+/gu, '-')}.pdf`,
-    );
+    try {
+      downloadBlob(
+        await statementPdf(await fullMeta()),
+        `supplier-${name.replace(/\s+/gu, '-')}.pdf`,
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const share = async () => {
     try {
@@ -402,23 +402,8 @@ export function SupplierStatement({
               return (
                 <li
                   key={row.entry.id}
-                  role={purchaseId ? 'button' : undefined}
-                  tabIndex={purchaseId ? 0 : undefined}
-                  aria-label={
-                    purchaseId
-                      ? `${t('office.suppliers.view_delivery')}: ${rows[index]?.description}`
-                      : undefined
-                  }
-                  onClick={
-                    purchaseId ? () => openDelivery(purchaseId) : undefined
-                  }
-                  onKeyDown={
-                    purchaseId
-                      ? (event) => onDeliveryKeyDown(event, purchaseId)
-                      : undefined
-                  }
-                  className={`rounded-card border border-border bg-surface p-3 text-small ${
-                    purchaseId ? 'cursor-pointer hover:bg-surface-2' : ''
+                  className={`relative rounded-card border border-border bg-surface p-3 text-small ${
+                    purchaseId ? 'hover:bg-surface-2' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -433,12 +418,20 @@ export function SupplierStatement({
                       <MoneyText paisa={row.balance} />
                     </span>
                   </div>
-                  <p className="mt-1 flex items-center gap-1">
-                    {rows[index]?.description}
-                    {purchaseId ? (
+                  {purchaseId ? (
+                    <button
+                      type="button"
+                      className="mt-1 flex items-center gap-1 text-start underline-offset-2 hover:underline"
+                      onClick={() => openDelivery(purchaseId)}
+                    >
+                      {rows[index]?.description}
                       <ChevronRightIcon className="size-3.5 shrink-0 rtl:rotate-180" />
-                    ) : null}
-                  </p>
+                    </button>
+                  ) : (
+                    <p className="mt-1 flex items-center gap-1">
+                      {rows[index]?.description}
+                    </p>
+                  )}
                   <dl className="mt-2 grid grid-cols-2 gap-2">
                     <div>
                       <dt className="text-text-muted">
@@ -468,7 +461,6 @@ export function SupplierStatement({
         <section
           className="overflow-auto rounded-card border border-border"
           aria-label={t('office.suppliers.statement')}
-          tabIndex={0}
         >
           <table className="w-full min-w-[32rem] text-small">
             <thead className="bg-surface">
@@ -513,17 +505,8 @@ export function SupplierStatement({
                   return (
                     <tr
                       key={row.entry.id}
-                      tabIndex={purchaseId ? 0 : undefined}
-                      onClick={
-                        purchaseId ? () => openDelivery(purchaseId) : undefined
-                      }
-                      onKeyDown={
-                        purchaseId
-                          ? (event) => onDeliveryKeyDown(event, purchaseId)
-                          : undefined
-                      }
                       className={`border-b border-border last:border-0 ${
-                        purchaseId ? 'cursor-pointer hover:bg-surface-2' : ''
+                        purchaseId ? 'hover:bg-surface-2' : ''
                       }`}
                     >
                       <td className="p-2 whitespace-nowrap">
@@ -534,12 +517,18 @@ export function SupplierStatement({
                         )}
                       </td>
                       <td className="p-2">
-                        <span className="inline-flex items-center gap-1">
-                          {rows[index]?.description}
-                          {purchaseId ? (
+                        {purchaseId ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-start underline-offset-2 hover:underline"
+                            onClick={() => openDelivery(purchaseId)}
+                          >
+                            {rows[index]?.description}
                             <ChevronRightIcon className="size-3.5 shrink-0 rtl:rotate-180" />
-                          ) : null}
-                        </span>
+                          </button>
+                        ) : (
+                          rows[index]?.description
+                        )}
                       </td>
                       <td className="p-2 text-start">
                         {row.got > 0 ? <MoneyText paisa={row.got} /> : '—'}

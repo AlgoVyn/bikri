@@ -5,6 +5,7 @@ import {
   parseQtyToMilli,
 } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
+import { csvCell } from '../lib/csv.ts';
 import { productAudit } from './catalog.ts';
 import { createProduct, type LedgerContext } from './products.ts';
 import { type WriteOptions, writeAction, writeScope } from './write.ts';
@@ -175,11 +176,6 @@ export function autoMap(headers: readonly string[]): Mapping {
     }
   }
   return mapping;
-}
-
-function csvCell(value: string): string {
-  const v = /^[=+\-@\t\r]/u.test(value) ? `'${value}` : value;
-  return /[",\n\r]/u.test(v) ? `"${v.replaceAll('"', '""')}"` : v;
 }
 
 export function toCsv(rows: readonly (readonly string[])[]): string {

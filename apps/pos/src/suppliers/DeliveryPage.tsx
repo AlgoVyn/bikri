@@ -2,7 +2,7 @@ import { businessDate, computePurchase, isQtyUnit, newId } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -55,6 +55,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
   );
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
+  const savingRef = useRef(false);
   const purchaseId = useState(() => newId())[0];
 
   const data = useLiveQuery(async () => {
@@ -132,7 +133,8 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
   const paid = paidNow ?? 0;
 
   const save = async () => {
-    if (!data || pending || valid.length === 0) return;
+    if (!data || savingRef.current || pending || valid.length === 0) return;
+    savingRef.current = true;
     setPending(true);
     try {
       const db = getDb();
@@ -169,13 +171,18 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
           copies: whole ? Math.max(1, Math.floor(line.qtyMilli / 1000)) : 1,
         };
       });
-      sessionStorage.setItem(
-        'bikri.label_seed',
-        JSON.stringify({
-          rows: labelRows,
-          returnTo: `/suppliers/${supplierId}`,
-        }),
-      );
+      try {
+        sessionStorage.setItem(
+          'bikri.label_seed',
+          JSON.stringify({
+            rows: labelRows,
+            returnTo: `/suppliers/${supplierId}`,
+          }),
+        );
+      } catch {
+        // The delivery is committed; a blocked storage quota must not look like
+        // a failed save or invite a duplicate.
+      }
       toast.push(
         t('office.suppliers.delivery_saved', {
           count: valid.length,
@@ -201,6 +208,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         toast.push(t(`office.suppliers.delivery_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      savingRef.current = false;
       setPending(false);
     }
   };

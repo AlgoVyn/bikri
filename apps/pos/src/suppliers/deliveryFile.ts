@@ -42,6 +42,7 @@ export type DeliveryFileMeta = {
     date: string;
     product: string;
     qty: string;
+    returned: string;
     unitCost: string;
     lineTotal: string;
     itemsTotal: string;
@@ -117,7 +118,7 @@ async function draw(meta: DeliveryFileMeta): Promise<HTMLCanvasElement> {
   ctx.globalAlpha = 0.84;
   ctx.font = canvasFont(meta.lang, 400, 17);
   ctx.fillText(
-    `${meta.labels.invoice}: ${meta.invoiceNo}`,
+    fitText(ctx, `${meta.labels.invoice}: ${meta.invoiceNo}`, 520),
     WIDTH - MARGIN,
     110,
   );
@@ -162,8 +163,12 @@ async function draw(meta: DeliveryFileMeta): Promise<HTMLCanvasElement> {
     }
     ctx.fillStyle = CANVAS.ink;
     ctx.font = canvasFont(meta.lang, 500, 18);
+    const returned =
+      line.returnedMilli > 0
+        ? ` · ${meta.labels.returned} ${qtyCsv(line.returnedMilli)}`
+        : '';
     ctx.fillText(
-      fitText(ctx, line.name, cols.qty - cols.name - 32),
+      fitText(ctx, `${line.name}${returned}`, cols.qty - cols.name - 32),
       cols.name,
       y,
     );
@@ -218,16 +223,28 @@ async function draw(meta: DeliveryFileMeta): Promise<HTMLCanvasElement> {
       );
       ctx.fillStyle = CANVAS.ink;
       ctx.font = canvasFont(meta.lang, 500, 16);
+      ctx.textAlign = 'right';
+      const returnRight = WIDTH - MARGIN - 300;
+      const refundRight = WIDTH - MARGIN;
       ctx.fillText(
-        `${meta.labels.returnTotal}: ${formatShopMoney(item.total)}`,
-        MARGIN + 700,
+        fitText(
+          ctx,
+          `${meta.labels.returnTotal}: ${formatShopMoney(item.total)}`,
+          280,
+        ),
+        returnRight,
         y,
       );
       ctx.fillText(
-        `${meta.labels.refundReceived}: ${formatShopMoney(item.refundReceived)}`,
-        MARGIN + 970,
+        fitText(
+          ctx,
+          `${meta.labels.refundReceived}: ${formatShopMoney(item.refundReceived)}`,
+          280,
+        ),
+        refundRight,
         y,
       );
+      ctx.textAlign = 'left';
       y += 30;
     }
   }

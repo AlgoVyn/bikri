@@ -114,10 +114,10 @@ test.describe('shell and languages (T-006, T-007)', () => {
       await expect(page).toHaveURL(new RegExp(`${path}$`));
       await page.getByTestId('rail-search').click();
       await expect(search).toBeFocused();
-      expect((await search.boundingBox())?.width).toBeCloseTo(
-        homeWidth ?? 0,
-        0,
-      );
+      // Radix compensates for the page scrollbar when it opens; allow the few
+      // pixels that pages with/without a scrollbar differ by.
+      const width = (await search.boundingBox())?.width ?? 0;
+      expect(Math.abs(width - (homeWidth ?? 0))).toBeLessThan(8);
       await search.press('Escape');
     }
   });

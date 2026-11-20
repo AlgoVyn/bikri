@@ -107,6 +107,7 @@ export function DeliveryDetailDialog({
       date: t('office.suppliers.delivery_date'),
       product: t('office.suppliers.product'),
       qty: t('office.suppliers.qty'),
+      returned: t('office.suppliers.returned'),
       unitCost: t('office.suppliers.unit_cost'),
       lineTotal: t('office.suppliers.line_total'),
       itemsTotal: t('office.suppliers.delivery_items_total'),
@@ -123,7 +124,7 @@ export function DeliveryDetailDialog({
   });
 
   const exportCsv = async () => {
-    if (!data || !detail) return;
+    if (!data || !detail || busy) return;
     setBusy(true);
     try {
       downloadText(
@@ -135,7 +136,7 @@ export function DeliveryDetailDialog({
     }
   };
   const exportPdf = async () => {
-    if (!data || !detail) return;
+    if (!data || !detail || busy) return;
     setBusy(true);
     try {
       downloadBlob(
@@ -149,7 +150,7 @@ export function DeliveryDetailDialog({
     }
   };
   const share = async () => {
-    if (!data || !detail) return;
+    if (!data || !detail || busy) return;
     setBusy(true);
     try {
       const png = await deliveryPng(fileMeta(detail, data.tz));
@@ -189,13 +190,17 @@ export function DeliveryDetailDialog({
       ];
     });
     if (rows.length === 0) return;
-    sessionStorage.setItem(
-      'bikri.label_seed',
-      JSON.stringify({
-        rows,
-        returnTo: `/suppliers/${String(detail.supplier.id)}`,
-      }),
-    );
+    try {
+      sessionStorage.setItem(
+        'bikri.label_seed',
+        JSON.stringify({
+          rows,
+          returnTo: `/suppliers/${String(detail.supplier.id)}`,
+        }),
+      );
+    } catch {
+      // Non-critical: the delivery detail is already saved.
+    }
     close();
     void navigate({ to: '/labels' });
   };

@@ -1,6 +1,12 @@
 import { businessDate, mulDivRound } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, pageClass } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -188,6 +194,7 @@ export function ReportsPage() {
     'starting' | 'ready' | 'unavailable'
   >('starting');
   const requestId = useRef(0);
+  const workerFailures = useRef(new Map<number, (error: Error) => void>());
   const firstRequest = useRef(true);
   const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
   // Rerun the live query when the business date passes midnight on an idle screen.
@@ -198,21 +205,39 @@ export function ReportsPage() {
   }, [preset, custom.from, custom.to, limited]);
 
   useEffect(() => {
+    let worker: Worker;
     try {
-      const worker = new Worker(new URL('./reportWorker.ts', import.meta.url), {
+      worker = new Worker(new URL('./reportWorker.ts', import.meta.url), {
         type: 'module',
       });
-      workerRef.current = worker;
-      setWorkerState('ready');
-      return () => {
-        worker.terminate();
-        workerRef.current = null;
-      };
     } catch {
       // A browser without module workers falls back to the main thread below.
       setWorkerState('unavailable');
       return undefined;
     }
+    const fail = (message: string) => {
+      for (const reject of workerFailures.current.values())
+        reject(new Error(message));
+      workerFailures.current.clear();
+      worker.terminate();
+      workerRef.current = null;
+      setWorkerState('unavailable');
+    };
+    const onError = (event: ErrorEvent) => {
+      event.preventDefault();
+      fail(event.message || 'report worker failed');
+    };
+    const onMessageError = () => fail('report worker message failed');
+    worker.addEventListener('error', onError);
+    worker.addEventListener('messageerror', onMessageError);
+    workerRef.current = worker;
+    setWorkerState('ready');
+    return () => {
+      worker.removeEventListener('error', onError);
+      worker.removeEventListener('messageerror', onMessageError);
+      worker.terminate();
+      workerRef.current = null;
+    };
   }, []);
 
   const data = useLiveQuery(async () => {
@@ -270,9 +295,12 @@ export function ReportsPage() {
     const worker = workerRef.current;
     let bundle: ReportBundle;
     let previous: ReportSummary | undefined;
-    if (worker === null || workerState === 'unavailable') {
-      bundle = await reportBundle(db, reportRangeValue, options);
-      previous =
+    const onMainThread = async (): Promise<{
+      bundle: ReportBundle;
+      previous: ReportSummary | undefined;
+    }> => {
+      const nextBundle = await reportBundle(db, reportRangeValue, options);
+      const nextPrevious =
         previousRange === undefined
           ? undefined
           : (
@@ -281,38 +309,56 @@ export function ReportsPage() {
                 summaryOnly: true,
               })
             ).summary;
+      return { bundle: nextBundle, previous: nextPrevious };
+    };
+    if (worker === null || workerState === 'unavailable') {
+      const computed = await onMainThread();
+      bundle = computed.bundle;
+      previous = computed.previous;
     } else {
       requestId.current += 1;
       const id = requestId.current;
-      const result = await new Promise<{
-        bundle: ReportBundle;
-        previous?: ReportSummary;
-      }>((resolve, reject) => {
-        const onMessage = (event: MessageEvent) => {
-          const payload = event.data as {
-            id?: number;
-            bundle?: ReportBundle;
-            previous?: ReportSummary;
-            error?: string;
+      try {
+        const result = await new Promise<{
+          bundle: ReportBundle;
+          previous?: ReportSummary;
+        }>((resolve, reject) => {
+          const onMessage = (event: MessageEvent) => {
+            const payload = event.data as {
+              id?: number;
+              bundle?: ReportBundle;
+              previous?: ReportSummary;
+              error?: string;
+            };
+            if (payload.id !== id) return;
+            worker.removeEventListener('message', onMessage);
+            workerFailures.current.delete(id);
+            if (payload.error !== undefined) reject(new Error(payload.error));
+            else if (payload.bundle !== undefined)
+              resolve({ bundle: payload.bundle, previous: payload.previous });
+            else reject(new Error('empty report'));
           };
-          if (payload.id !== id) return;
-          worker.removeEventListener('message', onMessage);
-          if (payload.error !== undefined) reject(new Error(payload.error));
-          else if (payload.bundle !== undefined)
-            resolve({ bundle: payload.bundle, previous: payload.previous });
-          else reject(new Error('empty report'));
-        };
-        worker.addEventListener('message', onMessage);
-        worker.postMessage({
-          id,
-          tenantId: db.tenantId,
-          range: reportRangeValue,
-          previousRange,
-          options,
+          workerFailures.current.set(id, reject);
+          worker.addEventListener('message', onMessage);
+          worker.postMessage({
+            id,
+            tenantId: db.tenantId,
+            range: reportRangeValue,
+            previousRange,
+            options,
+          });
         });
-      });
-      bundle = result.bundle;
-      previous = result.previous;
+        bundle = result.bundle;
+        previous = result.previous;
+      } catch {
+        // A worker that failed to load or crashed must not leave Reports on the
+        // loading spinner; recompute this range on the main thread instead.
+        const computed = await onMainThread();
+        bundle = computed.bundle;
+        previous = computed.previous;
+      } finally {
+        workerFailures.current.delete(id);
+      }
     }
     const devices = (await db.devices.toArray())
       .filter((device) => !device.deleted_at)
@@ -412,17 +458,28 @@ export function ReportsPage() {
     },
   };
   const exportCurrent = () => {
-    const csv = reportCsv(tab, bundle, { includeCost: cost });
-    downloadText(
-      `bikri-report-${tab}-${bundle.range.from}-${bundle.range.to}.csv`,
-      csv,
-    );
+    try {
+      const csv = reportCsv(tab, bundle, {
+        includeCost: cost,
+        uncategorizedLabel: t('office.reports.uncategorized'),
+      });
+      downloadText(
+        `bikri-report-${tab}-${bundle.range.from}-${bundle.range.to}.csv`,
+        csv,
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const exportPdf = async () => {
-    downloadBlob(
-      await reportPdf(meta),
-      `bikri-report-${bundle.range.from}-${bundle.range.to}.pdf`,
-    );
+    try {
+      downloadBlob(
+        await reportPdf(meta),
+        `bikri-report-${bundle.range.from}-${bundle.range.to}.pdf`,
+      );
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const share = async () => {
     try {
@@ -444,6 +501,24 @@ export function ReportsPage() {
     } catch (err) {
       if ((err as Error).name !== 'AbortError')
         toast.push(t('done.share_failed'), 'error');
+    }
+  };
+
+  const onTabKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const current = TABS.findIndex((item) => item.id === tab);
+    let next = current;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
+      next = (current + 1) % TABS.length;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+      next = (current - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = TABS.length - 1;
+    else return;
+    event.preventDefault();
+    const target = TABS[next];
+    if (target) {
+      setTab(target.id);
+      document.getElementById(`report-tab-${target.id}`)?.focus();
     }
   };
 
@@ -511,7 +586,9 @@ export function ReportsPage() {
       <div
         role="tablist"
         aria-label={t('office.reports.title')}
+        aria-orientation="horizontal"
         className={scrollStrip}
+        onKeyDown={onTabKeyDown}
       >
         {TABS.map((item) => (
           <button
@@ -520,7 +597,10 @@ export function ReportsPage() {
             role="tab"
             id={`report-tab-${item.id}`}
             aria-selected={tab === item.id}
-            aria-controls={`report-panel-${item.id}`}
+            aria-controls={
+              tab === item.id ? `report-panel-${item.id}` : undefined
+            }
+            tabIndex={tab === item.id ? 0 : -1}
             data-testid={`report-tab-${item.id}`}
             className="inline-flex min-h-11 items-center rounded-control px-3 aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink"
             onClick={() => setTab(item.id)}

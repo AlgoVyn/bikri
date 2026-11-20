@@ -10,8 +10,8 @@ export function csvCell(value: unknown): string {
   const trimmed = s.trimStart();
   if (
     typeof value === 'string' &&
-    /^[=+\-@\t\r]/u.test(trimmed) &&
-    !/^-?\d+(?:\.\d+)?$/u.test(trimmed)
+    (/^[\t\r]/u.test(s) ||
+      (/^[=+\-@]/u.test(trimmed) && !/^-?\d+(?:\.\d+)?$/u.test(trimmed)))
   )
     s = `'${s}`;
   // Excel auto-converts long digit strings (barcodes) to scientific notation and drops

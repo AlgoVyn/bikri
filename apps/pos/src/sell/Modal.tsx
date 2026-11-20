@@ -54,7 +54,7 @@ export function Modal({
           ref={contentRef}
           onOpenAutoFocus={(event) => {
             const field = contentRef.current?.querySelector<HTMLElement>(
-              'input:not([type="hidden"]), select, textarea, [data-autofocus]',
+              'input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), [data-autofocus]',
             );
             if (!field) return;
             event.preventDefault();

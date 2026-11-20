@@ -103,7 +103,7 @@ test.describe('Pay (T-017)', () => {
     await pay(page).getByLabel('Received').fill('30000');
     await page.keyboard.press('Control+Enter');
     await pay(page)
-      .getByRole('tab', { name: /Bank\/wallet/ })
+      .getByRole('radio', { name: /Bank\/wallet/ })
       .click();
     await pay(page).getByRole('button', { name: 'JazzCash' }).click();
     await pay(page).getByLabel('Reference (optional)').fill('TX123');
@@ -139,7 +139,7 @@ test.describe('Pay (T-017)', () => {
     );
     await page.keyboard.press('F8');
     await pay(page)
-      .getByRole('tab', { name: /Credit/ })
+      .getByRole('radio', { name: /Credit/ })
       .click();
     await expect(
       pay(page).getByText('Choose a customer for credit'),
@@ -176,7 +176,7 @@ test.describe('Pay (T-017)', () => {
     await pay(page).getByLabel('Received').fill('40000');
     await page.keyboard.press('Control+Enter');
     await pay(page)
-      .getByRole('tab', { name: /Credit/ })
+      .getByRole('radio', { name: /Credit/ })
       .click();
     await pay(page).getByRole('button', { name: 'Choose customer' }).click();
     await page

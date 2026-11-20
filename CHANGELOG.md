@@ -4,6 +4,21 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS UI/UX, accessibility and operator polish — 20 Nov 2026 review, PR 7
+- Day-close denomination counts are whole numbers (Urdu/Arabic-Indic digits supported, no float paisa), and a synchronous ref plus a stable close id prevent double-clicks creating two closes. `ConfirmDialog` also disables its confirm button on the first click.
+- Reports falls back to the main thread when its Web Worker fails to load or crashes, instead of staying on the loading spinner; report CSV/PDF exports surface failures.
+- The supplier delivery PNG/PDF clamps the invoice number, right-aligns refund columns inside the page, and shows returned quantities; a blocked `sessionStorage` write after a delivery no longer shows a false failure.
+- Global search now uses Radix Dialog (focus trap and focus return), and `/`/`?` no longer open over an active dialog; command-palette write commands are hidden in read-only shops, its combobox ARIA is valid, and Enter remembers the command.
+- Enter/Escape handlers ignore IME composition across the shell, search and command palette.
+- `MoneyInput` drops stale drafts on external value changes and only suppresses the first focus mouseup, so the caret can be placed normally.
+- Refund/label dialogs initialise their selections once per open, so a background sync cannot reset a mid-edit choice; the customer statement pre-opens the WhatsApp tab, hides the phone-only jump button, and guards "Sell to" in read-only shops.
+- The phone More menu closes on outside tap/Escape, and its idle callback is cancelled on unmount.
+- Hard-coded admin/report/payment strings moved to the three catalogs; percent fields use the new integer `parsePercentToBp`, and PIN/last-4 inputs normalise Urdu/Arabic-Indic digits.
+- Accessibility: semantic buttons replace interactive `<li>`/`<tr>`, the refund reason input is labelled, disabled fields are skipped on modal autofocus, and the report/tenant tablists have roving focus with Arrow/Home/End keys (the payment method is a radiogroup).
+- Refund, supplier payment/return, customer receipt, delivery and delivery-export actions have synchronous double-submit locks.
+- Six product/stock routes are lazy-loaded, cutting initial JS from 278.2 KB to 256.5 KB gz.
+- `check-bundle-size.mjs` imports `BASE_PATH`, fails on empty/missing output, and the service worker no longer precaches `brand/**`.
+
 ### POS printing, receipts and Urdu raster — 20 Nov 2026 review, PR 6
 - Bundle receipt headers no longer multiply the component-net fallback by the bundle quantity, and a free bundle (`bundle_price = 0`) keeps its zero price.
 - WhatsApp share text groups bundle components under one priced header; component allocation prices are no longer exposed.

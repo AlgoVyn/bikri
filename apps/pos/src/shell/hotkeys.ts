@@ -12,6 +12,14 @@ export function ignoresHotkey(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.isContentEditable;
 }
 
+/** Urdu/IME composition: Enter/Escape belong to the input, not to a shortcut. */
+export function composing(event: {
+  isComposing?: boolean;
+  keyCode?: number;
+}): boolean {
+  return event.isComposing === true || event.keyCode === 229;
+}
+
 /** True while a modal dialog owns the screen; page shortcuts must not act underneath it. */
 export function dialogOpen(): boolean {
   if (typeof document === 'undefined') return false;
@@ -40,7 +48,7 @@ export function useHotkey(
   useEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || composing(event)) return;
       if (!inFields && ignoresHotkey(event.target)) return;
       // Match first: `dialogOpen()` walks the DOM, and on Sell there are 13
       // listeners per keydown; only the matching binding needs that query.

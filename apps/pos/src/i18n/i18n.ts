@@ -2,6 +2,8 @@ import { type LocaleCode, loadCatalog } from '@bikri/i18n';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+export { i18n };
+
 export const LANGUAGE_KEY = 'bikri.language';
 export const LOCALES = ['en', 'ur', 'roman-ur'] as const;
 

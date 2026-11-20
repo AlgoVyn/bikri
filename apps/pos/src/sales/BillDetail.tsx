@@ -98,10 +98,14 @@ export function BillDetail({
 
   const print = async () => {
     if (!data) return;
-    await queueSalePrint(getDb(), saleId, {
-      reprint: data.detail.latestJob?.status === 'done',
-    });
-    toast.push(t('office.bill.print_queued'));
+    try {
+      await queueSalePrint(getDb(), saleId, {
+        reprint: data.detail.latestJob?.status === 'done',
+      });
+      toast.push(t('office.bill.print_queued'));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
 
   const share = async () => {
@@ -112,7 +116,10 @@ export function BillDetail({
         '../print/receiptFiles.ts'
       );
       const r = await saleReceipt(getDb(), saleId);
-      if (!r) return;
+      if (!r) {
+        closeShareWindow(shareWindow);
+        return;
+      }
       const png = await receiptPng(r);
       const phone = data.detail.customer?.phone
         ? String(data.detail.customer.phone)

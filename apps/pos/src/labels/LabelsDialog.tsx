@@ -78,6 +78,7 @@ function LabelsDialogContent({
   const readOnly = useReadOnly();
   const [rows, setRows] = useState<LabelSeed[]>([]);
   const [settings, setSettings] = useState<LabelSettings>(DEFAULT);
+  const settingsInitialized = useRef(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
@@ -96,6 +97,7 @@ function LabelsDialogContent({
     setQuery('');
     setError(null);
     setPrinting(false);
+    settingsInitialized.current = false;
   }, [open, seedKey]);
 
   const data = useLiveQuery(async () => {
@@ -118,8 +120,11 @@ function LabelsDialogContent({
   }, []);
 
   useEffect(() => {
-    if (data?.label) setSettings({ ...DEFAULT, ...data.label });
-  }, [data?.label]);
+    if (!open || !data?.label || settingsInitialized.current) return;
+    // Background syncs replace `data`, but must not reset a mid-edit choice.
+    settingsInitialized.current = true;
+    setSettings({ ...DEFAULT, ...data.label });
+  }, [data?.label, open]);
 
   const productById = useMemo(
     () =>
