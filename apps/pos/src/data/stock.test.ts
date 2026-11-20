@@ -1,9 +1,11 @@
 import type { MasterRow } from '@bikri/db';
+import { liveQuery } from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import {
   adjustDelta,
   adjustStock,
+  type CountDraft,
   countProducts,
   discardCount,
   finishCount,
@@ -369,6 +371,20 @@ describe('stock count (screens/09)', () => {
 });
 
 describe('count draft updates', () => {
+  it('notifies the draft live query when a count starts', async () => {
+    const { db } = await shop('stk-live');
+    const values: Array<CountDraft | null> = [];
+    const sub = liveQuery(() => loadCountDraft(db)).subscribe((value) =>
+      values.push(value),
+    );
+    try {
+      await startCount(db, { kind: 'all' }, NOW);
+      await expect.poll(() => values.at(-1)?.started_at).toBe(NOW);
+    } finally {
+      sub.unsubscribe();
+    }
+  });
+
   it('rapid +1 updates are serialised and none is lost', async () => {
     const { db, p } = await shop('stk-race');
     await startCount(db, { kind: 'all' }, NOW);

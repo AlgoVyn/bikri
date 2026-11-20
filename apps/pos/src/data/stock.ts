@@ -290,13 +290,13 @@ export async function startCount(
  * draft is being edited. A pending write is newer than `kv`, so return it first.
  */
 export async function loadCountDraft(db: BikriDb): Promise<CountDraft | null> {
-  // A save may still be in flight after the timer fired; read after it settles so
-  // the live query never observes the older draft.
-  await saveChain.catch(() => undefined);
+  // Read kv first: Dexie's liveQuery must see this read before any non-Dexie
+  // await, otherwise it never subscribes to the draft key and a started count
+  // would leave the screen on the scope picker.
   const stored =
     ((await db.kv.get(DRAFT_KEY))?.value as CountDraft | undefined) ?? null;
-  // Read kv even when a newer draft is pending: Dexie's liveQuery must keep
-  // subscribing to the draft key for cross-tab/other-screen changes.
+  // A newer draft may still be waiting for the debounced write; return it so the
+  // UI never reverts to the older kv copy.
   const pending = pendingDrafts.get(db);
   if (pending !== undefined) return pending.draft;
   draftCache.set(db, stored);
