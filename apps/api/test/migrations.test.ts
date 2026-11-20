@@ -107,6 +107,7 @@ function validRows(t: TenantFixture): ReadonlyArray<readonly [string, Row]> {
         ...master,
       },
     ],
+    ['branch_device_codes', { branch_id: 'br1', device_code: 'A' }],
     [
       'enrolment_codes',
       {

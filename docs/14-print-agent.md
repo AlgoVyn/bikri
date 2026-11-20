@@ -526,7 +526,7 @@ GET /v1/health
 ```json
 {
   "app": "bikri-print-agent",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "protocol": 1,
   "platform": "windows/amd64",
   "paired": true,

@@ -12,6 +12,7 @@ const PK_EXCEPTIONS: Record<string, string[]> = {
   change_log: ['seq'], // AUTOINCREMENT stream per database; readers filter by (tenant_id, seq)
   enrolment_codes: ['code_hash'], // the code itself identifies the tenant (D-072)
   applied_ops: ['tenant_id', 'op_id'],
+  branch_device_codes: ['tenant_id', 'branch_id', 'device_code'],
 };
 /** Cross-tenant indexes allowed by 10 §8 I20, plus globally unique secrets. */
 const INDEX_EXCEPTIONS = new Set(['applied_ops_at']);

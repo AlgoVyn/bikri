@@ -172,6 +172,11 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
       )
       .run();
     await env.DB.prepare(
+      'INSERT INTO branch_device_codes (tenant_id, branch_id, device_code) VALUES (?1, ?2, ?3)',
+    )
+      .bind(d.tenantId, d.branchId, 'Z')
+      .run();
+    await env.DB.prepare(
       `INSERT INTO shop_requests (id, shop_name, owner_name, email, status, tenant_id, created_at, updated_at)
        VALUES ('del-request', 'Del D', 'Owner', 'del-d@example.com', 'approved', ?1, ?2, ?2)`,
     )
@@ -202,6 +207,7 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
       'products',
       'bundle_items',
       'devices',
+      'branch_device_codes',
       'change_log',
       'applied_ops',
       'branches',
@@ -365,5 +371,28 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
         "SELECT COUNT(*) AS n FROM shop_requests WHERE id = 'fresh-rejected'",
       ),
     ).toBe(1);
+  });
+
+  it('stops at the account write budget and leaves the delete for tomorrow', async () => {
+    const shop = await seedShop('Budget delete');
+    await pushOk(shop.till, saleOps(shop, shop.till, 1));
+    await setStatus(shop.tenantId, 'deleting');
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare(
+      `INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read)
+       VALUES (?1, ?2, 0, 89990, 0)
+       ON CONFLICT(tenant_id, day) DO UPDATE SET rows_written = 89990`,
+    )
+      .bind(shop.tenantId, day)
+      .run();
+    const report = await pruneAll(env, Date.now());
+    expect(report.rows_written).toBeLessThan(100_000);
+    const tenant = await env.DB.prepare(
+      'SELECT status FROM tenants WHERE id = ?1',
+    )
+      .bind(shop.tenantId)
+      .first<{ status: string }>();
+    // The near-full account budget must pause the delete instead of blowing the cap.
+    expect(tenant?.status).toBe('deleting');
   });
 });

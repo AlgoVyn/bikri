@@ -4,6 +4,7 @@ import { auditStatements } from '../sync/audit.ts';
 import { revokeSupportDevices } from '../sync/status.ts';
 import { APPLY_ORDER } from '../sync/tables.ts';
 import type { TenantRow } from '../types.ts';
+import { utcDay } from './tenants.ts';
 
 export const MAX_CRON_CALLS = 50;
 const DAY = 86_400_000;
@@ -13,6 +14,9 @@ const DELETE_CHUNK = 2_000;
 const DELETE_MAX_PER_RUN = 20_000;
 /** At 10 reference shops ~13,500 applied_ops age out per day; the old 5,000 could never keep 90 days. */
 const APPLIED_OPS_MAX_PER_RUN = 20_000;
+/** Stay below the Free plan's 100k daily rows-written cap, leaving headroom for shops. */
+const ACCOUNT_WRITE_BUDGET = 90_000;
+const APPLIED_OPS_CHUNK = 5_000;
 
 /** Tables of a tenant, children first, for deletion (13 §7.4). */
 export const DELETE_ORDER = [
@@ -22,11 +26,13 @@ export const DELETE_ORDER = [
   'sync_conflicts',
   'change_log',
   'devices',
+  'branch_device_codes',
   ...[...APPLY_ORDER].reverse(),
 ] as const;
 
 export type PruneReport = {
   calls: number;
+  rows_written: number;
   change_log: Record<string, number>;
   applied_ops: number;
   deleted_rows: Record<string, number>;
@@ -36,19 +42,42 @@ export type PruneReport = {
 
 class Calls {
   used = 0;
+  writes = 0;
+  writeLimit = Number.POSITIVE_INFINITY;
   ok(n = 1): boolean {
     return this.used + n <= MAX_CRON_CALLS;
   }
+  hasWrites(estimate = 1): boolean {
+    return this.writes + estimate <= this.writeLimit;
+  }
+  writesLeft(): number {
+    return Math.max(0, this.writeLimit - this.writes);
+  }
   async run<T>(fn: () => Promise<T>): Promise<T> {
     this.used += 1;
-    return fn();
+    const result = await fn();
+    this.writes += writtenRowsOf(result);
+    return result;
   }
+}
+
+/** D1 reports the real rows written (table + index entries); fall back to changes. */
+function writtenRowsOf(result: unknown): number {
+  if (Array.isArray(result))
+    return result.reduce((sum, item) => sum + writtenRowsOf(item), 0);
+  if (result === null || typeof result !== 'object') return 0;
+  const meta = (
+    result as { meta?: { rows_written?: number; changes?: number } }
+  ).meta;
+  const rows = Number(meta?.rows_written ?? meta?.changes ?? 0);
+  return Number.isFinite(rows) ? rows : 0;
 }
 
 export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const calls = new Calls();
   const report: PruneReport = {
     calls: 0,
+    rows_written: 0,
     change_log: {},
     applied_ops: 0,
     deleted_rows: {},
@@ -61,14 +90,21 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   // 1–2. change_log older than 30 days, per tenant, round-robin from meta.prune_cursor.
   // One indexed `MAX(seq)` per tenant through `change_log_prune (tenant_id, at, seq)`,
   // not a full scan of every old row to group by tenant.
-  const [tenantRows, cursorRow] = await calls.run(() =>
+  const [tenantRows, cursorRow, usageRow] = await calls.run(() =>
     DB.batch([
       DB.prepare(
         "SELECT id FROM tenants WHERE status <> 'deleted' ORDER BY id",
       ),
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
+      DB.prepare(
+        'SELECT COALESCE(SUM(rows_written), 0) AS n FROM tenant_usage WHERE day = ?1',
+      ).bind(utcDay(now)),
     ]),
   );
+  const usedToday = Number(
+    (usageRow?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
+  );
+  calls.writeLimit = Math.max(0, ACCOUNT_WRITE_BUDGET - usedToday);
   const tenantIds = ((tenantRows?.results ?? []) as Array<{ id: string }>).map(
     (row) => String(row.id),
   );
@@ -107,7 +143,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   let completed = true;
   for (const { tenant_id, target } of ordered) {
     // Leave one call for the cursor write at the end of this pass.
-    if (budget <= 0 || !calls.ok(4)) {
+    if (budget <= 0 || !calls.ok(4) || !calls.hasWrites(4)) {
       completed = false;
       break;
     }
@@ -118,11 +154,20 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     );
     let floor = floorRow?.change_log_floor ?? 0;
     while (floor < target && budget > 0 && calls.ok(2)) {
+      const limit = Math.min(
+        LOG_CHUNK,
+        budget,
+        Math.floor(calls.writesLeft() / 4),
+      );
+      if (limit <= 0) {
+        completed = false;
+        break;
+      }
       const upto = await calls.run(() =>
         DB.prepare(
           'SELECT MAX(seq) AS upto FROM (SELECT seq FROM change_log WHERE tenant_id = ?1 AND seq > ?2 AND seq <= ?3 ORDER BY seq LIMIT ?4)',
         )
-          .bind(tenant_id, floor, target, Math.min(LOG_CHUNK, budget))
+          .bind(tenant_id, floor, target, limit)
           .first<{ upto: number | null }>(),
       );
       const next = upto?.upto ?? target;
@@ -143,7 +188,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     }
     lastTenant = tenant_id;
   }
-  if (calls.ok()) {
+  if (calls.ok() && calls.hasWrites(1)) {
     await calls.run(() =>
       DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'prune_cursor'")
         .bind(completed ? '' : lastTenant)
@@ -152,32 +197,50 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   }
 
   // 3–4. applied_ops (90 days), expired codes, old usage rows.
-  if (calls.ok()) {
-    const day90 = new Date(now - 90 * DAY).toISOString().slice(0, 10);
-    const res = await calls.run(() =>
-      DB.batch([
+  if (calls.ok() && calls.hasWrites(3)) {
+    let appliedLeft = APPLIED_OPS_MAX_PER_RUN;
+    while (appliedLeft > 0 && calls.ok() && calls.hasWrites(3)) {
+      const limit = Math.min(
+        APPLIED_OPS_CHUNK,
+        appliedLeft,
+        Math.floor(calls.writesLeft() / 3),
+      );
+      if (limit <= 0) break;
+      const res = await calls.run(() =>
         DB.prepare(
-          `DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT ${APPLIED_OPS_MAX_PER_RUN})`,
-        ).bind(now - 90 * DAY),
-        DB.prepare('DELETE FROM enrolment_codes WHERE expires_at < ?1').bind(
-          now - DAY,
-        ),
-        DB.prepare('DELETE FROM owner_email_codes WHERE expires_at < ?1').bind(
-          now - DAY,
-        ),
-        DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
-        // Public requests hold name/email/phone. A closed request has no operator use
-        // after the retention window (09 §9).
-        DB.prepare(
-          "DELETE FROM shop_requests WHERE status IN ('rejected','failed') AND updated_at < ?1",
-        ).bind(now - 30 * DAY),
-      ]),
-    );
-    report.applied_ops = res[0]?.meta.changes ?? 0;
+          'DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT ?2)',
+        )
+          .bind(now - 90 * DAY, limit)
+          .run(),
+      );
+      const n = res.meta.changes ?? 0;
+      report.applied_ops += n;
+      appliedLeft -= n;
+      if (n < limit) break;
+    }
+    if (calls.ok() && calls.hasWrites(100)) {
+      const day90 = new Date(now - 90 * DAY).toISOString().slice(0, 10);
+      await calls.run(() =>
+        DB.batch([
+          DB.prepare('DELETE FROM enrolment_codes WHERE expires_at < ?1').bind(
+            now - DAY,
+          ),
+          DB.prepare(
+            'DELETE FROM owner_email_codes WHERE expires_at < ?1',
+          ).bind(now - DAY),
+          DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
+          // Public requests hold name/email/phone. A closed request has no operator use
+          // after the retention window (09 §9).
+          DB.prepare(
+            "DELETE FROM shop_requests WHERE status IN ('rejected','failed') AND updated_at < ?1",
+          ).bind(now - 30 * DAY),
+        ]),
+      );
+    }
   }
 
   // 4b. support access that ran out with live support devices (13 §7.5).
-  if (calls.ok()) {
+  if (calls.ok() && calls.hasWrites(2)) {
     const expired = await calls.run(() =>
       DB.prepare(
         "SELECT t.* FROM tenants t WHERE t.support_until IS NOT NULL AND t.support_until <= ?1 AND EXISTS (SELECT 1 FROM devices d WHERE d.tenant_id = t.id AND d.kind = 'support' AND d.revoked_at IS NULL)",
@@ -186,7 +249,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
         .all<TenantRow>(),
     );
     for (const tenant of expired.results) {
-      if (!calls.ok(2)) break;
+      if (!calls.ok(2) || !calls.hasWrites(2)) break;
       const db = tenantDb(env, tenant);
       const revoke = await calls.run(() => revokeSupportDevices(db, now));
       await calls.run(() =>
@@ -204,7 +267,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   }
 
   // 5. tenant deletion, children first, ≤ 20,000 rows per night (13 §7.4).
-  if (calls.ok()) {
+  if (calls.ok() && calls.hasWrites(1)) {
     const deleting = await calls.run(() =>
       DB.prepare(
         "SELECT id, db_shard FROM tenants WHERE status = 'deleting' ORDER BY id",
@@ -222,11 +285,32 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
           ? ['replaces_sale_id IS NOT NULL', '1 = 1']
           : ['1 = 1'];
     for (const t of deleting.results) {
-      let empty = true;
+      if (left <= 0 || !calls.ok(3) || !calls.hasWrites(5)) break;
+      // One probe batch skips empty tables instead of issuing a DELETE for each of them.
+      const probes = await calls.run(() =>
+        DB.batch(
+          DELETE_ORDER.map((tbl) =>
+            DB.prepare(
+              `SELECT 1 AS x FROM ${tbl} WHERE tenant_id = ?1 LIMIT 1`,
+            ).bind(t.id),
+          ),
+        ),
+      );
+      const nonEmpty = new Set(
+        DELETE_ORDER.filter(
+          (_tbl, index) => (probes[index]?.results?.length ?? 0) > 0,
+        ),
+      );
+      let done = true;
       for (const tbl of DELETE_ORDER) {
+        if (!nonEmpty.has(tbl)) continue;
         for (const where of passesFor(tbl)) {
-          while (left > 0 && calls.ok(2)) {
-            const limit = Math.min(DELETE_CHUNK, left);
+          while (left > 0 && calls.ok(2) && calls.hasWrites(5)) {
+            const limit = Math.min(
+              DELETE_CHUNK,
+              left,
+              Math.max(1, Math.floor(calls.writesLeft() / 5)),
+            );
             const res = await calls.run(() =>
               DB.prepare(
                 `DELETE FROM ${tbl} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
@@ -239,14 +323,14 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
             report.deleted_rows[t.id] = (report.deleted_rows[t.id] ?? 0) + n;
             if (n < limit) break;
           }
-          if (left <= 0 || !calls.ok(2)) {
-            empty = false;
+          if (left <= 0 || !calls.ok(2) || !calls.hasWrites(1)) {
+            done = false;
             break;
           }
         }
-        if (!empty) break;
+        if (!done) break;
       }
-      if (!empty) break;
+      if (!done) break;
       // R2 objects under t/<tenant>/ (list + delete; deletes are free).
       let more = true;
       while (more && calls.ok(3)) {
@@ -259,7 +343,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
           );
         more = listed.truncated;
       }
-      if (more || !calls.ok(2)) break;
+      if (more || !calls.ok(2) || !calls.hasWrites(3)) break;
       const usage = await calls.run(() =>
         DB.batch([
           DB.prepare('DELETE FROM tenant_usage WHERE tenant_id = ?1').bind(
@@ -279,7 +363,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     }
   }
 
-  if (calls.ok()) {
+  if (calls.ok() && calls.hasWrites(1)) {
     await calls.run(() =>
       DB.prepare("UPDATE meta SET value = ?1 WHERE key = 'last_prune_at'")
         .bind(String(now))
@@ -287,5 +371,6 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     );
   }
   report.calls = calls.used;
+  report.rows_written = calls.writes;
   return report;
 }

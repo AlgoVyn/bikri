@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { businessDate } from '@bikri/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { sha256Hex } from '../src/auth/crypto.ts';
 import {
@@ -7,7 +8,9 @@ import {
   nextDeviceCode,
 } from '../src/auth/deviceCodes.ts';
 import { resetEnrolLimit } from '../src/auth/enrolLimit.ts';
-import { api, json, seedShop, setStatus } from './helpers/fixtures.ts';
+import { tenantDb } from '../src/db/tenantDb.ts';
+import { allocateDeviceCode } from '../src/sync/devices.ts';
+import { api, IDS, json, seedShop, setStatus } from './helpers/fixtures.ts';
 
 type EnrolResponse = {
   tenant: { id: string; display_name: string };
@@ -45,6 +48,41 @@ describe('device codes', () => {
       expect(indexOfCode(codeFromIndex(i))).toBe(i);
     expect(nextDeviceCode(['A', 'C'])).toBe('D');
     expect(nextDeviceCode([])).toBe('A');
+  });
+
+  it('allocates from the branch registry, not a sales invoice scan', async () => {
+    const shop = await seedShop('Enrol Registry');
+    const now = Date.now();
+    // A bill carrying code Z exists, but no device or history has it. The old
+    // allocator parsed every invoice and would return AA; the registry deliberately
+    // ignores it because the migration had already backfilled real codes.
+    await env.DB.prepare(
+      `INSERT INTO sales
+        (tenant_id, id, invoice_no, invoice_seq, branch_id, device_id, staff_id,
+         business_date, created_at, line_count, items_qty_milli, gross_total,
+         item_discount_total, subtotal, total, paid_total)
+       VALUES (?1, 'code-sale', 'INV-Z-1', 1, ?2, ?3, ?4, ?5, ?6, 1, 1000, 100, 0, 100, 100, 100)`,
+    )
+      .bind(
+        shop.tenantId,
+        shop.branchId,
+        shop.till.id,
+        IDS.cashier,
+        businessDate(now),
+        now,
+      )
+      .run();
+    const code = await allocateDeviceCode(
+      tenantDb(env, { id: shop.tenantId, db_shard: 'DB' }),
+      shop.branchId,
+    );
+    expect(code).toBe('C');
+    const reserved = await env.DB.prepare(
+      'SELECT device_code FROM branch_device_codes WHERE tenant_id = ?1 AND branch_id = ?2 AND device_code = ?3',
+    )
+      .bind(shop.tenantId, shop.branchId, code)
+      .first<{ device_code: string }>();
+    expect(reserved?.device_code).toBe('C');
   });
 });
 

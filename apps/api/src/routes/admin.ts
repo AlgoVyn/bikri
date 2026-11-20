@@ -866,17 +866,6 @@ export const PURGE_ORDER = [
 admin.post('/tenants/:id/purge', async (c) => {
   const { tenant, db } = c.var;
   assertMaintenance(tenant);
-  const counts = async () => {
-    const res = await db.batch(
-      PURGE_ORDER.map((t) =>
-        db.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE tenant_id = ?1`),
-      ),
-    );
-    return PURGE_ORDER.map((t, i) => ({
-      t,
-      n: Number((res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0),
-    }));
-  };
   let left = PURGE_CHUNK;
   let deleted = 0;
   // Self-referencing rows (expense reversals, replacement sales) must be deleted before
@@ -888,22 +877,37 @@ admin.post('/tenants/:id/purge', async (c) => {
       : tbl === 'sales'
         ? ['replaces_sale_id IS NOT NULL', '1 = 1']
         : ['1 = 1'];
-  for (const { t, n } of await counts()) {
-    if (n === 0 || left <= 0) continue;
-    let pending = n;
+  // One probe batch skips empty tables. Counting every table on every chunk read
+  // hundreds of millions of rows over a full-shop restore.
+  const probes = await db.batch(
+    PURGE_ORDER.map((tbl) =>
+      db.prepare(`SELECT 1 AS x FROM ${tbl} WHERE tenant_id = ?1 LIMIT 1`),
+    ),
+  );
+  const nonEmpty = new Set(
+    PURGE_ORDER.filter((_, index) => (probes[index]?.results?.length ?? 0) > 0),
+  );
+  for (const t of PURGE_ORDER) {
+    if (!nonEmpty.has(t) || left <= 0) continue;
     for (const where of passesFor(t)) {
-      if (pending <= 0 || left <= 0) break;
-      const r = await db.run(
-        `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
-        Math.min(left, pending),
-      );
-      const changed = r.meta.changes ?? 0;
-      left -= changed;
-      deleted += changed;
-      pending -= changed;
+      while (left > 0) {
+        const limit = Math.min(left, PURGE_CHUNK);
+        const r = await db.run(
+          `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
+          limit,
+        );
+        const changed = r.meta.changes ?? 0;
+        left -= changed;
+        deleted += changed;
+        if (changed < limit) break;
+      }
+      if (left <= 0) break;
     }
+    if (left <= 0) break;
   }
-  const remaining = (await counts()).reduce((s, x) => s + x.n, 0);
+  // 0 means the shop is empty; 1 means another call is needed. The exact row count
+  // is deliberately not computed: it was the dominant cost of a large restore.
+  const remaining = left <= 0 ? 1 : 0;
   if (remaining === 0)
     await db.batch(
       auditStatements(db, {
@@ -928,7 +932,7 @@ admin.post('/tenants/:id/import', async (c) => {
   const body = z
     .object({
       tbl: z.enum(IMPORT_TABLES as unknown as [string, ...string[]]),
-      rows: z.array(z.record(z.string(), Scalar)).min(1).max(500),
+      rows: z.array(z.record(z.string(), Scalar)).min(1).max(250),
       reason: z.string().trim().max(200).optional(),
     })
     .parse(await readJsonBody(c, 4_000_000));
@@ -1007,9 +1011,11 @@ admin.post('/tenants/:id/import', async (c) => {
           `Number out of range: ${tbl}.${k}`,
         );
     }
+    // No change_log rows: the restore flow calls restore-epoch, so every till takes a
+    // fresh snapshot and never reads these entries. Writing them for a 1M-row shop
+    // cost ~3M D1 writes and hundreds of MB of DB bloat.
     stmts.push(
       isLedgerTable(tbl) ? db.insertOnly(tbl, row) : db.upsert(tbl, row),
-      changeLogStatement(db, tbl, row.id, 'upsert', null, now),
     );
   }
   try {

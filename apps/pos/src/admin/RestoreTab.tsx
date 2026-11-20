@@ -262,7 +262,6 @@ export function RestoreTab({
                         exportedAt: loaded.exported_at,
                       };
                 commit(cursor);
-                let previousRemaining: number | null = null;
                 for (let guard = 0; guard < 100_000; guard += 1) {
                   if (abortRef.current) {
                     cursor = reduceRestore(cursor, { type: 'abort' }, tables);
@@ -287,19 +286,12 @@ export function RestoreTab({
                     onChanged();
                   } else if (action.type === 'purge') {
                     const result = await purgeTenant(tenantId);
-                    if (
-                      result.remaining > 0 &&
-                      previousRemaining !== null &&
-                      result.remaining >= previousRemaining
-                    ) {
+                    // `remaining` is 0/1 now (an exact row count cost a full scan per
+                    // chunk); a call that deletes nothing while rows remain is stuck.
+                    if (result.remaining > 0 && result.deleted === 0) {
                       throw new RestoreStuck();
                     }
-                    previousRemaining = result.remaining;
-                    setNote(
-                      t('admin.restore_purged', {
-                        remaining: formatCount(result.remaining, lang),
-                      }),
-                    );
+                    setNote(t('admin.restore_purging'));
                     cursor = reduceRestore(
                       cursor,
                       { type: 'purged', remaining: result.remaining },

@@ -121,10 +121,10 @@ const HOT_QUERIES: Array<{
     index: 'stock_movements_ref',
   },
   {
-    name: 'sales by branch invoice',
-    sql: 'SELECT invoice_no FROM sales WHERE tenant_id = ? AND branch_id = ?',
+    name: 'branch device codes',
+    sql: 'SELECT device_code FROM branch_device_codes WHERE tenant_id = ? AND branch_id = ?',
     args: ['t', 'b'],
-    index: 'sales_branch_invoice',
+    index: 'sqlite_autoindex_branch_device_codes_1',
   },
   {
     name: 'tenant status history',

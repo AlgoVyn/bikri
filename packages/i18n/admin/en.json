@@ -147,7 +147,7 @@
     "restore_importing": "{{table}}: {{done}} of {{total}}",
     "restore_intro": "Choose an export zip of this shop. Steps: maintenance on, purge, import, restore point, maintenance off. You can resume after a reload. Abort leaves the shop in maintenance.",
     "restore_need_file": "Choose the same export zip to continue.",
-    "restore_purged": "{{remaining}} rows left to purge",
+    "restore_purging": "Purge in progress — more rows remain",
     "restore_reason": "Restore",
     "restore_resume": "Resume",
     "restore_run": "Run",

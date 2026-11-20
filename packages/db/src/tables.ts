@@ -150,9 +150,7 @@ export const TABLE_COLUMNS = {
     'deleted_at',
     'rev',
     'updated_by',
-    // Added by migration 0022; ALTER TABLE appends it after the original columns.
     'show_shop_name_on_receipt',
-    // Added by migration 0025.
     'show_logo_on_receipt',
   ],
   branches: [
@@ -633,6 +631,7 @@ export const TABLE_COLUMNS = {
     'rev',
     'updated_by',
   ],
+  branch_device_codes: ['tenant_id', 'branch_id', 'device_code'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type D1Table = keyof typeof TABLE_COLUMNS;

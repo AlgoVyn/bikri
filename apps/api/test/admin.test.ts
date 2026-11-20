@@ -809,6 +809,57 @@ describe('operator export and restore (I17, I18, I27)', () => {
     ).toBe(bBefore);
   });
 
+  it('restore import writes no change_log rows and caps a batch at 250', async () => {
+    const shop = await seedShop('Import quiet');
+    await api(`/admin/tenants/${shop.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true },
+    });
+    const changeRows = () =>
+      n(
+        "SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1 AND tbl <> 'audit_log'",
+        shop.tenantId,
+      );
+    const before = await changeRows();
+    const id = newId();
+    const now = Date.now();
+    const imported = await api(`/admin/tenants/${shop.tenantId}/import`, {
+      method: 'POST',
+      json: {
+        tbl: 'products',
+        rows: [
+          {
+            id,
+            name_en: 'Restored',
+            sku: 'RESTORED-1',
+            price: 1000,
+            created_at: now,
+            updated_at: now,
+          },
+        ],
+        reason: 'restore drill',
+      },
+    });
+    expect(imported.status, await imported.clone().text()).toBe(200);
+    expect(await changeRows()).toBe(before);
+    const tooMany = await api(`/admin/tenants/${shop.tenantId}/import`, {
+      method: 'POST',
+      json: {
+        tbl: 'products',
+        rows: Array.from({ length: 251 }, (_, index) => ({
+          id: `too-many-${index}`,
+          name_en: 'x',
+          price: 1,
+        })),
+      },
+    });
+    expect(tooMany.status).toBe(400);
+    await api(`/admin/tenants/${shop.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: false },
+    });
+  });
+
   it('I18: restore of A (purge + import) leaves B unchanged and B pushes during maintenance apply', async () => {
     const a = await seedShop('Res A');
     const b = await seedShop('Res B');
