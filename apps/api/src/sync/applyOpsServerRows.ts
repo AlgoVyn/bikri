@@ -81,9 +81,7 @@ export function sideEffects(
            WHERE sl.tenant_id = ?1 AND sl.sale_id = ?2
              AND sl.qty_milli > COALESCE((
                SELECT SUM(rl.qty_milli) FROM refund_lines rl
-               JOIN refunds r ON r.tenant_id = rl.tenant_id AND r.id = rl.refund_id
-               WHERE rl.tenant_id = ?1 AND r.tenant_id = ?1
-                 AND rl.sale_line_id = sl.id
+               WHERE rl.tenant_id = ?1 AND rl.sale_line_id = sl.id
              ), 0)
          ) THEN 'refunded'
          WHEN EXISTS (SELECT 1 FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?2) THEN 'part_refunded'
@@ -260,13 +258,10 @@ export function sideEffects(
     }
   }
   if (tbl === 'sales' && Number.isSafeInteger(row.invoice_seq)) {
-    out.push(
-      guardedUpdate(
-        ctx,
-        'UPDATE devices SET last_invoice_seq = ?2 WHERE tenant_id = ?1 AND id = ?3 AND last_invoice_seq < ?2',
-        [Number(row.invoice_seq), ctx.device.id],
-        opId,
-      ),
+    // One device UPDATE at the end of the push instead of one per bill (D-278).
+    ctx.maxInvoiceSeq = Math.max(
+      ctx.maxInvoiceSeq ?? 0,
+      Number(row.invoice_seq),
     );
   }
   return out;

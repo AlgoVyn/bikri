@@ -104,7 +104,7 @@ const HOT_QUERIES: Array<{
   },
   {
     name: 'ledger by party',
-    sql: 'SELECT amount FROM ledger_entries WHERE tenant_id = ? AND party_type = ? AND party_id = ? ORDER BY created_at',
+    sql: 'SELECT amount FROM ledger_entries WHERE tenant_id = ? AND party_type = ? AND party_id = ?',
     args: ['t', 'customer', 'c'],
     index: 'ledger_party',
   },

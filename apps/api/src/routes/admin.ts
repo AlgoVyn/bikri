@@ -753,7 +753,7 @@ admin.get('/tenants/:id/export', async (c) => {
     db,
     tenant,
     1000,
-    true,
+    false,
     undefined,
     false,
   );

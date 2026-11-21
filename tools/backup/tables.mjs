@@ -12,6 +12,7 @@ export const PLATFORM_TABLES = [
 export const BACKUP_TABLES = [
   'tenant_usage',
   'change_log',
+  'change_log_watermarks',
   'applied_ops',
   'sync_conflicts',
   'devices',

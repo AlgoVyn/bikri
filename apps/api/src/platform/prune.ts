@@ -88,8 +88,10 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const cutoff = now - 30 * DAY;
 
   // 1–2. change_log older than 30 days, per tenant, round-robin from meta.prune_cursor.
-  // One indexed `MAX(seq)` per tenant through `change_log_prune (tenant_id, at, seq)`,
-  // not a full scan of every old row to group by tenant.
+  // Each tenant's daily watermark gives its seq ceiling for the cutoff day, so the
+  // prune no longer keeps `change_log_prune` (one D1 write per row).
+  const cutoffDay = utcDay(cutoff);
+  const today = utcDay(now);
   const [tenantRows, cursorRow, usageRow] = await calls.run(() =>
     DB.batch([
       DB.prepare(
@@ -98,7 +100,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
       DB.prepare(
         'SELECT COALESCE(SUM(rows_written), 0) AS n FROM tenant_usage WHERE day = ?1',
-      ).bind(utcDay(now)),
+      ).bind(today),
     ]),
   );
   const usedToday = Number(
@@ -108,40 +110,75 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const tenantIds = ((tenantRows?.results ?? []) as Array<{ id: string }>).map(
     (row) => String(row.id),
   );
-  const targetResults = tenantIds.length
-    ? await calls.run(() =>
-        DB.batch(
-          tenantIds.map((id) =>
-            DB.prepare(
-              'SELECT MAX(seq) AS target FROM change_log WHERE tenant_id = ?1 AND at < ?2',
-            ).bind(id, cutoff),
-          ),
-        ),
-      )
-    : [];
-  const list = tenantIds
-    .map((tenantId, index) => {
-      const targetRow = targetResults[index]?.results?.[0] as
-        | { target?: number | null }
+  const targetByTenant = new Map<string, number>();
+  // Record today's watermark and read each tenant's cutoff watermark in one batch
+  // per 40 tenants (two statements each).
+  for (let at = 0; at < tenantIds.length; at += 40) {
+    const chunk = tenantIds.slice(at, at + 40);
+    const statements: D1PreparedStatement[] = [];
+    for (const id of chunk) {
+      statements.push(
+        DB.prepare(
+          `INSERT INTO change_log_watermarks (tenant_id, day, max_seq)
+           SELECT ?1, ?2, COALESCE(MAX(seq), 0) FROM change_log WHERE tenant_id = ?1
+           ON CONFLICT(tenant_id, day) DO UPDATE SET max_seq =
+             CASE WHEN excluded.max_seq > max_seq THEN excluded.max_seq ELSE max_seq END`,
+        ).bind(id, today),
+        DB.prepare(
+          'SELECT max_seq FROM change_log_watermarks WHERE tenant_id = ?1 AND day <= ?2 ORDER BY day DESC LIMIT 1',
+        ).bind(id, cutoffDay),
+      );
+    }
+    const results = await calls.run(() => DB.batch(statements));
+    chunk.forEach((id, index) => {
+      const row = results[index * 2 + 1]?.results?.[0] as
+        | { max_seq?: number }
         | undefined;
-      return {
-        tenant_id: tenantId,
-        target: Number(targetRow?.target ?? 0),
-      };
-    })
-    .filter((row) => row.target > 0);
+      targetByTenant.set(id, Number(row?.max_seq ?? 0));
+    });
+  }
+  // First run after deploy: no watermark covers the cutoff yet. Derive each tenant's
+  // ceiling once from the log and store it for the cutoff day.
+  for (const id of tenantIds) {
+    if ((targetByTenant.get(id) ?? 0) > 0) continue;
+    if (!calls.ok(2) || !calls.hasWrites(2)) break;
+    const old = await calls.run(() =>
+      DB.prepare(
+        'SELECT MAX(seq) AS n FROM change_log WHERE tenant_id = ?1 AND at < ?2',
+      )
+        .bind(id, cutoff)
+        .first<{ n: number | null }>(),
+    );
+    const target = Number(old?.n ?? 0);
+    if (target <= 0) continue;
+    targetByTenant.set(id, target);
+    await calls.run(() =>
+      DB.prepare(
+        `INSERT INTO change_log_watermarks (tenant_id, day, max_seq) VALUES (?1, ?2, ?3)
+         ON CONFLICT(tenant_id, day) DO UPDATE SET max_seq =
+           CASE WHEN excluded.max_seq > max_seq THEN excluded.max_seq ELSE max_seq END`,
+      )
+        .bind(id, cutoffDay, target)
+        .run(),
+    );
+  }
   const cursor = String(
     (cursorRow?.results?.[0] as { value?: string } | undefined)?.value ?? '',
   );
   const startAt = Math.max(
     0,
-    list.findIndex((t) => t.tenant_id >= cursor),
+    tenantIds.findIndex((id) => id >= cursor),
   );
-  const ordered = [...list.slice(startAt), ...list.slice(0, startAt)];
+  const ordered = [...tenantIds.slice(startAt), ...tenantIds.slice(0, startAt)];
   let budget = LOG_MAX_PER_RUN;
   let lastTenant = cursor;
   let completed = true;
-  for (const { tenant_id, target } of ordered) {
+  for (const tenant_id of ordered) {
+    const target = targetByTenant.get(tenant_id) ?? 0;
+    if (target <= 0) {
+      lastTenant = tenant_id;
+      continue;
+    }
     // Leave one call for the cursor write at the end of this pass.
     if (budget <= 0 || !calls.ok(4) || !calls.hasWrites(4)) {
       completed = false;
@@ -153,6 +190,10 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
         .first<{ change_log_floor: number }>(),
     );
     let floor = floorRow?.change_log_floor ?? 0;
+    if (floor >= target) {
+      lastTenant = tenant_id;
+      continue;
+    }
     while (floor < target && budget > 0 && calls.ok(2)) {
       const limit = Math.min(
         LOG_CHUNK,

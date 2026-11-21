@@ -28,6 +28,8 @@ export async function loadLookups(
   const products = new Set<string>();
   const saleProductIds = new Set<string>();
   const saleIds = new Set<string>();
+  /** Sales whose void is being pushed; only their void payments are needed. */
+  const voidSaleIds = new Set<string>();
   const refundIds = new Set<string>();
   const returnIds = new Set<string>();
   const purchaseIds = new Set<string>();
@@ -103,6 +105,8 @@ export async function loadLookups(
       typeof op.row?.sale_id === 'string'
     )
       saleIds.add(op.row.sale_id);
+    if (op.tbl === 'sale_voids' && typeof op.row?.sale_id === 'string')
+      voidSaleIds.add(op.row.sale_id);
     if (op.tbl === 'sales' && typeof op.row?.customer_id === 'string')
       partyIds.customer.add(op.row.customer_id);
     if (op.tbl === 'purchases' && typeof op.row?.supplier_id === 'string')
@@ -421,9 +425,9 @@ export async function loadLookups(
     { payments: 'purchase' },
   );
   chunked(
-    saleIds,
+    voidSaleIds,
     (p) =>
-      `SELECT sale_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND sale_id IN (${p})`,
+      `SELECT sale_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND purpose = 'void' AND sale_id IN (${p})`,
     { payments: 'sale' },
   );
   chunked(

@@ -632,6 +632,7 @@ export const TABLE_COLUMNS = {
     'updated_by',
   ],
   branch_device_codes: ['tenant_id', 'branch_id', 'device_code'],
+  change_log_watermarks: ['tenant_id', 'day', 'max_seq'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type D1Table = keyof typeof TABLE_COLUMNS;
