@@ -16,6 +16,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { UsersIcon } from '../components/icons.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import { isPinTaken } from '../data/pinLock.ts';
 import {
@@ -167,6 +168,7 @@ function StaffDialog({
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
   const [pending, setPending] = useState(false);
+  const guard = useSubmitGuard();
 
   useEffect(() => {
     if (!open) return;
@@ -208,24 +210,24 @@ function StaffDialog({
   };
 
   const save = async () => {
-    if (pending) return;
-    if (pin !== '' && (pin !== pin2 || isWeakPin(pin))) {
-      toast.push(t('office.staff.pin_invalid'), 'error');
-      return;
-    }
-    if (
-      pin !== '' &&
-      (await isPinTaken(getDb(), pin, row ? String(row.id) : null))
-    ) {
-      toast.push(t('office.staff.pin_taken'), 'error');
-      return;
-    }
-    if (!row && pin === '') {
-      toast.push(t('office.staff.pin_required'), 'error');
-      return;
-    }
+    if (pending || !guard.lock()) return;
     setPending(true);
     try {
+      if (pin !== '' && (pin !== pin2 || isWeakPin(pin))) {
+        toast.push(t('office.staff.pin_invalid'), 'error');
+        return;
+      }
+      if (
+        pin !== '' &&
+        (await isPinTaken(getDb(), pin, row ? String(row.id) : null))
+      ) {
+        toast.push(t('office.staff.pin_taken'), 'error');
+        return;
+      }
+      if (!row && pin === '') {
+        toast.push(t('office.staff.pin_required'), 'error');
+        return;
+      }
       const pinHash = pin === '' ? undefined : await hashPin(pin);
       const permissions: Record<string, boolean> = {};
       for (const [permission, value] of Object.entries(overrides)) {
@@ -254,6 +256,7 @@ function StaffDialog({
         'error',
       );
     } finally {
+      guard.unlock();
       setPending(false);
     }
   };
@@ -304,7 +307,15 @@ function StaffDialog({
               if (bp !== null)
                 setMaxDiscountBp(Math.max(0, Math.min(10000, bp)));
             }}
-            onBlur={() => setDiscountText(String(maxDiscountBp / 100))}
+            onBlur={() => {
+              // An empty max discount means 0%, not a snap back to the old limit.
+              if (discountText.trim() === '') {
+                setDiscountText('0');
+                setMaxDiscountBp(0);
+                return;
+              }
+              setDiscountText(String(maxDiscountBp / 100));
+            }}
           />
         </label>
         <label className="flex items-center gap-2 self-end text-small">

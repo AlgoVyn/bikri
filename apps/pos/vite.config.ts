@@ -166,26 +166,29 @@ export default defineConfig({
         },
         // Keep operator-console code in its own folder so the service worker can
         // exclude it from the till precache. Route chunks in `_id.lazy-*` share a
-        // generic name with shop routes; module ids are the only reliable marker.
+        // generic name with shop routes, so the module list is the reliable marker.
+        // A chunk is moved only when *every* module belongs to that area: a shared
+        // chunk with even one shop module must stay in the precached graph, or the
+        // till's offline start would import a file the service worker skipped.
         chunkFileNames: (chunk) => {
-          // Only dynamic route entry chunks that live in the operator console or the
-          // online-only public pages are moved out of the PWA precache. Shared chunks
-          // (for example `app`) can contain shop modules; moving those under assets/admin
-          // would make the shop offline start depend on a chunk the service worker
-          // intentionally skipped.
-          const facade = chunk.facadeModuleId ?? '';
-          const admin =
-            chunk.isDynamicEntry &&
-            (facade.includes('/src/routes/admin') ||
-              facade.includes('/src/admin/') ||
-              facade.includes('/packages/i18n/admin/'));
-          const publicPage =
-            chunk.isDynamicEntry &&
-            (facade.includes('/src/routes/request') ||
-              facade.includes('/src/public/') ||
-              facade.includes('/packages/i18n/public/'));
-          if (admin) return 'assets/admin/[name]-[hash].js';
-          if (publicPage) return 'assets/public/[name]-[hash].js';
+          const moduleIds =
+            chunk.moduleIds.length > 0
+              ? chunk.moduleIds
+              : [chunk.facadeModuleId ?? ''];
+          const inArea = (pattern: RegExp) =>
+            moduleIds.length > 0 && moduleIds.every((id) => pattern.test(id));
+          if (
+            inArea(
+              /\/src\/(?:admin|routes\/admin)\/|\/packages\/i18n\/admin\//u,
+            )
+          )
+            return 'assets/admin/[name]-[hash].js';
+          if (
+            inArea(
+              /\/src\/(?:public|routes\/request)|\/packages\/i18n\/public\//u,
+            )
+          )
+            return 'assets/public/[name]-[hash].js';
           return 'assets/[name]-[hash].js';
         },
       },

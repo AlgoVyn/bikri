@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { PermissionGate } from '../components/PermissionGate.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
@@ -17,6 +18,7 @@ export function LabelsRoutePage() {
 }
 
 function LabelsRouteContent() {
+  const navigate = useNavigate();
   const [seed, setSeed] = useState<Seed>({ rows: [], returnTo: '/' });
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -34,7 +36,8 @@ function LabelsRouteContent() {
           ),
           returnTo:
             typeof parsed.returnTo === 'string' &&
-            parsed.returnTo.startsWith('/')
+            parsed.returnTo.startsWith('/') &&
+            !parsed.returnTo.startsWith('//')
               ? parsed.returnTo
               : '/',
         });
@@ -44,9 +47,8 @@ function LabelsRouteContent() {
   }, []);
   const close = () => {
     setOpen(false);
-    window.location.assign(
-      `${import.meta.env.BASE_URL || '/'}${seed.returnTo.replace(/^\//u, '')}`,
-    );
+    // In-app navigation keeps the unlocked PIN session; a full reload locked the till.
+    void navigate({ to: seed.returnTo });
   };
   return (
     <div className="p-4">

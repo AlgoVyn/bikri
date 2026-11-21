@@ -102,6 +102,15 @@ export function SupplierStatement({
   useHotkey(plainKey('p'), () => setPayOpen(true), {
     enabled: can('purchase.create') && !readOnly,
   });
+  useHotkey(
+    plainKey('r'),
+    () =>
+      void navigate({
+        to: '/suppliers/$supplierId/return/new',
+        params: { supplierId },
+      }),
+    { enabled: can('purchase.create') && !readOnly },
+  );
 
   if (data === null)
     return (

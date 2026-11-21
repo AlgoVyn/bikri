@@ -6,6 +6,7 @@ import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { createSupplier, updateSupplier } from '../data/suppliers.ts';
@@ -32,6 +33,7 @@ export function SupplierDialog({
   const [note, setNote] = useState('');
   const [opening, setOpening] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+  const guard = useSubmitGuard();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens or another supplier is selected; a live row update must not wipe typed input.
   useEffect(() => {
@@ -45,7 +47,7 @@ export function SupplierDialog({
   }, [open, editing?.id]);
 
   const save = async () => {
-    if (name.trim() === '' || pending) return;
+    if (name.trim() === '' || pending || !guard.lock()) return;
     setPending(true);
     try {
       const db = getDb();
@@ -73,6 +75,7 @@ export function SupplierDialog({
     } catch {
       toast.push(t('errors.generic'), 'error');
     } finally {
+      guard.unlock();
       setPending(false);
     }
   };

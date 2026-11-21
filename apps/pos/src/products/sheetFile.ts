@@ -3,6 +3,14 @@
 const WORKER_TIMEOUT_MS = 30_000;
 let nextId = 1;
 
+/** The file itself is unreadable; retrying the same bytes on the main thread is useless. */
+class SheetParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SheetParseError';
+  }
+}
+
 function readMainThread(file: File): Promise<string[][]> {
   return (async () => {
     const name = file.name.toLowerCase();
@@ -52,11 +60,18 @@ function readInWorker(file: File): Promise<string[][]> {
       if (event.data.id !== id) return;
       finish();
       if (event.data.grid !== undefined) resolve(event.data.grid);
-      else reject(new Error(event.data.error ?? 'spreadsheet parse failed'));
+      else
+        reject(
+          new SheetParseError(event.data.error ?? 'spreadsheet parse failed'),
+        );
     };
     worker.onerror = (event) => {
       finish();
       reject(new Error(event.message || 'spreadsheet worker failed'));
+    };
+    worker.onmessageerror = () => {
+      finish();
+      reject(new Error('spreadsheet worker message failed'));
     };
     worker.postMessage({ id, file });
   });
@@ -66,9 +81,10 @@ export async function readSheetFile(file: File): Promise<string[][]> {
   if (typeof Worker === 'undefined') return readMainThread(file);
   try {
     return await readInWorker(file);
-  } catch {
-    // A browser that refuses module workers (or a parser that needs the DOM) must not
-    // lose the import screen; the file is still small enough for the main-thread path.
+  } catch (error) {
+    // A corrupt file is corrupt in both places; only retry when the worker could not
+    // run (module workers refused, a parser that needs the DOM, a transport failure).
+    if (error instanceof SheetParseError) throw error;
     return readMainThread(file);
   }
 }

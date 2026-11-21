@@ -19,6 +19,7 @@ import {
   Panel,
   primaryBtn,
   quietBtn,
+  RefreshError,
   StatusBadge,
 } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
@@ -62,6 +63,7 @@ export function TenantsPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <RefreshError message={query.error} />
       <PageHeader
         icon={<StoreIcon />}
         title={t('admin.tenants_title')}

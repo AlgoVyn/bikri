@@ -21,6 +21,8 @@ import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { addProductToCart, useShopMoney } from '../sell/useSell.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
+import { composing } from './hotkeys.ts';
 import { usePriceCheck } from './priceCheckStore.ts';
 
 /** Price check (screens/18): look up a price by scan or name; reads only. */
@@ -44,6 +46,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const money = useShopMoney();
   const active = useSellStore((s) => s.active);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,7 +130,8 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
         : [];
     });
   }, [card?.product.id]);
-  const canSell = can('sale.create');
+  // A read-only/support device must not start a cart it can never save.
+  const canSell = can('sale.create') && !readOnly;
 
   const addToCart = async () => {
     if (!card) return;
@@ -175,7 +179,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
+            if (composing(e) || e.key !== 'Enter') return;
             e.preventDefault();
             if (card && shown?.q === query.trim() && canSell) void addToCart();
             else void lookup(query);

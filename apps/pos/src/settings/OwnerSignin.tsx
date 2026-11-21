@@ -137,7 +137,11 @@ export function OwnerSigninDialog({
     <Dialog.Root open={open} onOpenChange={(o) => (o ? undefined : onCancel())}>
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
-        <Dialog.Content className={contentClass} data-testid="owner-signin">
+        <Dialog.Content
+          aria-modal="true"
+          className={contentClass}
+          data-testid="owner-signin"
+        >
           <Dialog.Title className="text-title font-semibold">
             {t('owner.title')}
           </Dialog.Title>

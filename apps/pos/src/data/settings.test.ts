@@ -6,6 +6,7 @@ import {
   auditCsv,
   auditList,
   auditSummary,
+  loadAuditRows,
   SettingsError,
   saveStaff,
   shopSettings,
@@ -27,6 +28,16 @@ async function setup(prefix = 'settings') {
   await addShop(db, { name: 'Bikri Mobile', timezone: TZ });
   return db;
 }
+
+describe('activity date filters (screens/17)', () => {
+  it('returns no rows for a cleared or impossible date instead of throwing', async () => {
+    const db = await setup();
+    await expect(loadAuditRows(db, '', '')).resolves.toEqual([]);
+    await expect(
+      loadAuditRows(db, '2026-02-31', '2026-03-01'),
+    ).resolves.toEqual([]);
+  });
+});
 
 describe('shop and staff settings (screens/17)', () => {
   it('AC 1/8: saves receipt tax and the next inclusive bill uses it; old rows stay', async () => {

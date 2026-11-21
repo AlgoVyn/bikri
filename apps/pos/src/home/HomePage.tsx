@@ -25,6 +25,7 @@ import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PrivacyProvider, usePrivacyActive } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import {
   type AttentionItem,
@@ -129,6 +130,7 @@ export function HomePage() {
   const setJustSetUp = useSession((s) => s.setJustSetUp);
   const { staff, role, can } = useCurrentStaff();
   const readOnly = useReadOnly();
+  const sampleGuard = useSubmitGuard();
   const toast = useToast();
   const [samplePending, setSamplePending] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
@@ -272,7 +274,7 @@ export function HomePage() {
     formatTimestamp(at, i18n.language, timeZone, 'time');
 
   const loadSamples = async () => {
-    if (!staff || readOnly) return;
+    if (!staff || readOnly || !sampleGuard.lock()) return;
     setSamplePending(true);
     try {
       const count = await addSampleProducts(getDb(), staff.id);
@@ -280,6 +282,7 @@ export function HomePage() {
     } catch {
       toast.push(t('errors.generic'), 'error');
     } finally {
+      sampleGuard.unlock();
       setSamplePending(false);
     }
   };
@@ -324,7 +327,7 @@ export function HomePage() {
         ...(item.permAny ? { permAny: item.permAny } : {}),
       })),
   ].filter((tile) =>
-    !readOnly || tile.to !== '/day-close'
+    !readOnly || (tile.to !== '/day-close' && tile.to !== '/stock/count')
       ? tile.permAny !== undefined
         ? tile.permAny.some((permission) => can(permission))
         : tile.perm === null || can(tile.perm)
@@ -691,76 +694,17 @@ function GettingStarted({
 
   const progress = (done / steps.length) * 100;
 
-  // Once the catalogue exists, the remaining setup is one optional step. A full checklist
-  // card would outweigh the New sale hero; keep it as a compact strip.
-  if (products > 0) {
-    const step = pending[0];
-    if (!step) return null;
-    return (
-      <section
-        aria-labelledby="getting-started"
-        data-testid="getting-started"
-        className="rounded-card border border-border bg-surface p-3 shadow-card"
-      >
-        <div className="flex items-center gap-2">
-          <h2 id="getting-started" className="me-auto text-title font-semibold">
-            {t('home.get_started')}
-          </h2>
-          <span className="text-small text-text-muted tabular-nums">
-            {t('home.steps_progress', { done, total: steps.length })}
-          </span>
-          <button
-            type="button"
-            className="flex size-11 items-center justify-center rounded-control text-text-muted hover:bg-surface-2"
-            aria-label={t('common.dismiss')}
-            onClick={onDismiss}
-          >
-            <CloseIcon className="size-5 text-title leading-none" />
-          </button>
-        </div>
-        <Link
-          to={step.to}
-          className="mt-2 flex min-h-11 items-center gap-3 rounded-control px-1 hover:bg-surface-2"
-        >
-          <span
-            aria-hidden="true"
-            className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-small font-semibold text-text-muted"
-          >
-            {step.number}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">{step.title}</p>
-            <p className="text-small text-text-muted">{step.hint}</p>
-          </div>
-          <ChevronRightIcon className="size-4 text-title leading-none text-text-muted rtl:rotate-180" />
-        </Link>
-        <div
-          role="progressbar"
-          aria-label={t('home.steps_progress', {
-            done,
-            total: steps.length,
-          })}
-          aria-valuemin={0}
-          aria-valuemax={steps.length}
-          aria-valuenow={done}
-          className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2"
-        >
-          <div
-            className="h-full rounded-full bg-success transition-[width] duration-200"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </section>
-    );
-  }
-
+  // Once the catalogue exists, the remaining setup is one optional step. A full
+  // checklist card would outweigh the New sale hero; keep it as a compact strip.
+  const step = pending[0];
+  if (!step) return null;
   return (
     <section
       aria-labelledby="getting-started"
       data-testid="getting-started"
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+      className="rounded-card border border-border bg-surface p-3 shadow-card"
     >
-      <div className="flex items-center gap-2 px-4 py-3">
+      <div className="flex items-center gap-2">
         <h2 id="getting-started" className="me-auto text-title font-semibold">
           {t('home.get_started')}
         </h2>
@@ -776,41 +720,38 @@ function GettingStarted({
           <CloseIcon className="size-5 text-title leading-none" />
         </button>
       </div>
-      <div className="px-4 pb-3">
-        <div
-          role="progressbar"
-          aria-label={t('home.steps_progress', {
-            done,
-            total: steps.length,
-          })}
-          aria-valuemin={0}
-          aria-valuemax={steps.length}
-          aria-valuenow={done}
-          className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+      <Link
+        to={step.to}
+        className="mt-2 flex min-h-11 items-center gap-3 rounded-control px-1 hover:bg-surface-2"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-small font-semibold text-text-muted"
         >
-          <div
-            className="h-full rounded-full bg-success transition-[width] duration-200"
-            style={{ width: `${progress}%` }}
-          />
+          {step.number}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{step.title}</p>
+          <p className="text-small text-text-muted">{step.hint}</p>
         </div>
+        <ChevronRightIcon className="size-4 text-title leading-none text-text-muted rtl:rotate-180" />
+      </Link>
+      <div
+        role="progressbar"
+        aria-label={t('home.steps_progress', {
+          done,
+          total: steps.length,
+        })}
+        aria-valuemin={0}
+        aria-valuemax={steps.length}
+        aria-valuenow={done}
+        className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2"
+      >
+        <div
+          className="h-full rounded-full bg-success transition-[width] duration-200"
+          style={{ width: `${progress}%` }}
+        />
       </div>
-      <ol className="divide-y divide-border border-t border-border">
-        {pending.map((step) => (
-          <li key={step.title} className="flex gap-3 px-4 py-3">
-            <span
-              aria-hidden="true"
-              className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-small font-semibold text-text-muted"
-            >
-              {step.number}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">{step.title}</p>
-              <p className="mt-0.5 text-small text-text-muted">{step.hint}</p>
-              {step.action ? <div className="mt-2">{step.action}</div> : null}
-            </div>
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }

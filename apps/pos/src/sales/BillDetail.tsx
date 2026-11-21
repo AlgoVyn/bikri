@@ -45,7 +45,7 @@ import { useSellStore } from '../sell/sellStore.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { cashierTodayOnly } from '../state/reportScope.ts';
+import { billVisible } from '../state/reportScope.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
@@ -184,11 +184,12 @@ export function BillDetail({
   const canViewBill =
     data !== null &&
     data !== undefined &&
-    can('report.view') &&
-    !(
-      cashierTodayOnly(role, support) &&
-      (String(data.detail.sale.business_date) !== data.today ||
-        (branchId !== null && String(data.detail.sale.branch_id) !== branchId))
+    billVisible(
+      role,
+      support,
+      can('report.view'),
+      String(data.detail.sale.business_date) === data.today,
+      branchId === null || String(data.detail.sale.branch_id) === branchId,
     );
   useHotkey(plainKey('p'), () => void print(), { enabled: canViewBill });
   useHotkey(

@@ -21,6 +21,7 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   CART_IDS,
   type CartId,
@@ -156,9 +157,12 @@ export function BillDiscountDialog({
     setAmount(current?.type === 'amount' ? current.value : null);
     setPct(current?.type === 'percent' ? String(current.value / 100) : '');
   }, [open, current]);
+  const pctBp = percentToBp(pct);
+  const invalidPct = type === 'percent' && pct.trim() !== '' && pctBp === null;
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const value = type === 'amount' ? (amount ?? 0) : (percentToBp(pct) ?? 0);
+    if (invalidPct) return;
+    const value = type === 'amount' ? (amount ?? 0) : (pctBp ?? 0);
     onSave(value > 0 ? { type, value } : null);
     onOpenChange(false);
   };
@@ -187,11 +191,18 @@ export function BillDiscountDialog({
               inputMode="decimal"
               className={fieldClass}
               value={pct}
+              aria-invalid={invalidPct || undefined}
+              aria-describedby={invalidPct ? `${pctId}-error` : undefined}
               onChange={(e) => setPct(e.target.value)}
             />
+            {invalidPct ? (
+              <p id={`${pctId}-error`} className="mt-1 text-small text-danger">
+                {t('sell.discount_invalid')}
+              </p>
+            ) : null}
           </div>
         )}
-        <Actions submit={t('sell.apply')} />
+        <Actions submit={t('sell.apply')} disabled={invalidPct} />
       </form>
     </Modal>
   );
@@ -436,6 +447,8 @@ export function CustomerDialog({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const guard = useSubmitGuard();
   useEffect(() => {
     if (!open) return;
     setQuery('');
@@ -464,6 +477,8 @@ export function CustomerDialog({
       setError(t('sell.customer_name_required'));
       return;
     }
+    if (!guard.lock()) return;
+    setSaving(true);
     try {
       const c = await createCustomer(getDb(), { name, phone }, actor);
       toast.push(t('sell.customer_added', { name: String(c.name) }));
@@ -476,6 +491,9 @@ export function CustomerDialog({
             ? t('sell.phone_taken', { name: err.ownerName })
             : t('errors.generic'),
       );
+    } finally {
+      guard.unlock();
+      setSaving(false);
     }
   };
   return (
@@ -504,7 +522,7 @@ export function CustomerDialog({
             onChange={setPhone}
           />
           {error ? <p className="text-small text-danger">{error}</p> : null}
-          <Actions submit={t('sell.customer_save')} />
+          <Actions submit={t('sell.customer_save')} disabled={saving} />
         </form>
       ) : (
         <>

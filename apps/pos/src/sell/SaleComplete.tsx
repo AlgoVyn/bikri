@@ -160,11 +160,15 @@ export function SaleComplete({
     }),
     [],
   );
+  // Keep the callback in a ref so a parent re-render does not restart the countdown,
+  // and pause it while a share/PDF is in flight.
+  const autoCloseRef = useRef(onNewSale);
+  autoCloseRef.current = onNewSale;
   useEffect(() => {
-    if (!prefs?.autoClose) return;
-    const timer = setTimeout(onNewSale, AUTO_CLOSE_MS);
+    if (!prefs?.autoClose || busy) return;
+    const timer = setTimeout(() => autoCloseRef.current(), AUTO_CLOSE_MS);
     return () => clearTimeout(timer);
-  }, [prefs?.autoClose, onNewSale]);
+  }, [prefs?.autoClose, busy]);
 
   const printAgain = async () => {
     await queueSalePrint(getDb(), saleId, { reprint: true });

@@ -41,8 +41,9 @@ import {
   saveSetupDraft,
 } from '../data/setup.ts';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
+import { composing } from '../shell/hotkeys.ts';
 import { useSession } from '../state/session.ts';
-import { LogoError, type ProcessedLogo, processLogo } from './logo.ts';
+import { type ProcessedLogo, processLogo } from './logo.ts';
 import { PinBoxes } from './PinBoxes.tsx';
 import { ReceiptPreview } from './ReceiptPreview.tsx';
 
@@ -211,8 +212,15 @@ export function SetupWizard() {
       if (receipt.footer.length > 160 || receipt.footer.split('\n').length > 3)
         e.footer = t('setup.errors.too_long');
     }
-    if (s === 4 && product && product.name.trim() === '')
-      e.product_name = t('setup.errors.product_name');
+    if (s === 4 && product) {
+      if (product.name.trim() === '')
+        e.product_name = t('setup.errors.product_name');
+      else if (
+        product.opening.trim() !== '' &&
+        parseQtyToMilli(product.opening, 'pc') === null
+      )
+        e.opening = t('setup.errors.opening');
+    }
     return e;
   };
 
@@ -223,6 +231,7 @@ export function SetupWizard() {
     setStep(next);
   };
 
+  const finishGuard = useRef(false);
   const finish = async (
     withProduct: boolean,
     then: '/' | '/products/import' = '/',
@@ -230,6 +239,9 @@ export function SetupWizard() {
     const found = withProduct ? validate(4) : {};
     setErrors(found);
     if (Object.keys(found).length > 0) return focusFirstError(found);
+    // Enter and a click on Finish can land in the same tick; lock before awaiting.
+    if (finishGuard.current) return;
+    finishGuard.current = true;
     setBusy(true);
     useSession.getState().setAfterSetup(then);
     try {
@@ -264,6 +276,7 @@ export function SetupWizard() {
       // silently and the owner would not know the shop was not saved.
       toast.push(t('errors.generic'), 'error');
     } finally {
+      finishGuard.current = false;
       setBusy(false);
     }
   };
@@ -284,6 +297,7 @@ export function SetupWizard() {
   keyRef.current = { next, back };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (composing(event)) return;
       if (
         event.ctrlKey &&
         event.shiftKey &&
@@ -633,8 +647,10 @@ export function SetupWizard() {
                               const { logo: _drop, ...rest } = x;
                               return rest;
                             });
-                          } catch (error) {
-                            if (!(error instanceof LogoError)) throw error;
+                          } catch {
+                            // Any decode/canvas failure is the same actionable message;
+                            // throwing here left the file picker with an unhandled
+                            // rejection and no feedback.
                             setErrors((x) => ({
                               ...x,
                               logo: t('setup.errors.logo'),
@@ -874,7 +890,11 @@ export function SetupWizard() {
                     value={product.price}
                     onChange={(v) => setProduct({ ...product, price: v ?? 0 })}
                   />
-                  <Field id={id('opening')} label={t('setup.opening_stock')}>
+                  <Field
+                    id={id('opening')}
+                    label={t('setup.opening_stock')}
+                    error={err('opening')}
+                  >
                     <input
                       id={id('opening')}
                       inputMode="decimal"

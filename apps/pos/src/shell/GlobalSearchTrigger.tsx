@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchIcon } from '../components/icons.tsx';
-import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { useGlobalSearch } from './searchStore.ts';
 
 export function GlobalSearchTrigger({
@@ -40,29 +38,4 @@ export function GlobalSearchTrigger({
       <SearchIcon />
     </button>
   );
-}
-
-/** `/` opens search from anywhere; kept eager while the overlay body is lazy. */
-export function GlobalSearchHotkey() {
-  const openSearch = useGlobalSearch((state) => state.openSearch);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        composing(event) ||
-        dialogOpen() ||
-        event.key !== '/' ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        ignoresHotkey(event.target)
-      )
-        return;
-      event.preventDefault();
-      openSearch();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [openSearch]);
-  return null;
 }

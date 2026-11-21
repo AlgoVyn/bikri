@@ -51,6 +51,7 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content
+          aria-modal="true"
           ref={contentRef}
           onOpenAutoFocus={(event) => {
             const field = contentRef.current?.querySelector<HTMLElement>(

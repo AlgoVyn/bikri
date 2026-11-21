@@ -3,6 +3,8 @@ import type { LogoData } from '../data/setup.ts';
 
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const LOGO_MAX_WIDTH = 576;
+/** An extreme aspect ratio must not allocate a megapixel-tall bitmap. */
+export const LOGO_MAX_HEIGHT = 288;
 const TYPES = new Set(['image/png', 'image/jpeg', 'image/svg+xml']);
 
 export class LogoError extends Error {
@@ -63,11 +65,13 @@ export async function processLogo(file: File): Promise<ProcessedLogo> {
     throw new LogoError();
   const img = await loadImage(file);
   const natural = img.naturalWidth || LOGO_MAX_WIDTH;
-  const width = Math.min(LOGO_MAX_WIDTH, natural);
-  const height = Math.max(
-    1,
-    Math.round(((img.naturalHeight || natural) * width) / natural),
-  );
+  const naturalHeight = img.naturalHeight || natural;
+  let width = Math.min(LOGO_MAX_WIDTH, natural);
+  let height = Math.max(1, Math.round((naturalHeight * width) / natural));
+  if (height > LOGO_MAX_HEIGHT) {
+    height = LOGO_MAX_HEIGHT;
+    width = Math.max(1, Math.round((natural * height) / naturalHeight));
+  }
   const [c, ctx] = canvas(width, height);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, width, height);

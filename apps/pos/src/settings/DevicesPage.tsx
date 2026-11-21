@@ -3,7 +3,7 @@
 import { BASE_PATH } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
@@ -177,6 +177,7 @@ export function DevicesPage() {
   const [now, setNow] = useState(Date.now());
   const [form, setForm] = useState({ name: '', branch: '', admin: false });
   const [confirmRevoke, setConfirmRevoke] = useState<ShopDevice | null>(null);
+  const importSeq = useRef(0);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -191,10 +192,14 @@ export function DevicesPage() {
     | { kind: 'done'; applied: number; rejected: number }
   >(null);
 
+  // Tick only while a fresh enrolment code is counting down; the page used to
+  // re-render every second (and every row in it) for its whole lifetime.
   useEffect(() => {
+    if (!fresh || fresh.expires_at <= Date.now()) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [fresh]);
 
   const guard = useCallback(
     async (fn: () => Promise<void>) => {
@@ -279,7 +284,7 @@ export function DevicesPage() {
           icon={<DeviceIcon />}
           message={t('owner.not_enrolled')}
           actionLabel={t('enrol.connect')}
-          onAction={() => window.location.assign(`${BASE_PATH}enrol`)}
+          onAction={() => window.location.assign(`${BASE_PATH}/enrol`)}
         />
       ) : null}
       {enrolled === false ? null : (
@@ -471,8 +476,22 @@ export function DevicesPage() {
                           }
                           aria-label={t('devices.name')}
                         />
-                        <button type="submit" className={buttonPrimary}>
+                        <button
+                          type="submit"
+                          className={buttonPrimary}
+                          disabled={
+                            renaming.name.trim() === '' ||
+                            renaming.name === d.name
+                          }
+                        >
                           {t('devices.save')}
+                        </button>
+                        <button
+                          type="button"
+                          className={buttonQuiet}
+                          onClick={() => setRenaming(null)}
+                        >
+                          {t('common.cancel')}
                         </button>
                       </form>
                     ) : (
@@ -614,21 +633,35 @@ export function DevicesPage() {
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
+              const seq = importSeq.current + 1;
+              importSeq.current = seq;
               setFileName(f.name);
-              void f.text().then((text) => {
-                const p = previewUnsynced(text, db.tenantId);
-                if ('error' in p) {
+              void f
+                .text()
+                .then((text) => {
+                  if (seq !== importSeq.current) return;
+                  const p = previewUnsynced(text, db.tenantId);
+                  if ('error' in p) {
+                    setImportState(null);
+                    setError(
+                      p.error === 'other_shop'
+                        ? t('devices.import_other_shop')
+                        : t('devices.import_invalid'),
+                    );
+                  } else {
+                    setError(null);
+                    setImportState({ kind: 'preview', p });
+                  }
+                })
+                .catch(() => {
+                  if (seq !== importSeq.current) return;
                   setImportState(null);
-                  setError(
-                    p.error === 'other_shop'
-                      ? t('devices.import_other_shop')
-                      : t('devices.import_invalid'),
-                  );
-                } else {
-                  setError(null);
-                  setImportState({ kind: 'preview', p });
-                }
-              });
+                  setError(t('devices.import_invalid'));
+                })
+                .finally(() => {
+                  // Allow choosing the same file again after a failed/ignored read.
+                  e.target.value = '';
+                });
             }}
           />
           <label

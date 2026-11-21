@@ -24,6 +24,7 @@ import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { isLatinName } from '../products/format.ts';
+import { composing } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Line = {
@@ -278,6 +279,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
+                if (composing(e)) return;
                 if (e.key === 'Enter' && matches[0]) {
                   e.preventDefault();
                   add(matches[0]);
@@ -337,8 +339,8 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                         {String(line.product.name_en)}
                       </p>
                       <p className="text-small text-text-muted">
-                        {unit} · {t('office.suppliers.line_total')}:{' '}
-                        <MoneyText paisa={lineResult?.line_total ?? 0} />
+                        {t(`unit.${unit}`)} · {t('office.suppliers.line_total')}
+                        : <MoneyText paisa={lineResult?.line_total ?? 0} />
                       </p>
                     </div>
                     <button

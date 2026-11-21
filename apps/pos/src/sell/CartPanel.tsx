@@ -1,9 +1,4 @@
-import {
-  type CartResult,
-  mulDivRound,
-  type QtyUnit,
-  qtyAllowsDecimals,
-} from '@bikri/core';
+import { type CartResult, mulDivRound, type QtyUnit } from '@bikri/core';
 import type { Cart, CartBackdate, CartLine } from '@bikri/db';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +27,7 @@ import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { isLatinName, qtyWithUnit } from '../products/format.ts';
 import type { CartOrder } from '../shell/devicePrefs.ts';
+import { cartItemCount } from './itemCount.ts';
 import { InlineDiscount, LineEditor } from './LineEditor.tsx';
 import { useCustomer } from './useSell.ts';
 
@@ -72,14 +68,9 @@ export type CartPanelProps = {
   backdateStaffName?: string;
   onCancelBackdate: () => void;
   cartOrder: CartOrder;
+  /** Bumped when a manager override is dismissed, so a rejected price resets. */
+  priceReset?: number;
 };
-
-function itemCount(lines: readonly CartLine[]): number {
-  let n = 0;
-  for (const l of lines)
-    n += qtyAllowsDecimals(l.unit ?? 'pc') ? 1 : Math.round(l.qty_milli / 1000);
-  return n;
-}
 
 export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
   const { t, i18n } = useTranslation();
@@ -262,7 +253,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
         data-testid="cart-totals"
       >
         <Row
-          label={t('sell.subtotal', { count: itemCount(cart.lines) })}
+          label={t('sell.subtotal', { count: cartItemCount(cart.lines) })}
           paisa={totals.gross_total}
           testId="total-subtotal"
         />
@@ -584,6 +575,7 @@ function BundleRows({
               }}
             />
             <BundleInlinePrice
+              key={`bundle-price:${group}:${p.priceReset ?? 0}`}
               price={price}
               listPrice={Number(first.bundle_list_price ?? price)}
               onPrice={(next) => p.onBundlePrice(group, next)}
@@ -851,7 +843,11 @@ function LineRow({
                   p.onChangeLine(line.key, { qty_milli: milli });
               }}
             />
-            <InlinePrice line={line} onPrice={p.onPriceChange} />
+            <InlinePrice
+              key={`price:${line.key}:${p.priceReset ?? 0}`}
+              line={line}
+              onPrice={p.onPriceChange}
+            />
           </div>
           <LineEditor
             line={line}

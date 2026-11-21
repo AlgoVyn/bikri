@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { createExpenseCategory } from '../data/expenses.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -23,6 +24,13 @@ export function CategoryDialog({
   const [name, setName] = useState('');
   const [nameUr, setNameUr] = useState('');
   const [pending, setPending] = useState(false);
+  // The owning screen keeps this dialog mounted; clear the previous draft on reopen.
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setNameUr('');
+    setPending(false);
+  }, [open]);
   const field =
     'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
@@ -38,9 +46,11 @@ export function CategoryDialog({
       onOpenChange(false);
     } catch (err) {
       toast.push(
-        err instanceof Error
-          ? t('office.expenses.category_exists')
-          : t('errors.generic'),
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof Error
+            ? t('office.expenses.category_exists')
+            : t('errors.generic'),
         'error',
       );
     } finally {

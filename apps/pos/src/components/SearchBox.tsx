@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { composing } from '../shell/hotkeys.ts';
 import { SearchIcon } from './icons.tsx';
 import { searchInputClass, searchWrapperClass } from './search.ts';
 
@@ -73,6 +74,7 @@ export function SearchBox({
             onSearch(next);
           }}
           onKeyDown={(event) => {
+            if (composing(event)) return;
             const now = clock();
             if (event.key === 'Enter') {
               const barcode = isRapidBarcode(

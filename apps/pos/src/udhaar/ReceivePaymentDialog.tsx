@@ -1,5 +1,4 @@
 import { businessDate, newId } from '@bikri/core';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
@@ -11,8 +10,8 @@ import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
@@ -53,18 +52,15 @@ export function ReceivePaymentDialog({
   const [method, setMethod] = useState<PayMethod>('cash');
   const [provider, setProvider] = useState<string>(PROVIDERS[0].value);
   const [reference, setReference] = useState('');
-  const [date, setDate] = useState(businessDate(Date.now()));
+  const timeZone = useShopTimeZone();
+  const today = businessDate(Date.now(), timeZone);
+  const [date, setDate] = useState(today);
   const [note, setNote] = useState('');
   const [paymentId, setPaymentId] = useState(() => newId());
   const [pending, setPending] = useState(false);
   const savingRef = useRef(false);
   const [overpay, setOverpay] = useState(false);
-  const zones = useLiveQuery(async () => {
-    if (!open) return null;
-    const tz = await shopTimeZone(getDb());
-    return { tz, today: businessDate(Date.now(), tz) };
-  }, [open]);
-  const today = zones?.today ?? businessDate(Date.now());
+  const dateTouched = useRef(false);
   const minDate = (() => {
     const d = new Date(`${today}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() - 7);
@@ -84,12 +80,20 @@ export function ReceivePaymentDialog({
     setProvider(PROVIDERS[0].value);
     setReference('');
     setDate(todayAtOpen.current);
+    dateTouched.current = false;
     setNote('');
     setPaymentId(newId());
     setOverpay(false);
     setPending(false);
     savingRef.current = false;
   }, [open]);
+  // The shop's zone can resolve after the sheet opens; move the seeded date only
+  // while nobody has changed it. Otherwise a cashier (disabled date field) would submit
+  // Karachi's date in a shop with another business date.
+  useEffect(() => {
+    if (!open || dateTouched.current) return;
+    setDate(today);
+  }, [open, today]);
 
   const after = balance - (amount ?? 0);
   const over = (amount ?? 0) > Math.max(0, balance);
@@ -172,8 +176,11 @@ export function ReceivePaymentDialog({
             value={date}
             min={minDate}
             max={today}
+            onChange={(value) => {
+              dateTouched.current = true;
+              if (value) setDate(value);
+            }}
             disabled={role !== 'owner'}
-            onChange={setDate}
           />
           <fieldset className="sm:col-span-2">
             <legend className="mb-1 text-small">

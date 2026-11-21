@@ -14,6 +14,7 @@ import { StoreIcon } from '../components/icons.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import { defaultBranch } from '../data/localTenant.ts';
@@ -129,7 +130,10 @@ function ShopForm() {
     [form],
   );
 
+  const shopGuard = useSubmitGuard();
+  const branchGuard = useSubmitGuard();
   const saveShop = async () => {
+    if (!shopGuard.lock()) return;
     setSaving(true);
     try {
       const db = getDb();
@@ -150,11 +154,12 @@ function ShopForm() {
         'error',
       );
     } finally {
+      shopGuard.unlock();
       setSaving(false);
     }
   };
   const saveBranch = async () => {
-    if (!data?.branch) return;
+    if (!data?.branch || !branchGuard.lock()) return;
     try {
       await updateBranchSettings(
         getDb(),
@@ -170,6 +175,8 @@ function ShopForm() {
           : t('errors.generic'),
         'error',
       );
+    } finally {
+      branchGuard.unlock();
     }
   };
   const chooseLogo = async (file: File) => {
@@ -399,7 +406,15 @@ function ShopForm() {
                     tax_rate_bp: Math.max(0, Math.min(5000, bp)),
                   });
               }}
-              onBlur={() => setTaxText(String(form.tax_rate_bp / 100))}
+              onBlur={() => {
+                // Empty means "no tax" (screens/17), not a silent revert to the old rate.
+                if (taxText.trim() === '') {
+                  setTaxText('0');
+                  setForm({ ...form, tax_rate_bp: 0 });
+                  return;
+                }
+                setTaxText(String(form.tax_rate_bp / 100));
+              }}
             />
           </label>
           <label className="flex flex-col gap-1 text-small">

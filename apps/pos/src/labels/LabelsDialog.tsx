@@ -12,6 +12,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { addProductBarcode, generateBarcode } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
@@ -22,6 +23,7 @@ import { Modal } from '../sell/Modal.tsx';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { escapeLabelHtml } from './escape.ts';
 import { printLabelHtml } from './printLabels.ts';
 
 export type LabelSeed = { productId: string; copies: number };
@@ -33,14 +35,6 @@ const DEFAULT: LabelSettings = {
   dpi: 203,
   start: 0,
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
 
 /** Print labels through the browser dialog (screens/20, T-052). */
 export function LabelsDialog({
@@ -199,7 +193,9 @@ function LabelsDialogContent({
     }
   }
 
+  const generateGuard = useSubmitGuard();
   const generate = async (product: MasterRow) => {
+    if (!generateGuard.lock()) return;
     try {
       const code = await generateBarcode(getDb());
       await addProductBarcode(getDb(), product.id, code, staff?.id ?? null);
@@ -211,6 +207,8 @@ function LabelsDialogContent({
           : t('errors.generic'),
         'error',
       );
+    } finally {
+      generateGuard.unlock();
     }
   };
 
@@ -248,11 +246,11 @@ function LabelsDialogContent({
       for (let index = 0; index < row.copies; index += 1) {
         const product = row.product;
         labels.push(`<div class="label">
-          ${settings.showShop ? `<div class="shop" dir="auto">${escapeHtml(data?.shopName ?? '')}</div>` : ''}
-          <div class="name" dir="auto">${escapeHtml(labelName(product))}</div>
+          ${settings.showShop ? `<div class="shop" dir="auto">${escapeLabelHtml(data?.shopName ?? '')}</div>` : ''}
+          <div class="name" dir="auto">${escapeLabelHtml(labelName(product))}</div>
           ${settings.showPrice ? `<div class="price">${formatShopMoney(Number(product.price))}</div>` : ''}
           <div class="bars">${svg.svg}</div>
-          <div class="value">${escapeHtml(row.barcode)}</div>
+          <div class="value">${escapeLabelHtml(row.barcode)}</div>
         </div>`);
       }
     }
