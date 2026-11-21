@@ -24,6 +24,11 @@ export class PrintError extends Error {
 
 export const USB_CHUNK = 4096;
 export const JOB_TIMEOUT_MS = 8000;
+/**
+ * Bound for cleaning up a wedged transport. A stuck USB IRP or serial close must
+ * not keep `processQueue` from moving to the next job.
+ */
+export const CLEANUP_TIMEOUT_MS = 1500;
 
 // --- minimal WebUSB / Web Serial shapes ---
 export type UsbEndpointLike = {
@@ -198,19 +203,22 @@ const claimed = new WeakMap<
 async function releaseUsb(
   device: UsbDeviceLike,
   state: { iface: number } | undefined,
+  cleanupMs: number,
 ): Promise<void> {
   claimed.delete(device);
   if (state) {
     try {
-      await device.releaseInterface(state.iface);
+      // releaseInterface/close can hang on a wedged IRP; a failed print must not
+      // block the queue until the tab is reloaded.
+      await withTimeout(device.releaseInterface(state.iface), cleanupMs);
     } catch {
       // Already disconnected; close below is still best-effort.
     }
   }
   try {
-    await device.close();
+    await withTimeout(device.close(), cleanupMs);
   } catch {
-    // The device may already be gone.
+    // The device may already be gone, or the driver never answered.
   }
 }
 
@@ -218,6 +226,7 @@ export async function sendUsb(
   device: UsbDeviceLike,
   bytes: Uint8Array,
   ms = JOB_TIMEOUT_MS,
+  cleanupMs = CLEANUP_TIMEOUT_MS,
 ): Promise<void> {
   // One deadline for open + claim + every chunk. Giving each chunk a fresh `ms`
   // let a slow printer stretch one job to minutes.
@@ -225,7 +234,7 @@ export async function sendUsb(
   let state = claimed.get(device);
   let cleanupPromise: Promise<void> | null = null;
   const cleanup = (): Promise<void> => {
-    cleanupPromise ??= releaseUsb(device, state);
+    cleanupPromise ??= releaseUsb(device, state, cleanupMs);
     return cleanupPromise;
   };
   const timed = <T>(promise: Promise<T>): Promise<T> => {
@@ -275,12 +284,16 @@ type SerialOptions = Pick<SerialSaved, 'baudRate' | 'flowControl'>;
 /** Options the port was opened with; a settings change closes and reopens it. */
 const serialOpen = new WeakMap<SerialPortLike, SerialOptions>();
 
-async function closeSerial(port: SerialPortLike): Promise<void> {
+async function closeSerial(
+  port: SerialPortLike,
+  closeMs = CLEANUP_TIMEOUT_MS,
+): Promise<void> {
   serialOpen.delete(port);
   try {
-    await port.close();
+    // A wedged driver must not hang the print queue; the promise is abandoned.
+    await withTimeout(port.close(), closeMs);
   } catch {
-    // Already closed or never opened.
+    // Already closed, never opened, or the driver did not answer.
   }
 }
 
@@ -289,6 +302,7 @@ export async function sendSerial(
   bytes: Uint8Array,
   options: SerialOptions,
   ms = JOB_TIMEOUT_MS,
+  cleanupMs = CLEANUP_TIMEOUT_MS,
 ): Promise<void> {
   // A raw receipt can be several KB; at 9600 baud that takes longer than the
   // fixed job timeout. Allow the wire time plus one second of device overhead.
@@ -302,17 +316,53 @@ export async function sendSerial(
       current.baudRate !== options.baudRate ||
       current.flowControl !== options.flowControl)
   )
-    await closeSerial(port);
+    await closeSerial(port, cleanupMs);
   let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  let cleanupPromise: Promise<void> | null = null;
+  /**
+   * One cleanup path, in the order the Streams API requires: abort the transfer,
+   * release the writer lock, then close the port. Calling `close()` while the
+   * writer still holds the lock rejects with "Cannot cancel a locked stream",
+   * which the old code swallowed after forgetting the port — leaving the
+   * physical serial port open.
+   */
+  const cleanup = (): Promise<void> => {
+    cleanupPromise ??= (async () => {
+      serialOpen.delete(port);
+      const held = writer;
+      writer = null;
+      try {
+        await held?.abort();
+      } catch {
+        // The stream may already be errored.
+      }
+      try {
+        held?.releaseLock();
+      } catch {
+        // abort() already released it in some browsers.
+      }
+      try {
+        await withTimeout(port.close(), cleanupMs);
+      } catch {
+        // Already closed, or the driver never answered.
+      }
+    })();
+    return cleanupPromise;
+  };
   try {
     if (!port.writable) {
-      await port.open({
-        baudRate: options.baudRate,
-        dataBits: 8,
-        stopBits: 1,
-        parity: 'none',
-        flowControl: options.flowControl,
-      });
+      // A wedged COM/USB-serial port used to hang processQueue permanently.
+      await withDeadline(
+        port.open({
+          baudRate: options.baudRate,
+          dataBits: 8,
+          stopBits: 1,
+          parity: 'none',
+          flowControl: options.flowControl,
+        }),
+        timeoutMs,
+        cleanup,
+      );
       serialOpen.set(port, {
         baudRate: options.baudRate,
         flowControl: options.flowControl,
@@ -321,23 +371,13 @@ export async function sendSerial(
     if (!port.writable) throw new PrintError('DISCONNECTED');
     writer = port.writable.getWriter();
     // A timed-out write would otherwise keep the WritableStream locked until reload.
-    await withDeadline(writer.write(bytes), timeoutMs, async () => {
-      try {
-        await writer?.abort();
-      } catch {
-        // The stream may already be errored.
-      }
-      await closeSerial(port);
-    });
+    await withDeadline(writer.write(bytes), timeoutMs, cleanup);
+    // The port stays open for the next receipt; release only the writer lock.
+    writer.releaseLock();
+    writer = null;
   } catch (err) {
-    await closeSerial(port);
+    await cleanup();
     throw mapError(err);
-  } finally {
-    try {
-      writer?.releaseLock();
-    } catch {
-      // abort() already released it in some browsers.
-    }
   }
 }
 

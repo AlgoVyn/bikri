@@ -5,6 +5,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -29,6 +30,11 @@ type cupsBackend struct {
 // queue visible while singleflight prevents one refresh per waiter.
 const cupsPrinterTTL = 10 * time.Second
 
+// cupsRefreshTimeout bounds a shared refresh. It runs independently of the
+// caller that started it (see ListPrinters): `/v1/health` leads with a 300 ms
+// deadline while a 30 s print job may be waiting on the same singleflight.
+const cupsRefreshTimeout = 15 * time.Second
+
 var (
 	requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
 	spoolIDPattern   = regexp.MustCompile(`^[A-Za-z0-9._-]+-[0-9]+$`)
@@ -47,15 +53,10 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	if b.refreshing {
 		done := b.refreshDone
 		b.printersMu.Unlock()
-		select {
-		case <-done:
-		case <-ctx.Done():
-			return nil, ctx.Err()
+		list, refreshErr, waitErr := b.wait(ctx, done)
+		if waitErr != nil {
+			return nil, waitErr
 		}
-		b.printersMu.Lock()
-		list := append([]Printer(nil), b.printers...)
-		refreshErr := b.refreshErr
-		b.printersMu.Unlock()
 		if list == nil && refreshErr != nil {
 			return nil, refreshErr
 		}
@@ -68,23 +69,62 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	stale := append([]Printer(nil), b.printers...)
 	b.printersMu.Unlock()
 
-	list, err := b.enumerate(ctx)
+	// A refresh runs independently of the caller that started it: `/v1/health`
+	// leads with a 300 ms deadline while a 30 s print job may be waiting on the
+	// same singleflight. Inheriting the first caller's ctx failed the print job
+	// when the health probe gave up.
+	go func() {
+		refreshCtx, cancel := context.WithTimeout(context.Background(), cupsRefreshTimeout)
+		defer cancel()
+		b.refresh(refreshCtx, done)
+	}()
 
-	b.printersMu.Lock()
-	if err == nil {
-		// Keep an empty result non-nil so "no printers" is cached too.
-		b.printers = append([]Printer{}, list...)
-		b.printersAt = time.Now()
+	list, refreshErr, waitErr := b.wait(ctx, done)
+	if waitErr != nil {
+		// This caller gave up; the refresh keeps running for the next waiter.
+		return nil, waitErr
 	}
-	b.refreshErr = err
-	b.refreshing = false
-	b.refreshDone = nil
-	close(done)
-	b.printersMu.Unlock()
-	if err != nil && hasStale {
+	if refreshErr != nil && hasStale {
 		return stale, nil
 	}
-	return list, err
+	return list, refreshErr
+}
+
+// wait blocks until the singleflight finishes or the caller's deadline wins.
+func (b *cupsBackend) wait(ctx context.Context, done chan struct{}) ([]Printer, error, error) {
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+	b.printersMu.Lock()
+	list := append([]Printer(nil), b.printers...)
+	refreshErr := b.refreshErr
+	b.printersMu.Unlock()
+	return list, refreshErr, nil
+}
+
+// refresh runs the enumeration and always publishes a result: a panic in a
+// waiter-visible singleflight would otherwise leave `refreshing` true and make
+// every later call block on a channel that is never closed.
+func (b *cupsBackend) refresh(ctx context.Context, done chan struct{}) (list []Printer, err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			err = &Error{Code: "CUPS_UNAVAILABLE", Message: fmt.Sprint("printer enumeration failed: ", value)}
+		}
+		b.printersMu.Lock()
+		if err == nil {
+			// Keep an empty result non-nil so "no printers" is cached too.
+			b.printers = append([]Printer{}, list...)
+			b.printersAt = time.Now()
+		}
+		b.refreshErr = err
+		b.refreshing = false
+		b.refreshDone = nil
+		close(done)
+		b.printersMu.Unlock()
+	}()
+	return b.enumerate(ctx)
 }
 
 func (b *cupsBackend) enumerate(ctx context.Context) ([]Printer, error) {
@@ -120,8 +160,17 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
 	}
 	ext := ".bin"
+	var imageHeight int
 	if job.Encoding == "png" {
 		ext = ".png"
+		// Validate here too so a direct backend caller (or a future transport)
+		// cannot hand CUPS filters an unbounded PNG. The manager also validates
+		// centrally before any backend runs.
+		_, height, err := ImageConfig(job.Data)
+		if err != nil {
+			return "", err
+		}
+		imageHeight = height
 	}
 	file, err := os.CreateTemp("", "bikri-print-*"+ext)
 	if err != nil {
@@ -149,9 +198,7 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	if job.Mode == "raw" {
 		args = append(args, "-o", "raw")
 	} else {
-		// The PNG already includes the paper-width padding; do not let CUPS
-		// fit-to-page it (which would ignore the 1:1 dot width).
-		args = append(args, "-o", "scaling=100")
+		args = append(args, cupsDriverArgs(job, imageHeight)...)
 	}
 	// `--` ends options: a file name or queue that begins with `-` can never be
 	// interpreted as another lp flag.
@@ -164,6 +211,49 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	// that value and could interpret it as an option (e.g. `-a` cancels every job).
 	// An unparsed id is uncancelable but the job has still been spooled.
 	return parseRequestID(out), nil
+}
+
+// cupsDriverArgs keeps a rendered receipt at its real dot size. CUPS `scaling`
+// is page-relative: `-o scaling=100` stretches or shrinks the PNG to the whole
+// media (an A4 queue blew a 58 mm receipt across the sheet, and a tall receipt
+// was squeezed onto one thermal page). `natural-scaling=100` keeps one image
+// pixel at the requested ppi, and a custom media height lets the driver feed the
+// whole receipt instead of fitting it to a shorter page.
+func cupsDriverArgs(job Job, heightDots int) []string {
+	ppi, media, ok := driverGeometry(job.WidthDots, heightDots, job.PaperMM)
+	if !ok {
+		return []string{"-o", "natural-scaling=100"}
+	}
+	return []string{
+		"-o", "natural-scaling=100",
+		"-o", fmt.Sprintf("ppi=%d", ppi),
+		"-o", "media=" + media,
+	}
+}
+
+// driverGeometry derives the image resolution and page length. The PNG is the
+// full paper-width dot grid (576 dots for 80 mm, 384 for 58 mm), so the physical
+// paper width fixes the ppi. Unknown or implausible values fall back to 203 dpi,
+// the common thermal head.
+func driverGeometry(widthDots, heightDots, paperMm int) (ppi int, media string, ok bool) {
+	if widthDots < 1 || heightDots < 1 {
+		return 0, "", false
+	}
+	if paperMm != 58 && paperMm != 80 {
+		paperMm = 80
+	}
+	ppi = int(math.Round(float64(widthDots) * 25.4 / float64(paperMm)))
+	if ppi < 50 || ppi > 600 {
+		ppi = 203
+	}
+	heightMM := int(math.Round(float64(heightDots) * 25.4 / float64(ppi)))
+	if heightMM < 10 {
+		heightMM = 10
+	}
+	if heightMM > 2000 {
+		heightMM = 2000
+	}
+	return ppi, fmt.Sprintf("Custom.%dx%dmm", paperMm, heightMM), true
 }
 
 func (b *cupsBackend) Status(ctx context.Context, printer, spoolID string) (Status, error) {
@@ -180,6 +270,13 @@ func (b *cupsBackend) Status(ctx context.Context, printer, spoolID string) (Stat
 		return Status{}, &Error{Code: "CUPS_UNAVAILABLE", Message: err.Error()}
 	}
 	if containsJob(active, spoolID) {
+		// A disabled queue or a fault reason (paper out, offline) would otherwise
+		// keep the till polling a job that cannot finish until the 30 s timeout.
+		if queue, err := run(ctx, "lpstat", "-p", printer); err == nil {
+			if code, detail := queueFault(queue); code != "" {
+				return Status{State: "failed", Error: code, Detail: detail}, nil
+			}
+		}
 		return Status{State: "printing"}, nil
 	}
 	// CUPS removes completed jobs from the short listing after a while. If the
@@ -198,6 +295,27 @@ func (b *cupsBackend) Cancel(ctx context.Context, printer, spoolID string) error
 		return &Error{Code: "CANCEL_FAILED", Message: err.Error()}
 	}
 	return nil
+}
+
+// queueFault maps the textual `lpstat -p` state to the same codes the spooler
+// status uses, so the until UI can say "load paper" instead of timing out.
+// CUPS documents the reasons in free text ("printer X disabled since … - out of
+// paper"), and localized output is avoided by the forced C locale in run().
+func queueFault(out string) (code, detail string) {
+	lower := strings.ToLower(out)
+	detail = strings.TrimSpace(out)
+	switch {
+	case strings.Contains(lower, "out of paper"),
+		strings.Contains(lower, "media-empty"),
+		strings.Contains(lower, "paper-empty"),
+		strings.Contains(lower, "media-jam"):
+		return "PAPER_OUT", detail
+	case strings.Contains(lower, "offline"),
+		strings.Contains(lower, "off-line"),
+		strings.Contains(lower, "disabled"):
+		return "PRINTER_OFFLINE", detail
+	}
+	return "", ""
 }
 
 // cupsEnv forces the C locale so lp/lpstat output is parseable on non-English

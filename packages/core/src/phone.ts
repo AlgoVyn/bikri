@@ -8,8 +8,8 @@ export type ParsedPhone = {
   mobile: boolean;
 };
 
-/** Karachi, Lahore, Islamabad, Faisalabad — 2-digit area codes. */
-const AREA_CODES_2 = new Set(['21', '42', '51', '61']);
+/** Karachi, Lahore, Islamabad, Faisalabad and Multan — 2-digit area codes. */
+const AREA_CODES_2 = new Set(['21', '41', '42', '51', '61']);
 
 function compact(raw: string): { plus: boolean; digits: string } | null {
   const normalised = normaliseDigits(raw);
@@ -62,7 +62,7 @@ function formatLandline(national: string): string {
 }
 
 function landlineFromNsn(nsn: string): ParsedPhone | null {
-  if (!/^\d{9,10}$/u.test(nsn) || nsn.startsWith('3')) {
+  if (!/^\d{9,10}$/u.test(nsn) || nsn.startsWith('0') || nsn.startsWith('3')) {
     return null;
   }
   const national = `0${nsn}`;
@@ -107,6 +107,7 @@ export function parsePkPhone(
     (digits.length === 11 || digits.length === 10)
   ) {
     nsn = digits.slice(1);
+    if (nsn.startsWith('0')) return null;
   } else if (digits.startsWith('3') && digits.length === 10) {
     nsn = digits;
   } else {

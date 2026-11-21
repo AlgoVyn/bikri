@@ -18,12 +18,17 @@ export async function prepareRasterFonts(
 ): Promise<void> {
   const fonts = doc.fonts;
   if (!fonts) return;
-  await Promise.all([
+  // JetBrains Mono is the receipt's ASCII face (receiptImage.ts); without it the
+  // canvas falls back to the OS monospace and the glyph grid stops matching the
+  // 48/32-column layout. The woff2 ships with the app (styles/fonts.css).
+  await Promise.allSettled([
     fonts.load('400 24px "Noto Naskh Arabic UI"'),
     fonts.load('700 24px "Noto Naskh Arabic UI"'),
     fonts.load('400 24px Inter'),
     fonts.load('700 24px Inter'),
-  ]).catch(() => undefined);
+    fonts.load('400 24px "JetBrains Mono"'),
+    fonts.load('700 24px "JetBrains Mono"'),
+  ]);
 }
 
 export function createCanvasRasterRenderer(

@@ -150,6 +150,27 @@ describe('zip', () => {
     await expect(unzip(bytes)).rejects.toBeInstanceOf(ZipError);
   });
 
+  it('refuses an archive over the total decompressed cap', async () => {
+    const bytes = zipStore([
+      { name: 'a.json', data: text.encode('12345') },
+      { name: 'b.json', data: text.encode('12345') },
+    ]);
+    await expect(unzip(bytes, { maxTotalBytes: 8 })).rejects.toBeInstanceOf(
+      ZipError,
+    );
+  });
+
+  it('skips excluded entries without reading them', async () => {
+    const bytes = zipStore([
+      { name: 'json/sales.json', data: text.encode('[]') },
+      { name: 'csv/sales.csv', data: text.encode('a,b') },
+    ]);
+    const entries = await unzip(bytes, {
+      include: (name) => name.endsWith('.json'),
+    });
+    expect(entries.map((entry) => entry.name)).toEqual(['json/sales.json']);
+  });
+
   it('refuses a truncated archive and a bad CRC', async () => {
     await expect(unzip(new Uint8Array([1, 2, 3, 4]))).rejects.toBeInstanceOf(
       ZipError,

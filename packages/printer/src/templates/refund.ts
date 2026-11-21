@@ -7,6 +7,7 @@ import { formatColumnHeader, resolvePaper } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
   labelsFrom,
+  pushBundleComponent,
   pushCenter,
   pushFooter,
   pushJobEnd,
@@ -91,14 +92,12 @@ export function buildRefundReceipt(
         bold: true,
       });
       for (const component of line.bundle.components) {
-        const qty = formatItemCount(component.qtyMilli);
-        blocks.push({
-          t: 'item',
-          name: `  ${component.name.trim()}`,
-          qty,
-          amount: '',
-          breakdown: ` ${qty}`,
-        });
+        pushBundleComponent(
+          blocks,
+          component.name,
+          formatItemCount(component.qtyMilli),
+          paper.itemLayout,
+        );
       }
       continue;
     }

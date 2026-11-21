@@ -51,11 +51,16 @@ export function compareCatalogs(
   }
   const locales = [...flat.keys()];
   const reference = flat.get('en');
-  const placeholders = (text: string) =>
-    [...text.matchAll(/\{\{\s*([\w.]+)\s*\}\}/gu)]
+  const placeholders = (text: string) => {
+    const matches = [...text.matchAll(/\{\{\s*([\w.]+)\s*\}\}/gu)];
+    if (/[{}]/u.test(text.replace(/\{\{\s*[\w.]+\s*\}\}/gu, ''))) {
+      return 'malformed-braces';
+    }
+    return matches
       .map((match) => match[1])
       .sort()
       .join(',');
+  };
   for (const key of [...union].sort()) {
     for (const locale of locales) {
       const map = flat.get(locale);
@@ -89,11 +94,68 @@ export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
     const catalogs: Record<string, unknown> = {};
     for (const locale of LOCALE_FILES) {
       const file = resolve(dir, `${locale}.json`);
-      catalogs[locale] = JSON.parse(await readFile(file, 'utf8')) as unknown;
+      const text = await readFile(file, 'utf8');
+      for (const duplicate of duplicateJsonKeys(text)) {
+        errors.push(`${label}${locale}: duplicate key ${duplicate}`);
+      }
+      catalogs[locale] = JSON.parse(text) as unknown;
     }
     errors.push(...compareCatalogs(catalogs).map((e) => `${label}${e}`));
   }
   return errors.sort();
+}
+
+/**
+ * Finds duplicate object keys in raw JSON. `JSON.parse` keeps only the last one, so a
+ * duplicated translation silently disappears from the catalog otherwise.
+ */
+export function duplicateJsonKeys(text: string): string[] {
+  const duplicates: string[] = [];
+  const stack: Array<Set<string> | null> = [];
+  let inString = false;
+  let escaped = false;
+  let token = '';
+  const checkKey = (value: string, end: number): void => {
+    let at = end;
+    while (at < text.length && /\s/u.test(text[at] ?? '')) at += 1;
+    if (text[at] !== ':') return;
+    const keys = stack.at(-1);
+    if (!keys) return;
+    if (keys.has(value)) duplicates.push(value);
+    else keys.add(value);
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i] ?? '';
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        token += ch;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+        checkKey(token, i + 1);
+      } else {
+        token += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      token = '';
+    } else if (ch === '{') {
+      stack.push(new Set<string>());
+    } else if (ch === '[') {
+      stack.push(null);
+    } else if (ch === '}' || ch === ']') {
+      stack.pop();
+    }
+  }
+  return duplicates;
 }
 
 const entry = process.argv[1];

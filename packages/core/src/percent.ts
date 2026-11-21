@@ -9,7 +9,7 @@ export function parsePercentToBp(raw: string): number | null {
   const text = normaliseNumericText(raw)
     .trim()
     .replace('\u2212', '-')
-    .replace('%', '')
+    .replace(/%$/u, '')
     .replaceAll(',', '')
     .replaceAll(' ', '');
   const match = /^([+-]?)(\d*)(?:\.(\d*))?$/u.exec(text);
@@ -17,10 +17,12 @@ export function parsePercentToBp(raw: string): number | null {
   const whole = match[2] ?? '';
   const fraction = match[3] ?? '';
   if (whole === '' && fraction === '') return null;
+  if (fraction.length > 3) return null;
   const integer = Number(whole || '0');
   if (!Number.isSafeInteger(integer)) return null;
   const hundredths = Number(`${fraction}00`.slice(0, 2));
   const roundUp = Number(fraction.slice(2, 3) || '0') >= 5;
   const bp = integer * 100 + hundredths + (roundUp ? 1 : 0);
-  return match[1] === '-' ? -bp : bp;
+  if (!Number.isSafeInteger(bp)) return null;
+  return match[1] === '-' && bp !== 0 ? -bp : bp;
 }

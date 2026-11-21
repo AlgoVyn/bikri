@@ -43,9 +43,10 @@ describe('parsePkPhone', () => {
     });
     expect(parsePkPhone('0413123456', 'any')).toEqual({
       e164: '+92413123456',
-      display: '0413 123456',
+      display: '041 3123456',
       mobile: false,
     });
+    expect(parsePkPhone('0012345678', 'any')).toBeNull();
   });
 
   it('offers WhatsApp only for mobile numbers', () => {

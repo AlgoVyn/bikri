@@ -4,7 +4,7 @@
  */
 import type { SyncedRow } from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
-import { applyLedgerEntry, applyStockMovements } from '../data/caches.ts';
+import { applyLedgerEntries, applyStockMovements } from '../data/caches.ts';
 import { isPulledTable } from './tables.ts';
 
 export type ServerRow = { tbl: string; row: SyncedRow };
@@ -89,12 +89,25 @@ async function withRefundDates(
   const refundIds = [
     ...new Set(lineRows.map((entry) => String(entry.row.refund_id))),
   ];
-  const refunds = (await (
-    tx.table('refunds') as Table<SyncedRow, string>
-  ).bulkGet(refundIds)) as (SyncedRow | undefined)[];
   const dates = new Map<string, string>();
-  for (const refund of refunds)
-    if (refund) dates.set(String(refund.id), String(refund.business_date));
+  // The refund header and its lines normally arrive on the same pull page, before
+  // either is written. Read the incoming refunds first; the table lookup alone used
+  // to miss them and store every line without its business_date.
+  for (const entry of rows) {
+    if (entry.tbl !== 'refunds') continue;
+    const id = entry.row.id;
+    const date = entry.row.business_date;
+    if (typeof id === 'string' && typeof date === 'string' && date !== '')
+      dates.set(id, date);
+  }
+  const missing = refundIds.filter((id) => !dates.has(id));
+  if (missing.length > 0) {
+    const refunds = (await (
+      tx.table('refunds') as Table<SyncedRow, string>
+    ).bulkGet(missing)) as (SyncedRow | undefined)[];
+    for (const refund of refunds)
+      if (refund) dates.set(String(refund.id), String(refund.business_date));
+  }
   if (dates.size === 0) return rows;
   return rows.map((entry) => {
     if (entry.tbl !== 'refund_lines') return entry;
@@ -250,8 +263,7 @@ export async function mergeRows(
           Number(a.created_at ?? 0) - Number(b.created_at ?? 0) ||
           String(a.id).localeCompare(String(b.id)),
       );
-      for (const row of ordered)
-        await applyLedgerEntry({ table: (name) => tx.table(name) }, row);
+      await applyLedgerEntries({ table: (name) => tx.table(name) }, ordered);
     }
   }
   return applied.length;

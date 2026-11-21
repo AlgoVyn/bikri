@@ -120,4 +120,29 @@ describe('logo preparation (06 §6)', () => {
     );
     expect([small.width, small.height]).toEqual([10, 5]);
   });
+
+  it('rejects a NaN target and a truncated same-size gray buffer', () => {
+    expect(() =>
+      scaleToFit(
+        gray(4, 4, () => 0),
+        Number.NaN,
+        10,
+      ),
+    ).toThrow();
+    expect(() =>
+      scaleToFit(
+        gray(4, 4, () => 0),
+        Number.POSITIVE_INFINITY,
+        10,
+      ),
+    ).toThrow();
+    // The same-size fast path used to return the short buffer as-is.
+    expect(() =>
+      scaleToFit(
+        { width: 4, height: 4, data: new Uint8Array(4), format: 'gray' },
+        10,
+        10,
+      ),
+    ).toThrow();
+  });
 });

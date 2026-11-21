@@ -84,7 +84,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 		}()
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
-		if !validHost(r.Host) {
+		if !s.validHost(r) {
 			writeError(w, http.StatusForbidden, "FORBIDDEN_HOST", "invalid Host header")
 			return
 		}
@@ -127,15 +127,34 @@ func (s *Server) allowedOrigin(origin, host string) bool {
 			return true
 		}
 	}
+	// --allow-origin values are for this run only and are never persisted.
+	for _, allowed := range s.cfg.TransientOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
 	return false
 }
 
-func validHost(hostport string) bool {
-	host := hostport
-	if h, _, err := net.SplitHostPort(hostport); err == nil {
-		host = h
+// validHost accepts only a loopback host on the port this server is actually
+// listening on (14 §7). Discarding the port let a DNS-rebinding page reach the
+// agent through any other local port; the request context carries the bound
+// address, so tests and an overridden -port both keep working.
+func (s *Server) validHost(r *http.Request) bool {
+	host, port, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		return false
 	}
-	return host == "127.0.0.1" || host == "localhost" || host == "::1" || host == "[::1]"
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" && host != "[::1]" {
+		return false
+	}
+	expected := strconv.Itoa(s.cfg.Port)
+	if local, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if _, localPort, err := net.SplitHostPort(local.String()); err == nil {
+			expected = localPort
+		}
+	}
+	return port == expected
 }
 
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -187,7 +206,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 	if !s.limits.allow("pair:"+remoteIP(r.RemoteAddr), 5) {
-		writeError(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "too many pairing attempts")
+		writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many pairing attempts; try again in a minute")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
@@ -196,24 +215,26 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 		ClientName string `json:"clientName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if tooLarge(w, err) {
+			return
+		}
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid JSON body")
 		return
 	}
-	token, err := s.auth.Pair(strings.TrimSpace(body.Code))
+	token, err := s.auth.PairAndPersist(s.cfgPath, strings.TrimSpace(body.Code))
 	if err != nil {
 		switch {
 		case errors.Is(err, errAlreadyPaired):
 			writeError(w, http.StatusConflict, "ALREADY_PAIRED", "this agent is already paired")
 		case errors.Is(err, errTooManyTries):
 			writeError(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "too many pairing attempts")
-		default:
+		case errors.Is(err, errBadCode):
 			writeError(w, http.StatusUnauthorized, "PAIRING_CODE", "the pairing code is wrong or expired")
+		default:
+			// The token was rolled back with the failed write, so the agent stays
+			// unpaired and the code remains usable.
+			writeError(w, http.StatusInternalServerError, "CONFIG_ERROR", err.Error())
 		}
-		return
-	}
-	if err := s.auth.Persist(s.cfgPath); err != nil {
-		s.auth.Unpair()
-		writeError(w, http.StatusInternalServerError, "CONFIG_ERROR", err.Error())
 		return
 	}
 	s.log.Info("agent paired", "client", body.ClientName)
@@ -224,8 +245,7 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) unpair(w http.ResponseWriter, r *http.Request) {
-	s.auth.Unpair()
-	if err := s.auth.Persist(s.cfgPath); err != nil {
+	if err := s.auth.UnpairAndPersist(s.cfgPath); err != nil {
 		writeError(w, http.StatusInternalServerError, "CONFIG_ERROR", err.Error())
 		return
 	}
@@ -239,8 +259,7 @@ func (s *Server) uiUnpair(w http.ResponseWriter, r *http.Request) {
 	if !s.validUIAction(w, r) {
 		return
 	}
-	s.auth.Unpair()
-	if err := s.auth.Persist(s.cfgPath); err != nil {
+	if err := s.auth.UnpairAndPersist(s.cfgPath); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -262,6 +281,10 @@ func (s *Server) validUIAction(w http.ResponseWriter, r *http.Request) bool {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := r.ParseForm(); err != nil {
+		if bodyTooLarge(err) {
+			http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
+			return false
+		}
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return false
 	}
@@ -306,6 +329,9 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	var req JobRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
+		if tooLarge(w, err) {
+			return
+		}
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid JSON body: "+err.Error())
 		return
 	}
@@ -425,6 +451,22 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+// bodyTooLarge reports a MaxBytesReader rejection.
+func bodyTooLarge(err error) bool {
+	var max *http.MaxBytesError
+	return errors.As(err, &max)
+}
+
+// tooLarge writes the 413 the API documents (14 §6 lists PAYLOAD_TOO_LARGE)
+// instead of the generic 400 a decoder error would produce.
+func tooLarge(w http.ResponseWriter, err error) bool {
+	if !bodyTooLarge(err) {
+		return false
+	}
+	writeError(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "the request body is too large")
+	return true
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

@@ -61,7 +61,9 @@ func main() {
 	for _, origin := range strings.Split(*allowOrigin, ",") {
 		origin = strings.TrimSpace(origin)
 		if origin != "" {
-			cfg.Origins = append(cfg.Origins, origin)
+			// Development-only: kept in memory for this run, never persisted
+			// into config.json (14 §7).
+			cfg.TransientOrigins = append(cfg.TransientOrigins, origin)
 		}
 	}
 
@@ -69,7 +71,10 @@ func main() {
 	logger, closeLog := newLogger(logPath)
 	defer closeLog()
 	var crashLog *os.File
-	if crash, err := os.OpenFile(agent.CrashLogPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600); err == nil {
+	// Append: systemd (Restart=on-failure) and launchd (KeepAlive) restart the
+	// agent immediately after a panic, and O_TRUNC erased the stack trace of the
+	// crash that caused the restart before anyone could read it.
+	if crash, err := os.OpenFile(agent.CrashLogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 		// Keep the file open for the process lifetime; the runtime writes to
 		// this descriptor on a fatal error and does not own/close it.
 		if err := debug.SetCrashOutput(crash, debug.CrashOptions{}); err == nil {
@@ -139,7 +144,7 @@ func main() {
 }
 
 func newLogger(logPath string) (*slog.Logger, func()) {
-	writers := []io.Writer{os.Stderr}
+	var writers fanoutWriter
 	var logFile *rotatingWriter
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0o700); err == nil {
@@ -148,15 +153,41 @@ func newLogger(logPath string) (*slog.Logger, func()) {
 		// agent cannot grow agent.log without bound.
 		if writer, err := newRotatingWriter(logPath, 5<<20); err == nil {
 			logFile = writer
+			// The file is the durable sink, so it is written first: a broken
+			// console must not cost the line.
 			writers = append(writers, writer)
 		}
 	}
-	handler := slog.NewJSONHandler(io.MultiWriter(writers...), &slog.HandlerOptions{Level: slog.LevelInfo})
+	// A Windows -H=windowsgui binary has no console handle and every stderr
+	// write fails; leaving it in the fan-out kept agent.log empty in production.
+	if stderrUsable() {
+		writers = append(writers, os.Stderr)
+	}
+	handler := slog.NewJSONHandler(writers, &slog.HandlerOptions{Level: slog.LevelInfo})
 	return slog.New(handler), func() {
 		if logFile != nil {
 			_ = logFile.Close()
 		}
 	}
+}
+
+// stderrUsable reports whether os.Stderr is a real file handle. GUI-subsystem
+// Windows builds and a closed Unix stderr pipe both fail this.
+func stderrUsable() bool {
+	_, err := os.Stderr.Stat()
+	return err == nil
+}
+
+// fanoutWriter writes each log line to every sink and never stops early. io.MultiWriter
+// aborts at the first error, which is exactly what hid every agent.log line when
+// stderr was unusable.
+type fanoutWriter []io.Writer
+
+func (w fanoutWriter) Write(p []byte) (int, error) {
+	for _, out := range w {
+		_, _ = out.Write(p)
+	}
+	return len(p), nil
 }
 
 // rotatingWriter appends to a diagnostic log and rotates it once it reaches max
@@ -167,7 +198,16 @@ type rotatingWriter struct {
 	max  int64
 	file *os.File
 	size int64
+	// After a transient open/rename failure, back off instead of turning every
+	// log line into another failing syscall.
+	retryAt  time.Time
+	rotateAt time.Time
 }
+
+const (
+	logReopenBackoff = 2 * time.Second
+	logRotateBackoff = time.Minute
+)
 
 func newRotatingWriter(path string, max int64) (*rotatingWriter, error) {
 	writer := &rotatingWriter{path: path, max: max}
@@ -195,20 +235,41 @@ func (w *rotatingWriter) open() error {
 func (w *rotatingWriter) rotateLocked() {
 	_ = w.file.Close()
 	w.file = nil
+	w.size = 0
 	_ = os.Remove(w.path + ".1")
-	_ = os.Rename(w.path, w.path+".1")
-	_ = w.open()
+	if err := os.Rename(w.path, w.path+".1"); err != nil {
+		// Windows AV/scanners can hold the log file and fail the rename. Keep
+		// appending to the existing file instead of losing lines, and retry the
+		// rotation later rather than on every write.
+		w.rotateAt = time.Now().Add(logRotateBackoff)
+		if openErr := w.open(); openErr != nil {
+			w.retryAt = time.Now().Add(logReopenBackoff)
+		}
+		return
+	}
+	w.rotateAt = time.Time{}
+	if err := w.open(); err != nil {
+		w.retryAt = time.Now().Add(logReopenBackoff)
+	}
 }
 
 func (w *rotatingWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.file == nil {
-		return 0, os.ErrClosed
+		now := time.Now()
+		if now.Before(w.retryAt) {
+			return 0, os.ErrClosed
+		}
+		if err := w.open(); err != nil {
+			w.retryAt = now.Add(logReopenBackoff)
+			return 0, err
+		}
+		w.retryAt = time.Time{}
 	}
 	// Rotate before the write that would cross the limit; a single oversized line
 	// still lands in the fresh file instead of being dropped.
-	if w.size > 0 && w.size+int64(len(p)) > w.max {
+	if w.size > 0 && w.size+int64(len(p)) > w.max && time.Now().After(w.rotateAt) {
 		w.rotateLocked()
 		if w.file == nil {
 			return 0, os.ErrClosed

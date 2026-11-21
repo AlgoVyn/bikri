@@ -197,7 +197,7 @@
       "title_plain": "Raqam wapas",
       "choose_reason": "Jaari rakhne ke liye wajah aur miqdar chunein.",
       "bundle_sold": "{{qty}} bundle bike",
-      "bundle_sold_one": "{{qty}} bundle bike",
+      "bundle_sold_one": "{{qty}} bundle bika",
       "bundle_sold_other": "{{qty}} bundle bike",
       "bundle_already": "pehle {{qty}} wapas",
       "bundle_qty": "Wapas karne ke bundle",

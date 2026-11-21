@@ -381,6 +381,24 @@ describe('caches (02 §3.1, §3.2)', () => {
     });
   });
 
+  it('recomputes a party once when one action inserts several entries', async () => {
+    const db = freshDb();
+    await writeAction(db, (w) =>
+      w.insert('ledger_entries', entry('l1', 'c1', 1000, 100)),
+    );
+    await writeAction(db, (w) =>
+      w.insertMany('ledger_entries', [
+        entry('l2', 'c1', -400, 200),
+        entry('l3', 'c1', 600, 300),
+      ]),
+    );
+    expect(await db.party_balances.get(['customer', 'c1'])).toMatchObject({
+      balance: 1200,
+      oldest_unpaid_at: 100,
+      last_activity_at: 300,
+    });
+  });
+
   it('rebuilds both caches from movements and ledger entries', async () => {
     const db = freshDb();
     await writeAction(db, async (w) => {
