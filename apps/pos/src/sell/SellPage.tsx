@@ -2,7 +2,14 @@ import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -149,9 +156,12 @@ export function SellPage() {
   }, [cart.lines]);
   const prefix = parseQtyPrefix(query);
   const term = prefix ? prefix.rest : query;
+  // The barcode/scanner Enter path reads the input value synchronously; only the
+  // visible grid filtering is deferred, so a fast scan never waits for a paint.
+  const deferredTerm = useDeferredValue(term);
   const results = useMemo(
-    () => (rows ? filterRows(rows, term) : []),
-    [rows, term],
+    () => (rows ? filterRows(rows, deferredTerm) : []),
+    [rows, deferredTerm],
   );
   const stock = useMemo(
     () => new Map((rows ?? []).map((r) => [r.product.id, r.onHand])),
@@ -647,10 +657,12 @@ export function SellPage() {
       [cart.backdate?.staff_id],
     ) ?? '';
   const holdLabel =
-    customerName ||
-    t('sell.held_default', {
-      time: timeOf(Date.now(), i18n.language, timeZone),
-    });
+    dialog === 'hold'
+      ? customerName ||
+        t('sell.held_default', {
+          time: timeOf(Date.now(), i18n.language, timeZone),
+        })
+      : '';
 
   const onHold = async (label: string) => {
     await cartsSettled();
@@ -683,6 +695,34 @@ export function SellPage() {
     setSelected(null);
     setExpanded(null);
   };
+
+  // Stable identities keep the memoized grid and cart from re-rendering on every
+  // search keystroke; each wrapper always calls the latest closure.
+  const stableOnAdd = useStableCallback(addRow);
+  const stableOnTab = useStableCallback(tab);
+  const stableOnChangeLine = useStableCallback(
+    (key: string, patch: Partial<CartLine>) => {
+      void mutate((c) => updateLine(c, key, patch));
+    },
+  );
+  const stableOnRemoveLine = useStableCallback(removeLineByKey);
+  const stableOnPriceChange = useStableCallback(onPriceChange);
+  const stableOnBundleQty = useStableCallback((group: string, qty: number) => {
+    void changeBundleQty(group, qty);
+  });
+  const stableOnBundlePrice = useStableCallback(changeBundlePrice);
+  const stableOnBundleDiscount = useStableCallback(changeBundleDiscount);
+  const stableOnRemoveBundle = useStableCallback(removeBundleByGroup);
+  const stableOnCustomer = useStableCallback(() => setDialog('customer'));
+  const stableOnRemarks = useStableCallback(() => setDialog('remarks'));
+  const stableOnBillDiscount = useStableCallback(() => setDialog('discount'));
+  const stableOpenHold = useStableCallback(() => setDialog('hold'));
+  const stableOnClear = useStableCallback(askClear);
+  const stableOnPay = useStableCallback(() => {
+    void takePayment();
+  });
+  const stableOnAddItem = useStableCallback(focusSearch);
+  const stableOnHeld = useStableCallback(() => setDialog('held'));
 
   // --- hotkeys (screens/05) ---
   const ready = dialog === null && override === null;
@@ -983,7 +1023,7 @@ export function SellPage() {
             <ProductGrid
               rows={results}
               highlighted={highlight}
-              onAdd={addRow}
+              onAdd={stableOnAdd}
               scrollRef={scrollRef}
               cartQty={cartQty}
             />
@@ -1052,7 +1092,7 @@ export function SellPage() {
           <CartPanel
             carts={carts}
             active={active}
-            onTab={tab}
+            onTab={stableOnTab}
             cart={cart}
             totals={totals}
             money={money}
@@ -1061,28 +1101,26 @@ export function SellPage() {
             onSelect={setSelected}
             expanded={expanded}
             onExpand={setExpanded}
-            onChangeLine={(key, patch) =>
-              void mutate((c) => updateLine(c, key, patch))
-            }
-            onRemoveLine={removeLineByKey}
-            onPriceChange={onPriceChange}
-            onBundleQty={(group, qty) => void changeBundleQty(group, qty)}
-            onBundlePrice={changeBundlePrice}
-            onBundleDiscount={changeBundleDiscount}
-            onRemoveBundle={removeBundleByGroup}
+            onChangeLine={stableOnChangeLine}
+            onRemoveLine={stableOnRemoveLine}
+            onPriceChange={stableOnPriceChange}
+            onBundleQty={stableOnBundleQty}
+            onBundlePrice={stableOnBundlePrice}
+            onBundleDiscount={stableOnBundleDiscount}
+            onRemoveBundle={stableOnRemoveBundle}
             showCost={money.show_cost_on_till && can('cost.view')}
-            onCustomer={() => setDialog('customer')}
-            onRemarks={() => setDialog('remarks')}
-            onBillDiscount={() => setDialog('discount')}
-            onHold={() => setDialog('hold')}
-            onClear={askClear}
-            onPay={() => void takePayment()}
-            onAddItem={focusSearch}
-            onHeld={() => setDialog('held')}
+            onCustomer={stableOnCustomer}
+            onRemarks={stableOnRemarks}
+            onBillDiscount={stableOnBillDiscount}
+            onHold={stableOpenHold}
+            onClear={stableOnClear}
+            onPay={stableOnPay}
+            onAddItem={stableOnAddItem}
+            onHeld={stableOnHeld}
             heldCount={heldCount}
             backdate={cart.backdate ?? null}
             backdateStaffName={backdateStaffName}
-            onCancelBackdate={askClear}
+            onCancelBackdate={stableOnClear}
             cartOrder={prefs?.cartOrder ?? 'newest_first'}
           />
         ) : null}
@@ -1197,4 +1235,17 @@ export function SellPage() {
       />
     </div>
   );
+}
+
+/**
+ * A stable function identity whose body always reads the latest closure. Passing
+ * these to a memoized child avoids re-rendering it for every search keystroke while
+ * keeping the handler's state (cart, dialogs, permissions) fresh.
+ */
+function useStableCallback<Args extends unknown[], Result>(
+  fn: (...args: Args) => Result,
+): (...args: Args) => Result {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useCallback((...args: Args) => ref.current(...args), []);
 }

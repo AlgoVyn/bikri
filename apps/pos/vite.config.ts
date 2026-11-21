@@ -96,6 +96,71 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
+        // Rolldown's default automatic splitting produced 200+ micro-chunks (many
+        // under 1 KB), which cost a request/header/ES-module link per file. Group the
+        // vendor families and let the small-chunk threshold merge the rest; route
+        // code and the operator console stay separate (see chunkFileNames).
+        codeSplitting: {
+          minSize: 12_000,
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 40,
+            },
+            {
+              name: 'vendor-router',
+              test: /node_modules[\\/]@tanstack[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'vendor-dexie',
+              test: /node_modules[\\/]dexie[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'vendor-i18n',
+              test: /node_modules[\\/](i18next|react-i18next)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'vendor-radix',
+              test: /node_modules[\\/]@radix-ui[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'vendor',
+              test: /node_modules[\\/]/,
+              priority: 10,
+              minSize: 20_000,
+            },
+            {
+              // All modules the shell statically needs, except the entry module.
+              // main.tsx has a top-level `await initI18n()`; if it shared a chunk
+              // with modules a lazy chunk imports, that lazy chunk would wait on an
+              // entry chunk that is itself waiting for the lazy import (deadlock).
+              name: (moduleId) =>
+                moduleId.includes('/src/main.tsx') ? null : 'app-shared',
+              tags: ['$initial'],
+              priority: 4,
+              minSize: 0,
+            },
+            {
+              // Lazy feature modules: one chunk per source area instead of one per
+              // module. The operator console stays automatic so it can live under
+              // assets/admin and remain excluded from the offline precache.
+              name: (moduleId) => {
+                if (/\/src\/(admin|routes\/admin)\//u.test(moduleId))
+                  return null;
+                const match = /\/src\/([a-z0-9]+)\//u.exec(moduleId);
+                return match ? `app-${match[1]}` : null;
+              },
+              test: /\/src\//,
+              priority: 3,
+              minSize: 8_000,
+            },
+          ],
+        },
         // Keep operator-console code in its own folder so the service worker can
         // exclude it from the till precache. Route chunks in `_id.lazy-*` share a
         // generic name with shop routes; module ids are the only reliable marker.
