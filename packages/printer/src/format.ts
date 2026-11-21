@@ -74,11 +74,32 @@ export function formatReceiptDate(
   epochMs: number,
   timeZone = 'Asia/Karachi',
 ): string {
-  const parts = dateFormatter(timeZone).formatToParts(new Date(epochMs));
-  const read = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === type)?.value ?? '';
-  const hour = read('hour') === '24' ? '00' : read('hour');
-  return `${read('day')}-${read('month')}-${read('year')} ${hour}:${read('minute')}`;
+  let day = '';
+  let month = '';
+  let year = '';
+  let hour = '';
+  let minute = '';
+  for (const part of dateFormatter(timeZone).formatToParts(new Date(epochMs))) {
+    switch (part.type) {
+      case 'day':
+        day = part.value;
+        break;
+      case 'month':
+        month = part.value;
+        break;
+      case 'year':
+        year = part.value;
+        break;
+      case 'hour':
+        hour = part.value;
+        break;
+      case 'minute':
+        minute = part.value;
+        break;
+    }
+  }
+  if (hour === '24') hour = '00';
+  return `${day}-${month}-${year} ${hour}:${minute}`;
 }
 
 /** `YYYY-MM-DD` → `DD-MM-YYYY`. Anything else is returned unchanged. */

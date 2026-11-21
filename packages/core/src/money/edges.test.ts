@@ -82,6 +82,7 @@ describe('allocate', () => {
 
   it('rejects a negative or non-integer weight', () => {
     expect(() => allocate(1, [-1])).toThrow(RangeError);
+    expect(() => allocate(0, [1, -1])).toThrow(RangeError);
     expect(() => allocate(1.5, [1])).toThrow(RangeError);
     expect(() => allocate(1, [1.5])).toThrow(RangeError);
   });

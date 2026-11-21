@@ -44,7 +44,6 @@ export function businessDate(
   now: number,
   timeZone = DEFAULT_TIME_ZONE,
 ): string {
-  const parts = dateFormatter(timeZone).formatToParts(new Date(now));
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
+  // en-CA formats as YYYY-MM-DD, so the ISO business date needs no parts lookup.
+  return dateFormatter(timeZone).format(new Date(now));
 }

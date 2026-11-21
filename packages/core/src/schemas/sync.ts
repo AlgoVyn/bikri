@@ -150,12 +150,20 @@ export const LOCAL_ONLY_COLUMNS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** `row` for an op: drops tenant_id, rev, server-managed and till-only columns. */
+const DROP_BY_TABLE: Readonly<Record<SyncedTable, ReadonlySet<string>>> =
+  Object.fromEntries(
+    [...MASTER_TABLES, ...LEDGER_TABLES].map((tbl) => [
+      tbl,
+      new Set([
+        ...(SERVER_MANAGED_COLUMNS['*'] ?? []),
+        ...(SERVER_MANAGED_COLUMNS[tbl] ?? []),
+        ...(LOCAL_ONLY_COLUMNS[tbl] ?? []),
+      ]),
+    ]),
+  ) as unknown as Record<SyncedTable, ReadonlySet<string>>;
+
 export function opRow(tbl: SyncedTable, row: OpRow): OpRow {
-  const drop = new Set([
-    ...(SERVER_MANAGED_COLUMNS['*'] ?? []),
-    ...(SERVER_MANAGED_COLUMNS[tbl] ?? []),
-    ...(LOCAL_ONLY_COLUMNS[tbl] ?? []),
-  ]);
+  const drop = DROP_BY_TABLE[tbl];
   const out: OpRow = {};
   for (const [key, value] of Object.entries(row)) {
     if (!drop.has(key)) out[key] = value;

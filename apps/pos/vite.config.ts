@@ -91,6 +91,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA(pwaOptions),
   ],
+  // Module workers keep their dynamic imports (sheet parsers) as separate lazy chunks
+  // and can use the same ES chunk format as the main app instead of a classic IIFE.
+  worker: { format: 'es' },
   build: {
     outDir: `dist${BASE_PATH}`,
     emptyOutDir: true,
@@ -165,19 +168,25 @@ export default defineConfig({
         // exclude it from the till precache. Route chunks in `_id.lazy-*` share a
         // generic name with shop routes; module ids are the only reliable marker.
         chunkFileNames: (chunk) => {
-          // Only dynamic route entry chunks that live in the operator console are moved
-          // out of the PWA precache. Shared chunks (for example `app`) can contain both
-          // admin and shop modules; moving those under assets/admin would make the shop
-          // offline start depend on a chunk the service worker intentionally skipped.
+          // Only dynamic route entry chunks that live in the operator console or the
+          // online-only public pages are moved out of the PWA precache. Shared chunks
+          // (for example `app`) can contain shop modules; moving those under assets/admin
+          // would make the shop offline start depend on a chunk the service worker
+          // intentionally skipped.
           const facade = chunk.facadeModuleId ?? '';
           const admin =
             chunk.isDynamicEntry &&
             (facade.includes('/src/routes/admin') ||
               facade.includes('/src/admin/') ||
               facade.includes('/packages/i18n/admin/'));
-          return admin
-            ? 'assets/admin/[name]-[hash].js'
-            : 'assets/[name]-[hash].js';
+          const publicPage =
+            chunk.isDynamicEntry &&
+            (facade.includes('/src/routes/request') ||
+              facade.includes('/src/public/') ||
+              facade.includes('/packages/i18n/public/'));
+          if (admin) return 'assets/admin/[name]-[hash].js';
+          if (publicPage) return 'assets/public/[name]-[hash].js';
+          return 'assets/[name]-[hash].js';
         },
       },
     },

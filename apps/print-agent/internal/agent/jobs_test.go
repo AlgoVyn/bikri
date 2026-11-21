@@ -77,12 +77,18 @@ func validRequest() JobRequest {
 	}
 }
 
+// submitJob keeps the table-style tests on a value while exercising the
+// ownership-taking Submit used by the HTTP handler.
+func submitJob(manager *Manager, req JobRequest) (*JobStatus, error) {
+	return manager.Submit(context.Background(), &req)
+}
+
 func TestManagerMarksSynchronousPrintDone(t *testing.T) {
 	// Driver-mode Windows (and CUPS without a request id) return no spool id after
 	// the document has already been accepted; the till must not poll and wait.
 	fake := &fakeBackend{spoolID: ""}
 	manager := NewManager(fake)
-	job, err := manager.Submit(context.Background(), validRequest())
+	job, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,17 +97,28 @@ func TestManagerMarksSynchronousPrintDone(t *testing.T) {
 	}
 }
 
+func TestManagerClearsPayloadAfterDecode(t *testing.T) {
+	manager := NewManager(&fakeBackend{spoolID: "42"})
+	req := validRequest()
+	if _, err := manager.Submit(context.Background(), &req); err != nil {
+		t.Fatal(err)
+	}
+	if req.Data != "" {
+		t.Fatalf("encoded payload = %q, want it cleared", req.Data)
+	}
+}
+
 func TestManagerSubmitIsIdempotent(t *testing.T) {
 	fake := &fakeBackend{spoolID: "42", status: backend.Status{State: "done"}}
 	manager := NewManager(fake)
-	first, err := manager.Submit(context.Background(), validRequest())
+	first, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.Status != "spooled" {
 		t.Fatalf("status = %s", first.Status)
 	}
-	second, err := manager.Submit(context.Background(), validRequest())
+	second, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +137,7 @@ func TestManagerSubmitIsIdempotent(t *testing.T) {
 func TestManagerStoresBackendFailure(t *testing.T) {
 	fake := &fakeBackend{printErr: &backend.Error{Code: "RAW_UNSUPPORTED", Message: "no raw"}}
 	manager := NewManager(fake)
-	job, err := manager.Submit(context.Background(), validRequest())
+	job, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +152,7 @@ func TestManagerRejectsUnknownPrinter(t *testing.T) {
 		printers: []backend.Printer{{Name: "Office"}},
 	}
 	manager := NewManager(fake)
-	job, err := manager.Submit(context.Background(), validRequest())
+	job, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +170,7 @@ func TestManagerFailsClosedWhenEnumerationFails(t *testing.T) {
 		printersErr: errors.New("cups unavailable"),
 	}
 	manager := NewManager(fake)
-	job, err := manager.Submit(context.Background(), validRequest())
+	job, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +193,7 @@ func TestManagerValidatesJobIDAndPrinter(t *testing.T) {
 	} {
 		req := validRequest()
 		update(&req)
-		if _, err := manager.Submit(context.Background(), req); err == nil {
+		if _, err := submitJob(manager, req); err == nil {
 			t.Fatalf("invalid request was accepted: %+v", req)
 		}
 	}
@@ -187,7 +204,7 @@ func TestManagerCapsJobs(t *testing.T) {
 	for i := 0; i < maxJobs+5; i++ {
 		req := validRequest()
 		req.JobID = "job-" + leftPad(int64(i), 3)
-		if _, err := manager.Submit(context.Background(), req); err != nil {
+		if _, err := submitJob(manager, req); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -214,7 +231,7 @@ func TestManagerSerialisesJobsPerPrinter(t *testing.T) {
 			defer wg.Done()
 			req := validRequest()
 			req.JobID = "same-" + leftPad(int64(i), 2)
-			if _, err := manager.Submit(context.Background(), req); err != nil {
+			if _, err := submitJob(manager, req); err != nil {
 				t.Errorf("submit: %v", err)
 			}
 		}(i)
@@ -234,7 +251,7 @@ func TestManagerSerialisesJobsPerPrinter(t *testing.T) {
 			defer wg.Done()
 			req := validRequest()
 			req.JobID = "bix-" + leftPad(int64(i), 2)
-			if _, err := manager.Submit(context.Background(), req); err != nil {
+			if _, err := submitJob(manager, req); err != nil {
 				t.Errorf("submit: %v", err)
 			}
 		}(i)
@@ -243,7 +260,7 @@ func TestManagerSerialisesJobsPerPrinter(t *testing.T) {
 			req := validRequest()
 			req.JobID = "office-" + leftPad(int64(i), 2)
 			req.Printer = "Office"
-			if _, err := manager.Submit(context.Background(), req); err != nil {
+			if _, err := submitJob(manager, req); err != nil {
 				t.Errorf("submit: %v", err)
 			}
 		}(i)
@@ -257,7 +274,7 @@ func TestManagerSerialisesJobsPerPrinter(t *testing.T) {
 func TestManagerRetryAfterFailure(t *testing.T) {
 	fake := &fakeBackend{spoolID: "42", printErr: &backend.Error{Code: "PAPER_OUT", Message: "load paper"}}
 	manager := NewManager(fake)
-	first, err := manager.Submit(context.Background(), validRequest())
+	first, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +284,7 @@ func TestManagerRetryAfterFailure(t *testing.T) {
 	fake.mu.Lock()
 	fake.printErr = nil
 	fake.mu.Unlock()
-	second, err := manager.Submit(context.Background(), validRequest())
+	second, err := submitJob(manager, validRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,12 +300,12 @@ func TestManagerRejectsBadRequest(t *testing.T) {
 	manager := NewManager(&fakeBackend{})
 	req := validRequest()
 	req.Encoding = "png"
-	if _, err := manager.Submit(context.Background(), req); err == nil {
+	if _, err := submitJob(manager, req); err == nil {
 		t.Fatal("raw job with png encoding was accepted")
 	}
 	req = validRequest()
 	req.Copies = 9
-	if _, err := manager.Submit(context.Background(), req); err == nil {
+	if _, err := submitJob(manager, req); err == nil {
 		t.Fatal("copies above 3 was accepted")
 	}
 }
@@ -296,7 +313,7 @@ func TestManagerRejectsBadRequest(t *testing.T) {
 func TestManagerCancel(t *testing.T) {
 	fake := &fakeBackend{spoolID: "7", status: backend.Status{State: "printing"}}
 	manager := NewManager(fake)
-	if _, err := manager.Submit(context.Background(), validRequest()); err != nil {
+	if _, err := submitJob(manager, validRequest()); err != nil {
 		t.Fatal(err)
 	}
 	job, found, err := manager.Cancel(context.Background(), "job-1")
@@ -308,7 +325,7 @@ func TestManagerCancel(t *testing.T) {
 func TestManagerCancelFailure(t *testing.T) {
 	fake := &fakeBackend{spoolID: "7", status: backend.Status{State: "printing"}, cancelErr: errors.New("no")}
 	manager := NewManager(fake)
-	if _, err := manager.Submit(context.Background(), validRequest()); err != nil {
+	if _, err := submitJob(manager, validRequest()); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := manager.Cancel(context.Background(), "job-1"); err == nil {

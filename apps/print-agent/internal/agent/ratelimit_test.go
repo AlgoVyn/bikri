@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -31,5 +32,25 @@ func TestRateLimiterWindow(t *testing.T) {
 	}
 	if got := remoteIP("[::1]:54321"); got != "::1" {
 		t.Fatalf("remoteIP = %q", got)
+	}
+}
+
+func TestRateLimiterEvictsExpiredBuckets(t *testing.T) {
+	now := time.Unix(0, 0)
+	limiter := newRateLimiter(time.Minute)
+	limiter.now = func() time.Time { return now }
+	for i := 0; i < 300; i++ {
+		limiter.allow(fmt.Sprintf("pair:10.0.0.%d", i), 10)
+	}
+	now = now.Add(2 * time.Minute)
+	// The 512th call triggers a sweep; every old bucket has aged out.
+	for i := 0; i < 300; i++ {
+		limiter.allow("jobs:fresh", 1000)
+	}
+	limiter.mu.Lock()
+	buckets := len(limiter.hits)
+	limiter.mu.Unlock()
+	if buckets != 1 {
+		t.Fatalf("rateLimiter kept %d buckets after a sweep", buckets)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -138,25 +139,93 @@ func main() {
 }
 
 func newLogger(logPath string) (*slog.Logger, func()) {
-	var writers []io.Writer
-	writers = append(writers, os.Stderr)
-	var file *os.File
+	writers := []io.Writer{os.Stderr}
+	var logFile *rotatingWriter
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0o700); err == nil {
 		// Keep one previous file; this is a diagnostic log, not an audit trail.
-		if info, err := os.Stat(logPath); err == nil && info.Size() > 5<<20 {
-			_ = os.Remove(logPath + ".1")
-			_ = os.Rename(logPath, logPath+".1")
-		}
-		if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
-			file = f
-			writers = append(writers, f)
+		// The writer rotates on write as well as at startup so a long-running
+		// agent cannot grow agent.log without bound.
+		if writer, err := newRotatingWriter(logPath, 5<<20); err == nil {
+			logFile = writer
+			writers = append(writers, writer)
 		}
 	}
 	handler := slog.NewJSONHandler(io.MultiWriter(writers...), &slog.HandlerOptions{Level: slog.LevelInfo})
 	return slog.New(handler), func() {
-		if file != nil {
-			_ = file.Close()
+		if logFile != nil {
+			_ = logFile.Close()
 		}
 	}
+}
+
+// rotatingWriter appends to a diagnostic log and rotates it once it reaches max
+// bytes. Only one previous file is kept (`agent.log.1`).
+type rotatingWriter struct {
+	mu   sync.Mutex
+	path string
+	max  int64
+	file *os.File
+	size int64
+}
+
+func newRotatingWriter(path string, max int64) (*rotatingWriter, error) {
+	writer := &rotatingWriter{path: path, max: max}
+	if err := writer.open(); err != nil {
+		return nil, err
+	}
+	return writer, nil
+}
+
+func (w *rotatingWriter) open() error {
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+	w.file = file
+	w.size = info.Size()
+	return nil
+}
+
+func (w *rotatingWriter) rotateLocked() {
+	_ = w.file.Close()
+	w.file = nil
+	_ = os.Remove(w.path + ".1")
+	_ = os.Rename(w.path, w.path+".1")
+	_ = w.open()
+}
+
+func (w *rotatingWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return 0, os.ErrClosed
+	}
+	// Rotate before the write that would cross the limit; a single oversized line
+	// still lands in the fresh file instead of being dropped.
+	if w.size > 0 && w.size+int64(len(p)) > w.max {
+		w.rotateLocked()
+		if w.file == nil {
+			return 0, os.ErrClosed
+		}
+	}
+	n, err := w.file.Write(p)
+	w.size += int64(n)
+	return n, err
+}
+
+func (w *rotatingWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	err := w.file.Close()
+	w.file = nil
+	return err
 }

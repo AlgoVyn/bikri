@@ -4,6 +4,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Build, core, printer and agent polish — 21 Nov 2026 review
+- Web workers are emitted as ES modules, so the sheet parser's dynamic imports (Papaparse, read-excel-file) load only when an import runs instead of being bundled into one classic worker.
+- The online-only public shop-request catalogs move to `assets/public/` and leave the PWA precache; the operator console stays under `assets/admin/`.
+- `can()` fast-paths empty permission overrides and caches the last parsed JSON; `businessDate` uses the `en-CA` formatter directly; receipt dates fill their parts in one pass.
+- `allocate(0, …)` skips the BigInt split, `mulDivRound` fast-paths exact safe products, `opRow` uses precomputed column sets, printer clipping segments Urdu strings once, `ByteBuf` grows a single buffer and Code 128 reads pattern digits without allocating.
+- USB jobs share one deadline across open/claim/chunks; serial writes scale the timeout with the payload and baud rate; system print caches the extracted `@font-face` CSS; `isPinTaken` hashes candidates in parallel; top-bar search caches normalized product/customer/invoice keys.
+- The print agent rotates `agent.log` while running (5 MB, one previous file), drops the base64 payload reference after decoding and sweeps expired rate-limit buckets.
+
 ### UI cost and responsiveness — 21 Nov 2026 review
 - Cart and bundle quantity inputs now commit after a 200 ms pause or on blur/Enter instead of writing Dexie on every digit, so a typed quantity is one cart write.
 - Closed dialogs stop their live queries (held bills, backdate staff, expense categories/zone, approvals, receive-payment zone, delivery detail) until opened.
@@ -62,6 +70,10 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Workbox no longer appends `?__WB_REVISION__=…` to content-hashed `/assets/*` entries, so a first visit does not download the initial JS/CSS graph twice.
 - `/bikri/workbox-*.js` is immutable, while `sw.js`, `manifest.webmanifest` and `theme-init.js` revalidate without the broad `no-transform`, so Cloudflare can compress them; HTML keeps the beacon guard.
 - `check-bundle-size.mjs` now fails if a hashed asset’s precache entry keeps a non-null Workbox revision.
+
+### Print agent 0.1.5 — 21 Nov 2026
+- `agent.log` rotates at 5 MB while the agent runs (one previous file), instead of only when it starts; the rate limiter drops expired buckets and compacts retained slices; a job clears `req.Data` after base64 decoding so the encoded payload is collectable during printing.
+- Wizard download links, the installer default and the build fallback move to `print-agent-v0.1.5`. The agent protocol stays 1, so 0.1.4 agents keep working until updated.
 
 ### Print agent 0.1.4 — 21 Nov 2026
 - The Windows print agent enumerates printers natively with `EnumPrintersW`/`GetDefaultPrinterW` instead of spawning PowerShell/CIM every 10 s, CUPS enumeration is singleflighted with a stale fallback, the dead completed-job `lpstat` call is removed, synchronous prints return `done` without a spool id, and the GDI path uses a top-down DIB from the existing RGBA buffer.

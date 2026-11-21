@@ -66,6 +66,28 @@ export function roleAllows(role: Role, permission: Permission): boolean {
   return false;
 }
 
+/* `can()` runs for every button and guard; most staff have no overrides. Keep the last
+   parsed string so a screen with ten guards parses once, and skip JSON entirely for the
+   common empty value. */
+let lastOverridesJson: string | null = null;
+let lastOverrides: Record<string, unknown> | null = null;
+
+function overridesOf(permissionsJson: string): Record<string, unknown> | null {
+  if (permissionsJson === lastOverridesJson) return lastOverrides;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(permissionsJson || '{}');
+  } catch {
+    parsed = null;
+  }
+  lastOverridesJson = permissionsJson;
+  lastOverrides =
+    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  return lastOverrides;
+}
+
 /** Role default, overridden by `{"refund.create": true}`-style entries in permissions_json. */
 export function can(
   role: Role,
@@ -75,20 +97,12 @@ export function can(
   // The owner stays in control even if a hand-edited restore or an old bug wrote a
   // deny override into permissions_json (05 §6).
   if (role === 'owner') return true;
-  try {
-    const parsed: unknown = JSON.parse(permissionsJson || '{}');
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      !Array.isArray(parsed)
-    ) {
-      if (Object.hasOwn(parsed, permission)) {
-        const value = (parsed as Record<string, unknown>)[permission];
-        if (typeof value === 'boolean') return value;
-      }
-    }
-  } catch {
-    // Bad JSON falls back to the role default.
+  if (permissionsJson === '' || permissionsJson === '{}')
+    return roleAllows(role, permission);
+  const overrides = overridesOf(permissionsJson);
+  if (overrides !== null && Object.hasOwn(overrides, permission)) {
+    const value = overrides[permission];
+    if (typeof value === 'boolean') return value;
   }
   return roleAllows(role, permission);
 }

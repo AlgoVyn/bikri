@@ -62,37 +62,45 @@ const INITIAL_STYLE: Style = {
 };
 
 class ByteBuf {
-  private readonly chunks: Uint8Array[] = [];
+  private buffer = new Uint8Array(1024);
+  private length = 0;
+
+  private ensure(extra: number): void {
+    const needed = this.length + extra;
+    if (needed <= this.buffer.length) return;
+    let capacity = this.buffer.length * 2;
+    while (capacity < needed) capacity *= 2;
+    const next = new Uint8Array(capacity);
+    next.set(this.buffer.subarray(0, this.length));
+    this.buffer = next;
+  }
 
   push(...bytes: number[]): void {
-    this.chunks.push(Uint8Array.from(bytes));
+    this.ensure(bytes.length);
+    this.buffer.set(bytes, this.length);
+    this.length += bytes.length;
   }
 
   append(bytes: Uint8Array): void {
-    this.chunks.push(bytes);
+    this.ensure(bytes.length);
+    this.buffer.set(bytes, this.length);
+    this.length += bytes.length;
   }
 
   ascii(text: string): void {
-    const bytes = new Uint8Array(text.length);
+    this.ensure(text.length);
     for (let i = 0; i < text.length; i += 1) {
       const code = text.charCodeAt(i) ?? 0;
       if (code < 32 || code > 126) {
         throw new Error(`non-ASCII in text mode: U+${code.toString(16)}`);
       }
-      bytes[i] = code;
+      this.buffer[this.length] = code;
+      this.length += 1;
     }
-    this.append(bytes);
   }
 
   toUint8Array(): Uint8Array {
-    const length = this.chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const out = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of this.chunks) {
-      out.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return out;
+    return this.buffer.slice(0, this.length);
   }
 }
 

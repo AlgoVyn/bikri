@@ -219,22 +219,34 @@ export async function sendUsb(
   bytes: Uint8Array,
   ms = JOB_TIMEOUT_MS,
 ): Promise<void> {
+  // One deadline for open + claim + every chunk. Giving each chunk a fresh `ms`
+  // let a slow printer stretch one job to minutes.
+  const deadline = Date.now() + ms;
   let state = claimed.get(device);
   let cleanupPromise: Promise<void> | null = null;
   const cleanup = (): Promise<void> => {
     cleanupPromise ??= releaseUsb(device, state);
     return cleanupPromise;
   };
+  const timed = <T>(promise: Promise<T>): Promise<T> => {
+    const left = deadline - Date.now();
+    if (left <= 0) {
+      void cleanup();
+      return Promise.reject(new PrintError('TIMEOUT'));
+    }
+    return withDeadline(promise, left, cleanup);
+  };
   try {
     if (!state || !device.opened) {
       state = undefined;
       claimed.delete(device);
-      if (!device.opened) await device.open();
-      if (device.configuration === null) await device.selectConfiguration(1);
+      if (!device.opened) await timed(device.open());
+      if (device.configuration === null)
+        await timed(device.selectConfiguration(1));
       const target = printerEndpoint(device);
       if (!target) throw new PrintError('UNSUPPORTED');
       try {
-        await device.claimInterface(target.iface);
+        await timed(device.claimInterface(target.iface));
       } catch (err) {
         // Windows vendor driver or Linux usblp owns the device (06 §5.1).
         const name = (err as { name?: string } | null)?.name;
@@ -247,10 +259,8 @@ export async function sendUsb(
     }
     for (const chunk of chunks(bytes)) {
       // A stuck transferOut otherwise leaves the interface claimed forever.
-      const result = await withDeadline(
+      const result = await timed(
         device.transferOut(state.endpoint, chunk as BufferSource),
-        ms,
-        cleanup,
       );
       if (result.status !== 'ok') throw new PrintError('FAILED', result.status);
     }
@@ -280,6 +290,11 @@ export async function sendSerial(
   options: SerialOptions,
   ms = JOB_TIMEOUT_MS,
 ): Promise<void> {
+  // A raw receipt can be several KB; at 9600 baud that takes longer than the
+  // fixed job timeout. Allow the wire time plus one second of device overhead.
+  const baudRate = options.baudRate > 0 ? options.baudRate : 9600;
+  const wireMs = Math.ceil((bytes.length * 10 * 1000) / baudRate);
+  const timeoutMs = Math.max(ms, wireMs + 1000);
   const current = serialOpen.get(port);
   if (
     port.writable &&
@@ -306,7 +321,7 @@ export async function sendSerial(
     if (!port.writable) throw new PrintError('DISCONNECTED');
     writer = port.writable.getWriter();
     // A timed-out write would otherwise keep the WritableStream locked until reload.
-    await withDeadline(writer.write(bytes), ms, async () => {
+    await withDeadline(writer.write(bytes), timeoutMs, async () => {
       try {
         await writer?.abort();
       } catch {

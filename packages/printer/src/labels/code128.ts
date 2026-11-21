@@ -169,18 +169,17 @@ export function encodeCode128(value: string): Code128 {
   const symbols = [start, ...data];
   const all = [...symbols, check, STOP];
   const widths = all.map((symbol) => PATTERNS[symbol] ?? '');
-  const modules =
-    widths.reduce(
-      (total, pattern) =>
-        total + [...pattern].reduce((sum, width) => sum + Number(width), 0),
-      0,
-    ) + 20;
+  let modules = 20;
+  for (const pattern of widths) {
+    for (let i = 0; i < pattern.length; i += 1)
+      modules += pattern.charCodeAt(i) - 48;
+  }
   const bars: Code128Bar[] = [];
   let x = 10;
   for (const pattern of widths) {
     let bar = true;
-    for (const width of pattern) {
-      const size = Number(width);
+    for (let i = 0; i < pattern.length; i += 1) {
+      const size = pattern.charCodeAt(i) - 48;
       if (bar) bars.push({ x, width: size });
       x += size;
       bar = !bar;

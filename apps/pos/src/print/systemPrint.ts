@@ -13,6 +13,27 @@ const LOAD_TIMEOUT_MS = 8000;
 /** Safety net for browsers that never fire afterprint (the dialog is already gone). */
 const CLEANUP_TIMEOUT_MS = 60_000;
 
+/* Copying @font-face rules is a CSSOM scan of every stylesheet; the rules do not
+   change while the app runs, so do it once per document. */
+const fontFaceCache = new WeakMap<Document, string>();
+
+function fontFaceCss(doc: Document): string {
+  const cached = fontFaceCache.get(doc);
+  if (cached !== undefined) return cached;
+  const rules: string[] = [];
+  for (const sheet of Array.from(doc.styleSheets)) {
+    try {
+      for (const rule of Array.from(sheet.cssRules))
+        if (rule instanceof CSSFontFaceRule) rules.push(rule.cssText);
+    } catch {
+      // Cross-origin stylesheets cannot be inspected; the OS fallback still applies.
+    }
+  }
+  const css = rules.join('\n');
+  fontFaceCache.set(doc, css);
+  return css;
+}
+
 export async function printHtmlViaSystem(
   html: string,
   widthMm: 58 | 80,
@@ -53,18 +74,10 @@ export async function printHtmlViaSystem(
       return { ok: false, code: 'NO_PRINT' };
     }
     // @font-face rules do not cross into a srcdoc iframe; copy them before waiting.
-    const fontRules: string[] = [];
-    for (const sheet of Array.from(doc.styleSheets)) {
-      try {
-        for (const rule of Array.from(sheet.cssRules))
-          if (rule instanceof CSSFontFaceRule) fontRules.push(rule.cssText);
-      } catch {
-        // Cross-origin stylesheets cannot be inspected; the OS fallback still applies.
-      }
-    }
-    if (fontRules.length > 0) {
+    const fontRules = fontFaceCss(doc);
+    if (fontRules !== '') {
       const fontStyle = win.document.createElement('style');
-      fontStyle.textContent = fontRules.join('\n');
+      fontStyle.textContent = fontRules;
       win.document.head.append(fontStyle);
     }
     // Noto Naskh Arabic UI / JetBrains Mono must be ready before the driver rasterises.

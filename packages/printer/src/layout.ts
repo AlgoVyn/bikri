@@ -141,15 +141,16 @@ function textWidth(text: string): number {
 
 /** Cut from the start without splitting a surrogate pair or Urdu cluster. */
 function clipStart(text: string, width: number): string {
-  if (textWidth(text) <= width) return text;
+  // Segment once; the old textWidth + graphemes pair walked Urdu strings three times.
   const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  if (units.length <= width) return text;
   return units.slice(0, Math.max(0, width)).join('');
 }
 
 /** Cut from the end without splitting a surrogate pair or Urdu cluster. */
 function clipEnd(text: string, width: number): string {
-  if (textWidth(text) <= width) return text;
   const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  if (units.length <= width) return text;
   return units.slice(Math.max(0, units.length - Math.max(0, width))).join('');
 }
 
