@@ -14,8 +14,14 @@ export function appGate(input: {
   enrolled: boolean;
   devTenant: boolean;
   setupCompleted: boolean;
+  /** Enrolment is still downloading its first snapshot (SYNC-H4). */
+  initialSyncPending?: boolean;
 }): AppGate {
   if (!input.enrolled && !input.devTenant) return 'enrol';
+  // The enrol page owns the download it started. Leaving `enrol` while it runs would
+  // unmount the progress/retry UI and either start a competing sync engine or redirect
+  // to setup with an empty database.
+  if (input.initialSyncPending) return 'enrol';
   if (input.done) return 'ready';
   // An enrolled live shop is still downloading its first snapshot: keep waiting (the
   // sync engine resumes it) instead of sending the owner through setup again.
@@ -31,6 +37,8 @@ export type GateInfo = {
   revoked: boolean;
   /** This browser holds a device token for the open shop. */
   enrolled: boolean;
+  /** The enrolment's first snapshot is still downloading (SYNC-H4). */
+  initialSyncPending: boolean;
   shopName: string | null;
 };
 
@@ -52,16 +60,18 @@ export function useAppGate(): GateInfo {
   );
   const device = useLiveQuery(async () => {
     if (!db) return undefined;
-    const [token, revoked, tenant, setup] = await Promise.all([
+    const [token, revoked, tenant, setup, pending] = await Promise.all([
       db.kv.get('device_token'),
       db.kv.get('revoked'),
       db.kv.get('tenant'),
       db.kv.get('shop_setup_completed'),
+      db.kv.get('initial_sync_pending'),
     ]);
     return {
       enrolled: Boolean(token?.value),
       revoked: Boolean(revoked?.value),
       setupCompleted: setup?.value === true,
+      initialSyncPending: pending?.value === true,
       shopName:
         (tenant?.value as { display_name?: string } | undefined)
           ?.display_name ?? null,
@@ -71,6 +81,7 @@ export function useAppGate(): GateInfo {
     revoked: false,
     enrolled: false,
     setupCompleted: false,
+    initialSyncPending: false,
     shopName: null,
   };
   if (noTenant) return { gate: 'enrol', db: null, ...none };
@@ -82,6 +93,7 @@ export function useAppGate(): GateInfo {
       enrolled: device.enrolled,
       devTenant: db.tenantId === DEV_TENANT_ID,
       setupCompleted: device.setupCompleted,
+      initialSyncPending: device.initialSyncPending,
     }),
     db,
     ...device,

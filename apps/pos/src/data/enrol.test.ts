@@ -7,7 +7,9 @@ import {
   CODE_RE,
   defaultDeviceName,
   enrolDevice,
+  finishInitialSync,
   formatCode,
+  INITIAL_SYNC_PENDING_KEY,
   leaveShop,
   markUnsyncedExported,
   normaliseCodeInput,
@@ -104,6 +106,12 @@ describe('enrolDevice', () => {
     expect(await getKv(db, 'shop_setup_completed', false)).toBe(true);
     expect(await getKv(db, 'poll_after_ms', 0)).toBe(30_000);
     expect(await isReadOnly(db)).toBe(true);
+    // The gate and the sync engine wait for the enrol page's first snapshot (SYNC-H4).
+    expect(await getKv(db, INITIAL_SYNC_PENDING_KEY, false)).toBe(true);
+    await finishInitialSync(db);
+    expect(await getKv(db, INITIAL_SYNC_PENDING_KEY, 'missing')).toBe(
+      'missing',
+    );
     // screens/02 AC 5: never in localStorage.
     for (let i = 0; i < localStorage.length; i += 1) {
       const k = localStorage.key(i) ?? '';
