@@ -8,7 +8,7 @@ import {
   DEXIE_SCHEMA_V7,
   DEXIE_SCHEMA_V9,
   DEXIE_SCHEMA_V10,
-  DEXIE_SCHEMA_V11,
+  DEXIE_SCHEMA_V12,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -40,7 +40,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V11).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V12).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -167,6 +167,20 @@ describe('Dexie schema (02 §3)', () => {
         (index) => index.name === '[bundle_id+business_date]',
       ),
     ).toBe(true);
+  });
+
+  it('V12 drops unused indexes and adds the compound ones', async () => {
+    const db = open('v12-indexes');
+    await db.open();
+    const names = (table: string) =>
+      db.table(table).schema.indexes.map((index) => index.name);
+    expect(names('outbox')).toContain('[status+seq]');
+    expect(names('outbox')).not.toContain('status');
+    expect(names('file_queue')).toContain('[status+created_at]');
+    expect(names('sale_voids')).toContain('business_date');
+    expect(names('products')).not.toContain('name_en');
+    expect(names('sync_conflicts')).toContain('resolution');
+    expect(names('sync_conflicts')).not.toContain('row_id');
   });
 
   it('opens with the expected indexes and no tenant_id anywhere', async () => {

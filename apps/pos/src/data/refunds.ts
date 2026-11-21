@@ -60,6 +60,7 @@ export type RefundLineInput = {
 };
 
 export type RefundPlanLine = RefundLineInput & {
+  product_id: string | null;
   name: string;
   unit: string;
   soldMilli: number;
@@ -230,6 +231,7 @@ export async function computeRefund(
     exact += amount;
     planLines.push({
       ...request,
+      product_id: typeof line.product_id === 'string' ? line.product_id : null,
       name: String(line.name_snapshot),
       unit: String(product?.unit ?? 'pc'),
       soldMilli: sold,
@@ -359,8 +361,9 @@ export async function refundSale(
         amount: plan.amount,
       };
       await w.insert('refunds', refundRow);
-      for (const line of plan.lines) {
-        await w.insert('refund_lines', {
+      await w.insertMany(
+        'refund_lines',
+        plan.lines.map((line) => ({
           ...base,
           id: newId(w.now),
           refund_id: input.refundId,
@@ -368,8 +371,8 @@ export async function refundSale(
           qty_milli: line.qtyMilli,
           amount: line.amount,
           restock: line.restock ? 1 : 0,
-        });
-      }
+        })),
+      );
       if (plan.amount > 0 && plan.method) {
         await w.insert('payments', {
           ...base,
@@ -402,26 +405,28 @@ export async function refundSale(
           note: String(sale.invoice_no),
         });
       }
-      for (const line of plan.lines) {
-        if (!line.restock || !line.trackStock) continue;
-        const source = (
-          await (w.table('sale_lines') as Table<SyncedRow>).get(line.saleLineId)
-        )?.product_id;
-        if (typeof source !== 'string') continue;
-        await w.insert('stock_movements', {
-          ...base,
-          id: newId(w.now),
-          product_id: source,
-          qty_delta_milli: line.qtyMilli,
-          reason_code: 'refund_return',
-          ref_type: 'refund',
-          ref_id: input.refundId,
-          unit_cost: null,
-          note: '',
-        });
-      }
+      const movementRows = plan.lines.flatMap((line) =>
+        line.restock && line.trackStock && line.product_id
+          ? [
+              {
+                ...base,
+                id: newId(w.now),
+                product_id: line.product_id,
+                qty_delta_milli: line.qtyMilli,
+                reason_code: 'refund_return',
+                ref_type: 'refund',
+                ref_id: input.refundId,
+                unit_cost: null,
+                note: '',
+              },
+            ]
+          : [],
+      );
+      if (movementRows.length > 0)
+        await w.insertMany('stock_movements', movementRows);
+      const auditRows: SyncedRow[] = [];
       if (input.override) {
-        await w.insert('audit_log', {
+        auditRows.push({
           id: newId(w.now),
           action: 'override',
           entity: 'refunds',
@@ -436,7 +441,7 @@ export async function refundSale(
           created_at: now,
         });
       }
-      await w.insert('audit_log', {
+      auditRows.push({
         id: newId(w.now),
         action: 'refund',
         entity: 'refunds',
@@ -455,6 +460,7 @@ export async function refundSale(
         staff_id: ctx.staff_id,
         created_at: now,
       });
+      await w.insertMany('audit_log', auditRows);
       // The sale's status is a derived cache; the server recomputes it on push (03 §6).
       // `refunded` means every line's refunded quantity equals its sold quantity
       // (02 §4), not that the refunded amount reached the bill total: a 100%-discounted

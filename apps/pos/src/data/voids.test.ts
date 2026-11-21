@@ -137,8 +137,8 @@ describe('void recipe (02 §5)', () => {
       NOW + 1000,
     );
     const ledger = await db.ledger_entries
-      .where('source_id')
-      .equals('void-udhaar')
+      .toCollection()
+      .filter((entry) => entry.source_id === 'void-udhaar')
       .toArray();
     expect(ledger).toMatchObject([
       { party_type: 'customer', party_id: customer.id, amount: -60000 },
@@ -603,8 +603,8 @@ describe('void and reissue branches', () => {
     ).toBe(0);
     expect(
       await db.ledger_entries
-        .where('source_id')
-        .equals('udhaar-void')
+        .toCollection()
+        .filter((entry) => entry.source_id === 'udhaar-void')
         .toArray(),
     ).toMatchObject([{ party_type: 'customer', amount: -100000 }]);
   });

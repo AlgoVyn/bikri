@@ -334,9 +334,28 @@ export async function loadSalesHistory(
       .filter((s): s is MasterRow => s !== undefined)
       .map((s) => [s.id, s]),
   );
+  const deviceIds = [...new Set(sales.map((sale) => String(sale.device_id)))];
+  const deviceRows = await (
+    src.table('devices') as Table<SyncedRow, string>
+  ).bulkGet(deviceIds);
+  const localDevice = (await (
+    src.table('kv') as Table<{ key: string; value: unknown }>
+  ).get('device')) as
+    | { value?: { id?: string; name?: string; code?: string } }
+    | undefined;
   const deviceNames = new Map<string, string>();
-  for (const id of new Set(sales.map((s) => String(s.device_id))))
-    deviceNames.set(id, await deviceNameOf(src, id));
+  deviceIds.forEach((id, index) => {
+    const device = deviceRows[index];
+    const local = localDevice?.value;
+    deviceNames.set(
+      id,
+      device
+        ? String(device.name ?? device.code ?? '')
+        : local?.id === id
+          ? String(local.name ?? local.code ?? '')
+          : '',
+    );
+  });
 
   const rows: SaleListRow[] = [];
   for (const sale of sales) {
@@ -784,24 +803,15 @@ export async function billDetail(
     }
   });
   const auditTable = src.table('audit_log') as Table<SyncedRow>;
+  const auditKeys: [string, string][] = [
+    ['sales', saleId],
+    ...refunds.map((refund) => ['refunds', refund.id] as [string, string]),
+  ];
+  if (voidRow) auditKeys.push(['sale_voids', voidRow.id]);
   const audit = await auditTable
     .where('[entity+entity_id]')
-    .equals(['sales', saleId])
+    .anyOf(auditKeys)
     .toArray();
-  for (const refund of refunds)
-    audit.push(
-      ...(await auditTable
-        .where('[entity+entity_id]')
-        .equals(['refunds', refund.id])
-        .toArray()),
-    );
-  if (voidRow)
-    audit.push(
-      ...(await auditTable
-        .where('[entity+entity_id]')
-        .equals(['sale_voids', voidRow.id])
-        .toArray()),
-    );
 
   const jobs = await (src.table('print_jobs') as Table<PrintJobLite>)
     .where('sale_id')

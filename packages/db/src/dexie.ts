@@ -178,7 +178,35 @@ export const DEXIE_SCHEMA_V11 = {
   day_closes: 'id, [device_id+period_end], business_date, created_at',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V11;
+/**
+ * V12 removes indexes no query uses (and three prefix indexes already covered by a
+ * compound one), and adds the compound indexes the remaining scans need. Dropping an
+ * index is local-only; IndexedDB rebuilds the rest from stored rows.
+ */
+export const DEXIE_SCHEMA_V12 = {
+  ...DEXIE_SCHEMA_V11,
+  products: 'id, sku, category_id, deleted_at, track_stock',
+  customers: 'id, phone, credit_limit',
+  suppliers: 'id',
+  sales:
+    'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
+  sale_lines:
+    'id, sale_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]',
+  sale_voids: 'id, &sale_id, created_at, business_date',
+  purchase_lines: 'id, purchase_id',
+  supplier_return_lines: 'id, return_id, purchase_line_id',
+  expenses:
+    'id, business_date, [device_id+created_at], reverses_id, created_at',
+  ledger_entries:
+    'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], created_at',
+  outbox: '++seq, &op_id, [status+seq], created_at, [tbl+row_id]',
+  file_queue: '++id, status, created_at, [status+created_at]',
+  print_jobs:
+    'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at',
+  sync_conflicts: 'id, resolution',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V12;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -536,6 +564,8 @@ export class BikriDb extends Dexie {
             if (at !== undefined) row.last_payment_at = at;
           });
       });
+    // V12 only removes/adds indexes; IndexedDB rebuilds them from stored rows.
+    this.version(12).stores(DEXIE_SCHEMA_V12);
   }
 }
 

@@ -1,5 +1,11 @@
 import { businessDate, newId, type Role } from '@bikri/core';
-import type { BikriDb, MasterRow, PartyBalance, SyncedRow } from '@bikri/db';
+import type {
+  BikriDb,
+  MasterRow,
+  PartyBalance,
+  PartyType,
+  SyncedRow,
+} from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
@@ -909,9 +915,12 @@ export async function refreshPromises(
   // Gate on the business date before reading promises or payments.
   const gate = (await db.kv.get('promises_refreshed_on'))?.value;
   if (gate === options.today) return 0;
-  const promises = (await db.promises.toArray()).filter(
-    (p) => !p.deleted_at && p.status === 'open',
-  );
+  const promises = (
+    await db.promises
+      .where('[status+promised_on]')
+      .between(['open', ''], ['open', '\uffff'])
+      .toArray()
+  ).filter((p) => !p.deleted_at);
   const markDone = () =>
     db.kv.put({ key: 'promises_refreshed_on', value: options.today });
   if (promises.length === 0) {
@@ -954,10 +963,18 @@ export async function refreshPromises(
     list.push({ at: n(payment.created_at), amount: n(payment.amount) });
     paymentsByCustomer.set(key, list);
   }
+  const balanceRows = await db.party_balances.bulkGet(
+    [...byCustomer.keys()].map((id) => ['customer', id] as [PartyType, string]),
+  );
+  const balanceById = new Map(
+    [...byCustomer.keys()].map((id, index) => [
+      id,
+      balanceRows[index]?.balance ?? 0,
+    ]),
+  );
   for (const [customerId, customerPromises] of byCustomer) {
     const customerPayments = paymentsByCustomer.get(customerId) ?? [];
-    const balance =
-      (await db.party_balances.get(['customer', customerId]))?.balance ?? 0;
+    const balance = balanceById.get(customerId) ?? 0;
     for (const promise of customerPromises) {
       const since = n(promise.created_at);
       const paid = customerPayments

@@ -49,10 +49,19 @@ export async function pricePreview(
 ): Promise<PricePreviewRow[]> {
   const ids = filter.ids ? new Set(filter.ids) : null;
   const brand = filter.brand?.trim().toLowerCase() ?? '';
-  const products = (await db.products.toArray()).filter((p) => {
+  const source = ids
+    ? (await db.products.bulkGet([...ids])).filter(
+        (product): product is MasterRow => product !== undefined,
+      )
+    : filter.categoryId
+      ? await db.products
+          .where('category_id')
+          .equals(filter.categoryId)
+          .toArray()
+      : await db.products.toArray();
+  const products = source.filter((p) => {
     if (p.deleted_at || p.kind === 'bundle') return false;
     if (ids) return ids.has(p.id);
-    if (filter.categoryId && p.category_id !== filter.categoryId) return false;
     if (
       brand &&
       String(p.brand ?? '')

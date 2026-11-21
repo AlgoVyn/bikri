@@ -232,32 +232,51 @@ export async function checkCaches(
     }
     return copy.slice(0, sample);
   };
-  let ok = true;
-  const products = pick(
-    (await db.products.toCollection().primaryKeys()) as string[],
+  // One read transaction over both caches and their sources. Separate reads let a
+  // sale commit between them, which looked like a cache mismatch and forced a full
+  // 440k-row rebuild.
+  const mismatches = await db.transaction(
+    'r',
+    [
+      db.products,
+      db.stock_movements,
+      db.stock_levels,
+      db.party_balances,
+      db.ledger_entries,
+    ],
+    async () => {
+      const stock: boolean[] = [];
+      const products = pick(
+        (await db.products.toCollection().primaryKeys()) as string[],
+      );
+      for (const id of products) {
+        const moves = await db.stock_movements
+          .where('[product_id+created_at]')
+          .between([id, -Infinity], [id, Infinity])
+          .toArray();
+        const expected = moves.reduce(
+          (sum, move) => sum + Number(move.qty_delta_milli),
+          0,
+        );
+        const cached = (await db.stock_levels.get(id))?.on_hand_milli ?? 0;
+        stock.push(cached === expected);
+      }
+      const parties: boolean[] = [];
+      for (const p of pick(await db.party_balances.toArray())) {
+        const expected = balanceOf(
+          p.party_type,
+          p.party_id,
+          await partyEntries(db, p.party_type, p.party_id),
+        );
+        parties.push(
+          expected.balance === p.balance &&
+            expected.oldest_unpaid_at === p.oldest_unpaid_at,
+        );
+      }
+      return [...stock, ...parties];
+    },
   );
-  for (const id of products) {
-    const moves = await db.stock_movements
-      .where('[product_id+created_at]')
-      .between([id, -Infinity], [id, Infinity])
-      .toArray();
-    const expected = moves.reduce((s, m) => s + Number(m.qty_delta_milli), 0);
-    const cached = (await db.stock_levels.get(id))?.on_hand_milli ?? 0;
-    if (cached !== expected) ok = false;
-  }
-  const parties = pick(await db.party_balances.toArray());
-  for (const p of parties) {
-    const expected = balanceOf(
-      p.party_type,
-      p.party_id,
-      await partyEntries(db, p.party_type, p.party_id),
-    );
-    if (
-      expected.balance !== p.balance ||
-      expected.oldest_unpaid_at !== p.oldest_unpaid_at
-    )
-      ok = false;
-  }
+  const ok = mismatches.every(Boolean);
   if (!ok) await rebuildCaches(db);
   return ok;
 }

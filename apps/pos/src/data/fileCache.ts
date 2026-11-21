@@ -39,6 +39,27 @@ function storage(): CacheStorage | null {
 }
 
 /**
+ * `caches.open` per put/get was a needless promise + lookup on every photo. Keyed by
+ * the CacheStorage object so a test or browser swap never reuses the old cache.
+ */
+const CACHE_STORES = new WeakMap<CacheStorage, Map<string, Promise<Cache>>>();
+function fileCacheStore(): Promise<Cache> | null {
+  const store = storage();
+  if (!store) return null;
+  let byName = CACHE_STORES.get(store);
+  if (byName === undefined) {
+    byName = new Map();
+    CACHE_STORES.set(store, byName);
+  }
+  let pending = byName.get(FILE_CACHE);
+  if (pending === undefined) {
+    pending = store.open(FILE_CACHE);
+    byName.set(FILE_CACHE, pending);
+  }
+  return pending;
+}
+
+/**
  * Object URLs are content-addressed, so one URL per distinct photo can be reused
  * instead of re-reading Cache Storage on every virtualized tile mount. Keep a bounded
  * LRU: every URL retains its Blob in memory, and 2,000 photos × up to 150 KB could
@@ -111,9 +132,8 @@ export async function putFile(
   key: string,
   blob: Blob,
 ): Promise<void> {
-  const store = storage();
-  if (!store) return;
-  const cache = await store.open(FILE_CACHE);
+  const cache = await fileCacheStore();
+  if (!cache) return;
   await cache.put(
     fileCacheUrl(tenantId, key),
     new Response(await blob.arrayBuffer(), {
@@ -130,27 +150,24 @@ export async function getFile(
   tenantId: string,
   key: string,
 ): Promise<Blob | null> {
-  const store = storage();
-  if (!store) return null;
-  const cache = await store.open(FILE_CACHE);
+  const cache = await fileCacheStore();
+  if (!cache) return null;
   const hit = await cache.match(fileCacheUrl(tenantId, key));
   return hit ? hit.blob() : null;
 }
 
 export async function deleteFile(tenantId: string, key: string): Promise<void> {
-  const store = storage();
-  if (!store) return;
-  const cache = await store.open(FILE_CACHE);
+  const cache = await fileCacheStore();
+  if (!cache) return;
   await cache.delete(fileCacheUrl(tenantId, key));
 }
 
 /** "Leave this shop" (T-034): drop one tenant's cached files only. */
 export async function clearTenantFiles(tenantId: string): Promise<void> {
   clearFileUrls(tenantId);
-  const store = storage();
-  if (!store) return;
-  const cache = await store.open(FILE_CACHE);
+  const cache = await fileCacheStore();
+  if (!cache) return;
   const prefix = fileCacheUrl(tenantId, '');
-  for (const req of await cache.keys())
-    if (req.url.startsWith(prefix)) await cache.delete(req);
+  const keys = (await cache.keys()).filter((req) => req.url.startsWith(prefix));
+  await Promise.all(keys.map((req) => cache.delete(req)));
 }

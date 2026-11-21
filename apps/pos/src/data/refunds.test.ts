@@ -206,8 +206,8 @@ describe('refund plan and split (07 §6)', () => {
       .toArray();
     expect(payments.filter((p) => p.purpose === 'refund')).toHaveLength(1);
     const ledger = await db.ledger_entries
-      .where('source_id')
-      .equals('refund-r6')
+      .toCollection()
+      .filter((entry) => entry.source_id === 'refund-r6')
       .toArray();
     expect(ledger).toMatchObject([
       { party_type: 'customer', amount: -45000, source_type: 'refund' },
