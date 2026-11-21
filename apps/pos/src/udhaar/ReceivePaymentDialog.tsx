@@ -60,9 +60,10 @@ export function ReceivePaymentDialog({
   const savingRef = useRef(false);
   const [overpay, setOverpay] = useState(false);
   const zones = useLiveQuery(async () => {
+    if (!open) return null;
     const tz = await shopTimeZone(getDb());
     return { tz, today: businessDate(Date.now(), tz) };
-  }, []);
+  }, [open]);
   const today = zones?.today ?? businessDate(Date.now());
   const minDate = (() => {
     const d = new Date(`${today}T00:00:00Z`);

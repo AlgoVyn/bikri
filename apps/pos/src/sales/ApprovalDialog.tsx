@@ -29,7 +29,8 @@ export function ApprovalDialog({
 }) {
   const { t } = useTranslation();
   const { staff } = useCurrentStaff();
-  const everyone = useLiveQuery(() => getDb().staff.toArray(), []) ?? [];
+  const everyone =
+    useLiveQuery(() => (open ? getDb().staff.toArray() : []), [open]) ?? [];
   const profiles = approversFor(
     everyone,
     (s) =>

@@ -29,7 +29,7 @@ import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import {
   defaultProductSortDirection,
   filterAndSortProducts,
-  listCategories,
+  listCategoryOptions,
   type ProductListRow,
   type ProductSort,
   productsCsv,
@@ -116,7 +116,7 @@ export function ProductList({
     i18n.language,
   ]);
   const total = baseRows?.length;
-  const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
+  const categories = useLiveQuery(() => listCategoryOptions(getDb()), []) ?? [];
   const showCost = can('cost.view');
   const canEdit = can('catalog.edit');
   const canLabel = canEdit || can('purchase.create');

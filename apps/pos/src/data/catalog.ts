@@ -1547,6 +1547,11 @@ export async function listCategories(
   }));
 }
 
+/** Category rows without the product-count pass (ProductList/Form/Prices/StockCount). */
+export async function listCategoryOptions(db: BikriDb): Promise<MasterRow[]> {
+  return live(await db.categories.orderBy('sort_order').toArray());
+}
+
 export async function addCategory(
   db: BikriDb,
   name: string,

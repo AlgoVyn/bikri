@@ -54,7 +54,6 @@ import {
 } from './format.ts';
 import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
-import { statementPdf, statementPng } from './statementFile.ts';
 
 const STATEMENT_PAGE = 200;
 
@@ -266,7 +265,9 @@ export function CustomerStatement({
   const exportPdf = async () => {
     try {
       downloadBlob(
-        await statementPdf(await fullMeta()),
+        await (await import('./statementFile.ts')).statementPdf(
+          await fullMeta(),
+        ),
         `statement-${name.replace(/\s+/gu, '-')}.pdf`,
       );
     } catch {
@@ -285,6 +286,7 @@ export function CustomerStatement({
     // is blocked as a popup.
     const shareWindow = reminder ? openShareWindow() : null;
     try {
+      const { statementPng } = await import('./statementFile.ts');
       const png = await statementPng(await fullMeta());
       const file = new File([png], `statement-${name}.png`, {
         type: 'image/png',
@@ -573,13 +575,7 @@ export function CustomerStatement({
                 className="rounded-card border border-border bg-surface p-3 text-small"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-text-muted">
-                    {dateText(
-                      String(row.entry.business_date),
-                      i18n.language,
-                      tz,
-                    )}
-                  </span>
+                  <span className="text-text-muted">{rows[index]?.date}</span>
                   <span className="font-medium">
                     <MoneyText paisa={row.balance} />
                   </span>
@@ -668,11 +664,7 @@ export function CustomerStatement({
                     className="border-b border-border last:border-0"
                   >
                     <td className="p-2 whitespace-nowrap">
-                      {dateText(
-                        String(row.entry.business_date),
-                        i18n.language,
-                        tz,
-                      )}
+                      {rows[index]?.date}
                     </td>
                     <td className="p-2">
                       <span className="flex flex-wrap items-center gap-2">

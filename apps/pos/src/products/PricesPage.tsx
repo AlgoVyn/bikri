@@ -21,7 +21,7 @@ import {
   ROUNDINGS,
   type Rounding,
 } from '../data/bulkPrice.ts';
-import { ledgerContext, listCategories } from '../data/catalog.ts';
+import { ledgerContext, listCategoryOptions } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -54,7 +54,7 @@ export function PricesPage() {
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const id = useId();
-  const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
+  const categories = useLiveQuery(() => listCategoryOptions(getDb()), []) ?? [];
   const [categoryId, setCategoryId] = useState('');
   const [brand, setBrand] = useState('');
   const [kind, setKind] = useState<Kind>('percent');

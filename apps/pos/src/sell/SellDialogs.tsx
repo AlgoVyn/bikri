@@ -322,14 +322,15 @@ export function HeldBillsDialog({
   timeZone?: string;
 }) {
   const { t, i18n } = useTranslation();
-  const held = useLiveQuery(() => listHeld(getDb()), [open]) ?? [];
-  const staff = useLiveQuery(
-    async () =>
-      new Map(
+  const held =
+    useLiveQuery(() => (open ? listHeld(getDb()) : []), [open]) ?? [];
+  const staff =
+    useLiveQuery(async () => {
+      if (!open) return new Map<string, string>();
+      return new Map(
         (await getDb().staff.toArray()).map((s) => [s.id, String(s.name)]),
-      ),
-    [],
-  );
+      );
+    }, [open]) ?? new Map<string, string>();
   const [confirm, setConfirm] = useState<string | null>(null);
   return (
     <Modal

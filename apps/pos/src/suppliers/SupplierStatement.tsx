@@ -30,7 +30,6 @@ import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { statementPdf, statementPng } from '../udhaar/statementFile.ts';
 import { DeliveryDetailDialog } from './DeliveryDetailDialog.tsx';
 import {
   dateText,
@@ -219,7 +218,9 @@ export function SupplierStatement({
   const exportPdf = async () => {
     try {
       downloadBlob(
-        await statementPdf(await fullMeta()),
+        await (await import('../udhaar/statementFile.ts')).statementPdf(
+          await fullMeta(),
+        ),
         `supplier-${name.replace(/\s+/gu, '-')}.pdf`,
       );
     } catch {
@@ -228,6 +229,7 @@ export function SupplierStatement({
   };
   const share = async () => {
     try {
+      const { statementPng } = await import('../udhaar/statementFile.ts');
       const png = await statementPng(await fullMeta());
       const file = new File([png], `supplier-${name}.png`, {
         type: 'image/png',
@@ -510,11 +512,7 @@ export function SupplierStatement({
                       }`}
                     >
                       <td className="p-2 whitespace-nowrap">
-                        {dateText(
-                          String(row.entry.business_date),
-                          i18n.language,
-                          tz,
-                        )}
+                        {rows[index]?.date}
                       </td>
                       <td className="p-2">
                         {purchaseId ? (

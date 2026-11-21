@@ -13,6 +13,16 @@ import { usePrivacyActive } from './privacy.tsx';
  * In privacy mode the amount is replaced by a fixed-width mask before rendering, so the
  * real value never reaches the DOM.
  */
+function HiddenMoney({ paisa }: { paisa: number }) {
+  const { t } = useTranslation();
+  return (
+    <bdi dir="ltr" className="whitespace-nowrap tabular-nums">
+      <span className="sr-only">{t('privacy.hidden')}</span>
+      <span aria-hidden="true">{maskMoney(paisa)}</span>
+    </bdi>
+  );
+}
+
 export function MoneyText({
   paisa,
   grouping,
@@ -23,15 +33,8 @@ export function MoneyText({
 }) {
   const shopGrouping = useMoneyGrouping();
   const privacy = usePrivacyActive();
-  const { t } = useTranslation();
-  if (privacy) {
-    return (
-      <bdi dir="ltr" className="whitespace-nowrap tabular-nums">
-        <span className="sr-only">{t('privacy.hidden')}</span>
-        <span aria-hidden="true">{maskMoney(paisa)}</span>
-      </bdi>
-    );
-  }
+  // Every rendered price used to subscribe to i18n just for the hidden label.
+  if (privacy) return <HiddenMoney paisa={paisa} />;
   const text = formatMoney(paisa, grouping ?? shopGrouping);
   const match = /^(−)?Rs (.+)$/u.exec(text);
   if (!match) {

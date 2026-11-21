@@ -4,7 +4,7 @@ import {
   type QtyUnit,
   qtyAllowsDecimals,
 } from '@bikri/core';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet, buttonQuietDense } from './classes.ts';
 
@@ -24,6 +24,7 @@ export function QtyInput({
   name,
   dense = false,
   hideLabel = false,
+  commitOnBlur = false,
 }: {
   id?: string;
   label: string;
@@ -37,6 +38,8 @@ export function QtyInput({
   dense?: boolean;
   /** Keep the label for assistive tech only; the row already gives the context. */
   hideLabel?: boolean;
+  /** Write only on blur/Enter instead of every keystroke (cart lines, bundle qty). */
+  commitOnBlur?: boolean;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -44,12 +47,24 @@ export function QtyInput({
   const errorId = `${inputId}-error`;
   const [draft, setDraft] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelCommit = () => {
+    if (commitTimer.current !== null) clearTimeout(commitTimer.current);
+    commitTimer.current = null;
+  };
+  useEffect(
+    () => () => {
+      if (commitTimer.current !== null) clearTimeout(commitTimer.current);
+    },
+    [],
+  );
   const shown =
     draft ?? (value === null ? '' : formatQtyFromMilli(value, unit));
   const parsed = shown.trim() === '' ? null : parseQtyToMilli(shown, unit);
   const invalid = touched && shown.trim() !== '' && parsed === null;
 
   function commit(next: number | null) {
+    cancelCommit();
     setDraft(null);
     onChange(next);
   }
@@ -101,10 +116,18 @@ export function QtyInput({
             const empty = shown.trim() === '';
             const valid = empty || parseQtyToMilli(shown, unit) !== null;
             if (valid) {
+              cancelCommit();
+              if (commitOnBlur)
+                onChange(empty ? null : parseQtyToMilli(shown, unit));
               setDraft(null);
             }
           }}
           onKeyDown={(event) => {
+            if (commitOnBlur && event.key === 'Enter') {
+              event.preventDefault();
+              event.currentTarget.blur();
+              return;
+            }
             if (event.key === '+' || event.key === '-') {
               event.preventDefault();
               step(event.key === '+' ? 1 : -1);
@@ -113,7 +136,14 @@ export function QtyInput({
           onChange={(event) => {
             setDraft(event.target.value);
             const next = parseQtyToMilli(event.target.value, unit);
-            onChange(next);
+            if (!commitOnBlur) {
+              onChange(next);
+              return;
+            }
+            // A short pause commits one cart write instead of one per digit; blur and
+            // Enter commit immediately.
+            cancelCommit();
+            commitTimer.current = setTimeout(() => onChange(next), 200);
           }}
         />
         <button

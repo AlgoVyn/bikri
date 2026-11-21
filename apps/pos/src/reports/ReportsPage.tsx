@@ -53,7 +53,7 @@ import {
   percentText,
   qtyText,
 } from './format.ts';
-import { type ReportFileMeta, reportPdf, reportPng } from './reportFile.ts';
+import type { ReportFileMeta } from './reportFile.ts';
 
 type Preset =
   | 'today'
@@ -500,7 +500,7 @@ export function ReportsPage() {
   const exportPdf = async () => {
     try {
       downloadBlob(
-        await reportPdf(meta),
+        await (await import('./reportFile.ts')).reportPdf(meta),
         `bikri-report-${bundle.range.from}-${bundle.range.to}.pdf`,
       );
     } catch {
@@ -509,6 +509,7 @@ export function ReportsPage() {
   };
   const share = async () => {
     try {
+      const { reportPng } = await import('./reportFile.ts');
       const png = await reportPng(meta);
       const file = new File(
         [png],

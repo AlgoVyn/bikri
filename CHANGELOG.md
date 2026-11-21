@@ -4,6 +4,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### UI cost and responsiveness — 21 Nov 2026 review
+- Cart and bundle quantity inputs now commit after a 200 ms pause or on blur/Enter instead of writing Dexie on every digit, so a typed quantity is one cart write.
+- Closed dialogs stop their live queries (held bills, backdate staff, expense categories/zone, approvals, receive-payment zone, delivery detail) until opened.
+- `ProductList`, `ProductForm`, `PricesPage` and `StockCount` read only category rows (`listCategoryOptions`), not all 5,000 products; `ProductForm` also skips the stock-level/bundle catalogue read for simple products, tracks dirty state without `JSON.stringify`, and revokes the photo Object URL.
+- `MoneyText` only subscribes to translation in privacy mode; `ScrollStrip` reads direction once per language instead of every scroll frame; `ProductDetail` and the operator Tenants list render one responsive layout instead of two.
+- Statement rows reuse their formatted date and customer/supplier searches use precomputed name/phone keys and one collator.
+- PDF/PNG modules for statements, deliveries and reports load on click instead of in the first bundle.
+
 ### Client write path — 21 Nov 2026 review
 - Dexie V12 drops unused indexes (including three prefix indexes covered by a compound one) and adds `file_queue.[status+created_at]` and `sale_voids.business_date`; retention now reads primary keys instead of every failed blob/done job.
 - Push settlement bulk-loads the claimed rows, deletes applied ops in one `bulkDelete`, writes rejected/pending rows in one `bulkPut`, and skips `pull_shadow` work for ledger inserts. `discardFailed` reads the outbox once, narrows its lock to the action's tables and bulk-deletes ledger rows.

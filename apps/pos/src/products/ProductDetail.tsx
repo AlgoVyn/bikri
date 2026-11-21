@@ -43,6 +43,7 @@ import { shortDate } from '../reports/format.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { mutateCart, useShopMoney } from '../sell/useSell.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
+import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
@@ -72,6 +73,7 @@ export function ProductDetailPage({
   const { staff, can } = useCurrentStaff();
   const timeZone =
     useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const wide = useMediaQuery('(min-width: 640px)');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(PRODUCT_HISTORY_PAGE);
@@ -661,45 +663,86 @@ export function ProductDetailPage({
           <p className="text-text-muted">{t('products.history_empty')}</p>
         ) : (
           <>
-            <div className="hidden overflow-x-auto rounded-card border border-border bg-surface sm:block">
-              <table className="w-full text-start">
-                <thead className="text-small text-text-muted">
-                  <tr>
-                    <th className="px-3 py-2 text-start font-normal">
-                      {t('products.history_when')}
-                    </th>
-                    <th className="px-3 py-2 text-start font-normal">
-                      {t('products.history_reason')}
-                    </th>
-                    <th className="px-3 py-2 text-start font-normal">
-                      {t('products.history_qty')}
-                    </th>
-                    <th className="px-3 py-2 text-start font-normal">
-                      {t('products.history_balance')}
-                    </th>
-                    <th className="px-3 py-2 text-start font-normal">
-                      {t('products.history_by')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyView.map((h) => (
-                    <tr key={h.key} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <bdi dir="ltr" className="text-small">
-                          {formatTimestamp(h.at, i18n.language, timeZone)}
-                        </bdi>
-                      </td>
-                      <td className="px-3 py-2">
+            {wide ? (
+              <div className="overflow-x-auto rounded-card border border-border bg-surface">
+                <table className="w-full text-start">
+                  <thead className="text-small text-text-muted">
+                    <tr>
+                      <th className="px-3 py-2 text-start font-normal">
+                        {t('products.history_when')}
+                      </th>
+                      <th className="px-3 py-2 text-start font-normal">
+                        {t('products.history_reason')}
+                      </th>
+                      <th className="px-3 py-2 text-start font-normal">
+                        {t('products.history_qty')}
+                      </th>
+                      <th className="px-3 py-2 text-start font-normal">
+                        {t('products.history_balance')}
+                      </th>
+                      <th className="px-3 py-2 text-start font-normal">
+                        {t('products.history_by')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyView.map((h) => (
+                      <tr key={h.key} className="border-t border-border">
+                        <td className="px-3 py-2">
+                          <bdi dir="ltr" className="text-small">
+                            {formatTimestamp(h.at, i18n.language, timeZone)}
+                          </bdi>
+                        </td>
+                        <td className="px-3 py-2">
+                          {h.reason}
+                          {h.note ? (
+                            <span className="block text-small text-text-muted">
+                              {h.note}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-start ${h.tone}`}
+                          data-testid={
+                            h.qty === null ? 'history-change' : undefined
+                          }
+                        >
+                          {h.qty === null ? (
+                            <span className="text-text-muted">—</span>
+                          ) : (
+                            <bdi dir="ltr">{h.qty}</bdi>
+                          )}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-start"
+                          data-testid="history-balance"
+                        >
+                          <bdi dir="ltr">{h.balance}</bdi>
+                        </td>
+                        <td className="px-3 py-2">{h.by}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ul className="flex flex-col rounded-card border border-border bg-surface">
+                {historyView.map((h) => (
+                  <li
+                    key={h.key}
+                    className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 font-medium">
                         {h.reason}
                         {h.note ? (
-                          <span className="block text-small text-text-muted">
+                          <span className="block text-small font-normal text-text-muted">
                             {h.note}
                           </span>
                         ) : null}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-start ${h.tone}`}
+                      </span>
+                      <span
+                        className={`shrink-0 tabular-nums ${h.tone}`}
                         data-testid={
                           h.qty === null ? 'history-change' : undefined
                         }
@@ -709,62 +752,24 @@ export function ProductDetailPage({
                         ) : (
                           <bdi dir="ltr">{h.qty}</bdi>
                         )}
-                      </td>
-                      <td
-                        className="px-3 py-2 text-start"
-                        data-testid="history-balance"
-                      >
-                        <bdi dir="ltr">{h.balance}</bdi>
-                      </td>
-                      <td className="px-3 py-2">{h.by}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <ul className="flex flex-col rounded-card border border-border bg-surface sm:hidden">
-              {historyView.map((h) => (
-                <li
-                  key={h.key}
-                  className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 font-medium">
-                      {h.reason}
-                      {h.note ? (
-                        <span className="block text-small font-normal text-text-muted">
-                          {h.note}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      className={`shrink-0 tabular-nums ${h.tone}`}
-                      data-testid={
-                        h.qty === null ? 'history-change' : undefined
-                      }
-                    >
-                      {h.qty === null ? (
-                        <span className="text-text-muted">—</span>
-                      ) : (
-                        <bdi dir="ltr">{h.qty}</bdi>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-small text-text-muted">
-                    <bdi dir="ltr">
-                      {formatTimestamp(h.at, i18n.language, timeZone)}
-                    </bdi>
-                    <span>
-                      {t('products.history_balance')}:{' '}
-                      <bdi dir="ltr" data-testid="history-balance">
-                        {h.balance}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-small text-text-muted">
+                      <bdi dir="ltr">
+                        {formatTimestamp(h.at, i18n.language, timeZone)}
                       </bdi>
-                    </span>
-                    {h.by ? <span className="basis-full">{h.by}</span> : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      <span>
+                        {t('products.history_balance')}:{' '}
+                        <bdi dir="ltr" data-testid="history-balance">
+                          {h.balance}
+                        </bdi>
+                      </span>
+                      {h.by ? <span className="basis-full">{h.by}</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
             {detail.hasMoreHistory ? (
               <button
                 type="button"
