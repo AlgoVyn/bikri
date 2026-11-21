@@ -211,6 +211,30 @@ describe('app shell', () => {
     ).toBeTruthy();
   });
 
+  it('hides write controls, the N hotkey and write-only rail items in a read-only shop', async () => {
+    await seedTodaySales();
+    await setKv(getDb(), 'tenant_status', { status: 'read_only', since: 1 });
+    const router = await renderAt(`${BASE_PATH}/products`);
+    expect(
+      await screen.findByRole('heading', { name: 'Products' }),
+    ).toBeTruthy();
+    // The tenant-status live query resolves after the first paint.
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Add product' })).toBeNull(),
+    );
+    const rail = screen.getByRole('navigation', { name: 'Main' });
+    await waitFor(() =>
+      expect(rail.querySelector('a[title^="Sell ("]')).toBeNull(),
+    );
+    // Credits and expenses stay readable; their write controls are gated in-screen.
+    expect(rail.querySelector('a[title^="Credits ("]')).not.toBeNull();
+    expect(rail.querySelector('a[title^="Expenses ("]')).not.toBeNull();
+    expect(rail.querySelector('a[title^="Products ("]')).not.toBeNull();
+    const user = userEvent.setup();
+    await user.keyboard('n');
+    expect(router.state.location.pathname).toBe('/products');
+  });
+
   it('shows the read-only and support banners from kv', async () => {
     await setKv(getDb(), 'tenant_status', { status: 'read_only', since: 1 });
     await setKv(getDb(), 'support', {

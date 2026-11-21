@@ -72,7 +72,10 @@ export const ProductGrid = memo(function ProductGrid({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the result count changes
   useEffect(() => {
     setView((current) => ({ ...current, start: 0, end: 8 }));
-  }, [rows.length]);
+    // The virtual window and the scroll position must agree, or the first tiles of
+    // the new result set render off-screen until the next scroll event.
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [rows.length, scrollRef]);
 
   const totalRows = Math.ceil(rows.length / view.cols);
   const span = Math.max(1, (view.end - view.start) * view.cols);

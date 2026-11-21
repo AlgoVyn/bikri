@@ -20,12 +20,32 @@ export function composing(event: {
   return event.isComposing === true || event.keyCode === 229;
 }
 
-/** True while a modal dialog owns the screen; page shortcuts must not act underneath it. */
+/**
+ * Commit a pending quantity/price edit before a shortcut acts on the cart. QtyInput
+ * commits on blur; blurring here is synchronous, so the action sees the typed value
+ * instead of the previous one (and no later timer mutates the cart under a dialog).
+ */
+export function flushFocusedField(): void {
+  if (typeof document === 'undefined') return;
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement
+  ) {
+    active.blur();
+  }
+}
+
+/**
+ * True while a modal dialog owns the screen; page shortcuts must not act underneath it.
+ * Radix sets `role="dialog"`/`data-state="open"` (not `aria-modal`) and the operator
+ * console uses a native `<dialog open>`, so all three shapes are matched.
+ */
 export function dialogOpen(): boolean {
   if (typeof document === 'undefined') return false;
   return (
     document.querySelector(
-      '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
+      '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog[open]',
     ) !== null
   );
 }

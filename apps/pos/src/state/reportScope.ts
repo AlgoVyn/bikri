@@ -16,3 +16,19 @@ export function seesAllDates(
 ): boolean {
   return canViewReports && !cashierTodayOnly(role, support);
 }
+
+/**
+ * 05 §6: `report.view` gates history *beyond today*. Today's own-branch bill stays
+ * visible without it, and BillDetail/RefundDialog share this one rule so a bookmark
+ * cannot show more than the list does.
+ */
+export function billVisible(
+  role: Role,
+  support: boolean,
+  canViewReports: boolean,
+  sameDay: boolean,
+  sameBranch: boolean,
+): boolean {
+  if (seesAllDates(role, support, canViewReports)) return true;
+  return sameDay && sameBranch;
+}

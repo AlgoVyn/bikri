@@ -14,6 +14,7 @@ import { ChevronRightIcon, CloseIcon, TagIcon } from '../components/icons.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   addCategory,
   CATEGORY_COLORS,
@@ -37,6 +38,7 @@ export function CategoriesPage() {
   const categories = useLiveQuery(() => listCategories(getDb()), []);
   const [name, setName] = useState('');
   const [nameUr, setNameUr] = useState('');
+  const addGuard = useSubmitGuard();
   const [deleting, setDeleting] = useState<{
     id: string;
     name: string;
@@ -64,18 +66,22 @@ export function CategoriesPage() {
           className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3 sm:flex-row"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!name.trim()) return;
-            await addCategory(
-              getDb(),
-              name,
-              CATEGORY_COLORS[
-                (categories?.length ?? 0) % CATEGORY_COLORS.length
-              ],
-              { actor: staff?.id ?? null },
-              nameUr,
-            );
-            setName('');
-            setNameUr('');
+            if (!name.trim() || !addGuard.lock()) return;
+            try {
+              await addCategory(
+                getDb(),
+                name,
+                CATEGORY_COLORS[
+                  (categories?.length ?? 0) % CATEGORY_COLORS.length
+                ],
+                { actor: staff?.id ?? null },
+                nameUr,
+              );
+              setName('');
+              setNameUr('');
+            } finally {
+              addGuard.unlock();
+            }
           }}
         >
           <div className="flex min-w-0 flex-1 flex-col gap-2">

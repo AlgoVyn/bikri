@@ -81,7 +81,7 @@ export function OverrideDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
-        <Dialog.Content className={contentClass}>
+        <Dialog.Content aria-modal="true" className={contentClass}>
           <Dialog.Title className="text-title font-semibold">
             {titleText}
           </Dialog.Title>

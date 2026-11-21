@@ -55,11 +55,12 @@ import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
-import { useHotkey } from '../shell/hotkeys.ts';
+import { composing, flushFocusedField, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { beep } from './beep.ts';
 import { CartPanel } from './CartPanel.tsx';
+import { cartItemCount } from './itemCount.ts';
 import { PayDialog } from './PayDialog.tsx';
 import { ProductGrid } from './ProductGrid.tsx';
 import {
@@ -127,6 +128,7 @@ export function SellPage() {
   >(null);
   const [quickName, setQuickName] = useState('');
   const [override, setOverride] = useState<OverrideRequest | null>(null);
+  const [priceReset, setPriceReset] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stamps = useRef<number[]>([]);
@@ -734,8 +736,11 @@ export function SellPage() {
     { inFields: true, enabled: ready },
   );
   useHotkey(
-    (e) => e.ctrlKey && !e.altKey && /^[123]$/u.test(e.key),
-    (e) => tab(CART_IDS[Number(e.key) - 1] as CartId),
+    (e) => e.ctrlKey && !e.shiftKey && !e.altKey && /^[123]$/u.test(e.key),
+    (e) => {
+      flushFocusedField();
+      tab(CART_IDS[Number(e.key) - 1] as CartId);
+    },
     { inFields: true, enabled: ready },
   );
   useHotkey(fKey('F3'), () => cart.lines.length > 0 && setDialog('discount'), {
@@ -750,7 +755,11 @@ export function SellPage() {
         !e.altKey &&
         !e.metaKey &&
         e.key.toLowerCase() === 'h'),
-    () => cart.lines.length > 0 && setDialog('hold'),
+    () => {
+      if (cart.lines.length === 0) return;
+      flushFocusedField();
+      setDialog('hold');
+    },
     {
       inFields: true,
       enabled: ready,
@@ -795,10 +804,19 @@ export function SellPage() {
     },
     { inFields: true, enabled: ready },
   );
-  useHotkey(fKey('F8'), () => void takePayment(), {
-    inFields: true,
-    enabled: ready,
-  });
+  useHotkey(
+    fKey('F8'),
+    () => {
+      // Commit a quantity typed into an open cart line before the pay screen reads
+      // the cart; otherwise the 200 ms commit landed under the dialog.
+      flushFocusedField();
+      void takePayment();
+    },
+    {
+      inFields: true,
+      enabled: ready,
+    },
+  );
   useHotkey(
     (e) =>
       (e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.altKey && !e.metaKey,
@@ -919,6 +937,8 @@ export function SellPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
+                // Urdu/IME composition owns Enter and Escape while composing.
+                if (composing(e)) return;
                 const now = performance.now();
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -1038,7 +1058,7 @@ export function SellPage() {
             onClick={() => setSheet(true)}
           >
             <span className="min-w-0 truncate">
-              {t('sell.view_cart', { count: cart.lines.length })}
+              {t('sell.view_cart', { count: cartItemCount(cart.lines) })}
             </span>
             <span className="shrink-0">
               <MoneyText paisa={totals.total} />
@@ -1122,6 +1142,7 @@ export function SellPage() {
             backdateStaffName={backdateStaffName}
             onCancelBackdate={stableOnClear}
             cartOrder={prefs?.cartOrder ?? 'newest_first'}
+            priceReset={priceReset}
           />
         ) : null}
       </aside>
@@ -1216,7 +1237,11 @@ export function SellPage() {
       <OverrideDialog
         open={override !== null}
         onOpenChange={(o) => {
-          if (!o) setOverride(null);
+          if (o) return;
+          setOverride(null);
+          // The dialog was cancelled (or approved): drop a typed-but-rejected price
+          // from the line's inline field.
+          setPriceReset((value) => value + 1);
         }}
         body={
           override

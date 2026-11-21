@@ -59,6 +59,7 @@ import { formatShopMoney } from '../lib/money';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { cartItemCount } from './itemCount.ts';
 import { Modal } from './Modal.tsx';
 
 const SaleComplete = lazy(() =>
@@ -251,6 +252,7 @@ function PayStep({
   const chooseMethod = (method: PayMethod) =>
     setRow(activeRow, { method, amount: dueFor(activeRow) });
   const addSplit = () => {
+    if (rows.length >= 4) return;
     const used = new Set(rows.map((r) => r.method));
     const method = PAY_METHODS.find((m) => !used.has(m)) ?? 'cash';
     setRows((list) => [
@@ -525,7 +527,7 @@ function PayStep({
               <MoneyText paisa={total} />
             </p>
             <p className="text-small text-text-muted">
-              {t('pay.items_count', { count: cart.lines.length })}
+              {t('pay.items_count', { count: cartItemCount(cart.lines) })}
             </p>
           </div>
           <dl className="flex flex-col gap-2 border-t border-border pt-2 text-small">
