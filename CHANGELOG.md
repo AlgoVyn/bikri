@@ -4,6 +4,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### P3 polish — 21 Nov 2026 review
+- `tenantDb` hoists its alias-keyword set and FIFO-evicts one verified statement at a time instead of clearing all 1,000; the enrolment limiter evicts by Map insertion order (refreshed on each failure) instead of sorting 10,000 buckets; imported HMAC keys are cached per secret.
+- Server exports page by their signed `export_id` without re-reading the owner row and session on every 500-row page. Owner sign-in, device edit and device revoke now write their update, change-log row and audit row in one `onlyIfChanged` batch instead of two.
+- Operator formatters cache `Intl.NumberFormat`/`Intl.DateTimeFormat` per language; supplier returns reuse `businessDate()`; the lock screen ticks once per second only while a lockout counts down (30 s otherwise) and auto-lock reschedules at most once per second.
+- Product detail reads the shop row once for time zone, cost method and money format; the day-close footer uses an opaque surface with a shadow instead of `backdrop-blur`.
+- The report worker keeps one Dexie connection per tenant, batching uses one `TextEncoder`, price check reuses the normalized search cache, and supplier returns read only the last 180 days through `[supplier_id+created_at]` with `anyOf` chunking.
+- Migration `0024` carries a historical note that its one-time `NOT EXISTS` scan ran after the index was dropped; new backfills must keep an index or page by id.
+
 ### Build, core, printer and agent polish — 21 Nov 2026 review
 - Web workers are emitted as ES modules, so the sheet parser's dynamic imports (Papaparse, read-excel-file) load only when an import runs instead of being bundled into one classic worker.
 - The online-only public shop-request catalogs move to `assets/public/` and leave the PWA precache; the operator console stays under `assets/admin/`.

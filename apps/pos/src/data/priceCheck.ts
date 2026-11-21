@@ -1,5 +1,6 @@
 import type { BikriDb, MasterRow } from '@bikri/db';
 import { findByCode } from './cart.ts';
+import { searchProductIds } from './search.ts';
 import { onHand } from './stock.ts';
 
 /** What the price check card shows (screens/18). Read-only: never writes. */
@@ -45,16 +46,11 @@ export async function priceCheck(
   if (!q) return { kind: 'none' };
   const byCode = await findByCode(db, q);
   if (byCode) return { kind: 'found', card: await priceCard(db, byCode) };
-  const words = q.toLowerCase().split(/\s+/u);
-  const products = await db.products
-    .filter((p) => {
-      if (p.deleted_at) return false;
-      const hay =
-        `${String(p.name_en ?? '')} ${String(p.name_ur ?? '')} ${String(p.brand ?? '')}`.toLowerCase();
-      return words.every((w) => hay.includes(w));
-    })
-    .limit(MAX_MATCHES)
-    .toArray();
+  const ids = await searchProductIds(db, q, MAX_MATCHES);
+  const products = (await db.products.bulkGet(ids)).filter(
+    (product): product is MasterRow =>
+      product !== undefined && !product.deleted_at,
+  );
   if (products.length === 1) {
     return {
       kind: 'found',

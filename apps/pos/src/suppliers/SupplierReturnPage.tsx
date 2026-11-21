@@ -1,4 +1,4 @@
-import { mulDivRound, newId } from '@bikri/core';
+import { businessDate, mulDivRound, newId } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -80,12 +80,7 @@ export function SupplierReturnPage({
   const data = useLiveQuery(async () => {
     const db = getDb();
     const tz = await shopTimeZone(db);
-    const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    const today = businessDate(Date.now(), tz);
     const result = await supplierReturnData(db, supplierId, today);
     if (!result) return null;
     const barcodes = await db.product_barcodes.toArray();

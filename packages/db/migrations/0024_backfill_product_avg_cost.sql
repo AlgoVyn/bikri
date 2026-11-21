@@ -3,6 +3,11 @@
 -- made a sale before the first costed movement look like a zero-cost sale after a pull.
 -- Initialise those rows from the catalogue cost; rows with movements keep their derived
 -- weighted average. Additive data repair only: no column or wire change.
+--
+-- Historical note: 0021 had already dropped `stock_movements_product`, so this one-time
+-- NOT EXISTS scan was unindexed. It is safe because it runs exactly once before the
+-- table can grow large; do not copy the pattern into a new backfill without restoring
+-- an index or paging by product id.
 UPDATE products
 SET avg_cost = last_cost
 WHERE avg_cost = 0

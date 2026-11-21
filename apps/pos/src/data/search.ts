@@ -189,6 +189,27 @@ onLocalWrite((_count, tables) => {
   if (invoice) clearInvoiceSearchCache();
 });
 
+/** Product ids matching every word in the cached name/Urdu name/brand/SKU haystack. */
+export async function searchProductIds(
+  db: BikriDb,
+  raw: string,
+  limit: number,
+): Promise<string[]> {
+  const q = raw.trim().toLowerCase();
+  if (q === '') return [];
+  const words = q.split(/\s+/u);
+  const data = await searchCache(db);
+  const ids: string[] = [];
+  for (const product of data.products) {
+    if (product.deleted) continue;
+    if (words.every((word) => product.haystack.includes(word))) {
+      ids.push(product.id);
+      if (ids.length >= limit) break;
+    }
+  }
+  return ids;
+}
+
 /** Top-bar search (screens/04): name, SKU, barcode, phone or bill number; 5 hits per group. */
 export async function searchAll(
   db: BikriDb,

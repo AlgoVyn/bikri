@@ -73,11 +73,17 @@ export function LockScreen() {
   const [now, setNow] = useState(Date.now());
   const [locks, setLocks] = useState<Record<string, number>>({});
   const [forgot, setForgot] = useState(false);
+  const countingDown = Object.values(locks).some((until) => until > now);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    // A countdown needs one tick per second; an idle lock screen only needs to notice
+    // a lockout that another tab/profile set.
+    const id = setInterval(
+      () => setNow(Date.now()),
+      countingDown ? 1000 : 30_000,
+    );
     return () => clearInterval(id);
-  }, []);
+  }, [countingDown]);
 
   useEffect(() => {
     if (!data) return;

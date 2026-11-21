@@ -14,10 +14,9 @@ function recent(ip: string, now: number): number[] {
 
 function evictOldest(): void {
   if (fails.size <= CAP) return;
-  const ranked = [...fails.entries()].sort(
-    (a, b) => (a[1].at(-1) ?? 0) - (b[1].at(-1) ?? 0),
-  );
-  for (const [key] of ranked) {
+  // Map iterates in insertion order. This avoids sorting 10,000 buckets on the
+  // rare overflow path; keys are only inserted when an IP first fails.
+  for (const key of fails.keys()) {
     if (fails.size <= AFTER_EVICT) break;
     fails.delete(key);
   }
@@ -30,6 +29,8 @@ export function enrolBlocked(ip: string, now: number): boolean {
 export function recordEnrolFailure(ip: string, now: number): void {
   const list = recent(ip, now);
   list.push(now);
+  // Refresh insertion order so an IP that keeps failing is not the first evicted.
+  fails.delete(ip);
   fails.set(ip, list);
   evictOldest();
 }

@@ -58,6 +58,17 @@ export type SupplierReturnData = {
   products: MasterRow[];
 };
 
+/** D1/Dexie `anyOf` builds one bound parameter per key; keep batches well under it. */
+const ANYOF_CHUNK = 400;
+const DAY_MS = 86_400_000;
+
+function chunksOf<T>(values: readonly T[], size = ANYOF_CHUNK): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < values.length; i += size)
+    chunks.push(values.slice(i, i + size));
+  return chunks;
+}
+
 /** Deliveries from the last 180 days with their remaining returnable quantities. */
 export async function supplierReturnData(
   db: BikriDb,
@@ -68,30 +79,46 @@ export async function supplierReturnData(
   if (!supplier || supplier.deleted_at) return null;
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - 180);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  // Backdating is bounded to 30 days, so a 35-day created_at margin still contains
+  // every delivery whose business_date is inside the window.
+  const createdFloor = cutoff.getTime() - 35 * DAY_MS;
   const purchases = (
-    await db.purchases.where('supplier_id').equals(supplierId).toArray()
+    await db.purchases
+      .where('[supplier_id+created_at]')
+      .between(
+        [supplierId, createdFloor],
+        [supplierId, Number.MAX_SAFE_INTEGER],
+      )
+      .toArray()
   )
-    .filter(
-      (purchase) =>
-        String(purchase.business_date) >= cutoff.toISOString().slice(0, 10),
-    )
+    .filter((purchase) => String(purchase.business_date) >= cutoffDate)
     .sort((a, b) => n(b.created_at) - n(a.created_at));
   const purchaseIds = purchases.map((purchase) => String(purchase.id));
   const purchaseLines =
     purchaseIds.length === 0
       ? []
-      : await db.purchase_lines
-          .where('purchase_id')
-          .anyOf(purchaseIds)
-          .toArray();
+      : (
+          await Promise.all(
+            chunksOf(purchaseIds).map((ids) =>
+              db.purchase_lines.where('purchase_id').anyOf(ids).toArray(),
+            ),
+          )
+        ).flat();
   const lineIds = purchaseLines.map((line) => String(line.id));
   const returns =
     lineIds.length === 0
       ? []
-      : await db.supplier_return_lines
-          .where('purchase_line_id')
-          .anyOf(lineIds)
-          .toArray();
+      : (
+          await Promise.all(
+            chunksOf(lineIds).map((ids) =>
+              db.supplier_return_lines
+                .where('purchase_line_id')
+                .anyOf(ids)
+                .toArray(),
+            ),
+          )
+        ).flat();
   const returned = new Map<string, number>();
   for (const line of returns) {
     const key = String(line.purchase_line_id);

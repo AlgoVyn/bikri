@@ -37,9 +37,24 @@ const scope = self as unknown as {
   postMessage: (message: Response) => void;
 };
 
+/* One Dexie connection per tenant in the worker. A report screen sends several
+   requests while a pull changes rows; opening/closing the database each time paid
+   the schema/connection cost repeatedly. */
+let openDb: {
+  tenantId: string;
+  db: ReturnType<typeof openTenantDb>;
+} | null = null;
+
+function dbFor(tenantId: string): ReturnType<typeof openTenantDb> {
+  if (openDb?.tenantId === tenantId) return openDb.db;
+  openDb?.db.close();
+  openDb = { tenantId, db: openTenantDb(tenantId) };
+  return openDb.db;
+}
+
 async function compute(request: Request): Promise<Response> {
   const { id, tenantId, range, previousRange, options } = request;
-  const db = openTenantDb(tenantId);
+  const db = dbFor(tenantId);
   try {
     const bundle = await reportBundle(db, range, options);
     const previous =
@@ -57,8 +72,6 @@ async function compute(request: Request): Promise<Response> {
       id,
       error: error instanceof Error ? error.message : String(error),
     };
-  } finally {
-    db.close();
   }
 }
 
