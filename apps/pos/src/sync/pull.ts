@@ -541,6 +541,18 @@ export async function replayOutboxLocally(db: BikriDb): Promise<void> {
         continue;
       }
       if (isLedgerTable(entry.tbl)) {
+        if (entry.tbl === 'refund_lines') {
+          // The outbox row was stripped of the till-only business_date; restore it
+          // from the refund so the recovered line stays in the reports' date indexes.
+          const line = entry.row as Record<string, unknown>;
+          const refund = await db.refunds.get(String(line.refund_id));
+          await table.put(
+            (refund?.business_date === undefined
+              ? line
+              : { ...line, business_date: refund.business_date }) as never,
+          );
+          continue;
+        }
         await table.put(entry.row);
         continue;
       }

@@ -163,6 +163,9 @@ const DROP_BY_TABLE: Readonly<Record<SyncedTable, ReadonlySet<string>>> =
   ) as unknown as Record<SyncedTable, ReadonlySet<string>>;
 
 export function opRow(tbl: SyncedTable, row: OpRow): OpRow {
+  if (!Object.hasOwn(DROP_BY_TABLE, tbl)) {
+    throw new RangeError(`Unknown synced table: ${String(tbl)}`);
+  }
   const drop = DROP_BY_TABLE[tbl];
   const out: OpRow = {};
   for (const [key, value] of Object.entries(row)) {

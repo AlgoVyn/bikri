@@ -106,6 +106,9 @@ function cumulativeShare(
   if (!Number.isSafeInteger(next)) {
     throw new RangeError('refunded quantity exceeds safe integer');
   }
+  if (next > soldMilli) {
+    throw new RangeError('refunded quantity exceeds the sold quantity');
+  }
   return subSafe(
     mulDivRound(total, next, soldMilli),
     mulDivRound(total, prevMilli, soldMilli),

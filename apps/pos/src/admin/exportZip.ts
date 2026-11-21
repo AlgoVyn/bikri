@@ -42,10 +42,14 @@ async function readTable(
       done: rows.length,
       total: Math.max(total, rows.length),
     });
-    if (!page.has_more || page.rows.length === 0 || page.next_after === after) {
+    if (!page.has_more) {
       complete = true;
       break;
     }
+    // A page that claims more rows but makes no progress must fail loudly instead of
+    // producing a backup that silently stops mid-table.
+    if (page.rows.length === 0 || page.next_after === after)
+      throw new ExportStuck();
     after = page.next_after;
   }
   if (!complete) throw new ExportStuck();

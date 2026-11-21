@@ -79,6 +79,18 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
       expect.arrayContaining([50000, 100000]),
     );
 
+    // Till-only columns must not leak into the archive: the operator restore rejects
+    // unknown columns, and `refund_lines.business_date` exists only in Dexie.
+    const jsonRefundLines = JSON.parse(
+      text.decode(
+        entries.find((entry) => entry.name === 'json/refund_lines.json')?.data,
+      ),
+    ) as Record<string, unknown>[];
+    expect(jsonRefundLines.length).toBeGreaterThan(0);
+    expect(jsonRefundLines.every((line) => !('business_date' in line))).toBe(
+      true,
+    );
+
     const salesCsv = text
       .decode(entries.find((entry) => entry.name === 'csv/sales.csv')?.data)
       .replace(/^\uFEFF/u, '');

@@ -33,6 +33,100 @@ describe('mergeRows', () => {
     expect(pulled).toContain('party_balances');
   });
 
+  it('derives refund line dates from refunds on the same pull page', async () => {
+    const db = await readyDb('merge-refund-dates');
+    await merge(
+      db,
+      [
+        {
+          tbl: 'refunds',
+          row: row('r1', {
+            sale_id: 's1',
+            business_date: '2026-10-27',
+            kind: 'partial',
+            method: 'cash',
+            amount: 100,
+            exact_amount: 100,
+            udhaar_part: 0,
+            rounding: 0,
+            branch_id: 'b1',
+            device_id: 'd1',
+            staff_id: 'st1',
+            created_at: 100,
+          }),
+        },
+        {
+          tbl: 'refund_lines',
+          row: row('rl1', {
+            refund_id: 'r1',
+            sale_line_id: 'sl1',
+            qty_milli: 1000,
+            amount: 100,
+            restock: 1,
+            created_at: 100,
+          }),
+        },
+      ],
+      false,
+    );
+    expect((await db.refund_lines.get('rl1'))?.business_date).toBe(
+      '2026-10-27',
+    );
+  });
+
+  it('recomputes a party once when a page carries several ledger rows', async () => {
+    const db = await readyDb('merge-ledger-batch');
+    await db.ledger_entries.put(
+      row('l0', {
+        party_type: 'customer',
+        party_id: 'c1',
+        amount: 5000,
+        source_type: 'sale',
+        note: '',
+        created_at: 100,
+      }) as never,
+    );
+    await db.party_balances.put({
+      party_type: 'customer',
+      party_id: 'c1',
+      balance: 5000,
+      last_activity_at: 100,
+      oldest_unpaid_at: 100,
+      last_payment_at: null,
+    });
+    await merge(
+      db,
+      [
+        {
+          tbl: 'ledger_entries',
+          row: row('l1', {
+            party_type: 'customer',
+            party_id: 'c1',
+            amount: -400,
+            source_type: 'payment',
+            note: '',
+            created_at: 200,
+          }),
+        },
+        {
+          tbl: 'ledger_entries',
+          row: row('l2', {
+            party_type: 'customer',
+            party_id: 'c1',
+            amount: 1000,
+            source_type: 'sale',
+            note: '',
+            created_at: 300,
+          }),
+        },
+      ],
+      true,
+    );
+    expect(await db.party_balances.get(['customer', 'c1'])).toMatchObject({
+      balance: 5600,
+    });
+  });
+
   it('scans a large page once and bulk-writes sale lines', async () => {
     const db = await readyDb('merge-large');
     const rows = Array.from({ length: 250 }, (_, i) => ({

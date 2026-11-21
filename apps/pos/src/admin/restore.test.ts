@@ -260,6 +260,16 @@ describe('export zip manifest', () => {
     });
     expect(importableRow({ id: 1 })).toBeNull();
     expect(importableRow({ id: 'a', nest: { x: 1 } })).toBeNull();
+    expect(
+      importableRow(
+        {
+          id: 'line-1',
+          refund_id: 'refund-1',
+          business_date: '2026-10-27',
+        },
+        'refund_lines',
+      ),
+    ).toEqual({ id: 'line-1', refund_id: 'refund-1' });
 
     const bad = zipStore([
       { name: 'manifest.json', data: text.encode('{"format":"nope"}') },
@@ -267,6 +277,45 @@ describe('export zip manifest', () => {
     await expect(unzip(bad).then(parseExport)).rejects.toBeInstanceOf(
       ExportZipError,
     );
+  });
+
+  it('rejects a manifest that names the same table twice', async () => {
+    const duplicate = zipStore([
+      {
+        name: 'manifest.json',
+        data: text.encode(
+          JSON.stringify({
+            format: 'bikri-export',
+            version: 2,
+            exported_at: '2026-10-27T00:00:00.000Z',
+            tenant: { id: 't1', slug: 't1', display_name: 'T' },
+            tables: [
+              { tbl: 'shop', rows: 1 },
+              { tbl: 'shop', rows: 1 },
+            ],
+          }),
+        ),
+      },
+      {
+        name: 'json/shop.json',
+        data: text.encode(JSON.stringify([{ id: 'shop' }])),
+      },
+    ]);
+    await expect(unzip(duplicate).then(parseExport)).rejects.toBeInstanceOf(
+      ExportZipError,
+    );
+  });
+
+  it('does not throw when restore progress storage is unavailable', () => {
+    expect(() =>
+      writeRestoreState('t1', initialRestoreState(), {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('quota');
+        },
+        removeItem: () => undefined,
+      }),
+    ).not.toThrow();
   });
 
   it('flags an export that omits tables a restore would purge', () => {

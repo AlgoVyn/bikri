@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Review remediation — 22 Nov 2026
+- `bikri-export` strips till-only columns (`refund_lines.business_date`) and the operator restore also strips them defensively, so a till backup restores after the live purge.
+- Dexie V13 repairs refund lines that were pulled or replayed without `business_date`; the pull derives the date from refunds on the same page and restore replay reattaches it from the parent refund.
+- A batch with several ledger rows for one party recomputes that party's balance once instead of counting later siblings twice.
+- Migration `0030` republishes the `0024` `avg_cost` repair through `change_log`, advances `cost_changed_at` only for costed receipts, rejects negative movement costs, and adds database backstops for bundle recipes, bundle stock movements, bundle discounts and watermarks.
+- The restore ZIP grows its inflate buffer with the real output, caps the total archive, skips CSV entries, rejects duplicate manifest tables and keeps one active restore per tenant.
+
 ### P3 polish — 21 Nov 2026 review
 - `tenantDb` hoists its alias-keyword set and FIFO-evicts one verified statement at a time instead of clearing all 1,000; the enrolment limiter evicts by Map insertion order (refreshed on each failure) instead of sorting 10,000 buckets; imported HMAC keys are cached per secret.
 - Server exports page by their signed `export_id` without re-reading the owner row and session on every 500-row page. Owner sign-in, device edit and device revoke now write their update, change-log row and audit row in one `onlyIfChanged` batch instead of two.

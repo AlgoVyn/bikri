@@ -86,6 +86,8 @@ export function creditLimitCheck(
   assertSafeInteger(udhaarPart, 'udhaarPart');
   if (creditLimit !== null) {
     assertSafeInteger(creditLimit, 'creditLimit');
+    if (creditLimit < 0)
+      throw new RangeError('creditLimit must be non-negative');
   }
   const balanceAfter = currentBalance + udhaarPart;
   if (!Number.isSafeInteger(balanceAfter)) {

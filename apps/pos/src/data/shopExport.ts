@@ -3,6 +3,7 @@ import {
   DEFAULT_TIME_ZONE,
   EXPORT_HIDDEN_COLUMNS,
   isTimeZone,
+  LOCAL_ONLY_COLUMNS,
   MONEY_FIELDS,
   SYNC_EXPORT_ORDER,
   TIME_FIELDS,
@@ -302,7 +303,12 @@ export async function buildShopExport(
   const writer = new ZipStoreWriter(now);
   for (const [index, name] of SHOP_EXPORT_TABLES.entries()) {
     const table = db.table(name) as Table<Record<string, unknown>, string>;
-    const hidden = new Set(EXPORT_HIDDEN_COLUMNS[name] ?? []);
+    const hidden = new Set([
+      ...(EXPORT_HIDDEN_COLUMNS[name] ?? []),
+      // Till-only columns (e.g. `refund_lines.business_date`) have no D1 column and
+      // would make the operator restore reject every row of that table.
+      ...(LOCAL_ONLY_COLUMNS[name] ?? []),
+    ]);
     const json = new JsonStream();
     const csv = new ExportStream();
     let columns: string[] | null = null;
