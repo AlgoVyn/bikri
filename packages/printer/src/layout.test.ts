@@ -83,6 +83,24 @@ describe('formatPair', () => {
     ))
       expect(hasControl(line)).toBe(false);
   });
+
+  it('measures Urdu by grapheme, not UTF-16 code units', () => {
+    // 3 graphemes, 6 code units: the pair still fits one 10-column line.
+    const urdu = 'بَبَبَ';
+    expect(formatPair('', urdu, 10)).toEqual([`${' '.repeat(7)}${urdu}`]);
+    const [line] = formatPair('Total', urdu, 12);
+    expect(line).toBe(`Total${' '.repeat(4)}${urdu}`);
+  });
+});
+
+describe('visible line padding', () => {
+  it('pads by grapheme width so Urdu centres on the printed column', () => {
+    const out = renderReceiptText(
+      [{ t: 'text', text: 'بَبَبَ', align: 'center' }],
+      { charsPerLine: 10, itemLayout: 'stacked' },
+    );
+    expect(out).toBe(`   بَبَبَ    \n`);
+  });
 });
 
 describe('item columns (06 §4.1)', () => {
@@ -102,6 +120,18 @@ describe('item columns (06 §4.1)', () => {
     );
     expect(first?.[32]).toBe('2');
     expect(first?.slice(-6)).toBe('Rs 900');
+  });
+
+  it('keeps an Urdu quantity in the qty column when its graphemes fit', () => {
+    // 4 graphemes / 8 code units; the old .length check stacked the line.
+    const qty = 'بَبَبَ';
+    const [line] = formatItemLines(
+      { name: 'Rice', qty, amount: 'Rs 5' },
+      48,
+      'columns',
+    );
+    expect(line).toContain(qty);
+    expect(line?.endsWith('Rs 5')).toBe(true);
   });
 
   it('stacks instead of truncating a quantity or amount that does not fit', () => {

@@ -192,7 +192,7 @@ export async function printBlocks(
     languageOverride ?? (drawerOnly ? 'en' : await receiptLanguage(db));
   // English ASCII receipts never touch the canvas renderer; loading Noto Naskh and
   // Inter for them (and for a drawer kick) was the bulk of the print stall.
-  if (!drawerOnly && (language === 'ur' || hasNonAscii(JSON.stringify(blocks))))
+  if (!drawerOnly && (language === 'ur' || blocksNeedRaster(blocks)))
     await prepareRasterFonts();
   // A drawer kick belongs to the sale/refund action, not to every copy of its
   // receipt. Encode the body without drawer blocks and append one kick after all
@@ -269,6 +269,20 @@ const sleep = (ms: number) =>
 /** Urdu names/notes need the canvas renderer; pure ASCII receipts do not. */
 function hasNonAscii(value: string): boolean {
   for (const char of value) if ((char.codePointAt(0) ?? 0) > 0x7f) return true;
+  return false;
+}
+
+/**
+ * Whether any printed string needs the canvas font set. Scanning string fields
+ * avoids JSON-serialising the block list (and any binary payload a caller
+ * happens to pass) just to look for non-ASCII text.
+ */
+export function blocksNeedRaster(blocks: Block[]): boolean {
+  for (const block of blocks) {
+    for (const value of Object.values(block)) {
+      if (typeof value === 'string' && hasNonAscii(value)) return true;
+    }
+  }
   return false;
 }
 

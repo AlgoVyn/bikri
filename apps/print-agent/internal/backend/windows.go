@@ -37,6 +37,14 @@ const (
 	jobControlCancel       = 2
 )
 
+// windowsPrinterTTL is the same short cache CUPS uses: a newly installed queue
+// appears without a restart, and a burst of health/printers/diagnostics calls
+// does not enumerate the spooler each time.
+const windowsPrinterTTL = 10 * time.Second
+
+// windowsRefreshTimeout bounds the shared enumeration work.
+const windowsRefreshTimeout = 10 * time.Second
+
 var (
 	winspool = syscall.NewLazyDLL("winspool.drv")
 	gdi32    = syscall.NewLazyDLL("gdi32.dll")
@@ -48,29 +56,36 @@ var (
 	procWritePrinter      = winspool.NewProc("WritePrinter")
 	procEndPagePrinter    = winspool.NewProc("EndPagePrinter")
 	procEndDocPrinter     = winspool.NewProc("EndDocPrinter")
+	procAbortPrinter      = winspool.NewProc("AbortPrinter")
 	procGetJobW           = winspool.NewProc("GetJobW")
 	procSetJobW           = winspool.NewProc("SetJobW")
 	procEnumPrintersW     = winspool.NewProc("EnumPrintersW")
 	procGetDefaultPrinter = winspool.NewProc("GetDefaultPrinterW")
 
-	procCreateDCW     = gdi32.NewProc("CreateDCW")
-	procDeleteDC      = gdi32.NewProc("DeleteDC")
-	procStartDocW     = gdi32.NewProc("StartDocW")
-	procStartPage     = gdi32.NewProc("StartPage")
-	procEndPage       = gdi32.NewProc("EndPage")
-	procEndDoc        = gdi32.NewProc("EndDoc")
-	procAbortDoc      = gdi32.NewProc("AbortDoc")
-	procSetMapMode    = gdi32.NewProc("SetMapMode")
-	procStretchDIBits = gdi32.NewProc("StretchDIBits")
+	procCreateDCW         = gdi32.NewProc("CreateDCW")
+	procDeleteDC          = gdi32.NewProc("DeleteDC")
+	procStartDocW         = gdi32.NewProc("StartDocW")
+	procStartPage         = gdi32.NewProc("StartPage")
+	procEndPage           = gdi32.NewProc("EndPage")
+	procEndDoc            = gdi32.NewProc("EndDoc")
+	procAbortDoc          = gdi32.NewProc("AbortDoc")
+	procSetMapMode        = gdi32.NewProc("SetMapMode")
+	procStretchDIBits     = gdi32.NewProc("StretchDIBits")
+	procGetDeviceCaps     = gdi32.NewProc("GetDeviceCaps")
+	procSetStretchBltMode = gdi32.NewProc("SetStretchBltMode")
 )
 
 type windowsBackend struct {
 	mu             sync.Mutex
 	rawUnsupported map[string]bool
+	rawSupported   map[string]bool
 
-	printersMu sync.Mutex
-	printers   []Printer
-	printersAt time.Time
+	printersMu  sync.Mutex
+	printers    []Printer
+	printersAt  time.Time
+	refreshing  bool
+	refreshDone chan struct{}
+	refreshErr  error
 }
 
 type docInfo1 struct {
@@ -129,22 +144,106 @@ type printerInfo4 struct {
 
 func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	b.printersMu.Lock()
-	if b.printers != nil && time.Since(b.printersAt) < 10*time.Second {
+	if b.printers != nil && time.Since(b.printersAt) < windowsPrinterTTL {
 		list := append([]Printer(nil), b.printers...)
 		b.printersMu.Unlock()
-		return list, nil
+		return b.decorate(list), nil
 	}
+	if b.refreshing {
+		done := b.refreshDone
+		b.printersMu.Unlock()
+		list, refreshErr, waitErr := b.wait(ctx, done)
+		if waitErr != nil {
+			return nil, waitErr
+		}
+		if list == nil && refreshErr != nil {
+			return nil, refreshErr
+		}
+		return b.decorate(list), nil
+	}
+	b.refreshing = true
+	b.refreshDone = make(chan struct{})
+	done := b.refreshDone
+	hasStale := b.printers != nil
+	stale := append([]Printer(nil), b.printers...)
 	b.printersMu.Unlock()
 
-	list, err := listWindowsPrinters(ctx)
-	if err != nil {
-		return nil, err
+	// The refresh is shared by every waiter; do not inherit the first caller's
+	// deadline (a 300 ms health probe can lead a 30 s print job).
+	go func() {
+		refreshCtx, cancel := context.WithTimeout(context.Background(), windowsRefreshTimeout)
+		defer cancel()
+		b.refresh(refreshCtx, done)
+	}()
+
+	list, refreshErr, waitErr := b.wait(ctx, done)
+	if waitErr != nil {
+		return nil, waitErr
+	}
+	if refreshErr != nil && hasStale {
+		return b.decorate(stale), nil
+	}
+	if refreshErr != nil {
+		return nil, refreshErr
+	}
+	return b.decorate(list), nil
+}
+
+// wait blocks until the singleflight finishes or the caller's deadline wins.
+func (b *windowsBackend) wait(ctx context.Context, done chan struct{}) ([]Printer, error, error) {
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
 	}
 	b.printersMu.Lock()
-	b.printers = append([]Printer(nil), list...)
-	b.printersAt = time.Now()
+	list := append([]Printer(nil), b.printers...)
+	refreshErr := b.refreshErr
 	b.printersMu.Unlock()
-	return list, nil
+	return list, refreshErr, nil
+}
+
+// refresh always publishes a result: a panic in the singleflight would
+// otherwise leave `refreshing` true and make every later call block forever.
+func (b *windowsBackend) refresh(ctx context.Context, done chan struct{}) (list []Printer, err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			err = &Error{Code: "SPOOL_ERROR", Message: fmt.Sprint("printer enumeration failed: ", value)}
+		}
+		b.printersMu.Lock()
+		if err == nil {
+			b.printers = append([]Printer{}, list...)
+			b.printersAt = time.Now()
+		}
+		b.refreshErr = err
+		b.refreshing = false
+		b.refreshDone = nil
+		close(done)
+		b.printersMu.Unlock()
+	}()
+	return listWindowsPrinters(ctx)
+}
+
+// decorate attaches the optional supportsRaw metadata the agent has learned
+// from earlier jobs. No client depends on it (14 §6 marks it optional), so a
+// queue that has never seen a raw job simply omits the field.
+func (b *windowsBackend) decorate(printers []Printer) []Printer {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	out := make([]Printer, len(printers))
+	copy(out, printers)
+	for i := range out {
+		name := out[i].Name
+		switch {
+		case b.rawUnsupported[name]:
+			value := false
+			out[i].SupportsRaw = &value
+		case b.rawSupported[name]:
+			value := true
+			out[i].SupportsRaw = &value
+		}
+	}
+	return out
 }
 
 // listWindowsPrinters asks the spooler directly. The old PowerShell/CIM probe took
@@ -154,7 +253,6 @@ func listWindowsPrinters(ctx context.Context) ([]Printer, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	const errorInsufficientBuffer = 122
 	flags := uint32(printerEnumLocal | printerEnumConnections)
 	var needed, returned uint32
 	r1, _, callErr := procEnumPrintersW.Call(
@@ -209,8 +307,10 @@ func listWindowsPrinters(ctx context.Context) ([]Printer, error) {
 
 func defaultPrinterName() string {
 	var needed uint32
-	r1, _, _ := procGetDefaultPrinter.Call(0, uintptr(unsafe.Pointer(&needed)))
-	if r1 == 0 || needed == 0 {
+	r1, _, callErr := procGetDefaultPrinter.Call(0, uintptr(unsafe.Pointer(&needed)))
+	// A NULL buffer returns FALSE with ERROR_INSUFFICIENT_BUFFER while filling
+	// `needed`; that is success for the length query.
+	if !acceptDefaultPrinterBuffer(r1, errorNumberOf(callErr), needed) {
 		return ""
 	}
 	buf := make([]uint16, needed)
@@ -239,7 +339,7 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 		// GDI's StartDoc does not return the spooler job id, so the compatibility
 		// path is reported done once EndDoc accepts the document. Raw jobs keep
 		// the real spooler id and are polled for status.
-		return "", b.printImage(job)
+		return "", b.printImage(ctx, job)
 	}
 	b.mu.Lock()
 	unsupported := b.rawUnsupported[job.Printer]
@@ -280,16 +380,24 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 		}
 		return "", &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
-	defer procEndDocPrinter.Call(uintptr(handle))
+	// fail aborts the spool entry. Finalising a half-written ESC/POS stream with
+	// EndDocPrinter would print a truncated receipt (cut mid-raster/QR) and report
+	// success; AbortPrinter discards it instead.
+	fail := func(message string) (string, error) {
+		_, _, _ = procAbortPrinter.Call(uintptr(handle))
+		return "", &Error{Code: "SPOOL_ERROR", Message: message}
+	}
 
 	r1, _, callErr := procStartPagePrinter.Call(uintptr(handle))
 	if r1 == 0 {
-		return "", &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+		return fail(lastError(callErr))
 	}
-	defer procEndPagePrinter.Call(uintptr(handle))
 
-	for i := 0; i < max(1, job.Copies); i++ {
+	for copyIndex := 0; copyIndex < max(1, job.Copies); copyIndex++ {
 		for at := 0; at < len(job.Data); at += 4096 {
+			if err := ctx.Err(); err != nil {
+				return fail(err.Error())
+			}
 			end := min(at+4096, len(job.Data))
 			chunk := job.Data[at:end]
 			// The spooler may accept fewer bytes than offered. Keep feeding the
@@ -304,16 +412,31 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 				)
 				runtime.KeepAlive(chunk)
 				if r1 == 0 {
-					return "", &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+					return fail(lastError(callErr))
 				}
 				if written == 0 || int(written) > len(chunk) {
-					return "", &Error{Code: "SPOOL_ERROR", Message: "the spooler accepted no data"}
+					return fail("the spooler accepted no data")
 				}
 				chunk = chunk[written:]
 			}
 		}
 	}
 	runtime.KeepAlive(job.Data)
+	r1, _, callErr = procEndPagePrinter.Call(uintptr(handle))
+	if r1 == 0 {
+		return fail(lastError(callErr))
+	}
+	r1, _, callErr = procEndDocPrinter.Call(uintptr(handle))
+	if r1 == 0 {
+		return fail(lastError(callErr))
+	}
+	b.mu.Lock()
+	if b.rawSupported == nil {
+		b.rawSupported = map[string]bool{}
+	}
+	b.rawSupported[job.Printer] = true
+	delete(b.rawUnsupported, job.Printer)
+	b.mu.Unlock()
 	return strconv.FormatUint(uint64(jobID), 10), nil
 }
 
@@ -332,7 +455,7 @@ func (b *windowsBackend) Status(ctx context.Context, printer, spoolID string) (S
 	defer procClosePrinter.Call(uintptr(handle))
 
 	var needed uint32
-	_, _, _ = procGetJobW.Call(
+	r1, _, callErr := procGetJobW.Call(
 		uintptr(handle),
 		uintptr(uint32(id)),
 		1,
@@ -340,12 +463,27 @@ func (b *windowsBackend) Status(ctx context.Context, printer, spoolID string) (S
 		0,
 		uintptr(unsafe.Pointer(&needed)),
 	)
+	if r1 == 0 {
+		switch errorNumberOf(callErr) {
+		case errorInsufficientBuffer:
+			// The size query behaved as documented; `needed` is set below.
+		case 87, 6: // ERROR_INVALID_PARAMETER / ERROR_INVALID_HANDLE: job gone
+			return Status{State: "done"}, nil
+		default:
+			// A spooler failure is not a completed job. Reporting "done" here
+			// hid crashes and access-denied errors from the till.
+			return Status{}, &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+		}
+	}
 	if needed == 0 {
 		// The spooler removed the job: it normally means it printed.
 		return Status{State: "done"}, nil
 	}
+	if needed < uint32(unsafe.Sizeof(jobInfo1{})) {
+		return Status{}, &Error{Code: "SPOOL_ERROR", Message: "the spooler returned an invalid job record"}
+	}
 	buf := make([]byte, needed)
-	r1, _, callErr := procGetJobW.Call(
+	r1, _, callErr = procGetJobW.Call(
 		uintptr(handle),
 		uintptr(uint32(id)),
 		1,
@@ -405,7 +543,7 @@ func (b *windowsBackend) Cancel(ctx context.Context, printer, spoolID string) er
 	return nil
 }
 
-func (b *windowsBackend) printImage(job Job) error {
+func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	config, err := png.DecodeConfig(bytes.NewReader(job.Data))
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
@@ -470,13 +608,26 @@ func (b *windowsBackend) printImage(job Job) error {
 	abort := func() {
 		_, _, _ = procAbortDoc.Call(hdc)
 	}
+	// MM_TEXT coordinates are printer pixels, so a 1:1 StretchDIBits draw was a
+	// 24 mm strip on a 600 dpi driver and clipped on a 180 dpi head. Ask the
+	// driver for its resolution and printable width and fill the paper instead.
+	dpiX := deviceCaps(hdc, gdiLogPixelsX)
+	dpiY := deviceCaps(hdc, gdiLogPixelsY)
+	horzRes := deviceCaps(hdc, gdiHorzRes)
+	destWidth, destHeight := gdiTargetSize(width, height, job.PaperMM, dpiX, dpiY, horzRes)
 	for i := 0; i < max(1, job.Copies); i++ {
+		if err := ctx.Err(); err != nil {
+			abort()
+			return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
+		}
 		r1, _, callErr = procStartPage.Call(hdc)
 		if !gdiSucceeded(r1) {
 			abort()
 			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 		}
-		_, _, _ = procSetMapMode.Call(hdc, 1) // MM_TEXT
+		_, _, _ = procSetMapMode.Call(hdc, gdiMMText)
+		// HALFTONE smooths the downscale/upscale instead of dropping rows.
+		_, _, _ = procSetStretchBltMode.Call(hdc, gdiHalftone)
 		bmi := bitmapInfoHeader{
 			biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
 			biWidth:       int32(width),
@@ -488,7 +639,7 @@ func (b *windowsBackend) printImage(job Job) error {
 		}
 		r1, _, callErr = procStretchDIBits.Call(
 			hdc,
-			0, 0, uintptr(width), uintptr(height),
+			0, 0, uintptr(destWidth), uintptr(destHeight),
 			0, 0, uintptr(width), uintptr(height),
 			uintptr(unsafe.Pointer(&bits[0])),
 			uintptr(unsafe.Pointer(&bmi)),
@@ -513,6 +664,13 @@ func (b *windowsBackend) printImage(job Job) error {
 	}
 	runtime.KeepAlive(bits)
 	return nil
+}
+
+// deviceCaps returns one GetDeviceCaps value; 0 means the driver did not report
+// it (or the call failed), and the caller falls back to a sane default.
+func deviceCaps(hdc uintptr, index int32) int {
+	value, _, _ := procGetDeviceCaps.Call(hdc, uintptr(index))
+	return int(int32(value))
 }
 
 func openPrinter(name string) (syscall.Handle, error) {

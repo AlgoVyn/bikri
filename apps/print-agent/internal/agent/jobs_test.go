@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ type fakeBackend struct {
 	spoolID     string
 	status      backend.Status
 	statusErr   error
+	statusHook  func()
 	cancelErr   error
 	printers    []backend.Printer
 	printersErr error
@@ -58,7 +60,14 @@ func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
 }
 
 func (f *fakeBackend) Status(context.Context, string, string) (backend.Status, error) {
-	return f.status, f.statusErr
+	f.mu.Lock()
+	hook := f.statusHook
+	status, err := f.status, f.statusErr
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	return status, err
 }
 
 func (f *fakeBackend) Cancel(context.Context, string, string) error {
@@ -330,5 +339,59 @@ func TestManagerCancelFailure(t *testing.T) {
 	}
 	if _, _, err := manager.Cancel(context.Background(), "job-1"); err == nil {
 		t.Fatal("cancel failure was hidden")
+	}
+}
+
+// A poll that was already talking to the spooler when Cancel landed must not
+// write the spooler's older "printing"/"done" snapshot over the terminal state.
+func TestManagerGetDoesNotOverwriteCanceled(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	fake := &fakeBackend{spoolID: "42", status: backend.Status{State: "printing"}}
+	fake.statusHook = func() {
+		close(entered)
+		<-release
+	}
+	manager := NewManager(fake)
+	if _, err := submitJob(manager, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+
+	polled := make(chan *JobStatus, 1)
+	go func() {
+		status, ok := manager.Get(context.Background(), "job-1")
+		if !ok {
+			polled <- nil
+			return
+		}
+		polled <- status
+	}()
+	<-entered
+	if _, found, err := manager.Cancel(context.Background(), "job-1"); err != nil || !found {
+		t.Fatalf("cancel = %v, %v", found, err)
+	}
+	close(release)
+	got := <-polled
+	if got == nil || got.Status != "canceled" {
+		t.Fatalf("polled status = %+v, want canceled", got)
+	}
+}
+
+func TestManagerRejectsInvalidPNGBeforeTheBackend(t *testing.T) {
+	fake := &fakeBackend{spoolID: "42"}
+	manager := NewManager(fake)
+	req := validRequest()
+	req.Mode = "driver"
+	req.Encoding = "png"
+	req.Data = base64.StdEncoding.EncodeToString([]byte("not a png"))
+	job, err := submitJob(manager, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "failed" || job.Error != "SPOOL_ERROR" {
+		t.Fatalf("job = %+v", job)
+	}
+	if fake.printCalls != 0 {
+		t.Fatalf("unvalidated PNG reached the backend (%d prints)", fake.printCalls)
 	}
 }

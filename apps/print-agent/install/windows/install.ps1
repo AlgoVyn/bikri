@@ -20,6 +20,9 @@ $shortcut.Description = 'Bikri Print Agent'
 $shortcut.Save()
 
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+# The Run key exists on every normal profile, but a stripped/roamed profile may
+# not; create it instead of failing after the binary and shortcut are in place.
+New-Item -Path $runKey -Force | Out-Null
 Set-ItemProperty -Path $runKey -Name 'BikriPrintAgent' -Value "`"$exe`""
 
 Start-Process -FilePath $exe

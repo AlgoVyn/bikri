@@ -85,6 +85,28 @@ describe('renderReceiptHtml (06 §5.3)', () => {
     );
   });
 
+  it('styles the branding line only in the pushed Font B centre style', () => {
+    // A footer that happens to repeat the words is an ordinary line.
+    const footer = renderReceiptHtml(
+      [{ t: 'text', text: 'Powered by AlgoVyn' }],
+      { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
+    );
+    expect(footer).not.toContain('<p class="powered-by">');
+    expect(footer).toContain('<div class="l">Powered by AlgoVyn</div>');
+    const powered = renderReceiptHtml(
+      [
+        {
+          t: 'text',
+          text: 'Powered by AlgoVyn',
+          align: 'center',
+          size: 'small',
+        },
+      ],
+      { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
+    );
+    expect(powered).toContain('<p class="powered-by">Powered by AlgoVyn</p>');
+  });
+
   it('drops unsafe logo URLs from the print iframe', () => {
     const render = (logoUrl: string) =>
       renderReceiptHtml([{ t: 'logo' }], {

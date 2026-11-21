@@ -117,7 +117,14 @@ export function renderReceiptHtml(
         break;
       }
       case 'text': {
-        if (command.text === POWERED_BY) {
+        // Style the branding line only where pushPoweredBy put it (Font B,
+        // centred); a shop footer that happens to repeat the words stays a
+        // normal line.
+        if (
+          command.text === POWERED_BY &&
+          command.size === 'small' &&
+          command.align === 'center'
+        ) {
           body.push(`<p class="powered-by">${POWERED_BY}</p>`);
           break;
         }
