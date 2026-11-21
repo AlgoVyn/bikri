@@ -848,6 +848,15 @@ export async function applyOps(
       error_code: code,
     });
   }
+  const maxInvoiceSeq = ctx.maxInvoiceSeq ?? 0;
+  if (maxInvoiceSeq > 0)
+    tail.push(
+      db.prepare(
+        'UPDATE devices SET last_invoice_seq = MAX(last_invoice_seq, ?2) WHERE tenant_id = ?1 AND id = ?3',
+        maxInvoiceSeq,
+        ctx.device.id,
+      ),
+    );
   return {
     results: ops.flatMap((o) => {
       const r = final.get(o.op_id);

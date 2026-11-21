@@ -10,6 +10,7 @@ export const PLATFORM_TABLES = [
   'meta',
   'tenants',
   'tenant_usage',
+  'change_log_watermarks',
   'expense_category_templates',
   'shop_requests',
   'operator_audit',

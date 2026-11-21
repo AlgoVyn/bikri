@@ -36,6 +36,8 @@ export type ApplyContext = {
   device: DeviceRow;
   now: number;
   budget: CallBudget;
+  /** Highest invoice_seq applied in this push; one device update covers them all. */
+  maxInvoiceSeq?: number;
 };
 
 export type ApplyOutcome = {

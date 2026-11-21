@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### D1 write/read capacity — 21 Nov 2026 review
+- Migration `0029` drops four unused indexes (`products_kind`, `purchases_supplier`, `supplier_returns_supplier`, `audit_log_time`), narrows `ledger_source` to refund rows and `payments_sale` to void rows, makes `stock_movements_ref` and `ledger_party` covering, and replaces the per-row `change_log_prune` index with a per-tenant daily `change_log_watermarks` table.
+- The nightly prune records each tenant's daily `MAX(seq)` and reads its cutoff watermark; the first run after deploy derives the mark once. This removes the 9 D1 writes/bill the old prune index charged and the per-tenant `MAX(seq)` scans.
+- A push updates `devices.last_invoice_seq` once with `MAX(...)` instead of once per sale, sale-status recomputation no longer joins `refunds`, and only void reversals are looked up by `sale_id` (normal sale/refund payments use their own ids).
+- Operator export pages no longer run 29 `COUNT(*)` scans (`counts=false`), matching the till and owner exports.
+
 ### Remaining P1 performance batch — 21 Nov 2026 review
 - Sales history reads failed print jobs from the status index and refunds from the range start; the chase list uses the party-balance cache's new `last_payment_at` instead of scanning payments. Bundle detail reads only its 14-day `[bundle_id+business_date]` lines and its own component stock; restore recovery bounds parent rows by `created_at` and reads child lines only for recovered parents.
 - Hidden master lists and the Settings nav no longer mount below 1280 px; Chase, Reports, Customers, Suppliers and Activity render bounded pages instead of unbounded/infinite-scroll DOM.
