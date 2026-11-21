@@ -68,6 +68,10 @@ export const pwaOptions = {
     /* Glob URLs are relative to dist/bikri. Prefix them so they match the scope
        and navigateFallback. The manifest file is added by the plugin itself. */
     modifyURLPrefix: { '': scope },
+    /* Hashed filenames already change with every build. Without this, Workbox adds
+       ?__WB_REVISION__=… to each precache URL, which misses both the browser and
+       Cloudflare caches and downloads the whole initial graph twice on first visit. */
+    dontCacheBustURLsMatching: /\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/u,
     globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
     // The operator console is always online and must not be precached (01 §6).
     globIgnores: [

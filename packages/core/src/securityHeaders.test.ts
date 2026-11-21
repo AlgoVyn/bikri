@@ -4,6 +4,8 @@ import {
   ASSET_CACHE_CONTROL,
   IMMUTABLE_ASSET_PATHS,
   IMMUTABLE_CACHE_CONTROL,
+  ROOT_REVALIDATE_CACHE_CONTROL,
+  ROOT_REVALIDATE_PATHS,
   renderAssetHeaders,
   SECURITY_HEADERS,
   STABLE_ASSET_CACHE_CONTROL,
@@ -81,6 +83,15 @@ describe('security headers', () => {
       expect(STABLE_ASSET_CACHE_CONTROL).not.toContain('immutable');
       expect(IMMUTABLE_ASSET_PATHS).not.toContain(path);
     }
+    // Root files revalidate but must be compressed: no-transform is HTML-only.
+    for (const path of ROOT_REVALIDATE_PATHS) {
+      expect(blocks[path]).toEqual({
+        '! Cache-Control': '',
+        'Cache-Control': ROOT_REVALIDATE_CACHE_CONTROL,
+      });
+      expect(ROOT_REVALIDATE_CACHE_CONTROL).not.toContain('no-transform');
+    }
+    expect(file).toContain(`${BASE_PATH}/workbox-*.js`);
     expect(Object.fromEntries(securityHeaderEntries())).toEqual(
       SECURITY_HEADERS,
     );
