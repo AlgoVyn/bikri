@@ -257,7 +257,7 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised or paged above 100 rows; 60 fps scroll |
 
-The bundle gate also caps build fragmentation: total JS chunks (110), initial JS files (12), `modulepreload` tags (4) and sub-1 KB chunks (65). Route-level lazy entries are one per route by design; the caps stop a return to one chunk per module (D-272).
+The bundle gate also caps build fragmentation: total JS chunks (60), initial JS files (12), `modulepreload` tags (8) and sub-1 KB chunks (10). Route-level lazy entries are one per route by design; the caps stop a return to one chunk per module (D-272).
 
 Techniques required: in-memory product search index (prefix + token, normalised Urdu/English, rebuilt on product change), `useDeferredValue` for result lists, no synchronous Dexie queries in render, Web Worker for reports and imports.
 

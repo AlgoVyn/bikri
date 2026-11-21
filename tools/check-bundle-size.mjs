@@ -16,12 +16,12 @@ const INITIAL_BUDGET = 290 * 1024;
 const CHUNK_BUDGET = 100 * 1024;
 const CSS_BUDGET = 25 * 1024;
 const PRECACHE_BUDGET = 1.25 * 1024 * 1024;
-// Chunk fragmentation gate (D-231/fifth review): one lazy route entry per route is
-// expected, but the build must not slide back to one chunk per module.
-const MAX_TOTAL_JS_CHUNKS = 110;
+// Chunk fragmentation gate (D-272): the review target is <=60 chunks and <=8-10
+// initial requests. Keep a little headroom for a new route or vendor split.
+const MAX_TOTAL_JS_CHUNKS = 60;
 const MAX_INITIAL_JS_FILES = 12;
-const MAX_MODULE_PRELOADS = 4;
-const MAX_SUB_KB_CHUNKS = 65;
+const MAX_MODULE_PRELOADS = 8;
+const MAX_SUB_KB_CHUNKS = 10;
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 const initial = new Set(

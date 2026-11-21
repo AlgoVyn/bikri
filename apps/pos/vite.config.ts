@@ -135,11 +135,14 @@ export default defineConfig({
               minSize: 20_000,
             },
             {
-              // Everything the shell statically needs: one app chunk instead of dozens
-              // of tiny shared modules. Lazy routes and the operator console stay out.
-              name: 'app-initial',
+              // All modules the shell statically needs, except the entry module.
+              // main.tsx has a top-level `await initI18n()`; if it shared a chunk
+              // with modules a lazy chunk imports, that lazy chunk would wait on an
+              // entry chunk that is itself waiting for the lazy import (deadlock).
+              name: (moduleId) =>
+                moduleId.includes('/src/main.tsx') ? null : 'app-shared',
               tags: ['$initial'],
-              priority: 5,
+              priority: 4,
               minSize: 0,
             },
             {
