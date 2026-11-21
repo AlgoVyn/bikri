@@ -290,10 +290,15 @@ export async function loadLookups(
       'SELECT id, role, permissions_json, max_discount_bp, active, deleted_at, created_at, updated_at, rev FROM staff WHERE tenant_id = ?1',
     ),
     db.prepare('SELECT id, bill_prefix FROM branches WHERE tenant_id = ?1'),
+    // Shop rules travel in the same batch: a separate `db.first` after it cost one D1
+    // round trip (and one budget slot) on every push and retry round.
+    db.prepare(
+      'SELECT tax_rate_bp, tax_mode, cost_method, round_total_to, default_credit_limit, timezone, updated_at FROM shop WHERE tenant_id = ?1',
+    ),
   ];
   const kinds: Array<
     | { tbl: string }
-    | { onHand: true }
+    | { productRows: true }
     | { sales: true }
     | { refundUdhaar: true }
     | { payments: 'refund' | 'sret' | 'purchase' | 'sale' }
@@ -306,7 +311,6 @@ export async function loadLookups(
     | { customers: true }
     | { suppliers: true }
     | { partyBalance: 'customer' | 'supplier' }
-    | { saleProducts: true }
     | { lastClose: true }
     | { closePayments: true }
     | { closeCashMoves: true }
@@ -349,19 +353,22 @@ export async function loadLookups(
       kinds.push({ ledgerExists: tbl });
     }
   }
-  const productList = [...products];
+  // `products` (stock movements, purchase/return lines) and `saleProductIds` (sale lines,
+  // product edits, bundle recipes) overlap on almost every document. One query over the
+  // union replaces two `WHERE id IN (...)` scans of the same rows.
+  const productList = [...new Set([...products, ...saleProductIds])];
   for (let i = 0; i < productList.length; i += 90) {
     const chunk = productList.slice(i, i + 90);
     const params = chunk.map((_, j) => `?${j + 2}`).join(', ');
     stmts.push(
       db.prepare(
-        `SELECT p.id AS id, p.avg_cost AS avg_cost, p.last_cost AS last_cost,
-          p.on_hand_milli AS on_hand, p.cost_changed_at AS cost_changed_at
-         FROM products p WHERE p.tenant_id = ?1 AND p.id IN (${params})`,
+        `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind,
+          on_hand_milli AS on_hand, cost_changed_at
+         FROM products WHERE tenant_id = ?1 AND id IN (${params})`,
         ...chunk,
       ),
     );
-    kinds.push({ onHand: true });
+    kinds.push({ productRows: true });
   }
   const chunked = (
     ids: Set<string>,
@@ -510,12 +517,6 @@ export async function loadLookups(
     );
   }
   chunked(
-    saleProductIds,
-    (p) =>
-      `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind FROM products WHERE tenant_id = ?1 AND id IN (${p})`,
-    { saleProducts: true },
-  );
-  chunked(
     closeDevices,
     (p) =>
       `SELECT device_id AS id, (SELECT d2.id FROM day_closes d2 WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id ORDER BY d2.period_end DESC LIMIT 1) AS close_id, MAX(period_end) AS period_end, (SELECT d2.counted_cash FROM day_closes d2 WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id ORDER BY d2.period_end DESC LIMIT 1) AS counted_cash FROM day_closes d WHERE d.tenant_id = ?1 AND d.device_id IN (${p}) GROUP BY d.device_id`,
@@ -561,10 +562,7 @@ export async function loadLookups(
   }
   ctx.budget.take();
   const res = await db.batch(stmts);
-  ctx.budget.take();
-  const shop = await db.first<ShopRules>(
-    'SELECT tax_rate_bp, tax_mode, cost_method, round_total_to, default_credit_limit, timezone, updated_at FROM shop WHERE tenant_id = ?1',
-  );
+  const shop = (res[2]?.results?.[0] ?? null) as ShopRules | null;
   const look: Lookups = {
     sales: new Map(),
     pushedSales,
@@ -650,7 +648,7 @@ export async function loadLookups(
     }
   }
   kinds.forEach((k, i) => {
-    const rows = (res[i + 2]?.results ?? []) as Array<Record<string, unknown>>;
+    const rows = (res[i + 3]?.results ?? []) as Array<Record<string, unknown>>;
     for (const r of rows) {
       if ('voids' in k) {
         look.existingVoids.add(String(r.id));
@@ -767,7 +765,7 @@ export async function loadLookups(
           key(k.partyBalance, String(r.id)),
           Number(r.n ?? 0),
         );
-      } else if ('saleProducts' in k) {
+      } else if ('productRows' in k) {
         look.products.set(String(r.id), {
           price: Number(r.price ?? 0),
           avg_cost: Number(r.avg_cost ?? 0),
@@ -775,6 +773,13 @@ export async function loadLookups(
           track_stock: Number(r.track_stock ?? 0),
           updated_at: Number(r.updated_at ?? 0),
           kind: String(r.kind ?? 'simple'),
+        });
+        look.onHand.set(String(r.id), {
+          on_hand: Number(r.on_hand),
+          avg_cost: Number(r.avg_cost),
+          last_cost: Number(r.last_cost ?? 0),
+          cost_changed_at: Number(r.cost_changed_at ?? 0),
+          pushed: false,
         });
       } else if ('bundleDeleted' in k) {
         look.bundleDeleted.add(String(r.id));
@@ -834,14 +839,6 @@ export async function loadLookups(
           method: String(r.method),
           reverses_id: typeof r.reverses_id === 'string' ? r.reverses_id : null,
           created_at: Number(r.created_at),
-        });
-      } else {
-        look.onHand.set(String(r.id), {
-          on_hand: Number(r.on_hand),
-          avg_cost: Number(r.avg_cost),
-          last_cost: Number(r.last_cost ?? 0),
-          cost_changed_at: Number(r.cost_changed_at ?? 0),
-          pushed: false,
         });
       }
     }

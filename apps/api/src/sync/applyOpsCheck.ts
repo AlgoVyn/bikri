@@ -19,7 +19,7 @@ import {
   assertOwnerRemains,
   bootstrapOwnerId,
   CLIENT_AUDIT_ACTIONS,
-  type CostState,
+  type CostMap,
   DAY_MS,
   isBusinessDate,
   key,
@@ -111,7 +111,7 @@ export function checkOp(
   look: Lookups,
   group: PushOp[],
   op: PushOp,
-  costs: Map<string, CostState>,
+  costs: CostMap,
 ): void {
   if (!isMasterTable(op.tbl) && !isLedgerTable(op.tbl))
     throw new Reject('UNKNOWN_TABLE');

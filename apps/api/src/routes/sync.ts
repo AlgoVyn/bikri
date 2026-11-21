@@ -8,11 +8,9 @@ import {
   takeRowsRead,
 } from '../platform/readCounter.ts';
 import {
-  invalidateUsage,
   pollAfterMs,
   secondsToUtcMidnight,
   usageStatement,
-  usageToday,
 } from '../platform/tenants.ts';
 import { applyOps, CallBudget } from '../sync/applyOps.ts';
 import { latestSeq } from '../sync/changeLog.ts';
@@ -54,12 +52,11 @@ export function readOnlyEligible(
 }
 
 /** Quota gate before a push (13 §6). */
-export async function assertQuota(
-  env: Env,
+export function assertQuota(
   tenant: TenantRow,
+  usage: { rows_written: number },
   now: number,
-): Promise<void> {
-  const usage = await usageToday(env, tenant.id, now);
+): void {
   if (usage.rows_written >= tenant.daily_write_budget) {
     const wait = secondsToUtcMidnight(now);
     throw new ApiError(
@@ -131,7 +128,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   const body = PushBody.parse(raw);
   if (body.device_id !== device.id)
     throw new ApiError('FORBIDDEN', 403, 'device_id is not this device');
-  await assertQuota(c.env, tenant, now);
+  assertQuota(tenant, c.var.usage, now);
 
   let ops = body.ops;
   const tail: D1PreparedStatement[] = [];
@@ -144,7 +141,7 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   }
 
   const budget = new CallBudget();
-  budget.take(3); // device look-up, tenant, usage read
+  budget.take(3); // token look-up, the closing batch and one spare
   const outcome = await applyOps({ db, tenant, device, now, budget }, ops);
   tail.push(...outcome.tail);
   tail.push(
@@ -159,7 +156,6 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
     db.prepare('SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?1'),
   );
   const tailResults = await db.batch(tail);
-  invalidateUsage(tenant.id);
   const latest =
     (tailResults.at(-1)?.results?.[0] as { seq?: number | null } | undefined)
       ?.seq ?? tenant.change_log_floor;
@@ -224,18 +220,25 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
   if (seen) await seen.run();
   // Check before the SELECT: a page that crosses the cap must not be read and then
   // discarded, otherwise a blocked till keeps consuming the budget it is over.
-  const usage = await usageToday(c.env, tenant.id, now);
+  const usage = c.var.usage;
   assertReadQuota(tenant, usage);
-  const rows = await db.select<ChangeRow>(
-    'SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE tenant_id = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3',
-    q.since,
-    q.limit + 1,
-  );
+  // The rows and the prune floor move independently between the auth lookup and this
+  // page. Read both in one D1 batch: the floor used to be an extra round trip on 75%
+  // of all Worker traffic.
+  const [rowsResult, floorResult] = await db.batch([
+    db.prepare(
+      'SELECT seq, tbl, row_id, op, row_json FROM change_log WHERE tenant_id = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3',
+      q.since,
+      q.limit + 1,
+    ),
+    db.prepare('SELECT change_log_floor FROM tenants WHERE id = ?1'),
+  ]);
+  const rows = (rowsResult?.results ?? []) as unknown as ChangeRow[];
   // The prune can raise the floor between the device lookup and this SELECT. Re-read it
   // so a page that starts inside a pruned gap never advances the till past missing rows.
-  const floor = await db.first<{ change_log_floor: number }>(
-    'SELECT change_log_floor FROM tenants WHERE id = ?1',
-  );
+  const floor = (floorResult?.results?.[0] ?? undefined) as
+    | { change_log_floor?: number }
+    | undefined;
   if (floor && Number(floor.change_log_floor) > q.since) {
     throw new ApiError(
       'SNAPSHOT_REQUIRED',
@@ -257,13 +260,15 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
     }
   });
   addRowsRead(tenant.id, page.length);
-  return c.json({
-    changes: page.map((r) => ({
-      seq: r.seq,
-      tbl: r.tbl,
-      op: r.op,
-      row: JSON.parse(r.row_json) as unknown,
-    })),
+  // SQLite already holds valid row JSON. Embed it raw instead of parsing every row
+  // only to have c.json stringify the whole page again on catch-up pulls.
+  const changes = page
+    .map(
+      (row) =>
+        `{"seq":${Number(row.seq)},"tbl":${JSON.stringify(row.tbl)},"op":${JSON.stringify(row.op)},"row":${row.row_json}}`,
+    )
+    .join(',');
+  const meta = JSON.stringify({
     // Advance past hidden bundle rows even when the visible page is shorter.
     next_since: rawPage.at(-1)?.seq ?? q.since,
     has_more: rows.length > q.limit,
@@ -273,6 +278,9 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
     poll_after_ms: pollAfterMs(tenant, usage),
     tenant_status: tenantStatusPayload(tenant),
     support: supportPayload(tenant, now),
+  });
+  return c.body(`{"changes":[${changes}],${meta.slice(1)}`, 200, {
+    'content-type': 'application/json; charset=utf-8',
   });
 }
 
@@ -377,7 +385,7 @@ export async function snapshot(c: Context<AppEnv>): Promise<Response> {
   const clientSchema = assertClientSchema(c);
   const { tenant, device, db } = c.var;
   const now = Date.now();
-  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
+  assertReadQuota(tenant, c.var.usage);
   // A snapshot is also a first successful request for a restored/new till. Teach it
   // the current tenant status just like /me and pull, and mark read-only seen.
   const seen = readOnlySeenStatement(db, tenant, device, now);

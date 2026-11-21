@@ -32,7 +32,6 @@ import {
   releaseOwnerExportStatement,
   supportStatement,
 } from '../platform/tenantAdmin.ts';
-import { usageToday } from '../platform/tenants.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { allocateDeviceCode } from '../sync/devices.ts';
@@ -655,7 +654,7 @@ type ExportToken = {
 async function startOwnerExport(c: Context<AppEnv>) {
   const { tenant, device, db } = c.var;
   const now = Date.now();
-  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
+  assertReadQuota(tenant, c.var.usage);
   if (
     tenant.last_owner_export_at !== null &&
     now - tenant.last_owner_export_at < EXPORT_EVERY
@@ -702,7 +701,7 @@ shop.post('/export', (c) => startOwnerExport(c));
 shop.get('/export', async (c) => {
   const { tenant, device, db } = c.var;
   const now = Date.now();
-  assertReadQuota(tenant, await usageToday(c.env, tenant.id, now));
+  assertReadQuota(tenant, c.var.usage);
   const exportId = c.req.query('export_id');
   if (!exportId) {
     throw new ApiError(

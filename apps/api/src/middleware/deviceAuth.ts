@@ -29,11 +29,11 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const m = TOKEN.exec(c.req.header('authorization') ?? '');
   if (!m?.[1])
     throw new ApiError('UNAUTHENTICATED', 401, 'Device token required');
-  const found = await deviceByTokenHash(c.env, await sha256Hex(m[1]));
+  const now = Date.now();
+  const found = await deviceByTokenHash(c.env, await sha256Hex(m[1]), now);
   if (!found)
     throw new ApiError('UNAUTHENTICATED', 401, 'Unknown device token');
-  const { device, tenant } = found;
-  const now = Date.now();
+  const { device, tenant, usage } = found;
   if (
     device.revoked_at !== null ||
     (device.kind === 'support' && (device.expires_at ?? 0) <= now)
@@ -44,6 +44,7 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('tenant', tenant);
   c.set('device', device);
   c.set('db', db);
+  c.set('usage', usage);
   // Photos/logos are content-addressed and cached by the file route; a global
   // no-store here used to override its immutable header (D-231).
   if (!(c.req.method === 'GET' && c.req.path.startsWith(`${API_BASE}/files/`)))

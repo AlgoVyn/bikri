@@ -17,6 +17,7 @@ import {
   type ApplyContext,
   type ApplyOutcome,
   appliedOp,
+  type CostMap,
   type CostState,
   changeLog,
   errorCodeOf,
@@ -45,13 +46,45 @@ export {
   writableColumns,
 } from './applyOpsShared.ts';
 
+/**
+ * Copy-on-write view of the running avg-cost state for one transaction group. Planning
+ * reads and mutates product state in place; cloning the whole map per group made a push
+ * O(groups × products). Only states the group actually touches are copied, so a rejected
+ * group rolls back by dropping its overlay and a commit is O(touched).
+ */
+class CostOverlay implements CostMap {
+  private readonly base: Map<string, CostState>;
+  private readonly touched = new Map<string, CostState>();
+  constructor(base: Map<string, CostState>) {
+    this.base = base;
+  }
+  get(id: string): CostState | undefined {
+    const current = this.touched.get(id);
+    if (current !== undefined) return current;
+    const stored = this.base.get(id);
+    if (stored === undefined) return undefined;
+    const copy = { ...stored };
+    this.touched.set(id, copy);
+    return copy;
+  }
+  set(id: string, value: CostState): void {
+    this.touched.set(id, value);
+  }
+  has(id: string): boolean {
+    return this.touched.has(id) || this.base.has(id);
+  }
+  commit(): void {
+    for (const [id, value] of this.touched) this.base.set(id, value);
+  }
+}
+
 /** Builds the statements of one op (03 §4.1 step 4). Throws Reject for checks it can do. */
 function planOp(
   ctx: ApplyContext,
   look: Lookups,
   group: PushOp[],
   op: PushOp,
-  avg: Map<string, CostState>,
+  avg: CostMap,
 ): Planned {
   const { db, now } = ctx;
   const deviceId = ctx.device.id;
@@ -683,11 +716,9 @@ export async function applyOps(
         for (const op of ops) rejected.push({ op, code: 'CONSTRAINT_FAILED' });
         continue;
       }
-      // Plan against a copy so a rejected transaction cannot advance the running
+      // Plan against an overlay so a rejected transaction cannot advance the running
       // weighted-average state used by later transactions.
-      const groupAvg = new Map(
-        [...avg].map(([id, value]) => [id, { ...value }]),
-      );
+      const groupAvg = new CostOverlay(avg);
       try {
         const planned = ops.map((op) => planOp(ctx, look, ops, op, groupAvg));
         // A stored parent must not receive new children from a duplicate row. If every
@@ -701,7 +732,7 @@ export async function applyOps(
         applyStaffChanges(look, ops);
         applyShopChanges(look, ops);
         applyLedgerChanges(look, ops);
-        for (const [id, value] of groupAvg) avg.set(id, value);
+        groupAvg.commit();
       } catch (error) {
         if (!(error instanceof Reject)) throw error;
         for (const op of ops) rejected.push({ op, code: error.code });
