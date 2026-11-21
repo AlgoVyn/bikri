@@ -385,5 +385,14 @@ describe('share helpers', () => {
       sendWidth: true,
       itemLayout: 'stacked',
     });
+    // Latent profile: a true 58 mm printer configured for 24 columns needs the
+    // margin commands too, so sendWidth is keyed on the margin, not on paperMm.
+    expect(receiptPaper({ paper_mm: 58, chars_per_line: 24 })).toMatchObject({
+      paperMm: 58,
+      dots: 288,
+      paperDots: 384,
+      leftMarginDots: 48,
+      sendWidth: true,
+    });
   });
 });
