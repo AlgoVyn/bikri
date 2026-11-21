@@ -47,14 +47,27 @@ async function serverRows(
   tenantId: string,
   tbl: string,
 ): Promise<number> {
-  const res = await request.get(`${API}/admin/tenants/${tenantId}/export`, {
-    headers,
-  });
-  expect(res.status(), await res.text()).toBe(200);
-  const body = (await res.json()) as {
-    tables: { tbl: string; rows: number }[];
-  };
-  return body.tables.find((t) => t.tbl === tbl)?.rows ?? -1;
+  // The operator export no longer counts every row before page 1; page the table and
+  // count the returned rows instead.
+  const before = Date.now();
+  let after = '';
+  let rows = 0;
+  for (;;) {
+    const query = new URLSearchParams({ tbl, before: String(before), after });
+    const res = await request.get(
+      `${API}/admin/tenants/${tenantId}/export?${query.toString()}`,
+      { headers },
+    );
+    expect(res.status(), await res.text()).toBe(200);
+    const body = (await res.json()) as {
+      rows: unknown[];
+      next_after: string;
+      has_more: boolean;
+    };
+    rows += body.rows.length;
+    if (!body.has_more) return rows;
+    after = body.next_after;
+  }
 }
 
 async function onHand(page: Page, productId: string): Promise<number> {
