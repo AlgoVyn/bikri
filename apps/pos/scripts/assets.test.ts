@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SECURITY_HEADERS } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '../public');
@@ -12,10 +14,9 @@ function pngSize(bytes: Buffer): { width: number; height: number } {
 }
 
 describe('self-hosted PWA assets', () => {
-  it('loads the pre-paint theme without an inline script', async () => {
+  it('inlines the pre-paint theme under a CSP hash', async () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const html = await readFile(join(root, 'index.html'), 'utf8');
-    expect(html).toContain('src="/theme-init.js"');
     const inline = [
       ...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi),
     ].filter((match) => {
@@ -23,10 +24,17 @@ describe('self-hosted PWA assets', () => {
       const body = match[2] ?? '';
       return !/\bsrc\s*=/i.test(attrs) && body.trim() !== '';
     });
-    expect(inline).toEqual([]);
-    const theme = await readFile(join(publicDir, 'theme-init.js'), 'utf8');
-    expect(theme).toContain("localStorage.getItem('bikri.theme')");
-    expect(theme).toContain('document.documentElement.dataset.theme = theme');
+    expect(inline).toHaveLength(1);
+    const body = inline[0]?.[2] ?? '';
+    expect(body).toContain("localStorage.getItem('bikri.theme')");
+    expect(body).toContain('document.documentElement.dataset.theme = theme');
+    const hash = createHash('sha256').update(body).digest('base64');
+    expect(SECURITY_HEADERS['Content-Security-Policy']).toContain(
+      `'sha256-${hash}'`,
+    );
+    await expect(
+      readFile(join(publicDir, 'theme-init.js'), 'utf8'),
+    ).rejects.toThrow();
   });
 
   it('ships OFL licences and woff2 faces', async () => {
@@ -40,9 +48,7 @@ describe('self-hosted PWA assets', () => {
     }
     for (const name of [
       'inter-latin-wght-normal.woff2',
-      'noto-naskh-arabic-arabic-400-normal.woff2',
-      'noto-naskh-arabic-arabic-600-normal.woff2',
-      'noto-naskh-arabic-arabic-700-normal.woff2',
+      'noto-naskh-arabic-arabic-wght-normal.woff2',
       'jetbrains-mono-latin-wght-normal.woff2',
     ]) {
       const bytes = await readFile(join(publicDir, 'fonts', name));

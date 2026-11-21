@@ -277,7 +277,7 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 /bikri/*
   Cache-Control: public, max-age=0, must-revalidate, no-transform
   Strict-Transport-Security: max-age=31536000
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-vjPwkZNWSz239B2vfaji4dSVEAArUl6y0fWQtzpXIRI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(self), usb=(self), serial=(self)
@@ -310,18 +310,15 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
   ! Cache-Control
   Cache-Control: public, max-age=0, must-revalidate
 
-/bikri/theme-init.js
-  ! Cache-Control
-  Cache-Control: public, max-age=0, must-revalidate
 ```
 
-`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` and the content-hashed Workbox runtime never change under the same URL, so they skip revalidation for a year; HTML, `sw.js`, `manifest.webmanifest` and `theme-init.js` keep `max-age=0`. The root files detach `no-transform` so they are compressed. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
+`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` and the content-hashed Workbox runtime never change under the same URL, so they skip revalidation for a year; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`. The root files detach `no-transform` so they are compressed. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
 
 `no-transform` is required on **HTML**: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131). It must **not** be applied to JS/CSS: Cloudflare disables Brotli/Gzip for any response carrying `no-transform`, which tripled the app payload before D-231. Fonts and icons keep stable filenames, so they use a one-day revalidating cache instead of `immutable` (D-237).
 
-The app shell has **no inline scripts**. The pre-paint theme snippet is the static asset `/bikri/theme-init.js`, loaded with a blocking `<script src>` before the app module so the chosen theme is applied before first paint while `script-src 'self'` stays strict (D-149).
+The app shell has **one inline script**: the tiny pre-paint theme/language bootstrap in `index.html`, allowed by its `sha256-…` hash in `script-src` so `script-src 'self'` remains strict (D-277 supersedes D-149). It also injects the language-appropriate font preload. The build's locale-preload helper is an external `defer` script, so neither startup script blocks parsing.
 
 These headers apply only to responses under `/bikri/`. HSTS deliberately omits `includeSubDomains`, because it would be sent for the whole `algovyn.com` domain and force HTTPS on every Algovyn subdomain; add it only if the owner confirms all subdomains are HTTPS.
 

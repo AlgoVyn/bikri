@@ -10,7 +10,7 @@ export {
   type CartReissue,
   clearTenantDb,
   DEXIE_SCHEMA_V1,
-  DEXIE_SCHEMA_V10,
+  DEXIE_SCHEMA_V11,
   type DexieTableName,
   deleteTenantDb,
   type FileQueueEntry,

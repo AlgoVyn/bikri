@@ -218,9 +218,6 @@ importers:
       '@bikri/printer':
         specifier: workspace:*
         version: link:../../packages/printer
-      '@fontsource/noto-naskh-arabic':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@radix-ui/react-dialog':
         specifier: 1.3.1
         version: 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -265,6 +262,9 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
       '@fontsource-variable/jetbrains-mono':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource-variable/noto-naskh-arabic':
         specifier: 5.3.0
         version: 5.3.0
       '@tailwindcss/vite':
@@ -1302,8 +1302,8 @@ packages:
   '@fontsource-variable/jetbrains-mono@5.3.0':
     resolution: {integrity: sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw==}
 
-  '@fontsource/noto-naskh-arabic@5.3.0':
-    resolution: {integrity: sha512-S/GDgQ6mh/PKo4mz5+eXNYbEarvpI7yh6eCdOz8tTVbeM7+OUiacIEscaYEibr/+egDtGbO2ZB00sjy1bJC1kQ==}
+  '@fontsource-variable/noto-naskh-arabic@5.3.0':
+    resolution: {integrity: sha512-Ot0G5iln5MeLPKp1WNt6AGi4KHbPIVm0GEow2ED6rZ+8Rao+OuswhX4D+RPerc3aQ6teneLdqXSL8VPGorJvGg==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -5116,7 +5116,7 @@ snapshots:
 
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
-  '@fontsource/noto-naskh-arabic@5.3.0': {}
+  '@fontsource-variable/noto-naskh-arabic@5.3.0': {}
 
   '@img/colour@1.1.0': {}
 

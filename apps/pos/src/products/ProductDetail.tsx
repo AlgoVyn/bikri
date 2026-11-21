@@ -34,7 +34,7 @@ import {
   stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';

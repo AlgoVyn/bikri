@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pageClass } from '../components/classes.ts';
 import { SettingsIcon } from '../components/icons.tsx';
+import { useMasterDetailWide } from '../components/MasterDetail.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { SettingsNav } from './SettingsNav.tsx';
@@ -35,18 +36,21 @@ export function SettingsPageLayout({
 }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const wide = useMasterDetailWide();
   const activePath = pathname.replace(/\/+$/u, '');
   return (
     <AreaStrings area="office">
       <div className={pageClass('standard', 'gap-6')}>
         <div className="grid gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] xl:items-start">
-          <div className="hidden min-w-0 xl:block">
-            <SettingsNav
-              activePath={activePath}
-              headingLevel="h2"
-              titleSize="h1"
-            />
-          </div>
+          {wide ? (
+            <div className="min-w-0">
+              <SettingsNav
+                activePath={activePath}
+                headingLevel="h2"
+                titleSize="h1"
+              />
+            </div>
+          ) : null}
           <div className="flex min-w-0 flex-col gap-4">
             <SubpageHeader
               backTo="/settings"

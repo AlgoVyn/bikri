@@ -80,12 +80,20 @@ function balanceOf(
     amount: Number(e.amount),
     created_at: Number(e.created_at),
   }));
+  const lastPayment = entries.reduce(
+    (max, entry) =>
+      entry.source_type === 'payment'
+        ? Math.max(max, Number(entry.created_at))
+        : max,
+    0,
+  );
   return {
     party_type: type,
     party_id: id,
     balance: partyBalance(amounts.map((a) => a.amount)),
     last_activity_at: amounts.reduce((m, a) => Math.max(m, a.created_at), 0),
     oldest_unpaid_at: oldestUnpaidAt(amounts),
+    last_payment_at: lastPayment > 0 ? lastPayment : null,
   };
 }
 
@@ -118,6 +126,10 @@ export async function applyLedgerEntry(
       balance,
       last_activity_at: Math.max(current?.last_activity_at ?? 0, at),
       oldest_unpaid_at: balance > 0 ? (current?.oldest_unpaid_at ?? at) : null,
+      last_payment_at:
+        row.source_type === 'payment'
+          ? Math.max(Number(current?.last_payment_at ?? 0), at)
+          : (current?.last_payment_at ?? null),
     });
     return;
   }
@@ -132,6 +144,10 @@ export async function applyLedgerEntry(
       balance: current.balance + amount,
       last_activity_at: Math.max(current.last_activity_at, at),
       oldest_unpaid_at: null,
+      last_payment_at:
+        row.source_type === 'payment'
+          ? Math.max(Number(current.last_payment_at ?? 0), at)
+          : (current.last_payment_at ?? null),
     });
     return;
   }

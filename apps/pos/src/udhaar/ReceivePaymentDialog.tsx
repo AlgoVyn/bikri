@@ -11,7 +11,7 @@ import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { PaymentError, receivePayment } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';

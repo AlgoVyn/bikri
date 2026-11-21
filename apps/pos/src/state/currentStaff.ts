@@ -1,7 +1,15 @@
 import { can as canDo, type Permission, type Role } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useMemo } from 'react';
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+} from 'react';
 import { getDb } from '../data/db.ts';
 import { useSession } from './session.ts';
 
@@ -30,7 +38,7 @@ const SUPPORT_ALLOWED: ReadonlySet<Permission> = new Set([
  * The unlocked staff member. Until the PIN lock exists (T-035) a till with no session acts as
  * the shop's owner (D-090).
  */
-export function useCurrentStaff(): CurrentStaff {
+function useCurrentStaffLive(): CurrentStaff {
   const session = useSession((s) => s.session);
   const localTenant =
     import.meta.env.DEV || import.meta.env.VITE_LOCAL_TENANT === 'dev';
@@ -94,4 +102,25 @@ export function useCurrentStaff(): CurrentStaff {
           },
     [support, live, role, can, deviceBranch],
   );
+}
+
+const StaffContext = createContext<CurrentStaff | null>(null);
+
+/**
+ * One live subscription for the whole shell. Before this, 55 `useCurrentStaff` call sites
+ * each registered two live queries (D-231 review).
+ */
+export function CurrentStaffProvider({ children }: { children: ReactNode }) {
+  return createElement(
+    StaffContext.Provider,
+    { value: useCurrentStaffLive() },
+    children,
+  );
+}
+
+export function useCurrentStaff(): CurrentStaff {
+  const shared = useContext(StaffContext);
+  // Tests and the pre-shell setup pages render without the provider.
+  // biome-ignore lint/correctness/useHookAtTopLevel: the shell mounts the provider once; tests render without it
+  return shared ?? useCurrentStaffLive();
 }

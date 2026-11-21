@@ -8,6 +8,7 @@ import {
   DEXIE_SCHEMA_V7,
   DEXIE_SCHEMA_V9,
   DEXIE_SCHEMA_V10,
+  DEXIE_SCHEMA_V11,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -39,7 +40,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V10).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V11).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -131,6 +132,39 @@ describe('Dexie schema (02 §3)', () => {
     expect(
       db.refund_lines.schema.indexes.some(
         (index) => index.name === 'business_date',
+      ),
+    ).toBe(true);
+  });
+
+  it('adds the bundle+date index and backfills the last payment', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v10'));
+    old.version(10).stores(DEXIE_SCHEMA_V10);
+    await old.open();
+    await old.table('ledger_entries').add({
+      id: 'l1',
+      party_type: 'customer',
+      party_id: 'c1',
+      amount: -500,
+      source_type: 'payment',
+      created_at: 42,
+    });
+    await old.table('party_balances').add({
+      party_type: 'customer',
+      party_id: 'c1',
+      balance: -500,
+      last_activity_at: 42,
+      oldest_unpaid_at: null,
+    });
+    old.close();
+
+    const db = open('upgrade-v10');
+    await db.open();
+    expect(
+      (await db.party_balances.get(['customer', 'c1']))?.last_payment_at,
+    ).toBe(42);
+    expect(
+      db.sale_lines.schema.indexes.some(
+        (index) => index.name === '[bundle_id+business_date]',
       ),
     ).toBe(true);
   });

@@ -20,7 +20,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { DeliveryError, saveDelivery } from '../data/purchases.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { isLatinName } from '../products/format.ts';

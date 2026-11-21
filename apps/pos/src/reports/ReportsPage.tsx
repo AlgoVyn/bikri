@@ -13,6 +13,7 @@ import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExportMenu } from '../components/ExportMenu.tsx';
 import { ReportsIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
@@ -749,6 +750,8 @@ function NoRows({ message }: { message: string }) {
   );
 }
 
+const REPORT_PAGE = 50;
+
 function ReportTable({
   title,
   headers,
@@ -764,6 +767,12 @@ function ReportTable({
   testId?: string;
   rowKeys?: readonly string[];
 }) {
+  const [page, setPage] = useState(0);
+  // The rows array is rebuilt on each render; reset only when the row count changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: length is the stable signal
+  useEffect(() => setPage(0), [rows.length]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / REPORT_PAGE));
+  const pageRows = rows.slice(page * REPORT_PAGE, (page + 1) * REPORT_PAGE);
   return (
     <section className="flex flex-col gap-2" data-testid={testId}>
       <h2 className="text-title font-semibold">{title}</h2>
@@ -786,9 +795,9 @@ function ReportTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
+              {pageRows.map((row, index) => (
                 <tr
-                  key={rowKeys?.[index] ?? String(row[0])}
+                  key={rowKeys?.[page * REPORT_PAGE + index] ?? String(row[0])}
                   className="border-b border-border last:border-0"
                 >
                   {row.map((cell, cellIndex) => (
@@ -805,6 +814,7 @@ function ReportTable({
           </table>
         </div>
       )}
+      <ListPager page={page} pageCount={pageCount} onPage={setPage} />
     </section>
   );
 }

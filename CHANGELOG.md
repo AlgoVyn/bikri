@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Remaining P1 performance batch — 21 Nov 2026 review
+- Sales history reads failed print jobs from the status index and refunds from the range start; the chase list uses the party-balance cache's new `last_payment_at` instead of scanning payments. Bundle detail reads only its 14-day `[bundle_id+business_date]` lines and its own component stock; restore recovery bounds parent rows by `created_at` and reads child lines only for recovered parents.
+- Hidden master lists and the Settings nav no longer mount below 1280 px; Chase, Reports, Customers, Suppliers and Activity render bounded pages instead of unbounded/infinite-scroll DOM.
+- The shell computes staff, read-only and the shop time zone once, runs the print queue in a null leaf, rebinds its global keydown once, and reads `shopTimeZone` from its own module (initial JS 284.6 → 279.4 KB gz).
+- The pre-paint theme is inline under a CSP `sha256` hash with a language-aware font preload; Noto Naskh switched to the variable face (precache 941.0 → 874.4 KB gz). Raster text thresholds straight from the source, canvas line bitmaps are reused, and drawer-only/ASCII print jobs skip fonts and the logo. The agent poll starts at 100 ms and driver mode uses async `canvasBlob`.
+- `oldestUnpaidAt` is O(N), the bundle gate reads the exact locale preload map, the D1 measurement has an upper bound, and a 4× CPU keystroke guard runs in Playwright.
+
 ### Sale and catalogue hot path — 21 Nov 2026 review
 - `completeSale` now opens a per-bill Dexie scope: base stores plus only what the bill writes (`udhaar`, tracked movements, payments, audits, or a reissue). `products`, `shop` and `staff` stay read-only, and `products` is no longer reported to local-write listeners on every sale.
 - Sale lines, stock movements, payments and audit rows are written with one `bulkAdd` and one outbox `bulkAdd` each through `Writer.insertMany`; stock movements update `stock_levels` in one batched pass instead of two requests per line.

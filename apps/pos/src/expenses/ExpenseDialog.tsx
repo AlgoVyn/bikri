@@ -15,7 +15,7 @@ import {
   type ExpenseMethod,
   expenseCategories,
 } from '../data/expenses.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { ApprovalDialog } from '../sales/ApprovalDialog.tsx';
 import { Modal } from '../sell/Modal.tsx';

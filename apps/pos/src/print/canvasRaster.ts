@@ -29,16 +29,29 @@ export async function prepareRasterFonts(
 export function createCanvasRasterRenderer(
   doc: Document = document,
 ): RasterRenderer {
-  const canvas = doc.createElement('canvas');
+  // One backing bitmap per line size. Resizing a canvas drops and reallocates its
+  // bitmap, which used to happen for every one of the 40–60 receipt lines.
+  const surfaces = new Map<
+    string,
+    { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }
+  >();
   return {
     renderLine(text: string, o: RenderLineOptions): RasterSource {
       const px = PX[o.size];
       const tall = o.size === 'double-height' ? 2 : 1;
       const height = Math.ceil(px * (o.rtl ? 1.7 : 1.25)) * tall;
-      canvas.width = o.dots;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) throw new Error('canvas unavailable');
+      const key = `${o.dots}x${height}`;
+      let surface = surfaces.get(key);
+      if (!surface) {
+        const canvas = doc.createElement('canvas');
+        canvas.width = o.dots;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('canvas unavailable');
+        surface = { canvas, ctx };
+        surfaces.set(key, surface);
+      }
+      const { ctx } = surface;
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, o.dots, height);
       ctx.fillStyle = '#000';

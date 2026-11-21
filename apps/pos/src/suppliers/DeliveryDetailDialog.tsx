@@ -12,7 +12,7 @@ import {
   type DeliveryDetail,
   deliveryDetail as loadDeliveryDetail,
 } from '../data/purchases.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { qtyCsv } from '../lib/csv.ts';
 import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';

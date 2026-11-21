@@ -9,6 +9,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, SuppliersIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
@@ -78,24 +79,12 @@ export function SupplierList({
     [directory, deferredQuery, sort, direction],
   );
 
-  const [shown, setShown] = useState(PAGE);
-  const sentinel = useRef<HTMLLIElement>(null);
+  const [page, setPage] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the search changes
-  useEffect(() => setShown(PAGE), [deferredQuery, sort, direction]);
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el || !data || shown >= data.rows.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting))
-          setShown((count) => count + PAGE);
-      },
-      { rootMargin: '240px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [data, shown]);
+  useEffect(() => setPage(0), [deferredQuery, sort, direction]);
+  const pageCount = Math.max(1, Math.ceil((data?.rows.length ?? 0) / PAGE));
+  const pageRows = data?.rows.slice(page * PAGE, (page + 1) * PAGE) ?? [];
 
   const applySort = (next: SupplierSort) => {
     if (next === sort) {
@@ -258,94 +247,98 @@ export function SupplierList({
         ) : null}
 
         {data && data.rows.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-border">
-            <li
-              className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
-              data-testid="suppliers-list-header"
-            >
-              <SortHeader
-                label={t('office.suppliers.col_supplier')}
-                active={sort === 'name'}
-                direction={direction}
-                onClick={() => applySort('name')}
-              />
-              <SortHeader
-                label={t('office.suppliers.balance')}
-                active={sort === 'balance'}
-                direction={direction}
-                onClick={() => applySort('balance')}
-              />
-              <SortHeader
-                label={t('office.suppliers.col_last_delivery')}
-                active={sort === 'last'}
-                direction={direction}
-                onClick={() => applySort('last')}
-              />
-            </li>
-            {data.rows.slice(0, shown).map((row) => (
-              <li key={row.supplier.id}>
-                <Link
-                  to="/suppliers/$supplierId"
-                  params={{ supplierId: row.supplier.id }}
-                  resetScroll={false}
-                  onClick={rememberListScroll}
-                  aria-current={
-                    row.supplier.id === selectedId ? 'page' : undefined
-                  }
-                  className={`${SUPPLIER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle text-primary-subtle-ink' : 'border-s-transparent'}`}
-                >
-                  <span className="col-span-2 min-w-0 sm:col-span-1">
-                    <span className="block truncate font-medium">
-                      {String(row.supplier.name)}
-                    </span>
-                    <span
-                      dir="ltr"
-                      className="block text-small text-text-muted"
-                    >
-                      {String(row.supplier.phone ?? '')}
-                    </span>
-                  </span>
-                  <span className="min-w-0 text-start">
-                    {row.balance === 0 ? (
-                      <span className="block whitespace-nowrap font-semibold text-text-muted">
-                        {t('office.suppliers.settled')}
+          <>
+            <ul className="flex flex-col divide-y divide-border">
+              <li
+                className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
+                data-testid="suppliers-list-header"
+              >
+                <SortHeader
+                  label={t('office.suppliers.col_supplier')}
+                  active={sort === 'name'}
+                  direction={direction}
+                  onClick={() => applySort('name')}
+                />
+                <SortHeader
+                  label={t('office.suppliers.balance')}
+                  active={sort === 'balance'}
+                  direction={direction}
+                  onClick={() => applySort('balance')}
+                />
+                <SortHeader
+                  label={t('office.suppliers.col_last_delivery')}
+                  active={sort === 'last'}
+                  direction={direction}
+                  onClick={() => applySort('last')}
+                />
+              </li>
+              {pageRows.map((row) => (
+                <li key={row.supplier.id}>
+                  <Link
+                    to="/suppliers/$supplierId"
+                    params={{ supplierId: row.supplier.id }}
+                    resetScroll={false}
+                    onClick={rememberListScroll}
+                    aria-current={
+                      row.supplier.id === selectedId ? 'page' : undefined
+                    }
+                    className={`${SUPPLIER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.supplier.id === selectedId ? 'border-s-primary bg-primary-subtle text-primary-subtle-ink' : 'border-s-transparent'}`}
+                  >
+                    <span className="col-span-2 min-w-0 sm:col-span-1">
+                      <span className="block truncate font-medium">
+                        {String(row.supplier.name)}
                       </span>
-                    ) : (
-                      <>
-                        <span
-                          className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
-                        >
-                          {row.balance > 0 ? (
-                            <span className="sr-only">
-                              {supplierBalanceLabel(t, row.balance, money)}
+                      <span
+                        dir="ltr"
+                        className="block text-small text-text-muted"
+                      >
+                        {String(row.supplier.phone ?? '')}
+                      </span>
+                    </span>
+                    <span className="min-w-0 text-start">
+                      {row.balance === 0 ? (
+                        <span className="block whitespace-nowrap font-semibold text-text-muted">
+                          {t('office.suppliers.settled')}
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            className={`block whitespace-nowrap font-semibold ${supplierBalanceTone(row.balance)}`}
+                          >
+                            {row.balance > 0 ? (
+                              <span className="sr-only">
+                                {supplierBalanceLabel(t, row.balance, money)}
+                              </span>
+                            ) : null}
+                            <span
+                              aria-hidden={row.balance > 0 ? true : undefined}
+                            >
+                              <MoneyText paisa={row.balance} />
+                            </span>
+                          </span>
+                          {row.balance < 0 ? (
+                            <span className="block text-small text-success-subtle-ink">
+                              {t('office.suppliers.advance_label')}
                             </span>
                           ) : null}
-                          <span
-                            aria-hidden={row.balance > 0 ? true : undefined}
-                          >
-                            <MoneyText paisa={row.balance} />
-                          </span>
-                        </span>
-                        {row.balance < 0 ? (
-                          <span className="block text-small text-success-subtle-ink">
-                            {t('office.suppliers.advance_label')}
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </span>
-                  <span className="min-w-0 text-start text-small text-text-muted sm:text-start">
-                    {row.lastDeliveryDate
-                      ? dateText(row.lastDeliveryDate, i18n.language, timeZone)
-                      : '—'}
-                  </span>
-                </Link>
-              </li>
-            ))}
-            {shown < data.rows.length ? (
-              <li ref={sentinel} aria-hidden="true" className="h-px" />
-            ) : null}
-          </ul>
+                        </>
+                      )}
+                    </span>
+                    <span className="min-w-0 text-start text-small text-text-muted sm:text-start">
+                      {row.lastDeliveryDate
+                        ? dateText(
+                            row.lastDeliveryDate,
+                            i18n.language,
+                            timeZone,
+                          )
+                        : '—'}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <ListPager page={page} pageCount={pageCount} onPage={setPage} />
+          </>
         ) : null}
       </ListSurface>
 

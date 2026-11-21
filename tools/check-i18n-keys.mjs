@@ -55,7 +55,9 @@ function allowedKeys(file) {
     return new Set([...base, ...publicKeys]);
   const area = rel.split('/')[0];
   // A few shared components are only mounted from office screens.
-  const officeComponent = rel === 'components/PastDatePicker.tsx';
+  const officeComponent =
+    rel === 'components/PastDatePicker.tsx' ||
+    rel === 'components/ListPager.tsx';
   if (
     officeComponent ||
     OFFICE_DIRS.has(area) ||

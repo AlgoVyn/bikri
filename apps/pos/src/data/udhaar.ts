@@ -51,6 +51,8 @@ export type CustomerRow = {
   balance: number;
   oldestUnpaidAt: number | null;
   lastActivityAt: number;
+  /** Last customer/supplier payment, from the party-balance cache (V11). */
+  lastPaymentAt: number | null;
   /** Earliest open promise, if any. */
   promise: SyncedRow | null;
 };
@@ -209,6 +211,7 @@ export async function loadCustomerListData(
       balance: balance?.balance ?? 0,
       oldestUnpaidAt: balance?.oldest_unpaid_at ?? null,
       lastActivityAt: balance?.last_activity_at ?? 0,
+      lastPaymentAt: balance?.last_payment_at ?? null,
       promise,
     };
   });
@@ -1016,31 +1019,6 @@ export async function chaseList(
     today: options.today,
   });
   const owing = list.rows.filter((row) => row.balance > 0);
-  // Only the owing customers' payments: loading the whole payments table on a
-  // multi-year shop is needless and slows the chase list.
-  const owingIds = [...new Set(owing.map((row) => String(row.customer.id)))];
-  const owingSet = new Set(owingIds);
-  // One range scan, not one composite key per owing customer. A shop with thousands of
-  // udhaar customers made the old anyOf open thousands of index ranges (D-119).
-  const payments =
-    owingIds.length === 0
-      ? []
-      : (
-          await (src.table('payments') as Table<SyncedRow>)
-            .where('[party_type+party_id]')
-            .between(['customer', ''], ['customer', '\uffff'])
-            .toArray()
-        ).filter(
-          (p) =>
-            p.direction === 'in' &&
-            p.purpose === 'customer_payment' &&
-            owingSet.has(String(p.party_id)),
-        );
-  const lastPayment = new Map<string, number>();
-  for (const p of payments) {
-    const key = String(p.party_id);
-    lastPayment.set(key, Math.max(lastPayment.get(key) ?? 0, n(p.created_at)));
-  }
   const now = options.now ?? Date.now();
   const groups: ChaseList['groups'] = [
     { key: 'promise', rows: [], total: 0 },
@@ -1070,7 +1048,7 @@ export async function chaseList(
     group.rows.push({
       customer,
       ageDays,
-      lastPaymentAt: lastPayment.get(customer.customer.id) ?? null,
+      lastPaymentAt: customer.lastPaymentAt,
       group: key,
     });
     group.total += customer.balance;

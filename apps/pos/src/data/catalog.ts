@@ -694,20 +694,18 @@ export async function productDetail(
   const bundle = isBundle(product)
     ? await (async () => {
         const items = await loadBundleRecipe(db, id);
+        const componentIds = items.map((row) =>
+          String(row.component_product_id),
+        );
         const products = new Map(
-          (
-            await db.products.bulkGet(
-              items.map((row) => String(row.component_product_id)),
-            )
-          )
+          (await db.products.bulkGet(componentIds))
             .filter((row): row is MasterRow => row !== undefined)
             .map((row) => [row.id, row]),
         );
         const levels = new Map(
-          (await db.stock_levels.toArray()).map((level) => [
-            level.product_id,
-            level.on_hand_milli,
-          ]),
+          (await db.stock_levels.bulkGet(componentIds)).flatMap((level) =>
+            level ? [[level.product_id, level.on_hand_milli] as const] : [],
+          ),
         );
         return bundleInfoOf(id, items, products, levels, costMethod);
       })()
@@ -840,14 +838,14 @@ export async function productDetail(
     }
     // Sale day: one bundle quantity per group, component revenue per line.
     const seenSaleGroups = new Set<string>();
+    // The bundle+date index (Dexie V11) keeps this to the 14-day window instead of
+    // every component line the bundle ever sold.
     const bundleLines = (
-      await db.sale_lines.where('bundle_id').equals(id).toArray()
-    ).filter(
-      (line) =>
-        String(line.business_date) >= first &&
-        String(line.business_date) <= last &&
-        line.bundle_group !== undefined,
-    );
+      await db.sale_lines
+        .where('[bundle_id+business_date]')
+        .between([id, first], [id, last], true, true)
+        .toArray()
+    ).filter((line) => line.bundle_group !== undefined);
     for (const line of bundleLines) {
       const sale = byId.get(String(line.sale_id));
       if (!sale) continue;
