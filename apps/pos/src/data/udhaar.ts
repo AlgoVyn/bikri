@@ -9,6 +9,9 @@ import type {
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { formatShopMoney } from '../lib/money';
+
+const NAME_COLLATOR = new Intl.Collator();
+
 import type { SortDirection } from '../lib/sort.ts';
 import { isReadOnly } from '../sync/status.ts';
 import { rowsAnyOfTable } from './bulk.ts';
@@ -54,6 +57,9 @@ export function defaultCustomerSortDirection(
 
 export type CustomerRow = {
   customer: MasterRow;
+  /** Lower-case name and digit-only phone, computed once when the directory loads. */
+  searchName?: string;
+  searchDigits?: string;
   balance: number;
   oldestUnpaidAt: number | null;
   lastActivityAt: number;
@@ -214,6 +220,8 @@ export async function loadCustomerListData(
     const promise = promises.get(customer.id)?.[0] ?? null;
     return {
       customer,
+      searchName: String(customer.name ?? '').toLowerCase(),
+      searchDigits: String(customer.phone ?? '').replace(/\D/gu, ''),
       balance: balance?.balance ?? 0,
       oldestUnpaidAt: balance?.oldest_unpaid_at ?? null,
       lastActivityAt: balance?.last_activity_at ?? 0,
@@ -247,8 +255,10 @@ export function filterCustomerList(
   const { rows, payments } = data;
   const matching = rows.filter((row) => {
     if (query === '') return true;
-    const name = String(row.customer.name ?? '').toLowerCase();
-    const phone = String(row.customer.phone ?? '').replace(/\D/gu, '');
+    const name =
+      row.searchName ?? String(row.customer.name ?? '').toLowerCase();
+    const phone =
+      row.searchDigits ?? String(row.customer.phone ?? '').replace(/\D/gu, '');
     return (
       words.every((word) => name.includes(word)) ||
       (digits.length >= 3 && phone.includes(digits))
@@ -277,7 +287,7 @@ export function filterCustomerList(
       ? 1
       : -1;
   const byName = (a: CustomerRow, b: CustomerRow) =>
-    String(a.customer.name).localeCompare(String(b.customer.name));
+    NAME_COLLATOR.compare(String(a.customer.name), String(b.customer.name));
   filtered.sort((a, b) => {
     let value = 0;
     if (sort === 'balance') value = a.balance - b.balance;

@@ -55,15 +55,12 @@ export function useScrollStripMask<T extends HTMLElement>(): {
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
+    // Direction only changes with the document language; do not read computed style
+    // on every scroll frame.
+    const rtl = getComputedStyle(element).direction === 'rtl';
     const update = () => {
       const overflow = element.scrollWidth - element.clientWidth;
-      setMaskImage(
-        scrollMaskImage(
-          element.scrollLeft,
-          overflow,
-          getComputedStyle(element).direction === 'rtl',
-        ),
-      );
+      setMaskImage(scrollMaskImage(element.scrollLeft, overflow, rtl));
     };
     update();
     element.addEventListener('scroll', update, { passive: true });

@@ -19,7 +19,7 @@ import { downloadBlob } from '../print/receiptImage.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { deliveryDetailCsv, deliveryPdf, deliveryPng } from './deliveryFile.ts';
+import { deliveryDetailCsv } from './deliveryFile.ts';
 import { dateText } from './format.ts';
 
 export function DeliveryDetailDialog({
@@ -42,7 +42,7 @@ export function DeliveryDetailDialog({
   const canExport = can('export.data');
 
   const data = useLiveQuery(async () => {
-    if (!purchaseId) return null;
+    if (!open || !purchaseId) return null;
     const db = getDb();
     const detail = await loadDeliveryDetail(db, purchaseId);
     if (!detail) return null;
@@ -55,7 +55,7 @@ export function DeliveryDetailDialog({
       shopAddress: String(shop?.address ?? ''),
       shopPhone: String(shop?.phone ?? ''),
     };
-  }, [purchaseId]);
+  }, [open, purchaseId]);
 
   const close = () => onOpenChange(false);
   const detail: DeliveryDetail | null = data?.detail ?? null;
@@ -140,7 +140,9 @@ export function DeliveryDetailDialog({
     setBusy(true);
     try {
       downloadBlob(
-        await deliveryPdf(fileMeta(detail, data.tz)),
+        await (await import('./deliveryFile.ts')).deliveryPdf(
+          fileMeta(detail, data.tz),
+        ),
         `delivery-${invoiceNo.replace(/[^a-z0-9-]+/giu, '-')}.pdf`,
       );
     } catch {
@@ -153,6 +155,7 @@ export function DeliveryDetailDialog({
     if (!data || !detail || busy) return;
     setBusy(true);
     try {
+      const { deliveryPng } = await import('./deliveryFile.ts');
       const png = await deliveryPng(fileMeta(detail, data.tz));
       const file = new File(
         [png],

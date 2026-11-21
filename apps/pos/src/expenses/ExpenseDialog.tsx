@@ -39,11 +39,13 @@ export function ExpenseDialog({
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
-  const categories = useLiveQuery(() => expenseCategories(getDb()), []) ?? [];
+  const categories =
+    useLiveQuery(() => (open ? expenseCategories(getDb()) : []), [open]) ?? [];
   const zone = useLiveQuery(async () => {
+    if (!open) return null;
     const tz = await shopTimeZone(getDb());
     return { tz, today: businessDate(Date.now(), tz) };
-  }, []);
+  }, [open]);
   const today = zone?.today ?? businessDate(Date.now());
   const [categoryId, setCategoryId] = useState('');
   const [amount, setAmount] = useState<number | null>(null);

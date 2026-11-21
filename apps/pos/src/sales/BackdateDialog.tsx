@@ -46,6 +46,7 @@ export function BackdateDialog({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const people = useLiveQuery(async () => {
+    if (!open) return [];
     const rows = (await getDb().staff.toArray()).filter(
       (row) =>
         row.active === 1 &&
@@ -61,7 +62,7 @@ export function BackdateDialog({
         (roleOrder[String(a.role)] ?? 9) - (roleOrder[String(b.role)] ?? 9) ||
         String(a.name).localeCompare(String(b.name)),
     );
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

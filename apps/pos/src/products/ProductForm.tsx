@@ -32,7 +32,7 @@ import {
   duplicateDraft,
   generateBarcode,
   ledgerContext,
-  listCategories,
+  listCategoryOptions,
   type ProductInput,
   saveNewProduct,
   saveProductEdit,
@@ -163,8 +163,15 @@ export function ProductFormPage({
   const [existingKey, setExistingKey] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const existingUrl = useFileUrl(existingKey);
-  const categories = useLiveQuery(() => listCategories(getDb()), []) ?? [];
+  useEffect(
+    () => () => {
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+    },
+    [photoUrl],
+  );
+  const categories = useLiveQuery(() => listCategoryOptions(getDb()), []) ?? [];
   const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const money = shopMoney(shop);
   // One read of the catalogue powers the bundle picker, the brand suggestions and
@@ -173,18 +180,26 @@ export function ProductFormPage({
   const catalogue = useLiveQuery(async () => {
     const db = getDb();
     const all = await db.products.toArray();
-    const levels = new Map(
-      (await db.stock_levels.toArray()).map((level) => [
-        level.product_id,
-        level.on_hand_milli,
-      ]),
-    );
-    const simple = all.filter(
-      (product) =>
-        !product.deleted_at &&
-        product.kind !== 'bundle' &&
-        product.id !== editId,
-    );
+    // The stock map and bundle component list are only needed when the draft is a
+    // bundle; a simple product form no longer reads all 5,000 stock levels.
+    const levels =
+      draft?.kind === 'bundle'
+        ? new Map(
+            (await db.stock_levels.toArray()).map((level) => [
+              level.product_id,
+              level.on_hand_milli,
+            ]),
+          )
+        : new Map<string, number>();
+    const simple =
+      draft?.kind === 'bundle'
+        ? all.filter(
+            (product) =>
+              !product.deleted_at &&
+              product.kind !== 'bundle' &&
+              product.id !== editId,
+          )
+        : [];
     const brands = new Set<string>();
     const names = new Map<string, string>();
     for (const product of all) {
@@ -202,7 +217,7 @@ export function ProductFormPage({
       brands: [...brands].sort((a, b) => a.localeCompare(b)),
       names,
     };
-  }, [editId]) ?? {
+  }, [editId, draft?.kind]) ?? {
     all: [],
     levels: new Map<string, number>(),
     brands: [] as string[],
@@ -243,6 +258,7 @@ export function ProductFormPage({
       const p = await db.products.get(sourceId);
       if (!p || p.deleted_at) {
         setDraft(EMPTY);
+        setDirty(false);
         return;
       }
       const base = duplicateDraft(p);
@@ -271,6 +287,7 @@ export function ProductFormPage({
       const loaded = draftFrom(base);
       setDraft(loaded);
       setInitial(loaded);
+      setDirty(false);
       setTimeout(() => {
         nameRef.current?.focus();
         if (duplicateOf) nameRef.current?.select();
@@ -285,10 +302,6 @@ export function ProductFormPage({
     }
   }, [can, navigate, t, toast]);
 
-  const dirty =
-    draft !== null &&
-    JSON.stringify(draft) !==
-      JSON.stringify(isEdit || duplicateOf ? initial : EMPTY);
   const leave = () =>
     backId
       ? void navigate({ to: '/products/$id', params: { id: backId } })
@@ -311,8 +324,10 @@ export function ProductFormPage({
 
   if (draft === null) return <PageLoading compact />;
 
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    setDirty(true);
     setDraft((d) => (d ? { ...d, [key]: value } : d));
+  };
 
   const warrantyDays = () =>
     draft.warranty === 'custom'
@@ -447,6 +462,7 @@ export function ProductFormPage({
       if (another) {
         setPhotoUrl(null);
         setDraft(EMPTY);
+        setDirty(false);
         setErrors({});
         void navigate({ to: '/products/new', search: {} });
         setTimeout(() => nameRef.current?.focus(), 0);
@@ -865,6 +881,7 @@ export function ProductFormPage({
               disabled={isEdit && initial.kind === 'bundle'}
               onChange={(e) => {
                 if (e.target.checked) {
+                  setDirty(true);
                   setDraft((current) =>
                     current
                       ? {

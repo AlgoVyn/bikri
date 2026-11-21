@@ -11,6 +11,7 @@ import { type StatementItem, statementItemLabel } from './udhaar.ts';
 import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
+const NAME_COLLATOR = new Intl.Collator();
 
 export type SupplierInput = {
   name: string;
@@ -22,6 +23,8 @@ export type SupplierInput = {
 
 export type SupplierRow = {
   supplier: MasterRow;
+  searchName?: string;
+  searchDigits?: string;
   balance: number;
   /** The latest delivery's business date (`YYYY-MM-DD`), not its entry time. */
   lastDeliveryDate: string | null;
@@ -135,6 +138,8 @@ export async function loadSupplierListData(
   ).filter((row) => !row.deleted_at)) {
     all.push({
       supplier,
+      searchName: String(supplier.name ?? '').toLowerCase(),
+      searchDigits: String(supplier.phone ?? '').replace(/\D/gu, ''),
       balance: balances.get(supplier.id)?.balance ?? 0,
       lastDeliveryDate: last.get(supplier.id) ?? null,
     });
@@ -158,8 +163,10 @@ export function filterSupplierList(
   const digits = query.replace(/\D/gu, '').replace(/^0+/u, '');
   const rows = data.rows.filter((row) => {
     if (query === '') return true;
-    const name = String(row.supplier.name ?? '').toLowerCase();
-    const phone = String(row.supplier.phone ?? '').replace(/\D/gu, '');
+    const name =
+      row.searchName ?? String(row.supplier.name ?? '').toLowerCase();
+    const phone =
+      row.searchDigits ?? String(row.supplier.phone ?? '').replace(/\D/gu, '');
     return (
       words.every((word) => name.includes(word)) ||
       (digits.length >= 3 && phone.includes(digits))
@@ -171,7 +178,7 @@ export function filterSupplierList(
       ? 1
       : -1;
   const byName = (a: SupplierRow, b: SupplierRow) =>
-    String(a.supplier.name).localeCompare(String(b.supplier.name));
+    NAME_COLLATOR.compare(String(a.supplier.name), String(b.supplier.name));
   rows.sort((a, b) => {
     if (sort === 'last') {
       if (a.lastDeliveryDate === null || b.lastDeliveryDate === null) {

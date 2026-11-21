@@ -573,6 +573,7 @@ function BundleRows({
             <QtyInput
               dense
               hideLabel
+              commitOnBlur
               label={t('sell.bundle_qty')}
               ariaLabel={t('sell.bundle_qty')}
               unit="pc"
@@ -840,6 +841,7 @@ function LineRow({
             <QtyInput
               dense
               hideLabel
+              commitOnBlur
               label={t('ui.qty_label')}
               ariaLabel={t('sell.qty_of', { name: line.name })}
               unit={unit}

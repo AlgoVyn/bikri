@@ -15,7 +15,7 @@ import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { findByCode } from '../data/cart.ts';
-import { ledgerContext, listCategories } from '../data/catalog.ts';
+import { ledgerContext, listCategoryOptions } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
   type CountDraft,
@@ -47,7 +47,7 @@ export function StockCountPage() {
   const stored = useLiveQuery(() => loadCountDraft(getDb()), []);
   const [draft, setDraft] = useState<CountDraft | null | undefined>(undefined);
   const [products, setProducts] = useState<MasterRow[] | null>(null);
-  const categories = useLiveQuery(() => listCategories(getDb()), []);
+  const categories = useLiveQuery(() => listCategoryOptions(getDb()), []);
   const [scopeKind, setScopeKind] = useState<CountScope['kind']>('all');
   const [categoryId, setCategoryId] = useState('');
   const [zero, setZero] = useState(false);

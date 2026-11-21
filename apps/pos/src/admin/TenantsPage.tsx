@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SearchIcon, StoreIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
+import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { listTenants } from './api.ts';
 import {
   adminHref,
@@ -31,6 +32,7 @@ export function TenantsPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const lang = i18n.language;
+  const wide = useMediaQuery('(min-width: 768px)');
   if (query.data === null) {
     return query.error !== null ? (
       <AdminErrorState message={query.error} onRetry={query.reload} />
@@ -136,158 +138,162 @@ export function TenantsPage() {
           </div>
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-border md:hidden">
-              {shown.map((tenant) => (
-                <li key={tenant.id}>
-                  <a
-                    href={adminHref(`/admin/tenants/${tenant.id}`)}
-                    className="flex flex-col gap-2 p-4 hover:bg-surface-2/60"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {tenant.display_name}
-                        </p>
-                        <p className="truncate font-mono text-small text-text-muted">
-                          {tenant.slug}
-                        </p>
+            {wide ? null : (
+              <ul className="flex flex-col divide-y divide-border">
+                {shown.map((tenant) => (
+                  <li key={tenant.id}>
+                    <a
+                      href={adminHref(`/admin/tenants/${tenant.id}`)}
+                      className="flex flex-col gap-2 p-4 hover:bg-surface-2/60"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {tenant.display_name}
+                          </p>
+                          <p className="truncate font-mono text-small text-text-muted">
+                            {tenant.slug}
+                          </p>
+                        </div>
+                        <StatusBadge status={tenant.status} />
                       </div>
-                      <StatusBadge status={tenant.status} />
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
-                      <span>
-                        {t('admin.col_devices')}: {tenant.devices}
-                      </span>
-                      <span>
-                        {t('admin.col_last_seen')}:{' '}
-                        {tenant.last_seen_at === null
-                          ? t('admin.never')
-                          : formatWhen(tenant.last_seen_at, lang)}
-                      </span>
-                      <span>
-                        {t('admin.col_setup')}:{' '}
-                        {tenant.setup_completed
-                          ? t('admin.setup_done')
-                          : t('admin.setup_pending')}
-                      </span>
-                    </div>
-                    <WriteMeter tenant={tenant} lang={lang} />
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <div className="relative hidden md:block">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[880px] text-start text-small">
-                  <caption className="sr-only">
-                    {t('admin.tenants_title')}
-                  </caption>
-                  <thead className="border-b border-border bg-surface-2 text-text-muted">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_name')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_status')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_devices')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_last_seen')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_setup')}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start font-medium"
-                      >
-                        {t('admin.col_writes')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shown.map((tenant) => {
-                      return (
-                        <tr
-                          key={tenant.id}
-                          className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-small text-text-muted">
+                        <span>
+                          {t('admin.col_devices')}: {tenant.devices}
+                        </span>
+                        <span>
+                          {t('admin.col_last_seen')}:{' '}
+                          {tenant.last_seen_at === null
+                            ? t('admin.never')
+                            : formatWhen(tenant.last_seen_at, lang)}
+                        </span>
+                        <span>
+                          {t('admin.col_setup')}:{' '}
+                          {tenant.setup_completed
+                            ? t('admin.setup_done')
+                            : t('admin.setup_pending')}
+                        </span>
+                      </div>
+                      <WriteMeter tenant={tenant} lang={lang} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {wide ? (
+              <div className="relative">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[880px] text-start text-small">
+                    <caption className="sr-only">
+                      {t('admin.tenants_title')}
+                    </caption>
+                    <thead className="border-b border-border bg-surface-2 text-text-muted">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
                         >
-                          <td className="px-4 py-3">
-                            <a
-                              href={adminHref(`/admin/tenants/${tenant.id}`)}
-                              className="group inline-flex min-h-11 min-w-0 flex-col justify-center"
-                            >
-                              <span className="truncate font-medium text-text group-hover:text-primary">
-                                {tenant.display_name}
-                              </span>
-                              <span className="font-mono text-small text-text-muted">
-                                {tenant.slug}
-                              </span>
-                            </a>
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge status={tenant.status} />
-                          </td>
-                          <td className="px-4 py-3 text-start tabular-nums">
-                            {formatCount(tenant.devices, lang)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {tenant.last_seen_at === null
-                              ? t('admin.never')
-                              : formatWhen(tenant.last_seen_at, lang)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center gap-1.5 ${
-                                tenant.setup_completed
-                                  ? 'text-success-subtle-ink'
-                                  : 'text-text-muted'
-                              }`}
-                            >
+                          {t('admin.col_name')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
+                        >
+                          {t('admin.col_status')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
+                        >
+                          {t('admin.col_devices')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
+                        >
+                          {t('admin.col_last_seen')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
+                        >
+                          {t('admin.col_setup')}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 text-start font-medium"
+                        >
+                          {t('admin.col_writes')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map((tenant) => {
+                        return (
+                          <tr
+                            key={tenant.id}
+                            className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
+                          >
+                            <td className="px-4 py-3">
+                              <a
+                                href={adminHref(`/admin/tenants/${tenant.id}`)}
+                                className="group inline-flex min-h-11 min-w-0 flex-col justify-center"
+                              >
+                                <span className="truncate font-medium text-text group-hover:text-primary">
+                                  {tenant.display_name}
+                                </span>
+                                <span className="font-mono text-small text-text-muted">
+                                  {tenant.slug}
+                                </span>
+                              </a>
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={tenant.status} />
+                            </td>
+                            <td className="px-4 py-3 text-start tabular-nums">
+                              {formatCount(tenant.devices, lang)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {tenant.last_seen_at === null
+                                ? t('admin.never')
+                                : formatWhen(tenant.last_seen_at, lang)}
+                            </td>
+                            <td className="px-4 py-3">
                               <span
-                                aria-hidden="true"
-                                className={`size-1.5 rounded-full ${
+                                className={`inline-flex items-center gap-1.5 ${
                                   tenant.setup_completed
-                                    ? 'bg-success'
-                                    : 'bg-border-strong'
+                                    ? 'text-success-subtle-ink'
+                                    : 'text-text-muted'
                                 }`}
-                              />
-                              {tenant.setup_completed
-                                ? t('admin.setup_done')
-                                : t('admin.setup_pending')}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <WriteMeter tenant={tenant} lang={lang} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`size-1.5 rounded-full ${
+                                    tenant.setup_completed
+                                      ? 'bg-success'
+                                      : 'bg-border-strong'
+                                  }`}
+                                />
+                                {tenant.setup_completed
+                                  ? t('admin.setup_done')
+                                  : t('admin.setup_pending')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <WriteMeter tenant={tenant} lang={lang} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-linear-to-l from-surface to-transparent rtl:bg-linear-to-r lg:hidden"
+                />
               </div>
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-linear-to-l from-surface to-transparent rtl:bg-linear-to-r lg:hidden"
-              />
-            </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
               <p className="text-small text-text-muted tabular-nums">
                 {t('admin.page_of', {
