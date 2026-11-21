@@ -72,7 +72,8 @@ The config file lives in the OS user config directory:
 - Linux: `~/.config/bikri-print-agent/config.json`
 - macOS: `~/Library/Application Support/bikri-print-agent/config.json`
 
-Logs (JSON, rotated at 5 MB, one previous file; `crash.log` holds fatal panics):
+Logs (JSON, rotated at 5 MB, one previous file; `crash.log` holds fatal panics
+and is appended across restarts):
 
 - Windows: `%LocalAppData%\Bikri\PrintAgent\logs\agent.log`
 - Linux: `~/.local/state/bikri-print-agent/logs/agent.log`
@@ -127,7 +128,10 @@ lpstat -e                       # queues
 lpstat -p -d                    # default
 lpoptions -p "<queue>" -l       # media/options
 lp -d "<queue>" -o raw job.bin  # POS mode
-lp -d "<queue>" receipt.png     # compatibility mode
+# Compatibility mode keeps the receipt at its real dot size: `scaling` is
+# page-relative, so use natural-scaling with the PNG's ppi and page height.
+lp -d "<queue>" -o natural-scaling=100 -o ppi=183 \
+  -o media=Custom.80x220mm receipt.png
 ```
 
 For POS mode, create a raw queue once (admin):
