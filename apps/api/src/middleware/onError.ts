@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { ZodError } from 'zod';
-import { ApiError } from '../errors.ts';
+import { ApiError, type ErrorStatus } from '../errors.ts';
 import { secondsToUtcMidnight } from '../platform/tenants.ts';
 import { applySecurityHeaders } from './securityHeaders.ts';
 
@@ -32,6 +32,18 @@ function zodPath(path: ReadonlyArray<PropertyKey>): Array<string | number> {
 /** D1's own refusal once the account's free daily rows are used (Cloudflare D1 debug docs). */
 export const D1_LIMIT_RE =
   /exceeded D1's free tier daily row (?:read|write) limit/iu;
+
+/**
+ * The status the client will see for `err` (API-L9). The request log used to report a
+ * ZodError, malformed JSON or the D1 daily limit as 500 because Hono turns the error into
+ * a response only after the middleware's `finally` has run.
+ */
+export function statusForError(err: unknown): ErrorStatus {
+  if (err instanceof ApiError) return err.status;
+  if (err instanceof ZodError || err instanceof SyntaxError) return 400;
+  if (err instanceof Error && D1_LIMIT_RE.test(err.message)) return 503;
+  return 500;
+}
 
 export function onError<E extends { Bindings: Env }>(
   err: Error,

@@ -37,7 +37,7 @@ import { changeLogStatement } from '../sync/changeLog.ts';
 import { allocateDeviceCode } from '../sync/devices.ts';
 import { importOps, opsBefore } from '../sync/importOps.ts';
 import { ImportOpsBody } from '../sync/opSchema.ts';
-import { revokeSupportDevices } from '../sync/status.ts';
+import { revokeSupportDeviceStatements } from '../sync/status.ts';
 import type { AppEnv, DeviceRow, TenantRow } from '../types.ts';
 import { assertReadQuota, snapshotPayload } from './sync.ts';
 
@@ -297,7 +297,7 @@ shop.post('/support-access/end', async (c) => {
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
-    ...(await revokeSupportDevices(db, now)),
+    ...revokeSupportDeviceStatements(db, now),
     ...audit(c, 'support_access_end', { after: { ended_by: 'owner' } }),
   ]);
   return c.json({ ended: true });
@@ -311,6 +311,20 @@ async function branchExists(db: TenantDb, id: string): Promise<boolean> {
       'SELECT id FROM branches WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
       id,
     )) !== null
+  );
+}
+
+/** Enrol the old branch's code when a device moves, so the branch never reuses it (CORE-M1). */
+async function reserveOldDeviceCode(
+  db: TenantDb,
+  branchId: string,
+  deviceCode: string,
+): Promise<void> {
+  if (deviceCode === '') return;
+  await db.run(
+    'INSERT OR IGNORE INTO branch_device_codes (tenant_id, branch_id, device_code) VALUES (?1, ?2, ?3)',
+    branchId,
+    deviceCode,
   );
 }
 
@@ -406,12 +420,14 @@ shop.delete('/enrolment-codes/:code', async (c) => {
       `DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND ${match.sql} AND used_at IS NULL AND kind = 'till'`,
       match.value,
     ),
+    // Guarded by the DELETE: a lost race that returns 404 writes no `cancelled` audit row.
     ...audit(c, 'device_enrol_code', {
       after: {
         device_name: code.device_name,
         is_admin: code.grants_admin === 1,
         cancelled: true,
       },
+      onlyIfChanged: true,
     }),
   ]);
   if ((deleted?.meta.changes ?? 0) === 0)
@@ -505,6 +521,10 @@ shop.patch('/devices/:id', async (c) => {
       d.device_code,
     ].slice(-20);
     next.device_code_history = codes.join(',');
+    // Keep the old branch's code reserved before moving away: another device there must
+    // never reuse a number that an old bill already carries (CORE-M1). Pre-0028 history
+    // is not backfilled; this covers every move from now on.
+    await reserveOldDeviceCode(db, d.branch_id, d.device_code);
     next.device_code = await allocateDeviceCode(db, body.branch_id);
   }
   const now = Date.now();
@@ -513,7 +533,7 @@ shop.patch('/devices/:id', async (c) => {
       ? " AND (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0"
       : '';
   const update = db.prepare(
-    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, device_code_history = ?6, is_admin = ?7, updated_at = ?8 WHERE tenant_id = ?1 AND id = ?2${adminGuard}`,
+    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, device_code_history = ?6, is_admin = ?7, updated_at = ?8 WHERE tenant_id = ?1 AND id = ?2 AND revoked_at IS NULL${adminGuard}`,
     d.id,
     next.name,
     next.branch_id,
@@ -624,9 +644,9 @@ shop.post('/conflicts/:id/acknowledge', async (c) => {
       id,
     ),
     // The audit row is guarded by the UPDATE's changes(); the conflict change_log is
-    // guarded by the audit insert. A repeated acknowledgement writes nothing.
-    ...auditStatements(db, {
-      action: 'sync_conflict_ack',
+    // guarded by the audit insert. A repeated acknowledgement writes nothing. `audit(c)`
+    // records the acting device and unlocked owner, not `server`/the oldest owner (API-L1).
+    ...audit(c, 'sync_conflict_ack', {
       entity: 'sync_conflicts',
       entityId: id,
       after: { resolution: 'acknowledged' },

@@ -36,8 +36,6 @@ export type ApplyContext = {
   device: DeviceRow;
   now: number;
   budget: CallBudget;
-  /** Highest invoice_seq applied in this push; one device update covers them all. */
-  maxInvoiceSeq?: number;
 };
 
 export type ApplyOutcome = {
@@ -196,6 +194,9 @@ export type Lookups = {
       bundle_component_qty_milli?: number | null;
       bundle_qty?: number | null;
       bundle_id?: string | null;
+      bundle_name?: string | null;
+      bundle_price?: number | null;
+      bundle_discount?: number | null;
       name_snapshot?: string | null;
       net?: number;
     }[]
@@ -211,6 +212,9 @@ export type Lookups = {
       bundle_component_qty_milli?: number | null;
       bundle_qty?: number | null;
       bundle_id?: string | null;
+      bundle_name?: string | null;
+      bundle_price?: number | null;
+      bundle_discount?: number | null;
       name_snapshot?: string | null;
       net?: number;
     }
@@ -226,6 +230,15 @@ export type Lookups = {
       updated_at: number;
       deleted_at: number | null;
     }[]
+  >;
+  /**
+   * Every recipe row (active and soft-deleted) of the bundles in this push, so a fresh
+   * sale can tell whether the recipe it sold was already visible to the device and
+   * whether the stored recipe still matches (API-M2).
+   */
+  bundleRecipeHistory: Map<
+    string,
+    { updated_at: number; deleted_at: number | null }[]
   >;
   /** Active recipe row id → its bundle and component, for delete checks. */
   bundleItemById: Map<
@@ -271,6 +284,8 @@ export type Lookups = {
       track_stock: number;
       updated_at: number;
       kind: string;
+      /** The product row was created or edited earlier in this push: the device knows it. */
+      pushed: boolean;
     }
   >;
   /** The latest stored close of each device, for period chaining. */
@@ -423,6 +438,27 @@ export function appliedOp(
     result,
     errorCode,
   );
+}
+
+/**
+ * Aborts the D1 batch when the statement before it changed no row (API-H1, D-104).
+ *
+ * A guarded `UPDATE … WHERE rev = ?` that matches nothing is not an error in SQLite, so a
+ * `db.batch()` would commit the rest of the `tx_id` and leave a half-applied transaction.
+ * `abs()` of the smallest 64-bit integer raises "integer overflow" only when `changes()` is
+ * 0, and a SELECT leaves `changes()` intact for the following `onlyIfChanged` statements.
+ */
+export function guardAssert(db: TenantDb): D1PreparedStatement {
+  // `?1` keeps the tenant binding that `tenantDb.prepare` always adds.
+  return db.prepare(
+    'SELECT abs(-9223372036854775808) WHERE changes() = 0 AND ?1 IS NOT NULL',
+  );
+}
+
+/** True when a batch was rolled back by `guardAssert` (not a real constraint failure). */
+export function isGuardAssertion(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /integer overflow/iu.test(message);
 }
 
 export class Reject extends Error {
@@ -697,10 +733,13 @@ export function effectiveStaff(
     };
   }
   const changed = op.changed_fields ?? [];
-  const merge = current.rev !== (op.base_rev ?? 0);
   const pick = (field: 'role' | 'active' | 'deleted_at') => {
     const raw = op.row?.[field];
-    if (merge && !changed.includes(field)) return current[field];
+    // `planOp` always writes only `changed_fields` (plus updated_at/updated_by) for an
+    // existing master row, whether or not `base_rev` matched. Counting a role/active
+    // value the op does not actually write is what let a two-op transaction leave the
+    // shop with zero owners (API-H3).
+    if (!changed.includes(field)) return current[field];
     return raw === undefined ? current[field] : raw;
   };
   const deleted = pick('deleted_at');
@@ -745,6 +784,40 @@ export function ownersAfterPush(look: Lookups, group: PushOp[]): Set<string> {
 export function assertOwnerRemains(look: Lookups, group: PushOp[]): void {
   if (ownersAfterPush(look, group).size === 0)
     throw new Reject('CONSTRAINT_FAILED');
+}
+
+/**
+ * Active owners this transaction writes besides `op` (a promotion or a new owner). The
+ * SQL last-owner guard adds them to the stored count, because they may be written later
+ * in the same batch (API-H1).
+ */
+export function ownersAddedInGroup(
+  look: Lookups,
+  group: PushOp[],
+  op: PushOp,
+): number {
+  let added = 0;
+  for (const candidate of group) {
+    if (candidate === op || candidate.tbl !== 'staff') continue;
+    const id =
+      candidate.kind === 'delete' ? candidate.row_id : candidate.row?.id;
+    if (typeof id !== 'string') continue;
+    if (candidate.kind === 'delete') continue;
+    const next = effectiveStaff(look, candidate);
+    const current = look.staff.get(id);
+    const before =
+      current?.role === 'owner' &&
+      current.active === 1 &&
+      current.deleted_at === null;
+    if (
+      !before &&
+      next?.role === 'owner' &&
+      next.active === 1 &&
+      next.deleted_at === null
+    )
+      added += 1;
+  }
+  return added;
 }
 
 /** Only demoting/deactivating/deleting a stored owner can remove the last owner. */

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
-import { verifyAccessJwt } from '../src/auth/access.ts';
+import { resetJwksCache, verifyAccessJwt } from '../src/auth/access.ts';
 import { base64url } from '../src/auth/crypto.ts';
 import { statusChangeStatements } from '../src/platform/tenantAdmin.ts';
 import type { TenantRow } from '../src/types.ts';
@@ -150,9 +150,15 @@ describe('accessAuth and sameOrigin (05 §3.1, 01 §5)', () => {
     ).toBeNull();
     const t = await sign(good);
     expect(await verifyAccessJwt(`${t.slice(0, -4)}AAAA`, opts)).toBeNull();
+    // A key rotation is picked up by a fresh JWKS load; an unknown `kid` cannot drive an
+    // unthrottled live fetch on every request (API-M6).
+    resetJwksCache();
     const before = fetches;
     expect(await verifyAccessJwt(await sign(good, 'k2'), opts)).toBeNull();
     expect(fetches).toBe(before + 1);
+    const throttled = fetches;
+    expect(await verifyAccessJwt(await sign(good, 'k3'), opts)).toBeNull();
+    expect(fetches).toBe(throttled);
   });
 });
 

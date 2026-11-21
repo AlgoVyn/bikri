@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import type { OperatorVars } from '../middleware/accessAuth.ts';
-import { readJsonBody } from '../middleware/body.ts';
+import { readJsonBody, readOptionalJsonBody } from '../middleware/body.ts';
 import {
   createTenant,
   enrolLink,
@@ -43,7 +43,10 @@ import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
 import { importOps } from '../sync/importOps.ts';
 import { ImportOpsBody } from '../sync/opSchema.ts';
-import { revokeSupportDevices, supportPayload } from '../sync/status.ts';
+import {
+  revokeSupportDeviceStatements,
+  supportPayload,
+} from '../sync/status.ts';
 import { APPLY_ORDER, clientColumns, SNAPSHOT_TABLES } from '../sync/tables.ts';
 import type { DeviceRow, TenantRow, TenantStatus } from '../types.ts';
 import { snapshotPayload } from './sync.ts';
@@ -81,14 +84,40 @@ const issued = (
 
 admin.get('/session', (c) => c.json({ email: c.var.operator }));
 
+/**
+ * R2 listing pages cap at 1,000 keys. Retention keeps ~84 `d1/` objects, but a failed
+ * retention run or manual keys could exceed that and silently truncate `last_backup` and
+ * `/admin/backups` (API-L8). Pages are bounded so a misconfigured prefix cannot loop.
+ */
+const BACKUP_PAGE_LIMIT = 1_000;
+const BACKUP_MAX_PAGES = 10;
+export async function listBackupObjects(
+  bucket: Env['BACKUPS'],
+  prefix: string,
+): Promise<R2Object[]> {
+  const objects: R2Object[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < BACKUP_MAX_PAGES; page += 1) {
+    const listed = await bucket.list({
+      prefix,
+      limit: BACKUP_PAGE_LIMIT,
+      ...(cursor ? { cursor } : {}),
+    });
+    objects.push(...listed.objects);
+    if (!listed.truncated) break;
+    cursor = listed.cursor;
+  }
+  return objects;
+}
+
 admin.get('/usage', async (c) => {
   const now = Date.now();
   const [overview, list, backups] = await Promise.all([
     accountOverview(c.env, now),
     listTenants(c.env, now),
-    c.env.BACKUPS.list({ prefix: 'd1/', limit: 1000 }),
+    listBackupObjects(c.env.BACKUPS, 'd1/'),
   ]);
-  const last = backups.objects.sort(
+  const last = backups.sort(
     (a, b) => b.uploaded.getTime() - a.uploaded.getTime(),
   )[0];
   return c.json({
@@ -213,14 +242,7 @@ admin.post('/shop-requests/:id/approve', async (c) => {
       daily_write_budget: BUDGET.optional(),
       note: z.string().trim().max(500).optional(),
     })
-    .parse(
-      await readJsonBody(c, 64 * 1024).catch((error: unknown) => {
-        // An empty body is allowed (auto slug/budget), but a malformed or oversized
-        // body must fail instead of silently approving with defaults.
-        if (error instanceof ApiError) throw error;
-        return {};
-      }),
-    );
+    .parse(await readOptionalJsonBody(c, 64 * 1024));
   return c.json(
     await approveShopRequest(c.env, c.req.param('id'), c.var.operator, {
       ...body,
@@ -550,7 +572,7 @@ admin.post('/tenants/:id/support-access/end', async (c) => {
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
-    ...(await revokeSupportDevices(db, now)),
+    ...revokeSupportDeviceStatements(db, now),
     ...auditStatements(db, {
       action: 'support_access_end',
       after: { ended_by: 'operator' },
@@ -782,7 +804,7 @@ admin.post('/tenants/:id/files/gc', async (c) => {
   const { tenant, db } = c.var;
   const body = z
     .object({ dry_run: z.boolean().default(true) })
-    .parse((await readJsonBody(c, 64 * 1024).catch(() => ({}))) as unknown);
+    .parse(await readOptionalJsonBody(c, 64 * 1024));
   const now = Date.now();
   const result = await gcTenantFiles(c.env, tenant, {
     now,
@@ -852,9 +874,12 @@ function assertMaintenance(tenant: TenantRow): void {
  * Tables purged by a restore, children first. Devices, codes and branches stay (D-105), and
  * `audit_log` stays: it is append-only (AGENTS.md) and `maintenance off` reads the last
  * `tenant_status_change` from it to restore the shop's previous status.
+ * `change_log_watermarks` is a platform table with no tenant FK cascade; leaving it behind
+ * let a pre-restore watermark raise `change_log_floor` above the snapshot later (API-H7).
  */
 export const PURGE_ORDER = [
   'change_log',
+  'change_log_watermarks',
   'applied_ops',
   'sync_conflicts',
   'owner_email_codes',
@@ -892,8 +917,11 @@ admin.post('/tenants/:id/purge', async (c) => {
     for (const where of passesFor(t)) {
       while (left > 0) {
         const limit = Math.min(left, PURGE_CHUNK);
+        // Descending rowid: a chained reissue (C replaces B replaces A) is created after
+        // the row it points at, so deleting children first avoids an immediate FK failure
+        // that would wedge the purge (API-M4).
         const r = await db.run(
-          `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
+          `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} ORDER BY rowid DESC LIMIT ?2)`,
           limit,
         );
         const changed = r.meta.changes ?? 0;
@@ -1075,9 +1103,9 @@ admin.get('/backups', async (c) => {
     .string()
     .regex(/^[a-z0-9/_-]{0,40}$/)
     .parse(c.req.query('prefix') ?? 'd1/');
-  const listed = await c.env.BACKUPS.list({ prefix, limit: 1000 });
+  const listed = await listBackupObjects(c.env.BACKUPS, prefix);
   return c.json({
-    objects: listed.objects
+    objects: listed
       .map((o) => ({
         key: o.key,
         size: o.size,
