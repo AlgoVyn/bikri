@@ -104,6 +104,16 @@ export type CostState = {
   pushed: boolean;
 };
 
+/**
+ * What planning needs from the running avg-cost state: a plain `Map` for the push-wide
+ * state, or the per-group copy-on-write overlay in `applyOps.ts`.
+ */
+export type CostMap = {
+  get(id: string): CostState | undefined;
+  set(id: string, value: CostState): void;
+  has(id: string): boolean;
+};
+
 export type StaffRow = {
   id: string;
   role: Role;

@@ -17,7 +17,7 @@ import {
 } from '../db/tenantDb.ts';
 import {
   type ApplyContext,
-  type CostState,
+  type CostMap,
   changeLog,
   type Lookups,
   linkedInGroup,
@@ -65,7 +65,7 @@ export function sideEffects(
   ctx: ApplyContext,
   tbl: D1Table,
   row: Record<string, unknown>,
-  avg: Map<string, CostState>,
+  avg: CostMap,
   group: PushOp[],
   opId: string,
 ): D1PreparedStatement[] {
@@ -434,7 +434,7 @@ export function stockRepairStatements(
   group: PushOp[],
   tbl: string,
   row: Record<string, unknown>,
-  avg: Map<string, CostState>,
+  avg: CostMap,
   opId: string,
 ): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];

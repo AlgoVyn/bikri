@@ -14,7 +14,7 @@ import {
 } from '@bikri/core';
 import type { Lookups } from '../applyOpsShared.ts';
 import {
-  type CostState,
+  type CostMap,
   linkedInGroup,
   MAX_ROW_OP_SKEW_MS,
   overrideFor,
@@ -165,7 +165,7 @@ export function checkSalePolicy(
   staff: StaffRow | null,
   allowed: (permission: Permission) => boolean,
   entryAt: number,
-  costs: Map<string, CostState>,
+  costs: CostMap,
   deviceSeenAt: number,
 ): void {
   const n = (value: unknown) => Number(value ?? 0);

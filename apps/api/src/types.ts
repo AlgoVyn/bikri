@@ -68,6 +68,8 @@ export type DeviceVars = {
   tenant: TenantRow;
   device: DeviceRow;
   db: TenantDb;
+  /** Today's usage, joined into the device token lookup (13 §6). */
+  usage: { pushes: number; rows_written: number; rows_read: number };
   /** Set by shopAdmin: the owner unlocked on the admin device (X-Bikri-Staff). */
   ownerId: string;
 };

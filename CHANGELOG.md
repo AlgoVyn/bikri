@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Sync and push D1 throughput — 21 Nov 2026 review
+- The device-token lookup joins today's `tenant_usage` row, so pull, push, snapshot, `/me` and the shop export read the usage counters in the same D1 query instead of a second round trip.
+- `GET /api/sync/pull` reads the `change_log` page and the tenant's prune floor in one batch and embeds SQLite's stored `row_json` directly (only old clients parse rows for the bundle gate); a poll is two D1 round trips instead of four.
+- Push lookups read the `shop` rules in the same batch, query `products` once over the union of stock and sale ids, and plan each transaction group against a copy-on-write avg-cost overlay instead of cloning the whole map.
+
 ### Chunk consolidation and Sell responsiveness — 21 Nov 2026 review
 - Rolldown `codeSplitting` groups vendor families, all `$initial` shell modules into `app-shared`, and lazy source areas into `app-<area>` chunks; the build drops from 225 to 48 JS chunks, 10 initial files and 7 `modulepreload` tags, with initial JS still under the 290 KB gz budget.
 - Sell filters on `useDeferredValue`, memoizes the product grid/tile and cart panel with stable callbacks, computes the three cart-tab totals once per cart/money change, computes the hold label only while the dialog is open, and no longer recreates the two `ResizeObserver`s on every result-count change.

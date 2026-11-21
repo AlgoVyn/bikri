@@ -2,7 +2,7 @@
 import type { TenantDb } from '../db/tenantDb.ts';
 import { ApiError } from '../errors.ts';
 import { takeRowsRead } from '../platform/readCounter.ts';
-import { invalidateUsage, usageStatement } from '../platform/tenants.ts';
+import { usageStatement, usageToday } from '../platform/tenants.ts';
 import { assertQuota } from '../routes/sync.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
 import { applyOps, CallBudget } from './applyOps.ts';
@@ -47,7 +47,7 @@ export async function importOps(
       403,
       'Support access is view-only; its ops cannot be imported',
     );
-  await assertQuota(env, tenant, now);
+  assertQuota(tenant, await usageToday(env, tenant.id, now), now);
   const eligible =
     tenant.status === 'read_only' && tenant.status_changed_at !== null
       ? opsBefore(ops, tenant.status_changed_at)
@@ -66,7 +66,6 @@ export async function importOps(
       rows_read: outcome.rowsRead + takeRowsRead(tenant.id),
     }),
   ]);
-  invalidateUsage(tenant.id);
   return {
     results: outcome.results,
     server_time: now,

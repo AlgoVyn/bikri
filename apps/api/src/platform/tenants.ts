@@ -18,6 +18,7 @@ export async function getTenant(
 export type DeviceWithTenant = {
   device: DeviceRow & { tenant_id: string };
   tenant: TenantRow;
+  usage: UsageRow;
 };
 
 type TenantJoin = {
@@ -44,6 +45,9 @@ type TenantJoin = {
   tenant_created_at: number;
   tenant_updated_at: number;
   tenant_deleted_at: number | null;
+  usage_pushes: number | null;
+  usage_rows_written: number | null;
+  usage_rows_read: number | null;
 };
 
 /**
@@ -56,6 +60,7 @@ type TenantJoin = {
 export async function deviceByTokenHash(
   env: Env,
   tokenHash: string,
+  now: number,
 ): Promise<DeviceWithTenant | null> {
   const row = await env.DB.prepare(
     `SELECT d.*,
@@ -81,15 +86,31 @@ export async function deviceByTokenHash(
        t.created_by_email AS tenant_created_by_email,
        t.created_at AS tenant_created_at,
        t.updated_at AS tenant_updated_at,
-       t.deleted_at AS tenant_deleted_at
+       t.deleted_at AS tenant_deleted_at,
+       u.pushes AS usage_pushes,
+       u.rows_written AS usage_rows_written,
+       u.rows_read AS usage_rows_read
      FROM devices d
      JOIN tenants t ON t.id = d.tenant_id
+     LEFT JOIN tenant_usage u ON u.tenant_id = t.id AND u.day = ?2
      WHERE d.token_hash = ?1`,
   )
-    .bind(tokenHash)
+    .bind(tokenHash, utcDay(now))
     .first<DeviceRow & { tenant_id: string } & TenantJoin>();
   if (!row) return null;
-  const { tenant_slug, tenant_display_name, ...rest } = row;
+  const {
+    tenant_slug,
+    tenant_display_name,
+    usage_pushes,
+    usage_rows_written,
+    usage_rows_read,
+    ...rest
+  } = row;
+  const usage: UsageRow = {
+    pushes: Number(usage_pushes ?? 0),
+    rows_written: Number(usage_rows_written ?? 0),
+    rows_read: Number(usage_rows_read ?? 0),
+  };
   const tenant: TenantRow = {
     id: rest.tenant_id,
     slug: tenant_slug,
@@ -119,7 +140,7 @@ export async function deviceByTokenHash(
   const device = { ...rest } as Record<string, unknown>;
   for (const key of Object.keys(device))
     if (key.startsWith('tenant_')) delete device[key];
-  return { device: device as DeviceRow & { tenant_id: string }, tenant };
+  return { device: device as DeviceRow & { tenant_id: string }, tenant, usage };
 }
 
 export type EnrolmentCodeRow = {
@@ -164,44 +185,7 @@ export type UsageRow = {
   rows_read: number;
 };
 
-/**
- * Pull/snapshot pages check the read cap before every page. A 200-page snapshot used
- * to make 200 identical D1 reads. The value is best-effort across isolates (the quota
- * already is), and a push clears its own entry.
- */
-const USAGE_TTL_MS = 2_000;
-const usageCache = new Map<
-  string,
-  { at: number; day: string; value: UsageRow }
->();
-
-export function invalidateUsage(tenantId: string): void {
-  for (const key of usageCache.keys())
-    if (key.startsWith(`${tenantId}\u0000`)) usageCache.delete(key);
-}
-
-export async function usageToday(
-  env: Env,
-  tenantId: string,
-  now: number,
-): Promise<UsageRow> {
-  const day = utcDay(now);
-  const key = `${tenantId}\u0000${day}`;
-  const cached = usageCache.get(key);
-  if (cached !== undefined && now - cached.at < USAGE_TTL_MS)
-    return cached.value;
-  const row = await usageTodayStatement(env, tenantId, now).first<UsageRow>();
-  const value = row ?? { pushes: 0, rows_written: 0, rows_read: 0 };
-  usageCache.set(key, { at: now, day, value });
-  if (usageCache.size > 1_000) {
-    // Bound the isolate cache on a many-tenant deployment.
-    for (const [oldKey, entry] of usageCache)
-      if (now - entry.at >= USAGE_TTL_MS) usageCache.delete(oldKey);
-  }
-  return value;
-}
-
-/** The same read as `usageToday`, prepared for a caller's batch. */
+/** Today's usage row, prepared for a caller's batch or a direct read. */
 export function usageTodayStatement(
   env: Env,
   tenantId: string,
@@ -210,6 +194,16 @@ export function usageTodayStatement(
   return env.DB.prepare(
     'SELECT pushes, rows_written, rows_read FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
   ).bind(tenantId, utcDay(now));
+}
+
+/** A direct usage read for paths outside the device-auth pipeline (ops import, admin). */
+export async function usageToday(
+  env: Env,
+  tenantId: string,
+  now: number,
+): Promise<UsageRow> {
+  const row = await usageTodayStatement(env, tenantId, now).first<UsageRow>();
+  return row ?? { pushes: 0, rows_written: 0, rows_read: 0 };
 }
 
 /** The usage upsert that ends every push batch (03 §4.1 step 6). */
