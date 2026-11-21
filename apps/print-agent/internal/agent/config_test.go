@@ -59,3 +59,28 @@ func TestLoadConfigDoesNotLeaveOriginsEmpty(t *testing.T) {
 		t.Fatalf("loaded origins = %#v", loaded.Origins)
 	}
 }
+
+func TestTransientOriginsAreNeverPersisted(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := DefaultConfig()
+	cfg.TransientOrigins = []string{"http://localhost:4173", "http://127.0.0.1:3000"}
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range cfg.TransientOrigins {
+		if strings.Contains(string(raw), origin) {
+			t.Fatalf("transient origin was persisted: %s", raw)
+		}
+	}
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Origins) != 1 || len(loaded.TransientOrigins) != 0 {
+		t.Fatalf("loaded origins = %#v / %#v", loaded.Origins, loaded.TransientOrigins)
+	}
+}

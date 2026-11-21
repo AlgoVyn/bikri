@@ -29,6 +29,10 @@ type Config struct {
 	TokenHash string   `json:"tokenHash,omitempty"`
 	Paired    bool     `json:"paired"`
 	CreatedAt int64    `json:"createdAt"`
+
+	// TransientOrigins are extra browser origins from --allow-origin
+	// (development only). They are never written to config.json (14 §7).
+	TransientOrigins []string `json:"-"`
 }
 
 // developerOrigins were shipped in older builds. A local dev server is an
@@ -115,6 +119,7 @@ func SaveConfig(path string, cfg *Config) error {
 	}
 	saved := *cfg
 	saved.Origins = sanitizeOrigins(cfg.Origins)
+	saved.TransientOrigins = nil
 	data, err := json.MarshalIndent(&saved, "", "  ")
 	if err != nil {
 		return err
