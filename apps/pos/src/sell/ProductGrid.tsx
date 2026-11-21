@@ -1,5 +1,6 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
-import { useEffect, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { isLatinName } from '../products/format.ts';
@@ -15,7 +16,7 @@ const TILE_H_UR = 196;
 const OVERSCAN_ROWS = 3;
 
 /** Virtualised product tiles inside the Sell scroll area (screens/05). */
-export function ProductGrid({
+export const ProductGrid = memo(function ProductGrid({
   rows,
   highlighted,
   onAdd,
@@ -28,15 +29,13 @@ export function ProductGrid({
   scrollRef: React.RefObject<HTMLDivElement | null>;
   cartQty?: ReadonlyMap<string, number>;
 }) {
-  const { t } = useTranslation();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const urdu = i18n.language === 'ur';
   const tileH = urdu ? TILE_H_UR : TILE_H;
   const tileMin = urdu ? TILE_MIN_UR : TILE_MIN;
   const ref = useRef<HTMLUListElement>(null);
   const [view, setView] = useState({ cols: 4, start: 0, end: 8 });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the virtual window when the result set changes
   useEffect(() => {
     const scroller = scrollRef.current;
     const list = ref.current;
@@ -66,11 +65,19 @@ export function ProductGrid({
       scroller.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [scrollRef, tileH, rows.length]);
+  }, [scrollRef, tileH, tileMin]);
+
+  // A new result set starts at the top, but it must not tear down and recreate the
+  // two ResizeObservers on every barcode/search character.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the result count changes
+  useEffect(() => {
+    setView((current) => ({ ...current, start: 0, end: 8 }));
+  }, [rows.length]);
 
   const totalRows = Math.ceil(rows.length / view.cols);
-  const first = view.start * view.cols;
-  const last = Math.min(rows.length, view.end * view.cols);
+  const span = Math.max(1, (view.end - view.start) * view.cols);
+  const first = Math.min(view.start * view.cols, Math.max(0, rows.length - 1));
+  const last = Math.min(rows.length, first + span);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the highlight can move outside the rendered window
   useEffect(() => {
@@ -124,33 +131,35 @@ export function ProductGrid({
               active={index === highlighted}
               onAdd={onAdd}
               cartQty={cartQty?.get(row.product.id) ?? 0}
+              t={t}
+              urdu={urdu}
             />
           </li>
         );
       })}
     </ul>
   );
-}
+});
 
-function Tile({
+const Tile = memo(function Tile({
   row,
   index,
   active,
   onAdd,
   cartQty,
+  t,
+  urdu,
 }: {
   row: SellRow;
   index: number;
   active: boolean;
   onAdd: (row: SellRow) => void;
   cartQty: number;
+  t: TFunction;
+  urdu: boolean;
 }) {
-  const { t, i18n } = useTranslation();
   const p = row.product;
-  const name =
-    i18n.language === 'ur' && p.name_ur
-      ? String(p.name_ur)
-      : String(p.name_en ?? '');
+  const name = urdu && p.name_ur ? String(p.name_ur) : String(p.name_en ?? '');
   const latin = isLatinName(name);
   const unit = String(p.unit ?? 'pc') as QtyUnit;
   const pill =
@@ -220,4 +229,4 @@ function Tile({
       </span>
     </button>
   );
-}
+});

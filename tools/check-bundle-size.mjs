@@ -2,7 +2,7 @@
 // Bundle budget (docs/08-ux-guidelines.md §7): initial JS (gzip) < 290 KB, every other JS chunk < 100 KB.
 // CSS and the offline precache have separate budgets so a regression cannot hide outside the JS graph.
 // Run after `pnpm build`. Node 24, no dependencies.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -16,6 +16,12 @@ const INITIAL_BUDGET = 290 * 1024;
 const CHUNK_BUDGET = 100 * 1024;
 const CSS_BUDGET = 25 * 1024;
 const PRECACHE_BUDGET = 1.25 * 1024 * 1024;
+// Chunk fragmentation gate (D-231/fifth review): one lazy route entry per route is
+// expected, but the build must not slide back to one chunk per module.
+const MAX_TOTAL_JS_CHUNKS = 110;
+const MAX_INITIAL_JS_FILES = 12;
+const MAX_MODULE_PRELOADS = 4;
+const MAX_SUB_KB_CHUNKS = 65;
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 const initial = new Set(
@@ -50,6 +56,32 @@ function jsFiles(dir = join(DIST, 'assets'), prefix = 'assets') {
 const files = jsFiles();
 let initialTotal = 0;
 const problems = [];
+const preloads = [...html.matchAll(/<link\b[^>]*rel="modulepreload"/gu)].length;
+const smallChunks = files.filter((rel) => {
+  try {
+    return statSync(join(DIST, rel)).size < 1024;
+  } catch {
+    return false;
+  }
+}).length;
+if (initial.size > MAX_INITIAL_JS_FILES) {
+  problems.push(
+    `${initial.size} initial JS files (budget ${MAX_INITIAL_JS_FILES})`,
+  );
+}
+if (files.length > MAX_TOTAL_JS_CHUNKS) {
+  problems.push(`${files.length} JS chunks (budget ${MAX_TOTAL_JS_CHUNKS})`);
+}
+if (preloads > MAX_MODULE_PRELOADS) {
+  problems.push(
+    `${preloads} modulepreload tags (budget ${MAX_MODULE_PRELOADS})`,
+  );
+}
+if (smallChunks > MAX_SUB_KB_CHUNKS) {
+  problems.push(
+    `${smallChunks} JS chunks under 1 KB (budget ${MAX_SUB_KB_CHUNKS})`,
+  );
+}
 if (initial.size === 0)
   problems.push(
     'no initial scripts found in index.html (output format changed?)',
@@ -135,7 +167,7 @@ if (precacheTotal > PRECACHE_BUDGET) {
   );
 }
 console.log(
-  `initial JS: ${kb(initialTotal)} gz across ${initial.size} file(s) + the largest language catalog (${largestLocale ? kb(gz(largestLocale)) : '0.0 KB'}); ${files.length} JS file(s) total`,
+  `initial JS: ${kb(initialTotal)} gz across ${initial.size} file(s) + the largest language catalog (${largestLocale ? kb(gz(largestLocale)) : '0.0 KB'}); ${files.length} JS file(s) total (${smallChunks} under 1 KB); ${preloads} modulepreload tag(s)`,
 );
 console.log(
   `initial CSS: ${kb(cssTotal)} gz; offline precache: ${kb(precacheTotal)} gz across ${precache.length} entries`,

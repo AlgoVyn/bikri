@@ -5,7 +5,7 @@ import {
   qtyAllowsDecimals,
 } from '@bikri/core';
 import type { Cart, CartBackdate, CartLine } from '@bikri/db';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDangerQuiet,
@@ -81,10 +81,16 @@ function itemCount(lines: readonly CartLine[]): number {
   return n;
 }
 
-export function CartPanel(p: CartPanelProps) {
+export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
   const { t, i18n } = useTranslation();
   const customer = useCustomer(p.cart.customer_id);
   const { totals, cart, money } = p;
+  // The three tab totals depend only on the carts and the shop money settings, not on
+  // the search box or the cart's own line rendering.
+  const tabTotals = useMemo(
+    () => CART_IDS.map((id) => cartTotals(p.carts[id], p.money).total),
+    [p.carts, p.money],
+  );
   // The cart keeps newest first in memory, so only the "bottom" preference reverses.
   const displayLines = cart.lines.map((line, index) => ({ line, index }));
   if (p.cartOrder === 'newest_last') displayLines.reverse();
@@ -146,7 +152,7 @@ export function CartPanel(p: CartPanelProps) {
       <div role="tablist" aria-label={t('sell.carts')} className="flex gap-1">
         {CART_IDS.map((id, i) => {
           const filled = !isEmptyCart(p.carts[id]);
-          const total = cartTotals(p.carts[id], p.money).total;
+          const total = tabTotals[i] ?? 0;
           const active = p.active === id;
           return (
             <button
@@ -406,7 +412,7 @@ export function CartPanel(p: CartPanelProps) {
       </div>
     </div>
   );
-}
+});
 
 function Row({
   label,

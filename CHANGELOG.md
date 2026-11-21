@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Chunk consolidation and Sell responsiveness — 21 Nov 2026 review
+- Rolldown `codeSplitting` groups vendor families, all `$initial` shell modules into `app-initial`, and lazy source areas into `app-<area>` chunks; the build drops from 225 to 102 JS chunks, 10 initial files and 0 `modulepreload` tags, with initial JS still under the 290 KB gz budget.
+- Sell filters on `useDeferredValue`, memoizes the product grid/tile and cart panel with stable callbacks, computes the three cart-tab totals once per cart/money change, computes the hold label only while the dialog is open, and no longer recreates the two `ResizeObserver`s on every result-count change.
+- `check-bundle-size.mjs` now caps total JS chunks (110), initial JS files (12), `modulepreload` tags (4) and sub-1 KB chunks (65).
+
 ### PWA delivery — 21 Nov 2026 review
 - Workbox no longer appends `?__WB_REVISION__=…` to content-hashed `/assets/*` entries, so a first visit does not download the initial JS/CSS graph twice.
 - `/bikri/workbox-*.js` is immutable, while `sw.js`, `manifest.webmanifest` and `theme-init.js` revalidate without the broad `no-transform`, so Cloudflare can compress them; HTML keeps the beacon guard.
