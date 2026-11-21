@@ -10,11 +10,7 @@ import {
   type ShopMoney,
   shopMoney,
 } from '../data/cart.ts';
-import {
-  filterAndSortProducts,
-  loadBundleRecipe,
-  type ProductListRow,
-} from '../data/catalog.ts';
+import { loadBundleRecipe, type ProductListRow } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 
@@ -22,19 +18,15 @@ export type SellRow = ProductListRow & { haystack: string };
 
 const NO_SOLD = new Map<string, number>();
 
-/** Products in Sell order (30-day sales on this till, then name) with a search haystack. */
+/**
+ * Products in Sell order (30-day sales on this till, then name) with a search haystack.
+ * `useCatalogueRows` already sorts in this order and keeps positions when it patches a
+ * stock level, so a completed bill never re-sorts the catalogue.
+ */
 export function useSellProducts(): SellRow[] | undefined {
   const sold = useSold30();
-  const rows = useCatalogueRows(sold ?? NO_SOLD);
-  return useMemo(
-    () =>
-      rows === undefined
-        ? undefined
-        : // `buildProductRows` always sets the haystack; the cast avoids
-          // re-spreading every row after each catalogue change.
-          (filterAndSortProducts(rows, { sort: 'best' }) as SellRow[]),
-    [rows],
-  );
+  // `buildProductRows` always sets the haystack; the cast avoids re-spreading rows.
+  return useCatalogueRows(sold ?? NO_SOLD) as SellRow[] | undefined;
 }
 
 /** Every word must appear; an exact barcode or SKU also matches. */

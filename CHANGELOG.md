@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Sale and catalogue hot path — 21 Nov 2026 review
+- `completeSale` now opens a per-bill Dexie scope: base stores plus only what the bill writes (`udhaar`, tracked movements, payments, audits, or a reissue). `products`, `shop` and `staff` stay read-only, and `products` is no longer reported to local-write listeners on every sale.
+- Sale lines, stock movements, payments and audit rows are written with one `bulkAdd` and one outbox `bulkAdd` each through `Writer.insertMany`; stock movements update `stock_levels` in one batched pass instead of two requests per line.
+- `useCatalogueRows` sorts once in Sell order and patches only the products whose level changed plus the bundles whose recipe uses them, so a shop with any bundle no longer rebuilds 5,000 rows and haystacks after every bill.
+- Search cache invalidation is split: a sale/refund/void clears only the invoice fallback, not the 5k product/customer catalogue cache that every keystroke reads.
+
 ### Snapshot and enrolment throughput — 21 Nov 2026 review
 - Snapshot pages no longer maintain `stock_levels`/`party_balances` row by row; the caches are rebuilt once when the download completes, removing hundreds of thousands of redundant cache writes (and their reads) from a large enrolment.
 - `mergeRows` short-circuits an empty outbox instead of loading two empty arrays on every page, and a snapshot transaction locks only the tables it writes.

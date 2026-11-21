@@ -12,7 +12,10 @@ import type { BikriDb, SyncedRow } from '@bikri/db';
 import { rebuildCaches } from '../data/caches.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
-import { clearSearchCache } from '../data/search.ts';
+import {
+  clearCatalogueSearchCache,
+  clearInvoiceSearchCache,
+} from '../data/search.ts';
 import { clearSoldCache } from '../state/catalogue.ts';
 import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
 import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
@@ -124,23 +127,24 @@ const SOLD_SOURCE_TABLES = new Set([
   'refund_lines',
   'sale_voids',
 ]);
-const SEARCH_SOURCE_TABLES = new Set([
+const SEARCH_CATALOGUE_TABLES = new Set([
   'products',
   'product_barcodes',
   'customers',
-  'sales',
-  'refunds',
-  'sale_voids',
 ]);
+const SEARCH_INVOICE_TABLES = new Set(['sales', 'refunds', 'sale_voids']);
 function clearReaderCaches(tables: Iterable<string>): void {
   let sold = false;
-  let search = false;
+  let catalogue = false;
+  let invoice = false;
   for (const table of tables) {
     if (SOLD_SOURCE_TABLES.has(table)) sold = true;
-    if (SEARCH_SOURCE_TABLES.has(table)) search = true;
+    if (SEARCH_CATALOGUE_TABLES.has(table)) catalogue = true;
+    if (SEARCH_INVOICE_TABLES.has(table)) invoice = true;
   }
   if (sold) clearSoldCache();
-  if (search) clearSearchCache();
+  if (catalogue) clearCatalogueSearchCache();
+  if (invoice) clearInvoiceSearchCache();
 }
 
 /** Pulled rows that advance the derived caches (`stock_levels`, `party_balances`). */

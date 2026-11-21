@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type BundleInfo,
   buildBundleInfoMap,
+  bundleInfoOf,
+  filterAndSortProducts,
   type ProductListRow,
   soldByProduct,
   stockStateOf,
@@ -183,20 +185,128 @@ export function productHaystack(row: ProductListRow): string {
     .join(' ');
 }
 
-type CatalogueCache = {
+type CatalogueIndex = {
+  /** Rows in Sell order (`best`), so a stock patch keeps their positions. */
+  rows: ProductListRow[];
+  levels: ReadonlyMap<string, number>;
+  index: Map<string, number>;
+  productsById: Map<string, MasterRow>;
+  /** One bundle's recipe rows, for recomputing only the affected bundles. */
+  recipes: Map<string, MasterRow[]>;
+  /** component product id → active bundle ids that use it. */
+  componentBundles: Map<string, string[]>;
+};
+
+type CatalogueCache = CatalogueIndex & {
   master: CatalogueMaster;
   sold: ReadonlyMap<string, number>;
   levels: ReadonlyMap<string, number>;
   costMethod: 'avg' | 'last';
-  rows: ProductListRow[];
-  index: Map<string, number>;
 };
 
+/** Build the cached rows and the lookup structures the stock patch needs. */
+export function buildCatalogueIndex(
+  master: CatalogueMaster,
+  levels: ReadonlyMap<string, number>,
+  sold: ReadonlyMap<string, number>,
+  costMethod: 'avg' | 'last',
+): CatalogueIndex {
+  const recipes = new Map<string, MasterRow[]>();
+  const componentBundles = new Map<string, string[]>();
+  for (const item of master.bundleItems) {
+    const bundleId = String(item.bundle_id);
+    recipes.set(bundleId, [...(recipes.get(bundleId) ?? []), item]);
+    const componentId = String(item.component_product_id);
+    const usedBy = componentBundles.get(componentId) ?? [];
+    if (!usedBy.includes(bundleId)) usedBy.push(bundleId);
+    componentBundles.set(componentId, usedBy);
+  }
+  const rows = filterAndSortProducts(
+    buildProductRows(master, levels, sold, costMethod),
+    { sort: 'best' },
+  );
+  return {
+    rows,
+    levels,
+    index: new Map(rows.map((row, index) => [row.product.id, index])),
+    productsById: new Map(
+      master.products.map((product) => [product.id, product]),
+    ),
+    recipes,
+    componentBundles,
+  };
+}
+
 /**
- * Sell/Products rows. A sale invalidates the `stock_levels` live query; patching
- * the few rows whose level changed keeps the per-sale cost proportional to the
- * sale instead of the catalogue. Shops with bundles fall back to a full rebuild
- * because a component sale changes the bundle's availability (D-231).
+ * Patch only the rows whose stock changed. A component sale also recomputes the bundles
+ * whose recipe uses it. Returns `null` when more than 500 rows changed (a bulk import),
+ * where a full rebuild is cheaper than per-row work.
+ */
+export function patchCatalogueIndex(
+  prev: CatalogueIndex,
+  levels: ReadonlyMap<string, number>,
+  costMethod: 'avg' | 'last',
+): ProductListRow[] | null {
+  const changed: string[] = [];
+  const seen = new Set<string>();
+  for (const [id, level] of levels) {
+    seen.add(id);
+    if (prev.levels.get(id) !== level) changed.push(id);
+  }
+  for (const id of prev.levels.keys()) {
+    if (!seen.has(id)) changed.push(id);
+  }
+  if (changed.length === 0) return prev.rows;
+  if (changed.length > 500) return null;
+  const rows = prev.rows.slice();
+  const affectedBundles = new Set<string>();
+  for (const id of changed) {
+    const product = prev.productsById.get(id);
+    const index = prev.index.get(id);
+    // A bundle row's on-hand is its components' availability, not its own level.
+    if (index !== undefined && product && product.kind !== 'bundle') {
+      const old = rows[index];
+      if (old) {
+        const onHand = levels.get(id) ?? 0;
+        rows[index] = {
+          ...old,
+          onHand,
+          stockState: stockStateOf(product, onHand),
+        };
+      }
+    }
+    for (const bundleId of prev.componentBundles.get(id) ?? [])
+      affectedBundles.add(bundleId);
+  }
+  for (const bundleId of affectedBundles) {
+    const index = prev.index.get(bundleId);
+    const product = prev.productsById.get(bundleId);
+    const old = index === undefined ? undefined : rows[index];
+    if (index === undefined || !product || !old) continue;
+    const bundle = bundleInfoOf(
+      bundleId,
+      prev.recipes.get(bundleId) ?? [],
+      prev.productsById,
+      levels,
+      costMethod,
+    );
+    const onHand = (bundle.availability ?? 0) * 1000;
+    rows[index] = {
+      ...old,
+      bundle,
+      onHand,
+      stockState: stockStateOf(product, onHand, bundle),
+    };
+  }
+  return rows;
+}
+
+/**
+ * Sell/Products rows, already sorted in Sell order (`best`). A sale invalidates the
+ * `stock_levels` live query; patching the few rows whose level changed keeps the
+ * per-sale cost proportional to the sale instead of the catalogue. A component sale
+ * also recomputes only the bundles whose recipe uses that component, so a shop with
+ * bundles keeps the incremental path (D-231).
  */
 export function useCatalogueRows(
   sold: ReadonlyMap<string, number>,
@@ -212,47 +322,16 @@ export function useCatalogueRows(
       prev !== null &&
       prev.master === master &&
       prev.sold === sold &&
-      prev.costMethod === costMethod &&
-      master.bundleItems.length === 0
+      prev.costMethod === costMethod
     ) {
-      const changed: string[] = [];
-      const seen = new Set<string>();
-      for (const [id, level] of levels) {
-        seen.add(id);
-        if (prev.levels.get(id) !== level) changed.push(id);
-      }
-      for (const id of prev.levels.keys()) {
-        if (!seen.has(id)) changed.push(id);
-      }
-      if (changed.length === 0) return prev.rows;
-      if (changed.length <= 500) {
-        const rows = prev.rows.slice();
-        for (const id of changed) {
-          const index = prev.index.get(id);
-          if (index === undefined) continue;
-          const product = master.products[index];
-          const old = rows[index];
-          if (!product || !old) continue;
-          const onHand = levels.get(id) ?? 0;
-          rows[index] = {
-            ...old,
-            onHand,
-            stockState: stockStateOf(product, onHand),
-          };
-        }
+      const rows = patchCatalogueIndex(prev, levels, costMethod);
+      if (rows !== null) {
         cache.current = { ...prev, levels, rows };
         return rows;
       }
     }
-    const rows = buildProductRows(master, levels, sold, costMethod);
-    cache.current = {
-      master,
-      sold,
-      levels,
-      costMethod,
-      rows,
-      index: new Map(rows.map((row, index) => [row.product.id, index])),
-    };
-    return rows;
+    const index = buildCatalogueIndex(master, levels, sold, costMethod);
+    cache.current = { master, sold, costMethod, ...index };
+    return index.rows;
   }, [master, levels, sold, costMethod]);
 }
