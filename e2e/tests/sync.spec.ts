@@ -1,6 +1,16 @@
+import { readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { idbCount, idbCountFor, makePng } from './helpers.ts';
+import {
+  idbAll,
+  idbCount,
+  idbCountFor,
+  makePng,
+  setLanguage,
+} from './helpers.ts';
 import {
   API,
   createShop,
@@ -15,6 +25,66 @@ import {
 
 // M2 journeys (10-testing §6/§8): operator creates a shop, owner enrols an admin till, confirms by
 // email, adds a second till; data syncs between them; revoke and Leave this shop.
+
+/** Raise the tenant's prune floor in the local D1 so the next pull is stale (journey 20). */
+function raiseChangeLogFloor(tenantId: string): void {
+  const dir = fileURLToPath(
+    new URL(
+      '../../apps/api/.wrangler/state/v3/d1/miniflare-D1DatabaseObject',
+      import.meta.url,
+    ),
+  );
+  const file = readdirSync(dir)
+    .filter((name) => name.endsWith('.sqlite'))
+    .map((name) => ({
+      name,
+      at: statSync(join(dir, name)).mtimeMs,
+    }))
+    .sort((left, right) => right.at - left.at)
+    .at(0)?.name;
+  if (!file) throw new Error(`no local D1 database under ${dir}`);
+  const db = new DatabaseSync(join(dir, file));
+  try {
+    const row = db
+      .prepare('SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?')
+      .get(tenantId) as { seq?: number } | undefined;
+    const floor = Number(row?.seq ?? 0);
+    if (floor <= 0) throw new Error('the tenant has no change_log rows');
+    db.prepare('UPDATE tenants SET change_log_floor = ? WHERE id = ?').run(
+      floor,
+      tenantId,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+/** Rows of one table for a tenant through the operator export (Access is bypassed in tests). */
+async function serverRows(
+  request: import('@playwright/test').APIRequestContext,
+  tenantId: string,
+  tbl: string,
+): Promise<number> {
+  const before = Date.now();
+  let after = '';
+  let rows = 0;
+  for (;;) {
+    const query = new URLSearchParams({ tbl, before: String(before), after });
+    const res = await request.get(
+      `${API}/admin/tenants/${tenantId}/export?${query.toString()}`,
+      { headers: { origin: ORIGIN } },
+    );
+    expect(res.status(), await res.text()).toBe(200);
+    const body = (await res.json()) as {
+      rows: unknown[];
+      next_after: string;
+      has_more: boolean;
+    };
+    rows += body.rows.length;
+    if (!body.has_more) return rows;
+    after = body.next_after;
+  }
+}
 
 test.describe.configure({ mode: 'serial' });
 test.beforeEach(({ browserName: _b }, testInfo) => {
@@ -318,6 +388,12 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     'data-sync-state',
     'read-only',
   );
+  // Journey 23 requires the banner in both languages, not English only.
+  await setLanguage(a.page, 'ur');
+  await expect(a.page.getByTestId('banner-read-only')).toContainText(
+    'یہ دکان صرف پڑھنے کے لیے ہے',
+  );
+  await setLanguage(a.page, 'en');
   await a.page.evaluate(() => {
     void window.__bikriTest?.seedProducts([{ name: 'Blocked', price: 100 }]);
   });
@@ -336,11 +412,107 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
   await a.ctx.close();
 });
 
-test('operator console needs Access; till tokens never open /admin (I17)', async ({
+test('operator console needs the Access email allowlist and same-origin (I17)', async ({
   request,
 }) => {
-  const res = await request.get(`${API}/admin/tenants`, {
+  const crossSite = await request.get(`${API}/admin/tenants`, {
     headers: { 'sec-fetch-site': 'cross-site' },
   });
-  expect(res.status()).toBe(403);
+  expect(crossSite.status()).toBe(403);
+  // The test bypass still enforces OWNER_EMAILS; a non-operator identity never opens the console.
+  const notOperator = await request.get(`${API}/admin/tenants`, {
+    headers: { 'x-test-access-email': 'till@example.test' },
+  });
+  expect(notOperator.status()).toBe(403);
+});
+
+test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recovers from a new restore_epoch', async ({
+  browser,
+  request,
+}) => {
+  test.setTimeout(150_000);
+  const email = `stale-${Date.now()}@e2e.test`;
+  const shop = await createShop(request, email);
+  const admin = `${API}/admin/tenants/${shop.tenant.id}`;
+  const headers = { origin: ORIGIN };
+  const a = await newTill(browser);
+  await enrol(a.page, shop.owner_code.code, 'Counter 1');
+  await a.page.waitForFunction(() => window.__bikriTest !== undefined);
+  await a.page.evaluate(() => window.__bikriTest?.finishSetupHere());
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
+  await unlock(a.page);
+  await a.page.evaluate(() =>
+    window.__bikriTest?.seedProducts([
+      { name: 'Charger 20 W', price: 150_000, cost: 100_000, stock: 20 },
+    ]),
+  );
+  await syncNow(a.page);
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
+
+  // A sale the server has not seen yet must survive the forced snapshot.
+  await a.ctx.setOffline(true);
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+  await a.page.getByTestId('sell-tile').filter({ hasText: 'Charger' }).click();
+  await a.page.keyboard.press('F8');
+  await a.page.getByTestId('pay-done').click();
+  await expect(a.page.getByTestId('sale-saved')).toBeVisible();
+  await a.ctx.setOffline(false);
+
+  // The server's nightly prune moved the floor past this till's cursor. Set the client
+  // cursor low and the tenant floor to the current maximum: the next pull is stale.
+  await a.ctx.setOffline(true);
+  await a.page.evaluate(() => window.__bikriTest?.setKv('pull_cursor', 0));
+  raiseChangeLogFloor(shop.tenant.id);
+  await a.ctx.setOffline(false);
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
+  await syncNow(a.page);
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
+  expect(await idbAll(a.page, 'sales')).toHaveLength(1);
+  expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(1);
+
+  // A restore sets a new epoch; the till recovers without duplicating its sale.
+  const maintenance = await request.post(`${admin}/maintenance`, {
+    headers,
+    data: { on: true, reason: 'Journey 20 restore drill' },
+  });
+  expect(maintenance.status(), await maintenance.text()).toBe(200);
+  const epoch = await request.post(`${admin}/restore-epoch`, {
+    headers,
+    data: { restore_point_at: Date.now(), reason: 'Journey 20 restore drill' },
+  });
+  expect(epoch.status(), await epoch.text()).toBe(200);
+  const done = await request.post(`${admin}/maintenance`, {
+    headers,
+    data: {
+      on: false,
+      reason: 'Journey 20 restore drill finished',
+      to: 'active',
+    },
+  });
+  expect(done.status(), await done.text()).toBe(200);
+  await syncNow(a.page);
+  // A restore recovery may return the till to the lock screen; unlock and confirm.
+  if (
+    await a.page
+      .getByTestId('lock-screen')
+      .isVisible()
+      .catch(() => false)
+  )
+    await unlock(a.page);
+  await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
+  expect(await idbAll(a.page, 'sales')).toHaveLength(1);
+  expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(1);
+  await a.ctx.close();
 });
