@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -132,5 +133,87 @@ func TestContainsJob(t *testing.T) {
 	}
 	if containsJob("Bixolon-41 user 1024 Wed\n", "Bixolon-42") {
 		t.Fatal("wrong job found")
+	}
+}
+
+func TestDriverGeometryKeepsTheDotGrid(t *testing.T) {
+	ppi, media, ok := driverGeometry(576, 2030, 80)
+	if !ok || ppi != 183 || media != "Custom.80x282mm" {
+		t.Fatalf("80 mm geometry = %d, %q, %v", ppi, media, ok)
+	}
+	ppi, media, ok = driverGeometry(384, 1600, 58)
+	if !ok || ppi != 168 || media != "Custom.58x242mm" {
+		t.Fatalf("58 mm geometry = %d, %q, %v", ppi, media, ok)
+	}
+	// Unknown paper falls back to the 80 mm default, missing dots disable it.
+	if _, media, ok := driverGeometry(576, 2030, 0); !ok || media != "Custom.80x282mm" {
+		t.Fatalf("default paper media = %q, %v", media, ok)
+	}
+	if _, _, ok := driverGeometry(0, 2030, 80); ok {
+		t.Fatal("missing width produced geometry")
+	}
+	// Implausible ppi falls back to a 203 dpi head.
+	if ppi, _, ok := driverGeometry(2048, 2030, 80); !ok || ppi != 203 {
+		t.Fatalf("fallback ppi = %d, %v", ppi, ok)
+	}
+}
+
+func TestCupsDriverArgsAreNotPageRelative(t *testing.T) {
+	// `scaling=100` is page-relative and distorts receipts; the driver path must
+	// keep the image at its real ppi and give CUPS a page tall enough for it.
+	args := strings.Join(cupsDriverArgs(Job{WidthDots: 576, PaperMM: 80}, 2030), " ")
+	want := "-o natural-scaling=100 -o ppi=183 -o media=Custom.80x282mm"
+	if args != want {
+		t.Fatalf("driver args = %q, want %q", args, want)
+	}
+	if got := strings.Join(cupsDriverArgs(Job{WidthDots: 0, PaperMM: 80}, 0), " "); got != "-o natural-scaling=100" {
+		t.Fatalf("fallback args = %q", got)
+	}
+}
+
+func TestQueueFault(t *testing.T) {
+	cases := []struct {
+		out  string
+		code string
+	}{
+		{"printer Bixolon disabled since Mon 17 Nov 2025 - out of paper\n", "PAPER_OUT"},
+		{"printer Bixolon disabled since Mon 17 Nov 2025 - media-empty\n", "PAPER_OUT"},
+		{"printer Bixolon disabled since Mon 17 Nov 2025 - reason unknown\n", "PRINTER_OFFLINE"},
+		{"printer Bixolon is idle.  enabled since Mon 17 Nov 2025\n", ""},
+		{"printer Bixolon now printing Bixolon-42.  enabled since Mon 17 Nov 2025\n", ""},
+	}
+	for _, tc := range cases {
+		code, _ := queueFault(tc.out)
+		if code != tc.code {
+			t.Fatalf("queueFault(%q) = %q, want %q", tc.out, code, tc.code)
+		}
+	}
+}
+
+// A caller with a short deadline (the /v1/health probe) must not cancel the
+// refresh a 30 s print job is waiting on.
+func TestListPrintersRefreshOutlivesTheFirstCaller(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "lpstat")
+	body := "#!/bin/sh\nsleep 0.15\ncase \"$1\" in\n  -e) echo Bixolon ;;\n  -d) echo 'system default destination: Bixolon' ;;\n  -v) echo 'device for Bixolon: usb://BIXOLON/SRP-350III' ;;\nesac\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":/bin:/usr/bin")
+	cupsEnvOnce = sync.Once{}
+	cupsEnvCache = nil
+
+	b := &cupsBackend{}
+	short, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := b.ListPrinters(short); err == nil {
+		t.Fatal("the short-deadline caller did not time out")
+	}
+	list, err := b.ListPrinters(context.Background())
+	if err != nil {
+		t.Fatalf("refresh failed after the first caller left: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "Bixolon" {
+		t.Fatalf("printers = %#v", list)
 	}
 }

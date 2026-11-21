@@ -148,6 +148,16 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 		m.update(rec, "failed", "PAYLOAD_INVALID", err.Error())
 		return m.copy(rec), nil
 	}
+	// Driver mode sends a PNG to the OS driver. Check the IHDR centrally before
+	// any backend decodes it: CUPS hands the file to a filter, so validating only
+	// in the Windows path left Linux/macOS open to decompression bombs.
+	if req.Mode == "driver" {
+		if err := backend.ValidatePNG(data); err != nil {
+			code, detail := backendError(err)
+			m.update(rec, "failed", code, detail)
+			return m.copy(rec), nil
+		}
+	}
 	unlock, err := m.lockPrinter(ctx, req.Printer)
 	if err != nil {
 		m.update(rec, "failed", "BUSY", "another job is still printing to this printer")
@@ -220,7 +230,9 @@ func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 		return m.GetNoPoll(id)
 	}
 	m.mu.Lock()
-	if rec := m.jobs[id]; rec != nil {
+	// A cancel that landed while the spooler was polled is terminal: do not
+	// overwrite "canceled" with a spooler snapshot ("printing"/"done").
+	if rec := m.jobs[id]; rec != nil && !isTerminal(rec.Status) {
 		rec.Status = status.State
 		rec.Error = status.Error
 		rec.Detail = status.Detail

@@ -6,10 +6,10 @@ import { businessDate, newId, parsePkPhone, saleLineFinal } from '@bikri/core';
 import type { BikriDb, MasterRow, PrintJob, SyncedRow } from '@bikri/db';
 import {
   formatIsoDate,
+  formatItemCount,
   formatReceiptDate,
   formatReceiptMoney,
   type ItemLayout,
-  type ReceiptLine,
   type ReceiptPayment,
   receiptLabelsFor,
   resolvePaper,
@@ -102,7 +102,9 @@ export function receiptPaper(
     dots,
     paperDots: resolved.paperDots,
     leftMarginDots: resolved.leftMarginDots,
-    sendWidth: paperMm !== (dots <= 384 ? 58 : 80),
+    // Keyed on the margin, not on a paper/print comparison: a 58 mm printer
+    // configured for 24 columns (288 dots) also needs GS L/GS W to centre it.
+    sendWidth: resolved.leftMarginDots > 0,
     itemLayout: resolved.itemLayout,
     qr: printer?.qr === true,
   };
@@ -312,40 +314,39 @@ export function receiptShareText(input: SaleReceiptInput): string {
   const { shop, sale } = input;
   const money = (p: number) => formatReceiptMoney(p, shop.numberGrouping);
   const labels = input.labels ?? receiptLabelsFor('en');
-  const qtyText = (qtyMilli: number) =>
-    qtyMilli % 1000 === 0
-      ? String(qtyMilli / 1000)
-      : (qtyMilli / 1000).toFixed(3);
   const items: string[] = [];
-  for (let index = 0; index < input.lines.length; index += 1) {
-    const line = input.lines[index] as ReceiptLine;
+  // Merge a bundle's components even when another line sits between them; the
+  // old contiguous-only loop printed the bundle header twice.
+  const renderedGroups = new Set<string>();
+  for (const line of input.lines) {
     if (line.bundleGroup) {
-      const group: ReceiptLine[] = [];
-      let next = index;
-      while (
-        next < input.lines.length &&
-        input.lines[next]?.bundleGroup === line.bundleGroup
-      ) {
-        group.push(input.lines[next] as ReceiptLine);
-        next += 1;
+      if (renderedGroups.has(line.bundleGroup)) {
+        continue;
       }
-      const bundleQty = line.bundleQty ?? 1;
-      const bundleTotal =
-        line.bundlePrice != null
-          ? line.bundlePrice * bundleQty
-          : group.reduce((sum, component) => sum + component.net, 0);
+      renderedGroups.add(line.bundleGroup);
+      const group = input.lines.filter(
+        (candidate) => candidate.bundleGroup === line.bundleGroup,
+      );
+      const bundleQty = line.bundleQty ?? group[0]?.bundleQty ?? 1;
+      // Ordinary lines show the post-discount/tax `final`; the bundle header must
+      // match instead of quoting the pre-discount bundle price.
+      const bundleTotal = group.reduce(
+        (sum, component) => sum + (component.final ?? component.net),
+        0,
+      );
       items.push(
         `${line.bundleName?.trim() || labels.bundle || 'Bundle'} × ${bundleQty}  ${money(bundleTotal)}`,
       );
       // Component prices are an internal allocation (D-229); the message shows names and
       // quantities only, like the receipt picture.
       for (const component of group)
-        items.push(`  ${component.name} × ${qtyText(component.qtyMilli)}`);
-      index = next - 1;
+        items.push(
+          `  ${component.name} × ${formatItemCount(component.qtyMilli)}`,
+        );
       continue;
     }
     items.push(
-      `${line.name} × ${qtyText(line.qtyMilli)}  ${money(line.final ?? line.net)}`,
+      `${line.name} × ${formatItemCount(line.qtyMilli)}  ${money(line.final ?? line.net)}`,
     );
   }
   const rows = [

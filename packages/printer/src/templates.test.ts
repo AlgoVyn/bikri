@@ -114,6 +114,99 @@ describe('bundle receipts (06 §4, v1.1)', () => {
     expect(t).toMatch(/^ {2}Galaxy A15 +2 +$/m);
   });
 
+  it('prints a labelled component quantity on a 58 mm stacked receipt', () => {
+    const input = variant((i) => {
+      i.lines = [
+        {
+          name: 'Galaxy A15',
+          qtyMilli: 2000,
+          unitPrice: 2_000_000,
+          discount: 0,
+          net: 4_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: 4_000_000,
+        },
+        {
+          name: 'Charger',
+          qtyMilli: 2000,
+          unitPrice: 500_000,
+          discount: 0,
+          net: 1_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 2,
+          bundlePrice: 4_000_000,
+        },
+      ];
+    });
+    const t = renderReceiptText(buildSaleReceipt(input, { paperMm: 58 }), {
+      charsPerLine: 32,
+      itemLayout: 'stacked',
+    });
+    // 06 §4.2: the component line reads `  <name> x <total qty>`, and no bare
+    // unlabeled quantity line follows it.
+    expect(t).toMatch(/^ {2}Galaxy A15 x 2\s*$/m);
+    expect(t).toMatch(/^ {2}Charger x 2\s*$/m);
+    expect(t).not.toMatch(/^ +2\s*$/m);
+  });
+
+  it('groups components that a non-bundle line separates', () => {
+    const input = variant((i) => {
+      i.lines = [
+        {
+          name: 'Galaxy A15',
+          qtyMilli: 1000,
+          unitPrice: 2_000_000,
+          discount: 0,
+          net: 2_000_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 1,
+          bundlePrice: 2_400_000,
+        },
+        {
+          name: 'Separator',
+          qtyMilli: 1000,
+          unitPrice: 100_000,
+          discount: 0,
+          net: 100_000,
+          warrantyUntil: null,
+          bundleGroup: null,
+          bundleName: null,
+          bundleQty: null,
+          bundlePrice: null,
+        },
+        {
+          name: 'Charger',
+          qtyMilli: 1000,
+          unitPrice: 500_000,
+          discount: 0,
+          net: 500_000,
+          warrantyUntil: null,
+          bundleGroup: 'g1',
+          bundleName: 'Starter Pack',
+          bundleQty: 1,
+          bundlePrice: 2_400_000,
+        },
+      ];
+    });
+    const t = text80(buildSaleReceipt(input));
+    expect(t.match(/Starter Pack/g)).toHaveLength(1);
+    const header = t.indexOf('Starter Pack');
+    const first = t.indexOf('Galaxy A15');
+    const second = t.indexOf('Charger');
+    const between = t.indexOf('Separator');
+    // Both components stay under the single header; the separator prints after.
+    expect(header).toBeLessThan(first);
+    expect(first).toBeLessThan(second);
+    expect(second).toBeLessThan(between);
+  });
+
   it('does not multiply the component fallback by bundle quantity', () => {
     const input = variant((i) => {
       i.lines = [
@@ -221,6 +314,46 @@ describe('bundle receipts (06 §4, v1.1)', () => {
     expect(t).toContain('Galaxy A15');
     expect(t).toContain('Charger');
     expect(t).toMatch(/^Starter Pack +2 +Rs 40,000$/m);
+  });
+
+  it('prints a labelled component quantity on a 58 mm refund', () => {
+    const base = saleBasicInput();
+    const blocks = buildRefundReceipt(
+      {
+        shop: base.shop,
+        staffName: null,
+        customerName: null,
+        originalInvoiceNo: 'A-A-1',
+        originalCreatedAt: base.sale.createdAt,
+        refundCreatedAt: base.sale.createdAt,
+        lines: [
+          {
+            name: 'Starter Pack',
+            qtyMilli: 2000,
+            amount: 4_000_000,
+            bundle: {
+              name: 'Starter Pack',
+              quantity: 2,
+              components: [{ name: 'Galaxy A15', qtyMilli: 2000 }],
+            },
+          },
+        ],
+        exactAmount: 4_000_000,
+        rounding: 0,
+        amount: 4_000_000,
+        method: 'cash',
+        udhaarPart: 0,
+        khataBalancePaisa: null,
+        reason: 'Faulty',
+      },
+      { paperMm: 58 },
+    );
+    const t = renderReceiptText(blocks, {
+      charsPerLine: 32,
+      itemLayout: 'stacked',
+    });
+    expect(t).toMatch(/^ {2}Galaxy A15 x 2\s*$/m);
+    expect(t).not.toMatch(/^ +2\s*$/m);
   });
 });
 

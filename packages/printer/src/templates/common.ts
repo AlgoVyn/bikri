@@ -120,6 +120,37 @@ export function subtotalLabel(
   return fill(template, { n: count });
 }
 
+/**
+ * One bundle component row (06 §4.2 / D-229). At 40+ columns the quantity sits
+ * in the qty column and the amount column stays blank; a stacked 58 mm receipt
+ * has no columns, so the line must read `  <name> x <qty>` instead of leaving a
+ * bare unlabeled quantity on its own line.
+ */
+export function pushBundleComponent(
+  blocks: Block[],
+  name: string,
+  qty: string,
+  layout: 'columns' | 'stacked',
+): void {
+  if (layout === 'stacked') {
+    blocks.push({
+      t: 'item',
+      name: `  ${name.trim()} x ${qty}`,
+      qty: '',
+      amount: '',
+      breakdown: '',
+    });
+    return;
+  }
+  blocks.push({
+    t: 'item',
+    name: `  ${name.trim()}`,
+    qty,
+    amount: '',
+    breakdown: ` ${qty}`,
+  });
+}
+
 export function labelsFrom(partial?: Partial<ReceiptLabels>): ReceiptLabels {
   return resolveLabels(partial);
 }

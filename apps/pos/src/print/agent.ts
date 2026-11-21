@@ -141,13 +141,59 @@ async function request<T>(
   url: string,
   init: RequestInit,
   timeoutMs: number,
+  options: { expectJson?: boolean } = {},
 ): Promise<T> {
+  const expectJson = options.expectJson ?? true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let response: Response;
   try {
-    response = await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    // Reading the body belongs to the request: a stalled body used to outlive
+    // the timeout and hang the caller forever.
+    const text = await response.text();
+    let body: unknown = null;
+    if (text.trim() !== '') {
+      try {
+        body = JSON.parse(text) as unknown;
+      } catch {
+        body = null;
+      }
+    }
+    if (!response.ok) {
+      const record =
+        body !== null && typeof body === 'object'
+          ? (body as Record<string, unknown>)
+          : {};
+      const code =
+        typeof record.error === 'string'
+          ? record.error
+          : `HTTP_${response.status}`;
+      const message =
+        typeof record.message === 'string'
+          ? record.message
+          : `print service responded ${response.status}`;
+      throw new AgentRequestError(code, message, response.status);
+    }
+    if (expectJson && (body === null || typeof body !== 'object')) {
+      // A 200 with a broken body used to return `null as T`, blowing up later
+      // with a TypeError instead of a print error the UI can show.
+      throw new AgentRequestError(
+        'BAD_RESPONSE',
+        'the print service returned an invalid response',
+        response.status,
+      );
+    }
+    return body as T;
   } catch (err) {
+    if (err instanceof AgentRequestError) throw err;
+    if (controller.signal.aborted) {
+      // Our own deadline, not an unreachable agent: the queue maps TIMEOUT to a
+      // retryable state instead of DISCONNECTED + "install the agent".
+      throw new AgentRequestError(
+        'TIMEOUT',
+        'the print service did not answer in time',
+      );
+    }
     throw new AgentRequestError(
       'UNAVAILABLE',
       err instanceof Error ? err.message : 'print service is not reachable',
@@ -155,31 +201,6 @@ async function request<T>(
   } finally {
     clearTimeout(timer);
   }
-  const text = await response.text();
-  let body: unknown = null;
-  if (text.trim() !== '') {
-    try {
-      body = JSON.parse(text) as unknown;
-    } catch {
-      body = null;
-    }
-  }
-  if (!response.ok) {
-    const record =
-      body !== null && typeof body === 'object'
-        ? (body as Record<string, unknown>)
-        : {};
-    const code =
-      typeof record.error === 'string'
-        ? record.error
-        : `HTTP_${response.status}`;
-    const message =
-      typeof record.message === 'string'
-        ? record.message
-        : `print service responded ${response.status}`;
-    throw new AgentRequestError(code, message, response.status);
-  }
-  return body as T;
 }
 
 function headers(token?: string, json = false): Record<string, string> {
@@ -246,6 +267,7 @@ export const httpAgentClient: AgentClient = {
       `${base(url)}/v1/unpair`,
       { method: 'POST', headers: headers(token) },
       REQUEST_TIMEOUT_MS,
+      { expectJson: false },
     );
   },
   diagnostics(url, token) {

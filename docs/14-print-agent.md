@@ -122,13 +122,15 @@ Bikri renders the receipt to a PNG at the **full paper/head dot width** (576 dot
 **Windows**
 
 - GDI: `CreateDC("WINSPOOL", printerName, …)` → `StartDoc` → `StartPage` → `StretchDIBits`/`SetDIBitsToDevice` → `EndPage` → `EndDoc` → `DeleteDC`.
+- The drawing surface is `MM_TEXT` (device pixels), so the agent reads `LOGPIXELSX`/`LOGPIXELSY`/`HORZRES` with `GetDeviceCaps`, scales the image to the physical `paperMm` width (never past `HORZRES`), keeps the aspect ratio and uses `HALFTONE` stretching. A 1:1 576-dot image on a 600 dpi driver would otherwise print as a ~24 mm strip.
 - Use a per-job custom page size (height from the image) where the driver supports it; otherwise use the queue's configured receipt media and let the driver feed/cut.
 - The agent can read the queue's supported media via `DeviceCapabilities`/`DEVMODE` and apply `dmPaperSize`/`dmPaperWidth`/`dmPaperLength` and margins **per job** (or via a `PrintTicket` on the XPS path). It must not silently change the machine-wide default; that is an explicit "save as default" action.
 - No drawer/cut commands; the driver may have its own options, but Bikri cannot control them.
 
 **Linux / macOS**
 
-- Write the PNG/PDF to a temp file and `lp -d <queue> -o media=Custom.<w>x<h>mm <file>`.
+- Write the PNG/PDF to a temp file and `lp -d <queue> -o media=Custom.<w>x<h>mm -o natural-scaling=100 -o ppi=<dpi> <file>`.
+- `scaling=<percent>` is **page-relative** in CUPS: `-o scaling=100` stretches or shrinks the image to the whole media (an A4 queue blows a 58 mm receipt across the sheet and a tall receipt is squeezed onto one thermal page). `natural-scaling=100` keeps one image pixel at the requested `ppi`. The agent derives the ppi from `widthDots`/`paperMm` (203 dpi fallback) and the media height from the PNG height.
 - CUPS renders through the queue's driver. Media names and cut options vary by driver; the agent reports what `lpoptions -p <queue> -l` exposes.
 - This mode allows any installed printer (A4, label, non-ESC/POS thermal, PDF).
 
@@ -236,7 +238,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - **Bind to `127.0.0.1:17890` only.** No `0.0.0.0`, no firewall rule, no mDNS advertisement.
 - **Origin allowlist:** `https://algovyn.com` in production. The local page is same-origin with its request `Host`. Development origins are never written to a production config: pass `--allow-origin http://localhost:5173` for one run. Echo only an allowed Origin; `Vary: Origin`.
 - **CORS:** allow `Authorization`, `Content-Type`, `Idempotency-Key`; methods `GET, POST, DELETE, OPTIONS`; `Access-Control-Allow-Private-Network: true` for the Private Network Access preflight.
-- **Host check:** accept only `127.0.0.1:17890` and `localhost:17890`; reject anything else (DNS rebinding).
+- **Host check:** accept only `127.0.0.1:<listener port>` and `localhost:<listener port>` (the process's actual bound port); reject any other host or port (DNS rebinding).
 - **Pairing:** 6-digit code, 2-minute TTL, 5 attempts, constant-time compare. On success return a 32-byte random token (base64url); store only its SHA-256 hash. Rotate on unpair.
 - **Bearer only:** `Authorization: Bearer <token>`; no cookies, no token in URLs.
 - **Rate limits:** pairing 5/min/IP, jobs 60/min/token, diagnostics 10/min.
@@ -398,8 +400,8 @@ No changes to `apps/api`, D1, sync, auth or tenancy. The agent is per-till infra
 
 ## 12. Operations
 
-- **Config:** `%LOCALAPPDATA%\Bikri\PrintAgent\agent.json` (per-user Windows) or `%ProgramData%\Bikri\PrintAgent\agent.json` (service), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/BikriPrintAgent/config.json` (macOS). Token stored as a hash; file permissions restricted.
-- **Logs:** Windows `%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log` (plus `crash.log` for fatal panics), Linux `~/.local/state/bikri-print-agent/logs/agent.log`, macOS `~/Library/Logs/BikriPrintAgent/agent.log`; JSON lines, rotated at 5 MB while running with one previous file; no receipt payloads.
+- **Config:** `%APPDATA%\bikri-print-agent\config.json` (per-user Windows; `os.UserConfigDir()` = `%APPDATA%`), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/bikri-print-agent/config.json` (macOS). Token stored as a hash; file permissions restricted. Development origins passed with `--allow-origin` exist only for that run and are never written.
+- **Logs:** Windows `%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log` (plus `crash.log` for fatal panics, appended across restarts), Linux `~/.local/state/bikri-print-agent/logs/agent.log`, macOS `~/Library/Logs/BikriPrintAgent/agent.log`; JSON lines, rotated at 5 MB while running with one previous file; no receipt payloads. Logs go to the rotating file even when the process has no usable stderr (Windows GUI builds) or a log write fails.
 - **Health:** `/health` and `/diagnostics` (token required). Bikri's "Copy printer info" combines agent version, platform, queues and last error.
 - **Update:** signed `latest.json` with version, SHA-256 and minimum protocol; v1 notifies and links to the installer; auto-update only after signature verification is implemented.
 - **Uninstall:** removes the app, autostart, shortcuts, logs and the per-user config; leaves OS queues and drivers untouched.
@@ -614,6 +616,10 @@ lpoptions -p "BIXOLON_SRP350" -l
 
 # Print raw ESC/POS
 lp -d "BIXOLON_SRP350" -o raw -t "Bikri 01J..." /tmp/job.bin
+
+# Print a rendered receipt image at its real dot size (driver mode)
+lp -d "BIXOLON_SRP350" -o natural-scaling=100 -o ppi=183 \
+  -o media=Custom.80x220mm -t "Bikri 01J..." /tmp/job.png
 
 # Job status
 lpstat -W not-completed -o "BIXOLON_SRP350"

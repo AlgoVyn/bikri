@@ -488,6 +488,7 @@ describe('refund edges', () => {
     expect(() => computeRefundLine(100, 0, 0, 1)).toThrow(RangeError);
     expect(() => computeRefundLine(100, 10, -1, 1)).toThrow(RangeError);
     expect(() => computeRefundLine(100, 10, 0, -1)).toThrow(RangeError);
+    expect(() => computeRefundLine(100, 100, 60, 50)).toThrow(RangeError);
     expect(() =>
       computeRefundLine(100, 10, Number.MAX_SAFE_INTEGER, 1),
     ).toThrow(RangeError);
@@ -662,6 +663,7 @@ describe('computePurchase', () => {
       computePurchase([{ qty_milli: 1000, unit_cost: -1 }], 0),
     ).toThrow(RangeError);
     expect(() => computePurchase([], -1)).toThrow(RangeError);
+    expect(() => computePurchase([], 500)).toThrow(RangeError);
   });
 });
 
@@ -887,6 +889,7 @@ describe('ledger and stock', () => {
   });
 
   it('warns and hard-blocks a credit limit', () => {
+    expect(() => creditLimitCheck(1_000, 500, -1, true)).toThrow(RangeError);
     expect(creditLimitCheck(1_000, 500, null, true)).toEqual({
       balance_after: 1_500,
       over_by: 0,

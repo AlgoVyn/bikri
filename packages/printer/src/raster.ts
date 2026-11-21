@@ -233,21 +233,37 @@ function clampByte(value: number): number {
   return Math.round(value);
 }
 
-/** Downscale to fit. Never upscales. Result is gray. */
+/**
+ * Downscale to fit. Never upscales. Result is gray.
+ * Targets must be finite; NaN slipped through the `< 1` comparison and produced
+ * an empty bitmap. The same-size fast path checks the gray buffer length too,
+ * so a truncated logo is rejected instead of printed as garbage.
+ */
 export function scaleToFit(
   source: RasterSource,
   maxWidth: number,
   maxHeight: number,
 ): RasterSource {
   const { width, height } = source;
-  if (maxWidth < 1 || maxHeight < 1) {
+  if (
+    !Number.isFinite(maxWidth) ||
+    !Number.isFinite(maxHeight) ||
+    maxWidth < 1 ||
+    maxHeight < 1
+  ) {
     throw new Error('scale target must be positive');
   }
+  assertSize(width, height);
   const scale = Math.min(1, maxWidth / width, maxHeight / height);
   const targetWidth = Math.max(1, Math.round(width * scale));
   const targetHeight = Math.max(1, Math.round(height * scale));
   if (targetWidth === width && targetHeight === height) {
-    if (source.format === 'gray') return source;
+    if (source.format === 'gray') {
+      if (source.data.length < width * height) {
+        throw new Error('gray buffer length does not match width*height');
+      }
+      return source;
+    }
     const luma = toLuma(source);
     const data = new Uint8Array(width * height);
     for (let i = 0; i < data.length; i += 1) {

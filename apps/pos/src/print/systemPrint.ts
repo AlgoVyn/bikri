@@ -10,8 +10,24 @@ export type SystemPrintResult =
   | { ok: false; code: 'NO_PRINT' | 'TIMEOUT' };
 
 const LOAD_TIMEOUT_MS = 8000;
+/** `fonts.ready` can wait forever for a face the iframe never receives. */
+const FONT_TIMEOUT_MS = 2000;
 /** Safety net for browsers that never fire afterprint (the dialog is already gone). */
 const CLEANUP_TIMEOUT_MS = 60_000;
+
+/** Wait for the iframe fonts, but never longer than FONT_TIMEOUT_MS. */
+function fontsReady(doc: Document): Promise<void> {
+  const ready = doc.fonts?.ready;
+  if (!ready) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, FONT_TIMEOUT_MS);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    ready.then(done, done);
+  });
+}
 
 /* Copying @font-face rules is a CSSOM scan of every stylesheet; the rules do not
    change while the app runs, so do it once per document. */
@@ -81,7 +97,7 @@ export async function printHtmlViaSystem(
       win.document.head.append(fontStyle);
     }
     // Noto Naskh Arabic UI / JetBrains Mono must be ready before the driver rasterises.
-    await win.document.fonts?.ready;
+    await fontsReady(win.document);
     // One page as long as the receipt (06 §5.3 / D-087).
     const style = win.document.createElement('style');
     style.textContent = fitPageCss(

@@ -92,3 +92,69 @@ func TestAuthAttemptLimit(t *testing.T) {
 		t.Fatalf("expected too many attempts, got %v", err)
 	}
 }
+
+// A failed config write must roll the pairing back, not publish a token that is
+// gone after a restart.
+func TestPairAndPersistRollsBackWhenTheWriteFails(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	auth := NewAuth(cfg)
+	code := auth.PairingCode()
+	if _, err := auth.PairAndPersist(filepath.Join(blocker, "config.json"), code); err == nil {
+		t.Fatal("pairing with an unwritable config path succeeded")
+	}
+	if cfg.Paired || cfg.TokenHash != "" {
+		t.Fatalf("failed pairing left state behind: %+v", cfg)
+	}
+	if auth.PairingCode() != code {
+		t.Fatal("failed pairing rotated the code instead of rolling back")
+	}
+	// The same code still pairs once the path is writable.
+	token, err := auth.PairAndPersist(filepath.Join(dir, "config.json"), code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !auth.Verify(token) {
+		t.Fatal("persisted token does not verify")
+	}
+}
+
+// A failed unpair write must not leave a token that only works until restart.
+func TestUnpairAndPersistKeepsTheTokenWhenTheWriteFails(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	auth := NewAuth(cfg)
+	path := filepath.Join(dir, "config.json")
+	token, err := auth.PairAndPersist(path, auth.PairingCode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.UnpairAndPersist(filepath.Join(blocker, "config.json")); err == nil {
+		t.Fatal("unpair with an unwritable config path succeeded")
+	}
+	if !cfg.Paired || !auth.Verify(token) {
+		t.Fatal("failed unpair revoked the token in memory only")
+	}
+	// The config on disk still holds the same token hash.
+	reloaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reloaded.Paired || reloaded.TokenHash != cfg.TokenHash {
+		t.Fatal("failed unpair rewrote the persisted config")
+	}
+	if err := auth.UnpairAndPersist(path); err != nil {
+		t.Fatal(err)
+	}
+	if auth.Verify(token) {
+		t.Fatal("token still works after a successful unpair")
+	}
+}
