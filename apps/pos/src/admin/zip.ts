@@ -17,14 +17,26 @@ for (let n = 0; n < 256; n += 1) {
   CRC_TABLE[n] = c >>> 0;
 }
 
-/** IEEE CRC-32. */
-export function crc32(data: Uint8Array): number {
-  let crc = 0xffffffff;
+/**
+ * Streaming IEEE CRC-32. Start with `0xffffffff`, feed every chunk and finish with
+ * {@link crc32Final}; a table export no longer has to hold one contiguous buffer.
+ */
+export function crc32Update(state: number, data: Uint8Array): number {
+  let crc = state;
   for (let i = 0; i < data.length; i += 1) {
     const byte = data[i] ?? 0;
     crc = (CRC_TABLE[(crc ^ byte) & 0xff] ?? 0) ^ (crc >>> 8);
   }
-  return (crc ^ 0xffffffff) >>> 0;
+  return crc >>> 0;
+}
+
+export function crc32Final(state: number): number {
+  return (state ^ 0xffffffff) >>> 0;
+}
+
+/** IEEE CRC-32. */
+export function crc32(data: Uint8Array): number {
+  return crc32Final(crc32Update(0xffffffff, data));
 }
 
 export class ZipError extends Error {
@@ -229,6 +241,42 @@ export class ZipStoreWriter {
     });
     this.parts.push(header as BlobPart, data as BlobPart);
     this.offset += header.length + data.length;
+  }
+
+  /**
+   * Adds an entry whose bytes were accumulated as per-page Blobs. `crc` and `size` must
+   * cover exactly the bytes of `data` (the export computes them while streaming so the
+   * table never exists as one JS string or Uint8Array).
+   */
+  addBlob(name: string, data: Blob, crc: number, size: number): void {
+    if (this.finished) throw new ZipError('writer already finished');
+    if (this.central.length >= 0xffff) throw new ZipError('too many files');
+    if (size > 0xffffffff) throw new ZipError('file too large');
+    const nameBytes = this.encoder.encode(name);
+    if (nameBytes.length > 0xffff) throw new ZipError('name too long');
+    const header = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(header.buffer);
+    let at = 0;
+    at = write32(view, at, SIG_LOCAL);
+    at = write16(view, at, VERSION);
+    at = write16(view, at, FLAG_UTF8);
+    at = write16(view, at, 0);
+    at = write16(view, at, this.stamp.time);
+    at = write16(view, at, this.stamp.date);
+    at = write32(view, at, crc >>> 0);
+    at = write32(view, at, size);
+    at = write32(view, at, size);
+    at = write16(view, at, nameBytes.length);
+    write16(view, at, 0);
+    header.set(nameBytes, 30);
+    this.central.push({
+      name: nameBytes,
+      crc: crc >>> 0,
+      size,
+      offset: this.offset,
+    });
+    this.parts.push(header as BlobPart, data);
+    this.offset += header.length + size;
   }
 
   /** Appends the central directory and returns the downloadable archive. */

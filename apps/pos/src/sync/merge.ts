@@ -76,13 +76,42 @@ function keepLocalSaleStatus(
     : server;
 }
 
+/**
+ * The server does not store `refund_lines.business_date` (a till-only column, Dexie V10),
+ * so derive it from the refund before the row is stored or parked in `pull_shadow`.
+ */
+async function withRefundDates(
+  tx: Transaction,
+  rows: ServerRow[],
+): Promise<ServerRow[]> {
+  const lineRows = rows.filter((entry) => entry.tbl === 'refund_lines');
+  if (lineRows.length === 0) return rows;
+  const refundIds = [
+    ...new Set(lineRows.map((entry) => String(entry.row.refund_id))),
+  ];
+  const refunds = (await (
+    tx.table('refunds') as Table<SyncedRow, string>
+  ).bulkGet(refundIds)) as (SyncedRow | undefined)[];
+  const dates = new Map<string, string>();
+  for (const refund of refunds)
+    if (refund) dates.set(String(refund.id), String(refund.business_date));
+  if (dates.size === 0) return rows;
+  return rows.map((entry) => {
+    if (entry.tbl !== 'refund_lines') return entry;
+    const date = dates.get(String(entry.row.refund_id));
+    if (date === undefined || entry.row.business_date === date) return entry;
+    return { tbl: entry.tbl, row: { ...entry.row, business_date: date } };
+  });
+}
+
 /** Must run inside a rw transaction over the touched tables, outbox, pull_shadow and caches. */
 export async function mergeRows(
   tx: Transaction,
-  rows: ServerRow[],
+  incoming: ServerRow[],
   opts: { caches: boolean },
 ): Promise<number> {
-  if (rows.length === 0) return 0;
+  if (incoming.length === 0) return 0;
+  const rows = await withRefundDates(tx, incoming);
   const outbox = tx.table('outbox') as Table<
     { tbl: string; row_id: string; status?: string },
     number
@@ -236,5 +265,7 @@ export function mergeScope(tbls: Iterable<string>): string[] {
     'kv',
   ]);
   for (const t of tbls) if (isPulledTable(t)) names.add(t);
+  // A refund line takes its business date from the refund (till-only column).
+  if (names.has('refund_lines')) names.add('refunds');
   return [...names];
 }

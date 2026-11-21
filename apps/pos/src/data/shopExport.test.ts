@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { unzip } from '../admin/zip.ts';
 import { seedSampleDay } from '../dev/sampleDay.ts';
-import { buildShopExport, SHOP_EXPORT_TABLES, tableCsv } from './shopExport.ts';
+import {
+  buildShopExport,
+  exportCsvColumns,
+  SHOP_EXPORT_TABLES,
+  tableCsv,
+} from './shopExport.ts';
 import { dropTestDbs } from './testDb.ts';
 import { addShop, NOW, readyDb } from './testShop.ts';
 
@@ -139,6 +144,58 @@ describe('full shop export (screens/17 AC 6, 09 §3.3)', () => {
       expect(product).not.toHaveProperty('on_hand_milli');
       expect(product).not.toHaveProperty('cost_changed_at');
     }
+  });
+
+  it('streams a table past the page boundary and keeps the point-in-time cut', async () => {
+    const db = await readyDb('shop-export-pages');
+    await addShop(db, { name: 'Big Shop' });
+    const rows = Array.from({ length: 5_050 }, (_, i) => ({
+      id: `sale-${String(i).padStart(6, '0')}`,
+      invoice_no: `INV-${String(i).padStart(6, '0')}`,
+      business_date: TODAY,
+      total: i,
+      created_at: NOW,
+    }));
+    // One more row created after the export starts must not appear in either entry.
+    rows.push({
+      id: 'sale-999999',
+      invoice_no: 'INV-999999',
+      business_date: TODAY,
+      total: 1,
+      created_at: NOW + 5_000,
+    });
+    await db.sales.bulkAdd(rows as never);
+    const exported = await buildShopExport(db, { now: NOW + 1_000 });
+    expect(exported.manifest.tables.sales).toBe(5_050);
+    const entries = await unzip(
+      new Uint8Array(await exported.blob.arrayBuffer()),
+    );
+    const text = new TextDecoder();
+    const sales = JSON.parse(
+      text.decode(
+        entries.find((entry) => entry.name === 'json/sales.json')?.data,
+      ),
+    ) as { id: string }[];
+    expect(sales).toHaveLength(5_050);
+    expect(sales.map((sale) => sale.id)).not.toContain('sale-999999');
+    const csv = text
+      .decode(entries.find((entry) => entry.name === 'csv/sales.csv')?.data)
+      .replace(/^\uFEFF/u, '');
+    expect(csv.trim().split('\r\n')).toHaveLength(5_051);
+  });
+
+  it('uses canonical CSV columns plus local-only ones and hides server columns', () => {
+    const refundColumns = exportCsvColumns('refund_lines', [
+      { id: 'rl', refund_id: 'r', business_date: '2026-10-27' },
+    ]);
+    expect(refundColumns).toContain('business_date');
+    expect(refundColumns).toContain('sale_line_id');
+    const productColumns = exportCsvColumns('products', [
+      { id: 'p', on_hand_milli: 1, cost_changed_at: 2 },
+    ]);
+    expect(productColumns).not.toContain('on_hand_milli');
+    expect(productColumns).not.toContain('cost_changed_at');
+    expect(productColumns).not.toContain('tenant_id');
   });
 
   it('hardens CSV cells and converts percent, paisa and timestamp fields', () => {

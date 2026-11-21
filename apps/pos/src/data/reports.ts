@@ -40,18 +40,17 @@ function inRange(row: SyncedRow, range: ReportRange): boolean {
 
 const ID_CHUNK = 100;
 
-/** Rows whose key is in `ids`; one table scan beats hundreds of index lookups. */
+/**
+ * Rows whose index key is in `ids`, chunked. A full table scan above a key-count
+ * threshold used to turn a busy month into a scan of every line the shop ever wrote;
+ * a bounded page or range only ever needs a few index lookups.
+ */
 async function rowsForIds<T>(
   table: Table<T, string>,
   index: string,
-  keyOf: (row: T) => string,
   ids: readonly string[],
 ): Promise<T[]> {
   if (ids.length === 0) return [];
-  if (ids.length > ID_CHUNK) {
-    const wanted = new Set(ids);
-    return (await table.toArray()).filter((row) => wanted.has(keyOf(row)));
-  }
   const out: T[] = [];
   for (let at = 0; at < ids.length; at += ID_CHUNK) {
     const chunk = ids.slice(at, at + ID_CHUNK);
@@ -67,12 +66,6 @@ async function byIds<T extends { id: string }>(
 ): Promise<Map<string, T>> {
   const out = new Map<string, T>();
   const unique = [...new Set(ids)];
-  if (unique.length > ID_CHUNK) {
-    const wanted = new Set(unique);
-    for (const row of await table.toArray())
-      if (wanted.has(row.id)) out.set(row.id, row);
-    return out;
-  }
   for (let at = 0; at < unique.length; at += ID_CHUNK) {
     for (const row of await table.bulkGet(unique.slice(at, at + ID_CHUNK))) {
       if (row) out.set(row.id, row);
@@ -133,12 +126,9 @@ export async function summary(
     const refundById = new Map(
       refunds.map((refund) => [String(refund.id), refund]),
     );
-    const refundLines = await rowsForIds(
-      db.refund_lines,
-      'refund_id',
-      (line: SyncedRow) => String(line.refund_id),
-      [...refundById.keys()],
-    );
+    const refundLines = await rowsForIds(db.refund_lines, 'refund_id', [
+      ...refundById.keys(),
+    ]);
     const touchedLineIds = [
       ...new Set(refundLines.map((line) => String(line.sale_line_id))),
     ];
@@ -156,7 +146,6 @@ export async function summary(
     const allLineRefunds = await rowsForIds(
       db.refund_lines,
       'sale_line_id',
-      (line: SyncedRow) => String(line.sale_line_id),
       touchedLineIds,
     );
     const previousByRefundLine = new Map<string, number>();

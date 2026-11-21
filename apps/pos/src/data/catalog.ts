@@ -267,20 +267,14 @@ export function stockStateOf(
  */
 async function rowsForIds<T>(
   table: {
-    toArray(): Promise<T[]>;
     where(index: string): {
       anyOf(keys: string[]): { toArray(): Promise<T[]> };
     };
   },
   index: string,
-  keyOf: (row: T) => string,
   ids: readonly string[],
 ): Promise<T[]> {
   if (ids.length === 0) return [];
-  if (ids.length > 100) {
-    const wanted = new Set(ids);
-    return (await table.toArray()).filter((row) => wanted.has(keyOf(row)));
-  }
   const out: T[] = [];
   for (let at = 0; at < ids.length; at += 100) {
     const chunk = ids.slice(at, at + 100);
@@ -333,17 +327,13 @@ export async function soldByProduct(
     sold.set(id, (sold.get(id) ?? 0) + Number(line.qty_milli));
   }
   // Refunds count on their own business date (07 §9), including refunds of older bills.
-  const refunds = await db.refunds
+  // The refund's date is denormalised onto its lines (Dexie V10), so the window is one
+  // date-index range instead of a refund-id list that flipped to a full table scan.
+  const refundLines = await db.refund_lines
     .where('business_date')
     .between(from, to, true, true)
     .toArray();
-  if (refunds.length > 0) {
-    const refundLines = await rowsForIds(
-      db.refund_lines,
-      'refund_id',
-      (row: SyncedRow) => String(row.refund_id),
-      refunds.map((refund) => String(refund.id)),
-    );
+  if (refundLines.length > 0) {
     const saleLines = new Map(
       (
         await db.sale_lines.bulkGet(
@@ -766,19 +756,10 @@ export async function productDetail(
   // than the 14-day chart window (07 §9). Load the refunds in the window first, then
   // their original sale lines and every earlier refund of those lines for the
   // cumulative per-line allocation.
-  const windowRefunds = await db.refunds
+  const windowRefundLines = await db.refund_lines
     .where('business_date')
     .between(first, last, true, true)
     .toArray();
-  const windowRefundLines =
-    windowRefunds.length === 0
-      ? []
-      : await rowsForIds(
-          db.refund_lines,
-          'refund_id',
-          (row: SyncedRow) => String(row.refund_id),
-          windowRefunds.map((refund) => String(refund.id)),
-        );
   const refundOriginalLines =
     windowRefundLines.length === 0
       ? new Map<string, SyncedRow>()
@@ -803,10 +784,9 @@ export async function productDetail(
     (line) => line.product_id === id,
   );
   if (simpleRefundLines.length > 0) {
-    const allRefundLines = await rowsForIds(
+    const allRefundLines = await rowsForIds<SyncedRow>(
       db.refund_lines,
       'sale_line_id',
-      (row: SyncedRow) => String(row.sale_line_id),
       simpleRefundLines.map((line) => String(line.id)),
     );
     const allRefunds = new Map(
@@ -888,10 +868,9 @@ export async function productDetail(
       (line) => line.bundle_id === id && line.bundle_group,
     );
     if (bundleRefundLines.length > 0) {
-      const allRefundLines = await rowsForIds(
+      const allRefundLines = await rowsForIds<SyncedRow>(
         db.refund_lines,
         'sale_line_id',
-        (row: SyncedRow) => String(row.sale_line_id),
         bundleRefundLines.map((line) => String(line.id)),
       );
       const allRefunds = new Map(

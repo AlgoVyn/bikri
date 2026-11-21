@@ -43,5 +43,13 @@ describe('op tables (02 §1.1)', () => {
       id: 's',
       total: 5,
     });
+    // A till-only column (Dexie V10 refund line date) must not reach the Worker.
+    expect(
+      opRow('refund_lines', {
+        id: 'rl',
+        refund_id: 'r',
+        business_date: '2026-10-27',
+      }),
+    ).toEqual({ id: 'rl', refund_id: 'r' });
   });
 });

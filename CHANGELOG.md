@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Reports, refund dates and export streaming — 21 Nov 2026 review
+- `refund_lines` now carries a till-only `business_date` (Dexie V10), backfilled from each refund on upgrade and re-derived when a server row is merged. It is stripped from pushed ops and never stored in D1.
+- `summary`, `soldByProduct`, `productDetail` and `reportBundle` read refund lines by date range instead of scanning the table once a busy window crosses 100/200 refunds; `reports.ts` `byIds` always uses chunked `bulkGet`, and statement pages keep their `sale_lines`/`purchase_lines` lookups bounded to the page.
+- Device and server exports cache both `Intl.DateTimeFormat` instances per shop time zone and stream every device table in 5,000-row primary-key pages (server tables page by page) into Blob-backed zip entries, so a 440k-line table no longer needs one row array plus full JSON and CSV strings in memory at once.
+
 ### Sync and push D1 throughput — 21 Nov 2026 review
 - The device-token lookup joins today's `tenant_usage` row, so pull, push, snapshot, `/me` and the shop export read the usage counters in the same D1 query instead of a second round trip.
 - `GET /api/sync/pull` reads the `change_log` page and the tenant's prune floor in one batch and embeds SQLite's stored `row_json` directly (only old clients parse rows for the bundle gate); a poll is two D1 round trips instead of four.

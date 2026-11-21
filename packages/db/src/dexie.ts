@@ -142,7 +142,17 @@ export const DEXIE_SCHEMA_V9 = {
   sync_conflicts: 'id, row_id, at, resolution',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V9;
+/**
+ * V10 denormalises the refund's business date onto its lines. Reports count refunds on
+ * their own date; with only `refund_id`/`sale_line_id` indexes a busy range above the old
+ * key threshold fell back to scanning every refund line the shop had ever written.
+ */
+export const DEXIE_SCHEMA_V10 = {
+  ...DEXIE_SCHEMA_V9,
+  refund_lines: 'id, refund_id, sale_line_id, business_date',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V10;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -444,6 +454,34 @@ export class BikriDb extends Dexie {
       });
     // V9 only adds indexes; IndexedDB backfills them from the stored rows.
     this.version(9).stores(DEXIE_SCHEMA_V9);
+    this.version(10)
+      .stores(DEXIE_SCHEMA_V10)
+      .upgrade(async (tx) => {
+        // Old refund lines may predate the local column; derive the date from their
+        // refund. Refunds are far fewer than sale lines, so the map stays small.
+        const dates = new Map<string, string>();
+        await (
+          tx.table('refunds') as Table<Record<string, unknown>, string>
+        ).each((refund) => {
+          const id = refund.id;
+          const date = refund.business_date;
+          if (typeof id === 'string' && typeof date === 'string')
+            dates.set(id, date);
+        });
+        const lines = tx.table('refund_lines') as Table<
+          Record<string, unknown>,
+          string
+        >;
+        await lines.toCollection().modify((line) => {
+          if (
+            typeof line.business_date === 'string' &&
+            line.business_date !== ''
+          )
+            return;
+          const date = dates.get(String(line.refund_id));
+          if (date !== undefined) line.business_date = date;
+        });
+      });
   }
 }
 

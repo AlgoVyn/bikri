@@ -488,6 +488,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
       qty_milli: 1000,
       amount: 100000,
       restock: 1,
+      business_date: TODAY,
       created_at: NOW + 1,
     } as SyncedRow);
 
@@ -606,6 +607,7 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
         qty_milli: 1000,
         amount: 200000,
         restock: 1,
+        business_date: date,
         created_at: at(date),
       } as SyncedRow);
     }

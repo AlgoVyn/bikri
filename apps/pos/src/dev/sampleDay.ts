@@ -189,6 +189,7 @@ export async function seedSampleDay(
         qty_milli: 1000,
         amount: 50000,
         restock: 1,
+        business_date: date,
         created_at: now + 2,
       });
       await w.insert(

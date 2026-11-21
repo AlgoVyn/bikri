@@ -1,6 +1,7 @@
 import {
   APP_VERSION,
   DEFAULT_TIME_ZONE,
+  EXPORT_HIDDEN_COLUMNS,
   isTimeZone,
   SYNC_EXPORT_ORDER,
 } from '@bikri/core';
@@ -10,9 +11,13 @@ import { SyncHttpError } from '../sync/client.ts';
 import { shopRequest } from '../sync/shopApi.ts';
 import { tenantInfo } from './localTenant.ts';
 import {
+  ExportStream,
+  exportCsvColumns,
+  exportCsvHeader,
+  exportCsvRows,
+  JsonStream,
   type ShopExportManifest,
   shopExportFilename,
-  tableCsv,
 } from './shopExport.ts';
 
 export const SERVER_EXPORT_PAGE = 500;
@@ -155,7 +160,11 @@ async function buildOnce(
   // would make the resumed zip miss the rows fetched before the failure; re-reading with the
   // same export token is cheap enough and keeps the archive complete.
   for (const [index, table] of tables.entries()) {
-    const rows: Record<string, unknown>[] = [];
+    const hidden = new Set(EXPORT_HIDDEN_COLUMNS[table.tbl] ?? []);
+    const json = new JsonStream();
+    const csv = new ExportStream();
+    let columns: string[] | null = null;
+    let rows = 0;
     let after = '';
     for (let guard = 0; guard < 100_000; guard += 1) {
       const result = await page(
@@ -165,13 +174,28 @@ async function buildOnce(
         table.tbl,
         after,
       );
-      rows.push(...result.rows);
+      // Each page goes straight into Blob-backed streams; the table is never
+      // materialised as one row array plus one JSON and one CSV string.
+      const clean: Record<string, unknown>[] = [];
+      for (const row of result.rows) {
+        const copy = { ...row };
+        delete copy.tenant_id;
+        for (const field of hidden) delete copy[field];
+        clean.push(copy);
+      }
+      if (clean.length > 0) {
+        rows += clean.length;
+        json.push(clean);
+        columns ??= exportCsvColumns(table.tbl, clean);
+        if (csv.empty) csv.push(exportCsvHeader(columns));
+        csv.push(exportCsvRows(clean, columns, timeZone));
+      }
       options.onProgress?.({
         table: table.tbl,
         index,
         total: tables.length,
         rows: table.rows,
-        done: rows.length,
+        done: rows,
       });
       if (
         !result.has_more ||
@@ -182,12 +206,10 @@ async function buildOnce(
       }
       after = result.next_after;
     }
-    writer.add(`json/${table.tbl}.json`, encoder.encode(JSON.stringify(rows)));
-    writer.add(
-      `csv/${table.tbl}.csv`,
-      encoder.encode(tableCsv(rows, timeZone)),
-    );
-    counts.push({ tbl: table.tbl, rows: rows.length });
+    json.addTo(writer, `json/${table.tbl}.json`);
+    if (csv.empty) csv.push('\uFEFF');
+    csv.addTo(writer, `csv/${table.tbl}.csv`);
+    counts.push({ tbl: table.tbl, rows });
   }
   const tenant = await tenantInfo(db);
   const displayName =
