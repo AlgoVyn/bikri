@@ -26,7 +26,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | POST | `/shop/conflicts/:id/acknowledge` | admin device + owner | Mark a `sync_conflicts` row acknowledged |
 | POST | `/shop/owner-signin/start`, `/shop/owner-signin/verify` | admin device + owner PIN (no session yet) | Email a one-time code to the shop's owner email; exchange it for an owner session ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)) |
 | POST | `/shop/export` | admin device + owner | Start the owner's server export and claim the daily slot ([13 §7.3](13-multi-tenancy.md#73-per-tenant-export-and-restore)) |
-| GET | `/shop/export` | admin device + owner | Page an already-started export (`export_id` required) |
+| GET | `/shop/export` | admin device + signed `export_id` | Page an already-started export (`export_id` required); the token replaces the per-page owner-session check |
 | POST | `/shop/support-access/end` | admin device + owner PIN (no session needed) | End the operator's support access now ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |
 | GET | `/admin/session` | Access | Who is signed in to the operator console |
 | GET | `/admin/shop-requests` | Access | List public shop requests (status/search) |
@@ -197,7 +197,7 @@ Restore of one tenant ([09 §3.4](09-backups-and-ops.md#34-restore-one-tenant)):
 
 ### 3.8 Shop-admin endpoints (admin device)
 
-Device token of an admin device (`is_admin = 1`) **and** `X-Bikri-Staff` = an active `owner` of the same tenant ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) **and** `X-Bikri-Owner-Session` ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)); otherwise `403 FORBIDDEN` / `401 OWNER_SIGNIN_REQUIRED`. Support devices are never admin devices. Online only. Every call that changes something writes an `audit_log` row in the tenant.
+Device token of an admin device (`is_admin = 1`) **and** `X-Bikri-Staff` = an active `owner` of the same tenant ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) **and** `X-Bikri-Owner-Session` ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)); otherwise `403 FORBIDDEN` / `401 OWNER_SIGNIN_REQUIRED`. Support devices are never admin devices. Online only. Every call that changes something writes an `audit_log` row in the tenant. Exception: each page of an already-started server export (`GET /api/shop/export?export_id=…`) is authorised by that signed, 2-hour token, which is bound to the tenant and admin device; it skips the per-page owner-row and session checks so a large export does not issue one `staff` query per 500-row page.
 
 `POST /api/shop/owner-signin/start` (no body; no session needed) → `200 { "code_id": "01JC…", "expires_at": 1793050600000, "email_hint": "a***@gmail.com" }`; `429 RATE_LIMITED` (cooldown, hourly or daily cap, paused after 3 dead codes), `503 EMAIL_UNAVAILABLE`. `POST /api/shop/owner-signin/verify` `{ "code_id", "code": "482913" }` → `200 { "session": "<token>", "expires_at": 1793093200000 }`; wrong code → `400 BAD_SIGNIN_CODE` with `details.tries_left`; expired, used or dead → `400 BAD_SIGNIN_CODE` with `tries_left: 0`. The same error body whether or not `code_id` exists (in this tenant or another).
 

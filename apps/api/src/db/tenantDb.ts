@@ -110,6 +110,25 @@ export function tenantTablesIn(sql: string): string[] {
  */
 const SCOPE_CACHE = new Set<string>();
 const SCOPE_CACHE_MAX = 1_000;
+/* Aliases that are SQL keywords, not table aliases, when scanning `FROM tbl x`. */
+const ALIAS_KEYWORDS: ReadonlySet<string> = new Set([
+  'on',
+  'where',
+  'join',
+  'left',
+  'right',
+  'inner',
+  'outer',
+  'cross',
+  'natural',
+  'group',
+  'order',
+  'limit',
+  'using',
+  'set',
+  'values',
+  'select',
+]);
 
 export function assertTenantScoped(sql: string): void {
   if (SCOPE_CACHE.has(sql)) return;
@@ -144,30 +163,12 @@ export function assertTenantScoped(sql: string): void {
   // unscoped joined table. Every alias that names a tenant table must carry its own
   // `alias.tenant_id = ?1`; a table without an alias is covered by the count above.
   const aliases = new Map<string, string>();
-  const keywords = new Set([
-    'on',
-    'where',
-    'join',
-    'left',
-    'right',
-    'inner',
-    'outer',
-    'cross',
-    'natural',
-    'group',
-    'order',
-    'limit',
-    'using',
-    'set',
-    'values',
-    'select',
-  ]);
   for (const match of sql.matchAll(
     /\b(?:FROM|JOIN)\s+"?(\w+)"?(?:\s+(?:AS\s+)?(\w+))?/giu,
   )) {
     const table = (match[1] ?? '').toLowerCase();
     const alias = (match[2] ?? '').toLowerCase();
-    if (!TENANT_SET.has(table) || !alias || keywords.has(alias)) continue;
+    if (!TENANT_SET.has(table) || !alias || ALIAS_KEYWORDS.has(alias)) continue;
     if (alias !== table) aliases.set(alias, table);
   }
   for (const alias of aliases.keys()) {
@@ -182,7 +183,12 @@ export function assertTenantScoped(sql: string): void {
 
 /** Caches only successful checks; a bad statement must throw every time it is used. */
 function rememberScoped(sql: string): void {
-  if (SCOPE_CACHE.size >= SCOPE_CACHE_MAX) SCOPE_CACHE.clear();
+  if (SCOPE_CACHE.size >= SCOPE_CACHE_MAX) {
+    // FIFO: Set iteration follows insertion order. Evict one entry per new statement
+    // instead of clearing 1,000 verified statements on the 1,001st.
+    const oldest = SCOPE_CACHE.values().next().value;
+    if (oldest !== undefined) SCOPE_CACHE.delete(oldest);
+  }
   SCOPE_CACHE.add(sql);
 }
 

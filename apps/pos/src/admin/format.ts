@@ -56,13 +56,26 @@ function inReadingDirection(text: string, lang: string): string {
   return lang === 'ur' ? `\u2066${text}\u2069` : text;
 }
 
+/* Operators page/scan the same dashboard repeatedly; constructing a formatter on every
+   cell is measurable. One entry per language/option pair. */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
+function numberFormat(lang: string, digits: number): Intl.NumberFormat {
+  const key = `${lang}:${digits}`;
+  let format = numberFormats.get(key);
+  if (format === undefined) {
+    format = new Intl.NumberFormat(localeOf(lang), {
+      maximumFractionDigits: digits,
+    });
+    numberFormats.set(key, format);
+  }
+  return format;
+}
+
 export function formatCount(value: number, lang: string): string {
-  return inReadingDirection(
-    new Intl.NumberFormat(localeOf(lang), {
-      maximumFractionDigits: 0,
-    }).format(value),
-    lang,
-  );
+  return inReadingDirection(numberFormat(lang, 0).format(value), lang);
 }
 
 export function formatBytes(bytes: number, lang: string): string {
@@ -73,9 +86,7 @@ export function formatBytes(bytes: number, lang: string): string {
     n /= 1024;
     i += 1;
   }
-  const text = new Intl.NumberFormat(localeOf(lang), {
-    maximumFractionDigits: i === 0 ? 0 : 1,
-  }).format(n);
+  const text = numberFormat(lang, i === 0 ? 0 : 1).format(n);
   const unit = units[i] ?? 'B';
   return inReadingDirection(`${text} ${unit}`, lang);
 }
@@ -83,25 +94,37 @@ export function formatBytes(bytes: number, lang: string): string {
 /** Date and time in Asia/Karachi. Left as the locale writes it: Urdu dates carry
  *  their own month names and separators, so isolating the whole string reorders them. */
 export function formatWhen(ms: number, lang: string): string {
-  return new Intl.DateTimeFormat(localeOf(lang), {
-    timeZone: 'Asia/Karachi',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(ms);
+  let format = dateTimeFormats.get(lang);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat(localeOf(lang), {
+      timeZone: 'Asia/Karachi',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    dateTimeFormats.set(lang, format);
+  }
+  return format.format(ms);
 }
 
 /** Short axis/day label for a YYYY-MM-DD business date. */
 export function formatDayShort(iso: string, lang: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(iso)) return iso;
   const [year, month, day] = iso.split('-').map(Number);
-  return new Intl.DateTimeFormat(localeOf(lang), {
-    timeZone: 'Asia/Karachi',
-    day: '2-digit',
-    month: 'short',
-  }).format(new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, 12)));
+  let format = dayFormats.get(lang);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat(localeOf(lang), {
+      timeZone: 'Asia/Karachi',
+      day: '2-digit',
+      month: 'short',
+    });
+    dayFormats.set(lang, format);
+  }
+  return format.format(
+    new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, 12)),
+  );
 }
 
 export function exportFilename(slug: string, at: number): string {

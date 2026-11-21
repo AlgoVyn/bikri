@@ -27,19 +27,26 @@ export function useAutoLock(enabled: boolean): void {
     const minutes = effectiveAutoLockMinutes(configured, role);
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastActivityAt = Date.now();
+    let lastScheduledAt = 0;
     const schedule = () => {
       if (timer) clearTimeout(timer);
       timer = null;
+      lastScheduledAt = Date.now();
       if (minutes <= 0) return;
       const remaining = minutes * 60_000 - (Date.now() - lastActivityAt);
       if (remaining <= 0) {
         lock();
         return;
       }
-      timer = setTimeout(lock, remaining);
+      // Re-check when the timer fires: a throttled activity event may have moved
+      // the deadline after this timer was armed.
+      timer = setTimeout(check, remaining);
     };
     const activity = () => {
       lastActivityAt = Date.now();
+      // Pointer/wheel events fire dozens of times a second; one reschedule per
+      // second is enough and keeps the idle timer from being rebuilt on every move.
+      if (lastActivityAt - lastScheduledAt < 1000) return;
       schedule();
     };
     const check = () => {

@@ -5,10 +5,12 @@ export const MAX_BATCH_BYTES = 512 * 1024;
 
 /** Request wrapper overhead (device id, schema version, JSON punctuation). */
 const BODY_OVERHEAD_BYTES = 512;
+/** One encoder for every batch size check; `TextEncoder` is stateless. */
+const ENCODER = new TextEncoder();
 
 /** Byte size of a JSON value as UTF-8, not JavaScript's UTF-16 string length. */
 export function jsonBytes(value: unknown): number {
-  return new TextEncoder().encode(JSON.stringify(value)).length;
+  return ENCODER.encode(JSON.stringify(value)).length;
 }
 
 /**

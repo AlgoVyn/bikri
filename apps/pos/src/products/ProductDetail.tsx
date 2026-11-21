@@ -1,7 +1,7 @@
-import { formatQtyFromMilli, mulDivRound } from '@bikri/core';
+import { formatQtyFromMilli, isTimeZone, mulDivRound } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
@@ -20,6 +20,7 @@ import {
   addProduct,
   CartFullError,
   EmptyBundleError,
+  shopMoney,
 } from '../data/cart.ts';
 import {
   ComponentInUseError,
@@ -34,14 +35,13 @@ import {
   stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
 import { shortDate } from '../reports/format.ts';
 import { useSellStore } from '../sell/sellStore.ts';
-import { mutateCart, useShopMoney } from '../sell/useSell.ts';
+import { mutateCart } from '../sell/useSell.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -71,13 +71,16 @@ export function ProductDetailPage({
   const navigate = useNavigate();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
-  const timeZone =
-    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  // One shop read powers the time zone, cost method and money format; the detail
+  // screen used to subscribe to `shop` three times.
+  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
+  const timeZone = isTimeZone(shop?.timezone)
+    ? String(shop?.timezone)
+    : 'Asia/Karachi';
   const wide = useMediaQuery('(min-width: 640px)');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(PRODUCT_HISTORY_PAGE);
-  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const costMethod = shop?.cost_method === 'last' ? 'last' : 'avg';
   const detail = useLiveQuery(
     () =>
@@ -94,7 +97,7 @@ export function ProductDetailPage({
   const readOnly = useReadOnly();
   const canEdit = can('catalog.edit') && !readOnly;
   const activeCart = useSellStore((state) => state.active);
-  const money = useShopMoney();
+  const money = useMemo(() => shopMoney(shop), [shop]);
 
   useHotkey(plainKey('l'), () => setLabelsOpen(true), {
     enabled: can('catalog.edit') || can('purchase.create'),

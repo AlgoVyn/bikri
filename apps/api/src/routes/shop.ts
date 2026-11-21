@@ -266,11 +266,14 @@ shop.post('/owner-signin/verify', async (c) => {
       now,
       device.id,
     ),
+    // Guarded by the UPDATE's changes(); a repeated or lost claim writes no audit row.
+    ...audit(c, 'owner_signin', {
+      entity: 'staff',
+      entityId: ownerId,
+      onlyIfChanged: true,
+    }),
   ]);
   if ((res[0]?.meta.changes ?? 0) !== 1) throw bad(0);
-  await db.batch(
-    audit(c, 'owner_signin', { entity: 'staff', entityId: ownerId }),
-  );
   const exp = now + OWNER_SESSION_MS;
   const session = await signToken(ownerSessionKey(c.env), {
     kind: 'owner',
@@ -519,15 +522,9 @@ shop.patch('/devices/:id', async (c) => {
     next.is_admin,
     now,
   );
-  const res = await db.batch([update]);
-  if ((res[0]?.meta.changes ?? 0) !== 1)
-    throw new ApiError(
-      'CONFLICT',
-      409,
-      'This device changed elsewhere; refresh and try again',
-    );
-  await db.batch([
-    changeLogStatement(db, 'devices', d.id, 'upsert', null, now),
+  const res = await db.batch([
+    update,
+    changeLogStatement(db, 'devices', d.id, 'upsert', null, now, true),
     ...audit(c, 'device_change', {
       entity: 'devices',
       entityId: d.id,
@@ -543,8 +540,15 @@ shop.patch('/devices/:id', async (c) => {
         device_code: next.device_code,
         is_admin: next.is_admin === 1,
       },
+      onlyIfChanged: true,
     }),
   ]);
+  if ((res[0]?.meta.changes ?? 0) !== 1)
+    throw new ApiError(
+      'CONFLICT',
+      409,
+      'This device changed elsewhere; refresh and try again',
+    );
   return c.json({ device: shopDevice({ ...next, updated_at: now }) });
 });
 
@@ -565,21 +569,22 @@ shop.post('/devices/:id/revoke', async (c) => {
     now,
     d.id,
   );
-  const res = await db.batch([update]);
+  const res = await db.batch([
+    update,
+    changeLogStatement(db, 'devices', d.id, 'upsert', null, now, true),
+    ...audit(c, 'device_revoke', {
+      entity: 'devices',
+      entityId: d.id,
+      after: { name: d.name },
+      onlyIfChanged: true,
+    }),
+  ]);
   if ((res[0]?.meta.changes ?? 0) !== 1)
     throw new ApiError(
       'LAST_ADMIN_DEVICE',
       409,
       'Keep at least one admin device',
     );
-  await db.batch([
-    changeLogStatement(db, 'devices', d.id, 'upsert', null, now),
-    ...audit(c, 'device_revoke', {
-      entity: 'devices',
-      entityId: d.id,
-      after: { name: d.name },
-    }),
-  ]);
   return c.json({ revoked_at: now });
 });
 

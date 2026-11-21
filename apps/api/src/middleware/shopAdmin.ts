@@ -20,10 +20,37 @@ const NO_SESSION = [
   /\/shop\/support-access\/end$/,
 ];
 
+/** Minimal export-token shape; `routes/shop.ts` owns the full payload. */
+type ExportPageToken = {
+  kind: 'export';
+  tenant_id: string;
+  device_id: string;
+  exp: number;
+};
+
 export const shopAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   const { device, db, tenant } = c.var;
   if (device.is_admin !== 1 || device.kind !== 'till') {
     throw new ApiError('FORBIDDEN', 403, 'Only an admin device can do this');
+  }
+  const path = new URL(c.req.url).pathname;
+  // A signed export_id authorises its own pages and is already bound to this
+  // tenant/device. Re-reading the owner row and session on every 500-row page made
+  // a large export issue hundreds of extra staff queries.
+  if (c.req.method === 'GET' && /\/shop\/export$/u.test(path)) {
+    const exportId = c.req.query('export_id') ?? '';
+    const token = exportId
+      ? await verifyToken<ExportPageToken>(ownerSessionKey(c.env), exportId)
+      : null;
+    if (
+      token?.kind === 'export' &&
+      token.tenant_id === tenant.id &&
+      token.device_id === device.id &&
+      token.exp > Date.now()
+    ) {
+      await next();
+      return;
+    }
   }
   const staffId = c.req.header('x-bikri-staff') ?? '';
   const owner = await db.first<{ id: string }>(
@@ -33,7 +60,6 @@ export const shopAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!owner)
     throw new ApiError('FORBIDDEN', 403, 'Unlock as the shop owner first');
   c.set('ownerId', owner.id);
-  const path = new URL(c.req.url).pathname;
   if (!NO_SESSION.some((re) => re.test(path))) {
     const token = c.req.header('x-bikri-owner-session') ?? '';
     const s = token

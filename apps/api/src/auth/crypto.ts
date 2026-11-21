@@ -70,14 +70,29 @@ export function newSixDigitCode(): string {
   return randomSymbols(6, '0123456789');
 }
 
+const HMAC_KEY_CACHE = new Map<string, Promise<CryptoKey>>();
+const HMAC_KEY_CACHE_MAX = 8;
+
 async function hmacKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
+  const cached = HMAC_KEY_CACHE.get(secret);
+  if (cached !== undefined) return cached;
+  const key = crypto.subtle.importKey(
     'raw',
     encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify'],
   );
+  if (HMAC_KEY_CACHE.size >= HMAC_KEY_CACHE_MAX) {
+    const oldest = HMAC_KEY_CACHE.keys().next().value;
+    if (oldest !== undefined) HMAC_KEY_CACHE.delete(oldest);
+  }
+  HMAC_KEY_CACHE.set(secret, key);
+  // A failed import must not poison every later request with the same secret.
+  key.catch(() => {
+    if (HMAC_KEY_CACHE.get(secret) === key) HMAC_KEY_CACHE.delete(secret);
+  });
+  return key;
 }
 
 export async function hmacHex(
