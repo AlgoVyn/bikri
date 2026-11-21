@@ -2017,7 +2017,14 @@ until the next run, so retention is 30 days plus at most one day.
 -- with no stock movement, but it did not bump `rev`, write a `change_log` row or set
 -- `cost_changed_at`. Tills that had already pulled `avg_cost = 0` therefore kept the old
 -- value and their next sale failed the cost check forever. Repair every remaining row
--- (including products whose only movements were non-costed) and publish the change.
+-- and publish the change.
+--
+-- The predicate is deliberately `cost_changed_at = 0` rather than a `NOT EXISTS` scan
+-- over stock_movements: `0021` dropped the per-product movement index, so a scan would
+-- be O(products x movements) during a production deploy. A costed receipt leaves a
+-- derived non-zero average, and the normal client writes null `unit_cost` on a count,
+-- refund or damage row, so `cost_changed_at = 0` covers the affected rows; a rare
+-- non-costed movement with a unit cost is repaired on the next product edit.
 INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at)
 SELECT
   p.tenant_id,
@@ -2056,21 +2063,7 @@ FROM products p
 WHERE p.avg_cost = 0
   AND p.last_cost > 0
   AND p.kind = 'simple'
-  AND (
-    p.cost_changed_at = 0
-    OR NOT EXISTS (
-      SELECT 1
-      FROM stock_movements sm
-      WHERE sm.tenant_id = p.tenant_id
-        AND sm.product_id = p.id
-        AND sm.qty_delta_milli > 0
-        AND sm.unit_cost IS NOT NULL
-        AND sm.unit_cost >= 0
-        AND sm.reason_code IN (
-          'opening', 'purchase', 'received_godown', 'received_local', 'received_other'
-        )
-    )
-  );
+  AND p.cost_changed_at = 0;
 
 UPDATE products
 SET
@@ -2081,21 +2074,7 @@ SET
 WHERE avg_cost = 0
   AND last_cost > 0
   AND kind = 'simple'
-  AND (
-    cost_changed_at = 0
-    OR NOT EXISTS (
-      SELECT 1
-      FROM stock_movements sm
-      WHERE sm.tenant_id = products.tenant_id
-        AND sm.product_id = products.id
-        AND sm.qty_delta_milli > 0
-        AND sm.unit_cost IS NOT NULL
-        AND sm.unit_cost >= 0
-        AND sm.reason_code IN (
-          'opening', 'purchase', 'received_godown', 'received_local', 'received_other'
-        )
-    )
-  );
+  AND cost_changed_at = 0;
 
 -- CORE-M2. `cost_changed_at` must only advance for a costed receipt: a count, refund or
 -- damage row with a unit_cost must not make another till's sale look "known" and then
