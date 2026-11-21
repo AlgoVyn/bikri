@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SECURITY_HEADERS } from '@bikri/core';
+import { BASE_PATH, SECURITY_HEADERS } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '../public');
@@ -28,7 +28,9 @@ describe('self-hosted PWA assets', () => {
     const body = inline[0]?.[2] ?? '';
     expect(body).toContain("localStorage.getItem('bikri.theme')");
     expect(body).toContain('document.documentElement.dataset.theme = theme');
-    const hash = createHash('sha256').update(body).digest('base64');
+    // Vite replaces %BASE_URL% in the built inline script; hash what is served.
+    const served = body.replaceAll('%BASE_URL%', `${BASE_PATH}/`);
+    const hash = createHash('sha256').update(served).digest('base64');
     expect(SECURITY_HEADERS['Content-Security-Policy']).toContain(
       `'sha256-${hash}'`,
     );

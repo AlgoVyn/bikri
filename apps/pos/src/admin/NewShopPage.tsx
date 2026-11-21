@@ -70,8 +70,13 @@ export function NewShopPage() {
   }, [slug, t, toast]);
 
   const budgetN = Number(budget);
+  // An emptied field is "" (Number("") === 0): that must not silently save a
+  // zero daily write budget, which blocks every sync push for the shop.
   const budgetOk =
-    Number.isInteger(budgetN) && budgetN >= 0 && budgetN <= 100_000;
+    /^\d+$/u.test(budget.trim()) &&
+    Number.isInteger(budgetN) &&
+    budgetN >= 0 &&
+    budgetN <= 100_000;
   const emailOk =
     email.trim() === '' || EMAIL_RE.test(email.trim().toLowerCase());
   const nameOk = name.trim().length >= 1 && name.trim().length <= 60;

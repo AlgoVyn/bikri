@@ -236,6 +236,7 @@
     "bundle_price": "Bundle price",
     "bundle_items": "Is bundle ki cheezein",
     "bundle_items_empty": "Is bundle mein kam az kam ek cheez shamil karein.",
+    "bundle_missing": "{{count}} component product maujood nahi ya delete ho chuki hai. Save karne se pehle usay hatayein.",
     "bundle_add_item": "Cheez shamil karein",
     "bundle_search": "Naam ya SKU se product talash karein",
     "bundle_qty": "Fi bundle miqdar",
@@ -814,6 +815,7 @@
     "delete_held": "Delete karein",
     "discount": "Discount",
     "discount_max": "Zyada se zyada {{amount}}",
+    "discount_invalid": "0 se 100% ke darmiyan discount likhein.",
     "discount_pct": "Discount %",
     "discount_type": "Discount Rs ya % mein",
     "discount_forbidden": "Aap ko discount dene ki ijazat nahin.",
@@ -922,6 +924,7 @@
       "pin_mismatch": "PIN aik jaise nahin",
       "pin_weak": "Kam aasaan PIN chunein",
       "product_name": "Product ka naam likhein.",
+      "opening": "Sahi opening quantity likhein.",
       "shop_name": "Dukaan ka naam likhein (2 se 60 huroof).",
       "tax": "0 se 25 likhein, ashaariya zyada se zyada do.",
       "too_long": "Bohat lamba hai."

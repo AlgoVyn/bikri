@@ -1,3 +1,4 @@
+import { normaliseNumericText } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,8 +41,14 @@ function DisplayContent() {
   const touched = useRef(false);
   const [gap, setGap] = useState<number | null>(null);
   const last = useRef<number | null>(null);
+  const [autoLockText, setAutoLockText] = useState(
+    String(DEFAULT_PREFS.autoLockMinutes),
+  );
+  const saved = useRef<DevicePrefs>(DEFAULT_PREFS);
   useEffect(() => {
     if (!stored) return;
+    saved.current = stored;
+    setAutoLockText(String(stored.autoLockMinutes));
     setForm((current) =>
       touched.current
         ? current.privacyMode === stored.privacyMode
@@ -53,6 +60,14 @@ function DisplayContent() {
   useEffect(() => {
     applyDevicePrefs(form, i18n.language);
   }, [form, i18n.language]);
+  // A preview that was never saved must not survive navigation: another screen would
+  // keep the unsaved theme/font-size until reload (screens/17).
+  useEffect(
+    () => () => {
+      applyDevicePrefs(saved.current, i18n.language);
+    },
+    [i18n.language],
+  );
 
   const change = (patch: Partial<DevicePrefs>) => {
     touched.current = true;
@@ -62,6 +77,7 @@ function DisplayContent() {
   };
   const save = async () => {
     await saveDevicePrefs(getDb(), form);
+    saved.current = form;
     toast.push(t('office.display.saved'));
   };
 
@@ -177,15 +193,29 @@ function DisplayContent() {
             min={0}
             max={60}
             className={field}
-            value={form.autoLockMinutes}
-            onChange={(event) =>
-              change({
-                autoLockMinutes: Math.max(
-                  0,
-                  Math.min(60, Number(event.target.value) || 0),
-                ),
-              })
-            }
+            value={autoLockText}
+            onChange={(event) => {
+              const text = normaliseNumericText(event.target.value).replace(
+                /\D/gu,
+                '',
+              );
+              setAutoLockText(text);
+              // Clearing the field must not snap to 0 while the cashier retypes.
+              if (text !== '')
+                change({
+                  autoLockMinutes: Math.max(0, Math.min(60, Number(text))),
+                });
+            }}
+            onBlur={() => {
+              if (autoLockText === '') {
+                setAutoLockText(String(form.autoLockMinutes));
+                return;
+              }
+              const minutes = Math.max(0, Math.min(60, Number(autoLockText)));
+              setAutoLockText(String(minutes));
+              if (minutes !== form.autoLockMinutes)
+                change({ autoLockMinutes: minutes });
+            }}
           />
         </label>
         <label className="flex min-h-11 items-center gap-2 text-small">

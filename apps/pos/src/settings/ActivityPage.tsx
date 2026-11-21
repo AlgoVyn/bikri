@@ -1,6 +1,6 @@
 import { businessDate } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -15,6 +15,7 @@ import {
   filterAuditRows,
   loadAuditRows,
 } from '../data/settings.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadText } from '../lib/download.ts';
 import { addDays, longDate, timeText } from '../reports/format.ts';
@@ -41,11 +42,27 @@ export function ActivityPage() {
 function ActivityContent() {
   const { t, i18n } = useTranslation();
   const { can } = useCurrentStaff();
-  const today = businessDate(Date.now());
-  const [filters, setFilters] = useState<AuditFilters>({
+  const timeZone = useShopTimeZone();
+  // The shop's business date, not the device's Karachi date (13 §3).
+  const today = businessDate(Date.now(), timeZone);
+  const [filters, setFilters] = useState<AuditFilters>(() => ({
     from: addDays(today, -29),
     to: today,
-  });
+  }));
+  // A late time-zone read must not overwrite a filter the owner already changed.
+  const seededToday = useRef(today);
+  useEffect(() => {
+    if (seededToday.current === today) return;
+    const previous = seededToday.current;
+    seededToday.current = today;
+    setFilters((current) =>
+      current.to === previous && current.from === addDays(previous, -29)
+        ? { ...current, from: addDays(today, -29), to: today }
+        : current.to === previous
+          ? { ...current, to: today }
+          : current,
+    );
+  }, [today]);
   const options = useLiveQuery(async () => {
     const db = getDb();
     const staff = (await db.staff.toArray()).filter((row) => !row.deleted_at);
@@ -67,11 +84,6 @@ function ActivityContent() {
   );
   const update = (patch: Partial<AuditFilters>) =>
     setFilters((current) => ({ ...current, ...patch }));
-  const timeZone =
-    useLiveQuery(async () => {
-      const shop = await getDb().shop.get('shop');
-      return String(shop?.timezone ?? 'Asia/Karachi');
-    }, []) ?? 'Asia/Karachi';
   const [page, setPage] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the range/filter changes
   useEffect(
@@ -95,14 +107,18 @@ function ActivityContent() {
               label={t('office.activity.from')}
               value={filters.from}
               max={filters.to}
-              onChange={(value) => update({ from: value })}
+              onChange={(value) => {
+                if (value) update({ from: value });
+              }}
             />
             <DateField
               label={t('office.activity.to')}
               value={filters.to}
               min={filters.from}
               max={today}
-              onChange={(value) => update({ to: value })}
+              onChange={(value) => {
+                if (value) update({ to: value });
+              }}
             />
             <label className="flex flex-col gap-1 text-small">
               {t('office.activity.action')}

@@ -103,9 +103,14 @@ export function SyncPage() {
 
   useEffect(() => {
     void (async () => {
-      const est = await navigator.storage?.estimate?.();
-      const persisted = (await navigator.storage?.persisted?.()) ?? false;
-      setStorage({ usage: est?.usage ?? 0, persisted });
+      try {
+        const est = await navigator.storage?.estimate?.();
+        const persisted = (await navigator.storage?.persisted?.()) ?? false;
+        setStorage({ usage: est?.usage ?? 0, persisted });
+      } catch {
+        // StorageManager can be missing or reject in private webviews.
+        setStorage({ usage: 0, persisted: false });
+      }
     })();
   }, []);
 
@@ -273,7 +278,11 @@ export function SyncPage() {
                     <button
                       type="button"
                       className={buttonQuiet}
-                      onClick={() => void retryFailed(db, [e.seq as number])}
+                      onClick={() => {
+                        const seq = e.seq;
+                        if (typeof seq === 'number')
+                          void retryFailed(db, [seq]);
+                      }}
                     >
                       {t('syncpage.retry')}
                     </button>

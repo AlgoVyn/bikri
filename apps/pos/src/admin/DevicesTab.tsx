@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/Toast.tsx';
 import { chunkOpsByTx } from '../sync/chunk.ts';
@@ -22,6 +22,7 @@ import {
   Panel,
   primaryBtn,
   quietBtn,
+  RefreshError,
 } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
@@ -128,6 +129,7 @@ export function DevicesTab({
   const [revokeId, setRevokeId] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  const pickSeq = useRef(0);
   const lang = i18n.language;
 
   if (query.data === null) {
@@ -145,6 +147,7 @@ export function DevicesTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <RefreshError message={query.error} />
       <Panel
         title={t('admin.issue_code')}
         description={t('admin.issue_code_hint')}
@@ -285,37 +288,47 @@ export function DevicesTab({
             label={t('admin.import_file')}
             accept="application/json,.json"
             onPick={(file) => {
+              pickSeq.current += 1;
+              const seq = pickSeq.current;
               if (file === null) {
                 setPreview(null);
                 return;
               }
-              void file.text().then((text) => {
-                const parsed = parseUnsynced(text);
-                if (parsed === null) {
+              void file
+                .text()
+                .then((text) => {
+                  if (seq !== pickSeq.current) return;
+                  const parsed = parseUnsynced(text);
+                  if (parsed === null) {
+                    setPreview(null);
+                    toast.push(t('admin.import_bad'), 'error');
+                    return;
+                  }
+                  if (parsed.tenant_id !== tenantId) {
+                    setPreview(null);
+                    toast.push(t('admin.import_tenant_mismatch'), 'error');
+                    return;
+                  }
+                  const device = devices.find(
+                    (item) => item.id === parsed.device_id,
+                  );
+                  if (device === undefined || device.revoked_at === null) {
+                    setPreview(null);
+                    toast.push(t('admin.import_not_revoked'), 'error');
+                    return;
+                  }
+                  setPreview({
+                    deviceId: parsed.device_id,
+                    name: device.name,
+                    ops: parsed.ops,
+                  });
+                  setProgress(null);
+                })
+                .catch(() => {
+                  if (seq !== pickSeq.current) return;
                   setPreview(null);
                   toast.push(t('admin.import_bad'), 'error');
-                  return;
-                }
-                if (parsed.tenant_id !== tenantId) {
-                  setPreview(null);
-                  toast.push(t('admin.import_tenant_mismatch'), 'error');
-                  return;
-                }
-                const device = devices.find(
-                  (item) => item.id === parsed.device_id,
-                );
-                if (device === undefined || device.revoked_at === null) {
-                  setPreview(null);
-                  toast.push(t('admin.import_not_revoked'), 'error');
-                  return;
-                }
-                setPreview({
-                  deviceId: parsed.device_id,
-                  name: device.name,
-                  ops: parsed.ops,
                 });
-                setProgress(null);
-              });
             }}
           />
           {preview !== null ? (

@@ -61,18 +61,30 @@ export function ExpenseDialog({
   const [approving, setApproving] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const dateTouched = useRef(false);
+  const todayAtOpen = useRef(today);
+  todayAtOpen.current = today;
 
+  // Reset only when the sheet opens. `today` is still the default Karachi date until
+  // the shop's zone loads; including it here wiped every typed field mid-entry.
   useEffect(() => {
     if (!open) return;
+    dateTouched.current = false;
     setAmount(null);
     setMethod('cash');
     setPayee('');
     setNote('');
-    setDate(today);
+    setDate(todayAtOpen.current);
     setExpenseId(newId());
     setOverride(null);
     setApproving(false);
     setPending(false);
+  }, [open]);
+  // A late time-zone read updates the seeded date only while the owner has not
+  // chosen one; typed fields and an approved override stay untouched.
+  useEffect(() => {
+    if (!open || dateTouched.current) return;
+    setDate(today);
   }, [open, today]);
 
   // The category list can arrive after the dialog opens (or change when the owner
@@ -100,6 +112,12 @@ export function ExpenseDialog({
   const overLimit =
     role === 'cashier' &&
     (method !== 'cash' || (amount ?? 0) > CASHIER_EXPENSE_LIMIT);
+  // A manager approved one amount; editing the amount needs a fresh approval.
+  useEffect(() => {
+    if (!override) return;
+    if (overLimit && amount === override.amount) return;
+    setOverride(null);
+  }, [amount, overLimit, override]);
 
   const save = async () => {
     if (!amount || amount <= 0 || !categoryId || pending) return;
@@ -185,7 +203,10 @@ export function ExpenseDialog({
             min={minDate}
             max={today}
             disabled={role !== 'owner'}
-            onChange={setDate}
+            onChange={(value) => {
+              dateTouched.current = true;
+              if (value) setDate(value);
+            }}
           />
           <fieldset className="sm:col-span-2">
             <legend className="mb-1 text-small">

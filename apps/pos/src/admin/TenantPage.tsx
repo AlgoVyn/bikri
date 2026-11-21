@@ -15,7 +15,13 @@ import {
   readRestoreState,
 } from './restore.ts';
 import { SummaryTab } from './SummaryTab.tsx';
-import { AdminConfirm, AdminErrorState, quietBtn, StatusBadge } from './ui.tsx';
+import {
+  AdminConfirm,
+  AdminErrorState,
+  quietBtn,
+  RefreshError,
+  StatusBadge,
+} from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 type Tab = 'summary' | 'devices' | 'pin' | 'export' | 'restore' | 'delete';
@@ -86,11 +92,17 @@ export function TenantPage({ id }: { id: string }) {
   const tone = tenantTone(tenant.id);
   const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const current = TABS.findIndex((item) => item.id === tab);
+    // RTL Urdu lays the strip out right-to-left, so ArrowRight moves to the
+    // previous tab and ArrowLeft to the next (the reverse of LTR).
+    const rtl = document.documentElement.dir === 'rtl';
     let next = current;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
-      next = (current + 1) % TABS.length;
-    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+    if (event.key === 'ArrowDown') next = (current + 1) % TABS.length;
+    else if (event.key === 'ArrowUp')
       next = (current - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'ArrowRight')
+      next = (current + (rtl ? -1 : 1) + TABS.length) % TABS.length;
+    else if (event.key === 'ArrowLeft')
+      next = (current + (rtl ? 1 : -1) + TABS.length) % TABS.length;
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = TABS.length - 1;
     else return;
@@ -104,6 +116,7 @@ export function TenantPage({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <RefreshError message={query.error} />
       <a
         href={adminHref('/admin/tenants')}
         className="inline-flex min-h-11 w-fit items-center gap-1 text-small font-medium text-text-muted hover:text-text"

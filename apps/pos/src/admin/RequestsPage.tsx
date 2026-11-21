@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClockIcon, SearchIcon } from '../components/icons.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
@@ -6,7 +6,13 @@ import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { listShopRequests } from './api.ts';
 import { adminHref, formatCount, formatWhen } from './format.ts';
 import type { ShopRequest, ShopRequestStatus } from './types.ts';
-import { AdminErrorState, EmailBadge, Panel, quietBtn } from './ui.tsx';
+import {
+  AdminErrorState,
+  EmailBadge,
+  Panel,
+  quietBtn,
+  RefreshError,
+} from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
 const PAGE_SIZE = 20;
@@ -52,9 +58,15 @@ export function RequestsPage() {
   const { t, i18n } = useTranslation();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [querySearch, setQuerySearch] = useState('');
   const [page, setPage] = useState(1);
-  const query = useAdminQuery(`shop-requests:${status}:${search}`, () =>
-    listShopRequests({ status, q: search }),
+  // One request per pause, not one per keystroke (the endpoint scans every request).
+  useEffect(() => {
+    const timer = setTimeout(() => setQuerySearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const query = useAdminQuery(`shop-requests:${status}:${querySearch}`, () =>
+    listShopRequests({ status, q: querySearch }),
   );
   if (query.data === null) {
     return query.error !== null ? (
@@ -74,6 +86,7 @@ export function RequestsPage() {
         title={t('admin.requests_title')}
         subtitle={t('admin.requests_subtitle')}
       />
+      <RefreshError message={query.error} />
       <Panel bodyClassName="p-0">
         <div className="flex flex-wrap items-end gap-3 border-b border-border p-3">
           <label className={`${searchWrapperClass} min-w-56 flex-1`}>

@@ -28,6 +28,7 @@ import {
   Panel,
   primaryBtn,
   quietBtn,
+  RefreshError,
 } from './ui.tsx';
 import { useAdminQuery } from './useAdminQuery.ts';
 
@@ -192,6 +193,7 @@ export function RequestPage({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <RefreshError message={query.error} />
       <PageHeader
         icon={<StoreIcon />}
         title={request.shop_name}

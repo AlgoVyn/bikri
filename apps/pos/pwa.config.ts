@@ -2,6 +2,7 @@ import { BASE_PATH } from '@bikri/core';
 import type { VitePWAOptions } from 'vite-plugin-pwa';
 
 const scope = `${BASE_PATH}/`;
+const baseRe = BASE_PATH.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 /**
  * PWA options for vite-plugin-pwa. Served under /bikri/ so the worker cannot
@@ -64,7 +65,12 @@ export const pwaOptions = {
     // the reload happen immediately after activation.
     clientsClaim: true,
     navigateFallback: `${scope}index.html`,
-    navigateFallbackDenylist: [/^\/bikri\/api\//, /^\/bikri\/admin/],
+    // The API and operator console are always online; derive the prefix from BASE_PATH
+    // instead of hard-coding the deployment path (AGENTS §4).
+    navigateFallbackDenylist: [
+      new RegExp(`^${baseRe}/api/`, 'u'),
+      new RegExp(`^${baseRe}/admin`, 'u'),
+    ],
     /* Glob URLs are relative to dist/bikri. Prefix them so they match the scope
        and navigateFallback. The manifest file is added by the plugin itself. */
     modifyURLPrefix: { '': scope },

@@ -1,3 +1,4 @@
+import { normaliseNumericText } from '@bikri/core';
 import { barcodeLabelSvg, LABEL_SIZES } from '@bikri/printer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
@@ -8,7 +9,9 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
+import { escapeLabelHtml } from '../labels/escape.ts';
 import { printLabelHtml } from '../labels/printLabels.ts';
+import { formatShopMoney } from '../lib/money.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';
 
@@ -42,13 +45,18 @@ export function LabelsPage() {
 function LabelsContent() {
   const { t } = useTranslation();
   const toast = useToast();
+  const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const stored = useLiveQuery(
     () => getKv<LabelSettings>(getDb(), 'label', DEFAULT),
     [],
   );
   const [form, setForm] = useState<LabelSettings>(DEFAULT);
+  const [startText, setStartText] = useState(String(DEFAULT.start));
   useEffect(() => {
-    if (stored) setForm(stored);
+    if (stored) {
+      setForm(stored);
+      setStartText(String(stored.start));
+    }
   }, [stored]);
   const save = async () => {
     await setKv(getDb(), 'label', form);
@@ -61,9 +69,9 @@ function LabelsContent() {
       printLabelHtml(
         [
           `<div class="label">
-            ${form.showShop ? `<div class="shop"></div>` : ''}
-            <div class="name">${t('office.labels.print_test')}</div>
-            ${form.showPrice ? '<div class="price">Rs 1,000.00</div>' : ''}
+            ${form.showShop ? `<div class="shop" dir="auto">${escapeLabelHtml(String(shop?.name ?? ''))}</div>` : ''}
+            <div class="name" dir="auto">${escapeLabelHtml(t('office.labels.print_test'))}</div>
+            ${form.showPrice ? `<div class="price">${escapeLabelHtml(formatShopMoney(100_000))}</div>` : ''}
             <div class="bars">${svg.svg}</div>
             <div class="value">${barcode}</div>
           </div>`,
@@ -138,16 +146,29 @@ function LabelsContent() {
               min={0}
               max={23}
               className={field}
-              value={form.start}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  start: Math.max(
-                    0,
-                    Math.min(23, Number(event.target.value) || 0),
-                  ),
-                })
-              }
+              value={startText}
+              onChange={(event) => {
+                const text = normaliseNumericText(event.target.value).replace(
+                  /\D/gu,
+                  '',
+                );
+                setStartText(text);
+                // Emptying the field must not jump to 0 while it is retyped.
+                if (text !== '')
+                  setForm({
+                    ...form,
+                    start: Math.max(0, Math.min(23, Number(text))),
+                  });
+              }}
+              onBlur={() => {
+                if (startText === '') {
+                  setStartText(String(form.start));
+                  return;
+                }
+                const start = Math.max(0, Math.min(23, Number(startText)));
+                setStartText(String(start));
+                if (start !== form.start) setForm({ ...form, start });
+              }}
             />
           </label>
         ) : null}

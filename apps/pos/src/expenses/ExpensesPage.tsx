@@ -37,6 +37,7 @@ import { useReadOnly } from '../state/readOnly.ts';
 import { CashMoveDialog } from './CashMoveDialog.tsx';
 import { ExpenseDialog } from './ExpenseDialog.tsx';
 import { categoryName, dateText, timeText } from './format.ts';
+import { categorySharePercent } from './share.ts';
 
 type Preset = 'today' | '7d' | '30d' | 'month' | 'last_month' | 'custom';
 
@@ -141,8 +142,6 @@ export function ExpensesPage() {
     }
   };
 
-  const max = Math.max(1, ...(data?.byCategory.map((c) => c.net) ?? [1]));
-
   return (
     <div className={pageClass('standard')}>
       <PageHeader
@@ -243,7 +242,11 @@ export function ExpensesPage() {
                     </p>
                     <div className="mt-1 flex flex-col gap-1">
                       {data.byCategory.map((row) => {
-                        const percent = Math.round((row.net / max) * 100);
+                        // Share of the period total (screens/14), not of the largest row.
+                        const percent = categorySharePercent(
+                          row.net,
+                          data.total,
+                        );
                         return (
                           <div
                             key={row.category?.id ?? 'none'}
