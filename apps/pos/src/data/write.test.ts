@@ -4,10 +4,12 @@ import { discardFailed } from '../sync/push.ts';
 import { checkCaches, rebuildCaches } from './caches.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
 import {
+  onLocalWrite,
   RowNotFoundError,
   TooManyOpsError,
   type Writer,
   writeAction,
+  writeScope,
 } from './write.ts';
 
 afterEach(dropTestDbs);
@@ -89,6 +91,37 @@ describe('writeAction (03 §3)', () => {
       product_id: product.id,
       on_hand_milli: 5000,
     });
+  });
+
+  it('bulk-inserts ledger rows and applies their stock once per product', async () => {
+    const db = freshDb();
+    await writeAction(db, (w) =>
+      w.insertMany('stock_movements', [
+        move('m1', 'p1', 1000),
+        move('m2', 'p1', 2000),
+        move('m3', 'p2', 500),
+      ]),
+    );
+    expect(await db.stock_movements.count()).toBe(3);
+    expect(await db.outbox.count()).toBe(3);
+    expect((await db.stock_levels.get('p1'))?.on_hand_milli).toBe(3000);
+    expect((await db.stock_levels.get('p2'))?.on_hand_milli).toBe(500);
+  });
+
+  it('notifies only the stores the action changed', async () => {
+    const db = freshDb();
+    const seen: string[][] = [];
+    const off = onLocalWrite((_count, tables) => seen.push([...tables]));
+    try {
+      await writeAction(
+        db,
+        (w) => w.insert('sales', { id: 's1', created_at: NOW }),
+        { tables: writeScope('sales', 'products'), changedTables: ['sales'] },
+      );
+    } finally {
+      off();
+    }
+    expect(seen).toEqual([['sales']]);
   });
 
   it('an aborted action leaves neither rows, ops nor cache changes', async () => {

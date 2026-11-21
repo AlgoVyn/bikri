@@ -35,7 +35,7 @@ import {
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
 import { computeVoid, writeVoidRows } from './voids.ts';
-import { writeAction } from './write.ts';
+import { WRITE_SCOPE_BASE, writeAction } from './write.ts';
 
 export type PayMethod = 'cash' | 'bank_wallet' | 'card' | 'udhaar';
 export const PAY_METHODS: readonly PayMethod[] = [
@@ -44,29 +44,6 @@ export const PAY_METHODS: readonly PayMethod[] = [
   'card',
   'udhaar',
 ];
-/**
- * Stores a sale (including a same-action void/reissue) may touch. Everything else stays
- * unlocked while the bill commits.
- */
-const SALE_WRITE_TABLES = [
-  'outbox',
-  'pull_shadow',
-  'kv',
-  'carts',
-  'sales',
-  'sale_lines',
-  'payments',
-  'ledger_entries',
-  'stock_movements',
-  'stock_levels',
-  'party_balances',
-  'audit_log',
-  'products',
-  'sale_voids',
-  'refunds',
-  'staff',
-  'shop',
-] as const satisfies readonly DexieTableName[];
 export const WALLET_PROVIDERS = [
   'JazzCash',
   'Easypaisa',
@@ -360,6 +337,56 @@ export async function completeSale(
     }
   }
 
+  // A simple cash sale needs far fewer stores than the old static 17-store scope:
+  // `products`/`shop`/`staff` are only read, and the optional documents (udhaar ledger,
+  // void & reissue) join only when the bill actually writes them.
+  const writes = new Set<DexieTableName>(['carts', 'sales', 'sale_lines']);
+  if (s.applied.cash + s.applied.card + s.applied.bank_wallet > 0)
+    writes.add('payments');
+  const tracked = cart.lines.some((line) => {
+    const product = line.product_id ? products.get(line.product_id) : undefined;
+    return product?.track_stock === 1;
+  });
+  if (tracked) {
+    writes.add('stock_movements');
+    writes.add('stock_levels');
+  }
+  if (s.udhaar > 0) {
+    writes.add('ledger_entries');
+    writes.add('party_balances');
+  }
+  const audited =
+    reissue !== null ||
+    backdate !== null ||
+    backdatePriceAudits.length > 0 ||
+    manualDiscount > sellerLimit ||
+    (cart.overrides?.some((override) => override.permission !== 'sale.void') ??
+      false);
+  if (audited) writes.add('audit_log');
+  const reads: DexieTableName[] = ['products'];
+  if (reissue) {
+    // `computeVoid` and `writeVoidRows` read the sale's documents and write the reversal.
+    for (const table of [
+      'sale_voids',
+      'refunds',
+      'staff',
+      'shop',
+      'payments',
+      'stock_movements',
+      'stock_levels',
+      'ledger_entries',
+      'party_balances',
+      'audit_log',
+    ] as const) {
+      reads.push(table);
+      if (table !== 'refunds' && table !== 'staff' && table !== 'shop')
+        writes.add(table);
+    }
+  }
+  const scope = [
+    ...new Set<DexieTableName>([...WRITE_SCOPE_BASE, ...reads, ...writes]),
+  ];
+
   let created = false;
   const sale = await writeAction(
     db,
@@ -491,6 +518,8 @@ export async function completeSale(
       );
       let lineNo = 0;
       const saleLineIds = new Map<string, string>();
+      const saleLineRows: SyncedRow[] = [];
+      const movementRows: SyncedRow[] = [];
       for (const { line, r } of ordered) {
         if (!r) continue;
         lineNo += 1;
@@ -513,7 +542,7 @@ export async function completeSale(
         );
         const saleLineId = newId(now);
         saleLineIds.set(line.key, saleLineId);
-        await w.insert('sale_lines', {
+        saleLineRows.push({
           id: saleLineId,
           sale_id: input.saleId,
           line_no: lineNo,
@@ -555,7 +584,7 @@ export async function completeSale(
           created_at: now,
         });
         if (product && product.track_stock === 1) {
-          await w.insert('stock_movements', {
+          movementRows.push({
             ...base,
             id: newId(now),
             product_id: product.id,
@@ -568,11 +597,15 @@ export async function completeSale(
           });
         }
       }
+      await w.insertMany('sale_lines', saleLineRows);
+      if (movementRows.length > 0)
+        await w.insertMany('stock_movements', movementRows);
+      const paymentRows: SyncedRow[] = [];
       for (const method of ['cash', 'bank_wallet', 'card'] as const) {
         const amount = s.applied[method];
         if (amount <= 0) continue;
         const row = rows.find((r) => r.method === method);
-        await w.insert('payments', {
+        paymentRows.push({
           ...base,
           id: newId(now),
           direction: 'in',
@@ -594,6 +627,7 @@ export async function completeSale(
           note: method === 'bank_wallet' ? (row?.provider ?? '') : '',
         });
       }
+      if (paymentRows.length > 0) await w.insertMany('payments', paymentRows);
       if (s.udhaar > 0 && cart.customer_id) {
         await w.insert('ledger_entries', {
           ...base,
@@ -606,8 +640,9 @@ export async function completeSale(
           note: saleRow.invoice_no,
         });
       }
-      const audit = (action: string, after: unknown) =>
-        w.insert('audit_log', {
+      const auditRows: SyncedRow[] = [];
+      const audit = (action: string, after: unknown) => {
+        auditRows.push({
           id: newId(now),
           action,
           entity: 'sales',
@@ -618,6 +653,7 @@ export async function completeSale(
           staff_id: ctx.staff_id,
           created_at: now,
         });
+      };
       for (const o of cart.overrides ?? []) {
         if (o.permission === 'sale.void') continue;
         // `bound_cart` is a large local signature used only by overrideMatches; the
@@ -629,7 +665,7 @@ export async function completeSale(
           typeof o.bound_line === 'string'
             ? saleLineIds.get(o.bound_line)
             : undefined;
-        await audit(
+        audit(
           'override',
           boundLine === undefined
             ? approval
@@ -641,7 +677,7 @@ export async function completeSale(
       for (const price of backdatePriceAudits) {
         const boundLine = saleLineIds.get(price.lineKey);
         if (!boundLine) continue;
-        await audit('override', {
+        audit('override', {
           permission: 'catalog.edit',
           approved_by: ctx.staff_id,
           approved_at: now,
@@ -650,7 +686,7 @@ export async function completeSale(
         });
       }
       if (manualDiscount > sellerLimit)
-        await audit('discount_over_limit', {
+        audit('discount_over_limit', {
           discount_share_bp: manualDiscount,
           limit_bp: sellerLimit,
           approved_by: overrideMatches(cart, 'sale.discount')
@@ -659,12 +695,13 @@ export async function completeSale(
             : null,
         });
       if (backdate)
-        await audit('sale_backdated', {
+        audit('sale_backdated', {
           attributed_staff_id: sellerId,
           business_date: date,
           reason: backdate.reason.trim(),
           recorded_at: now,
         });
+      if (auditRows.length > 0) await w.insertMany('audit_log', auditRows);
       if (reissue && reissuePlan) {
         await writeVoidRows(w, reissuePlan, ctx, {
           voidId: reissue.void_id,
@@ -686,7 +723,7 @@ export async function completeSale(
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
       return saleRow;
     },
-    { now, actor: ctx.staff_id, tables: SALE_WRITE_TABLES },
+    { now, actor: ctx.staff_id, tables: scope, changedTables: [...writes] },
   );
   if (!created) return { sale, created: false };
   // 06 §9: the print job is a separate, best-effort write; the sale is already committed.

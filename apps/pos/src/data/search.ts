@@ -103,19 +103,29 @@ export function clearSearchCache(): void {
   invoiceCache = null;
 }
 
-const SEARCH_TABLES = new Set([
-  'products',
-  'product_barcodes',
-  'customers',
-  'sales',
-  'refunds',
-  'sale_voids',
-]);
+export function clearCatalogueSearchCache(): void {
+  cache = null;
+}
 
-// A product/customer/sale written on this device must be searchable immediately. Other
-// writes (an expense, a stock count, a setting) no longer evict the whole cache.
+export function clearInvoiceSearchCache(): void {
+  invoiceCache = null;
+}
+
+const CATALOGUE_TABLES = new Set(['products', 'product_barcodes', 'customers']);
+const INVOICE_TABLES = new Set(['sales', 'refunds', 'sale_voids']);
+
+// A product/customer/sale written on this device must be searchable immediately. A sale
+// only changes the invoice-number fallback; it must not evict the 5k products/customers
+// cache that every keystroke reads.
 onLocalWrite((_count, tables) => {
-  if (tables.some((table) => SEARCH_TABLES.has(table))) clearSearchCache();
+  let catalogue = false;
+  let invoice = false;
+  for (const table of tables) {
+    if (CATALOGUE_TABLES.has(table)) catalogue = true;
+    if (INVOICE_TABLES.has(table)) invoice = true;
+  }
+  if (catalogue) clearCatalogueSearchCache();
+  if (invoice) clearInvoiceSearchCache();
 });
 
 /** Top-bar search (screens/04): name, SKU, barcode, phone or bill number; 5 hits per group. */

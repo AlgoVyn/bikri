@@ -14,7 +14,11 @@ import type {
   SyncedRow,
 } from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
-import { applyLedgerEntry, applyStockMovement } from './caches.ts';
+import {
+  applyLedgerEntry,
+  applyStockMovement,
+  applyStockMovements,
+} from './caches.ts';
 
 export class TooManyOpsError extends Error {
   readonly count: number;
@@ -75,6 +79,14 @@ export interface Writer {
   table<T = SyncedRow, K = string>(name: DexieTableName): Table<T, K>;
   /** Ledger row: stored, queued as an insert op, caches updated. */
   insert(tbl: LedgerTable, row: SyncedRow): Promise<SyncedRow>;
+  /**
+   * Many ledger rows of one table in one `bulkAdd` + one outbox `bulkAdd`. Stock
+   * movements update `stock_levels` in one batched pass instead of two requests per row.
+   */
+  insertMany(
+    tbl: LedgerTable,
+    rows: readonly SyncedRow[],
+  ): Promise<SyncedRow[]>;
   /** New master row (base_rev 0, changed_fields []). */
   create(tbl: MasterTable, row: NewMasterRow): Promise<MasterRow>;
   /** Edit a master row; only fields that really change are sent as changed_fields. */
@@ -94,6 +106,12 @@ export type WriteOptions = {
    * not lock unrelated stores for the whole commit.
    */
   tables?: readonly DexieTableName[];
+  /**
+   * Stores this action actually wrote, for `onLocalWrite` listeners. Defaults to
+   * `tables`; pass a narrower list when the scope also contains read-only stores
+   * (e.g. a sale reads `products` but never writes it).
+   */
+  changedTables?: readonly DexieTableName[];
 };
 
 /** Stores every writeAction needs, whatever the business action touches. */
@@ -212,6 +230,29 @@ export async function writeAction<T>(
         if (tbl === 'ledger_entries') await applyLedgerEntry(tx, row);
         return row;
       },
+      async insertMany(tbl, rows) {
+        if (rows.length === 0) return [];
+        opCount += rows.length;
+        if (opCount > MAX_OPS_PER_TX) throw new TooManyOpsError(opCount);
+        await tx.table(tbl).bulkAdd(rows as SyncedRow[]);
+        await outbox.bulkAdd(
+          rows.map((row) => ({
+            tbl,
+            kind: 'insert' as const,
+            row_id: row.id,
+            row: opRow(tbl, row),
+            op_id: newId(now),
+            tx_id: txId,
+            created_at: now,
+            status: 'pending' as const,
+            attempts: 0,
+          })),
+        );
+        if (tbl === 'stock_movements') await applyStockMovements(tx, rows);
+        if (tbl === 'ledger_entries')
+          for (const row of rows) await applyLedgerEntry(tx, row);
+        return [...rows];
+      },
       async create(tbl, input) {
         const row: MasterRow = {
           ...input,
@@ -322,6 +363,7 @@ export async function writeAction<T>(
   }
   if (opCount > 0) {
     const touched =
+      options.changedTables ??
       options.tables ??
       (db.tables.map((table) => table.name) as DexieTableName[]);
     for (const fn of listeners) fn(opCount, touched);
