@@ -27,7 +27,7 @@ React + Vite PWA · Hono on Cloudflare Workers · D1 · R2 · Dexie · TypeScrip
 
 ## Status
 
-v1.0.0 release candidate. See [CHANGELOG.md](CHANGELOG.md) and the [roadmap](docs/11-roadmap.md). The specification lives in [`docs/`](docs/00-overview.md); coding agents start at [`AGENTS.md`](AGENTS.md).
+v1.1.0. See [CHANGELOG.md](CHANGELOG.md) and the [roadmap](docs/11-roadmap.md). The specification lives in [`docs/`](docs/00-overview.md); coding agents start at [`AGENTS.md`](AGENTS.md).
 
 ## Quick start
 
@@ -58,6 +58,8 @@ pnpm i18n:check && pnpm contrast:check && pnpm docs:check && pnpm size
 |---|---|
 | `apps/pos` | React + Vite PWA: till and back office |
 | `apps/api` | Cloudflare Worker: Hono API + static assets |
+| `apps/print-agent` | Go companion service: raw ESC/POS through the OS print queue ([14](docs/14-print-agent.md)) |
+| `e2e/` | Playwright end-to-end journeys and fixtures |
 | `packages/core` | Pure business and money rules, shared table/op metadata |
 | `packages/db` | D1 SQL migrations, Dexie schema, table metadata |
 | `packages/printer` | Receipt layout, ESC/POS encoder, raster renderer, transports |

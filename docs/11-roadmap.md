@@ -56,7 +56,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 
 **T-019 Print pipeline.** `packages/printer` Block model, ESC/POS encoder, templates 58/80 mm, raster logo/Urdu ([06](06-printing.md)). **Note (D-085, owner decision 27 Oct 2026, phase 2 is building this now):** every customer receipt (sale, refund, void notice; 58 mm, 80 mm, raster/Urdu and the `window.print` HTML fallback) ends with one small centred line, exactly `Powered by AlgoVyn`, in Font B (`1B 4D 01` … `1B 4D 00`; Block `text` gets `size: 'small'`), after the footer and optional QR and before the feed and cut ([06 §4.4](06-printing.md#44-powered-by-algovyn-line-d-085)); the golden byte files and receipt text snapshots must include it; day-close slips, supplier slips, labels and the test page must not. AC: golden byte files for sale-basic at 58/80 ending with the `Powered by AlgoVyn` line; Urdu receipt rendered as image (with the same line); HTML receipt at 58/80 mm shows it.
 
-**T-020 Transports + printer setup.** Printer-agnostic: WebUSB, Web Serial, system print (58/80 mm CSS), drawer kick, print jobs and retry, the printer setup wizard and test print ([06 §8](06-printing.md#8-printer-setup-and-test-print-per-device), [screens/17 printer](screens/17-settings.md#printer)). AC: mocked USB and mocked Serial tests at 32 and 48 chars/line; failure keeps sale; H1–H5 manual checks on whatever printer the shop buys.
+**T-020 Transports + printer setup.** Printer-agnostic: WebUSB, Web Serial, system print (58/80 mm CSS), drawer kick, print jobs and retry, the printer setup wizard and test print ([06 §8](06-printing.md#8-printer-setup-and-test-print-per-device), [screens/17 printer](screens/17-settings.md#printer-settingsdevice-this-device-only)). AC: mocked USB and mocked Serial tests at 32 and 48 chars/line; failure keeps sale; H1–H5 manual checks on whatever printer the shop buys.
 
 **T-021 Stock adjust and count.** [screens/09](screens/09-stock-adjust.md). AC: ACs 1–3, 5.
 
@@ -114,7 +114,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 
 **T-048 Reports.** [screens/16](screens/16-reports.md). AC: ACs 1–6.
 
-**T-049 Exports.** CSV for every list (REQ-B02), PDF for reports/statements, full export zip ([09 §3.3](09-backups-and-ops.md#33-restore-from-the-owners-json-export-new-deploy--leaving-cloudflare)). AC: each list's CSV header documented and tested.
+**T-049 Exports.** CSV for every list (REQ-B02), PDF for reports/statements, full export zip ([09 §3.3](09-backups-and-ops.md#33-restore-from-the-owners-json-export-operator-action-in-v1)). AC: each list's CSV header documented and tested.
 
 **T-050 Settings (remaining sections) + Activity.** Activity also shows the operator's `operator_export` / `operator_import` / `tenant_restore` / `tenant_status_change` (with reason) / `owner_email_change` / `support_access_start` / `support_access_end` rows and the owner's `owner_signin` / `owner_export` rows; Settings → About links the terms and privacy notes ([09 §6.1](09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)). [screens/17](screens/17-settings.md), including the "Prices include tax" switch (shown only when tax > 0, `shop.tax_mode`; receipts and cart per [07 §3](07-money-rules.md#3-bill-totals)) and Settings → Labels. AC: ACs 1–8; E2E journey 19.
 

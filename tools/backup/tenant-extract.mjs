@@ -3,7 +3,7 @@
  * Extract one tenant from a nightly backup database (docs/09 §3.4) into the
  * same `bikri-export` v2 zip as the console and the owner's server export.
  *
- *   node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --out export.zip
+ *   node tools/backup/tenant-extract.mjs --db bikri-restore --tenant <id> --backup-date YYYY-MM-DD --out export.zip
  *
  * Use --local when the scratch DB is the local `wrangler dev` one.
  */

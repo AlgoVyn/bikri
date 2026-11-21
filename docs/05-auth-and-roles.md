@@ -47,7 +47,7 @@ A person who works in two shops has two separate `staff` rows (one per tenant) a
 Every device is enrolled with a one-time **enrolment code**, which is tied to one tenant and one branch. There is no vendor account or activation (REQ-B05), and no Cloudflare Access login for shop owners.
 
 **A. First device of a new shop (owner pairing code).**
-1. The operator creates the tenant in the console; it returns an **owner pairing code** (`grants_admin = 1`, valid 72 hours) and the link `https://algovyn.com/bikri/enrol?code=K7Q2M9XD` ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)).
+1. The operator creates the tenant in the console; it returns an **owner pairing code** (`grants_admin = 1`, valid 72 hours) and the link `https://algovyn.com/bikri/enrol?code=K7Q2M9XD` ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175).
 2. The shop owner opens the link (or types the code on the [enrol screen](screens/02-enrol.md)) → `POST /api/devices/enrol` → the device becomes the shop's first **admin device**; the response includes the tenant (`id`, `display_name`).
 3. The browser opens the tenant's Dexie database `bikri-<tenant_id>`, stores the token and goes to the [setup wizard](screens/01-setup-wizard.md) (`shop_setup_completed = false`), which creates the shop profile and the owner PIN.
 

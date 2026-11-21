@@ -6,9 +6,12 @@
 //
 //   node tools/check-website.mjs                 # checks https://algovyn.com
 //   node tools/check-website.mjs --site=https://example.test
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const MAX_PAGES = 50;
 const MAX_SCRIPTS = 200;
+const FETCH_TIMEOUT_MS = 15_000;
 const ROOT_SW_PATHS = [
   '/sw.js',
   '/service-worker.js',
@@ -280,6 +283,7 @@ export async function checkSite(site, fetchImpl = fetch) {
     const res = await fetchImpl(url, {
       redirect: 'follow',
       headers: { 'user-agent': 'bikri-check-website/1' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     return {
       status: res.status,
@@ -341,6 +345,18 @@ export async function checkSite(site, fetchImpl = fetch) {
     jsQueue.push(...result.sameOriginScripts);
   }
 
+  const remainingPages = queue.filter((url) => {
+    const u = new URL(url);
+    return !isBikriPath(u.pathname) && !seen.has(u.href);
+  }).length;
+  if (remainingPages > 0)
+    findings.push({
+      level: 'warn',
+      page: home,
+      rule: 'page-limit',
+      detail: `stopped after ${MAX_PAGES} pages (${remainingPages} left in the queue)`,
+    });
+
   // Follow same-origin imports in the scripts that pages load, not just the scripts
   // referenced by an HTML tag. A visited set handles cycles and the cap bounds the crawl.
   while (jsQueue.length > 0 && seenJs.size < MAX_SCRIPTS) {
@@ -385,6 +401,7 @@ export async function checkSite(site, fetchImpl = fetch) {
     try {
       const res = await fetchImpl(new URL(path, origin).href, {
         redirect: 'manual',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       const f = rootServiceWorkerFinding(
         path,
@@ -400,7 +417,8 @@ export async function checkSite(site, fetchImpl = fetch) {
 }
 
 const isCli =
-  import.meta.url === new URL(`file://${process.argv[1] ?? ''}`).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 if (isCli) {
   const siteArg = process.argv.find((a) => a.startsWith('--site='));
   const site = siteArg

@@ -235,6 +235,52 @@ export function countDumpRows(sql) {
   });
 }
 
+/**
+ * Reads the tenant list from the same dump that is hashed and uploaded. A second
+ * `SELECT` against live D1 after the export could return a tenant created or edited
+ * between the dump and the query, making the manifest describe a different database.
+ * @param {string} sql
+ * @returns {{ id: string, slug: string, status: string }[]}
+ */
+export function parseDumpTenants(sql) {
+  const tenants = [];
+  for (const statement of sqlStatements(sql)) {
+    const text = statement.trim();
+    const head =
+      /^INSERT\s+INTO\s+["`[]?tenants["`\]]?\s*\(([^)]*)\)\s*VALUES\s*([\s\S]*)$/iu.exec(
+        text,
+      );
+    if (!head) continue;
+    const columns = head[1].split(',').map((column) =>
+      column
+        .trim()
+        .replace(/^["`[]/u, '')
+        .replace(/["`\]]$/u, '')
+        .toLowerCase(),
+    );
+    const idIndex = columns.indexOf('id');
+    const slugIndex = columns.indexOf('slug');
+    const statusIndex = columns.indexOf('status');
+    if (idIndex < 0)
+      throw new Error('backup dump: tenants INSERT has no id column');
+    const rows = parseSqlTuples(head[2].replace(/;\s*$/u, ''));
+    for (const values of rows) {
+      if (values.length !== columns.length)
+        throw new Error(
+          `backup dump: tenants row has ${values.length} values for ${columns.length} columns`,
+        );
+      const id = unquoteSql(values[idIndex] ?? '');
+      if (!id) throw new Error('backup dump: tenants row has no id');
+      tenants.push({
+        id,
+        slug: slugIndex < 0 ? '' : unquoteSql(values[slugIndex] ?? ''),
+        status: statusIndex < 0 ? '' : unquoteSql(values[statusIndex] ?? ''),
+      });
+    }
+  }
+  return tenants;
+}
+
 export function buildTenantManifest(tenants, counts) {
   const out = {};
   for (const tenant of tenants) {
@@ -325,17 +371,9 @@ export async function main(argv = process.argv.slice(2)) {
   assertSqlDump(sqlText);
   const size = statSync(sqlPath).size;
 
-  const tenants = parseWranglerJson(
-    wrangler([
-      'd1',
-      'execute',
-      database,
-      local ? '--local' : '--remote',
-      '--json',
-      '--command',
-      'SELECT id, slug, status FROM tenants ORDER BY id',
-    ]),
-  );
+  const tenants = parseDumpTenants(sqlText);
+  if (tenants.length === 0)
+    throw new Error('D1 export has no tenant rows in the dump');
   const counts = countDumpRows(sqlText);
 
   const manifest = buildManifest({

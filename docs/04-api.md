@@ -165,7 +165,7 @@ The till then upserts `products.image_key` / `shop.logo_key` through the normal 
 
 `POST /api/admin/tenants`
 ```json
-{ "slug": "hall-road-mobiles", "display_name": "Hall Road Mobiles", "owner_email": "owner@example.com", "daily_write_budget": 18000, "note": "" }
+{ "slug": "hall-road-mobiles", "display_name": "Hall Road Mobiles", "owner_email": "owner@example.com", "daily_write_budget": 19500, "note": "" }
 → 201 { "tenant": { "id": "01JBZT...", "slug": "hall-road-mobiles", "status": "active", ... },
         "owner_code": { "code": "K7Q2-M9XD", "expires_at": 1793309200000, "link": "https://algovyn.com/bikri/enrol?code=K7Q2M9XD" } }
 ```
@@ -201,7 +201,7 @@ Device token of an admin device (`is_admin = 1`) **and** `X-Bikri-Staff` = an ac
 
 `POST /api/shop/owner-signin/start` (no body; no session needed) → `200 { "code_id": "01JC…", "expires_at": 1793050600000, "email_hint": "a***@gmail.com" }`; `429 RATE_LIMITED` (cooldown, hourly or daily cap, paused after 3 dead codes), `503 EMAIL_UNAVAILABLE`. `POST /api/shop/owner-signin/verify` `{ "code_id", "code": "482913" }` → `200 { "session": "<token>", "expires_at": 1793093200000 }`; wrong code → `400 BAD_SIGNIN_CODE` with `details.tries_left`; expired, used or dead → `400 BAD_SIGNIN_CODE` with `tries_left: 0`. The same error body whether or not `code_id` exists (in this tenant or another).
 
-`POST /api/shop/export` (no body) → starts an export and claims the daily slot: `200 { "export_id": "<signed token, 2 h>", "snapshot_seq", "tables": [ { "tbl", "rows" } ] }`, writes `owner_export`, sets `tenants.last_owner_export_at`; `429 RATE_LIMITED` with `Retry-After` if a server export was started in the last 24 hours. `tables` lists the table order; `rows` is `0`/unknown for the owner export because the start does not scan every table (progress is rows downloaded). The operator console's admin export start returns exact per-table counts for its progress bars and does not charge them to the shop's download budget. `GET /api/shop/export?export_id=&tbl=&after=&limit=` → the snapshot page shape ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)) for this tenant (`limit` 1–500); `export_id` is required (else `400 VALIDATION_FAILED`) and must belong to this tenant and device and not be expired. A GET without `export_id` does not start an export or claim the daily slot. Allowed for `active` and `read_only` shops.
+`POST /api/shop/export` (no body) → starts an export and claims the daily slot: `200 { "export_id": "<signed token, 2 h>", "snapshot_seq", "tables": [ { "tbl", "rows" } ] }`, writes `owner_export`, sets `tenants.last_owner_export_at`; `429 RATE_LIMITED` with `Retry-After` if a server export was started in the last 24 hours. `tables` lists the table order; `rows` is `0`/unknown for both the owner export and the operator export start, because neither scans every table before page 1 (progress is rows downloaded, not a full count). `GET /api/shop/export?export_id=&tbl=&after=&limit=` → the snapshot page shape ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)) for this tenant (`limit` 1–500); `export_id` is required (else `400 VALIDATION_FAILED`) and must belong to this tenant and device and not be expired. A GET without `export_id` does not start an export or claim the daily slot. Allowed for `active` and `read_only` shops.
 
 `POST /api/shop/support-access/end` (admin device + owner PIN header; no session needed) → `200` (or `200` with `{ "ended": false }` when no support access is active); writes `support_access_end` (`ended_by: 'owner'`).
 

@@ -1,12 +1,13 @@
 # Weekly R2 file backup (docs/09 §1 layer 7, §2.1): list every till file (shop logo,
 # product photos) under t/, download it, then tar + age-encrypt the archive.
-# Schedule 22:45 UTC Sunday = 03:45 Asia/Karachi Monday, after the nightly D1 export.
-# Required secrets: CLOUDFLARE_API_TOKEN (R2 read on bikri-files), CLOUDFLARE_ACCOUNT_ID,
-# BACKUP_AGE_RECIPIENT. Never upload or retain a plain archive.
+# Schedule 00:45 UTC Monday = 05:45 Asia/Karachi Monday, 40 minutes after the
+# nightly D1 export at 00:05 UTC. Required secrets: CLOUDFLARE_API_TOKEN (R2 read on
+# bikri-files), CLOUDFLARE_ACCOUNT_ID, BACKUP_AGE_RECIPIENT. Never upload or retain a
+# plain archive.
 name: files-backup
 on:
   schedule:
-    - cron: "45 22 * * 0"
+    - cron: "45 0 * * 1"
   workflow_dispatch:
 permissions:
   contents: read

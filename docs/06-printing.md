@@ -311,7 +311,7 @@ v1 does not implement a Bluetooth transport. Android users use System printing w
 
 ## 8. Printer setup and test print (per device)
 
-Settings → Printer (layout and copy in [screens/17](screens/17-settings.md#printer)) offers **Print service**, **USB**, **Serial**, **System** and **A4** connection choices, plus a **Set up printer** wizard that is also offered from the setup wizard's last step and from the first failed print.
+Settings → Printer (layout and copy in [screens/17](screens/17-settings.md#printer-settingsdevice-this-device-only)) offers **Print service**, **USB**, **Serial**, **System** and **A4** connection choices, plus a **Set up printer** wizard that is also offered from the setup wizard's last step and from the first failed print.
 
 Wizard steps:
 

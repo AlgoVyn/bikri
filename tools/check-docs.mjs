@@ -10,7 +10,10 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const LOCAL_ONLY = [join(ROOT, 'docs/reference/dukaan')];
+const LOCAL_ONLY = [
+  join(ROOT, 'docs/reference/dukaan'),
+  join(ROOT, 'docs/reviews'),
+];
 
 /** @param {string} dir @returns {string[]} */
 function mdFiles(dir) {
@@ -20,6 +23,33 @@ function mdFiles(dir) {
     if (statSync(p).isDirectory()) return mdFiles(p);
     return p.endsWith('.md') ? [p] : [];
   });
+}
+
+/** GitHub heading slug (keeps Unicode letters/numbers, `_` and `-`). @param {string} heading */
+export function headingSlug(heading) {
+  return heading
+    .trim()
+    .toLowerCase()
+    .replace(/`/gu, '')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .trim()
+    .replace(/\s/gu, '-');
+}
+
+/** @param {string} file @returns {Set<string>} */
+export function headingAnchors(file) {
+  const anchors = new Set();
+  let inFence = false;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^(?:#{1,6})\s+(.*)$/u.exec(line);
+    if (heading?.[1]) anchors.add(headingSlug(heading[1]));
+  }
+  return anchors;
 }
 
 /** @param {string} md */
@@ -42,11 +72,24 @@ const files = [
 ];
 for (const file of files) {
   for (const link of extractLinks(readFileSync(file, 'utf8'))) {
-    if (/^(?:[a-z]+:|#)/i.test(link)) continue; // external, mailto, in-page anchor
-    const target = resolve(dirname(file), decodeURI(link.split('#')[0] ?? ''));
+    if (/^[a-z]+:/i.test(link)) continue; // external URL, mailto
+    const [pathPart = '', anchorPart] = link.split('#');
+    const target =
+      pathPart === '' ? file : resolve(dirname(file), decodeURI(pathPart));
     if (LOCAL_ONLY.some((l) => target.startsWith(l))) continue;
-    if (!existsSync(target))
+    if (!existsSync(target)) {
       problems.push(`${relative(ROOT, file)}: broken link ${link}`);
+      continue;
+    }
+    if (!anchorPart || !target.endsWith('.md')) continue;
+    let anchor;
+    try {
+      anchor = decodeURIComponent(anchorPart);
+    } catch {
+      anchor = anchorPart;
+    }
+    if (!headingAnchors(target).has(anchor))
+      problems.push(`${relative(ROOT, file)}: missing heading anchor ${link}`);
   }
 }
 

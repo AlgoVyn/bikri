@@ -22,7 +22,7 @@ There is still **one** nightly backup of the whole database (all tenants): a pri
 Schedule `cron: "5 0 * * *"` (UTC) = **05:05 Asia/Karachi** daily, after the D1 daily reset and before the shops open; also `workflow_dispatch`.
 
 Steps:
-1. Checkout, setup Node 24, `pnpm i --filter tools`.
+1. Checkout, setup Node 24 and pnpm, then `pnpm install --frozen-lockfile`.
 2. `wrangler d1 export bikri --remote --output=bikri-YYYY-MM-DD.sql` (date in Asia/Karachi).
 3. Sanity check: the dump contains `CREATE TABLE` for **every** table in `tools/backup/tables.mjs` plus `meta`/`tenants`, and at least one `INSERT INTO tenants`; a partial dump is refused. Row counts per tenant are computed **from the dump itself** (no second `COUNT(*)` pass over D1) and written to `manifest.json` `{ date, tenants: { <tenant_id>: { slug, status, tables: { sales: 20311, … } } }, sha256 }` (the hash of the uploaded `.sql.gz`). An `INSERT` for a known tenant table that cannot be parsed fails the backup rather than writing a zero count.
 4. `gzip -9` → upload to R2 bucket `bikri-backups`: `d1/YYYY-MM-DD.sql.gz` + `d1/YYYY-MM-DD.manifest.json` (`wrangler r2 object put bikri-backups/d1/… --remote`).
@@ -56,7 +56,7 @@ workflow copies them:
    `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `BACKUP_AGE_RECIPIENT` secrets are used;
    the token needs R2 read on `bikri-files`.
 
-It runs at **22:45 UTC Sunday** (03:45 Asia/Karachi Monday), after the nightly D1 export. Each
+It runs at **00:45 UTC Monday** (05:45 Asia/Karachi Monday), 40 minutes after the nightly D1 export starts. Each
 archive is a full copy (not a delta) so it restores on its own; the bucket holds images only
 (≤ 2 MB each), so the archive is small. If it grows into gigabytes, revisit the cadence or add
 incremental archives before extending retention.
@@ -139,7 +139,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 |---|---|
 | Deploy | merge to `main` → CI runs tests (including the isolation suite) → website check ([01 §5.5](01-architecture.md#55-release-gate-a-clean-algovyncom-decision-d-049)) → `wrangler d1 migrations apply bikri --remote` (and each shard) → `wrangler deploy` |
 | Clean orphan shop files | console/API `POST /api/admin/tenants/:id/files/gc` (`dry_run` first); removes unreferenced R2 objects under `t/<tenant>/` older than 24 h |
-| Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) |
+| Add a shop | console → Tenants → New → send the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175) |
 | Make a shop read-only (e.g. unpaid) / suspend / reactivate | console → tenant → `Make read-only` / `Suspend` / `Reactivate`, with a reason; recorded in the shop's Activity ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 | Help a shop (support access) | console → tenant → `Support access` (reason, 1–24 h) → open the code in a separate browser profile; the shop sees a banner until it ends ([13 §7.5](13-multi-tenancy.md#75-operator-support-access-d-084)) |
 | Add or change a shop owner's email | console → tenant → Edit → owner email, then Cloudflare → Email Routing → Destination addresses → add it; the owner clicks the verification email ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)) |

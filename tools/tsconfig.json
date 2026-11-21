@@ -10,7 +10,7 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["src", "vitest.config.ts", "contrast-check.ts"],
+  "include": ["**/*.ts"],
   "references": [
     {
       "path": "../packages/core"

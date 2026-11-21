@@ -37,6 +37,7 @@ const publicKeys = catalogKeys['packages/i18n/public/en.json'];
 
 const OFFICE_DIRS = new Set([
   'dayclose',
+  'day-close',
   'sales',
   'udhaar',
   'suppliers',

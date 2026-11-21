@@ -10,6 +10,7 @@ import {
   backupDate,
   buildManifest,
   countDumpRows,
+  parseDumpTenants,
   parseWranglerJson,
 } from './export.mjs';
 import { BACKUP_TABLES, PLATFORM_TABLES } from './tables.mjs';
@@ -131,6 +132,19 @@ describe('nightly D1 export', () => {
     ).toEqual([
       { tbl: 'expenses', tenant_id: 't2', n: 2 },
       { tbl: 'sales', tenant_id: 't1', n: 3 },
+    ]);
+  });
+
+  it('reads tenants from the exported dump, not a second live query', () => {
+    const sql = [
+      'CREATE TABLE "tenants" (id TEXT, slug TEXT, status TEXT, note TEXT);',
+      `INSERT INTO "tenants" ("id","slug","status","note") VALUES('t1','shop-one','active','a, b (c); d');`,
+      `INSERT INTO "tenants" ("status","id","slug") VALUES('read_only','t2','shop-two');`,
+      `INSERT INTO "sales" ("tenant_id","id") VALUES('t1','s1');`,
+    ].join('\n');
+    expect(parseDumpTenants(sql)).toEqual([
+      { id: 't1', slug: 'shop-one', status: 'active' },
+      { id: 't2', slug: 'shop-two', status: 'read_only' },
     ]);
   });
 
