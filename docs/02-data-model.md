@@ -810,7 +810,7 @@ INSERT INTO expense_category_templates (code, name_en, name_ur, icon, sort_order
  ('other','Other','دیگر','dots',99);
 ```
 
-No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175) runs one batch:
+No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175)) runs one batch:
 
 ```
 INSERT INTO tenants (id, slug, display_name, owner_email, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, ?7, CAST(?4 AS TEXT), ?5, ?4, ?4);
