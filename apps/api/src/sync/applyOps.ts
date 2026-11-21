@@ -7,7 +7,7 @@
 import { isLedgerTable, isMasterTable, newId, type Role } from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import { checkOp } from './applyOpsCheck.ts';
-import { loadLookups } from './applyOpsLookups.ts';
+import { applyCloseChanges, loadLookups } from './applyOpsLookups.ts';
 import {
   moneyAuditStatements,
   sideEffects,
@@ -22,12 +22,16 @@ import {
   changeLog,
   errorCodeOf,
   type Group,
+  guardAssert,
   isD1ConstraintError,
+  isGuardAssertion,
   key,
   type Lookups,
   opRowKey,
+  ownersAddedInGroup,
   type Planned,
   Reject,
+  removesOwner,
   type ShopRules,
   type StaffRow,
   StopExecution,
@@ -93,6 +97,17 @@ function planOp(
 
   if (op.kind === 'delete') {
     const id = op.row_id ?? '';
+    // Defence in depth for the last-owner invariant (API-H1): even a planning bug must
+    // not let a 0-row guard commit a shop with no active owner. Mirrors LAST_ADMIN_DEVICE.
+    // A promotion written later in the same batch counts too, so an owner transfer is not
+    // blocked by the promote statement's position.
+    const addedOwners = removesOwner(look, op)
+      ? ownersAddedInGroup(look, group, op)
+      : 0;
+    const ownerGuard =
+      tbl === 'staff' && removesOwner(look, op)
+        ? ` AND ((SELECT COUNT(*) FROM staff WHERE tenant_id = ?1 AND id <> ?4 AND role = 'owner' AND active = 1 AND deleted_at IS NULL) + ${addedOwners}) > 0`
+        : '';
     const cur = look.current.get(key(tbl, id));
     if (!cur || cur.deleted_at !== null) {
       // A create and a delete can be queued before the same sync (for example a product
@@ -127,13 +142,14 @@ function planOp(
       op,
       stmts: [
         db.prepare(
-          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)`,
+          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)${ownerGuard}`,
           now,
           op.updated_by ?? null,
           id,
           cur.rev,
           op.op_id,
         ),
+        guardAssert(db),
         appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'delete', deviceId, now, true),
       ],
@@ -263,6 +279,7 @@ function planOp(
           id,
           ...insertValues,
         ),
+        guardAssert(db),
         appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'upsert', deviceId, now, true),
       ],
@@ -285,14 +302,22 @@ function planOp(
     'rev = rev + 1',
   ].join(', ');
   const guardParam = set.length + 4;
+  const addedOwners = removesOwner(look, op)
+    ? ownersAddedInGroup(look, group, op)
+    : 0;
+  const ownerGuard =
+    tbl === 'staff' && removesOwner(look, op)
+      ? ` AND ((SELECT COUNT(*) FROM staff WHERE tenant_id = ?1 AND id <> ?2 AND role = 'owner' AND active = 1 AND deleted_at IS NULL) + ${addedOwners}) > 0`
+      : '';
   const stmts: D1PreparedStatement[] = [
     db.prepare(
-      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${guardParam})`,
+      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${guardParam})${ownerGuard}`,
       id,
       cur.rev,
       ...set.map((c) => sqlValue(row[c])),
       op.op_id,
     ),
+    guardAssert(db),
   ];
   if (merge) {
     const conflictId = newId(now);
@@ -494,6 +519,7 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
         track_stock: Number(op.row.track_stock ?? 0),
         updated_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
         kind: String(op.row.kind ?? 'simple'),
+        pushed: true,
       });
       continue;
     }
@@ -513,7 +539,80 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
       track_stock: Number(pick('track_stock')),
       updated_at: Number(op.row.updated_at ?? previous.updated_at),
       kind: String(pick('kind')),
+      pushed: true,
     });
+  }
+}
+
+/**
+ * Apply the recipe rows of a successfully planned transaction to the next group (API-M2):
+ * a bundle created or edited earlier in the same push must be visible to a later sale,
+ * and a deleted/soft-deleted row must disappear from the active recipe.
+ */
+function applyBundleChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.tbl !== 'bundle_items') continue;
+    const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+    if (typeof id !== 'string' || id === '') continue;
+    const previous = look.bundleItemById.get(id);
+    const previousRecipe = previous
+      ? look.bundleRecipes.get(previous.bundle_id)
+      : undefined;
+    const previousRow = previousRecipe?.find((item) => item.id === id);
+    const bundleId =
+      typeof op.row?.bundle_id === 'string'
+        ? op.row.bundle_id
+        : previous?.bundle_id;
+    const componentId =
+      typeof op.row?.component_product_id === 'string'
+        ? op.row.component_product_id
+        : previous?.component_product_id;
+    if (!bundleId || !componentId) continue;
+    const deleted =
+      op.kind === 'delete' ||
+      (op.row?.deleted_at !== null && op.row?.deleted_at !== undefined);
+    const recipe = (look.bundleRecipes.get(bundleId) ?? []).filter(
+      (item) => item.id !== id,
+    );
+    if (deleted) {
+      look.bundleItemById.delete(id);
+      const usedBy = (look.bundleOfComponent.get(componentId) ?? []).filter(
+        (candidate) => candidate !== bundleId,
+      );
+      if (usedBy.length > 0) look.bundleOfComponent.set(componentId, usedBy);
+      else look.bundleOfComponent.delete(componentId);
+      if (previousRow)
+        recipe.push({
+          ...previousRow,
+          deleted_at: Number(op.row?.deleted_at ?? op.created_at ?? 0),
+        });
+    } else {
+      if (!op.row) continue;
+      recipe.push({
+        id,
+        component_product_id: componentId,
+        qty_milli: Number(op.row.qty_milli ?? 0),
+        sort_order: Number(op.row.sort_order ?? 0),
+        updated_at: Number(op.row.updated_at ?? op.created_at ?? 0),
+        deleted_at: null,
+      });
+      look.bundleItemById.set(id, {
+        bundle_id: bundleId,
+        component_product_id: componentId,
+      });
+      const usedBy = look.bundleOfComponent.get(componentId) ?? [];
+      if (!usedBy.includes(bundleId)) {
+        usedBy.push(bundleId);
+        look.bundleOfComponent.set(componentId, usedBy);
+      }
+    }
+    if (previous && previous.bundle_id !== bundleId) {
+      const stale = (look.bundleRecipes.get(previous.bundle_id) ?? []).filter(
+        (item) => item.id !== id,
+      );
+      look.bundleRecipes.set(previous.bundle_id, stale);
+    }
+    look.bundleRecipes.set(bundleId, recipe);
   }
 }
 
@@ -729,9 +828,11 @@ export async function applyOps(
           throw new Reject('CONSTRAINT_FAILED');
         groups.push({ txId: ops[0]?.tx_id ?? '', planned });
         applyProductChanges(look, ops);
+        applyBundleChanges(look, ops);
         applyStaffChanges(look, ops);
         applyShopChanges(look, ops);
         applyLedgerChanges(look, ops);
+        applyCloseChanges(look, ops);
         groupAvg.commit();
       } catch (error) {
         if (!(error instanceof Reject)) throw error;
@@ -775,16 +876,22 @@ export async function applyOps(
             if (lostGroup && p.guard !== null) continue;
             final.set(p.op.op_id, p.result);
           }
-          if (lostGroup)
-            lost.push(
-              g.planned.filter((p) => p.guard !== null).map((p) => p.op),
-            );
+          // A lost guard rolls back the whole transaction (`guardAssert`): replay every
+          // op of the group, not only the guarded ones, so companions reach round 2 with
+          // the purchase movement / recipe still in the group (API-H1, D-104).
+          if (lostGroup) lost.push(g.planned.map((p) => p.op));
         }
         for (const r of res) {
           rowsWritten += r.meta.rows_written ?? 0;
           rowsRead += r.meta.rows_read ?? 0;
         }
       } catch (error) {
+        if (isGuardAssertion(error)) {
+          // D1 rolled the whole batch back. Retry every transaction in it intact; round 2
+          // reloads the lookups so a concurrent writer's committed rev is used.
+          for (const g of list) lost.push(g.planned.map((p) => p.op));
+          return;
+        }
         if (!isD1ConstraintError(error)) throw error;
         if (list.length === 1) {
           const g = list[0];
@@ -848,7 +955,17 @@ export async function applyOps(
       error_code: code,
     });
   }
-  const maxInvoiceSeq = ctx.maxInvoiceSeq ?? 0;
+  // API-H5: only a sale insert that actually applied may advance the device's
+  // `last_invoice_seq`. Computing this during planning let a rejected, merged-away or
+  // deferred sale (even with `Number.MAX_SAFE_INTEGER`) poison every later bill.
+  let maxInvoiceSeq = 0;
+  for (const op of ops) {
+    if (op.tbl !== 'sales' || op.kind !== 'insert' || !op.row) continue;
+    if (final.get(op.op_id)?.result !== 'applied') continue;
+    const seq = Number(op.row.invoice_seq);
+    if (Number.isSafeInteger(seq) && seq > 0)
+      maxInvoiceSeq = Math.max(maxInvoiceSeq, seq);
+  }
   if (maxInvoiceSeq > 0)
     tail.push(
       db.prepare(

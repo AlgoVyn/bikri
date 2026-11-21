@@ -303,6 +303,7 @@ type CfAddress = { id?: unknown; email?: unknown; verified?: unknown };
 type CfResponse = {
   success?: boolean;
   result?: unknown;
+  result_info?: { page?: unknown; total_pages?: unknown };
   errors?: { code?: unknown; message?: unknown }[];
 };
 
@@ -334,6 +335,15 @@ async function cf(
   path: string,
   init: RequestInit = {},
 ): Promise<unknown> {
+  return (await cfEnvelope(env, path, init)).result;
+}
+
+/** The whole Cloudflare envelope, for list endpoints that paginate with `result_info`. */
+async function cfEnvelope(
+  env: Env,
+  path: string,
+  init: RequestInit = {},
+): Promise<CfResponse> {
   const { account, token } = cloudflare(env);
   const headers = new Headers(init.headers);
   headers.set('authorization', `Bearer ${token}`);
@@ -357,22 +367,34 @@ async function cf(
       { code: typeof code === 'number' ? code : null },
     );
   }
-  return body.result;
+  return body;
 }
+
+/** Email Routing list pages allow 5–50 entries; 1,000 is rejected with HTTP 400 (API-M3). */
+const CF_ADDRESS_PAGE = 50;
+const CF_ADDRESS_MAX_PAGES = 20;
 
 async function findCfAddress(
   env: Env,
   email: string,
 ): Promise<CfAddress | null> {
-  const result = await cf(env, '/addresses?per_page=1000', { method: 'GET' });
-  if (!Array.isArray(result)) return null;
-  return (
-    (result as CfAddress[]).find(
+  for (let page = 1; page <= CF_ADDRESS_MAX_PAGES; page += 1) {
+    const body = await cfEnvelope(
+      env,
+      `/addresses?per_page=${CF_ADDRESS_PAGE}&page=${page}`,
+      { method: 'GET' },
+    );
+    const rows = Array.isArray(body.result) ? (body.result as CfAddress[]) : [];
+    const found = rows.find(
       (row) =>
         typeof row.email === 'string' &&
         row.email.toLowerCase() === email.toLowerCase(),
-    ) ?? null
-  );
+    );
+    if (found) return found;
+    const total = Number(body.result_info?.total_pages ?? 1);
+    if (!Number.isFinite(total) || page >= total) return null;
+  }
+  return null;
 }
 
 /** Adds the request's email to Cloudflare (or reuses an existing destination) and records it. */
@@ -848,13 +870,29 @@ export async function reopenShopRequest(
       'Only a rejected request can be reopened',
     );
   const next = row.email_verified_at !== null ? 'email_verified' : 'pending';
-  await env.DB.prepare(
-    `UPDATE shop_requests
-        SET status = ?2, reject_reason = '', reviewed_by = ?3, reviewed_at = ?4, updated_at = ?4
-      WHERE id = ?1`,
-  )
-    .bind(id, next, operator, now)
-    .run();
+  try {
+    const result = await env.DB.prepare(
+      `UPDATE shop_requests
+          SET status = ?2, reject_reason = '', reviewed_by = ?3, reviewed_at = ?4, updated_at = ?4
+        WHERE id = ?1 AND status = 'rejected'`,
+    )
+      .bind(id, next, operator, now)
+      .run();
+    if ((result.meta.changes ?? 0) !== 1)
+      throw new ApiError('CONFLICT', 409, 'This request changed meanwhile');
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    // `shop_requests_active_email` is unique per lowercased email among open requests:
+    // the owner already opened a second request with the same address (API-L3).
+    const message = error instanceof Error ? error.message : String(error);
+    if (/UNIQUE constraint failed/iu.test(message))
+      throw new ApiError(
+        'CONFLICT',
+        409,
+        'Another open request uses this email',
+      );
+    throw error;
+  }
   await audit(env, {
     action: 'shop_request_reopen',
     requestId: id,

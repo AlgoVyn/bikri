@@ -99,10 +99,20 @@ export function checkRefund(
       id,
     ]);
   }
+  // `restock` is per refund line, but a bundle group is one return: every component of a
+  // touched group must restock or none may (04 §5, API-M2).
+  const restockOf = new Map<string, number>();
+  for (const line of lines) {
+    restockOf.set(
+      String(line.sale_line_id),
+      Number(line.restock ?? 1) === 1 ? 1 : 0,
+    );
+  }
   for (const componentIds of bundleGroups.values()) {
     const touched = componentIds.some((id) => (refundQty.get(id) ?? 0) > 0);
     if (!touched) continue;
     let bundles: number | null = null;
+    let restock: number | null = null;
     for (const id of componentIds) {
       const line = saleLineInfo(id);
       const perBundle = Number(line?.bundle_component_qty_milli ?? 0);
@@ -112,6 +122,9 @@ export function checkRefund(
       const k = qty / perBundle;
       if (bundles === null) bundles = k;
       else if (k !== bundles) throw new Reject('CONSTRAINT_FAILED');
+      const restockValue = restockOf.get(id) ?? 1;
+      if (restock === null) restock = restockValue;
+      else if (restockValue !== restock) throw new Reject('CONSTRAINT_FAILED');
     }
   }
   if (sale && udhaar > 0) {

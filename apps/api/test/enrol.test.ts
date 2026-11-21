@@ -236,6 +236,13 @@ describe('deviceAuth, tenantGate and /api/me', () => {
   it('returns own tenant and device only (I10)', async () => {
     const a = await seedShop('Me A');
     const b = await seedShop('Me B');
+    // `last_seen_at` is written at most every five minutes (03 §6); make this the first
+    // request after the cap so the pending-report header is stored.
+    await env.DB.prepare(
+      'UPDATE devices SET last_seen_at = 0 WHERE tenant_id = ?1 OR tenant_id = ?2',
+    )
+      .bind(a.tenantId, b.tenantId)
+      .run();
     for (const [shop, dev] of [
       [a, a.admin],
       [a, a.till],

@@ -73,6 +73,14 @@ const TABLE_REF =
 const TENANT_PREDICATE = /\b(?:[a-z_][a-z0-9_]*\.)?tenant_id\s*=\s*\?1\b/gi;
 const TENANT_INSERT =
   /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+[a-z_][a-z0-9_]*\s*\(\s*tenant_id\s*,[^)]*\)\s*(?:VALUES\s*\(\s*\?1\s*,|SELECT\s+\?1\s*,)/i;
+/** `VALUES (…), (…)` only scopes the first row; a multi-row INSERT is never accepted. */
+const MULTI_ROW_INSERT = /\bVALUES\s*\([^)]*\)\s*,\s*\(/i;
+/** The table an INSERT targets, so it can be excluded from the unaliased-reference rule. */
+const INSERT_TARGET =
+  /^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+\(?\s*(?:(?:"?[a-z_][a-z0-9_]*"?)\.)?"?([a-z_][a-z0-9_]*)"?/i;
+/** The part of a statement that lists tables after FROM, up to the next clause. */
+const FROM_CLAUSE =
+  /\bFROM\b([\s\S]*?)(?=\bWHERE\b|\bGROUP\b|\bORDER\b|\bHAVING\b|\bLIMIT\b|\bUNION\b|\bRETURNING\b|$)/gi;
 /**
  * A CTE or derived table can hide a tenant table behind a predicate on its alias
  * (`WITH x AS (SELECT * FROM sales) … WHERE x.tenant_id = ?1`), which the global
@@ -103,13 +111,33 @@ export function tenantTablesIn(sql: string): string[] {
   return found;
 }
 
+/** Tenant tables named after a comma inside a FROM clause (`FROM a, b`). */
+export function commaJoinedTables(sql: string): string[] {
+  const found: string[] = [];
+  for (const m of sql.matchAll(FROM_CLAUSE)) {
+    const clause = m[1] ?? '';
+    for (const part of clause.split(',').slice(1)) {
+      const name =
+        /^\s*(?:(?:"?[a-z_][a-z0-9_]*"?)\.)?"?([a-z_][a-z0-9_]*)"?/i
+          .exec(part)?.[1]
+          ?.toLowerCase() ?? '';
+      if (TENANT_SET.has(name)) found.push(name);
+    }
+  }
+  return found;
+}
+
+/** A table reference with an optional `AS`/bare alias, after FROM, JOIN or a comma. */
+const ALIAS_REF =
+  /(?:,|\bFROM|\bJOIN)\s+(?:(?:"?\w+"?)\.)?"?(\w+)"?(?:\s+(?:AS\s+)?("?\w+"?))?/giu;
+
 /**
  * Throws unless every tenant-table reference in `sql` is scoped to `?1`:
  * one `tenant_id = ?1` per reference, where an INSERT's leading `(tenant_id, …) VALUES (?1, …)`
  * counts for its target table.
  */
 const SCOPE_CACHE = new Set<string>();
-const SCOPE_CACHE_MAX = 1_000;
+export const SCOPE_CACHE_MAX = 1_000;
 /* Aliases that are SQL keywords, not table aliases, when scanning `FROM tbl x`. */
 const ALIAS_KEYWORDS: ReadonlySet<string> = new Set([
   'on',
@@ -128,11 +156,49 @@ const ALIAS_KEYWORDS: ReadonlySet<string> = new Set([
   'set',
   'values',
   'select',
+  'from',
+  'as',
+  'and',
+  'or',
+  'not',
+  'in',
+  'is',
+  'null',
+  'case',
+  'when',
+  'then',
+  'else',
+  'end',
+  'desc',
+  'asc',
+  'by',
 ]);
+
+/**
+ * Refs and aliases per statement scope (`SELECT` starts a new scope, so a subquery's own
+ * `tenant_id = ?1` predicate covers its own tables). A comma is a table separator too, so
+ * an aliased comma join is checked like an explicit `JOIN` (API-L7).
+ */
+function scopeRefs(sql: string): Array<{ refs: number; aliased: number }> {
+  return sql.split(/\bSELECT\b/iu).map((part) => {
+    const refs = tenantTablesIn(part).length + commaJoinedTables(part).length;
+    let aliased = 0;
+    for (const match of part.matchAll(ALIAS_REF)) {
+      const table = (match[1] ?? '').toLowerCase();
+      const alias = (match[2] ?? '').replace(/"/gu, '').toLowerCase();
+      if (!TENANT_SET.has(table) || !alias || ALIAS_KEYWORDS.has(alias))
+        continue;
+      aliased += 1;
+    }
+    return { refs, aliased };
+  });
+}
 
 export function assertTenantScoped(sql: string): void {
   if (SCOPE_CACHE.has(sql)) return;
-  const refs = tenantTablesIn(sql).length;
+  const named = tenantTablesIn(sql);
+  const comma = commaJoinedTables(sql);
+  const refs = named.length + comma.length;
   if (refs === 0) {
     rememberScoped(sql);
     return;
@@ -151,6 +217,12 @@ export function assertTenantScoped(sql: string): void {
         sql,
       );
     }
+    if (MULTI_ROW_INSERT.test(sql)) {
+      throw new TenantScopeError(
+        'INSERT into a tenant table must have exactly one row bound to ?1',
+        sql,
+      );
+    }
     scoped += 1;
   }
   if (scoped < refs) {
@@ -163,12 +235,11 @@ export function assertTenantScoped(sql: string): void {
   // unscoped joined table. Every alias that names a tenant table must carry its own
   // `alias.tenant_id = ?1`; a table without an alias is covered by the count above.
   const aliases = new Map<string, string>();
-  for (const match of sql.matchAll(
-    /\b(?:FROM|JOIN)\s+"?(\w+)"?(?:\s+(?:AS\s+)?(\w+))?/giu,
-  )) {
+  for (const match of sql.matchAll(ALIAS_REF)) {
     const table = (match[1] ?? '').toLowerCase();
-    const alias = (match[2] ?? '').toLowerCase();
-    if (!TENANT_SET.has(table) || !alias || ALIAS_KEYWORDS.has(alias)) continue;
+    const alias = (match[2] ?? '').replace(/"/gu, '').toLowerCase();
+    if (!TENANT_SET.has(table)) continue;
+    if (!alias || ALIAS_KEYWORDS.has(alias)) continue;
     if (alias !== table) aliases.set(alias, table);
   }
   for (const alias of aliases.keys()) {
@@ -178,7 +249,33 @@ export function assertTenantScoped(sql: string): void {
         sql,
       );
   }
+  // Two unaliased tenant tables in one statement cannot be told apart by two bare
+  // `tenant_id = ?1` predicates, so the second one could be unscoped (API-L7). Scopes are
+  // per `SELECT`: a subquery's predicate only covers its own tables.
+  const target = (INSERT_TARGET.exec(sql)?.[1] ?? '').toLowerCase();
+  const insertTarget = TENANT_SET.has(target) ? target : null;
+  let insertTargetSeen = false;
+  for (const scope of scopeRefs(sql)) {
+    const targetHere = !insertTargetSeen && insertTarget !== null ? 1 : 0;
+    insertTargetSeen = true;
+    if (scope.refs - scope.aliased - targetHere > 1) {
+      throw new TenantScopeError(
+        'a statement with several tenant tables must alias every one of them',
+        sql,
+      );
+    }
+  }
   rememberScoped(sql);
+}
+
+/** Test hook: how many statements the scope cache holds (bounded FIFO, API-L7). */
+export function scopeCacheSize(): number {
+  return SCOPE_CACHE.size;
+}
+
+/** Test hook: start from an empty scope cache. */
+export function resetScopeCache(): void {
+  SCOPE_CACHE.clear();
 }
 
 /** Caches only successful checks; a bad statement must throw every time it is used. */

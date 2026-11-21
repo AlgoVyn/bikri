@@ -389,11 +389,22 @@ export function checkOp(
           voidDate > businessDate(ctx.now, tz)
         )
           throw new Reject('CONSTRAINT_FAILED');
-        // 05 §5: a manager voids only bills of the same business day (D-044).
-        if (staff?.role === 'manager' && !over) {
-          const saleId = String(row.sale_id);
-          const saleDate = saleOf(look, group, saleId)?.business_date;
-          if (saleDate !== undefined && saleDate !== voidDate)
+        // 05 §5, D-044: only an owner voids a bill from an earlier business day. Every
+        // non-owner (manager, or a cashier with a `sale.void` grant) stays same-day, and
+        // only an owner may approve the override — a manager's self-approval is not an
+        // owner override (API-H2).
+        const saleId = String(row.sale_id);
+        const saleDate = saleOf(look, group, saleId)?.business_date;
+        if (saleDate !== undefined && saleDate !== voidDate) {
+          const ownerOver = overrideFor(
+            group,
+            'sale_voids',
+            row.id,
+            'sale.void',
+            look.staff,
+            ['owner'],
+          );
+          if (staff?.role !== 'owner' && !ownerOver)
             throw new Reject('FORBIDDEN');
         }
         checkVoid(look, group, row);
@@ -470,16 +481,27 @@ export function checkOp(
               )
           )
             throw new Reject('CONSTRAINT_FAILED');
-          // A cashier may reverse only a same-day expense (D-117); the client enforces
-          // this, but the server must not trust that.
-          if (
-            staff?.role === 'cashier' &&
-            !over &&
-            String(
-              (original as { business_date?: unknown }).business_date ?? '',
-            ) !== businessDate(ctx.now, look.shop?.timezone || 'Asia/Karachi')
-          )
-            throw new Reject('FORBIDDEN');
+          // A cashier may reverse only a same-day expense (D-117, screens/14). Compare
+          // the original's business date with the day the reversal was actually made
+          // (`created_at`), not with the server's sync time: an offline reversal synced
+          // the next morning is still a same-day reversal (API-M1). The reversal date
+          // must be the row's own date, so a cashier cannot backdate it to pass.
+          if (staff?.role === 'cashier' && !over) {
+            const tz = look.shop?.timezone || 'Asia/Karachi';
+            const createdAt = Number(row.created_at);
+            const reversalDate = Number.isSafeInteger(createdAt)
+              ? businessDate(createdAt, tz)
+              : '';
+            if (
+              reversalDate === '' ||
+              String(row.business_date) !== reversalDate ||
+              reversalDate > businessDate(ctx.now, tz) ||
+              String(
+                (original as { business_date?: unknown }).business_date ?? '',
+              ) !== reversalDate
+            )
+              throw new Reject('FORBIDDEN');
+          }
           const duplicate =
             look.existingReversals.has(originalId) ||
             group.some(
@@ -885,7 +907,18 @@ export function checkOp(
                 'received_other',
               ].includes(String(candidate.row?.reason_code)))),
       );
-    if (!catalogueEdit && !costSource) throw new Reject('FORBIDDEN');
+    // A retried `last_cost`-only upsert (its sibling movement was already committed by a
+    // lost round) is a no-op when the stored cost already matches, so it cannot smuggle a
+    // catalogue change (API-H1).
+    const costNoop =
+      op.tbl === 'products' &&
+      changes.length > 0 &&
+      changes.every((field) => field === 'last_cost') &&
+      row.last_cost !== undefined &&
+      Number(row.last_cost) ===
+        Number(look.products.get(String(row.id))?.last_cost);
+    if (!catalogueEdit && !costSource && !costNoop)
+      throw new Reject('FORBIDDEN');
     if (
       op.tbl === 'products' &&
       changes.includes('last_cost') &&
@@ -931,55 +964,59 @@ export function checkOp(
       qty <= 0
     )
       throw new Reject('CONSTRAINT_FAILED');
-    const components = new Set<string>();
-    for (const item of look.bundleRecipes.get(bundleId) ?? []) {
-      if (item.deleted_at === null) components.add(item.component_product_id);
-    }
-    for (const candidate of group) {
-      if (candidate.tbl !== 'bundle_items' || !candidate.row) continue;
-      if (candidate.row.bundle_id !== bundleId) continue;
-      if (candidate.kind === 'delete') {
-        const known =
-          look.bundleItemById.get(String(candidate.row_id ?? '')) ??
-          candidate.row;
-        components.delete(String(known.component_product_id ?? ''));
-      } else if (candidate.row.deleted_at == null) {
-        const id = String(candidate.row.component_product_id ?? '');
-        if (id) components.add(id);
-      }
-    }
+    // The recipe after this op and the other recipe ops of the same transaction. A
+    // delete has no row payload, so counting rows in `group` used to miss deletions
+    // (dead code) and reject a legitimate 20→20 swap (API-H6).
+    const components = activeBundleComponents(look, group, bundleId);
     if (
       (components.size < 1 || components.size > 20) &&
       !productDeletedInGroup(look, group, bundleId)
     )
       throw new Reject('CONSTRAINT_FAILED');
   }
-  if (
-    op.tbl === 'products' &&
-    (row.deleted_at != null || row.kind === 'bundle')
-  ) {
-    // Deleting a component or turning it into a bundle is forbidden while a recipe
-    // uses it. A normal simple-product upsert (price, name, last_cost, …) must stay
-    // allowed: a bundle sale in the same push must not reject the component edit or
-    // a purchase delivery that updates its cost.
+  if (op.tbl === 'products') {
+    // D-229 invariants are enforced on the state the op actually leaves: `planOp` writes
+    // only `changed_fields` for an existing row, so a `track_stock`-only update of a
+    // bundle (or a `kind`-only flip with `track_stock` omitted) must not slip through
+    // (API-H6).
     const productId = String(row.id);
-    for (const bundleId of look.bundleOfComponent.get(productId) ?? []) {
-      if (productDeletedInGroup(look, group, bundleId)) continue;
-      if (activeBundleComponents(look, group, bundleId).has(productId))
+    const stored = look.current.get(key('products', productId));
+    const local = look.products.get(productId);
+    const writes = (field: string) =>
+      writesColumn('products', productId, field);
+    const kind = writes('kind')
+      ? String(row.kind ?? 'simple')
+      : String(local?.kind ?? 'simple');
+    const trackStock = writes('track_stock')
+      ? Number(row.track_stock ?? 0)
+      : Number(local?.track_stock ?? 0);
+    // A soft-deleted row is never resurrected (03 §5), matching planOp's write list.
+    const storedDeleted = stored?.deleted_at ?? null;
+    const deletedAt =
+      storedDeleted !== null
+        ? storedDeleted
+        : writes('deleted_at')
+          ? row.deleted_at
+          : null;
+    const components = activeBundleComponents(look, group, productId);
+    if (kind === 'bundle') {
+      if (trackStock !== 0) throw new Reject('CONSTRAINT_FAILED');
+      if (deletedAt == null && (components.size < 1 || components.size > 20))
         throw new Reject('CONSTRAINT_FAILED');
+    } else if (deletedAt == null && components.size > 0) {
+      // An active bundle with a recipe cannot become a simple product.
+      throw new Reject('CONSTRAINT_FAILED');
     }
-    if (row.kind === 'bundle' && Number(row.track_stock ?? 1) !== 0)
-      throw new Reject('CONSTRAINT_FAILED');
-    if (
-      row.kind === 'bundle' &&
-      activeBundleComponents(look, group, productId).size < 1
-    )
-      throw new Reject('CONSTRAINT_FAILED');
-    if (
-      row.kind === 'simple' &&
-      activeBundleComponents(look, group, productId).size > 0
-    )
-      throw new Reject('CONSTRAINT_FAILED');
+    if (deletedAt != null || kind === 'bundle') {
+      // Deleting a component or turning it into a bundle is forbidden while another
+      // bundle's recipe uses it. A normal simple-product edit (price, name, last_cost, …)
+      // stays allowed so a bundle sale in the same push does not reject it.
+      for (const bundleId of look.bundleOfComponent.get(productId) ?? []) {
+        if (productDeletedInGroup(look, group, bundleId)) continue;
+        if (activeBundleComponents(look, group, bundleId).has(productId))
+          throw new Reject('CONSTRAINT_FAILED');
+      }
+    }
   }
   if (op.tbl === 'expense_categories') {
     if (
