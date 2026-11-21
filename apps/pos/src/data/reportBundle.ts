@@ -867,7 +867,7 @@ export async function slowMoversReport(
   ).filter((product) => !product.deleted_at);
   const [levelRows, voidRows] = await Promise.all([
     db.stock_levels.bulkGet(products.map((product) => String(product.id))),
-    db.sale_voids.toArray(),
+    db.sale_voids.where('business_date').aboveOrEqual(slowCutoff).toArray(),
   ]);
   const levels = new Map(
     levelRows
@@ -1076,8 +1076,13 @@ async function udhaarReport(
     db.customers,
     balances.map((balance) => balance.party_id),
   );
-  const promises = (await db.promises.toArray())
-    .filter((promise) => !promise.deleted_at && promise.status === 'open')
+  const promises = (
+    await db.promises
+      .where('[status+promised_on]')
+      .between(['open', ''], ['open', '\uffff'])
+      .toArray()
+  )
+    .filter((promise) => !promise.deleted_at)
     .sort((a, b) => String(a.promised_on).localeCompare(String(b.promised_on)));
   const promiseByCustomer = new Map<string, SyncedRow>();
   for (const promise of promises) {
@@ -1158,12 +1163,12 @@ async function staffReport(
   db: BikriDb,
   input: { range: ReportRange; staff: Map<string, StaffReportRow> },
 ): Promise<StaffReportRow[]> {
-  const voids = (await db.sale_voids.toArray()).filter(
-    (row) =>
-      String(row.business_date) >= input.range.from &&
-      String(row.business_date) <= input.range.to &&
-      inRange(row, input.range),
-  );
+  const voids = (
+    await db.sale_voids
+      .where('business_date')
+      .between(input.range.from, input.range.to, true, true)
+      .toArray()
+  ).filter((row) => inRange(row, input.range));
   const voidedSales = await byIds(
     db.sales,
     voids.map((row) => String(row.sale_id)),

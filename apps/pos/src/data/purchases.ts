@@ -211,11 +211,26 @@ export async function saveDelivery(
         { on_hand: number; avg_cost: number }
       >();
       let lineNo = 0;
+      const productIds = [
+        ...new Set(input.lines.map((line) => line.productId)),
+      ];
+      const levelRows = await w
+        .table<{ product_id: string; on_hand_milli: number }>('stock_levels')
+        .bulkGet(productIds);
+      const levels = new Map(
+        levelRows.flatMap((level) =>
+          level ? [[level.product_id, level.on_hand_milli] as const] : [],
+        ),
+      );
+      const lineRows: SyncedRow[] = [];
+      const movementRows: SyncedRow[] = [];
+      const auditRows: SyncedRow[] = [];
+      const patches = new Map<string, Record<string, unknown>>();
       for (const [index, line] of input.lines.entries()) {
         lineNo += 1;
         const priced = result.lines[index] as PurchaseLineResult;
         const product = products.get(line.productId) as MasterRow;
-        await w.insert('purchase_lines', {
+        lineRows.push({
           id: newId(now),
           purchase_id: input.purchaseId,
           line_no: lineNo,
@@ -229,16 +244,8 @@ export async function saveDelivery(
         });
         let state = costState.get(line.productId);
         if (!state) {
-          const onHand =
-            (
-              await w
-                .table<{ product_id: string; on_hand_milli: number }>(
-                  'stock_levels',
-                )
-                .get(line.productId)
-            )?.on_hand_milli ?? 0;
           state = {
-            on_hand: onHand,
+            on_hand: levels.get(line.productId) ?? 0,
             avg_cost: Number(product.avg_cost ?? 0),
           };
           costState.set(line.productId, state);
@@ -256,7 +263,7 @@ export async function saveDelivery(
           });
           state.on_hand += line.qtyMilli;
           state.avg_cost = Number(patch.avg_cost);
-          await w.insert('stock_movements', {
+          movementRows.push({
             id: newId(now),
             product_id: line.productId,
             qty_delta_milli: line.qtyMilli,
@@ -276,7 +283,7 @@ export async function saveDelivery(
           const before = Number(product.price ?? 0);
           if (before !== line.updatePrice) {
             patch.price = line.updatePrice;
-            await w.insert('audit_log', {
+            auditRows.push({
               id: newId(now),
               action: 'price_change',
               entity: 'products',
@@ -289,8 +296,17 @@ export async function saveDelivery(
             });
           }
         }
-        await w.update('products', line.productId, patch);
+        patches.set(line.productId, {
+          ...(patches.get(line.productId) ?? {}),
+          ...patch,
+        });
       }
+      await w.insertMany('purchase_lines', lineRows);
+      if (movementRows.length > 0)
+        await w.insertMany('stock_movements', movementRows);
+      if (auditRows.length > 0) await w.insertMany('audit_log', auditRows);
+      for (const [productId, patch] of patches)
+        await w.update('products', productId, patch);
       // A free-of-charge delivery must not write the zero amount the ledger CHECK forbids.
       if (result.total > 0)
         await w.insert('ledger_entries', {

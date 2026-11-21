@@ -249,9 +249,17 @@ export async function countProducts(
       l.on_hand_milli,
     ]),
   );
-  const list = (await db.products.toArray()).filter((p) => {
+  const source =
+    scope.kind === 'category'
+      ? await db.products
+          .where('category_id')
+          .equals(scope.categoryId)
+          .toArray()
+      : scope.kind === 'low'
+        ? await db.products.where('track_stock').equals(1).toArray()
+        : await db.products.toArray();
+  const list = source.filter((p) => {
     if (p.deleted_at || p.track_stock !== 1) return false;
-    if (scope.kind === 'category') return p.category_id === scope.categoryId;
     if (scope.kind === 'low') {
       const min = Number(p.min_stock_milli ?? 0);
       return min > 0 && (levels.get(p.id) ?? 0) <= min;
@@ -440,23 +448,55 @@ export async function finishCount(
         let movements = 0;
         let counted = 0;
         let valueDiff = 0;
-        for (const id of slice) {
+        // One bulkGet for the chunk: 90 sequential full-history sums made Finish
+        // count the slowest local action.
+        const products = await w
+          .table<MasterRow, string>('products')
+          .bulkGet(slice);
+        const levels = await w
+          .table<{ product_id: string; on_hand_milli: number }, string>(
+            'stock_levels',
+          )
+          .bulkGet(slice);
+        const levelOf = new Map(
+          levels.flatMap((level) =>
+            level ? [[level.product_id, level.on_hand_milli] as const] : [],
+          ),
+        );
+        const movementRows: SyncedRow[] = [];
+        for (const [index, id] of slice.entries()) {
           const has = Object.hasOwn(source.counted, id);
           if (!has && !options.zeroUncounted) continue;
           const qty = has ? (source.counted[id] ?? 0) : 0;
           if (has) counted += 1;
-          const product = await w.table<MasterRow, string>('products').get(id);
+          const product = products[index];
           if (!product || product.deleted_at || product.track_stock !== 1)
             continue;
-          const delta = qty - (await onHandExact(w, id));
+          const cached = levelOf.get(id);
+          const onHand =
+            cached === undefined ? await onHandExact(w, id) : cached;
+          const delta = qty - onHand;
           if (delta === 0) continue;
-          await insertMovement(w, product, delta, 'count', ctx, {
-            unitCost: null,
+          movementRows.push({
+            id: newId(w.now),
+            product_id: product.id,
+            qty_delta_milli: delta,
+            reason_code: 'count',
+            ref_type: 'adjustment',
+            ref_id: null,
+            unit_cost: null,
             note: '',
+            branch_id: ctx.branch_id,
+            device_id: ctx.device_id,
+            staff_id: ctx.staff_id,
+            business_date: businessDate(w.now, ctx.timeZone),
+            created_at: w.now,
           });
           movements += 1;
           valueDiff += mulDivRound(delta, Number(product.avg_cost ?? 0), 1000);
         }
+        if (movementRows.length > 0)
+          await w.insertMany('stock_movements', movementRows);
         // Persist the applied ids in the same transaction as the movements. If the tab
         // dies after this commit, the retry skips the chunk instead of re-applying the
         // count over sales that happened in between.

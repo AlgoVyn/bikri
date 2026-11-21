@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Client write path — 21 Nov 2026 review
+- Dexie V12 drops unused indexes (including three prefix indexes covered by a compound one) and adds `file_queue.[status+created_at]` and `sale_voids.business_date`; retention now reads primary keys instead of every failed blob/done job.
+- Push settlement bulk-loads the claimed rows, deletes applied ops in one `bulkDelete`, writes rejected/pending rows in one `bulkPut`, and skips `pull_shadow` work for ledger inserts. `discardFailed` reads the outbox once, narrows its lock to the action's tables and bulk-deletes ledger rows.
+- Refund, purchase and stock-count actions use `insertMany`/bulk reads: refund lines, movements and audits, purchase lines/movements/price audits, and count movements; `finishCount` reads products and stock levels for the whole chunk instead of 90 history scans.
+- File cache reopens `CacheStorage` once per storage object, prunes failed uploads by primary key, and `checkCaches` samples movements and levels in one read transaction so a concurrent sale cannot trigger a false rebuild.
+
 ### D1 write/read capacity — 21 Nov 2026 review
 - Migration `0029` drops four unused indexes (`products_kind`, `purchases_supplier`, `supplier_returns_supplier`, `audit_log_time`), narrows `ledger_source` to refund rows and `payments_sale` to void rows, makes `stock_movements_ref` and `ledger_party` covering, and replaces the per-row `change_log_prune` index with a per-tenant daily `change_log_watermarks` table.
 - The nightly prune records each tenant's daily `MAX(seq)` and reads its cutoff watermark; the first run after deploy derives the mark once. This removes the 9 D1 writes/bill the old prune index charged and the per-tenant `MAX(seq)` scans.

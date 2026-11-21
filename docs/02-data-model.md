@@ -1845,39 +1845,39 @@ export const DEXIE_SCHEMA_V1 = {
   devices: 'id, branch_id',
   staff: 'id, active, deleted_at',
   categories: 'id, sort_order, deleted_at',
-  products: 'id, sku, category_id, name_en, updated_at, deleted_at, kind, track_stock', // V8 adds kind (bundle filter); V9 adds track_stock (Home low-stock probe)
+  products: 'id, sku, category_id, deleted_at, track_stock', // V9 track_stock; V12 drops name_en/updated_at/kind (filtered in memory)
   bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
   product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
-  customers: 'id, name, phone, deleted_at, credit_limit', // V9 adds credit_limit (Home over-limit probe)
-  suppliers: 'id, name, deleted_at',
+  customers: 'id, phone, credit_limit', // V12 drops name/deleted_at (filtered in memory)
+  suppliers: 'id',
   expense_categories: 'id, code, sort_order',
   promises: 'id, customer_id, [status+promised_on]',
-  sync_conflicts: 'id, row_id, at, resolution',   // pulled read-only; V9 adds resolution
+  sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
   // ledger
-  sales: 'id, &invoice_no, business_date, customer_id, created_at, [device_id+invoice_seq], status',
-  sale_lines: 'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle_id; V11 bundle+date
+  sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
+  sale_lines: 'id, sale_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id
 
   payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
   refunds: 'id, sale_id, business_date, [device_id+created_at]',
   refund_lines: 'id, refund_id, sale_line_id, business_date', // V10 adds the refund's business date (till-only; reports count refunds on their own date)
-  sale_voids: 'id, &sale_id',
-  ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id', // V7 adds the business-date page index
+  sale_voids: 'id, &sale_id, created_at, business_date',
+  ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], created_at', // V7 date page; V11 created_at; V12 drops source_id
   stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date', // V4 adds [ref_type+ref_id] (refund/void restock)
   purchases: 'id, [supplier_id+created_at], business_date',
-  purchase_lines: 'id, purchase_id, product_id',
+  purchase_lines: 'id, purchase_id',
   supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date',
-  supplier_return_lines: 'id, return_id, product_id, purchase_line_id',
-  expenses: 'id, business_date, category_id, [device_id+created_at], reverses_id', // V3 adds reverses_id
+  supplier_return_lines: 'id, return_id, purchase_line_id',
+  expenses: 'id, business_date, [device_id+created_at], reverses_id', // V3 reverses_id; V12 drops category_id
   cash_moves: 'id, [device_id+created_at]',
   day_closes: 'id, [device_id+period_end], business_date',
   audit_log: 'id, [entity+entity_id], created_at',
   // local-only
-  outbox: '++seq, &op_id, status, created_at, [tbl+row_id]', // [tbl+row_id]: coalescing lookup (D-088)
+  outbox: '++seq, &op_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
-  file_queue: '++id, status, created_at', // V6 adds created_at for the retention pass
-  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, status, [status+created_at], created_at', // V1 'id, status, created_at'; V2 adds sale_id/refund_id; V3 adds day_close/supplier ids; V6 adds [status+created_at]
+  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index
+  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)
   pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
@@ -1891,6 +1891,8 @@ export const DEXIE_SCHEMA_V1 = {
 **Dexie V10 (D-274)** denormalises the refund's `business_date` onto `refund_lines` as a **till-only** column: it is not in D1, is stripped from pushed ops (`LOCAL_ONLY_COLUMNS`), and is re-derived from the refund when a server row is merged. The upgrade backfills missing dates from the local `refunds` table, the same streaming pattern as V7's sale lines. Reports then read one date range instead of turning a busy refund list above the old key threshold into a full scan of every refund line the shop ever wrote.
 
 **Dexie V11 (D-277)** adds `sale_lines.[bundle_id+business_date]` so a bundle's 14-day chart reads only its window, plus `created_at` indexes on the ledger tables restore recovery bounds by the restore point. The upgrade backfills `party_balances.last_payment_at` from the matching `ledger_entries` payment rows for the chase list. Local-only indexes/columns; D1 is unchanged.
+
+**Dexie V12 (D-279)** removes indexes no query uses (and three prefix indexes already covered by a compound one), adds `file_queue.[status+created_at]` and `sale_voids.business_date`, and keeps only the range indexes the remaining scans need. The upgrade only adds/drops indexes; IndexedDB rebuilds them from stored rows. No server or wire change.
 
 ### 3.1 Local-only tables
 

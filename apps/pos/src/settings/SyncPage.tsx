@@ -1,7 +1,7 @@
 /** Settings → Sync (screens/17, T-036): status, failed ops, conflicts, Sync now. */
 
 import { newId } from '@bikri/core';
-import type { OutboxEntry, SyncedRow } from '@bikri/db';
+import type { OutboxEntry } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -76,7 +76,7 @@ export function SyncPage() {
     ] = await Promise.all([
       db.outbox.where('status').equals('pending').count(),
       db.outbox.where('status').equals('failed').toArray(),
-      db.sync_conflicts.toArray(),
+      db.sync_conflicts.where('resolution').equals('needs_owner').toArray(),
       deviceInfo(db),
       getKv<number | null>(db, 'last_sync_at', null),
       getKv<{ status: string } | null>(db, 'tenant_status', null),
@@ -91,9 +91,7 @@ export function SyncPage() {
     return {
       pending,
       failed,
-      conflicts: conflicts.filter(
-        (c: SyncedRow) => c.resolution === 'needs_owner',
-      ),
+      conflicts,
       device,
       lastSync,
       readOnly: status?.status === 'read_only',

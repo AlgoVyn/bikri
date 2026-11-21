@@ -5,7 +5,12 @@ import {
   isLedgerTable,
   newId,
 } from '@bikri/core';
-import type { BikriDb, OutboxEntry, SyncedRow } from '@bikri/db';
+import type {
+  BikriDb,
+  DexieTableName,
+  OutboxEntry,
+  SyncedRow,
+} from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
@@ -79,6 +84,8 @@ type PushResponse = {
   server_time: number;
   latest_seq: number;
 } & StatusPayload;
+
+type PushResult = PushResponse['results'][number];
 
 export type PushOutcome = {
   sent: number;
@@ -206,16 +213,35 @@ async function pushAllUnlocked(
     // Every table in the batch, including ledger tables: the settle reads an applied
     // op's local row when a newer op is still pending. Dexie throws if a table is used
     // outside the transaction scope.
-    const batchTables = [...new Set(batch.map((entry) => db.table(entry.tbl)))];
+    // Ledger rows are only deleted from the outbox; they never use pull_shadow.
+    const batchTables = [
+      ...new Set(
+        batch
+          .filter((entry) => !isLedgerTable(entry.tbl))
+          .map((entry) => db.table(entry.tbl)),
+      ),
+    ];
     await db.transaction(
       'rw',
       [db.outbox, db.pull_shadow, db.kv, ...batchTables],
       async () => {
         const answered = new Set(res.results.map((r) => r.op_id));
+        const settle = batch.filter((entry) => entry.seq !== undefined);
+        const currentRows = (await db.outbox.bulkGet(
+          settle.map((entry) => entry.seq as number),
+        )) as (OutboxEntry | undefined)[];
+        const currentBySeq = new Map<number, OutboxEntry>();
+        settle.forEach((entry, index) => {
+          const row = currentRows[index];
+          if (row && entry.seq !== undefined) currentBySeq.set(entry.seq, row);
+        });
+        const appliedSeqs: number[] = [];
+        const rejectedRows: OutboxEntry[] = [];
+        const masterApplied: { entry: OutboxEntry; result: PushResult }[] = [];
         for (const r of res.results) {
           const entry = bySeq.get(r.op_id);
           if (entry?.seq === undefined) continue;
-          const current = await db.outbox.get(entry.seq);
+          const current = currentBySeq.get(entry.seq);
           // Another tab may have reclaimed this row (or it changed) while the request
           // was in flight; only the claim owner may settle it.
           if (
@@ -226,7 +252,8 @@ async function pushAllUnlocked(
             continue;
           if (r.result === 'rejected') {
             out.rejected += 1;
-            await db.outbox.update(entry.seq, {
+            rejectedRows.push({
+              ...current,
               status: 'failed',
               last_error: r.error_code ?? 'REJECTED',
               sending_at: undefined,
@@ -235,90 +262,99 @@ async function pushAllUnlocked(
             });
           } else {
             out.applied += 1;
-            await db.outbox.delete(entry.seq);
-            // A newer op for the same row may still be pending (for example one queued
-            // while this request was in flight). Its restore point is the row the server
-            // just accepted, not the older shadow; delete the shadow if we cannot replace it.
-            const newer = await db.outbox
-              .where('[tbl+row_id]')
-              .equals([entry.tbl, entry.row_id])
-              .filter(
-                (candidate) =>
-                  candidate.status === 'pending' ||
-                  candidate.status === 'sending',
-              )
-              .count();
-            if (newer > 0) {
-              // Keep a restore point for the newer op. For an applied upsert, replace it
-              // with the row the server now has; for a delete or a field merge, keep the
-              // shadow the newer op recorded when it was queued.
-              if (r.result === 'applied' && entry.row) {
-                // Keep the server-managed columns (avg_cost, sales.status, …) from the
-                // current local row; the op payload intentionally omits them.
-                const local = (await db.table(entry.tbl).get(entry.row_id)) as
-                  | Record<string, unknown>
-                  | undefined;
-                await db.pull_shadow.put({
-                  tbl: entry.tbl,
-                  id: entry.row_id,
-                  source: 'local',
-                  row: {
-                    ...(local ?? {}),
-                    ...entry.row,
-                    id: entry.row_id,
-                    rev: r.server_rev ?? local?.rev ?? 0,
-                  },
-                });
-              }
-            } else {
-              const shadow = await db.pull_shadow.get([
-                entry.tbl,
-                entry.row_id,
-              ]);
-              if (shadow?.source === 'server') {
-                // A pull parked a newer server row while this local op was pending.
-                // The cursor is already past that change, so apply it now; deleting the
-                // shadow would strand the till on stale fields/rev until another edit.
-                const local = (await db.table(entry.tbl).get(entry.row_id)) as
-                  | Record<string, unknown>
-                  | undefined;
-                const localRev = Number(local?.rev ?? 0);
-                const shadowRev = Number(shadow.row.rev ?? 0);
-                // Only apply a shadow that is at least the revision this push
-                // produced. An older pre-merge pull is stale; the follow-up pull
-                // fetches the merged row.
-                const serverRev =
-                  typeof r.server_rev === 'number' ? r.server_rev : shadowRev;
-                if (local && shadowRev > localRev && shadowRev >= serverRev)
-                  await db.table(entry.tbl).put(shadow.row);
-              }
-              await db.pull_shadow.delete([entry.tbl, entry.row_id]);
-            }
-            // Keep the local optimistic revision current; otherwise the next edit of
-            // this row would use a stale base_rev and be needlessly field-merged.
-            // Only a plain applied result proves the local row equals the server row.
-            // A field merge keeps fields from the other device; adopting its revision
-            // here would let the next edit overwrite that device's field with our stale
-            // copy. Keep the old base revision until the merged row is pulled.
-            if (
-              r.result === 'applied' &&
-              !isLedgerTable(entry.tbl) &&
-              typeof r.server_rev === 'number' &&
-              Number.isSafeInteger(r.server_rev)
-            )
-              await db
-                .table(entry.tbl)
-                .update(entry.row_id, { rev: r.server_rev });
+            appliedSeqs.push(entry.seq);
+            if (!isLedgerTable(entry.tbl))
+              masterApplied.push({ entry, result: r });
           }
         }
+        if (appliedSeqs.length > 0) await db.outbox.bulkDelete(appliedSeqs);
+        // Settle master shadows before writing the rejected followers: a pending
+        // follower must still count as "newer" or its pre-delete shadow is lost.
+        for (const { entry, result: r } of masterApplied) {
+          // A newer op for the same row may still be pending (for example one queued
+          // while this request was in flight). Its restore point is the row the server
+          // just accepted, not the older shadow; delete the shadow if we cannot replace it.
+          const newer = await db.outbox
+            .where('[tbl+row_id]')
+            .equals([entry.tbl, entry.row_id])
+            .filter(
+              (candidate) =>
+                candidate.status === 'pending' ||
+                candidate.status === 'sending',
+            )
+            .count();
+          if (newer > 0) {
+            // Keep a restore point for the newer op. For an applied upsert, replace it
+            // with the row the server now has; for a delete or a field merge, keep the
+            // shadow the newer op recorded when it was queued.
+            if (r.result === 'applied' && entry.row) {
+              // Keep the server-managed columns (avg_cost, sales.status, …) from the
+              // current local row; the op payload intentionally omits them.
+              const local = (await db.table(entry.tbl).get(entry.row_id)) as
+                | Record<string, unknown>
+                | undefined;
+              await db.pull_shadow.put({
+                tbl: entry.tbl,
+                id: entry.row_id,
+                source: 'local',
+                row: {
+                  ...(local ?? {}),
+                  ...entry.row,
+                  id: entry.row_id,
+                  rev: r.server_rev ?? local?.rev ?? 0,
+                },
+              });
+            }
+          } else {
+            const shadow = await db.pull_shadow.get([entry.tbl, entry.row_id]);
+            if (shadow?.source === 'server') {
+              // A pull parked a newer server row while this local op was pending.
+              // The cursor is already past that change, so apply it now; deleting the
+              // shadow would strand the till on stale fields/rev until another edit.
+              const local = (await db.table(entry.tbl).get(entry.row_id)) as
+                | Record<string, unknown>
+                | undefined;
+              const localRev = Number(local?.rev ?? 0);
+              const shadowRev = Number(shadow.row.rev ?? 0);
+              // Only apply a shadow that is at least the revision this push
+              // produced. An older pre-merge pull is stale; the follow-up pull
+              // fetches the merged row.
+              const serverRev =
+                typeof r.server_rev === 'number' ? r.server_rev : shadowRev;
+              if (local && shadowRev > localRev && shadowRev >= serverRev)
+                await db.table(entry.tbl).put(shadow.row);
+            }
+            await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+          }
+          // Keep the local optimistic revision current; otherwise the next edit of
+          // this row would use a stale base_rev and be needlessly field-merged.
+          // Only a plain applied result proves the local row equals the server row.
+          // A field merge keeps fields from the other device; adopting its revision
+          // here would let the next edit overwrite that device's field with our stale
+          // copy. Keep the old base revision until the merged row is pulled.
+          if (
+            r.result === 'applied' &&
+            typeof r.server_rev === 'number' &&
+            Number.isSafeInteger(r.server_rev)
+          )
+            await db
+              .table(entry.tbl)
+              .update(entry.row_id, { rev: r.server_rev });
+        }
+        if (rejectedRows.length > 0) await db.outbox.bulkPut(rejectedRows);
+        const pendingRows: OutboxEntry[] = [];
         for (const entry of batch) {
           if (entry.seq === undefined || answered.has(entry.op_id)) continue;
-          await db.outbox.update(entry.seq, {
+          const current = currentBySeq.get(entry.seq);
+          if (!current) continue;
+          pendingRows.push({
+            ...current,
             status: 'pending',
             sending_at: undefined,
             claim_token: undefined,
           });
         }
+        if (pendingRows.length > 0) await db.outbox.bulkPut(pendingRows);
         await setKv(db, 'last_push_at', Date.now());
       },
     );
@@ -428,27 +464,37 @@ export async function discardFailed(
   seqs: number[],
 ): Promise<void> {
   let ledgerChanged = false;
-  await db.transaction('rw', db.tables, async (tx) => {
-    const failed = (await db.outbox.where('seq').anyOf(seqs).toArray()).filter(
-      (e) => e.seq !== undefined && e.status === 'failed',
-    );
-    if (failed.length === 0) return;
-    // A rejected document is one transaction. Remove every still-queued row of that transaction
-    // (queued child lines included), not just the row the UI happened to show.
-    const txIds = [...new Set(failed.map((e) => e.tx_id))];
-    const entries = (await db.outbox.toArray()).filter((e) =>
-      txIds.includes(e.tx_id),
-    );
-    // A newer action may still be waiting for the same row. Restoring an older shadow
-    // would then overwrite that newer local edit, so leave the row for its own op.
-    const otherKeys = new Set(
-      (await db.outbox.toArray())
-        .filter((e) => !txIds.includes(e.tx_id))
-        .map((e) => `${e.tbl}:${e.row_id}`),
-    );
+  const all = await db.outbox.toArray();
+  const failed = all.filter(
+    (e) => e.seq !== undefined && e.status === 'failed' && seqs.includes(e.seq),
+  );
+  if (failed.length === 0) return;
+  // A rejected document is one transaction. Remove every still-queued row of that transaction
+  // (queued child lines included), not just the row the UI happened to show.
+  const txIds = new Set(failed.map((e) => e.tx_id));
+  const entries = all.filter((e) => txIds.has(e.tx_id));
+  // A newer action may still be waiting for the same row. Restoring an older shadow
+  // would then overwrite that newer local edit, so leave the row for its own op.
+  const otherKeys = new Set(
+    all.filter((e) => !txIds.has(e.tx_id)).map((e) => `${e.tbl}:${e.row_id}`),
+  );
+  const scope = new Set<DexieTableName>([
+    'outbox',
+    'pull_shadow',
+    'sales',
+    'sale_voids',
+    'refunds',
+    'sale_lines',
+    'refund_lines',
+  ]);
+  for (const entry of entries) scope.add(entry.tbl);
+  await db.transaction('rw', [...scope], async (tx) => {
     const saleIds = new Set<string>();
+    const deleteSeqs: number[] = [];
+    const ledgerDeletes = new Map<string, string[]>();
     for (const e of entries) {
       if (e.seq === undefined) continue;
+      deleteSeqs.push(e.seq);
       const rowKey = `${e.tbl}:${e.row_id}`;
       if (isLedgerTable(e.tbl)) {
         if (e.tbl === 'refunds' || e.tbl === 'sale_voids') {
@@ -456,8 +502,9 @@ export async function discardFailed(
           if (row && typeof row.sale_id === 'string') saleIds.add(row.sale_id);
         }
         if (!otherKeys.has(rowKey)) {
-          await db.table(e.tbl).delete(e.row_id);
-          await db.pull_shadow.delete([e.tbl, e.row_id]);
+          const list = ledgerDeletes.get(e.tbl) ?? [];
+          list.push(e.row_id);
+          ledgerDeletes.set(e.tbl, list);
           ledgerChanged = true;
         }
       } else if (!otherKeys.has(rowKey)) {
@@ -470,8 +517,9 @@ export async function discardFailed(
           await db.table(e.tbl).delete(e.row_id);
         }
       }
-      await db.outbox.delete(e.seq);
     }
+    for (const [tbl, ids] of ledgerDeletes) await db.table(tbl).bulkDelete(ids);
+    if (deleteSeqs.length > 0) await db.outbox.bulkDelete(deleteSeqs);
     await recomputeDiscardedStatuses(tx, saleIds);
   });
   if (ledgerChanged) await rebuildCaches(db);

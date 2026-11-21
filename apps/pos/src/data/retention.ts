@@ -44,24 +44,20 @@ export async function pruneLocalHistory(
           true,
           false,
         )
-        .toArray();
-      if (oldJobs.length > 0)
-        await db.print_jobs.bulkDelete(oldJobs.map((job) => job.id));
+        .primaryKeys();
+      if (oldJobs.length > 0) await db.print_jobs.bulkDelete(oldJobs);
 
-      const failed = await db.file_queue
-        .where('status')
-        .equals('failed')
-        .toArray();
-      const oldUploads = failed.filter(
-        (entry) =>
-          typeof entry.created_at === 'number' &&
-          entry.created_at < now - FAILED_UPLOAD_RETENTION_MS &&
-          entry.id !== undefined,
-      );
-      if (oldUploads.length > 0)
-        await db.file_queue.bulkDelete(
-          oldUploads.map((entry) => entry.id as number),
-        );
+      // primaryKeys() never reads the failed blob itself.
+      const oldUploads = await db.file_queue
+        .where('[status+created_at]')
+        .between(
+          ['failed', 0],
+          ['failed', now - FAILED_UPLOAD_RETENTION_MS],
+          true,
+          false,
+        )
+        .primaryKeys();
+      if (oldUploads.length > 0) await db.file_queue.bulkDelete(oldUploads);
 
       let removedErrors = 0;
       const stored = (await db.kv.get('pull_errors')) as

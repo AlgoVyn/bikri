@@ -17,7 +17,10 @@ export async function cancelPrintJob(db: BikriDb, id: string): Promise<void> {
 /** Drops every waiting job; returns how many were removed. */
 export async function cancelQueuedPrintJobs(db: BikriDb): Promise<number> {
   return db.transaction('rw', db.print_jobs, async () => {
-    const jobs = await db.print_jobs.where('status').equals('queued').toArray();
+    const jobs = await db.print_jobs
+      .where('[status+created_at]')
+      .between(['queued', 0], ['queued', Number.MAX_SAFE_INTEGER])
+      .toArray();
     if (jobs.length === 0) return 0;
     await db.print_jobs.bulkDelete(jobs.map((job) => job.id));
     return jobs.length;
@@ -103,12 +106,18 @@ export async function unresolvedFailedCount(db: BikriDb): Promise<number> {
   // Read only the failed jobs (usually zero), then probe the document's index for
   // a later `done`. Reading every `done` job in the 90-day table made every print
   // and every Home refresh scan thousands of rows (D-231).
-  const failed = await db.print_jobs.where('status').equals('failed').toArray();
+  const failed = await db.print_jobs
+    .where('[status+created_at]')
+    .between(['failed', 0], ['failed', Number.MAX_SAFE_INTEGER])
+    .toArray();
   // A broken printer can leave thousands of failed jobs (retention trims only
   // `done`). One index lookup per failed job would then be an N+1 on every Home
   // refresh; fall back to the single done scan for a backlog.
   if (failed.length > 50) {
-    const done = await db.print_jobs.where('status').equals('done').toArray();
+    const done = await db.print_jobs
+      .where('[status+created_at]')
+      .between(['done', 0], ['done', Number.MAX_SAFE_INTEGER])
+      .toArray();
     return unresolvedFailed([...failed, ...done]).length;
   }
   let count = 0;
