@@ -15,12 +15,24 @@ async function merge(
   caches: boolean,
 ) {
   const tables = new Set(rows.map((r) => r.tbl));
-  return db.transaction('rw', mergeScope(tables), async (tx) => {
+  return db.transaction('rw', mergeScope(tables, caches), async (tx) => {
     return mergeRows(tx, rows, { caches });
   });
 }
 
 describe('mergeRows', () => {
+  it('locks cache stores only when the merge maintains them', () => {
+    const snapshot = mergeScope(['products']);
+    expect(snapshot).toEqual(
+      expect.arrayContaining(['outbox', 'pull_shadow', 'kv', 'products']),
+    );
+    expect(snapshot).not.toContain('stock_levels');
+    expect(snapshot).not.toContain('party_balances');
+    const pulled = mergeScope(['products'], true);
+    expect(pulled).toContain('stock_levels');
+    expect(pulled).toContain('party_balances');
+  });
+
   it('scans a large page once and bulk-writes sale lines', async () => {
     const db = await readyDb('merge-large');
     const rows = Array.from({ length: 250 }, (_, i) => ({
