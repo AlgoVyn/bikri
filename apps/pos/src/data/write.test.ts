@@ -124,6 +124,29 @@ describe('writeAction (03 §3)', () => {
     expect(seen).toEqual([['sales']]);
   });
 
+  it('notifies listeners when an edit coalesces into a pending op (SYNC-M2)', async () => {
+    const db = freshDb();
+    const created = await writeAction(db, (w) =>
+      w.create('products', { name_en: 'P', sku: 'P-1', price: 100 }),
+    );
+    const seen: { count: number; tables: string[] }[] = [];
+    const off = onLocalWrite((count, tables) =>
+      seen.push({ count, tables: [...tables] }),
+    );
+    try {
+      // The second edit is merged into the still-pending create (no new outbox row).
+      await writeAction(
+        db,
+        (w) => w.update('products', created.id, { price: 200 }),
+        { tables: writeScope('products'), changedTables: ['products'] },
+      );
+    } finally {
+      off();
+    }
+    expect(await db.outbox.count()).toBe(1);
+    expect(seen).toEqual([{ count: 0, tables: ['products'] }]);
+  });
+
   it('an aborted action leaves neither rows, ops nor cache changes', async () => {
     const db = freshDb();
     await expect(

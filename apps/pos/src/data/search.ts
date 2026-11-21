@@ -223,9 +223,9 @@ export async function searchAll(
   const words = q.split(/\s+/u);
   const data = await searchCache(db);
   const barcodeHits = new Set(
-    (
-      await db.product_barcodes.where('barcode').equals(raw.trim()).toArray()
-    ).map((b) => String(b.product_id)),
+    (await db.product_barcodes.where('barcode').equals(raw.trim()).toArray())
+      .filter((b) => !b.deleted_at)
+      .map((b) => String(b.product_id)),
   );
   const products: SearchHit[] = [];
   for (const p of data.products) {

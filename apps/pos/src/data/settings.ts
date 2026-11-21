@@ -13,6 +13,9 @@ import { writeAction, writeScope } from './write.ts';
 
 const n = (value: unknown): number => Number(value ?? 0);
 
+const sameValue = (a: unknown, b: unknown): boolean =>
+  a === b || JSON.stringify(a) === JSON.stringify(b);
+
 export const BUSINESS_TYPES = [
   'grocery',
   'general',
@@ -190,21 +193,25 @@ export async function updateShopSettings(
       const current = await w.table<MasterRow, string>('shop').get('shop');
       if (!current) throw new SettingsError('name');
       const before = shopValues(current);
+      // A save that changes nothing (a form opened and closed, a picker re-selecting
+      // the same value) must not append a `shop_change` audit row (SYNC-L9).
+      const changed = Object.keys(clean).filter(
+        (key) => !sameValue(current[key], clean[key]),
+      );
+      if (changed.length === 0) return current;
       const updated = await w.update('shop', 'shop', clean);
+      const beforeJson = Object.fromEntries(
+        changed.map((key) => [key, before[key as keyof ShopSettings]]),
+      );
       await w.insert('audit_log', {
         id: newId(now),
         action: 'shop_change',
         entity: 'shop',
         entity_id: 'shop',
-        before_json: JSON.stringify(
-          Object.fromEntries(
-            Object.keys(clean).map((key) => [
-              key,
-              before[key as keyof ShopSettings],
-            ]),
-          ),
+        before_json: JSON.stringify(beforeJson),
+        after_json: JSON.stringify(
+          Object.fromEntries(changed.map((key) => [key, clean[key]])),
         ),
-        after_json: JSON.stringify(clean),
         device_id: deviceId,
         staff_id: actor ?? '',
         created_at: now,

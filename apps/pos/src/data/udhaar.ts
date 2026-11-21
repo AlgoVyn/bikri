@@ -1,4 +1,4 @@
-import { businessDate, newId, type Role } from '@bikri/core';
+import { businessDate, can, newId, type Role } from '@bikri/core';
 import type {
   BikriDb,
   MasterRow,
@@ -821,7 +821,22 @@ export async function receivePayment(
         business_date: input.date,
         created_at: now,
       });
-      await keepPromises(w, input.customerId);
+      // `promises` upserts need `party.edit`; a cashier with only `payment.receive`
+      // must still be able to take the money (SYNC-H5). Read the acting staff row, not
+      // the caller's role, so the decision matches what the Worker will check.
+      const actorRow = (await w.table('staff').get(ctx.staff_id)) as
+        | SyncedRow
+        | undefined;
+      const canEditParty =
+        actorRow !== undefined &&
+        actorRow.active === 1 &&
+        !actorRow.deleted_at &&
+        can(
+          actorRow.role as Role,
+          String(actorRow.permissions_json ?? '{}'),
+          'party.edit',
+        );
+      if (canEditParty) await keepPromises(w, input.customerId);
       return payment;
     },
     {
@@ -832,6 +847,7 @@ export async function receivePayment(
         'ledger_entries',
         'party_balances',
         'promises',
+        'staff',
       ),
     },
   );

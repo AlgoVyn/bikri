@@ -867,7 +867,10 @@ export async function slowMoversReport(
   ).filter((product) => !product.deleted_at);
   const [levelRows, voidRows] = await Promise.all([
     db.stock_levels.bulkGet(products.map((product) => String(product.id))),
-    db.sale_voids.where('business_date').aboveOrEqual(slowCutoff).toArray(),
+    // Every void ever, not only the last 30 days: a void of an older bill must still
+    // hide that bill as the product's `lastSale` (SYNC-L8). Voids are rare, so this
+    // stays far smaller than the products/lines scans around it.
+    db.sale_voids.toArray(),
   ]);
   const levels = new Map(
     levelRows

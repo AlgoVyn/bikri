@@ -156,6 +156,47 @@ describe('day close (T-047)', () => {
     expect(data.openingCash).toBe(50_000);
   });
 
+  it('clamps period_end and created_at after a backward clock correction (SYNC-H3)', async () => {
+    const { db, ctx } = await setup('clock-clamp');
+    const future = NOW + 86_400_000;
+    await db.day_closes.add({
+      id: 'future-close',
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+      staff_id: 'st-1',
+      business_date: TODAY,
+      period_start: 0,
+      period_end: future,
+      opening_cash: 0,
+      cash_sales: 0,
+      udhaar_cash_in: 0,
+      pay_ins: 0,
+      supplier_cash_in: 0,
+      cash_refunds: 0,
+      cash_expenses: 0,
+      supplier_cash_out: 0,
+      pay_outs: 0,
+      expected_cash: 0,
+      counted_cash: 50_000,
+      difference: 0,
+      denominations_json: null,
+      note: '',
+      created_at: future,
+    } as never);
+    const row = await closeDay(
+      db,
+      { dayCloseId: 'after-jump', countedCash: 50_000, note: '' },
+      ctx,
+      { now: NOW, print: false },
+    );
+    expect(Number(row.period_start)).toBe(future);
+    expect(Number(row.period_end)).toBe(future + 1);
+    expect(Number(row.created_at)).toBe(future + 1);
+    expect(Number(row.period_start)).toBeLessThanOrEqual(
+      Number(row.period_end),
+    );
+  });
+
   it('first close without an opening override opens at zero', async () => {
     const { db } = await setup('first-zero');
     const data = await dayCloseData(db, 'dev-1', NOW);
