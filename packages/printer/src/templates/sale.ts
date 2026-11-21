@@ -12,6 +12,7 @@ import { formatColumnHeader, resolvePaper } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
   labelsFrom,
+  pushBundleComponent,
   pushCenter,
   pushFooter,
   pushJobEnd,
@@ -83,19 +84,20 @@ function pushItems(
   }
   const money = (paisa: number): string =>
     formatReceiptMoney(paisa, shop.numberGrouping);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] as ReceiptLine;
+  // A bundle's component lines are printed as one group even if a later line
+  // (e.g. imported or re-ordered data) separates them; merging only contiguous
+  // rows would print the bundle twice.
+  const renderedGroups = new Set<string>();
+  for (const line of lines) {
     if (line.bundleGroup) {
-      const group: ReceiptLine[] = [];
-      let next = index;
-      while (
-        next < lines.length &&
-        lines[next]?.bundleGroup === line.bundleGroup
-      ) {
-        group.push(lines[next] as ReceiptLine);
-        next += 1;
+      if (renderedGroups.has(line.bundleGroup)) {
+        continue;
       }
-      const bundleQty = line.bundleQty ?? 1;
+      renderedGroups.add(line.bundleGroup);
+      const group = lines.filter(
+        (candidate) => candidate.bundleGroup === line.bundleGroup,
+      );
+      const bundleQty = line.bundleQty ?? group[0]?.bundleQty ?? 1;
       // The component nets are already the total for every bundle in the group;
       // multiplying them by bundleQty again doubled the fallback header.
       const bundleTotal =
@@ -111,16 +113,13 @@ function pushItems(
         bold: true,
       });
       for (const component of group) {
-        const qty = formatItemCount(component.qtyMilli);
-        blocks.push({
-          t: 'item',
-          name: `  ${component.name.trim()}`,
-          qty,
-          amount: '',
-          breakdown: ` ${qty}`,
-        });
+        pushBundleComponent(
+          blocks,
+          component.name,
+          formatItemCount(component.qtyMilli),
+          layout,
+        );
       }
-      index = next - 1;
       continue;
     }
     const qty = formatItemCount(line.qtyMilli);

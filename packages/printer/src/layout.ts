@@ -247,14 +247,16 @@ export function formatPair(
   }
   const cleanLeft = sanitizeInline(left);
   const cleanRight = sanitizeInline(right);
-  if (cleanRight.length === 0) {
+  const leftWidth = textWidth(cleanLeft);
+  const rightWidth = textWidth(cleanRight);
+  if (rightWidth === 0) {
     return wrapText(cleanLeft, width);
   }
-  if (cleanLeft.length === 0) {
+  if (leftWidth === 0) {
     return rightAlign(cleanRight, width);
   }
-  if (cleanLeft.length + 1 + cleanRight.length <= width) {
-    const gap = width - cleanLeft.length - cleanRight.length;
+  if (leftWidth + 1 + rightWidth <= width) {
+    const gap = width - leftWidth - rightWidth;
     return [`${cleanLeft}${' '.repeat(gap)}${cleanRight}`];
   }
   return [...wrapText(cleanLeft, width), ...rightAlign(cleanRight, width)];
@@ -341,7 +343,7 @@ export function formatItemLines(
     return lines;
   }
   const widths = columnWidths(charsPerLine);
-  if (qty.length > widths.qty || amount.length > widths.amount) {
+  if (textWidth(qty) > widths.qty || textWidth(amount) > widths.amount) {
     const lines = wrapText(name, charsPerLine);
     lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
     if (detail !== undefined && detail.length > 0) {
@@ -537,10 +539,11 @@ export function layOut(blocks: Block[], options: LayoutOptions): LaidCommand[] {
 }
 
 function visibleLine(text: string, align: Align, width: number): string {
-  if (text.length >= width) {
+  const length = textWidth(text);
+  if (length >= width) {
     return text;
   }
-  const gap = width - text.length;
+  const gap = width - length;
   if (align === 'right') {
     return `${' '.repeat(gap)}${text}`;
   }
