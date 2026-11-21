@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### PWA delivery — 21 Nov 2026 review
+- Workbox no longer appends `?__WB_REVISION__=…` to content-hashed `/assets/*` entries, so a first visit does not download the initial JS/CSS graph twice.
+- `/bikri/workbox-*.js` is immutable, while `sw.js`, `manifest.webmanifest` and `theme-init.js` revalidate without the broad `no-transform`, so Cloudflare can compress them; HTML keeps the beacon guard.
+- `check-bundle-size.mjs` now fails if a hashed asset’s precache entry keeps a non-null Workbox revision.
+
 ### Print agent 0.1.4 — 21 Nov 2026
 - The Windows print agent enumerates printers natively with `EnumPrintersW`/`GetDefaultPrinterW` instead of spawning PowerShell/CIM every 10 s, CUPS enumeration is singleflighted with a stale fallback, the dead completed-job `lpstat` call is removed, synchronous prints return `done` without a spool id, and the GDI path uses a top-down DIB from the existing RGBA buffer.
 - Wizard download links, the installer default and the build fallback move to `print-agent-v0.1.4`. The agent protocol stays 1, so 0.1.3 agents keep working until updated.

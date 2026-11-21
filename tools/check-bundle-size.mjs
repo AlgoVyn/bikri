@@ -96,11 +96,31 @@ if (cssTotal > CSS_BUDGET) {
 // The service worker installs the offline copy; a regression here is felt on
 // every first visit and every deploy, not only on a slow route.
 const sw = readFileSync(join(DIST, 'sw.js'), 'utf8');
-const precache = [...sw.matchAll(/\{url:"([^"]+)"/g)].map((m) =>
-  String(m[1]).replace(`${BASE_PATH}/`, ''),
-);
+// Workbox appends ?__WB_REVISION__=… when an entry keeps a `revision`. Hashed
+// /assets/* files must not: the clean URL was already fetched to render the page,
+// and the query-string miss downloads the whole initial graph a second time.
+const precacheEntries = [
+  ...sw.matchAll(/\{url:"([^"]+)"(?:,revision:(?:"([^"]*)"|null))?\}/gu),
+].map((match) => ({
+  rel: String(match[1]).replace(`${BASE_PATH}/`, ''),
+  revision: match[2] ?? null,
+}));
+const precache = precacheEntries.map((entry) => entry.rel);
 if (precache.length === 0)
   problems.push('no offline precache entries found (Workbox format changed?)');
+const revisioned = precacheEntries.filter(
+  (entry) =>
+    entry.revision !== null &&
+    /^assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/u.test(entry.rel),
+);
+if (revisioned.length > 0) {
+  problems.push(
+    `${revisioned.length} hashed asset(s) carry a Workbox revision (double download; add dontCacheBustURLsMatching): ${revisioned
+      .slice(0, 5)
+      .map((entry) => entry.rel)
+      .join(', ')}`,
+  );
+}
 let precacheTotal = 0;
 for (const rel of precache) {
   try {

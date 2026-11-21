@@ -27,8 +27,11 @@ export const ASSET_CACHE_CONTROL =
 /** Content-hashed files can never change under the same URL (D-231). */
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
-/** Directories whose filenames carry a content hash. */
-export const IMMUTABLE_ASSET_PATHS = [`${BASE_PATH}/assets/*`] as const;
+/** Directories/files whose filenames carry a content hash. */
+export const IMMUTABLE_ASSET_PATHS = [
+  `${BASE_PATH}/assets/*`,
+  `${BASE_PATH}/workbox-*.js`,
+] as const;
 
 /**
  * Icons and fonts keep stable filenames because the web manifest, index.html and
@@ -45,6 +48,19 @@ export const STABLE_ASSET_PATHS = [
   `${BASE_PATH}/brand/*`,
 ] as const;
 
+/**
+ * Root files that must revalidate on every load but must not inherit the broad
+ * `no-transform`: Cloudflare disables Brotli/Gzip for `no-transform` responses,
+ * and the service worker, manifest and pre-paint theme script are tiny but hot.
+ */
+export const ROOT_REVALIDATE_CACHE_CONTROL =
+  'public, max-age=0, must-revalidate';
+export const ROOT_REVALIDATE_PATHS = [
+  `${BASE_PATH}/sw.js`,
+  `${BASE_PATH}/manifest.webmanifest`,
+  `${BASE_PATH}/theme-init.js`,
+] as const;
+
 export function securityHeaderEntries(): ReadonlyArray<
   readonly [SecurityHeaderName, string]
 > {
@@ -57,8 +73,9 @@ export function securityHeaderEntries(): ReadonlyArray<
  * Cloudflare Workers `_headers` body. Rules apply in file order and a repeated
  * header is joined, so the broad rule sets the security headers and the narrow
  * rules detach and replace Cache-Control (Workers static-assets "Detach a
- * header"). HTML keeps `no-transform`; hashed assets become immutable, while
- * stable filenames (icons, fonts) revalidate daily.
+ * header"). HTML keeps `no-transform`; hashed assets and the Workbox runtime
+ * become immutable, stable filenames revalidate daily, and the root service
+ * worker, manifest and theme script revalidate without `no-transform`.
  */
 export function renderAssetHeaders(): string {
   const blocks: string[] = [];
@@ -82,6 +99,15 @@ export function renderAssetHeaders(): string {
         path,
         '  ! Cache-Control',
         `  Cache-Control: ${STABLE_ASSET_CACHE_CONTROL}`,
+      ].join('\n'),
+    );
+  }
+  for (const path of ROOT_REVALIDATE_PATHS) {
+    blocks.push(
+      [
+        path,
+        '  ! Cache-Control',
+        `  Cache-Control: ${ROOT_REVALIDATE_CACHE_CONTROL}`,
       ].join('\n'),
     );
   }

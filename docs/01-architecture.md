@@ -286,6 +286,10 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
   ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 
+/bikri/workbox-*.js
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
 /bikri/fonts/*
   ! Cache-Control
   Cache-Control: public, max-age=86400, must-revalidate
@@ -297,9 +301,21 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 /bikri/brand/*
   ! Cache-Control
   Cache-Control: public, max-age=86400, must-revalidate
+
+/bikri/sw.js
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/bikri/manifest.webmanifest
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/bikri/theme-init.js
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
 ```
 
-`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` never change under the same URL, so they skip revalidation for a year; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
+`_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` and the content-hashed Workbox runtime never change under the same URL, so they skip revalidation for a year; HTML, `sw.js`, `manifest.webmanifest` and `theme-init.js` keep `max-age=0`. The root files detach `no-transform` so they are compressed. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
 
 `'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
 
