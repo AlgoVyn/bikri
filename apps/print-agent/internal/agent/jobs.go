@@ -92,9 +92,13 @@ func (m *Manager) lockPrinter(ctx context.Context, printer string) (func(), erro
 
 // Submit validates, spools and records a job. A backend failure is stored on the
 // job and returned in its status; the HTTP request itself succeeds so the client
-// can show the printer error without guessing.
-func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error) {
-	if err := validateRequest(req); err != nil {
+// can show the printer error without guessing. The caller's req.Data is cleared
+// after decoding so the encoded payload can be collected while the printer runs.
+func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, error) {
+	if req == nil {
+		return nil, errors.New("request is required")
+	}
+	if err := validateRequest(*req); err != nil {
 		return nil, err
 	}
 	m.mu.Lock()
@@ -137,6 +141,9 @@ func (m *Manager) Submit(ctx context.Context, req JobRequest) (*JobStatus, error
 	}
 
 	data, err := decodeData(req.Data)
+	// The base64 text is the largest allocation in the request; drop this reference
+	// before the printer runs instead of keeping it alive for the whole job.
+	req.Data = ""
 	if err != nil {
 		m.update(rec, "failed", "PAYLOAD_INVALID", err.Error())
 		return m.copy(rec), nil

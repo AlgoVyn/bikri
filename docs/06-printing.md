@@ -329,7 +329,7 @@ Other fields: auto-print after sale (default on), copies (1–3), print logo on 
 REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 
 1. After the sale transaction commits, create `print_jobs { id, sale_id, kind: 'sale', status: 'queued' }` in a **separate** Dexie transaction (best effort: if it fails, the sale is still saved and can be reprinted from Sales).
-2. Print service picks jobs FIFO; status `printing`; timeout 8 s per job.
+2. Print service picks jobs FIFO; status `printing`; timeout 8 s per job (a serial job's write timeout scales to the payload at the configured baud rate plus 1 s).
 3. Success → `done`. Failure → `failed` with error code (`NO_PRINTER`, `PERMISSION`, `DISCONNECTED`, `TIMEOUT`, `PAPER_OUT` if status known).
 4. UI on failure: a non-blocking toast "Receipt didn't print — <reason>" with **Retry** and **Print later**; the success sheet stays usable for the next sale.
 5. Settings → Printer → Recent prints lists the last 50 jobs with Retry for failed jobs and Cancel for jobs still **Waiting**. A job left in `printing` by a closed tab is marked `INTERRUPTED` on the next start and can be retried. Cancelling deletes only that local queued job; a job that has started printing cannot be cancelled. The section also offers Cancel waiting (N) for all queued jobs.

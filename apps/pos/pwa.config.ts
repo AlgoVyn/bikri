@@ -79,6 +79,8 @@ export const pwaOptions = {
       '**/admin.lazy-*.js',
       '**/backups.lazy-*.js',
       '**/useAdminQuery-*.js',
+      // Public shop-request pages load their own strings and are online-only.
+      '**/public/**',
       // Email/brand images are served from the website, not needed offline.
       '**/brand/**',
     ],

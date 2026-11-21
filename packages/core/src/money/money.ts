@@ -10,6 +10,9 @@ export function assertSafeInteger(value: number, label: string): void {
   }
 }
 
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+
 /** Round numerator ÷ denominator, half away from zero. */
 export function roundHalfAway(numerator: bigint, denominator: bigint): number {
   if (denominator === 0n) {
@@ -22,10 +25,7 @@ export function roundHalfAway(numerator: bigint, denominator: bigint): number {
   const remainder = absNumerator % absDenominator;
   const magnitude = remainder * 2n >= absDenominator ? quotient + 1n : quotient;
   const signed = negative ? -magnitude : magnitude;
-  if (
-    signed > BigInt(Number.MAX_SAFE_INTEGER) ||
-    signed < BigInt(Number.MIN_SAFE_INTEGER)
-  ) {
+  if (signed > MAX_SAFE_BIGINT || signed < MIN_SAFE_BIGINT) {
     throw new RangeError('result exceeds safe integer');
   }
   return Number(signed);
@@ -36,6 +36,13 @@ export function mulDivRound(a: number, b: number, c: number): number {
   assertSafeInteger(a, 'a');
   assertSafeInteger(b, 'b');
   assertSafeInteger(c, 'c');
+  if (c === 0) {
+    throw new RangeError('division by zero');
+  }
+  // qty_milli × price ÷ 1000 usually divides exactly; avoid BigInt for that path.
+  const product = a * b;
+  if (product === 0) return 0;
+  if (Number.isSafeInteger(product) && product % c === 0) return product / c;
   return roundHalfAway(BigInt(a) * BigInt(b), BigInt(c));
 }
 
@@ -84,6 +91,16 @@ export function allocate(amount: number, weights: readonly number[]): number[] {
   const width = weights.length;
   if (width === 0) {
     return [];
+  }
+  if (amount === 0) {
+    // The common no-discount/no-tax call: validate the weights, then skip BigInt work.
+    for (const weight of weights) {
+      assertSafeInteger(weight, 'weight');
+      if (weight < 0) {
+        throw new RangeError('weights must be non-negative');
+      }
+    }
+    return weights.map(() => 0);
   }
   const rows: { weight: bigint; index: number }[] = [];
   let totalWeight = 0n;

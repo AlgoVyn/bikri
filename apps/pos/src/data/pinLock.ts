@@ -95,21 +95,22 @@ export async function isPinTaken(
   pin: string,
   exceptId: string | null = null,
 ): Promise<boolean> {
-  for (const staff of await db.staff.toArray()) {
-    if (
-      staff.id === exceptId ||
-      staff.active !== 1 ||
-      staff.deleted_at !== null
-    )
-      continue;
-    const ok = await verifyPin(pin, {
-      pin_hash: String(staff.pin_hash),
-      pin_salt: String(staff.pin_salt),
-      pin_iterations: Number(staff.pin_iterations),
-    });
-    if (ok) return true;
-  }
-  return false;
+  const candidates = (await db.staff.toArray()).filter(
+    (staff) =>
+      staff.id !== exceptId && staff.active === 1 && staff.deleted_at === null,
+  );
+  // PIN hashing is deliberately slow; checking staff one after another made the
+  // settings screen wait for every hash even when the first one matched.
+  const results = await Promise.all(
+    candidates.map((staff) =>
+      verifyPin(pin, {
+        pin_hash: String(staff.pin_hash),
+        pin_salt: String(staff.pin_salt),
+        pin_iterations: Number(staff.pin_iterations),
+      }),
+    ),
+  );
+  return results.some(Boolean);
 }
 
 const ROLE_ORDER: Record<string, number> = { owner: 0, manager: 1, cashier: 2 };

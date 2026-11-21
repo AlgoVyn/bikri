@@ -311,7 +311,7 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	job, err := s.jobs.Submit(ctx, req)
+	job, err := s.jobs.Submit(ctx, &req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return

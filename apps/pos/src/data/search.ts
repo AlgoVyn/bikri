@@ -16,19 +16,21 @@ const CACHE_TTL_MS = 30_000;
 
 type ProductRow = {
   id: string;
-  name_en?: unknown;
-  name_ur?: unknown;
-  brand?: unknown;
-  sku?: unknown;
-  price?: unknown;
-  deleted_at?: unknown;
+  name: string;
+  sku: string;
+  price: number;
+  deleted: boolean;
+  /** Name, Urdu name, brand and SKU lower-cased once when the cache fills. */
+  haystack: string;
 };
 
 type CustomerRow = {
   id: string;
-  name?: unknown;
-  phone?: unknown;
-  deleted_at?: unknown;
+  name: string;
+  phone: string;
+  deleted: boolean;
+  searchName: string;
+  searchDigits: string;
 };
 
 type InvoiceRow = {
@@ -37,7 +39,72 @@ type InvoiceRow = {
   business_date: unknown;
   branch_id?: unknown;
   created_at: unknown;
+  /** Lower-cased invoice number, built once per cached row. */
+  searchInvoice: string;
 };
+
+type RawProductRow = {
+  id: unknown;
+  name_en?: unknown;
+  name_ur?: unknown;
+  brand?: unknown;
+  sku?: unknown;
+  price?: unknown;
+  deleted_at?: unknown;
+};
+
+type RawCustomerRow = {
+  id: unknown;
+  name?: unknown;
+  phone?: unknown;
+  deleted_at?: unknown;
+};
+
+type RawInvoiceRow = {
+  id: unknown;
+  invoice_no: unknown;
+  business_date: unknown;
+  branch_id?: unknown;
+  created_at: unknown;
+};
+
+function prepareProduct(row: RawProductRow): ProductRow {
+  const name = String(row.name_en ?? '');
+  const sku = String(row.sku ?? '');
+  return {
+    id: String(row.id),
+    name,
+    sku,
+    price: Number(row.price ?? 0),
+    deleted: Boolean(row.deleted_at),
+    haystack:
+      `${name} ${String(row.name_ur ?? '')} ${String(row.brand ?? '')} ${sku}`.toLowerCase(),
+  };
+}
+
+function prepareCustomer(row: RawCustomerRow): CustomerRow {
+  const name = String(row.name ?? '');
+  const phone = String(row.phone ?? '');
+  return {
+    id: String(row.id),
+    name,
+    phone,
+    deleted: Boolean(row.deleted_at),
+    searchName: name.toLowerCase(),
+    searchDigits: phone.replace(/\D/gu, ''),
+  };
+}
+
+function prepareInvoice(row: RawInvoiceRow): InvoiceRow {
+  return {
+    id: String(row.id),
+    invoice_no: row.invoice_no,
+    business_date: row.business_date,
+    branch_id: row.branch_id,
+    created_at: row.created_at,
+    searchInvoice: String(row.invoice_no).toLowerCase(),
+  };
+}
 
 type SearchCache = {
   tenant: string;
@@ -64,8 +131,8 @@ async function searchCache(db: BikriDb): Promise<SearchCache> {
   cache = {
     tenant: db.tenantId,
     at: Date.now(),
-    products: products as ProductRow[],
-    customers: customers as CustomerRow[],
+    products: (products as RawProductRow[]).map(prepareProduct),
+    customers: (customers as RawCustomerRow[]).map(prepareCustomer),
   };
   return cache;
 }
@@ -86,13 +153,7 @@ async function invoicesFor(db: BikriDb): Promise<InvoiceRow[]> {
       .reverse()
       .limit(INVOICE_FALLBACK_LIMIT)
       .toArray()
-  ).map((row) => ({
-    id: String(row.id),
-    invoice_no: row.invoice_no,
-    business_date: row.business_date,
-    branch_id: row.branch_id,
-    created_at: row.created_at,
-  }));
+  ).map((row) => prepareInvoice(row as RawInvoiceRow));
   invoiceCache = { tenant: db.tenantId, at: Date.now(), rows };
   return rows;
 }
@@ -147,39 +208,33 @@ export async function searchAll(
   );
   const products: SearchHit[] = [];
   for (const p of data.products) {
-    if (p.deleted_at) continue;
-    const name = String(p.name_en ?? '');
-    const sku = String(p.sku ?? '');
-    const haystack =
-      `${name} ${String(p.name_ur ?? '')} ${String(p.brand ?? '')} ${sku}`.toLowerCase();
+    if (p.deleted) continue;
     if (
-      words.every((word) => haystack.includes(word)) ||
-      barcodeHits.has(String(p.id))
+      words.every((word) => p.haystack.includes(word)) ||
+      barcodeHits.has(p.id)
     ) {
       products.push({
         kind: 'product',
-        id: String(p.id),
-        title: name,
-        detail: sku,
-        price: Number(p.price ?? 0),
+        id: p.id,
+        title: p.name,
+        detail: p.sku,
+        price: p.price,
       });
       if (products.length === PER_GROUP) break;
     }
   }
   const customers: SearchHit[] = [];
   for (const c of data.customers) {
-    if (c.deleted_at) continue;
-    const name = String(c.name ?? '');
-    const phone = String(c.phone ?? '');
+    if (c.deleted) continue;
     if (
-      name.toLowerCase().includes(q) ||
-      (digits.length >= 3 && phone.replace(/\D/gu, '').includes(digits))
+      c.searchName.includes(q) ||
+      (digits.length >= 3 && c.searchDigits.includes(digits))
     ) {
       customers.push({
         kind: 'customer',
-        id: String(c.id),
-        title: name,
-        detail: phone,
+        id: c.id,
+        title: c.name,
+        detail: c.phone,
       });
       if (customers.length === PER_GROUP) break;
     }
@@ -192,7 +247,7 @@ export async function searchAll(
       String(row.branch_id ?? '') !== String(scope.branchId)
     )
       return false;
-    return String(row.invoice_no).toLowerCase().includes(q);
+    return row.searchInvoice.includes(q);
   };
   const bills: SearchHit[] = [];
   const seen = new Set<string>();
@@ -210,7 +265,7 @@ export async function searchAll(
       .startsWith(prefix)
       .limit(PER_GROUP * 8)
       .toArray())
-      addBill(row as InvoiceRow);
+      addBill(prepareInvoice(row as RawInvoiceRow));
   }
   if (matchedBills.length < PER_GROUP) {
     for (const row of await invoicesFor(db)) addBill(row);
