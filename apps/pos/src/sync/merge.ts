@@ -132,7 +132,11 @@ export async function mergeRows(
       outbox.where('status').equals('sending').count(),
     ]);
     const total = pendingCount + sendingCount;
-    if (total <= 2_000) {
+    if (total === 0) {
+      // Initial enrolment merges thousands of pages against an empty outbox; do not
+      // load two empty arrays for each one.
+      pending = [];
+    } else if (total <= 2_000) {
       const [pendingRows, sendingRows] = await Promise.all([
         outbox.where('status').equals('pending').toArray(),
         outbox.where('status').equals('sending').toArray(),
@@ -253,17 +257,21 @@ export async function mergeRows(
   return applied.length;
 }
 
-/** Table names a merge transaction needs (plus kv for the cursor). */
-export function mergeScope(tbls: Iterable<string>): string[] {
-  const names = new Set<string>([
-    'outbox',
-    'pull_shadow',
-    'stock_levels',
-    'party_balances',
-    'stock_movements',
-    'ledger_entries',
-    'kv',
-  ]);
+/**
+ * Table names a merge transaction needs (plus kv for the cursor). Snapshot pages disable
+ * caches and rebuild them once at the end, so they must not lock the cache stores (or
+ * the ledger/movement stores they would not touch) on every page.
+ */
+export function mergeScope(tbls: Iterable<string>, caches = false): string[] {
+  const names = new Set<string>(['outbox', 'pull_shadow', 'kv']);
+  if (caches)
+    for (const name of [
+      'stock_levels',
+      'party_balances',
+      'stock_movements',
+      'ledger_entries',
+    ])
+      names.add(name);
   for (const t of tbls) if (isPulledTable(t)) names.add(t);
   // A refund line takes its business date from the refund (till-only column).
   if (names.has('refund_lines')) names.add('refunds');

@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Snapshot and enrolment throughput — 21 Nov 2026 review
+- Snapshot pages no longer maintain `stock_levels`/`party_balances` row by row; the caches are rebuilt once when the download completes, removing hundreds of thousands of redundant cache writes (and their reads) from a large enrolment.
+- `mergeRows` short-circuits an empty outbox instead of loading two empty arrays on every page, and a snapshot transaction locks only the tables it writes.
+- The next snapshot page is fetched while the current page is written to IndexedDB, and `applyStatus` runs once per snapshot run instead of three `kv` reads per page.
+- A restore recovery skips the snapshot-end cache rebuild and lets the recovered-outbox replay rebuild once, so `stock_movements` and `ledger_entries` are no longer scanned twice back to back.
+
 ### Reports, refund dates and export streaming — 21 Nov 2026 review
 - `refund_lines` now carries a till-only `business_date` (Dexie V10), backfilled from each refund on upgrade and re-derived when a server row is merged. It is stripped from pushed ops and never stored in D1.
 - `summary`, `soldByProduct`, `productDetail` and `reportBundle` read refund lines by date range instead of scanning the table once a busy window crosses 100/200 refunds; `reports.ts` `byIds` always uses chunked `bulkGet`, and statement pages keep their `sale_lines`/`purchase_lines` lookups bounded to the page.

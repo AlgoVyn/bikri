@@ -14,7 +14,7 @@ import { getKv, setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { clearSearchCache } from '../data/search.ts';
 import { clearSoldCache } from '../state/catalogue.ts';
-import { SyncHttpError, tillRequest } from './client.ts';
+import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
 import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 import { isLedgerTable, PULLED_TABLES } from './tables.ts';
@@ -143,10 +143,9 @@ function clearReaderCaches(tables: Iterable<string>): void {
   if (search) clearSearchCache();
 }
 
-/**
- * Applies one pull page. If one malformed row aborts the page, retry row-by-row, quarantine the
- * bad rows under kv.pull_errors and advance the cursor so sync can continue.
- */
+/** Pulled rows that advance the derived caches (`stock_levels`, `party_balances`). */
+const CACHE_TABLES = new Set(['stock_movements', 'ledger_entries']);
+
 /** Only a row-shaped error is quarantined; storage/abort errors must keep the cursor. */
 function isRowError(error: unknown): boolean {
   return (
@@ -160,15 +159,22 @@ function isRowError(error: unknown): boolean {
   );
 }
 
+/**
+ * Applies one pull page. If one malformed row aborts the page, retry row-by-row, quarantine the
+ * bad rows under kv.pull_errors and advance the cursor so sync can continue.
+ */
 async function applyPage(
   db: BikriDb,
   rows: ServerRow[],
   nextSince: number,
 ): Promise<void> {
   const tbls = new Set(rows.map((row) => row.tbl));
+  // Only movement/ledger rows touch the derived caches; a master-data page must not
+  // lock the cache stores for nothing.
+  const caches = rows.some((row) => CACHE_TABLES.has(row.tbl));
   try {
-    await db.transaction('rw', mergeScope(tbls), async (tx) => {
-      await mergeRows(tx, rows, { caches: true });
+    await db.transaction('rw', mergeScope(tbls, caches), async (tx) => {
+      await mergeRows(tx, rows, { caches });
       await tx.table('kv').put({ key: 'pull_cursor', value: nextSince });
     });
     clearReaderCaches(tbls);
@@ -178,10 +184,15 @@ async function applyPage(
   }
   const errors: { tbl: string; id: string; message: string; at: number }[] = [];
   for (const row of rows) {
+    const rowCaches = CACHE_TABLES.has(row.tbl);
     try {
-      await db.transaction('rw', mergeScope([row.tbl]), async (tx) => {
-        await mergeRows(tx, [row], { caches: true });
-      });
+      await db.transaction(
+        'rw',
+        mergeScope([row.tbl], rowCaches),
+        async (tx) => {
+          await mergeRows(tx, [row], { caches: rowCaches });
+        },
+      );
     } catch (error) {
       if (!isRowError(error)) throw error;
       errors.push({
@@ -211,9 +222,10 @@ async function applyPage(
  * `sale_voids` collision means another till already voided the same sale: the server's
  * void is the winner, so the local pending/failed void and its outbox entry are dropped.
  *
- * Stock levels are updated per row even during a snapshot: the table is cleared before a
- * restore and rebuilt only at the end, and selling/counting keeps working meanwhile.
- * Party balances stay off the hot path and are rebuilt with everything else at the end.
+ * Caches stay untouched while a snapshot downloads: `runSnapshotUnlocked` rebuilds
+ * `stock_levels` and `party_balances` from the full local tables once at the end.
+ * Updating them on every page only to have that rebuild clear and rescan them was most
+ * of the write traffic of a large enrolment.
  */
 async function mergeSnapshotPage(
   db: BikriDb,
@@ -221,13 +233,12 @@ async function mergeSnapshotPage(
   rows: SyncedRow[],
   next: SnapshotState,
 ): Promise<void> {
-  const caches = tbl === 'stock_movements';
   try {
     await db.transaction('rw', mergeScope([tbl]), async (tx) => {
       await mergeRows(
         tx,
         rows.map((row) => ({ tbl, row })),
-        { caches },
+        { caches: false },
       );
       await tx.table('kv').put({ key: 'snapshot_state', value: next });
     });
@@ -240,7 +251,7 @@ async function mergeSnapshotPage(
   for (const row of rows) {
     try {
       await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-        await mergeRows(tx, [{ tbl, row }], { caches });
+        await mergeRows(tx, [{ tbl, row }], { caches: false });
       });
     } catch (error) {
       if (!isRowError(error)) throw error;
@@ -270,7 +281,7 @@ async function mergeSnapshotPage(
           );
           try {
             await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-              await mergeRows(tx, [{ tbl, row }], { caches });
+              await mergeRows(tx, [{ tbl, row }], { caches: false });
             });
             continue;
           } catch (retryError) {
@@ -315,6 +326,7 @@ async function runSnapshotUnlocked(
   onProgress?: Progress,
 ): Promise<void> {
   let state = await getKv<SnapshotState | null>(db, 'snapshot_state', null);
+  let statusApplied = false;
   if (!state) {
     const start = await tillRequest<
       {
@@ -323,6 +335,7 @@ async function runSnapshotUnlocked(
       } & StatusPayload
     >(db, '/sync/snapshot');
     await applyStatus(db, start);
+    statusApplied = true;
     state = {
       seq: start.snapshot_seq,
       tables: start.tables,
@@ -334,19 +347,33 @@ async function runSnapshotUnlocked(
   }
   const total = state.tables.reduce((s, t) => s + t.rows, 0);
   onProgress?.(state.done, total);
+  type SnapshotPage = {
+    rows: SyncedRow[];
+    next_after: string;
+    has_more: boolean;
+  } & StatusPayload;
+  // The token and pending header do not change between pages; reusing them keeps two
+  // kv/outbox reads off every one of the ~2,500 pages and lets the prefetch start at once.
+  const auth = await tillAuth(db);
+  const fetchPage = (current: SnapshotState): Promise<SnapshotPage> => {
+    const tbl = current.tables[current.index]?.tbl ?? '';
+    return tillRequest<SnapshotPage>(
+      db,
+      `/sync/snapshot?tbl=${encodeURIComponent(tbl)}&after=${encodeURIComponent(current.after)}&limit=500`,
+      auth ? { auth } : {},
+    );
+  };
+  let pending: Promise<SnapshotPage> | null = null;
   while (state.index < state.tables.length) {
     const tbl = state.tables[state.index]?.tbl ?? '';
-    const page = await tillRequest<
-      {
-        rows: SyncedRow[];
-        next_after: string;
-        has_more: boolean;
-      } & StatusPayload
-    >(
-      db,
-      `/sync/snapshot?tbl=${encodeURIComponent(tbl)}&after=${encodeURIComponent(state.after)}&limit=500`,
-    );
-    await applyStatus(db, page);
+    const page = pending === null ? await fetchPage(state) : await pending;
+    pending = null;
+    // The start response already applied the status; refresh it once per run (a resumed
+    // snapshot has no start response) instead of running three kv reads per page.
+    if (!statusApplied) {
+      await applyStatus(db, page);
+      statusApplied = true;
+    }
     const next: SnapshotState = page.has_more
       ? {
           ...state,
@@ -359,11 +386,24 @@ async function runSnapshotUnlocked(
           after: '',
           done: state.done + page.rows.length,
         };
-    await mergeSnapshotPage(db, tbl, page.rows, next);
+    // Fetch page N+1 while page N is written to IndexedDB.
+    if (next.index < state.tables.length) {
+      pending = fetchPage(next);
+      void pending.catch(() => undefined);
+    }
+    try {
+      await mergeSnapshotPage(db, tbl, page.rows, next);
+    } catch (error) {
+      if (pending !== null) void pending.catch(() => undefined);
+      throw error;
+    }
     state = next;
     onProgress?.(state.done, total);
   }
-  await rebuildCaches(db);
+  // A pending restore replays the recovered outbox and rebuilds the caches itself;
+  // doing it here as well scanned every movement and ledger row twice.
+  const recovering = await getKv<boolean>(db, RECOVERY_KEY, false);
+  if (!recovering) await rebuildCaches(db);
   await db.transaction('rw', db.kv, async () => {
     await setKv(db, 'pull_cursor', state.seq);
     await setKv(db, 'last_pull_at', Date.now());

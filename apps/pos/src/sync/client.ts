@@ -138,22 +138,32 @@ export async function request<T>(
   return data as T;
 }
 
+export type TillAuth = { token: string; pending: string };
+
+/** Token + pending report to reuse across a long run of pages (snapshot). */
+export async function tillAuth(db: BikriDb): Promise<TillAuth | null> {
+  const token = await deviceToken(db);
+  if (!token) return null;
+  return { token, pending: await pendingHeader(db) };
+}
+
 /** A request as this till: token and pending report from the tenant database. */
 export async function tillRequest<T>(
   db: BikriDb,
   path: string,
-  options: RequestOptions = {},
+  options: RequestOptions & { auth?: TillAuth } = {},
 ): Promise<T> {
-  const token = await deviceToken(db);
-  if (!token)
+  const { auth, ...rest } = options;
+  const credentials = auth ?? (await tillAuth(db));
+  if (!credentials)
     throw new SyncHttpError('UNAUTHENTICATED', 401, 'not enrolled', {}, null);
   return request<T>(path, {
-    ...options,
-    token,
+    ...rest,
+    token: credentials.token,
     headers: {
-      'x-bikri-pending': await pendingHeader(db),
+      'x-bikri-pending': credentials.pending,
       'x-bikri-schema': String(CLIENT_SCHEMA_VERSION),
-      ...(options.headers ?? {}),
+      ...(rest.headers ?? {}),
     },
   });
 }
