@@ -4,6 +4,20 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS sync and data remediation — 22 Nov 2026 review
+- A pulled `sale_voids` row that loses its offline race with another till now removes the whole losing local void transaction (void, reversal payments, ledger, movements, audits and their outbox ops) before the server's void is written, on both incremental pull and snapshot, and the caches are rebuilt.
+- Restore recovery groups a void & reissue under its replacement sale, so a 200-op chunk boundary can no longer split the reissue into two rejected transactions.
+- `closeDay` clamps `period_end`/`created_at`/`business_date` after a backward clock correction instead of writing an unclosable period.
+- Enrolment persists `initial_sync_pending` until the first snapshot completes; the app gate stays on the enrol screen and `SyncEngine.start` refuses to run while it is set, so a reload resumes the download instead of starting a competing engine.
+- `receivePayment` reads the acting staff row and only refreshes promises when it may `party.edit`, so a `payment.receive`-only role no longer has its payment rejected.
+- Push settlement never lowers a newer revision applied from a pull shadow, and transport/unanswered resets only release the claim token they own.
+- A coalesced master edit now notifies `onLocalWrite` even though it queues no new op, so search and Price Check refresh immediately and the push still starts.
+- The sync engine coalesces follow-ups into one pending run, preserves the read-only `learned_at` age, records the fallback pull's last-sync/clock skew and skips file uploads while the shop is known read-only.
+- Backdated bundle component lines no longer require a `catalog.edit` approval, and an unnecessary approval for a full-price bundle is not audited.
+- Stock count cancels its debounced draft before finishing and stamps every draft save, so a second tab's discard is noticed instead of resurrected; the applied set stays with the committed chunks.
+- Search ignores soft-deleted barcodes; the till's staff role falls back to cashier (not owner) before the live query resolves; export session writes tolerate a full/blocked `sessionStorage`; a rejected `caches.open` is retried instead of cached forever.
+- Supplier returns verify the remaining delivered quantity before writing, slow movers read every void (not just 30 days), `refund_lines` ops carry only server columns, product photos are cached after the read-only guard, and an unchanged shop settings save writes no audit row.
+
 ### Review remediation — 22 Nov 2026
 - `bikri-export` strips till-only columns (`refund_lines.business_date`) and the operator restore also strips them defensively, so a till backup restores after the live purge.
 - Dexie V13 repairs refund lines that were pulled or replayed without `business_date`; the pull derives the date from refunds on the same page and restore replay reattaches it from the parent refund.
