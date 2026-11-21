@@ -654,6 +654,8 @@ export async function customerStatement(
       'sale_id',
       saleIds,
       (row) => String(row.sale_id),
+      // The page already bounds these ids; a table scan would read every line.
+      Number.POSITIVE_INFINITY,
     );
     const bySale = new Map<string, { lineNo: number; item: StatementItem }[]>();
     for (const line of lines) {

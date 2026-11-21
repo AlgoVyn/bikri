@@ -153,6 +153,7 @@ describe('catalog edge cases', () => {
       qty_milli: 1000,
       amount: 10000,
       restock: 1,
+      business_date: today,
       created_at: NOW,
     } as never);
     const detail = await productDetail(db, product.id, NOW);

@@ -8,11 +8,15 @@ import {
   TIME_FIELDS,
 } from '@bikri/core';
 import { type BikriDb, LOCAL_ONLY_TABLES } from '@bikri/db';
-import { ZipStoreWriter } from '../admin/zip.ts';
+import { TABLE_COLUMNS } from '@bikri/db/tables';
+import type { Table } from 'dexie';
+import { crc32Final, crc32Update, ZipStoreWriter } from '../admin/zip.ts';
 import { csvCell } from '../lib/csv.ts';
 import { tenantInfo } from './localTenant.ts';
 
 const localOnly = new Set<string>(LOCAL_ONLY_TABLES);
+/** Rows per primary-key page. One page of sale lines is a few MB, not the whole table. */
+const EXPORT_PAGE = 5_000;
 
 /** Export in dependency order so a restore can import table by table without FK failures. */
 export const SHOP_EXPORT_TABLES = SYNC_EXPORT_ORDER.filter(
@@ -54,12 +58,46 @@ function slugify(value: string): string {
   );
 }
 
+/**
+ * `Intl.DateTimeFormat` construction is expensive; the export formats every timestamp
+ * cell, so the two formatters are cached per shop time zone instead of per cell.
+ */
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+const offsetFormats = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormat(timeZone: string): Intl.DateTimeFormat {
+  let format = dateFormats.get(timeZone);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    });
+    dateFormats.set(timeZone, format);
+  }
+  return format;
+}
+
+function offsetFormat(timeZone: string): Intl.DateTimeFormat {
+  let format = offsetFormats.get(timeZone);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      timeZoneName: 'longOffset',
+    });
+    offsetFormats.set(timeZone, format);
+  }
+  return format;
+}
+
 /** `+05:00`-style offset for the shop's zone at `at` (DST-safe). */
 function zoneOffset(at: number, timeZone: string): string {
-  const part = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    timeZoneName: 'longOffset',
-  })
+  const part = offsetFormat(timeZone)
     .formatToParts(new Date(at))
     .find((entry) => entry.type === 'timeZoneName')?.value;
   const match = /^GMT([+-]\d{2}:\d{2})$/u.exec(part ?? '');
@@ -67,16 +105,7 @@ function zoneOffset(at: number, timeZone: string): string {
 }
 
 function localIso(at: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(at));
+  const parts = dateFormat(timeZone).formatToParts(new Date(at));
   const get = (type: string) =>
     parts.find((part) => part.type === type)?.value ?? '00';
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}${zoneOffset(at, timeZone)}`;
@@ -105,12 +134,8 @@ function csvValue(
   return String(value);
 }
 
-export function tableCsv(
-  rows: readonly Record<string, unknown>[],
-  timeZone = DEFAULT_TIME_ZONE,
-): string {
-  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
-  if (rows.length === 0) return '\uFEFF';
+/** Every key of the page, in first-seen order (used by the small `tableCsv` helper). */
+function fieldUnion(rows: readonly Record<string, unknown>[]): string[] {
   const fields: string[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
@@ -120,27 +145,118 @@ export function tableCsv(
       fields.push(field);
     }
   }
-  const lines = [fields.map(csvCell).join(',')];
-  for (const row of rows) {
-    lines.push(
-      fields
+  return fields;
+}
+
+/**
+ * CSV columns for a table: the D1 columns minus tenant/hidden ones, then any local-only
+ * column the first page carries (Dexie V10's `refund_lines.business_date`). Fixing the
+ * header up front lets a large table stream page by page.
+ */
+export function exportCsvColumns(
+  table: string,
+  firstRows: readonly Record<string, unknown>[],
+): string[] {
+  const hidden = new Set(EXPORT_HIDDEN_COLUMNS[table] ?? []);
+  const known = new Set<string>();
+  const fields: string[] = [];
+  const columns = (
+    TABLE_COLUMNS as Record<string, readonly string[] | undefined>
+  )[table];
+  for (const column of columns ?? []) {
+    if (column === 'tenant_id' || hidden.has(column) || known.has(column))
+      continue;
+    known.add(column);
+    fields.push(column);
+  }
+  for (const field of fieldUnion(firstRows)) {
+    if (hidden.has(field) || known.has(field)) continue;
+    known.add(field);
+    fields.push(field);
+  }
+  return fields;
+}
+
+export function exportCsvHeader(columns: readonly string[]): string {
+  return `\uFEFF${columns.map(csvCell).join(',')}\r\n`;
+}
+
+export function exportCsvRows(
+  rows: readonly Record<string, unknown>[],
+  columns: readonly string[],
+  timeZone = DEFAULT_TIME_ZONE,
+): string {
+  if (rows.length === 0) return '';
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  return `${rows
+    .map((row) =>
+      columns
         .map((field) => csvCell(csvValue(field, row[field], row, zone)))
         .join(','),
+    )
+    .join('\r\n')}\r\n`;
+}
+
+export function tableCsv(
+  rows: readonly Record<string, unknown>[],
+  timeZone = DEFAULT_TIME_ZONE,
+): string {
+  const zone = isTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  if (rows.length === 0) return '\uFEFF';
+  const fields = fieldUnion(rows);
+  return `${exportCsvHeader(fields)}${exportCsvRows(rows, fields, zone)}`;
+}
+
+/** Text accumulated as per-page Blobs and entered into the zip once. */
+export class ExportStream {
+  private readonly encoder = new TextEncoder();
+  private readonly parts: Blob[] = [];
+  private crc = 0xffffffff;
+  private bytes = 0;
+
+  get empty(): boolean {
+    return this.bytes === 0;
+  }
+
+  push(text: string): void {
+    if (text === '') return;
+    const data = this.encoder.encode(text);
+    this.crc = crc32Update(this.crc, data);
+    this.bytes += data.length;
+    this.parts.push(new Blob([data]));
+  }
+
+  addTo(writer: ZipStoreWriter, name: string): void {
+    writer.addBlob(
+      name,
+      new Blob(this.parts),
+      crc32Final(this.crc),
+      this.bytes,
     );
   }
-  return `\uFEFF${lines.join('\r\n')}\r\n`;
+}
+
+/** JSON array streamed as `[` + page items separated by commas + `]`. */
+export class JsonStream {
+  private readonly stream = new ExportStream();
+  private started = false;
+
+  push(rows: readonly Record<string, unknown>[]): void {
+    if (rows.length === 0) return;
+    const items = JSON.stringify(rows).slice(1, -1);
+    this.stream.push(`${this.started ? ',' : '['}${items}`);
+    this.started = true;
+  }
+
+  addTo(writer: ZipStoreWriter, name: string): void {
+    if (!this.started) this.stream.push('[]');
+    else this.stream.push(']');
+    this.stream.addTo(writer, name);
+  }
 }
 
 function exportStamp(now: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
+  return dateFormat(timeZone)
     .format(now)
     .replaceAll(/[^0-9]/gu, '')
     .slice(0, 12);
@@ -184,36 +300,59 @@ export async function buildShopExport(
     tables: {},
   };
   const writer = new ZipStoreWriter(now);
-  const encoder = new TextEncoder();
-  for (const [index, table] of SHOP_EXPORT_TABLES.entries()) {
-    const all = (await db.table(table).toArray()) as Record<string, unknown>[];
-    // Point-in-time: a row created after the export started is left out of both the
-    // table and its children, so a restore never gets an orphan line.
-    const rows = all.filter(
-      (row) => typeof row.created_at !== 'number' || row.created_at <= now,
-    );
-    const hidden = new Set(EXPORT_HIDDEN_COLUMNS[table] ?? []);
-    const clean = rows.map((row) => {
-      const copy = { ...row };
-      delete copy.tenant_id;
-      for (const field of hidden) delete copy[field];
-      return copy;
-    });
-    manifest.tables[table] = clean.length;
+  for (const [index, name] of SHOP_EXPORT_TABLES.entries()) {
+    const table = db.table(name) as Table<Record<string, unknown>, string>;
+    const hidden = new Set(EXPORT_HIDDEN_COLUMNS[name] ?? []);
+    const json = new JsonStream();
+    const csv = new ExportStream();
+    let columns: string[] | null = null;
+    let rows = 0;
+    let after = '';
+    for (;;) {
+      // Primary-key pages keep peak memory to one page even for 400k sale lines.
+      const page = await table
+        .where(':id')
+        .above(after)
+        .limit(EXPORT_PAGE)
+        .toArray();
+      if (page.length === 0) break;
+      after = String(page.at(-1)?.id ?? '');
+      // Point-in-time: a row created after the export started is left out of both the
+      // table and its children, so a restore never gets an orphan line.
+      const clean: Record<string, unknown>[] = [];
+      for (const row of page) {
+        if (typeof row.created_at === 'number' && row.created_at > now)
+          continue;
+        const copy = { ...row };
+        delete copy.tenant_id;
+        for (const field of hidden) delete copy[field];
+        clean.push(copy);
+      }
+      if (clean.length > 0) {
+        rows += clean.length;
+        json.push(clean);
+        columns ??= exportCsvColumns(name, clean);
+        if (csv.empty) csv.push(exportCsvHeader(columns));
+        csv.push(exportCsvRows(clean, columns, timeZone));
+      }
+      if (page.length < EXPORT_PAGE || after === '') break;
+    }
+    json.addTo(writer, `json/${name}.json`);
+    if (csv.empty) csv.push('\uFEFF');
+    csv.addTo(writer, `csv/${name}.csv`);
+    manifest.tables[name] = rows;
     options.onProgress?.({
-      table,
+      table: name,
       index,
       total: SHOP_EXPORT_TABLES.length,
-      rows: clean.length,
+      rows,
     });
-    writer.add(`json/${table}.json`, encoder.encode(JSON.stringify(clean)));
-    writer.add(`csv/${table}.csv`, encoder.encode(tableCsv(clean, timeZone)));
-    // Drop this table's rows before reading the next one; its bytes are already in parts.
+    // Let the event loop breathe between tables; Blob parts hold the bytes.
     if (index % 4 === 3) await new Promise((resolve) => setTimeout(resolve, 0));
   }
   writer.add(
     'manifest.json',
-    encoder.encode(JSON.stringify(manifest, null, 2)),
+    new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
   );
   return {
     blob: writer.finish(),

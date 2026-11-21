@@ -140,11 +140,21 @@ export const SERVER_MANAGED_COLUMNS: Readonly<
   sales: ['status'],
 };
 
-/** `row` for an op: drops tenant_id, rev and table-specific server-managed columns. */
+/**
+ * Till-only columns denormalised for local range queries. The server neither stores nor
+ * returns them, so they must never travel in an op (Dexie V10 adds
+ * `refund_lines.business_date` this way).
+ */
+export const LOCAL_ONLY_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  refund_lines: ['business_date'],
+};
+
+/** `row` for an op: drops tenant_id, rev, server-managed and till-only columns. */
 export function opRow(tbl: SyncedTable, row: OpRow): OpRow {
   const drop = new Set([
     ...(SERVER_MANAGED_COLUMNS['*'] ?? []),
     ...(SERVER_MANAGED_COLUMNS[tbl] ?? []),
+    ...(LOCAL_ONLY_COLUMNS[tbl] ?? []),
   ]);
   const out: OpRow = {};
   for (const [key, value] of Object.entries(row)) {

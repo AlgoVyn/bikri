@@ -67,6 +67,36 @@ describe('mergeRows', () => {
     expect(await db.sale_lines.count()).toBe(500);
   });
 
+  it('stores the refund business date on a pulled refund line', async () => {
+    const db = await readyDb('merge-refund-date');
+    await db.refunds.put({
+      id: 'r-1',
+      sale_id: 's-1',
+      business_date: '2026-10-27',
+      created_at: 1,
+    });
+    const applied = await merge(
+      db,
+      [
+        {
+          tbl: 'refund_lines',
+          row: row('rl-1', {
+            refund_id: 'r-1',
+            sale_line_id: 'sl-1',
+            qty_milli: 1000,
+            amount: 5000,
+            created_at: 1,
+          }),
+        },
+      ],
+      false,
+    );
+    expect(applied).toBe(1);
+    expect((await db.refund_lines.get('rl-1'))?.business_date).toBe(
+      '2026-10-27',
+    );
+  });
+
   it('keeps the local sale status and updates the local device row', async () => {
     const db = await readyDb('merge-status');
     await db.sales.put({

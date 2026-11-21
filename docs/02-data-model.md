@@ -1853,7 +1853,7 @@ export const DEXIE_SCHEMA_V1 = {
 
   payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
   refunds: 'id, sale_id, business_date, [device_id+created_at]',
-  refund_lines: 'id, refund_id, sale_line_id',
+  refund_lines: 'id, refund_id, sale_line_id, business_date', // V10 adds the refund's business date (till-only; reports count refunds on their own date)
   sale_voids: 'id, &sale_id',
   ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id', // V7 adds the business-date page index
   stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date', // V4 adds [ref_type+ref_id] (refund/void restock)
@@ -1881,6 +1881,8 @@ export const DEXIE_SCHEMA_V1 = {
 **Dexie V8 (bundles)** adds the `products.kind` index, the `bundle_items` table and the `sale_lines.bundle_id` index. The upgrade backfills `kind='simple'` on local product rows that lack it (an indexed field must exist); existing `sale_lines` get null bundle fields, and held carts keep their current lines. No server data is rewritten. A till that has never pulled a bundle has an empty `bundle_items` table.
 
 **Dexie V9 (D-231)** only adds indexes: `products.track_stock`, `customers.credit_limit` and `sync_conflicts.resolution` (Home's attention probes). IndexedDB backfills the entries from the stored rows; no data is rewritten. The client filter/statement changes in the same decision do not change the schema.
+
+**Dexie V10 (D-274)** denormalises the refund's `business_date` onto `refund_lines` as a **till-only** column: it is not in D1, is stripped from pushed ops (`LOCAL_ONLY_COLUMNS`), and is re-derived from the refund when a server row is merged. The upgrade backfills missing dates from the local `refunds` table, the same streaming pattern as V7's sale lines. Reports then read one date range instead of turning a busy refund list above the old key threshold into a full scan of every refund line the shop ever wrote.
 
 ### 3.1 Local-only tables
 

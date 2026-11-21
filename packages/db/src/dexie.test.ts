@@ -7,6 +7,7 @@ import {
   DEXIE_SCHEMA_V6,
   DEXIE_SCHEMA_V7,
   DEXIE_SCHEMA_V9,
+  DEXIE_SCHEMA_V10,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -38,7 +39,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V9).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V10).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -50,7 +51,7 @@ describe('Dexie schema (02 §3)', () => {
     );
   });
 
-  it('upgrades a V6 database: backfills line dates and product kind, then adds V9 indexes', async () => {
+  it('upgrades a V6 database: backfills line and refund dates, product kind, then adds V10 indexes', async () => {
     const old = new Dexie(tenantDbName('upgrade-v6'));
     old.version(6).stores(DEXIE_SCHEMA_V6);
     await old.open();
@@ -105,6 +106,31 @@ describe('Dexie schema (02 §3)', () => {
     expect(
       db.sync_conflicts.schema.indexes.some(
         (index) => index.name === 'resolution',
+      ),
+    ).toBe(true);
+  });
+
+  it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v9'));
+    old.version(9).stores(DEXIE_SCHEMA_V9);
+    await old.open();
+    await old.table('refunds').add({
+      id: 'r1',
+      business_date: '2026-10-27',
+    });
+    await old.table('refund_lines').add({
+      id: 'l1',
+      refund_id: 'r1',
+      sale_line_id: 's1',
+    });
+    old.close();
+
+    const db = open('upgrade-v9');
+    await db.open();
+    expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
+    expect(
+      db.refund_lines.schema.indexes.some(
+        (index) => index.name === 'business_date',
       ),
     ).toBe(true);
   });

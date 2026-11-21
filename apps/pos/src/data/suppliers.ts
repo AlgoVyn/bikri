@@ -473,6 +473,8 @@ export async function supplierStatement(
       'purchase_id',
       purchaseIds,
       (row) => String(row.purchase_id),
+      // The page already bounds these ids; a table scan would read every line.
+      Number.POSITIVE_INFINITY,
     );
     const productIds = [
       ...new Set(lines.map((line) => String(line.product_id))),

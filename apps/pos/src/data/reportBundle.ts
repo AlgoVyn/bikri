@@ -18,8 +18,6 @@ import { lineRevenue, type ReportRange } from './reports.ts';
 const DAY = 86_400_000;
 const n = (v: unknown): number => Number(v ?? 0);
 const CHUNK = 2_000;
-/** Above this many keys, one table scan beats thousands of index lookups (D-119). */
-const SCAN_ABOVE = 200;
 
 export type PaymentMix = {
   cash: number;
@@ -287,15 +285,10 @@ async function byAnyOf<T>(
 ): Promise<T[]> {
   const list = unique(ids);
   if (list.length === 0) return [];
-  if (list.length > SCAN_ABOVE) {
-    const wanted = new Set(list);
-    return (await table.toArray()).filter((row) =>
-      wanted.has(String((row as Record<string, unknown>)[index] ?? '')),
-    );
-  }
+  // Bounded to the page/range being reported; never fall back to a table scan.
   const out: T[] = [];
-  for (let at = 0; at < list.length; at += CHUNK) {
-    const chunk = list.slice(at, at + CHUNK);
+  for (let at = 0; at < list.length; at += 100) {
+    const chunk = list.slice(at, at + 100);
     out.push(...(await table.where(index).anyOf(chunk).toArray()));
   }
   return out;
@@ -542,11 +535,12 @@ export async function reportBundle(
     if (refunds.length > 0) {
       const refundById = new Map(refunds.map((refund) => [refund.id, refund]));
       const refundIds = new Set(refunds.map((refund) => String(refund.id)));
-      const refundLines = await byAnyOf(
-        db.refund_lines,
-        'refund_id',
-        refunds.map((refund) => refund.id),
-      );
+      const refundLines = (
+        await db.refund_lines
+          .where('business_date')
+          .between(chunk.from, chunk.to, true, true)
+          .toArray()
+      ).filter((line) => refundIds.has(String(line.refund_id)));
       const touchedLineIds = unique(
         refundLines.map((line) => String(line.sale_line_id)),
       );
