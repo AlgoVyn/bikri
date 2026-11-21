@@ -15,6 +15,7 @@ import type {
 } from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
 import {
+  applyLedgerEntries,
   applyLedgerEntry,
   applyStockMovement,
   applyStockMovements,
@@ -249,8 +250,7 @@ export async function writeAction<T>(
           })),
         );
         if (tbl === 'stock_movements') await applyStockMovements(tx, rows);
-        if (tbl === 'ledger_entries')
-          for (const row of rows) await applyLedgerEntry(tx, row);
+        if (tbl === 'ledger_entries') await applyLedgerEntries(tx, rows);
         return [...rows];
       },
       async create(tbl, input) {

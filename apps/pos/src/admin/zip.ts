@@ -371,7 +371,9 @@ async function inflateRaw(
     .write(data as Uint8Array<ArrayBuffer>)
     .then(() => writer.close());
   void writing.catch(() => undefined);
-  const out = new Uint8Array(expected);
+  // Grow with the real output instead of trusting the (untrusted) declared size: a
+  // 1 KB entry must not reserve 64 MB just because the central directory says so.
+  const chunks: Uint8Array[] = [];
   let total = 0;
   try {
     for (;;) {
@@ -385,7 +387,7 @@ async function inflateRaw(
         await reader.cancel().catch(() => undefined);
         throw new ZipError('entry too large');
       }
-      out.set(value, total);
+      chunks.push(value);
       total += value.length;
     }
     await writing;
@@ -397,6 +399,12 @@ async function inflateRaw(
     reader.releaseLock();
   }
   if (total !== expected) throw new ZipError('size mismatch');
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
   return out;
 }
 
@@ -426,8 +434,22 @@ async function readEntry(
   return data;
 }
 
+/** Total decompressed bytes one archive may produce (a restore is all JSON tables). */
+export const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
+
+export type UnzipOptions = {
+  /** Refuse the archive once this many decompressed bytes have been produced. */
+  maxTotalBytes?: number;
+  /** Entries that do not match are skipped without inflating them. */
+  include?: (name: string) => boolean;
+};
+
 /** Reads STORE and deflate-raw entries. ZIP64 is refused. */
-export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
+export async function unzip(
+  bytes: Uint8Array,
+  options: UnzipOptions = {},
+): Promise<ZipEntry[]> {
+  const maxTotal = options.maxTotalBytes ?? MAX_ARCHIVE_BYTES;
   const eocd = findEocd(bytes);
   const view = viewOf(bytes);
   const count = view.getUint16(eocd + 8, true);
@@ -438,6 +460,7 @@ export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
   }
   const out: ZipEntry[] = [];
   let p = cdOffset;
+  let total = 0;
   const decoder = new TextDecoder();
   for (let i = 0; i < count; i += 1) {
     if (p + 46 > bytes.length) throw new ZipError();
@@ -462,6 +485,8 @@ export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
     if (nameEnd > bytes.length) throw new ZipError();
     const name = decoder.decode(bytes.subarray(nameStart, nameEnd));
     p = nameEnd + extraLen + commentLen;
+    if (options.include && !options.include(name)) continue;
+    if (total + rawSize > maxTotal) throw new ZipError('archive too large');
     const data = await readEntry(
       bytes,
       view,
@@ -471,6 +496,7 @@ export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
       rawSize,
       crc,
     );
+    total += data.length;
     out.push({ name, data });
   }
   return out;

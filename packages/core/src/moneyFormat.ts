@@ -51,7 +51,7 @@ export function parseMoneyToPaisa(
   if (!Number.isSafeInteger(paisa)) {
     return null;
   }
-  return negative ? -paisa : paisa;
+  return negative && paisa !== 0 ? -paisa : paisa;
 }
 
 const INTL_GROUP = new Intl.NumberFormat('en-US', {
@@ -64,6 +64,9 @@ function groupIntl(rupees: number): string {
 
 /** Last three digits, then groups of two (1,24,500). */
 export function groupLakh(rupees: number): string {
+  if (!Number.isSafeInteger(rupees) || rupees < 0) {
+    throw new Error('groupLakh expects a non-negative safe integer');
+  }
   const digits = String(rupees);
   if (digits.length <= 3) {
     return digits;
