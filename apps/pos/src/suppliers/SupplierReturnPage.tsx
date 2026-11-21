@@ -19,7 +19,7 @@ import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { queueSupplierReturnPrint } from '../data/supplierReturnReceipt.ts';
 import {
   createSupplierReturn,

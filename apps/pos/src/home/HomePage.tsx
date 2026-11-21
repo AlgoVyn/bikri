@@ -34,7 +34,7 @@ import {
 } from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { onLocalWrite } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date';

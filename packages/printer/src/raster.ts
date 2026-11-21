@@ -30,10 +30,10 @@ function blendedLuma(r: number, g: number, b: number, a: number): number {
   return (y * a + 255 * (255 - a)) / 255;
 }
 
-function toLuma(source: RasterSource): Float64Array {
+function toLuma(source: RasterSource): Float32Array {
   assertSize(source.width, source.height);
   const count = source.width * source.height;
-  const out = new Float64Array(count);
+  const out = new Float32Array(count);
   const format = source.format as string;
   if (format === 'gray') {
     if (source.data.length !== count) {
@@ -63,7 +63,7 @@ function toLuma(source: RasterSource): Float64Array {
 }
 
 function spread(
-  buf: Float64Array,
+  buf: Float32Array,
   width: number,
   height: number,
   x: number,
@@ -79,11 +79,11 @@ function spread(
 
 /** Floyd–Steinberg. 1 = black. Errors use exact sixteenths. */
 function ditherBits(
-  luma: Float64Array,
+  luma: Float32Array,
   width: number,
   height: number,
 ): Uint8Array {
-  const buf = new Float64Array(luma);
+  const buf = new Float32Array(luma);
   const bits = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -101,16 +101,43 @@ function ditherBits(
   return bits;
 }
 
-function thresholdBits(
-  luma: Float64Array,
-  width: number,
-  height: number,
-): Uint8Array {
-  const bits = new Uint8Array(width * height);
-  for (let i = 0; i < width * height; i += 1) {
-    bits[i] = (luma[i] ?? 255) < BLACK_BELOW ? 1 : 0;
+/** 1-bit threshold straight from the source pixels; no full-image luma buffer. */
+function thresholdPacked(source: RasterSource): PackedBitmap {
+  assertSize(source.width, source.height);
+  const { width, height } = source;
+  const widthBytes = Math.ceil(width / 8);
+  const data = new Uint8Array(widthBytes * height);
+  const format = source.format as string;
+  if (format === 'gray') {
+    if (source.data.length !== width * height)
+      throw new Error('gray buffer length does not match width*height');
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if ((source.data[y * width + x] ?? 255) >= BLACK_BELOW) continue;
+        const byteIndex = y * widthBytes + (x >> 3);
+        data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
+      }
+    }
+    return { widthBytes, height, data };
   }
-  return bits;
+  if (format !== 'rgba') throw new Error('unsupported raster format');
+  if (source.data.length !== width * height * 4)
+    throw new Error('RGBA buffer length does not match width*height*4');
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const luma = blendedLuma(
+        source.data[offset] ?? 0,
+        source.data[offset + 1] ?? 0,
+        source.data[offset + 2] ?? 0,
+        source.data[offset + 3] ?? 255,
+      );
+      if (luma >= BLACK_BELOW) continue;
+      const byteIndex = y * widthBytes + (x >> 3);
+      data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
+    }
+  }
+  return { widthBytes, height, data };
 }
 
 function packBits(
@@ -137,12 +164,13 @@ export function packMono(
   source: RasterSource,
   mode: 'threshold' | 'dither',
 ): PackedBitmap {
+  if (mode === 'threshold') return thresholdPacked(source);
   const luma = toLuma(source);
-  const bits =
-    mode === 'dither'
-      ? ditherBits(luma, source.width, source.height)
-      : thresholdBits(luma, source.width, source.height);
-  return packBits(bits, source.width, source.height);
+  return packBits(
+    ditherBits(luma, source.width, source.height),
+    source.width,
+    source.height,
+  );
 }
 
 /**
@@ -211,7 +239,6 @@ export function scaleToFit(
   maxWidth: number,
   maxHeight: number,
 ): RasterSource {
-  const luma = toLuma(source);
   const { width, height } = source;
   if (maxWidth < 1 || maxHeight < 1) {
     throw new Error('scale target must be positive');
@@ -220,12 +247,15 @@ export function scaleToFit(
   const targetWidth = Math.max(1, Math.round(width * scale));
   const targetHeight = Math.max(1, Math.round(height * scale));
   if (targetWidth === width && targetHeight === height) {
+    if (source.format === 'gray') return source;
+    const luma = toLuma(source);
     const data = new Uint8Array(width * height);
     for (let i = 0; i < data.length; i += 1) {
       data[i] = clampByte(luma[i] ?? 255);
     }
     return { width, height, data, format: 'gray' };
   }
+  const luma = toLuma(source);
   const data = new Uint8Array(targetWidth * targetHeight);
   for (let y = 0; y < targetHeight; y += 1) {
     const y0 = (y * height) / targetHeight;

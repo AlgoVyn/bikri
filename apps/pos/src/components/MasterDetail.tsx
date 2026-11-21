@@ -45,6 +45,7 @@ export function MasterDetail({
   detailTestId?: string;
 }) {
   const masterRef = useRef<HTMLDivElement>(null);
+  const wide = useMasterDetailWide();
 
   // List rows keep the page scroll (resetScroll={false}) so desktop selections do not jump.
   // The list remounts on the detail route and its document height collapses for a frame, so
@@ -86,13 +87,17 @@ export function MasterDetail({
           : ''
       }`}
     >
-      <div
-        ref={masterRef}
-        className={showDetail ? 'min-w-0 max-xl:hidden' : 'min-w-0'}
-        data-testid={masterTestId}
-      >
-        {master}
-      </div>
+      {/* Below xl the detail replaces the list; do not mount the hidden list and its
+          live queries behind `display: none`. */}
+      {!showDetail || wide ? (
+        <div
+          ref={masterRef}
+          className={showDetail ? 'min-w-0 max-xl:hidden' : 'min-w-0'}
+          data-testid={masterTestId}
+        >
+          {master}
+        </div>
+      ) : null}
       {showDetail ? (
         <div
           className="min-w-0 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:[scrollbar-width:thin]"

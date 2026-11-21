@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// The app shell must stay compatible with `script-src 'self'` (D-036, D-149).
-test('the theme pre-paint is external and runs under the strict script CSP', async ({
+// The app shell must stay compatible with a nonce-free `script-src` (D-036, D-149).
+test('the theme pre-paint is inline under a CSP hash', async ({
   page,
   request,
 }) => {
@@ -12,7 +12,6 @@ test('the theme pre-paint is external and runs under the strict script CSP', asy
   expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
 
   const html = await shell.text();
-  expect(html).toContain('<script src="/bikri/theme-init.js"></script>');
   const inline = [
     ...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi),
   ].filter((match) => {
@@ -20,7 +19,8 @@ test('the theme pre-paint is external and runs under the strict script CSP', asy
     const body = match[2] ?? '';
     return !/\bsrc\s*=/i.test(attrs) && body.trim() !== '';
   });
-  expect(inline).toEqual([]);
+  expect(inline).toHaveLength(1);
+  expect(csp).toMatch(/'sha256-[A-Za-z0-9+/=]+'/u);
 
   const violations: string[] = [];
   page.on('console', (message) => {
@@ -29,7 +29,7 @@ test('the theme pre-paint is external and runs under the strict script CSP', asy
     }
   });
   await page.addInitScript(() => localStorage.setItem('bikri.theme', 'dark'));
-  // Stop the app module: the theme must already be applied by theme-init.js.
+  // Stop the app module: the theme must already be applied by the inline script.
   await page.route('**/bikri/assets/index-*.js', (route) => route.abort());
   await page.goto('/bikri/');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

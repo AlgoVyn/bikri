@@ -8,6 +8,9 @@ describe('T-062 D1 size measurement', () => {
     expect(result.tenants).toBe(2);
     expect(result.billsPerShop).toBe(20);
     expect(result.bytesPerBill).toBeGreaterThan(0);
+    // 20 reference bills measured ~1,229 bytes/bill after 0021/0028; 2,000 leaves
+    // room for additive columns but catches an index/bloat regression.
+    expect(result.bytesPerBill).toBeLessThan(2_000);
     expect(result.bytesPerShopYear).toBeGreaterThan(result.bytesPerBill);
     expect(result.logicalRowsPerBill).toBe(27);
     expect(result.billsPerDay).toBeCloseTo(4);

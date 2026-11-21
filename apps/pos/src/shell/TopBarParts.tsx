@@ -71,8 +71,8 @@ export function useSyncStatus() {
         db.kv.get('tenant_status'),
         db.kv.get('last_sync_at'),
         db.outbox
-          .orderBy('seq')
-          .filter((op) => op.status === 'pending')
+          .where('[status+seq]')
+          .between(['pending', 0], ['pending', Number.MAX_SAFE_INTEGER])
           .first(),
       ]);
     return {

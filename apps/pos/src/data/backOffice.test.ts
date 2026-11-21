@@ -7,8 +7,8 @@ import {
   rangeFor,
   salesCsv,
   salesHistory,
-  shopTimeZone,
 } from './salesHistory.ts';
+import { shopTimeZone } from './shopTimeZone.ts';
 import { dropTestDbs } from './testDb.ts';
 import { addShop, NOW, readyDb } from './testShop.ts';
 

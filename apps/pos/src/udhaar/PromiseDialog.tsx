@@ -8,7 +8,7 @@ import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { Modal } from '../sell/Modal.tsx';

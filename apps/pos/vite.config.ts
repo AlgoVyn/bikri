@@ -67,7 +67,7 @@ function localePreload(): Plugin {
       this.emitFile({ type: 'asset', fileName, source });
       html.source = html.source.replace(
         placeholder,
-        `<script src="${BASE_PATH}/${fileName}"></script>`,
+        `<script defer src="${BASE_PATH}/${fileName}"></script>`,
       );
     },
   };

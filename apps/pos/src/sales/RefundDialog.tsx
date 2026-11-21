@@ -22,7 +22,8 @@ import {
   RefundNotAllowedError,
   refundSale,
 } from '../data/refunds.ts';
-import { billDetail, shopTimeZone } from '../data/salesHistory.ts';
+import { billDetail } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';

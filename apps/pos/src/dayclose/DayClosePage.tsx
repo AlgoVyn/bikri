@@ -30,7 +30,7 @@ import {
 import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { downloadText } from '../lib/download.ts';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';

@@ -9,6 +9,7 @@ import {
 } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchIcon, UdhaarIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
@@ -106,25 +107,13 @@ export function UdhaarList({
     [directory, deferredQuery, filter, sort, direction, today],
   );
 
-  const [shown, setShown] = useState(PAGE);
-  const sentinel = useRef<HTMLLIElement>(null);
+  const [page, setPage] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   // A new filter starts from the first page again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the filter changes
-  useEffect(() => setShown(PAGE), [deferredQuery, filter, sort, direction]);
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el || !data || shown >= data.rows.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting))
-          setShown((count) => count + PAGE);
-      },
-      { rootMargin: '240px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [data, shown]);
+  useEffect(() => setPage(0), [deferredQuery, filter, sort, direction]);
+  const pageCount = Math.max(1, Math.ceil((data?.rows.length ?? 0) / PAGE));
+  const pageRows = data?.rows.slice(page * PAGE, (page + 1) * PAGE) ?? [];
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
@@ -351,177 +340,177 @@ export function UdhaarList({
         ) : null}
 
         {data && data.rows.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-border">
-            <li
-              className={`${CUSTOMER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
-              data-testid="udhaar-list-header"
-            >
-              <SortHeader
-                label={t('office.udhaar.col_customer')}
-                active={sort === 'name'}
-                direction={direction}
-                onClick={() => applySort('name')}
-              />
-              <SortHeader
-                label={t('office.udhaar.balance')}
-                active={sort === 'balance'}
-                direction={direction}
-                onClick={() => applySort('balance')}
-              />
-              <SortHeader
-                label={t('office.udhaar.sort_oldest')}
-                active={sort === 'oldest'}
-                direction={direction}
-                onClick={() => applySort('oldest')}
-              />
-              <SortHeader
-                label={t('office.udhaar.credit_limit')}
-                active={sort === 'limit'}
-                direction={direction}
-                onClick={() => applySort('limit')}
-              />
-              <SortHeader
-                label={t('office.udhaar.promise')}
-                active={sort === 'promise'}
-                direction={direction}
-                onClick={() => applySort('promise')}
-              />
-            </li>
-            {data.rows.slice(0, shown).map((row) => {
-              const percent = limitPercent(
-                row.balance,
-                row.customer.credit_limit === null ||
-                  row.customer.credit_limit === undefined
-                  ? null
-                  : Number(row.customer.credit_limit),
-              );
-              return (
-                <li key={row.customer.id}>
-                  <Link
-                    to="/udhaar/$customerId"
-                    params={{ customerId: row.customer.id }}
-                    resetScroll={false}
-                    onClick={rememberListScroll}
-                    aria-current={
-                      row.customer.id === selectedId ? 'page' : undefined
-                    }
-                    className={`${CUSTOMER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.customer.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
-                  >
-                    <span className="col-span-2 min-w-0 sm:col-span-1">
-                      <span className="line-clamp-2 break-words font-medium">
-                        {String(row.customer.name)}
-                      </span>
-                      <span
-                        dir="ltr"
-                        className="block text-small text-text-muted"
-                      >
-                        {String(row.customer.phone ?? '')}
-                      </span>
-                    </span>
-                    <span className="min-w-0 text-start">
-                      {row.balance === 0 ? (
-                        <span className="block whitespace-nowrap font-semibold text-text-muted">
-                          {t('office.udhaar.settled')}
+          <>
+            <ul className="flex flex-col divide-y divide-border">
+              <li
+                className={`${CUSTOMER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
+                data-testid="udhaar-list-header"
+              >
+                <SortHeader
+                  label={t('office.udhaar.col_customer')}
+                  active={sort === 'name'}
+                  direction={direction}
+                  onClick={() => applySort('name')}
+                />
+                <SortHeader
+                  label={t('office.udhaar.balance')}
+                  active={sort === 'balance'}
+                  direction={direction}
+                  onClick={() => applySort('balance')}
+                />
+                <SortHeader
+                  label={t('office.udhaar.sort_oldest')}
+                  active={sort === 'oldest'}
+                  direction={direction}
+                  onClick={() => applySort('oldest')}
+                />
+                <SortHeader
+                  label={t('office.udhaar.credit_limit')}
+                  active={sort === 'limit'}
+                  direction={direction}
+                  onClick={() => applySort('limit')}
+                />
+                <SortHeader
+                  label={t('office.udhaar.promise')}
+                  active={sort === 'promise'}
+                  direction={direction}
+                  onClick={() => applySort('promise')}
+                />
+              </li>
+              {pageRows.map((row) => {
+                const percent = limitPercent(
+                  row.balance,
+                  row.customer.credit_limit === null ||
+                    row.customer.credit_limit === undefined
+                    ? null
+                    : Number(row.customer.credit_limit),
+                );
+                return (
+                  <li key={row.customer.id}>
+                    <Link
+                      to="/udhaar/$customerId"
+                      params={{ customerId: row.customer.id }}
+                      resetScroll={false}
+                      onClick={rememberListScroll}
+                      aria-current={
+                        row.customer.id === selectedId ? 'page' : undefined
+                      }
+                      className={`${CUSTOMER_GRID} min-h-16 border-s-2 px-3 py-2 transition-colors duration-150 focus-visible:outline-offset-[-2px] hover:bg-surface-2 ${row.customer.id === selectedId ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'}`}
+                    >
+                      <span className="col-span-2 min-w-0 sm:col-span-1">
+                        <span className="line-clamp-2 break-words font-medium">
+                          {String(row.customer.name)}
                         </span>
-                      ) : (
-                        <>
-                          <span
-                            className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
-                          >
-                            {row.balance > 0 ? (
-                              <span className="sr-only">
-                                {balanceLabel(t, row.balance, money)}
-                              </span>
-                            ) : null}
-                            <span
-                              aria-hidden={row.balance > 0 ? true : undefined}
-                            >
-                              <MoneyText paisa={row.balance} />
-                            </span>
-                          </span>
-                          {row.balance < 0 ? (
-                            <span className="block text-small text-success-subtle-ink">
-                              {t('office.udhaar.in_credit_label')}
-                            </span>
-                          ) : null}
-                        </>
-                      )}
-                    </span>
-                    <span className="min-w-0 text-small text-text-muted max-sm:text-start">
-                      <span className="sm:hidden">
-                        {t('office.udhaar.sort_oldest')} ·{' '}
-                      </span>
-                      {ageLabel(t, row.oldestUnpaidAt) || '—'}
-                    </span>
-                    <span className="col-span-2 min-w-0 sm:col-span-1">
-                      {percent !== null ? (
-                        <>
-                          <span
-                            className="mb-1 block h-1.5 overflow-hidden rounded-full bg-surface-2"
-                            role="img"
-                            aria-label={t('office.udhaar.limit_bar', {
-                              percent,
-                            })}
-                          >
-                            <span
-                              className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
-                              style={{ width: `${percent}%` }}
-                            />
-                          </span>
-                          <span className="flex flex-wrap items-center gap-1 text-small text-text-muted">
-                            <span className="tabular-nums">{percent}%</span>
-                            <span aria-hidden="true">·</span>
-                            <MoneyText
-                              paisa={Number(row.customer.credit_limit ?? 0)}
-                            />
-                            {percent >= 100 ? (
-                              <span className="text-danger">
-                                · {t('office.udhaar.over_limit')}
-                              </span>
-                            ) : percent >= 80 ? (
-                              <span className="text-warning">
-                                · {t('office.udhaar.near_limit')}
-                              </span>
-                            ) : null}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-small text-text-muted">
-                          {t('office.udhaar.no_limit')}
-                        </span>
-                      )}
-                    </span>
-                    {row.promise ? (
-                      <span className="col-span-2 min-w-0 text-small text-text-muted sm:col-span-1">
                         <span
-                          className={`inline-flex max-w-full items-center rounded-full px-2 py-0.5 ${
-                            String(row.promise.promised_on) <= today
-                              ? 'bg-warning-subtle text-warning-subtle-ink'
-                              : 'border border-border'
-                          }`}
+                          dir="ltr"
+                          className="block text-small text-text-muted"
                         >
-                          <span className="truncate">
-                            {dateText(
-                              String(row.promise.promised_on),
-                              i18n.language,
-                              timeZone,
-                            )}
-                          </span>
+                          {String(row.customer.phone ?? '')}
                         </span>
                       </span>
-                    ) : (
-                      <span className="hidden text-small text-text-muted sm:block">
-                        —
+                      <span className="min-w-0 text-start">
+                        {row.balance === 0 ? (
+                          <span className="block whitespace-nowrap font-semibold text-text-muted">
+                            {t('office.udhaar.settled')}
+                          </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`block whitespace-nowrap font-semibold ${balanceTone(row.balance)}`}
+                            >
+                              {row.balance > 0 ? (
+                                <span className="sr-only">
+                                  {balanceLabel(t, row.balance, money)}
+                                </span>
+                              ) : null}
+                              <span
+                                aria-hidden={row.balance > 0 ? true : undefined}
+                              >
+                                <MoneyText paisa={row.balance} />
+                              </span>
+                            </span>
+                            {row.balance < 0 ? (
+                              <span className="block text-small text-success-subtle-ink">
+                                {t('office.udhaar.in_credit_label')}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
                       </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-            {shown < data.rows.length ? (
-              <li ref={sentinel} aria-hidden="true" className="h-px" />
-            ) : null}
-          </ul>
+                      <span className="min-w-0 text-small text-text-muted max-sm:text-start">
+                        <span className="sm:hidden">
+                          {t('office.udhaar.sort_oldest')} ·{' '}
+                        </span>
+                        {ageLabel(t, row.oldestUnpaidAt) || '—'}
+                      </span>
+                      <span className="col-span-2 min-w-0 sm:col-span-1">
+                        {percent !== null ? (
+                          <>
+                            <span
+                              className="mb-1 block h-1.5 overflow-hidden rounded-full bg-surface-2"
+                              role="img"
+                              aria-label={t('office.udhaar.limit_bar', {
+                                percent,
+                              })}
+                            >
+                              <span
+                                className={`block h-full ${percent >= 100 ? 'bg-danger' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            </span>
+                            <span className="flex flex-wrap items-center gap-1 text-small text-text-muted">
+                              <span className="tabular-nums">{percent}%</span>
+                              <span aria-hidden="true">·</span>
+                              <MoneyText
+                                paisa={Number(row.customer.credit_limit ?? 0)}
+                              />
+                              {percent >= 100 ? (
+                                <span className="text-danger">
+                                  · {t('office.udhaar.over_limit')}
+                                </span>
+                              ) : percent >= 80 ? (
+                                <span className="text-warning">
+                                  · {t('office.udhaar.near_limit')}
+                                </span>
+                              ) : null}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-small text-text-muted">
+                            {t('office.udhaar.no_limit')}
+                          </span>
+                        )}
+                      </span>
+                      {row.promise ? (
+                        <span className="col-span-2 min-w-0 text-small text-text-muted sm:col-span-1">
+                          <span
+                            className={`inline-flex max-w-full items-center rounded-full px-2 py-0.5 ${
+                              String(row.promise.promised_on) <= today
+                                ? 'bg-warning-subtle text-warning-subtle-ink'
+                                : 'border border-border'
+                            }`}
+                          >
+                            <span className="truncate">
+                              {dateText(
+                                String(row.promise.promised_on),
+                                i18n.language,
+                                timeZone,
+                              )}
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="hidden text-small text-text-muted sm:block">
+                          —
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <ListPager page={page} pageCount={pageCount} onPage={setPage} />
+          </>
         ) : null}
       </ListSurface>
 

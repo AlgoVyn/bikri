@@ -18,6 +18,7 @@ import { pruneLocalHistoryIfDue } from '../data/retention.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
+import { AppSessionProvider } from '../state/appSession.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { Banners } from './Banners.tsx';
@@ -27,7 +28,8 @@ import {
   loadDevicePrefs,
   togglePrivacyMode,
 } from './devicePrefs.ts';
-import { GlobalSearchHost, GlobalSearchTrigger } from './GlobalSearch.tsx';
+import { GlobalSearchHost } from './GlobalSearch.tsx';
+import { GlobalSearchTrigger } from './GlobalSearchTrigger.tsx';
 import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
@@ -63,13 +65,26 @@ const EXTRA_TITLES: Record<string, string> = {
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <AppSessionProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </AppSessionProvider>
+  );
+}
+
+/** The queue runs in its own component so a print job re-renders a `null` leaf, not the shell. */
+function PrintServiceRunner() {
+  usePrintService();
+  return null;
+}
+
+function AppShellInner({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const selling = isSellingRoute(pathname);
   const toast = useToast();
   const { updateReady, applyUpdate } = useUpdateReady();
-  usePrintService();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const shopName = useShopName();
@@ -78,6 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const keyHandler = useRef<(event: KeyboardEvent) => void>(() => undefined);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -243,65 +259,67 @@ export function AppShell({ children }: { children: ReactNode }) {
     void navigate({ to: '/', replace: true });
   }, [blocked, navigate, t, toast]);
 
-  // Re-bound every render so the handler sees the current permissions.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (composing(event)) return;
-      // Hide amounts is a display action: it must also work in a field or an open dialog.
-      if (
-        !event.defaultPrevented &&
-        event.ctrlKey &&
-        event.shiftKey &&
-        !event.altKey &&
-        !event.metaKey &&
-        event.code === 'KeyH'
-      ) {
-        event.preventDefault();
-        togglePrivacy();
-        return;
-      }
-      // Ctrl+Shift+P works everywhere, even while typing (screens/18).
-      if (
-        !event.defaultPrevented &&
-        !dialogOpen() &&
-        event.ctrlKey &&
-        event.shiftKey &&
-        !event.altKey &&
-        !event.metaKey &&
-        event.code === 'KeyP'
-      ) {
-        event.preventDefault();
-        openPriceCheck(true);
-        return;
-      }
-      if (
-        event.defaultPrevented ||
-        event.metaKey ||
-        ignoresHotkey(event.target) ||
-        dialogOpen()
-      )
-        return;
-      if (
-        !event.ctrlKey &&
-        !event.altKey &&
-        !event.shiftKey &&
-        (event.key === 'n' || event.key === 'N')
-      ) {
-        if (readOnly || !can('sale.create')) return;
-        event.preventDefault();
-        void navigate({ to: '/sell' });
-        return;
-      }
-      if (!event.ctrlKey || !event.shiftKey || event.altKey) return;
-      const digit = /^Digit([1-9])$/u.exec(event.code)?.[1];
-      const item = digit === undefined ? undefined : NAV[Number(digit) - 1];
-      if (item === undefined || !allowed(item)) return;
+  // The listener is bound once; the ref always points at this render's handler so it
+  // still sees the current permissions (a print job used to rebind it twice).
+  keyHandler.current = (event: KeyboardEvent) => {
+    if (composing(event)) return;
+    // Hide amounts is a display action: it must also work in a field or an open dialog.
+    if (
+      !event.defaultPrevented &&
+      event.ctrlKey &&
+      event.shiftKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      event.code === 'KeyH'
+    ) {
       event.preventDefault();
-      void navigate({ to: item.to });
-    };
+      togglePrivacy();
+      return;
+    }
+    // Ctrl+Shift+P works everywhere, even while typing (screens/18).
+    if (
+      !event.defaultPrevented &&
+      !dialogOpen() &&
+      event.ctrlKey &&
+      event.shiftKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      event.code === 'KeyP'
+    ) {
+      event.preventDefault();
+      openPriceCheck(true);
+      return;
+    }
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      ignoresHotkey(event.target) ||
+      dialogOpen()
+    )
+      return;
+    if (
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      (event.key === 'n' || event.key === 'N')
+    ) {
+      if (readOnly || !can('sale.create')) return;
+      event.preventDefault();
+      void navigate({ to: '/sell' });
+      return;
+    }
+    if (!event.ctrlKey || !event.shiftKey || event.altKey) return;
+    const digit = /^Digit([1-9])$/u.exec(event.code)?.[1];
+    const item = digit === undefined ? undefined : NAV[Number(digit) - 1];
+    if (item === undefined || !allowed(item)) return;
+    event.preventDefault();
+    void navigate({ to: item.to });
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => keyHandler.current(event);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, []);
 
   const navItems = visible.filter((item) => !item.hideInNav);
   const more = navItems.filter((item) => !item.bar);
@@ -317,6 +335,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         } as CSSProperties
       }
     >
+      <PrintServiceRunner />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-ink"

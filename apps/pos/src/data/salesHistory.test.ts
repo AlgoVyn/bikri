@@ -9,8 +9,8 @@ import {
   salesCsv,
   salesFilterOptions,
   salesHistory,
-  shopTimeZone,
 } from './salesHistory.ts';
+import { shopTimeZone } from './shopTimeZone.ts';
 import { dropTestDbs } from './testDb.ts';
 import { NOW, sale, shopWithStock, t2Cart } from './testShop.ts';
 

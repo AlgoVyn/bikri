@@ -1,4 +1,4 @@
-import { businessDate, isTimeZone, mulDivRound } from '@bikri/core';
+import { businessDate, mulDivRound } from '@bikri/core';
 import type { MasterRow, SyncedRow } from '@bikri/db';
 import type { Table } from 'dexie';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
@@ -138,16 +138,6 @@ export function rangeFor(
   }
 }
 
-export async function shopTimeZone(src: TableSource): Promise<string> {
-  const shop = await (src.table('shop') as Table<MasterRow, string>).get(
-    'shop',
-  );
-  const tz = String(shop?.timezone ?? '');
-  // A typo from an import/restore must not make every Intl call throw; the core
-  // business-date helper already falls back to the default (D-218).
-  return isTimeZone(tz) ? tz : 'Asia/Karachi';
-}
-
 function paymentRows(rows: readonly SyncedRow[]): SyncedRow[] {
   return rows.filter((p) => p.direction === 'in' && p.purpose === 'sale');
 }
@@ -272,11 +262,16 @@ export async function loadSalesHistory(
 
   const refundsById = new Map<string, SyncedRow[]>();
   if (ids.length > 0) {
-    const refunds = await rowsAnyOf<SyncedRow>(
-      src.table('refunds') as Table<SyncedRow>,
-      'sale_id',
-      ids,
-      (refund) => String(refund.sale_id),
+    // A sale in this range cannot be refunded before the range starts; the date index
+    // bounds the read instead of probing every sale id or scanning lifetime refunds.
+    const refunds = (
+      await (src.table('refunds') as Table<SyncedRow>)
+        .where('business_date')
+        .aboveOrEqual(range.from)
+        .toArray()
+    ).filter(
+      (refund) =>
+        refund.sale_id !== null && saleIdSet.has(String(refund.sale_id)),
     );
     for (const r of refunds) {
       const key = String(r.sale_id);
@@ -286,22 +281,38 @@ export async function loadSalesHistory(
     }
   }
 
-  const jobs =
-    ids.length === 0
-      ? []
-      : await rowsAnyOf<PrintJobLite>(
-          src.table('print_jobs') as Table<PrintJobLite>,
-          'sale_id',
-          ids,
-          (job) => String(job.sale_id),
-        );
-  // Group once; `failedPrint` used to filter the whole job list for every bill.
+  // A failed print is rare: read the indexed failed jobs first, then only the jobs of
+  // those sales (a later `done` job supersedes the failure). An empty failure list costs
+  // one index query, not 90 days of print history.
   const jobsBySale = new Map<string, PrintJobLite[]>();
-  for (const job of jobs) {
-    const key = String(job.sale_id ?? '');
-    const list = jobsBySale.get(key) ?? [];
-    list.push(job);
-    jobsBySale.set(key, list);
+  if (ids.length > 0) {
+    const failed = await (src.table('print_jobs') as Table<PrintJobLite>)
+      .where('status')
+      .equals('failed')
+      .toArray();
+    const failedSaleIds = [
+      ...new Set(
+        failed
+          .map((job) => String(job.sale_id ?? ''))
+          .filter((id) => id !== '' && saleIdSet.has(id)),
+      ),
+    ];
+    if (failedSaleIds.length > 0) {
+      const jobs = await rowsAnyOf<PrintJobLite>(
+        src.table('print_jobs') as Table<PrintJobLite>,
+        'sale_id',
+        failedSaleIds,
+        (job) => String(job.sale_id),
+        Number.POSITIVE_INFINITY,
+      );
+      for (const job of jobs) {
+        const key = String(job.sale_id ?? '');
+        if (!saleIdSet.has(key)) continue;
+        const list = jobsBySale.get(key) ?? [];
+        list.push(job);
+        jobsBySale.set(key, list);
+      }
+    }
   }
 
   const customerIds = [

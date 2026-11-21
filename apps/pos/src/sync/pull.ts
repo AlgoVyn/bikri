@@ -822,28 +822,47 @@ async function restoreRecoveryUnlocked(
             field: 'return_id',
           },
         };
+        // Parent documents only: bounded by the restore point via the local
+        // `created_at` index instead of loading every sale/refund/purchase ever.
         for (const tbl of PULLED_TABLES) {
-          if (!isLedgerTable(tbl)) continue;
-          const rows = (await db.table(tbl).toArray()) as SyncedRow[];
-          const parent = lineParents[tbl];
+          if (!isLedgerTable(tbl) || lineParents[tbl]) continue;
+          const rows = (await db
+            .table(tbl)
+            .where('created_at')
+            .aboveOrEqual(restorePointAt)
+            .toArray()) as SyncedRow[];
           for (const row of rows) {
-            const mine = parent
-              ? recovered.get(parent.table)?.has(String(row[parent.field])) ===
-                true
-              : row.device_id !== undefined && row.device_id === device.id;
             if (
-              !mine ||
-              (!parent && Number(row.created_at ?? 0) < restorePointAt) ||
+              row.device_id !== device.id ||
               queued.has(`${tbl}:${row.id}`) ||
               failedKeys.has(`${tbl}:${row.id}`)
             )
               continue;
-            if (!parent) {
-              const set = recovered.get(tbl) ?? new Set<string>();
-              set.add(String(row.id));
-              recovered.set(tbl, set);
-            }
+            const set = recovered.get(tbl) ?? new Set<string>();
+            set.add(String(row.id));
+            recovered.set(tbl, set);
             recoveredRows.push({ tbl: tbl as LedgerTable, row });
+          }
+        }
+        // Child lines only for the parents recovered above (100 ids per index range).
+        for (const [tbl, parent] of Object.entries(lineParents)) {
+          if (!isLedgerTable(tbl)) continue;
+          const ids = [...(recovered.get(parent.table) ?? [])];
+          for (let at = 0; at < ids.length; at += 100) {
+            const chunk = ids.slice(at, at + 100);
+            const rows = (await db
+              .table(tbl)
+              .where(parent.field)
+              .anyOf(chunk)
+              .toArray()) as SyncedRow[];
+            for (const row of rows) {
+              if (
+                queued.has(`${tbl}:${row.id}`) ||
+                failedKeys.has(`${tbl}:${row.id}`)
+              )
+                continue;
+              recoveredRows.push({ tbl: tbl as LedgerTable, row });
+            }
           }
         }
       }

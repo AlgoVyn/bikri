@@ -28,11 +28,8 @@ import { getDb } from '../data/db.ts';
 import { queueSalePrint, receiptShareText, waLink } from '../data/receipt.ts';
 import { queueRefundPrint } from '../data/refundReceipt.ts';
 import { ReissueNotAllowedError, startReissue } from '../data/sale.ts';
-import {
-  type BillDetail as Bill,
-  billDetail,
-  shopTimeZone,
-} from '../data/salesHistory.ts';
+import { type BillDetail as Bill, billDetail } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date';

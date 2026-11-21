@@ -32,7 +32,7 @@ import {
 } from './agent.ts';
 import { prepareRasterFonts } from './canvasRaster.ts';
 import { jobReceipt } from './receiptFiles.ts';
-import { renderReceiptCanvas } from './receiptImage.ts';
+import { canvasBlob, renderReceiptCanvas } from './receiptImage.ts';
 import { printHtmlViaSystem, type SystemPrintResult } from './systemPrint.ts';
 import {
   findSerial,
@@ -120,7 +120,9 @@ export async function printBlocks(
 ): Promise<void> {
   if (!printer?.transport) throw new PrintError('NO_PRINTER');
   const paper = receiptPaper(printer);
-  const storedLogo = await readLogo(db);
+  // A drawer kick is 5 bytes and needs no logo, shop read or font load.
+  const drawerOnly = blocks.every((block) => block.t === 'drawer');
+  const storedLogo = drawerOnly ? null : await readLogo(db);
   // Statements need a smaller mark than a sale receipt. Pre-scale the bitmap so
   // every transport (raw ESC/POS, agent PNG, system HTML) gets the same size.
   const logo =
@@ -145,7 +147,8 @@ export async function printBlocks(
       logo: printer.print_logo === false ? null : logo,
       padding: 0,
     });
-    const png = canvas.toDataURL('image/png').split(',')[1];
+    const blob = await canvasBlob(canvas, 'image/png');
+    const png = toBase64(new Uint8Array(await blob.arrayBuffer()));
     if (!png) throw new PrintError('FAILED', 'receipt image is empty');
     await sendAgentJob(
       printer,
@@ -185,8 +188,12 @@ export async function printBlocks(
     }
     return;
   }
-  await prepareRasterFonts();
-  const language = languageOverride ?? (await receiptLanguage(db));
+  const language =
+    languageOverride ?? (drawerOnly ? 'en' : await receiptLanguage(db));
+  // English ASCII receipts never touch the canvas renderer; loading Noto Naskh and
+  // Inter for them (and for a drawer kick) was the bulk of the print stall.
+  if (!drawerOnly && (language === 'ur' || hasNonAscii(JSON.stringify(blocks))))
+    await prepareRasterFonts();
   // A drawer kick belongs to the sale/refund action, not to every copy of its
   // receipt. Encode the body without drawer blocks and append one kick after all
   // copies (the command is harmless if no drawer is attached).
@@ -259,6 +266,12 @@ const sleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
+/** Urdu names/notes need the canvas renderer; pure ASCII receipts do not. */
+function hasNonAscii(value: string): boolean {
+  for (const char of value) if ((char.codePointAt(0) ?? 0) > 0x7f) return true;
+  return false;
+}
+
 /** Browser-safe base64 for potentially large ESC/POS buffers. */
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -290,7 +303,7 @@ async function sendAgentJob(
     throw mapAgentError(err);
   }
   const deadline = Date.now() + (deps.timeoutMs ?? 30_000);
-  let wait = 400;
+  let wait = 100;
   while (
     job.status !== 'done' &&
     job.status !== 'failed' &&
@@ -351,11 +364,14 @@ export async function runJob(
   job: PrintJob,
   deps: PrintDeps,
 ): Promise<PrintJob> {
-  await db.print_jobs.update(job.id, {
-    status: 'printing',
-    error: undefined,
-    started_at: Date.now(),
-  });
+  // `claimNextJob` already wrote `printing`; writing it again was a second IDB
+  // transaction on every job. A direct caller with a queued job still gets the mark.
+  if (job.status !== 'printing')
+    await db.print_jobs.update(job.id, {
+      status: 'printing',
+      error: undefined,
+      started_at: Date.now(),
+    });
   try {
     const printer = await readPrinter(db);
     if (!printer?.transport) throw new PrintError('NO_PRINTER');

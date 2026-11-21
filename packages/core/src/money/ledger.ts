@@ -30,12 +30,13 @@ interface OpenDebit {
 export function oldestUnpaidAt(
   entries: readonly LedgerAmount[],
 ): number | null {
-  const ordered = entries.map((entry, index) => ({ ...entry, index }));
-  ordered.sort(
-    (left, right) =>
-      left.created_at - right.created_at || left.index - right.index,
-  );
+  // `Array.prototype.sort` is stable (ES2019), so equal timestamps keep their input
+  // order without cloning every entry into an index wrapper.
+  const ordered = [...entries];
+  ordered.sort((left, right) => left.created_at - right.created_at);
   const open: OpenDebit[] = [];
+  // A head cursor makes clearing an old debit O(1); `shift()` moved the whole array.
+  let head = 0;
   let credit = 0;
   for (const entry of ordered) {
     assertSafeInteger(entry.amount, 'amount');
@@ -55,14 +56,14 @@ export function oldestUnpaidAt(
       }
     } else {
       let pay = -entry.amount;
-      while (pay > 0 && open.length > 0) {
-        const head = open[0] as OpenDebit;
-        if (head.remaining > pay) {
-          head.remaining -= pay;
+      while (pay > 0 && head < open.length) {
+        const current = open[head] as OpenDebit;
+        if (current.remaining > pay) {
+          current.remaining -= pay;
           pay = 0;
         } else {
-          pay -= head.remaining;
-          open.shift();
+          pay -= current.remaining;
+          head += 1;
         }
       }
       if (pay > 0) {
@@ -70,7 +71,7 @@ export function oldestUnpaidAt(
       }
     }
   }
-  const oldest = open[0];
+  const oldest = open[head];
   return oldest === undefined ? null : oldest.created_at;
 }
 

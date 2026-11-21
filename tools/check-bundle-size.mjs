@@ -11,7 +11,7 @@ import { BASE_PATH } from '../packages/core/src/paths.ts';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'apps/pos/dist', BASE_PATH.replace(/^\//u, ''));
 const BASE_RE = BASE_PATH.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-// 290 KB after counting the blocking theme-init.js and recalculating the real initial graph.
+// 290 KB after counting the (now inline) theme bootstrap and the real initial graph.
 const INITIAL_BUDGET = 290 * 1024;
 const CHUNK_BUDGET = 100 * 1024;
 const CSS_BUDGET = 25 * 1024;
@@ -90,7 +90,7 @@ if (css.length === 0)
   problems.push(
     'no initial stylesheet found in index.html (output format changed?)',
   );
-// Count every blocking/preloaded script in index.html, including theme-init.js.
+// Count every external module script in index.html.
 for (const rel of initial) initialTotal += gz(rel);
 for (const rel of files) {
   if (initial.has(rel)) continue;
@@ -101,18 +101,33 @@ for (const rel of files) {
     );
   }
 }
-// The active language's catalog is loaded before the first render (D-100): count the largest.
-// It is not in index.html (dynamic import), but guard against counting it twice if that changes.
-const locales = files.filter((rel) =>
-  /^assets\/(en|ur|roman-ur)-[\w-]+\.js$/.test(rel),
+// The active language's catalog is loaded before the first render (D-100): count the
+// largest. The build's locale-preload script carries the exact hash map, so main/office/
+// public locale chunks are not mistaken for the catalog.
+const preloadRel = files.find((rel) =>
+  /^assets\/locale-preload-[\w-]+\.js$/.test(rel),
 );
-const largestLocale = locales.reduce(
+let localeMap = {};
+if (preloadRel === undefined) {
+  problems.push('no locale-preload script found (language preload missing)');
+} else {
+  const source = readFileSync(join(DIST, preloadRel), 'utf8');
+  const match = /var m=(\{[^}]*\})/u.exec(source);
+  if (match?.[1]) localeMap = JSON.parse(match[1]);
+}
+const localeChunks = [];
+for (const locale of ['en', 'roman-ur', 'ur']) {
+  const rel = localeMap[locale];
+  if (typeof rel !== 'string' || !files.includes(rel)) {
+    problems.push(`no ${locale} language catalog chunk in the preload map`);
+    continue;
+  }
+  localeChunks.push(rel);
+}
+const largestLocale = localeChunks.reduce(
   (best, rel) => (best === null || gz(rel) > gz(best) ? rel : best),
   null,
 );
-for (const locale of ['en', 'roman-ur', 'ur'])
-  if (!locales.some((rel) => rel.startsWith(`assets/${locale}-`)))
-    problems.push(`no ${locale} language catalog chunk found`);
 if (largestLocale !== null && !initial.has(largestLocale))
   initialTotal += gz(largestLocale);
 if (initialTotal > INITIAL_BUDGET) {

@@ -152,7 +152,33 @@ export const DEXIE_SCHEMA_V10 = {
   refund_lines: 'id, refund_id, sale_line_id, business_date',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V10;
+/**
+ * V11 adds the bundle+date index (a bundle's 14-day chart no longer scans every
+ * component line ever sold) and backfills `party_balances.last_payment_at` for the
+ * chase list. Both are local caches; no server schema changes.
+ */
+export const DEXIE_SCHEMA_V11 = {
+  ...DEXIE_SCHEMA_V10,
+  sale_lines:
+    'id, sale_id, product_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]',
+  // Restore recovery reads ledger rows created since the restore point; without a
+  // created_at index it had to load every sale line/movement/ledger row.
+  refunds: 'id, sale_id, business_date, [device_id+created_at], created_at',
+  sale_voids: 'id, &sale_id, created_at',
+  ledger_entries:
+    'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], source_id, created_at',
+  stock_movements:
+    'id, [product_id+created_at], [ref_type+ref_id], business_date, created_at',
+  purchases: 'id, [supplier_id+created_at], business_date, created_at',
+  supplier_returns:
+    'id, [supplier_id+created_at], purchase_id, business_date, created_at',
+  expenses:
+    'id, business_date, category_id, [device_id+created_at], reverses_id, created_at',
+  cash_moves: 'id, [device_id+created_at], created_at',
+  day_closes: 'id, [device_id+period_end], business_date, created_at',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V11;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -226,6 +252,8 @@ export type PartyBalance = {
   balance: number;
   last_activity_at: number;
   oldest_unpaid_at: number | null;
+  /** When the party last made a customer/supplier payment (local cache, V11). */
+  last_payment_at?: number | null;
 };
 
 export type CartLine = {
@@ -481,6 +509,32 @@ export class BikriDb extends Dexie {
           const date = dates.get(String(line.refund_id));
           if (date !== undefined) line.business_date = date;
         });
+      });
+    this.version(11)
+      .stores(DEXIE_SCHEMA_V11)
+      .upgrade(async (tx) => {
+        // Backfill the chase list's last customer payment from the ledger cache's
+        // source. A payment row always has a matching ledger entry.
+        const last = new Map<string, number>();
+        await (
+          tx.table('ledger_entries') as Table<Record<string, unknown>, string>
+        ).each((entry) => {
+          if (entry.source_type !== 'payment') return;
+          const key = `${String(entry.party_type)}\u0000${String(entry.party_id)}`;
+          const at = Number(entry.created_at ?? 0);
+          if (at > (last.get(key) ?? 0)) last.set(key, at);
+        });
+        if (last.size === 0) return;
+        await (
+          tx.table('party_balances') as Table<Record<string, unknown>, string>
+        )
+          .toCollection()
+          .modify((row) => {
+            const at = last.get(
+              `${String(row.party_type)}\u0000${String(row.party_id)}`,
+            );
+            if (at !== undefined) row.last_payment_at = at;
+          });
       });
   }
 }

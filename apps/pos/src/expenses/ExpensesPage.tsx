@@ -26,7 +26,7 @@ import {
   expensesCsv,
   reverseExpense,
 } from '../data/expenses.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';

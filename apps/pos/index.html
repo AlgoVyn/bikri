@@ -7,15 +7,37 @@
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link
-      rel="preload"
-      as="font"
-      type="font/woff2"
-      crossorigin
-      href="/fonts/inter-latin-wght-normal.woff2"
-    />
     <title>Bikri POS</title>
-    <script src="/theme-init.js"></script>
+    <script>// Apply the chosen theme and language before the first paint. The shop DB is loaded later.
+try {
+  const theme = localStorage.getItem('bikri.theme');
+  if (theme === 'light' || theme === 'dark') {
+    document.documentElement.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', theme === 'dark' ? '#0e1014' : '#006BB3');
+    }
+  }
+  const stored = localStorage.getItem('bikri.language');
+  const language =
+    stored === 'ur' ? 'ur' : stored === 'roman-ur' ? 'roman-ur' : 'en';
+  document.documentElement.lang = language;
+  document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
+  const font =
+    language === 'en'
+      ? 'fonts/inter-latin-wght-normal.woff2'
+      : 'fonts/noto-naskh-arabic-arabic-wght-normal.woff2';
+  const preload = document.createElement('link');
+  preload.rel = 'preload';
+  preload.as = 'font';
+  preload.type = 'font/woff2';
+  preload.crossOrigin = '';
+  preload.href = new URL(font, document.baseURI).href;
+  document.head.appendChild(preload);
+} catch {
+  /* storage may be disabled */
+}
+</script>
     <meta name="bikri-locale-preload" content="" />
   </head>
   <body>

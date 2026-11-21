@@ -1,11 +1,12 @@
 import { businessDate } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ClockIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { getDb } from '../data/db.ts';
 import {
   AUDIT_ACTIONS,
@@ -71,11 +72,10 @@ function ActivityContent() {
       const shop = await getDb().shop.get('shop');
       return String(shop?.timezone ?? 'Asia/Karachi');
     }, []) ?? 'Asia/Karachi';
-  const [shown, setShown] = useState(PAGE);
-  const sentinel = useRef<HTMLTableRowElement>(null);
+  const [page, setPage] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the range/filter changes
   useEffect(
-    () => setShown(PAGE),
+    () => setPage(0),
     [
       filters.from,
       filters.to,
@@ -84,19 +84,8 @@ function ActivityContent() {
       filters.deviceId,
     ],
   );
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el || !rows || shown >= rows.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting))
-          setShown((count) => count + PAGE);
-      },
-      { rootMargin: '240px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [rows, shown]);
+  const pageCount = Math.max(1, Math.ceil((rows?.length ?? 0) / PAGE));
+  const pageRows = rows?.slice(page * PAGE, (page + 1) * PAGE) ?? [];
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
       <div className="rounded-card border border-border bg-surface">
@@ -219,7 +208,7 @@ function ActivityContent() {
                 </tr>
               </thead>
               <tbody>
-                {rows.slice(0, shown).map((entry) => (
+                {pageRows.map((entry) => (
                   <tr
                     key={String(entry.row.id)}
                     className="border-b border-border last:border-0"
@@ -251,14 +240,12 @@ function ActivityContent() {
                     </td>
                   </tr>
                 ))}
-                {shown < rows.length ? (
-                  <tr ref={sentinel}>
-                    <td colSpan={5} className="h-px" />
-                  </tr>
-                ) : null}
               </tbody>
             </table>
           </div>
+        ) : null}
+        {rows && rows.length > 0 ? (
+          <ListPager page={page} pageCount={pageCount} onPage={setPage} />
         ) : null}
       </div>
     </SettingsPageLayout>

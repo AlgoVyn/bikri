@@ -369,6 +369,7 @@ describe('caches (02 §3.1, §3.2)', () => {
       balance: 8000,
       last_activity_at: 200,
       oldest_unpaid_at: 100,
+      last_payment_at: null,
     });
     await writeAction(db, (w) =>
       w.insert('ledger_entries', entry('l3', 'c1', -6000, 300)),

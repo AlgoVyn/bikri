@@ -18,7 +18,7 @@ import { PageLoading } from '../components/PageLoading';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import {
   supplierBalance,
   supplierStatement,

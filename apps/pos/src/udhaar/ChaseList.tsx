@@ -12,8 +12,9 @@ import { UdhaarIcon } from '../components/icons.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { getDb } from '../data/db.ts';
-import { shopTimeZone } from '../data/salesHistory.ts';
+import { shopTimeZone } from '../data/shopTimeZone.ts';
 import {
+  type ChaseGroupKey,
   type ChaseRow,
   chaseCsv,
   chaseList,
@@ -34,6 +35,9 @@ import {
 import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 
+/** Rows rendered per group before the user asks for the rest. */
+const CHASE_PAGE = 25;
+
 /** Chase list (screens/12): promises due, then oldest unpaid age groups. */
 export function ChaseList() {
   const { t, i18n } = useTranslation();
@@ -42,6 +46,9 @@ export function ChaseList() {
   const canEditPromises = can('party.edit');
   const [selected, setSelected] = useState<ChaseRow | null>(null);
   const [dialog, setDialog] = useState<'promise' | 'receive' | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<ChaseGroupKey>>(
+    new Set(),
+  );
 
   useEffect(() => {
     if (!canEditPromises || readOnly) return;
@@ -125,93 +132,109 @@ export function ChaseList() {
         </p>
       ) : null}
 
-      {data?.groups.map((group, groupIndex) => (
-        <section key={group.key} className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
-            <h2 className="text-title font-semibold">
-              {groupLabel(t, group.key)}
-            </h2>
-            <p className="text-small text-text-muted">
-              <MoneyText paisa={group.total} />
-            </p>
-          </div>
-          <ul className="flex flex-col rounded-card border border-border bg-surface">
-            {group.rows.map((row, rowIndex) => (
-              <li
-                key={row.customer.customer.id}
-                className="flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0"
-              >
-                <Link
-                  to="/udhaar/$customerId"
-                  params={{ customerId: row.customer.customer.id }}
-                  className="min-w-0 flex-[2_1_12rem] hover:underline"
+      {data?.groups.map((group, groupIndex) => {
+        const visible = expanded.has(group.key)
+          ? group.rows
+          : group.rows.slice(0, CHASE_PAGE);
+        return (
+          <section key={group.key} className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
+              <h2 className="text-title font-semibold">
+                {groupLabel(t, group.key)}
+              </h2>
+              <p className="text-small text-text-muted">
+                <MoneyText paisa={group.total} />
+              </p>
+            </div>
+            <ul className="flex flex-col rounded-card border border-border bg-surface">
+              {visible.map((row, rowIndex) => (
+                <li
+                  key={row.customer.customer.id}
+                  className="flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0"
                 >
-                  <span className="block truncate font-medium">
-                    {String(row.customer.customer.name)}
-                  </span>
-                  <span className="block text-small text-text-muted">
-                    {ageDaysText(t, row.ageDays)}
-                    {row.lastPaymentAt
-                      ? ` · ${timeText(row.lastPaymentAt, i18n.language, data.tz)}`
-                      : ''}
-                  </span>
-                </Link>
-                <span
-                  className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-start text-small font-semibold max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
-                >
-                  <MoneyText paisa={row.customer.balance} />
-                </span>
-                <span className="grid w-full grid-cols-2 gap-1 sm:w-auto sm:grid-cols-4">
-                  <button
-                    type="button"
-                    className={buttonQuiet}
-                    disabled={!String(row.customer.customer.phone ?? '')}
-                    onClick={() => remind(row)}
+                  <Link
+                    to="/udhaar/$customerId"
+                    params={{ customerId: row.customer.customer.id }}
+                    className="min-w-0 flex-[2_1_12rem] hover:underline"
                   >
-                    {t('office.udhaar.remind')}
-                  </button>
-                  {row.customer.customer.phone ? (
-                    <a
-                      className={buttonQuiet}
-                      href={`tel:${String(row.customer.customer.phone)}`}
-                    >
-                      {t('office.udhaar.call')}
-                    </a>
-                  ) : null}
-                  {can('party.edit') && !readOnly ? (
+                    <span className="block truncate font-medium">
+                      {String(row.customer.customer.name)}
+                    </span>
+                    <span className="block text-small text-text-muted">
+                      {ageDaysText(t, row.ageDays)}
+                      {row.lastPaymentAt
+                        ? ` · ${timeText(row.lastPaymentAt, i18n.language, data.tz)}`
+                        : ''}
+                    </span>
+                  </Link>
+                  <span
+                    className={`min-w-0 flex-[1_1_7rem] whitespace-nowrap text-start text-small font-semibold max-sm:basis-full max-sm:text-start ${balanceTone(row.customer.balance)}`}
+                  >
+                    <MoneyText paisa={row.customer.balance} />
+                  </span>
+                  <span className="grid w-full grid-cols-2 gap-1 sm:w-auto sm:grid-cols-4">
                     <button
                       type="button"
                       className={buttonQuiet}
-                      onClick={() => {
-                        setSelected(row);
-                        setDialog('promise');
-                      }}
+                      disabled={!String(row.customer.customer.phone ?? '')}
+                      onClick={() => remind(row)}
                     >
-                      {t('office.udhaar.promise')}
+                      {t('office.udhaar.remind')}
                     </button>
-                  ) : null}
-                  {can('payment.receive') && !readOnly ? (
-                    <button
-                      type="button"
-                      className={
-                        groupIndex === 0 && rowIndex === 0
-                          ? buttonPrimary
-                          : buttonQuiet
-                      }
-                      onClick={() => {
-                        setSelected(row);
-                        setDialog('receive');
-                      }}
-                    >
-                      {t('office.udhaar.receive')}
-                    </button>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+                    {row.customer.customer.phone ? (
+                      <a
+                        className={buttonQuiet}
+                        href={`tel:${String(row.customer.customer.phone)}`}
+                      >
+                        {t('office.udhaar.call')}
+                      </a>
+                    ) : null}
+                    {can('party.edit') && !readOnly ? (
+                      <button
+                        type="button"
+                        className={buttonQuiet}
+                        onClick={() => {
+                          setSelected(row);
+                          setDialog('promise');
+                        }}
+                      >
+                        {t('office.udhaar.promise')}
+                      </button>
+                    ) : null}
+                    {can('payment.receive') && !readOnly ? (
+                      <button
+                        type="button"
+                        className={
+                          groupIndex === 0 && rowIndex === 0
+                            ? buttonPrimary
+                            : buttonQuiet
+                        }
+                        onClick={() => {
+                          setSelected(row);
+                          setDialog('receive');
+                        }}
+                      >
+                        {t('office.udhaar.receive')}
+                      </button>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {group.rows.length > CHASE_PAGE && !expanded.has(group.key) ? (
+              <button
+                type="button"
+                className={buttonQuiet}
+                onClick={() =>
+                  setExpanded((current) => new Set([...current, group.key]))
+                }
+              >
+                {t('office.udhaar.show_more')}
+              </button>
+            ) : null}
+          </section>
+        );
+      })}
 
       {selected ? (
         <>
