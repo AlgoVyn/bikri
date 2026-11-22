@@ -970,7 +970,27 @@ export function ProductFormPage({
                 id={fieldId('unit')}
                 className={fieldClass}
                 value={draft.unit}
-                onChange={(e) => set('unit', e.target.value as QtyUnit)}
+                onChange={(e) => {
+                  const unit = e.target.value as QtyUnit;
+                  if (qtyAllowsDecimals(unit)) {
+                    set('unit', unit);
+                    return;
+                  }
+                  // An integer unit cannot keep a fractional opening/minimum.
+                  const whole = (value: number | null) =>
+                    value === null ? null : Math.round(value / 1000) * 1000;
+                  setDirty(true);
+                  setDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          unit,
+                          opening: whole(d.opening),
+                          min_stock: whole(d.min_stock),
+                        }
+                      : d,
+                  );
+                }}
               >
                 {QTY_UNITS.map((u) => (
                   <option key={u} value={u}>
