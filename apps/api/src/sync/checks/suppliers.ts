@@ -23,7 +23,16 @@ export function checkSupplierReturn(
   row: Record<string, unknown>,
 ): void {
   const id = String(row.id);
-  if (!partyUsableAt(look, group, 'supplier', row.supplier_id, row.created_at))
+  if (
+    !partyUsableAt(
+      look,
+      group,
+      'supplier',
+      row.supplier_id,
+      row.created_at,
+      true,
+    )
+  )
     throw new Reject('CONSTRAINT_FAILED');
   const lines = linkedInGroup(group, 'supplier_return_lines', 'return_id', id);
   if (lines.length !== Number(row.line_count))
@@ -115,7 +124,16 @@ export function checkPurchase(
   row: Record<string, unknown>,
 ): void {
   const id = String(row.id);
-  if (!partyUsableAt(look, group, 'supplier', row.supplier_id, row.created_at))
+  if (
+    !partyUsableAt(
+      look,
+      group,
+      'supplier',
+      row.supplier_id,
+      row.created_at,
+      true,
+    )
+  )
     throw new Reject('CONSTRAINT_FAILED');
   const lines = linkedInGroup(group, 'purchase_lines', 'purchase_id', id);
   if (lines.length === 0 || lines.length !== Number(row.line_count))

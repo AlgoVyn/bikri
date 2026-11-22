@@ -271,7 +271,25 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
       return true;
     }
   });
-  addRowsRead(tenant.id, page.length);
+  addRowsRead(tenant.id, Number(rowsResult?.meta?.rows_read ?? rawPage.length));
+  // Read-only shops and support devices never push, so their reads would stay in the
+  // isolate until it evicts. Flush in coarse 5,000-row batches instead of one write per
+  // pull (API-L6).
+  if (
+    (tenant.status === 'read_only' || device.kind === 'support') &&
+    pendingRowsRead(tenant.id) >= 5_000
+  ) {
+    const rows = takeRowsRead(tenant.id);
+    if (rows > 0) {
+      await db
+        .prepare(
+          'INSERT INTO tenant_usage (tenant_id, day, rows_read) VALUES (?1, ?2, ?3) ON CONFLICT (tenant_id, day) DO UPDATE SET rows_read = rows_read + ?3',
+          new Date().toISOString().slice(0, 10),
+          rows,
+        )
+        .run();
+    }
+  }
   // SQLite already holds valid row JSON. Embed it raw instead of parsing every row
   // only to have c.json stringify the whole page again on catch-up pulls.
   const changes = page

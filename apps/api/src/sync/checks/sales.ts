@@ -69,7 +69,14 @@ export function checkSaleInsert(
   if (
     row.customer_id !== null &&
     row.customer_id !== undefined &&
-    !partyUsableAt(look, group, 'customer', row.customer_id, row.created_at)
+    !partyUsableAt(
+      look,
+      group,
+      'customer',
+      row.customer_id,
+      row.created_at,
+      true,
+    )
   )
     throw new Reject('CONSTRAINT_FAILED');
 

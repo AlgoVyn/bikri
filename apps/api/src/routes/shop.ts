@@ -533,7 +533,7 @@ shop.patch('/devices/:id', async (c) => {
       ? " AND (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0"
       : '';
   const update = db.prepare(
-    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, device_code_history = ?6, is_admin = ?7, updated_at = ?8 WHERE tenant_id = ?1 AND id = ?2 AND revoked_at IS NULL${adminGuard}`,
+    `UPDATE devices SET name = ?3, branch_id = ?4, device_code = ?5, device_code_history = ?6, is_admin = ?7, updated_at = ?8 WHERE tenant_id = ?1 AND id = ?2 AND revoked_at IS NULL AND updated_at = ?9${adminGuard}`,
     d.id,
     next.name,
     next.branch_id,
@@ -541,6 +541,7 @@ shop.patch('/devices/:id', async (c) => {
     next.device_code_history,
     next.is_admin,
     now,
+    d.updated_at,
   );
   const res = await db.batch([
     update,
@@ -585,7 +586,7 @@ shop.post('/devices/:id/revoke', async (c) => {
   }
   const now = Date.now();
   const update = db.prepare(
-    "UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3 AND (is_admin = 0 OR (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?3 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0)",
+    "UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3 AND revoked_at IS NULL AND (is_admin = 0 OR (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND id <> ?3 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL) > 0)",
     now,
     d.id,
   );
@@ -599,12 +600,16 @@ shop.post('/devices/:id/revoke', async (c) => {
       onlyIfChanged: true,
     }),
   ]);
-  if ((res[0]?.meta.changes ?? 0) !== 1)
+  if ((res[0]?.meta.changes ?? 0) !== 1) {
+    const current = await deviceOf(db, d.id);
+    if (current.revoked_at !== null)
+      return c.json({ revoked_at: current.revoked_at });
     throw new ApiError(
       'LAST_ADMIN_DEVICE',
       409,
       'Keep at least one admin device',
     );
+  }
   return c.json({ revoked_at: now });
 });
 

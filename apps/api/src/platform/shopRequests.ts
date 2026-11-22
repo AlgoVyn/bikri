@@ -448,7 +448,7 @@ export async function addRequestEmail(
             email_verified_at = CASE WHEN ?4 = 1 THEN COALESCE(email_verified_at, ?3) ELSE email_verified_at END,
             status = ?5,
             updated_at = ?3
-      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving','failed')`,
   )
     .bind(id, addressId, now, verified ? 1 : 0, status)
     .run();
@@ -465,7 +465,11 @@ export async function addRequestEmail(
     action: 'shop_request_email_added',
     requestId: id,
     operator,
-    after: { email: row.email, verified, reused: existing !== null },
+    after: {
+      email: maskEmail(row.email),
+      verified,
+      reused: existing !== null,
+    },
     now,
   });
   return { email: row.email, verified, status, already_added: false };
@@ -508,7 +512,7 @@ export async function checkRequestEmail(
             email_verified_at = CASE WHEN ?3 = 1 THEN COALESCE(email_verified_at, ?2) ELSE email_verified_at END,
             status = ?4,
             updated_at = ?2
-      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving','failed')`,
   )
     .bind(id, now, verified ? 1 : 0, status)
     .run();
@@ -526,7 +530,7 @@ export async function checkRequestEmail(
       action: 'shop_request_email_verified',
       requestId: id,
       operator,
-      after: { email: row.email },
+      after: { email: maskEmail(row.email) },
       now,
     });
   return {
@@ -560,7 +564,7 @@ export async function manualVerifyRequestEmail(
   const res = await env.DB.prepare(
     `UPDATE shop_requests
         SET email_verified_at = ?2, email_checked_at = ?2, status = 'email_verified', updated_at = ?2
-      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving')`,
+      WHERE id = ?1 AND status NOT IN ('approved','rejected','approving','failed')`,
   )
     .bind(id, now)
     .run();
@@ -575,7 +579,7 @@ export async function manualVerifyRequestEmail(
     requestId: id,
     operator,
     reason: note,
-    after: { email: row.email },
+    after: { email: maskEmail(row.email) },
     now,
   });
 }
@@ -818,7 +822,7 @@ export async function approveShopRequest(
           ? error.message
           : 'Approval failed';
     await env.DB.prepare(
-      `UPDATE shop_requests SET status = 'failed', last_error = ?2, updated_at = ?3 WHERE id = ?1`,
+      `UPDATE shop_requests SET status = 'failed', last_error = ?2, updated_at = ?3 WHERE id = ?1 AND status = 'approving'`,
     )
       .bind(id, message.slice(0, 200), now)
       .run();

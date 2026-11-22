@@ -269,6 +269,52 @@ describe('derived-ledger permissions (05 §5, 07 §5)', () => {
     ]);
   });
 
+  it('accepts a costed delivery that also changes the selling price (POS-H1)', async () => {
+    const shop = await seedShop('Delivery price');
+    const now = Date.now();
+    const tx = newId(now);
+    const res = await pushOk(shop.admin, [
+      op(
+        'products',
+        'upsert',
+        productRow(IDS.product, {
+          last_cost: 5000,
+          price: 60000,
+          updated_by: IDS.owner,
+        }),
+        {
+          tx_id: tx,
+          base_rev: 3,
+          changed_fields: ['last_cost', 'price'],
+        },
+      ),
+      op(
+        'stock_movements',
+        'insert',
+        {
+          id: newId(now),
+          product_id: IDS.product,
+          qty_delta_milli: 1000,
+          reason_code: 'received_local',
+          ref_type: 'adjustment',
+          ref_id: null,
+          unit_cost: 5000,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.admin.id,
+          staff_id: IDS.owner,
+          business_date: '2026-10-29',
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    ]);
+    expect(res.results.map((row) => row.error_code ?? null)).toEqual([
+      null,
+      null,
+    ]);
+  });
+
   it('accepts a payment to a party created earlier in the same push', async () => {
     const shop = await seedShop('New party payment');
     const now = Date.now();
