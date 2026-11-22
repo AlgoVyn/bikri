@@ -25,9 +25,9 @@ The tax label and printer are configured later in Settings → Shop and Settings
 
 ## 3. Selling
 
-1. **Sell** (`N` focuses search). Scan a barcode or type a name/SKU, then Enter.
+1. **Sell** (`F2` or `Ctrl+F` focuses search). Scan a barcode or type a name/SKU, then Enter.
 2. Change quantity, price or line discount if your role allows it.
-3. `F2` or **Take payment**: choose cash, card, bank/wallet or **Udhaar** (khata). For cash, enter what the customer gave; change is calculated.
+3. `F8` (or Enter while the search is empty) or **Take payment**: choose cash, card, bank/wallet or **Udhaar** (khata). For cash, enter what the customer gave; change is calculated.
 4. Choose the customer for an udhaar sale. A credit limit can warn you or block the sale (owner setting per customer).
 5. **Done** saves the sale and can print the receipt, share it on WhatsApp or download a PDF.
 
@@ -55,6 +55,7 @@ If a sale was not entered, open **Sales → Record past sale**. Pick the sale da
 ## 6. Products, stock and suppliers
 
 - **Products**: add name (English and Urdu), price, cost, SKU, barcode, unit, low-stock alert and whether stock is tracked. `Print label` creates a Code 128 barcode label.
+- **Bundles** (v1.1): create a product and tick **This is a bundle**, then add 1–20 component products with a quantity each and one bundle price. Selling the bundle deducts each tracked component; a component gets no stock of its own. Edit the recipe or price in the product; a component used by a bundle cannot be deleted until you remove it from the recipe. A return is always for whole bundle units.
 - **Stock adjust**: stock in/out, count or correction. A count is saved as a difference, never as an edit of history. Low-stock and slow-moving lists are under Products/Reports.
 - **Suppliers**: record deliveries (purchase invoice, lines, freight, paid now) and pay the supplier. A delivery raises stock at the landed cost.
 - **Return to supplier**: open a supplier → **Return to supplier**, link the original delivery lines, choose the credit and whether the supplier refunded you now.
@@ -74,6 +75,7 @@ If a sale was not entered, open **Sales → Record past sale**. Pick the sale da
 ## 9. Printer and labels
 
 - **Settings → Printer** (owner/manager): choose 58 mm or 80 mm, connect a USB or Serial printer, print a test page and set auto-print/copies/drawer options.
+- **Bikri Print Agent** (optional, Windows/macOS/Linux): install it on the till PC to print through the system printer driver (raw ESC/POS or a driver-rendered image). Pair it from Settings → Printer with the 6-digit code the agent shows on `http://127.0.0.1:17890`. It listens on the local machine only; uninstall or unpair it from the same page. See [14-print-agent](14-print-agent.md).
 - If the printer is not connected, the receipt stays queued; **Retry** from Sale complete or Settings → Printer.
 - **Labels**: from a product (`L`), the product list's Select mode, or after saving a delivery. Choose 50×25, 38×25, 40×30 mm or A4, generate a barcode if needed, and print through the browser dialog. Settings → Labels prints a test label.
 

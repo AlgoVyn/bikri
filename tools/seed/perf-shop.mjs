@@ -29,7 +29,7 @@ import { createHash, createHmac, pbkdf2Sync } from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const D1_DIR = join(
@@ -285,7 +285,10 @@ const TENANT_TABLES = [
   'audit_log',
   'sync_conflicts',
   'change_log',
+  'change_log_watermarks',
   'applied_ops',
+  'branch_device_codes',
+  'owner_email_codes',
   'tenant_usage',
 ];
 
@@ -761,7 +764,7 @@ function* billStream(ctx, days) {
       lines.map((line) => line.net),
     );
     const roundingAlloc =
-      rounding > 0
+      rounding !== 0
         ? allocate(
             rounding,
             lines.map((line) => line.net),
@@ -912,7 +915,7 @@ function main() {
       status_changed_at: null,
       status_changed_by: null,
       db_shard: 'DB',
-      daily_write_budget: 7000,
+      daily_write_budget: 19_500,
       poll_after_ms: 60_000,
       restore_epoch: String(now),
       restore_point_at: 0,
@@ -2098,4 +2101,8 @@ Start the API, then open the enrol link:
 `);
 }
 
-main();
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+)
+  main();

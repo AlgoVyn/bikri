@@ -42,21 +42,29 @@ function concat(parts) {
 }
 
 export function zipStore(files, now = Date.now()) {
+  if (files.length > 0xffff)
+    throw new RangeError('ZIP32 supports at most 65,535 entries');
   const stamp = new Date(now);
+  // DOS dates cannot represent years outside 1980–2107. Clamp instead of letting a
+  // pre-1980 clock wrap the year field.
+  const year = Math.min(127, Math.max(0, stamp.getUTCFullYear() - 1980));
+  const month = Math.min(12, Math.max(1, stamp.getUTCMonth() + 1));
+  const day = Math.min(31, Math.max(1, stamp.getUTCDate()));
   const time =
     (stamp.getUTCHours() << 11) |
     (stamp.getUTCMinutes() << 5) |
     (stamp.getUTCSeconds() >> 1);
-  const date =
-    ((stamp.getUTCFullYear() - 1980) << 9) |
-    ((stamp.getUTCMonth() + 1) << 5) |
-    stamp.getUTCDate();
+  const date = (year << 9) | (month << 5) | day;
   const encoder = new TextEncoder();
   const locals = [];
   const centrals = [];
   let offset = 0;
   for (const file of files) {
     const name = encoder.encode(file.name);
+    if (name.length > 0xffff)
+      throw new RangeError(`ZIP entry name is too long: ${file.name}`);
+    if (file.data.length > 0xfffffffe)
+      throw new RangeError(`ZIP entry is too large (ZIP32): ${file.name}`);
     const crc = crc32(file.data);
     const local = concat([
       u32(SIG_LOCAL),
@@ -99,6 +107,8 @@ export function zipStore(files, now = Date.now()) {
     offset += local.length;
   }
   const central = concat(centrals);
+  if (offset > 0xfffffffe || central.length > 0xfffffffe)
+    throw new RangeError('ZIP32 archive is too large');
   const end = concat([
     u32(SIG_EOCD),
     u16(0),

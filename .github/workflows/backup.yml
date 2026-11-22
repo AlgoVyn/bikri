@@ -60,6 +60,7 @@ jobs:
             exit 1
           fi
       - name: Export D1 and write manifest
+        id: export
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -70,6 +71,7 @@ jobs:
             --date "$DATE"
           gzip -9 "$RUNNER_TEMP/backup/bikri-$DATE.sql"
       - name: Upload the SQL dump and manifest to R2
+        id: upload
         working-directory: apps/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -112,6 +114,7 @@ jobs:
         if: always()
         env:
           DATE: ${{ steps.date.outputs.date }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
           if [ -f "$RUNNER_TEMP/backup/bikri-$DATE.manifest.json" ]; then
             node -e '
@@ -119,6 +122,10 @@ jobs:
               const tenants = Object.entries(m.tenants);
               const rows = tenants.reduce((sum, [, t]) => sum + Object.values(t.tables).reduce((a, b) => a + b, 0), 0);
               console.log(`## Backup ${m.date}`);
-              console.log(`${tenants.length} tenants, ${rows} rows, sha256 ${m.sha256.slice(0, 12)}…`);
+              if (process.env.UPLOAD_OUTCOME !== "success") {
+                console.log(`${tenants.length} tenants, ${rows} rows. The upload to R2 did not finish, so this manifest hash may describe the uncompressed dump, not the uploaded object.`);
+              } else {
+                console.log(`${tenants.length} tenants, ${rows} rows, sha256 ${m.sha256.slice(0, 12)}… (uploaded)`);
+              }
             ' >> "$GITHUB_STEP_SUMMARY"
           fi

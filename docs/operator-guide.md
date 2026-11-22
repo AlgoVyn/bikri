@@ -56,7 +56,7 @@ pnpm exec wrangler r2 bucket create bikri-backups
 ## 3. Create the first shop
 
 1. Open `https://algovyn.com/bikri/admin` (Cloudflare Access prompts for the operator email code).
-2. **Tenants → New**: display name, slug (`a-z`, digits, `-`, 3–30), owner email, daily write budget (default 18,000 rows; a reference shop needs this).
+2. **Tenants → New**: display name, slug (`a-z`, digits, `-`, 3–30), owner email, daily write budget (default 19,500 rows; a reference shop needs about 14,500).
 3. Copy the owner pairing code/link once and send it to the owner. The plain code is never shown again.
 4. The owner opens the link on the first till, enters their name and chooses the owner PIN. The setup wizard creates the shop, branch, tax and receipt settings.
 5. In the console, the shop shows its devices and sync status. Rename or revoke devices from **Devices**.
@@ -82,17 +82,17 @@ If `EMAIL_ROUTING_TOKEN` is not set, add the address in the Cloudflare dashboard
 | Suspend / reactivate | Tenant → **Suspend** / **Reactivate** | Suspension blocks all server access; tills keep selling offline. |
 | Support access | Tenant → **Support access** | Reason + 1–24 h. Join with the code in a **separate browser profile**; the device is view-only and expires automatically. The owner can end it. |
 | Export one shop | Tenant → **Export** | Browser-built `bikri-export` zip from the server state; audited. |
-| Restore one shop | Tenant → **Restore** | Maintenance on → purge → import (≤ 500 rows/call) → restore epoch → maintenance off. |
+| Restore one shop | Tenant → **Restore** | Maintenance on → purge → import (≤ 250 rows/call) → restore epoch → maintenance off. |
 | Delete a shop | Tenant → **Delete** | Type the slug. Devices stop at once; the cron removes rows and `t/<tenant>/` files; the tenant row stays as a tombstone. Offer an export first. |
 | Owner email change | Tenant → **Edit** | Also add/verify the address in Cloudflare Email Routing. |
 | Owner PIN reset | Tenant → **Reset owner PIN** | The console hashes the new PIN in the browser; the plain PIN never reaches the Worker. |
-| Budgets | Tenant → daily write budget | Keep the sum of active shops ≤ 70,000 rows on Free: four reference shops at 18,000 each. Ten shops need Workers Paid or lower volume. |
+| Budgets | Tenant → daily write budget | Keep the sum of active shops ≤ 70,000 rows on Free: three and a half reference shops at 19,500 each. Ten shops need Workers Paid or lower volume. |
 
 Status changes, exports, imports, restores and support access write an audit row **inside that shop**, visible to the owner in Settings → Activity; status changes and support access include the reason.
 
 ## 5. Backups
 
-- `.github/workflows/backup.yml` runs daily at **02:30 Asia/Karachi** (21:30 UTC) and on demand.
+- `.github/workflows/backup.yml` runs daily at **05:05 Asia/Karachi** (00:05 UTC) and on demand.
 - It exports D1, writes `d1/YYYY-MM-DD.manifest.json` with per-shop counts, uploads both to the private `bikri-backups` bucket, keeps an `age`-encrypted copy as a 90-day GitHub artifact, and prunes R2 to 30 daily + 12 monthly backups.
 - The first run must be after this workflow exists on `main`; use **Actions → backup → Run workflow**. A same-day rerun is refused unless you tick `overwrite`, so a failed upload cannot silently replace a good pair.
 - Check the run summary and the artifact. Then do the restore drill:

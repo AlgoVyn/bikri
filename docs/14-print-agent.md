@@ -2,7 +2,7 @@
 
 **Status:** Phase 1 implemented, 11 Nov 2026. Core agent, Windows/CUPS backends, GitHub-release packages and the Bikri `agent` transport are in `apps/print-agent` and the PWA. Authenticode signing/notarization, auto-update and direct TCP remain release tasks. See §18.
 
-**Related:** [06-printing](06-printing.md), [01-architecture](01-architecture.md), [10-testing](10-testing.md), [11-roadmap](11-roadmap.md), [13-multi-tenancy](13-multi-tenancy.md), [screens/17](screens/17-settings.md#printer), [decisions](decisions.md).
+**Related:** [06-printing](06-printing.md), [01-architecture](01-architecture.md), [10-testing](10-testing.md), [11-roadmap](11-roadmap.md), [13-multi-tenancy](13-multi-tenancy.md), [screens/17](screens/17-settings.md#printer-settingsdevice-this-device-only), [decisions](decisions.md).
 
 ## 1. Summary
 
@@ -209,7 +209,7 @@ Base URL: `http://127.0.0.1:17890/v1`. JSON is UTF-8; binary payloads are base64
 States: `received → queued → spooled → printing → done | failed | canceled`.
 
 - Windows: poll `GetJob`/`EnumJobs` and map `JOB_STATUS_PRINTED`, `JOB_STATUS_ERROR`, `JOB_STATUS_OFFLINE`, `JOB_STATUS_PAPEROUT`, `JOB_STATUS_USER_INTERVENTION`.
-- CUPS: parse `lpstat -W not-completed`/`lpstat -W completed` or use IPP `Get-Job-Attributes`; map `job-state` and `job-state-reasons`.
+- CUPS: parse `lpstat -W not-completed`; a job that is no longer in that list is treated as done (a failed job stays active with a reason). Polling `-W completed` was removed because its answer was ignored.
 - Direct TCP: `done` after the write; `failed` on a socket error; no physical confirmation.
 
 ### Error codes
@@ -243,7 +243,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - **Bearer only:** `Authorization: Bearer <token>`; no cookies, no token in URLs.
 - **Rate limits:** pairing 5/min/IP, jobs 60/min/token, diagnostics 10/min.
 - **Limits:** 5 MiB body, 30 s job timeout, 100 queued jobs, 1 concurrent job per printer, 24 h idempotency window.
-- **No receipt contents in logs.** Log job id, printer, mode, byte count, duration, status and error code only. Rotate logs at 10 MB, keep 7 days.
+- **No receipt contents in logs.** Log job id, printer, mode, byte count, duration, status and error code only. Rotate `agent.log` at 5 MB while running, keeping one previous file; `crash.log` is capped separately.
 - **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. The unpair form carries a per-process CSRF nonce and accepts only a same-origin POST from the loopback page; `Origin`, `Sec-Fetch-Site` and the nonce are checked before the token is revoked. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing.
 
 ### Browser constraints to validate in Phase 0
@@ -268,7 +268,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - CUPS: `lpstat -e` for queues, `lpstat -p -d` for default, `lpoptions -p <queue> -l` for media/options.
 - Raw: `lp -d <queue> -o raw -t "Bikri <jobId>" <tempfile>`; parse the request id.
 - Image: `lp -d <queue> -o media=Custom.<w>x<h>mm <png>`.
-- Status: `lpstat -W not-completed -o <queue>`, `lpstat -W completed -o <queue>`, or IPP.
+- Status: `lpstat -W not-completed -o <queue>`; no longer active ⇒ done (or IPP `Get-Job-Attributes`).
 - No root, no udev rules; the user must be permitted to print (CUPS policy / `lp` group).
 - systemd user unit for autostart; `.deb`/`.rpm`/tarball. A system service is optional for kiosk tills.
 - SELinux/AppArmor: the agent only executes `lp`/`lpstat`/`lpoptions` and writes temp files; document any confinement exceptions.
@@ -307,15 +307,11 @@ Suggested layout (monorepo, built by its own CI job; not a pnpm package):
 
 ```
 apps/print-agent/
-  cmd/bikri-print-agent/main.go
-  internal/api/          # HTTP, CORS, health, jobs
-  internal/auth/         # pairing, tokens, rate limits
-  internal/jobs/         # queue, idempotency, state machine
-  internal/platform/windows/
-  internal/platform/cups/ # linux + darwin
-  internal/ui/           # embedded HTML/CSS
-  internal/config/       # file, logging
-  testdata/
+  cmd/bikri-print-agent/ # main.go: flags, startup, version
+  internal/agent/         # HTTP/CORS, pairing, auth, jobs, rate limits, logs, config
+  internal/backend/       # Windows spooler and CUPS backends, image helpers
+  install/                # Inno Setup, launchd and systemd files
+  scripts/                # build.sh and packaging
   go.mod
 ```
 
@@ -623,7 +619,6 @@ lp -d "BIXOLON_SRP350" -o natural-scaling=100 -o ppi=183 \
 
 # Job status
 lpstat -W not-completed -o "BIXOLON_SRP350"
-lpstat -W completed -o "BIXOLON_SRP350"
 
 # Cancel
 cancel "BIXOLON_SRP350-123"

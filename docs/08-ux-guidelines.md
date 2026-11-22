@@ -188,7 +188,7 @@ Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference vie
 
 ## 4. Language, RTL and numbers
 
-- Languages: `en`, `ur`, `roman-ur` (Roman Urdu, LTR; same code for the file `roman-ur.json`, i18next and receipts). i18next with namespaces per screen (`sell`, `pay`, `udhaar`…), keys like `sell.take_payment`. Missing key in CI = fail (`i18next-parser` check that all 3 files have identical key sets).
+- Languages: `en`, `ur`, `roman-ur` (Roman Urdu, LTR; same code for the file `roman-ur.json`, i18next and receipts). i18next with namespaces per screen (`sell`, `pay`, `udhaar`…), keys like `sell.take_payment`. Missing key in CI = fail (`pnpm i18n:check`: `packages/i18n/src/check-keys.ts` requires identical key sets in all catalogs, and `tools/check-i18n-keys.mjs` checks literal `t('…')` use in the POS source).
 - Urdu sets `<html lang="ur" dir="rtl">`. Use logical CSS only (`ms-`, `me-`, `ps-`, `start`, `end`); icons with direction (arrows, chevrons) flip via `rtl:` variant.
 - **Numbers stay Western digits and LTR** in all languages (`<bdi dir="ltr">` around amounts, invoice numbers, phones). Input fields accept Urdu/Arabic-Indic digits (`۰-۹`, `٠-٩`) and normalise.
 - Money format: `Rs 43,000` (no decimals when paisa = 0, else `Rs 3,459.77`); negative `−Rs 500` with a true minus; lakh grouping optional (`shop.number_grouping`).

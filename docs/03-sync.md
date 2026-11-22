@@ -48,8 +48,8 @@ Request:
 ```json
 {
   "device_id": "01JC0Z8K3V7R1M2Q4S6T8V0X2Y",
-  "schema_version": 2,
-  "app_version": "1.0.0",
+  "schema_version": 8,
+  "app_version": "1.1.0",
   "ops": [
     { "op_id": "01JC1A...", "tbl": "sales", "kind": "insert", "row": { "id": "01JC1A...", "invoice_no": "INV-A-1042", "...": "..." } },
     { "op_id": "01JC1B...", "tbl": "products", "kind": "upsert", "base_rev": 3, "changed_fields": ["price"], "row": { "id": "01J9...", "price": 155000, "...": "..." } }
@@ -59,7 +59,7 @@ Request:
 
 Server algorithm (`apps/api/src/sync/applyOps.ts`). `T` = the tenant of the authenticated device; every statement below binds `tenant_id = T` (through `tenantDb`, [13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)):
 0. Tenant gate: tenant `status` must be `active` or `read_only` (`suspended` → `403 TENANT_SUSPENDED`; `maintenance` → `503 MAINTENANCE`); a push from a `support` device → `403 FORBIDDEN`; today's `tenant_usage` row is read with the device-token lookup (one D1 query, no extra round trip): at or above `daily_write_budget` → `503 TENANT_QUOTA` with `Retry-After` until 00:00 UTC ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). The client keeps its ops in all these cases.
-   - **Read-only cutoff** ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080), D-080): if the tenant is `read_only` and the device's `read_only_seen_at` is NULL, every op in this push is eligible and `read_only_seen_at = now` is added to the batch. Otherwise only ops of transactions (`tx_id`) whose rows all have `created_at ≤ read_only_seen_at + 10 min` are eligible; the rest are not processed and are omitted from `results` (step 7), so they stay pending on the till. No eligible op → `403 TENANT_READ_ONLY`.
+   - **Read-only cutoff** ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080), D-080): ops are eligible only when their transaction's `created_at` is at or before `read_only_seen_at + 10 min`; before the device has learned the status (`read_only_seen_at IS NULL`) the server uses `status_changed_at + 10 min` instead, and when it learns it, `read_only_seen_at = now` is added to the batch. The rest are not processed and are omitted from `results` (step 7), so they stay pending on the till. No eligible op → `403 TENANT_READ_ONLY`.
 1. Reject if `schema_version` < server `MIN_CLIENT_SCHEMA` (Worker var) → `409 SCHEMA_OUTDATED` (client must update the app first; it keeps the ops). Clients with `MIN_CLIENT_SCHEMA ≤ schema_version ≤ SCHEMA_VERSION` are accepted, which is what makes additive migrations safe while old cached tills are still running ([09 §5](09-backups-and-ops.md#5-routine-operations)). `MIN_CLIENT_SCHEMA` is raised only when a migration is not backward compatible.
 2. Validate the whole **body envelope** with Zod (`PushBody` in `apps/api/src/sync/opSchema.ts`); reject the batch on structural errors (`400`). Row payloads are not parsed with per-table Zod schemas: `writableColumns` applies the known-column allow-list, `checkOp` applies the scalar/safe-integer/4,000-character and table-specific checks, then D1 enforces `STRICT`, `CHECK` and composite foreign keys ([D-170](decisions.md#decisions-log), [04 §4](04-api.md#4-request-validation)). A sale whose `business_date` is earlier than the op's business date must carry a `sale_backdated` audit row in the same batch; the Worker checks the recorder's `sale.backdate`, the attributed staff/date/reason and the no-future-date rule ([D-173](decisions.md#decisions-log), [D-174](decisions.md#decisions-log)). Bundle master rows and sale-line bundle groups get the extra structural/recipe checks in [04 §5](04-api.md#5-server-side-checks-beyond-the-request-envelope).
 3. Look up which `op_id`s already exist in `applied_ops` (one `SELECT ... WHERE tenant_id = ?1 AND op_id IN (...)`, chunked by 100 because D1 allows 100 bound parameters). Those ops are answered `applied` without re-applying. If a guarded write is lost in the retry round, re-read `applied_ops` before re-planning: a concurrent retry of the same op may have committed between the first read and the batch.
@@ -151,7 +151,7 @@ Progress UI: full-screen on a new device ("Downloading shop data… 12,400 rows"
 
 ### 4.4 Retention, pruning and stale tills
 
-A Worker **Cron Trigger** (`"triggers": { "crons": ["0 22 * * *"] }` = 03:00 Asia/Karachi (30 minutes after the 02:30 backup export); 1 of the account's 5 free cron triggers) runs `apps/api/src/cron/prune.ts` in the Worker's `scheduled()` handler:
+A Worker **Cron Trigger** (`"triggers": { "crons": ["0 22 * * *"] }` = 03:00 Asia/Karachi, two hours before the 05:05 PKT nightly D1 export; 1 of the account's 5 free cron triggers) runs `apps/api/src/cron/prune.ts` in the Worker's `scheduled()` handler:
 
 The prune covers **all tenants in one run** (still one cron trigger), with per-tenant floors, and stays within the Free plan's 50 D1 queries per invocation and the account's daily write cap: it reads today's total `tenant_usage.rows_written`, leaves 10,000 rows of headroom below the 100,000/day limit, and stops before a write would cross that budget. A run that stops early continues the next night:
 

@@ -15,6 +15,6 @@
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
     "vitest": "5.0.5",
-    "zxing-wasm": "^3.1.6"
+    "zxing-wasm": "3.1.6"
   }
 }

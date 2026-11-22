@@ -100,22 +100,18 @@ Pin exact versions in `package.json` at scaffold time. The table lists the lates
 | vite | 8.3 | pos | |
 | vite-plugin-pwa | 2.0 | pos | Workbox `generateSW`, `registerType: 'prompt'` |
 | @tanstack/react-router | 1.170 | pos | file-based routes |
-| @tanstack/react-virtual | 3.14 | pos | product grid, long lists |
 | tailwindcss | 4.3 | pos | CSS-first config with tokens from doc 08 |
 | Radix UI primitives / shadcn/ui | latest | pos | dialogs, tabs, popovers |
 | dexie / dexie-react-hooks | 4.4 / 4.4 | pos | |
 | zustand | 5.0 | pos | carts, UI state |
 | i18next / react-i18next | 26.5 / 17.1 | pos | |
-| react-hotkeys-hook | 5.3 | pos | |
 | ulidx | 2.4 | core | `monotonicFactory()` |
 | zod | 4.6 | api | HTTP request envelopes only; no per-table row schemas ([D-170](decisions.md#decisions-log)) |
 | hono | 4.13 | api | |
-| wrangler | 4.152 | api | |
+| wrangler | 4.153 | api | |
 | @cloudflare/workers-types | 2026-10 | api | |
 | papaparse | 5.7 | pos | CSV import/export |
 | read-excel-file | 9.3 | pos | XLSX import (read only) |
-| pdf-lib | 1.17 | pos | PDF report export |
-| zxing-wasm | 3.1 | pos | camera barcode fallback |
 | vitest | 5.0 | all | unit tests |
 | @cloudflare/vitest-plugin | 1.4.8 | api | Worker + D1 integration tests (renamed from vitest-pool-workers; [D-055](decisions.md)) |
 | fake-indexeddb | 6.2 | pos tests | Dexie in Node |
@@ -149,7 +145,8 @@ bikri/
 │   ├─ deploy.yml         website check + build + wrangler deploy (on main)
 │   ├─ website-guard.yml  nightly + manual: tools/check-website.mjs against the live algovyn.com
 │   ├─ backup.yml         nightly D1 export (cron)
-│   └─ files-backup.yml   weekly R2 file archive (cron)
+│   ├─ files-backup.yml   weekly R2 file archive (cron)
+│   └─ print-agent-release.yml  tag-triggered print-agent archives
 ├─ apps/
 │   ├─ pos/               React PWA
 │   │   ├─ index.html  vite.config.ts
@@ -163,6 +160,7 @@ bikri/
 │   │       ├─ print/     printer service using packages/printer
 │   │       ├─ scan/      HID listener, camera scanner
 │   │       ├─ export/    CSV/PDF builders
+│   │       ├─ public/    online-only shop request/status pages (`/request`, `/request-status`)
 │   │       ├─ i18n/      i18next init, direction handling
 │   │       └─ state/     zustand stores (carts, session, ui)
 │   ├─ api/               Cloudflare Worker
@@ -181,8 +179,10 @@ bikri/
 │   ├─ db/                migrations/*.sql (plain D1 SQL), dexie.ts (Dexie schema), tables.ts (shared table metadata)
 │   ├─ printer/           layout.ts, escpos.ts, raster.ts, templates/, transports/webusb.ts, transports/webserial.ts, labels/ (code128.ts, label layouts, screens/20)
 │   └─ i18n/              en.json, ur.json, roman-ur.json, check-keys.ts
-├─ tools/backup/          export.sh, encrypt.sh, tenant-extract.mjs (one tenant from a backup, 09 §3.4), README.md
+├─ tools/backup/           export.mjs, files.mjs, retention.mjs, tenant-extract.mjs, zip.mjs (09 §2–§3.4), README.md
 ├─ tools/check-website.mjs  go-live gate: no third-party scripts, no service worker on algovyn.com (§5.5)
+├─ tools/check-docs.mjs    links, anchors, schema/doc sync
+├─ tools/check-migrations-safe.mjs  destructive-D1 guard
 ├─ e2e/                   Playwright tests + fixtures
 └─ docs/                  this specification
 ```
@@ -314,7 +314,7 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 
 `_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` and the content-hashed Workbox runtime never change under the same URL, so they skip revalidation for a year; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`. The root files detach `no-transform` so they are compressed. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
 
-`'wasm-unsafe-eval'` is required because the camera barcode fallback (`zxing-wasm`) compiles WebAssembly; without it Chrome blocks `WebAssembly.instantiate` under `default-src 'self'`. Self-host the `.wasm` file (no CDN).
+`'wasm-unsafe-eval'` is retained for the optional camera barcode fallback, which is **not** part of v1: the till uses a HID/keyboard scanner, and no POS dependency loads WebAssembly today. Do not add a wasm scanner without self-hosting the `.wasm` file (no CDN).
 
 `no-transform` is required on **HTML**: Cloudflare Web Analytics injects `static.cloudflareinsights.com/beacon.min.js` into proxied HTML unless the response says not to transform it. The CSP would block the script, but the browser still requests it and logs a violation. `no-transform` keeps the app free of third-party scripts (D-131). It must **not** be applied to JS/CSS: Cloudflare disables Brotli/Gzip for any response carrying `no-transform`, which tripled the app payload before D-231. Fonts and icons keep stable filenames, so they use a one-day revalidating cache instead of `immutable` (D-237).
 
@@ -381,13 +381,13 @@ Status on 27 Oct 2026: **fails** (`https://cdn.tailwindcss.com` script on `/`); 
 4. Zero Trust → Access → Applications → Add → Self-hosted, name "Bikri admin" (the platform operator console). Destinations (public hostnames): `algovyn.com` path `bikri/admin`, `algovyn.com` path `bikri/admin/*`, `algovyn.com` path `bikri/api/admin`, `algovyn.com` path `bikri/api/admin/*` (Access path wildcards do not cover the parent path, so both forms are listed). Policy "Allow", Include → Emails → `operator@example.com` (the only operator). Login method One-time PIN; session 24 h. Nothing else on `algovyn.com` is put behind Access. Copy the **AUD tag** → `wrangler secret put ACCESS_AUD`; `wrangler secret put OWNER_EMAILS` → `operator@example.com`. The Worker's `accessAuth` check is authoritative regardless of how Access matched the path.
 5. Check `wrangler d1 migrations list bikri --remote` shows nothing applied (M0 schema was single-shop and is rewritten in place, D-077), then `wrangler d1 migrations apply bikri --remote`.
 6. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers, D1, R2 edit), `CLOUDFLARE_ACCOUNT_ID`, `BACKUP_AGE_RECIPIENT` (the operator's age public key); repository variable `DEPLOY_ENABLED` = `true`; make the `ci` check required on `main` (branch protection).
-7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)).
+7. After the first deploy: create the first tenant (the operator's own shop) in the console and enrol its first device with the owner pairing code ([13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175)).
 8. Owner email sign-in: `wrangler secret put OWNER_CODE_KEY` and `OWNER_SESSION_KEY` (e.g. `openssl rand -base64 32`). For each shop owner's email: Cloudflare dashboard → Email Service → Email Routing → Destination addresses → add it; the owner clicks Cloudflare's verification email once. `algovyn.com` is already an Email Routing domain, so no DNS change is needed ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)).
 
 ### 7.2 CI/CD
 
 - `ci.yml` (PR): a fast `quality` job runs `pnpm biome ci` → `pnpm typecheck` → `pnpm test` → i18n/contrast/docs checks → destructive-migration check → build → bundle size, in parallel with four Playwright shards against `wrangler dev` with local D1 (one worker per shard, so the timing budgets still measure the app) and a `print_agent` job (`gofmt`/`go vet`/Go tests plus Windows, macOS and Linux cross-builds). The `ci` aggregator job passes only when all three are green; use it as the required check.
-- `deploy.yml` (successful `ci` workflow_run for a **push** to this repository's `main`; fork PR runs are rejected): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy` → smoke test. The deploy job runs only when the repository variable `DEPLOY_ENABLED` is `true` (set after §7.1) and refuses the placeholder `database_id`; the website check runs on every push to `main` regardless (D-060). A preview environment (`bikri-preview`, separate D1 `bikri-preview`, URL `https://bikri-preview.<account>.workers.dev/bikri/`, no routes on `algovyn.com`) deploys on PRs with label `preview`; its origin is added to `ALLOWED_ORIGINS` for that environment only.
+- `deploy.yml` (successful `ci` workflow_run for a **push** to this repository's `main`; fork PR runs are rejected): `node tools/check-website.mjs` (§5.5) → build `apps/pos` → `wrangler d1 migrations apply bikri --remote` → `wrangler deploy` → smoke test. The deploy job runs only when the repository variable `DEPLOY_ENABLED` is `true` (set after §7.1) and refuses the placeholder `database_id`; the website check runs on every push to `main` regardless (D-060). There is no separate preview Worker: a branch or PR is tested locally with `wrangler dev` against local D1, and only `main` deploys.
 - Migrations live in `packages/db/migrations/000N_<name>.sql` (the `migrations_dir` in `wrangler.jsonc`). They must stay backward compatible with tills running the previous app version for at least **14 days** (add columns nullable or with defaults; never rename/drop in v1), because tills may run the old cached app for a while. Bump `SCHEMA_VERSION` when a migration changes columns or the wire shape; index-only migrations (e.g. T-062's `0003_perf_indexes.sql`) do not need a client version bump. Raise `MIN_CLIENT_SCHEMA` only for a breaking change ([03 §4.1](03-sync.md#41-push--post-apisyncpush)). Dexie schema versions are bumped in the same PR (`db.version(n).stores(...)` with an `upgrade()` when local data must change).
 
 ## 8. Cloudflare free-tier budget
@@ -399,7 +399,7 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 | Worker requests | 100,000/day per account (reset 00:00 UTC) | ~1,560 pulls (60 s × 2 tills × 13 h) + ~300 pushes + ~200 file/other ≈ 2,100/day | ≈ 33 shops at 70 % of the limit |
 | Worker CPU | 10 ms per request | push of 200 ops ≈ 2–5 ms | watch |
 | Worker subrequests | 50/request (1,000 to internal services) | 1 D1 batch + ≤ 2 R2 calls | fine |
-| D1 rows written | 100,000/day per account | ≈ 19,050/day (T-062 measured 127/bill after the D-225 stock-cache trigger, for 150 reference bills incl. indexes and sync) | **≈ 3.6 shops** at the 70 % share |
+| D1 rows written | 100,000/day per account | ≈ 14,500/day (a 3-line reference bill is ~97 rows after D-231 dropped unused indexes and added the hot-path ones; 150 reference bills incl. indexes and sync) | **≈ 3.6 shops** at the 70 % share with the 19,500 default budget |
 | D1 rows read | 5,000,000/day per account | indexed pulls ≈ 25,000/day | > 100 shops |
 | D1 DB size | 500 MB per DB, 10 DBs and 5 GB per account | ≈ 153 MB/year (T-062 measured 1.9 KB/bill) | ≈ 3.3 shop-years per database, then a shard or Workers Paid |
 | D1 queries per Worker invocation | 50 | `db.batch()` counts as 1 | fine |

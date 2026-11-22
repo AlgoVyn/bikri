@@ -25,7 +25,7 @@ This document is the **source of truth** for table and column names. D1 (server)
 |---|---|---|
 | **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
-| **Server-owned** (tenant-scoped) | `devices`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` is never pulled or exported. |
+| **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
 | **Local-only** (Dexie) | `outbox`, `kv`, `carts`, `held_bills`, `file_queue`, `print_jobs`, `stock_levels`, `party_balances`, `pull_shadow` | Never synced. |
 
@@ -810,7 +810,7 @@ INSERT INTO expense_category_templates (code, name_en, name_ur, icon, sort_order
  ('other','Other','دیگر','dots',99);
 ```
 
-No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072)) runs one batch:
+No tenant exists after the migrations. Creating a tenant (`POST /api/admin/tenants`, [13 §7.1](13-multi-tenancy.md#71-onboarding-a-new-shop-d-072-d-175)) runs one batch:
 
 ```
 INSERT INTO tenants (id, slug, display_name, owner_email, restore_epoch, created_by_email, created_at, updated_at) VALUES (?1, ?2, ?3, ?7, CAST(?4 AS TEXT), ?5, ?4, ?4);
@@ -1837,13 +1837,61 @@ pulled by a till. Restore purge keeps it (like devices and enrolment codes); ten
 deletion removes it. The invoice backfill runs once; enrolment only reads the
 branch's few codes.
 
+### 2.28 D1 write/read capacity (migration `0029_d1_write_capacity.sql`)
+
+```sql
+DROP INDEX IF EXISTS products_kind;
+DROP INDEX IF EXISTS purchases_supplier;
+DROP INDEX IF EXISTS supplier_returns_supplier;
+DROP INDEX IF EXISTS audit_log_time;
+
+-- Only refund ledger rows are looked up by source; the old index covered ~all rows.
+DROP INDEX IF EXISTS ledger_source;
+CREATE INDEX ledger_source
+  ON ledger_entries (tenant_id, source_id)
+  WHERE source_type = 'refund' AND source_id IS NOT NULL;
+
+-- Only void-reversal payments are looked up by sale; sale/refund payments use
+-- refund_id, purchase_id or supplier_return_id.
+DROP INDEX IF EXISTS payments_sale;
+CREATE INDEX payments_sale
+  ON payments (tenant_id, sale_id)
+  WHERE purpose = 'void' AND sale_id IS NOT NULL;
+
+-- The refund/void planning query reads exactly these four columns for sale rows.
+DROP INDEX IF EXISTS stock_movements_ref;
+CREATE INDEX stock_movements_ref
+  ON stock_movements (tenant_id, ref_id, product_id, qty_delta_milli)
+  WHERE reason_code = 'sale' AND ref_id IS NOT NULL;
+
+-- Party balances only sum the amount; created_at made the index wider for nothing.
+DROP INDEX IF EXISTS ledger_party;
+CREATE INDEX ledger_party
+  ON ledger_entries (tenant_id, party_type, party_id, amount);
+
+-- The nightly prune no longer needs a per-row (tenant_id, at, seq) index: a daily
+-- watermark gives it the seq ceiling for the 30-day cutoff in one tiny read.
+DROP INDEX IF EXISTS change_log_prune;
+CREATE TABLE change_log_watermarks (
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  day       TEXT NOT NULL,
+  max_seq   INTEGER NOT NULL,
+  PRIMARY KEY (tenant_id, day)
+) STRICT;
+```
+
+`change_log_watermarks` is server-only. The nightly prune records each tenant's
+`MAX(seq)` for the UTC day at the start of each run and uses that tenant's latest mark at
+or before the 30-day cutoff as its deletion ceiling. Rows written after the mark stay
+until the next run, so retention is 30 days plus at most one day.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V1 = {
+export const DEXIE_SCHEMA_V12 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -1956,54 +2004,6 @@ All rows of one action are written in **one Dexie transaction** together with th
 | Pay-in / pay-out | 1 `cash_moves` |
 | Day close | 1 `day_closes`; forces a sync |
 | Opening balance for a customer/supplier | 1 `ledger_entries` (source opening) |
-
-### 2.28 D1 write/read capacity (migration `0029_d1_write_capacity.sql`)
-
-```sql
-DROP INDEX IF EXISTS products_kind;
-DROP INDEX IF EXISTS purchases_supplier;
-DROP INDEX IF EXISTS supplier_returns_supplier;
-DROP INDEX IF EXISTS audit_log_time;
-
--- Only refund ledger rows are looked up by source; the old index covered ~all rows.
-DROP INDEX IF EXISTS ledger_source;
-CREATE INDEX ledger_source
-  ON ledger_entries (tenant_id, source_id)
-  WHERE source_type = 'refund' AND source_id IS NOT NULL;
-
--- Only void-reversal payments are looked up by sale; sale/refund payments use
--- refund_id, purchase_id or supplier_return_id.
-DROP INDEX IF EXISTS payments_sale;
-CREATE INDEX payments_sale
-  ON payments (tenant_id, sale_id)
-  WHERE purpose = 'void' AND sale_id IS NOT NULL;
-
--- The refund/void planning query reads exactly these four columns for sale rows.
-DROP INDEX IF EXISTS stock_movements_ref;
-CREATE INDEX stock_movements_ref
-  ON stock_movements (tenant_id, ref_id, product_id, qty_delta_milli)
-  WHERE reason_code = 'sale' AND ref_id IS NOT NULL;
-
--- Party balances only sum the amount; created_at made the index wider for nothing.
-DROP INDEX IF EXISTS ledger_party;
-CREATE INDEX ledger_party
-  ON ledger_entries (tenant_id, party_type, party_id, amount);
-
--- The nightly prune no longer needs a per-row (tenant_id, at, seq) index: a daily
--- watermark gives it the seq ceiling for the 30-day cutoff in one tiny read.
-DROP INDEX IF EXISTS change_log_prune;
-CREATE TABLE change_log_watermarks (
-  tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  day       TEXT NOT NULL,
-  max_seq   INTEGER NOT NULL,
-  PRIMARY KEY (tenant_id, day)
-) STRICT;
-```
-
-`change_log_watermarks` is server-only. The nightly prune records each tenant's
-`MAX(seq)` for the UTC day at the start of each run and uses that tenant's latest mark at
-or before the 30-day cutoff as its deletion ceiling. Rows written after the mark stay
-until the next run, so retention is 30 days plus at most one day.
 
 ### 2.29 Review hardening (migration `0030_review_hardening.sql`)
 
@@ -2236,3 +2236,5 @@ END;
 The repair publishes the corrected `products.avg_cost` through the change log so an
 enrolled till pulls it, and the triggers enforce the bundle, cost and watermark rules
 for the operator import path and for migrations that write tables directly.
+
+
