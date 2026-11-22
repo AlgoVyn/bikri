@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Worker API and sync — 22 Nov 2026 review recheck
+- Push planning advances `look.current` between transactions and bisects a lost `guardAssert`, so editing then deleting the same row in one push no longer wedges the till; D1 singleton failures stop the round and re-plan from committed state.
+- Rejected transactions no longer leak their customer/supplier/sale/refund lookups into later transactions; payments and ledger rows still require an applied or same-transaction party, while FK-backed sales/purchases may reference a party created later in the push.
+- A soft delete through `customers`/`suppliers` upsert now enforces the zero-balance rule; duplicate ledger inserts guard their side effects; a reissue validates a changed bundle price/recipe instead of rejecting every edit or bypassing checks.
+- Support expiry re-checks the deadline in SQL and only audits when devices were revoked; device edits/revokes use optimistic guards; owner PIN reset is one atomic batch; malformed Access JWTs return 401 instead of 500; shop requests mask emails and cannot overwrite `failed`.
+- `last_cost` guards use the effective `track_stock` write list; `void_return` deduplicates same-transaction sale lines; malformed day closes no longer poison the lookup window; purchase stock repair uses BigInt; partial staff PIN writes are rejected; read-only/support pull reads flush in coarse batches.
+
 ### Core and DB — 22 Nov 2026 review recheck
 - `formatQtyFromMilli()` formats fractional values for integer units instead of throwing, so a `kg` sale no longer crashes Sale Complete, Sales History, Reports or Product Edit; `parseQtyToMilli()` still rejects fractional `pc` input.
 - Migration `0030` now splits its 24-pair `json_object` into a 16-pair `json_object` plus `json_insert` (D1's 32-argument limit), and migration `0031` applies the corrected cost repair and bundle triggers to shops that already recorded `0030`. The `json_insert` paths include their `$.` prefix; the first deploy attempt failed with `bad JSON path` and was rolled back before the Worker deploy.

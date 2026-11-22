@@ -7,7 +7,11 @@
 import { isLedgerTable, isMasterTable, newId, type Role } from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import { checkOp } from './applyOpsCheck.ts';
-import { applyCloseChanges, loadLookups } from './applyOpsLookups.ts';
+import {
+  applyCloseChanges,
+  applyLookupChanges,
+  loadLookups,
+} from './applyOpsLookups.ts';
 import {
   moneyAuditStatements,
   sideEffects,
@@ -113,7 +117,16 @@ function planOp(
       // A create and a delete can be queued before the same sync (for example a product
       // created and removed while offline). The create is applied earlier in this push,
       // so the delete must still soft-delete the new row instead of being a no-op.
-      if (!cur && look.pushedCreates.has(key(tbl, id))) {
+      if (
+        !cur &&
+        (look.pushedCreates.has(key(tbl, id)) ||
+          group.some(
+            (candidate) =>
+              candidate.tbl === tbl &&
+              candidate.kind !== 'delete' &&
+              candidate.row?.id === id,
+          ))
+      ) {
         return {
           op,
           stmts: [
@@ -231,6 +244,10 @@ function planOp(
         id,
         ...insertValues,
       ),
+      // A concurrent request may have inserted this ledger row with a different op_id.
+      // Without this guard the INSERT affects 0 rows but every side effect below still
+      // runs (API-H4).
+      guardAssert(db),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
       ...sideEffects(ctx, tbl, row, avg, group, op.op_id),
     ];
@@ -258,6 +275,9 @@ function planOp(
       op,
       stmts,
       result: { op_id: op.op_id, result: 'applied' },
+      // `meta.changes` counts trigger writes too (a stock movement also updates products),
+      // so the ledger insert cannot use the master-row `guard: 0` check. The
+      // `guardAssert` statement above is the authoritative 0-row/rollback guard.
       guard: null,
     };
   }
@@ -519,6 +539,10 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
         track_stock: Number(op.row.track_stock ?? 0),
         updated_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
         kind: String(op.row.kind ?? 'simple'),
+        deleted_at:
+          op.row.deleted_at === null || op.row.deleted_at === undefined
+            ? null
+            : Number(op.row.deleted_at),
         pushed: true,
       });
       continue;
@@ -539,6 +563,7 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
       track_stock: Number(pick('track_stock')),
       updated_at: Number(op.row.updated_at ?? previous.updated_at),
       kind: String(pick('kind')),
+      deleted_at: pick('deleted_at') as number | null,
       pushed: true,
     });
   }
@@ -714,6 +739,46 @@ function applyShopChanges(look: Lookups, ops: PushOp[]): void {
 }
 
 /**
+ * Advances the optimistic-revision overlay for the next transaction in the same push.
+ * A master row edited twice in one push must plan the second write with `rev + 1`, or
+ * both batches use the old rev and `guardAssert` rolls the whole batch back forever
+ * (API-C1). Replays (`existingInsert`) are filtered by the caller.
+ */
+function applyCurrentChanges(look: Lookups, ops: PushOp[], now: number): void {
+  for (const op of ops) {
+    if (!isMasterTable(op.tbl)) continue;
+    const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+    if (typeof id !== 'string' || id === '') continue;
+    const at = key(op.tbl, id);
+    const cur = look.current.get(at);
+    if (op.kind === 'delete') {
+      if (cur)
+        look.current.set(at, { ...cur, rev: cur.rev + 1, deleted_at: now });
+      continue;
+    }
+    const row = op.row ?? {};
+    const changed = new Set(op.changed_fields ?? []);
+    const pick = <T>(field: string, fallback: T): T =>
+      changed.has(field) && row[field] !== undefined
+        ? (row[field] as T)
+        : fallback;
+    look.current.set(at, {
+      id,
+      rev: cur ? cur.rev + 1 : 1,
+      deleted_at: cur
+        ? pick('deleted_at', cur.deleted_at)
+        : ((row.deleted_at as number | null | undefined) ?? null),
+      setup_completed_at: cur
+        ? pick('setup_completed_at', cur.setup_completed_at)
+        : ((row.setup_completed_at as number | null | undefined) ?? null),
+      hard_limit: cur
+        ? pick('hard_limit', cur.hard_limit)
+        : ((row.hard_limit as number | null | undefined) ?? null),
+    });
+  }
+}
+
+/**
  * Applies a list of ops for one device (03 §4.1 steps 3–7). Returns results in op order for the
  * processed ops; ops not processed (call budget, lost guard twice) are omitted.
  */
@@ -753,7 +818,9 @@ export async function applyOps(
   // a delivery rung before a sale is a later `tx_id`, but `purchases` ranks after `sales`,
   // so the sale would be checked against the pre-delivery average cost and rejected.
   // Foreign-key safety inside one request is provided by the statement sort in `run()` below.
-  for (let round = 0; round < 2 && pending.length > 0; round += 1) {
+  // Three rounds: a stopped singleton may leave two groups of work for the retry
+  // (the failing group is rejected, the rest re-plan from committed D1 state).
+  for (let round = 0; round < 3 && pending.length > 0; round += 1) {
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     if (round > 0) {
       // A previous round lost a guarded write. The most likely cause is a concurrent
@@ -827,6 +894,13 @@ export async function applyOps(
         if (existing > 0 && existing < planned.length)
           throw new Reject('CONSTRAINT_FAILED');
         groups.push({ txId: ops[0]?.tx_id ?? '', planned });
+        // A replay (existingInsert) wrote no row; do not advance the lookup or revision
+        // overlays for it. Everything else is visible to the next transaction (API-H2).
+        const appliedOps = planned
+          .filter((entry) => !entry.existingInsert)
+          .map((entry) => entry.op);
+        applyLookupChanges(look, appliedOps, ctx.now);
+        applyCurrentChanges(look, appliedOps, ctx.now);
         applyProductChanges(look, ops);
         applyBundleChanges(look, ops);
         applyStaffChanges(look, ops);
@@ -887,8 +961,16 @@ export async function applyOps(
         }
       } catch (error) {
         if (isGuardAssertion(error)) {
-          // D1 rolled the whole batch back. Retry every transaction in it intact; round 2
-          // reloads the lookups so a concurrent writer's committed rev is used.
+          // D1 rolled the whole batch back. A multi-group batch is bisected so only the
+          // group that actually lost its guard is retried in round 2; a singleton is
+          // retried intact. Replaying every group without bisecting was the permanent
+          // sync livelock (API-C1).
+          if (list.length > 1) {
+            const mid = Math.ceil(list.length / 2);
+            await run(list.slice(0, mid));
+            await run(list.slice(mid));
+            return;
+          }
           for (const g of list) lost.push(g.planned.map((p) => p.op));
           return;
         }
@@ -898,22 +980,11 @@ export async function applyOps(
           if (g)
             for (const p of g.planned)
               rejected.push({ op: p.op, code: errorCodeOf(error) });
-          // A rejected stock-bearing document (or a server-repaired movement) can change
-          // the on-hand/average state later groups were planned with. A master-only
-          // failure can keep bisecting safely.
-          if (
-            g?.planned.some(
-              (p) =>
-                p.op.tbl === 'stock_movements' ||
-                p.op.tbl === 'sales' ||
-                p.op.tbl === 'purchases' ||
-                p.op.tbl === 'supplier_returns' ||
-                p.op.tbl === 'refunds' ||
-                p.op.tbl === 'sale_voids',
-            )
-          )
-            throw new StopExecution();
-          return;
+          // Any rejected singleton can have changed the in-memory lookups later groups
+          // were planned with (a day close, a party balance, a bundle recipe, ...).
+          // Re-plan the rest from committed D1 state instead of committing a group
+          // validated against a rolled-back mutation (API-H1).
+          throw new StopExecution();
         }
         const mid = Math.ceil(list.length / 2);
         await run(list.slice(0, mid));

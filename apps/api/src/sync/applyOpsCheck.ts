@@ -852,6 +852,17 @@ export function checkOp(
     throw new Reject('CONSTRAINT_FAILED');
   if (op.tbl === 'staff') {
     const pinFields = ['pin_hash', 'pin_salt', 'pin_iterations', 'pin_length'];
+    const changed = new Set(op.changed_fields ?? []);
+    if (look.current.has(key('staff', String(row.id)))) {
+      // A partial verifier update would pair the new hash with the old salt/iterations.
+      const verifier = ['pin_hash', 'pin_salt', 'pin_iterations'];
+      const touched = verifier.filter((field) => changed.has(field));
+      if (
+        (touched.length > 0 && touched.length !== verifier.length) ||
+        (changed.has('pin_length') && touched.length !== verifier.length)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+    }
     if (
       pinFields.some((field) => writesColumn('staff', String(row.id), field))
     ) {
@@ -889,10 +900,9 @@ export function checkOp(
     // `avg_cost` is server-managed, so it must not make a costed delivery or stock-in
     // look like a catalogue edit. The companion costed movement/purchase line is the
     // authority for this consequence.
-    const costSource =
+    const hasCostSource =
       op.tbl === 'products' &&
       look.current.has(key('products', row.id)) &&
-      changes.every((field) => field === 'last_cost') &&
       group.some(
         (candidate) =>
           candidate.kind === 'insert' &&
@@ -907,6 +917,8 @@ export function checkOp(
                 'received_other',
               ].includes(String(candidate.row?.reason_code)))),
       );
+    const onlyCostChange =
+      changes.length > 0 && changes.every((field) => field === 'last_cost');
     // A retried `last_cost`-only upsert (its sibling movement was already committed by a
     // lost round) is a no-op when the stored cost already matches, so it cannot smuggle a
     // catalogue change (API-H1).
@@ -917,18 +929,30 @@ export function checkOp(
       row.last_cost !== undefined &&
       Number(row.last_cost) ===
         Number(look.products.get(String(row.id))?.last_cost);
-    if (!catalogueEdit && !costSource && !costNoop)
+    // A costed delivery may update `last_cost` without `catalog.edit`; a price change
+    // in the same op still needs catalogue permission (POS-H1).
+    if (!catalogueEdit && !(onlyCostChange && hasCostSource) && !costNoop)
       throw new Reject('FORBIDDEN');
     if (
       op.tbl === 'products' &&
       changes.includes('last_cost') &&
       row.last_cost !== undefined &&
-      !costSource
+      !hasCostSource
     ) {
       const current = look.products.get(String(row.id));
+      // Use the effective state: `row` is a full local row, but `planOp` writes only
+      // `changed_fields`. A `last_cost`-only push carrying `track_stock: 0` must not
+      // bypass the tracked-product cost guard (API-M3).
+      const effectiveTrackStock = writesColumn(
+        'products',
+        String(row.id),
+        'track_stock',
+      )
+        ? Number(row.track_stock ?? 0)
+        : Number(current?.track_stock ?? 0);
       if (
         current?.track_stock === 1 &&
-        Number(row.track_stock ?? 1) !== 0 &&
+        effectiveTrackStock !== 0 &&
         Number(row.last_cost) !== current.last_cost
       )
         throw new Reject('CONSTRAINT_FAILED');
@@ -957,8 +981,10 @@ export function checkOp(
     if (
       !bundle ||
       String(bundle.kind ?? 'simple') !== 'bundle' ||
+      bundle.deleted_at != null ||
       !component ||
       String(component.kind ?? 'simple') === 'bundle' ||
+      (component as { deleted_at?: number | null }).deleted_at != null ||
       bundleId === componentId ||
       !Number.isSafeInteger(qty) ||
       qty <= 0
@@ -1052,8 +1078,28 @@ export function checkOp(
       !can(updater.role, updater.permissions_json, 'party.delete')
     )
       throw new Reject('FORBIDDEN');
+    // A soft delete through `upsert` must obey the same zero-balance rule as a
+    // `delete` op (05 §6, API-H3).
+    const cur = look.current.get(key(op.tbl, partyId));
+    if (row.deleted_at != null && cur?.deleted_at == null) {
+      const type = op.tbl === 'customers' ? 'customer' : 'supplier';
+      const balance =
+        (look.partyBalances.get(key(type, partyId)) ?? 0) +
+        group
+          .filter(
+            (candidate) =>
+              candidate.kind === 'insert' &&
+              candidate.tbl === 'ledger_entries' &&
+              candidate.row?.party_type === type &&
+              candidate.row?.party_id === partyId,
+          )
+          .reduce(
+            (sum, candidate) => sum + Number(candidate.row?.amount ?? 0),
+            0,
+          );
+      if (balance !== 0) throw new Reject('CONSTRAINT_FAILED');
+    }
     if (op.tbl === 'customers' && row.hard_limit !== undefined) {
-      const cur = look.current.get(key(op.tbl, partyId));
       // Only an owner may change a hard limit (or set one on a new customer); an
       // unchanged value from the full row payload is fine.
       const changed =

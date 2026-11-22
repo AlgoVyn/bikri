@@ -32,7 +32,15 @@ export {
   oldestUnpaidAt,
   partyBalance,
 } from './money/ledger.ts';
-export { allocate, cashChips, mulDivRound, roundTo } from './money/money.ts';
+export {
+  allocate,
+  cashChips,
+  mulDivRound,
+  roundHalfAway,
+  roundTo,
+  subSafe,
+  sumSafe,
+} from './money/money.ts';
 export type {
   PurchaseLineInput,
   PurchaseLineResult,

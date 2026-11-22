@@ -127,20 +127,47 @@ export function checkRefund(
       else if (restockValue !== restock) throw new Reject('CONSTRAINT_FAILED');
     }
   }
+  const at = group.findIndex(
+    (candidate) =>
+      candidate.tbl === 'refunds' &&
+      candidate.kind === 'insert' &&
+      candidate.row?.id === id,
+  );
+  const earlierInGroup = at < 0 ? [] : group.slice(0, at);
   if (sale && udhaar > 0) {
     if (!sale.customer_id) throw new Reject('CONSTRAINT_FAILED');
+    const sameGroup = earlierInGroup.reduce(
+      (sum, candidate) =>
+        candidate.tbl === 'refunds' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.sale_id === saleId
+          ? sum + Number(candidate.row?.udhaar_part ?? 0)
+          : sum,
+      0,
+    );
     const earlier =
       (look.refundUdhaar.get(saleId) ?? 0) +
-      (look.pushedRefundBefore.get(id) ?? 0);
+      (look.pushedRefundUdhaar.get(saleId) ?? 0) +
+      sameGroup;
     if (udhaar > sale.udhaar_amount - Math.max(0, earlier))
       throw new Reject('CONSTRAINT_FAILED');
   }
   if (sale) {
     const exact = Number(row.exact_amount ?? 0);
     const paidExact = exact - udhaar;
+    const sameGroup = earlierInGroup.reduce(
+      (sum, candidate) =>
+        candidate.tbl === 'refunds' &&
+        candidate.kind === 'insert' &&
+        candidate.row?.sale_id === saleId
+          ? sum + Number(candidate.row?.amount ?? 0)
+          : sum,
+      0,
+    );
     const priorAmount =
       (look.refundAmount.get(saleId) ?? 0) +
-      (look.pushedRefundAmountBefore.get(id) ?? 0);
+      (look.pushedRefundAmount.get(saleId) ?? 0) +
+      sameGroup;
     const remainingPaid = Math.max(sale.paid_total - priorAmount, 0);
     // A normal refund cannot invent a rounding amount; an amount above what is left
     // is the documented over-refund path and is accepted (and flagged) instead.

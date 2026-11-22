@@ -170,10 +170,10 @@ export type Lookups = {
   refundUdhaar: Map<string, number>;
   /** Σ refunds.amount already stored per sale. */
   refundAmount: Map<string, number>;
-  /** Σ refunds.udhaar_part earlier in this push, per refund row id. */
-  pushedRefundBefore: Map<string, number>;
-  /** Σ refunds.amount earlier in this push, per refund row id. */
-  pushedRefundAmountBefore: Map<string, number>;
+  /** Σ refunds.udhaar_part already planned earlier in this push, per sale. */
+  pushedRefundUdhaar: Map<string, number>;
+  /** Σ refunds.amount already planned earlier in this push, per sale. */
+  pushedRefundAmount: Map<string, number>;
   /** Sale ids that already have a void in D1. */
   existingVoids: Set<string>;
   /** Stored payments / ledger rows linked to pushed refunds and supplier returns (04 §5). */
@@ -254,6 +254,10 @@ export type Lookups = {
   /** Parties referenced by payments/ledger rows, for polymorphic party checks. */
   customers: Set<string>;
   suppliers: Set<string>;
+  /** Parties created anywhere in this push, for FK-backed forward references only. */
+  forwardParties: Set<string>;
+  /** Forward party → deleted_at (null = live), from the same push. */
+  forwardPartyDeleted: Map<string, number | null>;
   /** Party id → deleted_at (null = live), for "new business needs a live party" checks. */
   partyDeleted: Map<string, number | null>;
   /** Original expenses referenced by a reversal row in this push. */
@@ -284,6 +288,7 @@ export type Lookups = {
       track_stock: number;
       updated_at: number;
       kind: string;
+      deleted_at: number | null;
       /** The product row was created or edited earlier in this push: the device knows it. */
       pushed: boolean;
     }
@@ -842,10 +847,16 @@ export function partyExists(
   group: PushOp[],
   type: unknown,
   id: unknown,
+  allowForward = false,
 ): boolean {
   if (typeof id !== 'string' || id.length === 0) return false;
+  const forward =
+    allowForward &&
+    (type === 'customer' || type === 'supplier') &&
+    look.forwardParties.has(key(type, id));
   if (type === 'customer')
     return (
+      forward ||
       look.customers.has(id) ||
       group.some(
         (o) => o.tbl === 'customers' && o.row?.id === id && o.kind !== 'delete',
@@ -853,6 +864,7 @@ export function partyExists(
     );
   if (type === 'supplier')
     return (
+      forward ||
       look.suppliers.has(id) ||
       group.some(
         (o) => o.tbl === 'suppliers' && o.row?.id === id && o.kind !== 'delete',
@@ -868,12 +880,22 @@ export function partyUsableAt(
   type: 'customer' | 'supplier',
   id: unknown,
   at: unknown,
+  allowForward = false,
 ): boolean {
   // Unknown and another tenant's ids are indistinguishable (no existence oracle) and
   // keep the FOREIGN_KEY answer the foreign key used to give them. A soft-deleted
   // party is a constraint failure, not a missing row.
-  if (!partyExists(look, group, type, id)) throw new Reject('FOREIGN_KEY');
+  if (!partyExists(look, group, type, id, allowForward))
+    throw new Reject('FOREIGN_KEY');
   if (typeof id !== 'string') return false;
+  if (allowForward) {
+    const forwardDeleted = look.forwardPartyDeleted.get(key(type, id));
+    if (forwardDeleted !== undefined)
+      return (
+        forwardDeleted === null ||
+        (typeof at === 'number' && at <= forwardDeleted)
+      );
+  }
   const deleted = look.partyDeleted.get(key(type, id));
   if (deleted !== undefined)
     return deleted === null || (typeof at === 'number' && at <= deleted);

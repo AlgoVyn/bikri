@@ -318,15 +318,18 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     for (const tenant of expired.results) {
       if (!calls.ok(2) || !calls.hasWrites(2)) break;
       const db = tenantDb(env, tenant);
+      const [revoked] = await calls.run(() =>
+        db.batch(revokeSupportDeviceStatements(db, now, true)),
+      );
+      if ((revoked?.meta.changes ?? 0) === 0) continue;
       await calls.run(() =>
-        db.batch([
-          ...revokeSupportDeviceStatements(db, now),
-          ...auditStatements(db, {
+        db.batch(
+          auditStatements(db, {
             action: 'support_access_end',
             after: { ended_by: 'expiry' },
             now,
           }),
-        ]),
+        ),
       );
       report.support_ended.push(tenant.id);
     }

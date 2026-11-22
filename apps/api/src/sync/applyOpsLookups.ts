@@ -9,7 +9,6 @@ import {
   asPayment,
   key,
   type Lookups,
-  type SaleInfo,
   type ShopRules,
   type StaffRow,
 } from './applyOpsShared.ts';
@@ -51,45 +50,7 @@ export async function loadLookups(
   const closeDevices = new Set<string>();
   let closeStart = Number.POSITIVE_INFINITY;
   let closeEnd = Number.NEGATIVE_INFINITY;
-  const pushedSales = new Map<string, SaleInfo>();
-  const pushedRefundBefore = new Map<string, number>();
-  const pushedRefundAmountBefore = new Map<string, number>();
-  const refundRunning = new Map<string, number>();
-  const amountRunning = new Map<string, number>();
   for (const op of ops) {
-    if (
-      op.tbl === 'sales' &&
-      op.kind !== 'delete' &&
-      typeof op.row?.id === 'string'
-    )
-      pushedSales.set(op.row.id, {
-        business_date: String(op.row.business_date ?? ''),
-        branch_id: String(op.row.branch_id ?? ''),
-        customer_id:
-          typeof op.row.customer_id === 'string' ? op.row.customer_id : null,
-        udhaar_amount: Number(op.row.udhaar_amount ?? 0),
-        paid_total: Number(op.row.paid_total ?? 0),
-      });
-    if (
-      op.tbl === 'refunds' &&
-      op.kind === 'insert' &&
-      typeof op.row?.sale_id === 'string'
-    ) {
-      const saleId = op.row.sale_id;
-      pushedRefundBefore.set(String(op.row.id), refundRunning.get(saleId) ?? 0);
-      pushedRefundAmountBefore.set(
-        String(op.row.id),
-        amountRunning.get(saleId) ?? 0,
-      );
-      refundRunning.set(
-        saleId,
-        (refundRunning.get(saleId) ?? 0) + Number(op.row.udhaar_part ?? 0),
-      );
-      amountRunning.set(
-        saleId,
-        (amountRunning.get(saleId) ?? 0) + Number(op.row.amount ?? 0),
-      );
-    }
     if (
       (op.tbl === 'sale_voids' || op.tbl === 'refunds') &&
       typeof op.row?.sale_id === 'string'
@@ -167,9 +128,17 @@ export async function loadLookups(
       op.kind === 'insert' &&
       typeof op.row?.device_id === 'string'
     ) {
-      closeDevices.add(op.row.device_id);
-      closeStart = Math.min(closeStart, Number(op.row.period_start));
-      closeEnd = Math.max(closeEnd, Number(op.row.period_end));
+      const start = Number(op.row.period_start);
+      const end = Number(op.row.period_end);
+      if (
+        Number.isSafeInteger(start) &&
+        Number.isSafeInteger(end) &&
+        start <= end
+      ) {
+        closeDevices.add(op.row.device_id);
+        closeStart = Math.min(closeStart, start);
+        closeEnd = Math.max(closeEnd, end);
+      }
     }
     if (op.tbl === 'supplier_returns' && typeof op.row?.id === 'string')
       returnIds.add(op.row.id);
@@ -185,13 +154,16 @@ export async function loadLookups(
     )
       purchaseLineIds.add(op.row.purchase_line_id);
     if (
-      op.kind === 'delete' &&
-      op.row_id &&
+      (op.kind === 'delete' ||
+        (op.kind === 'upsert' && op.row?.deleted_at != null)) &&
       (op.tbl === 'customers' || op.tbl === 'suppliers')
-    )
-      deleteParties[op.tbl === 'customers' ? 'customer' : 'supplier'].add(
-        op.row_id,
-      );
+    ) {
+      const partyId = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof partyId === 'string')
+        deleteParties[op.tbl === 'customers' ? 'customer' : 'supplier'].add(
+          partyId,
+        );
+    }
     if (isMasterTable(op.tbl)) {
       const id =
         op.kind === 'delete'
@@ -313,7 +285,7 @@ export async function loadLookups(
     stmts.push(
       db.prepare(
         `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind,
-          on_hand_milli AS on_hand, cost_changed_at
+          deleted_at, on_hand_milli AS on_hand, cost_changed_at
          FROM products WHERE tenant_id = ?1 AND id IN (${params})`,
         ...chunk,
       ),
@@ -516,11 +488,11 @@ export async function loadLookups(
   const shop = (res[2]?.results?.[0] ?? null) as ShopRules | null;
   const look: Lookups = {
     sales: new Map(),
-    pushedSales,
+    pushedSales: new Map(),
     refundUdhaar: new Map(),
     refundAmount: new Map(),
-    pushedRefundBefore,
-    pushedRefundAmountBefore,
+    pushedRefundUdhaar: new Map(),
+    pushedRefundAmount: new Map(),
     existingVoids: new Set(),
     linkedPayments: new Map(),
     linkedLedger: new Map(),
@@ -536,6 +508,8 @@ export async function loadLookups(
     saleMoved: new Map(),
     customers: new Set(),
     suppliers: new Set(),
+    forwardParties: new Set(),
+    forwardPartyDeleted: new Map(),
     partyDeleted: new Map(),
     staff: new Map(),
     branches: new Map(),
@@ -565,42 +539,30 @@ export async function loadLookups(
     bill_prefix: string;
   }[])
     look.branches.set(b.id, { bill_prefix: b.bill_prefix });
-  // A refund or void can be pushed in the same request as the sale it refers to, but in a
-  // later transaction (one user action = one tx). The sale lines are not in D1 yet, so
-  // make every pending sale line visible to the document checks. A rejected sale still
-  // fails its own FK when the child insert reaches D1.
+  // A sale/purchase may reference a party created in a later transaction of this push;
+  // the batch orders parents first, and the real FK rejects a parent whose create was
+  // rejected. Payments/ledger rows have no such FK and deliberately do not use this set.
   for (const op of ops) {
-    if (op.tbl !== 'sale_lines' || op.kind !== 'insert' || !op.row) continue;
-    const saleId = typeof op.row.sale_id === 'string' ? op.row.sale_id : '';
-    const id = typeof op.row.id === 'string' ? op.row.id : '';
-    if (!saleId || !id) continue;
-    const line = {
-      id,
-      sale_id: saleId,
-      product_id:
-        typeof op.row.product_id === 'string' ? op.row.product_id : null,
-      qty_milli: Number(op.row.qty_milli ?? 0),
-      bundle_group:
-        typeof op.row.bundle_group === 'string' ? op.row.bundle_group : null,
-      bundle_component_qty_milli: Number(
-        op.row.bundle_component_qty_milli ?? 0,
-      ),
-      bundle_qty: Number(op.row.bundle_qty ?? 0),
-      bundle_id: typeof op.row.bundle_id === 'string' ? op.row.bundle_id : null,
-      bundle_name:
-        typeof op.row.bundle_name === 'string' ? op.row.bundle_name : null,
-      bundle_price: Number(op.row.bundle_price ?? 0),
-      bundle_discount: Number(op.row.bundle_discount ?? 0),
-      name_snapshot:
-        typeof op.row.name_snapshot === 'string' ? op.row.name_snapshot : null,
-      net: Number(op.row.net ?? 0),
-    };
-    if (!look.saleLineById.has(id)) {
-      look.saleLineById.set(id, line);
-      look.saleLineSale.set(id, saleId);
-      const list = look.saleLinesBySale.get(saleId) ?? [];
-      list.push(line);
-      look.saleLinesBySale.set(saleId, list);
+    if (op.kind === 'delete' || typeof op.row?.id !== 'string') continue;
+    if (op.tbl === 'customers') {
+      const partyKey = key('customer', op.row.id);
+      look.forwardParties.add(partyKey);
+      look.forwardPartyDeleted.set(
+        partyKey,
+        op.row.deleted_at === null || op.row.deleted_at === undefined
+          ? null
+          : Number(op.row.deleted_at),
+      );
+    }
+    if (op.tbl === 'suppliers') {
+      const partyKey = key('supplier', op.row.id);
+      look.forwardParties.add(partyKey);
+      look.forwardPartyDeleted.set(
+        partyKey,
+        op.row.deleted_at === null || op.row.deleted_at === undefined
+          ? null
+          : Number(op.row.deleted_at),
+      );
     }
   }
   kinds.forEach((k, i) => {
@@ -735,6 +697,7 @@ export async function loadLookups(
           track_stock: Number(r.track_stock ?? 0),
           updated_at: Number(r.updated_at ?? 0),
           kind: String(r.kind ?? 'simple'),
+          deleted_at: r.deleted_at === null ? null : Number(r.deleted_at ?? 0),
           pushed: false,
         });
         look.onHand.set(String(r.id), {
@@ -816,41 +779,116 @@ export async function loadLookups(
       }
     }
   });
-  // A customer/supplier or branch created earlier in this push is not in D1 yet. Treat it
-  // as existing so an offline "new parent, then sale/payment" batch is not rejected before
-  // the parent row is applied (the batch orders parents first).
-  for (const op of ops) {
-    if (op.kind === 'delete' || typeof op.row?.id !== 'string') continue;
-    if (op.kind === 'upsert' && (op.base_rev ?? 0) === 0)
-      look.pushedCreates.add(key(op.tbl, op.row.id));
-    if (op.tbl === 'customers') {
-      look.customers.add(op.row.id);
-      const partyKey = key('customer', op.row.id);
-      if (!look.partyDeleted.has(partyKey))
-        look.partyDeleted.set(
-          partyKey,
-          op.row.deleted_at === null || op.row.deleted_at === undefined
-            ? null
-            : Number(op.row.deleted_at),
-        );
-    }
-    if (op.tbl === 'suppliers') {
-      look.suppliers.add(op.row.id);
-      const partyKey = key('supplier', op.row.id);
-      if (!look.partyDeleted.has(partyKey))
-        look.partyDeleted.set(
-          partyKey,
-          op.row.deleted_at === null || op.row.deleted_at === undefined
-            ? null
-            : Number(op.row.deleted_at),
-        );
-    }
-    if (op.tbl === 'branches' && !look.branches.has(op.row.id))
-      look.branches.set(op.row.id, {
-        bill_prefix: String(op.row.bill_prefix ?? ''),
-      });
-  }
   return look;
+}
+
+/**
+ * Applies the lookups of a successfully planned transaction to the next transaction in
+ * the push. These were previously pre-loaded from every op, so a rejected transaction
+ * could leak a customer/supplier/sale/refund into a later one (API-H2).
+ */
+export function applyLookupChanges(
+  look: Lookups,
+  ops: PushOp[],
+  now: number,
+): void {
+  for (const op of ops) {
+    if (op.tbl === 'customers' || op.tbl === 'suppliers') {
+      const type = op.tbl === 'customers' ? 'customer' : 'supplier';
+      const set = type === 'customer' ? look.customers : look.suppliers;
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id !== 'string' || id === '') continue;
+      set.add(id);
+      look.partyDeleted.set(
+        key(type, id),
+        op.kind === 'delete'
+          ? now
+          : op.row?.deleted_at === null || op.row?.deleted_at === undefined
+            ? null
+            : Number(op.row.deleted_at),
+      );
+      continue;
+    }
+    if (op.tbl === 'branches') {
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id !== 'string' || id === '') continue;
+      if (op.kind === 'delete') look.branches.delete(id);
+      else if (!look.branches.has(id))
+        look.branches.set(id, {
+          bill_prefix: String(op.row?.bill_prefix ?? ''),
+        });
+      continue;
+    }
+    if (op.kind === 'delete' || typeof op.row?.id !== 'string') continue;
+    const id = op.row.id;
+    if (
+      op.kind === 'upsert' &&
+      (op.base_rev ?? 0) === 0 &&
+      isMasterTable(op.tbl)
+    )
+      look.pushedCreates.add(key(op.tbl, id));
+    if (op.tbl === 'sales') {
+      look.pushedSales.set(id, {
+        business_date: String(op.row.business_date ?? ''),
+        branch_id: String(op.row.branch_id ?? ''),
+        customer_id:
+          typeof op.row.customer_id === 'string' ? op.row.customer_id : null,
+        udhaar_amount: Number(op.row.udhaar_amount ?? 0),
+        paid_total: Number(op.row.paid_total ?? 0),
+      });
+      continue;
+    }
+    if (op.tbl === 'sale_lines' && op.kind === 'insert') {
+      const saleId = typeof op.row.sale_id === 'string' ? op.row.sale_id : '';
+      if (saleId === '' || look.saleLineById.has(id)) continue;
+      const line = {
+        id,
+        sale_id: saleId,
+        product_id:
+          typeof op.row.product_id === 'string' ? op.row.product_id : null,
+        qty_milli: Number(op.row.qty_milli ?? 0),
+        bundle_group:
+          typeof op.row.bundle_group === 'string' ? op.row.bundle_group : null,
+        bundle_component_qty_milli: Number(
+          op.row.bundle_component_qty_milli ?? 0,
+        ),
+        bundle_qty: Number(op.row.bundle_qty ?? 0),
+        bundle_id:
+          typeof op.row.bundle_id === 'string' ? op.row.bundle_id : null,
+        bundle_name:
+          typeof op.row.bundle_name === 'string' ? op.row.bundle_name : null,
+        bundle_price: Number(op.row.bundle_price ?? 0),
+        bundle_discount: Number(op.row.bundle_discount ?? 0),
+        name_snapshot:
+          typeof op.row.name_snapshot === 'string'
+            ? op.row.name_snapshot
+            : null,
+        net: Number(op.row.net ?? 0),
+      };
+      look.saleLineById.set(id, line);
+      look.saleLineSale.set(id, saleId);
+      const list = look.saleLinesBySale.get(saleId) ?? [];
+      list.push(line);
+      look.saleLinesBySale.set(saleId, list);
+      continue;
+    }
+    if (
+      op.tbl === 'refunds' &&
+      op.kind === 'insert' &&
+      typeof op.row.sale_id === 'string'
+    ) {
+      const saleId = op.row.sale_id;
+      look.pushedRefundUdhaar.set(
+        saleId,
+        (look.pushedRefundUdhaar.get(saleId) ?? 0) +
+          Number(op.row.udhaar_part ?? 0),
+      );
+      look.pushedRefundAmount.set(
+        saleId,
+        (look.pushedRefundAmount.get(saleId) ?? 0) + Number(op.row.amount ?? 0),
+      );
+    }
+  }
 }
 
 /**
