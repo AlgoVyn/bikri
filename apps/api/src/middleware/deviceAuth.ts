@@ -36,7 +36,8 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const { device, tenant, usage } = found;
   if (
     device.revoked_at !== null ||
-    (device.kind === 'support' && (device.expires_at ?? 0) <= now)
+    (device.kind === 'support' &&
+      ((device.expires_at ?? 0) <= now || (tenant.support_until ?? 0) <= now))
   ) {
     throw new ApiError('DEVICE_REVOKED', 401, 'This device was removed');
   }
@@ -50,8 +51,14 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!(c.req.method === 'GET' && c.req.path.startsWith(`${API_BASE}/files/`)))
     c.header('Cache-Control', 'private, no-store');
 
+  // A suspended/deleting shop or deployment-wide maintenance is refused by `tenantGate`.
+  // Do not spend a write (and a daily row) on `last_seen_at` for a request that cannot
+  // read anything (API-L4).
+  const gateAllows =
+    String(c.env.MAINTENANCE) !== '1' &&
+    (tenant.status === 'active' || tenant.status === 'read_only');
   const pending = parsePending(c.req.header('x-bikri-pending'));
-  if (now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {
+  if (gateAllows && now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {
     const app =
       (c.req.header('x-bikri-app') ?? '').slice(0, 20) || device.app_version;
     const write = db.run(

@@ -62,10 +62,11 @@ export function Modal({
       onKeyDown={(event) => {
         if (event.key !== 'Enter') return;
         const target = event.target;
-        if (target instanceof HTMLTextAreaElement) return;
+        // A focused button keeps its native Enter activation (Cancel included).
+        // Enter in a text field must not implicitly submit a form in the dialog.
         if (
-          target instanceof HTMLButtonElement &&
-          target.dataset.confirm === 'true'
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLButtonElement
         ) {
           return;
         }
@@ -78,6 +79,22 @@ export function Modal({
       {description !== undefined ? <p id={bodyId}>{description}</p> : null}
       {children}
     </dialog>
+  );
+}
+
+/**
+ * A refresh of an already-loaded page failed: keep the stale rows visible but say so,
+ * instead of the error only appearing while `data === null`.
+ */
+export function RefreshError({ message }: { message: string | null }) {
+  if (message === null) return null;
+  return (
+    <p
+      role="alert"
+      className="rounded-control bg-danger-subtle p-2 text-small text-danger-subtle-ink"
+    >
+      {message}
+    </p>
   );
 }
 
@@ -424,16 +441,17 @@ export function Meter({
   );
 }
 
-export function useNow(intervalMs = 1000): number {
+export function useNow(intervalMs = 1000, enabled = true): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!enabled) return;
     const id = setInterval(() => {
       setNow(Date.now());
     }, intervalMs);
     return () => {
       clearInterval(id);
     };
-  }, [intervalMs]);
+  }, [intervalMs, enabled]);
   return now;
 }
 
@@ -452,7 +470,9 @@ export function PairingPanel({
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const now = useNow();
+  // Stop the one-second tick once the code has expired instead of re-rendering the
+  // whole panel forever.
+  const now = useNow(1000, expiresAt > Date.now());
   const left = countdownParts(expiresAt, now);
   const when = formatWhen(expiresAt, i18n.language);
   const waText = t('admin.wa_text', { name: shopName, link, code, when });
@@ -561,6 +581,12 @@ export function HoursDialog({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const [reason, setReason] = useState('');
   const [hours, setHours] = useState<(typeof SUPPORT_HOURS)[number]>(2);
+  // A cancelled/timed-out support request must not prefill the next one.
+  useEffect(() => {
+    if (!open) return;
+    setReason('');
+    setHours(2);
+  }, [open]);
   const trimmed = reason.trim();
   const canConfirm =
     trimmed.length >= 1 && trimmed.length <= 200 && pending !== true;

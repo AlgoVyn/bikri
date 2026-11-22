@@ -1,7 +1,7 @@
 import { formatQtyFromMilli, type QtyUnit } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Link } from '@tanstack/react-router';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
@@ -56,6 +56,21 @@ export function AdjustDialog({
   const [saving, setSaving] = useState(false);
   const noteId = useId();
   const reasonId = useId();
+
+  // Radix unmounts the dialog content, but this component stays mounted by the product
+  // screen; reopen would otherwise show the previous adjustment (and its error).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on open/product only
+  useEffect(() => {
+    if (!open) return;
+    setKind('in');
+    setReason('received_godown');
+    setQty(null);
+    setMinus(false);
+    setCost(Number(product.last_cost ?? 0) || null);
+    setNote('');
+    setError(null);
+    setSaving(false);
+  }, [open, product.id]);
 
   const effectiveReason: string =
     kind === 'count' ? 'count' : kind === 'fix' ? 'entry_fix' : reason;

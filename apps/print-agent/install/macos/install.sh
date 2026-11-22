@@ -9,17 +9,27 @@ plist="${HOME}/Library/LaunchAgents/com.algovyn.bikri.printagent.plist"
 mkdir -p "$bin_dir" "$log_dir" "$(dirname "$plist")"
 install -m 0755 bikri-print-agent "$agent"
 
+# launchd writes the plist as XML. $HOME can contain &, < or quotes, which would
+# produce an invalid plist and a silently unstarted agent.
+xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' -e "s/'/\&apos;/g"
+}
+agent_xml="$(xml_escape "$agent")"
+# The agent writes JSON lines to agent.log itself (rotated at 5 MB with one
+# backup). Pointing StandardErrorPath at a file duplicated every log line into an
+# unrotated stderr.log that grew without bound; launchd has no log rotation.
 cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.algovyn.bikri.printagent</string>
-  <key>ProgramArguments</key><array><string>${agent}</string></array>
+  <key>ProgramArguments</key><array><string>${agent_xml}</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardErrorPath</key><string>${log_dir}/stderr.log</string>
-  <key>StandardOutPath</key><string>${log_dir}/stdout.log</string>
+  <key>StandardOutPath</key><string>/dev/null</string>
+  <key>StandardErrorPath</key><string>/dev/null</string>
 </dict>
 </plist>
 EOF

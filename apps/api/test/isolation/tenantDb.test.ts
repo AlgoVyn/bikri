@@ -3,6 +3,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   assertTenantScoped,
   insertSql,
+  resetScopeCache,
+  SCOPE_CACHE_MAX,
+  scopeCacheSize,
   shardOf,
   TenantScopeError,
   tenantDb,
@@ -45,6 +48,16 @@ describe('assertTenantScoped', () => {
     'DELETE FROM products',
     'INSERT INTO products (id, tenant_id) VALUES (?2, ?1)',
     'INSERT INTO products (tenant_id, id) VALUES (?2, ?1)',
+    // A comma join of two unaliased tenant tables cannot be proven scoped by two bare
+    // `tenant_id = ?1` predicates.
+    'SELECT * FROM products, sales WHERE tenant_id = ?1 AND tenant_id = ?1',
+    // An aliased comma join must carry a predicate for each alias.
+    'SELECT * FROM products p, sales s WHERE p.tenant_id = ?1 AND p.tenant_id = ?1',
+    'SELECT * FROM products p JOIN sales s ON s.tenant_id = ?1 WHERE p.tenant_id = ?1 AND ?1 = ?1 AND p.tenant_id = ?1 AND s.tenant_id = ?1 AND p.id = s.id AND (SELECT COUNT(*) FROM sales, products) > 0',
+    // A multi-row VALUES only scopes its first row.
+    'INSERT INTO products (tenant_id, id) VALUES (?1, ?2), (?3, ?4)',
+    // A quoted alias still has to carry its own predicate.
+    'SELECT * FROM products AS "p" JOIN product_barcodes AS "b" ON b.product_id = p.id WHERE p.tenant_id = ?1',
     // A CTE/derived table can satisfy the predicate count with its outer alias while
     // the inner tenant table is unscoped.
     'WITH x AS (SELECT * FROM products) SELECT * FROM x WHERE x.tenant_id = ?1',
@@ -54,6 +67,32 @@ describe('assertTenantScoped', () => {
     'SELECT * FROM (SELECT * FROM products WHERE tenant_id = ?1) p WHERE p.tenant_id = ?1',
   ])('refuses %s', (sql) => {
     expect(() => assertTenantScoped(sql)).toThrow(TenantScopeError);
+  });
+
+  it('accepts a quoted alias that carries its tenant predicate', () => {
+    expect(() =>
+      assertTenantScoped(
+        'SELECT p.id FROM products AS "p" JOIN product_barcodes AS "b" ON b.tenant_id = ?1 AND b.product_id = p.id WHERE p.tenant_id = ?1',
+      ),
+    ).not.toThrow();
+  });
+
+  it('keeps the scope cache bounded (FIFO eviction, API-L7)', () => {
+    resetScopeCache();
+    const sql = (n: number) =>
+      `SELECT id FROM products WHERE tenant_id = ?1 AND id <> 'row-${n}'`;
+    for (let n = 0; n < SCOPE_CACHE_MAX + 5; n += 1) assertTenantScoped(sql(n));
+    expect(scopeCacheSize()).toBe(SCOPE_CACHE_MAX);
+    // The evicted oldest statement is re-validated (and still accepted).
+    expect(() => assertTenantScoped(sql(0))).not.toThrow();
+    expect(scopeCacheSize()).toBe(SCOPE_CACHE_MAX);
+    // A refused statement is never cached.
+    expect(() => assertTenantScoped('SELECT * FROM products')).toThrow(
+      TenantScopeError,
+    );
+    expect(() => assertTenantScoped('SELECT * FROM products')).toThrow(
+      TenantScopeError,
+    );
   });
 });
 

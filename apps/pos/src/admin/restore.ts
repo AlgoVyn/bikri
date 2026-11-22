@@ -1,4 +1,8 @@
-import { SYNC_EXPORT_ORDER, SYNC_IMPORT_ORDER } from '@bikri/core';
+import {
+  LOCAL_ONLY_COLUMNS,
+  SYNC_EXPORT_ORDER,
+  SYNC_IMPORT_ORDER,
+} from '@bikri/core';
 import type { ExportRow } from './types.ts';
 
 /** Rows per `POST /admin/tenants/:id/import` call (04 §3.7). */
@@ -218,14 +222,22 @@ export function writeRestoreState(
   state: RestoreState,
   storage: Store,
 ): void {
-  storage.setItem(
-    restoreStorageKey(tenantId),
-    JSON.stringify({ v: 1, ...state }),
-  );
+  try {
+    storage.setItem(
+      restoreStorageKey(tenantId),
+      JSON.stringify({ v: 1, ...state }),
+    );
+  } catch {
+    // Private mode / quota: the in-memory state still drives this tab.
+  }
 }
 
 export function clearRestoreState(tenantId: string, storage: Store): void {
-  storage.removeItem(restoreStorageKey(tenantId));
+  try {
+    storage.removeItem(restoreStorageKey(tenantId));
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
 }
 
 export class ExportZipError extends Error {
@@ -332,6 +344,10 @@ export function parseExport(
   for (const tbl of order) {
     if (!known.has(tbl)) throw new ExportZipError();
   }
+  if (new Set(order).size !== order.length) {
+    // Two entries for one table would import one and silently drop the other.
+    throw new ExportZipError();
+  }
   const rank = new Map<string, number>(
     SYNC_EXPORT_ORDER.map((tbl, index) => [tbl, index]),
   );
@@ -397,10 +413,12 @@ export function missingRestoreTables(
 /** Coerce an export row into the scalars `POST …/import` accepts. */
 export function importableRow(
   row: ExportRow,
+  tbl?: string,
 ): Record<string, string | number | null> | null {
+  const localOnly = new Set(tbl ? (LOCAL_ONLY_COLUMNS[tbl] ?? []) : []);
   const out: Record<string, string | number | null> = {};
   for (const [key, value] of Object.entries(row)) {
-    if (key === 'tenant_id') continue;
+    if (key === 'tenant_id' || localOnly.has(key)) continue;
     if (
       value === null ||
       typeof value === 'string' ||

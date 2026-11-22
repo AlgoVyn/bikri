@@ -41,9 +41,9 @@ export function printLabelHtml(
       : `width:${size.widthMm}mm;height:${size.heightMm}mm;box-sizing:border-box;padding:1mm;overflow:hidden;break-after:page;`;
   doc.open();
   doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
-    @font-face{font-family:"Noto Naskh Arabic UI";font-style:normal;font-weight:400;font-display:swap;src:url("${fontBase}/noto-naskh-arabic-arabic-400-normal.woff2") format("woff2")}
-    @font-face{font-family:"Noto Naskh Arabic UI";font-style:normal;font-weight:600;font-display:swap;src:url("${fontBase}/noto-naskh-arabic-arabic-600-normal.woff2") format("woff2")}
-    @font-face{font-family:"Noto Naskh Arabic UI";font-style:normal;font-weight:700;font-display:swap;src:url("${fontBase}/noto-naskh-arabic-arabic-700-normal.woff2") format("woff2")}
+    @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("${fontBase}/inter-latin-wght-normal.woff2") format("woff2")}
+    @font-face{font-family:"Noto Naskh Arabic UI";font-style:normal;font-weight:400 700;font-display:swap;src:url("${fontBase}/noto-naskh-arabic-arabic-wght-normal.woff2") format("woff2")}
+    @font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:100 800;font-display:swap;src:url("${fontBase}/jetbrains-mono-latin-wght-normal.woff2") format("woff2")}
     *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     ${page}
     .sheet{${grid}}

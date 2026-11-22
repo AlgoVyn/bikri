@@ -1,3 +1,4 @@
+import { normaliseNumericText } from '@bikri/core';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,7 +41,9 @@ export function PinBoxes({
             value={(value[i] ?? ' ').trim()}
             onFocus={(e) => e.target.select()}
             onChange={(e) => {
-              const digit = e.target.value.replace(/\D/g, '').slice(-1);
+              const digit = normaliseNumericText(e.target.value)
+                .replace(/\D/gu, '')
+                .slice(-1);
               // Fixed 4 slots; an empty slot is a space so clearing one box never shifts the others.
               const slots = [0, 1, 2, 3].map((n) => value[n] ?? ' ');
               slots[i] = digit || ' ';

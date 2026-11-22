@@ -13,6 +13,7 @@ import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import {
   CustomerBalanceError,
@@ -54,6 +55,8 @@ export function CustomerDialog({
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
+  const guard = useSubmitGuard();
+  const removeGuard = useSubmitGuard();
   const balance = useLiveQuery(
     () => (editing ? customerBalance(getDb(), editing.id) : 0),
     [editing?.id],
@@ -80,7 +83,7 @@ export function CustomerDialog({
   }, [open, editing?.id]);
 
   const save = async () => {
-    if (name.trim() === '' || pending) return;
+    if (name.trim() === '' || pending || !guard.lock()) return;
     setPending(true);
     setDuplicate(null);
     try {
@@ -131,12 +134,13 @@ export function CustomerDialog({
         setDuplicate({ id: err.ownerId, name: err.ownerName });
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      guard.unlock();
       setPending(false);
     }
   };
 
   const remove = async () => {
-    if (!editing) return;
+    if (!editing || !removeGuard.lock()) return;
     try {
       const db = getDb();
       await deleteCustomer(db, editing.id, staff?.id ?? null);
@@ -149,6 +153,8 @@ export function CustomerDialog({
           : t('errors.generic'),
         'error',
       );
+    } finally {
+      removeGuard.unlock();
     }
   };
 

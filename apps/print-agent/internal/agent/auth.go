@@ -53,11 +53,36 @@ func (a *Auth) PairingCode() string {
 	return a.code
 }
 
-// Pair validates a one-time code and returns a new bearer token. The caller must
-// persist the config after this succeeds.
+// Pair validates a one-time code and returns a new bearer token in memory. It
+// is exposed for tests; the HTTP handlers use PairAndPersist so a failed write
+// cannot publish a token that is gone after a restart.
 func (a *Auth) Pair(code string) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return a.pairLocked(code)
+}
+
+// PairAndPersist mutates memory and writes config.json under one lock. On a
+// failed write the pairing state is rolled back, so the token returned to the
+// caller is always the token the agent will accept after a restart.
+func (a *Auth) PairAndPersist(path, code string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	prevPaired, prevHash := a.cfg.Paired, a.cfg.TokenHash
+	prevCode, prevExpires, prevAttempts := a.code, a.expires, a.attempts
+	token, err := a.pairLocked(code)
+	if err != nil {
+		return "", err
+	}
+	if err := SaveConfig(path, a.cfg); err != nil {
+		a.cfg.Paired, a.cfg.TokenHash = prevPaired, prevHash
+		a.code, a.expires, a.attempts = prevCode, prevExpires, prevAttempts
+		return "", err
+	}
+	return token, nil
+}
+
+func (a *Auth) pairLocked(code string) (string, error) {
 	if a.cfg.Paired {
 		return "", errAlreadyPaired
 	}
@@ -105,21 +130,31 @@ func (a *Auth) Paired() bool {
 	return a.cfg.Paired
 }
 
-// Persist writes the current config while holding the auth lock, so a
-// concurrent pair/unpair cannot marshal a partially updated file.
-func (a *Auth) Persist(path string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return SaveConfig(path, a.cfg)
-}
-
-// Unpair revokes the token and starts a new pairing window.
+// Unpair revokes the token and starts a new pairing window in memory only. It
+// is exposed for tests; the HTTP handlers use UnpairAndPersist.
 func (a *Auth) Unpair() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.cfg.Paired = false
 	a.cfg.TokenHash = ""
 	a.rotateLocked()
+}
+
+// UnpairAndPersist revokes the token and writes the config under one lock. A
+// failed write restores the old token in memory too: the alternative was a
+// "revoked" agent whose old token came back on the next restart.
+func (a *Auth) UnpairAndPersist(path string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	prevPaired, prevHash := a.cfg.Paired, a.cfg.TokenHash
+	a.cfg.Paired = false
+	a.cfg.TokenHash = ""
+	if err := SaveConfig(path, a.cfg); err != nil {
+		a.cfg.Paired, a.cfg.TokenHash = prevPaired, prevHash
+		return err
+	}
+	a.rotateLocked()
+	return nil
 }
 
 func (a *Auth) rotate() {

@@ -62,3 +62,20 @@ export async function readJsonBody<E extends { Bindings: Env }>(
     throw new ApiError('VALIDATION_FAILED', 400, 'Body is not JSON');
   }
 }
+
+/**
+ * Read a JSON body with a hard cap, treating an empty body as `{}`. A malformed or
+ * oversized body still fails: operator actions with defaults must not swallow it (API-L6).
+ */
+export async function readOptionalJsonBody<E extends { Bindings: Env }>(
+  c: Context<E>,
+  maxBytes: number,
+): Promise<unknown> {
+  const text = await readTextBody(c, maxBytes);
+  if (text.trim() === '') return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new ApiError('VALIDATION_FAILED', 400, 'Body is not JSON');
+  }
+}

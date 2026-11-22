@@ -50,8 +50,8 @@ class RestoreLoop extends Error {
   }
 }
 
-/** One restore at a time, even if the tab that started it was unmounted. */
-let activeRestore: string | null = null;
+/** One restore per tenant at a time, even if the tab that started it was unmounted. */
+const activeRestore = new Set<string>();
 
 function slicesOf(zip: ParsedExport): { tbl: string; count: number }[] {
   return zip.tables.map((table) => ({
@@ -126,47 +126,63 @@ export function RestoreTab({
               setError(null);
               return;
             }
-            void file.arrayBuffer().then(async (buffer) => {
-              try {
-                const parsed = parseExport(await unzip(new Uint8Array(buffer)));
-                if (parsed.tenant.id !== tenantId) {
+            void file
+              .arrayBuffer()
+              .then(async (buffer) => {
+                try {
+                  const parsed = parseExport(
+                    await unzip(new Uint8Array(buffer), {
+                      // The restore needs the JSON tables; skipping the CSV mirrors
+                      // avoids inflating a second copy of every row.
+                      include: (name) =>
+                        name === 'manifest.json' || name.endsWith('.json'),
+                    }),
+                  );
+                  if (parsed.tenant.id !== tenantId) {
+                    setZip(null);
+                    setError(t('admin.restore_wrong_shop'));
+                    toast.push(t('admin.restore_wrong_shop'), 'error');
+                    return;
+                  }
+                  if (missingRestoreTables(parsed).length > 0) {
+                    setZip(null);
+                    setError(t('admin.restore_incomplete'));
+                    toast.push(t('admin.restore_incomplete'), 'error');
+                    return;
+                  }
+                  const stored =
+                    readRestoreState(tenantId, sessionStorage) ??
+                    initialRestoreState();
+                  const base =
+                    stored.phase === 'done' ? initialRestoreState() : stored;
+                  if (
+                    base.exportedAt !== null &&
+                    base.exportedAt !== parsed.exported_at &&
+                    hasStarted(base)
+                  ) {
+                    setZip(null);
+                    setError(t('admin.restore_different_zip'));
+                    toast.push(t('admin.restore_different_zip'), 'error');
+                    return;
+                  }
+                  const next = { ...base, exportedAt: parsed.exported_at };
+                  setZip(parsed);
+                  setConfirmed(false);
+                  setError(null);
+                  commit(next);
+                } catch {
                   setZip(null);
-                  setError(t('admin.restore_wrong_shop'));
-                  toast.push(t('admin.restore_wrong_shop'), 'error');
-                  return;
+                  setError(t('admin.restore_bad_zip'));
+                  toast.push(t('admin.restore_bad_zip'), 'error');
                 }
-                if (missingRestoreTables(parsed).length > 0) {
-                  setZip(null);
-                  setError(t('admin.restore_incomplete'));
-                  toast.push(t('admin.restore_incomplete'), 'error');
-                  return;
-                }
-                const stored =
-                  readRestoreState(tenantId, sessionStorage) ??
-                  initialRestoreState();
-                const base =
-                  stored.phase === 'done' ? initialRestoreState() : stored;
-                if (
-                  base.exportedAt !== null &&
-                  base.exportedAt !== parsed.exported_at &&
-                  hasStarted(base)
-                ) {
-                  setZip(null);
-                  setError(t('admin.restore_different_zip'));
-                  toast.push(t('admin.restore_different_zip'), 'error');
-                  return;
-                }
-                const next = { ...base, exportedAt: parsed.exported_at };
-                setZip(parsed);
-                setConfirmed(false);
-                setError(null);
-                commit(next);
-              } catch {
+              })
+              .catch(() => {
+                // Reading the picked file can fail (removed drive, permission); do not
+                // leave the operator with a silently ignored click.
                 setZip(null);
                 setError(t('admin.restore_bad_zip'));
                 toast.push(t('admin.restore_bad_zip'), 'error');
-              }
-            });
+              });
           }}
         />
         <section aria-labelledby="restore-steps">
@@ -240,12 +256,12 @@ export function RestoreTab({
                 setError(t('admin.restore_need_file'));
                 return;
               }
-              if (activeRestore === tenantId) {
+              if (activeRestore.has(tenantId)) {
                 toast.push(t('admin.restore_busy'), 'info');
                 return;
               }
               const loaded = zip;
-              activeRestore = tenantId;
+              activeRestore.add(tenantId);
               abortRef.current = false;
               setRunning(true);
               setError(null);
@@ -305,7 +321,7 @@ export function RestoreTab({
                     const raw = table.rows.slice(action.from, action.to);
                     const rows: Record<string, string | number | null>[] = [];
                     for (const row of raw) {
-                      const coerced = importableRow(row);
+                      const coerced = importableRow(row, action.tbl);
                       if (coerced === null) throw new ExportZipError();
                       rows.push(coerced);
                     }
@@ -376,13 +392,15 @@ export function RestoreTab({
                     toast.push(t('admin.restore_loop'), 'error');
                     return;
                   }
-                  toast.push(
-                    adminErrorMessage(err, t('admin.err_generic')),
-                    'error',
+                  const message = adminErrorMessage(
+                    err,
+                    t('admin.err_generic'),
                   );
+                  setError(message);
+                  toast.push(message, 'error');
                 })
                 .finally(() => {
-                  if (activeRestore === tenantId) activeRestore = null;
+                  activeRestore.delete(tenantId);
                   setRunning(false);
                 });
             }}

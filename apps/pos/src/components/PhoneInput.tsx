@@ -88,6 +88,7 @@ export function PhoneInput({
         <a
           className="mt-1 inline-flex min-h-11 items-center text-primary"
           href={whatsApp}
+          target="_blank"
           rel="noopener noreferrer"
         >
           {t('ui.phone_whatsapp')}

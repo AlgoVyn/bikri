@@ -100,4 +100,27 @@ describe('printHtmlViaSystem', () => {
     expect(await pending).toEqual({ ok: false, code: 'TIMEOUT' });
     vi.useRealTimers();
   });
+
+  it('does not wait forever for iframe fonts that never become ready', async () => {
+    vi.useFakeTimers();
+    const append = document.body.append.bind(document.body);
+    vi.spyOn(document.body, 'append').mockImplementation((...nodes) => {
+      append(...nodes);
+      const frame = nodes[0] as HTMLIFrameElement;
+      const win = frame.contentWindow as Window;
+      Object.defineProperty(win.document, 'fonts', {
+        configurable: true,
+        value: { ready: new Promise(() => undefined) },
+      });
+      win.print = () => win.dispatchEvent(new Event('afterprint'));
+      frame.dispatchEvent(new Event('load'));
+    });
+    const pending = printHtmlViaSystem('<p>x</p>', 58);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await pending).toEqual({ ok: true });
+    expect(
+      document.querySelector('[data-testid="system-print-frame"]'),
+    ).toBeNull();
+    vi.useRealTimers();
+  });
 });

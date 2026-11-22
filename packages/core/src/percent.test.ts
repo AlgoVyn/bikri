@@ -14,4 +14,12 @@ describe('parsePercentToBp', () => {
     expect(parsePercentToBp('1.2.3')).toBeNull();
     expect(parsePercentToBp('')).toBeNull();
   });
+
+  it('rejects unsafe, mid-string and over-precise values', () => {
+    expect(parsePercentToBp('90071992547410')).toBeNull();
+    expect(parsePercentToBp('1%5')).toBeNull();
+    expect(parsePercentToBp('%10')).toBeNull();
+    expect(parsePercentToBp('1.2345')).toBeNull();
+    expect(Object.is(parsePercentToBp('-0'), -0)).toBe(false);
+  });
 });

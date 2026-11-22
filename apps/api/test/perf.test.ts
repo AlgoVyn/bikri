@@ -380,6 +380,12 @@ describe('T-062 performance', () => {
           .first<{ n: number }>()
       )?.n,
     ).toBe(20_000);
+    // The reference bill snapshots the catalogue cost.
+    await env.DB.prepare(
+      'UPDATE products SET avg_cost = 50000, last_cost = 50000 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.product)
+      .run();
     // Measure only the push, not the fixture writes.
     await env.DB.prepare(
       'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
@@ -431,6 +437,12 @@ describe('T-062 performance', () => {
       .bind(shop.tenantId)
       .first<{ n: number }>();
     expect(recipes?.n).toBe(500);
+    // Reference bills snapshot the catalogue cost; keep the seeded product in step.
+    await env.DB.prepare(
+      'UPDATE products SET avg_cost = 50000, last_cost = 50000 WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.product)
+      .run();
     await env.DB.prepare(
       'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
     )

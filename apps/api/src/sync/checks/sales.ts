@@ -191,8 +191,12 @@ export function checkSalePolicy(
   const inclusive = Number(row.tax_inclusive) === 1;
   // A shop setting only governs sales made after it changed; an offline sale keeps the
   // snapshot it was rung with. The envelope time, not the client-authored row time, is
-  // the authority for "when it was rung".
-  const fresh = look.shop !== null && entryAt >= look.shop.updated_at;
+  // the authority for "when it was rung". A setting this device could not have pulled
+  // yet cannot govern the sale either (API-M1).
+  const fresh =
+    look.shop !== null &&
+    entryAt >= look.shop.updated_at &&
+    look.shop.updated_at <= deviceSeenAt;
   if (fresh && look.shop && taxRate !== look.shop.tax_rate_bp)
     throw new Reject('CONSTRAINT_FAILED');
   if (fresh && look.shop && inclusive !== (look.shop.tax_mode === 'inclusive'))
@@ -337,8 +341,18 @@ export function checkSalePolicy(
       if (unitCost !== expectedCost) throw new Reject('CONSTRAINT_FAILED');
     }
     // A bundle component price is derived by priceBundle, not a manual override;
-    // the bundle group total is the guard instead.
-    if (product && !line.bundle_id && entryAt >= product.updated_at) {
+    // the bundle group total is the guard instead. A price this device could not have
+    // pulled yet cannot govern an offline sale (API-M1); a product the same push created
+    // or edited is known to it.
+    const priceKnown =
+      product?.pushed === true ||
+      (product !== undefined && product.updated_at <= deviceSeenAt);
+    if (
+      product &&
+      !line.bundle_id &&
+      priceKnown &&
+      entryAt >= product.updated_at
+    ) {
       if (
         unitPrice < product.price &&
         !allowed('catalog.edit') &&
@@ -403,8 +417,11 @@ export function checkSalePolicy(
     if (base < 0) throw new Reject('CONSTRAINT_FAILED');
     const share = base === 0 ? 10_000 : mulDivRound(discount, 10_000, base);
     const maxBp = staff?.max_discount_bp ?? 0;
-    // The limit governs the sale when it was rung, not a later staff edit.
-    const limitFresh = !staff || entryAt >= staff.updated_at;
+    // The limit governs the sale when it was rung, not a later staff edit, and a limit
+    // this device could not have pulled yet cannot reject an offline sale (API-M1).
+    const limitFresh =
+      !staff ||
+      (entryAt >= staff.updated_at && staff.updated_at <= deviceSeenAt);
     if (
       limitFresh &&
       share > maxBp &&

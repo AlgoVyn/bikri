@@ -1,7 +1,7 @@
 /** Retention prune and tenant deletion (03 §4.4, 13 §7.4). Raw D1 allowed here (platform/). */
 import { tenantDb } from '../db/tenantDb.ts';
 import { auditStatements } from '../sync/audit.ts';
-import { revokeSupportDevices } from '../sync/status.ts';
+import { revokeSupportDeviceStatements } from '../sync/status.ts';
 import { APPLY_ORDER } from '../sync/tables.ts';
 import type { TenantRow } from '../types.ts';
 import { utcDay } from './tenants.ts';
@@ -25,6 +25,7 @@ export const DELETE_ORDER = [
   'applied_ops',
   'sync_conflicts',
   'change_log',
+  'change_log_watermarks',
   'devices',
   'branch_device_codes',
   ...[...APPLY_ORDER].reverse(),
@@ -95,7 +96,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const [tenantRows, cursorRow, usageRow] = await calls.run(() =>
     DB.batch([
       DB.prepare(
-        "SELECT id FROM tenants WHERE status <> 'deleted' ORDER BY id",
+        "SELECT id, created_at FROM tenants WHERE status NOT IN ('deleted', 'deleting') ORDER BY id",
       ),
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
       DB.prepare(
@@ -107,14 +108,28 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     (usageRow?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
   );
   calls.writeLimit = Math.max(0, ACCOUNT_WRITE_BUDGET - usedToday);
-  const tenantIds = ((tenantRows?.results ?? []) as Array<{ id: string }>).map(
-    (row) => String(row.id),
-  );
+  const tenants = (
+    (tenantRows?.results ?? []) as Array<{
+      id: string;
+      created_at: number;
+    }>
+  ).map((row) => ({
+    id: String(row.id),
+    createdAt: Number(row.created_at ?? 0),
+  }));
+  const tenantIds = tenants.map((tenant) => tenant.id);
+  // `undefined` = no watermark covers the cutoff day yet; 0 is a real watermark that says
+  // "this shop had nothing old". Conflating the two re-ran the fallback scan every night
+  // for 30 nights (API-H7).
   const targetByTenant = new Map<string, number>();
   // Record today's watermark and read each tenant's cutoff watermark in one batch
-  // per 40 tenants (two statements each).
+  // per 40 tenants (two statements each). `deleting` shops are skipped: their log is
+  // being deleted and their watermark would leak (API-H7).
   for (let at = 0; at < tenantIds.length; at += 40) {
     const chunk = tenantIds.slice(at, at + 40);
+    if (!calls.ok() || !calls.hasWrites(chunk.length * 2)) {
+      break;
+    }
     const statements: D1PreparedStatement[] = [];
     for (const id of chunk) {
       statements.push(
@@ -134,31 +149,37 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       const row = results[index * 2 + 1]?.results?.[0] as
         | { max_seq?: number }
         | undefined;
-      targetByTenant.set(id, Number(row?.max_seq ?? 0));
+      if (row?.max_seq !== undefined && row?.max_seq !== null)
+        targetByTenant.set(id, Number(row.max_seq));
     });
   }
   // First run after deploy: no watermark covers the cutoff yet. Derive each tenant's
-  // ceiling once from the log and store it for the cutoff day.
-  for (const id of tenantIds) {
-    if ((targetByTenant.get(id) ?? 0) > 0) continue;
+  // ceiling once from the log and store it for the cutoff day — including a real 0, so
+  // the next night does not scan again. A shop younger than the cutoff cannot have old
+  // rows, so it is skipped until it is old enough (API-H7).
+  for (const tenant of tenants) {
+    if (targetByTenant.has(tenant.id)) continue;
+    if (tenant.createdAt >= cutoff) {
+      targetByTenant.set(tenant.id, 0);
+      continue;
+    }
     if (!calls.ok(2) || !calls.hasWrites(2)) break;
     const old = await calls.run(() =>
       DB.prepare(
         'SELECT MAX(seq) AS n FROM change_log WHERE tenant_id = ?1 AND at < ?2',
       )
-        .bind(id, cutoff)
+        .bind(tenant.id, cutoff)
         .first<{ n: number | null }>(),
     );
     const target = Number(old?.n ?? 0);
-    if (target <= 0) continue;
-    targetByTenant.set(id, target);
+    targetByTenant.set(tenant.id, target);
     await calls.run(() =>
       DB.prepare(
         `INSERT INTO change_log_watermarks (tenant_id, day, max_seq) VALUES (?1, ?2, ?3)
          ON CONFLICT(tenant_id, day) DO UPDATE SET max_seq =
            CASE WHEN excluded.max_seq > max_seq THEN excluded.max_seq ELSE max_seq END`,
       )
-        .bind(id, cutoffDay, target)
+        .bind(tenant.id, cutoffDay, target)
         .run(),
     );
   }
@@ -174,8 +195,8 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   let lastTenant = cursor;
   let completed = true;
   for (const tenant_id of ordered) {
-    const target = targetByTenant.get(tenant_id) ?? 0;
-    if (target <= 0) {
+    const target = targetByTenant.get(tenant_id);
+    if (target === undefined || target <= 0) {
       lastTenant = tenant_id;
       continue;
     }
@@ -270,6 +291,11 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
             'DELETE FROM owner_email_codes WHERE expires_at < ?1',
           ).bind(now - DAY),
           DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
+          // Superseded per-day watermarks: only the newest row at or before the cutoff
+          // day is read, so older ones would grow without bound (API-H7).
+          DB.prepare('DELETE FROM change_log_watermarks WHERE day < ?1').bind(
+            cutoffDay,
+          ),
           // Public requests hold name/email/phone. A closed request has no operator use
           // after the retention window (09 §9).
           DB.prepare(
@@ -292,10 +318,9 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     for (const tenant of expired.results) {
       if (!calls.ok(2) || !calls.hasWrites(2)) break;
       const db = tenantDb(env, tenant);
-      const revoke = await calls.run(() => revokeSupportDevices(db, now));
       await calls.run(() =>
         db.batch([
-          ...revoke,
+          ...revokeSupportDeviceStatements(db, now),
           ...auditStatements(db, {
             action: 'support_access_end',
             after: { ended_by: 'expiry' },
@@ -354,7 +379,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
             );
             const res = await calls.run(() =>
               DB.prepare(
-                `DELETE FROM ${tbl} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 AND ${where} LIMIT ?2)`,
+                `DELETE FROM ${tbl} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 AND ${where} ORDER BY rowid DESC LIMIT ?2)`,
               )
                 .bind(t.id, limit)
                 .run(),

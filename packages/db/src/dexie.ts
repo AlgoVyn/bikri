@@ -1,5 +1,5 @@
 import type { LedgerTable, MasterTable, OpRow } from '@bikri/core';
-import Dexie, { type DexieOptions, type Table } from 'dexie';
+import Dexie, { type DexieOptions, type Table, type Transaction } from 'dexie';
 
 /**
  * Till database (02 §3). One Dexie database per tenant, named `bikri-<tenant_id>` (D-073);
@@ -407,6 +407,32 @@ export type FileQueueEntry = {
 
 type Rows<T> = Table<T, string>;
 
+/**
+ * Repairs refund lines stored without the till-only `business_date` (a V10 column).
+ * A line pulled on the same page as its refund, or replayed from the outbox, could
+ * miss it; without the date the range indexes silently drop it from reports.
+ */
+async function backfillRefundLineDates(tx: Transaction): Promise<void> {
+  const dates = new Map<string, string>();
+  await (tx.table('refunds') as Table<Record<string, unknown>, string>).each(
+    (refund) => {
+      const id = refund.id;
+      const date = refund.business_date;
+      if (typeof id === 'string' && typeof date === 'string')
+        dates.set(id, date);
+    },
+  );
+  if (dates.size === 0) return;
+  await (tx.table('refund_lines') as Table<Record<string, unknown>, string>)
+    .toCollection()
+    .modify((line) => {
+      if (typeof line.business_date === 'string' && line.business_date !== '')
+        return;
+      const date = dates.get(String(line.refund_id));
+      if (date !== undefined) line.business_date = date;
+    });
+}
+
 export class BikriDb extends Dexie {
   readonly tenantId: string;
   shop!: Rows<MasterRow>;
@@ -512,32 +538,7 @@ export class BikriDb extends Dexie {
     this.version(9).stores(DEXIE_SCHEMA_V9);
     this.version(10)
       .stores(DEXIE_SCHEMA_V10)
-      .upgrade(async (tx) => {
-        // Old refund lines may predate the local column; derive the date from their
-        // refund. Refunds are far fewer than sale lines, so the map stays small.
-        const dates = new Map<string, string>();
-        await (
-          tx.table('refunds') as Table<Record<string, unknown>, string>
-        ).each((refund) => {
-          const id = refund.id;
-          const date = refund.business_date;
-          if (typeof id === 'string' && typeof date === 'string')
-            dates.set(id, date);
-        });
-        const lines = tx.table('refund_lines') as Table<
-          Record<string, unknown>,
-          string
-        >;
-        await lines.toCollection().modify((line) => {
-          if (
-            typeof line.business_date === 'string' &&
-            line.business_date !== ''
-          )
-            return;
-          const date = dates.get(String(line.refund_id));
-          if (date !== undefined) line.business_date = date;
-        });
-      });
+      .upgrade((tx) => backfillRefundLineDates(tx));
     this.version(11)
       .stores(DEXIE_SCHEMA_V11)
       .upgrade(async (tx) => {
@@ -566,6 +567,11 @@ export class BikriDb extends Dexie {
       });
     // V12 only removes/adds indexes; IndexedDB rebuilds them from stored rows.
     this.version(12).stores(DEXIE_SCHEMA_V12);
+    // V13 repairs refund lines that were pulled (or replayed) without the V10
+    // business_date; the schema is unchanged.
+    this.version(13)
+      .stores(DEXIE_SCHEMA_V12)
+      .upgrade((tx) => backfillRefundLineDates(tx));
   }
 }
 

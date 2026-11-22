@@ -29,7 +29,13 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     await pushOk(a.till, saleOps(a, a.till, 1));
     await pushOk(b.till, saleOps(b, b.till, 1));
     const now = Date.now();
-    // Age every A row and half of B's.
+    // Age every A row and half of B's. The shops must also predate the 30-day cutoff:
+    // the prune skips the fallback scan for a shop younger than the cutoff (API-H7).
+    await env.DB.prepare(
+      'UPDATE tenants SET created_at = ?2 WHERE id = ?1 OR id = ?3',
+    )
+      .bind(a.tenantId, now - 60 * DAY, b.tenantId)
+      .run();
     await env.DB.prepare('UPDATE change_log SET at = ?2 WHERE tenant_id = ?1')
       .bind(a.tenantId, now - 40 * DAY)
       .run();

@@ -69,5 +69,7 @@ describe('formatMoney', () => {
     expect(groupLakh(1000)).toBe('1,000');
     expect(groupLakh(100000)).toBe('1,00,000');
     expect(groupLakh(10000000)).toBe('1,00,00,000');
+    expect(() => groupLakh(-1)).toThrow();
+    expect(() => groupLakh(1.5)).toThrow();
   });
 });

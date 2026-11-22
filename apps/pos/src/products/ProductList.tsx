@@ -24,6 +24,7 @@ import {
   PageActions,
 } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { usePrivacyActive } from '../components/privacy.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import {
@@ -43,6 +44,7 @@ import type { SortDirection } from '../lib/sort.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { isLatinName, marginText, qtyWithUnit } from './format.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
@@ -72,6 +74,7 @@ export function ProductList({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { can } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -117,8 +120,11 @@ export function ProductList({
   ]);
   const total = baseRows?.length;
   const categories = useLiveQuery(() => listCategoryOptions(getDb()), []) ?? [];
-  const showCost = can('cost.view');
-  const canEdit = can('catalog.edit');
+  const privacy = usePrivacyActive();
+  // Cost is masked by MoneyText, but a margin % and the sold-value columns would
+  // still reveal it; privacy mode drops the cost/margin columns entirely.
+  const showCost = can('cost.view') && !privacy;
+  const canEdit = can('catalog.edit') && !readOnly;
   const canLabel = canEdit || can('purchase.create');
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -184,7 +190,7 @@ export function ProductList({
       { label: t('home.suggested'), to: '/products/suggested' },
     );
   }
-  if (can('stock.adjust')) {
+  if (can('stock.adjust') && !readOnly) {
     more.push({ label: t('count.title'), to: '/stock/count' });
   }
 

@@ -162,9 +162,15 @@ export function InlineDiscount({
         value={line.discount_value || null}
         placeholder="0"
         leading={<DiscountTypeToggle type={type} onChange={switchType} />}
-        onChange={(value) =>
-          onChange({ discount_type: type, discount_value: value ?? 0 })
-        }
+        onChange={(value) => {
+          const next = value ?? 0;
+          onChange({
+            discount_type: type,
+            // Percent is basis points and cannot exceed the whole line.
+            discount_value:
+              type === 'percent' ? Math.max(0, Math.min(10_000, next)) : next,
+          });
+        }}
       />
       {overMax ? (
         <p className="mt-1 text-small text-danger" data-testid="discount-max">

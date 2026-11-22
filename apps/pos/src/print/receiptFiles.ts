@@ -223,11 +223,9 @@ export async function receiptPdf(r: ReceiptLayout): Promise<Blob> {
   const jpeg = new Uint8Array(
     await (await canvasBlob(canvas, 'image/jpeg', 0.92)).arrayBuffer(),
   );
-  const pdf = jpegToPdf(
-    jpeg,
-    canvas.width,
-    canvas.height,
-    r.paper.printWidthMm,
-  );
+  // Use the full rendered canvas width, not the narrowed print area: a 32-column
+  // profile on 80 mm paper is centred in a 576-dot canvas, and mapping that to
+  // `printWidthMm` (48 mm) shrank the PDF text by half.
+  const pdf = jpegToPdf(jpeg, canvas.width, canvas.height, canvas.width / 8);
   return new Blob([pdf as BlobPart], { type: 'application/pdf' });
 }

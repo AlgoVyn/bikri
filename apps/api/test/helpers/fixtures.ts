@@ -60,8 +60,8 @@ async function addDevice(
   const id = newId(now);
   const token = newDeviceToken();
   await env.DB.prepare(
-    `INSERT INTO devices (tenant_id, id, name, branch_id, device_code, token_hash, is_admin, kind, expires_at, enrolled_at, enrolled_by, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'operator:test', ?10, ?10)`,
+    `INSERT INTO devices (tenant_id, id, name, branch_id, device_code, token_hash, is_admin, kind, expires_at, enrolled_at, enrolled_by, last_seen_at, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'operator:test', ?10, ?10, ?10)`,
   )
     .bind(
       tenantId,
@@ -81,6 +81,15 @@ async function addDevice(
 
 export async function addSupportDevice(shop: Shop, expiresAt: number) {
   counter += 1;
+  // A support device is only ever enrolled while the shop has an active grant, so mirror
+  // that here: `deviceAuth` refuses a support token once `support_until` has passed (API-H4).
+  if (expiresAt > Date.now()) {
+    await env.DB.prepare(
+      'UPDATE tenants SET support_until = MAX(COALESCE(support_until, 0), ?2), support_reason = COALESCE(support_reason, ?3) WHERE id = ?1',
+    )
+      .bind(shop.tenantId, expiresAt, 'test support')
+      .run();
+  }
   return addDevice(
     shop.tenantId,
     shop.branchId,

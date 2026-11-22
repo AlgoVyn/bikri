@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { signToken } from '../src/auth/crypto.ts';
 import { testMail, testOutbox } from '../src/auth/mailer.ts';
+import { ownerSessionKey } from '../src/auth/ownerKeys.ts';
 import { releaseOwnerExportStatement } from '../src/platform/tenantAdmin.ts';
 import {
   addSupportDevice,
@@ -478,6 +480,205 @@ describe('shop admin (T-038, 04 §3.8)', () => {
         a.tenantId,
       ),
     ).toBe(1);
+  });
+});
+
+describe('OPS-H2: export_id is a capability bound to one device', () => {
+  it('pages without owner headers, and refuses another device, an expired or a non-admin device', async () => {
+    const a = await seedShop('Ops export');
+    const session = await ownerSession(a, a.ownerEmail ?? '');
+    const start = await json<{ export_id: string }>(
+      await shopApi(a, session, '/shop/export', { method: 'POST' }),
+    );
+    const query = `export_id=${encodeURIComponent(start.export_id)}&tbl=products`;
+    // The signed token authorises its own pages: no owner header or session is needed.
+    const page = await api(`/shop/export?${query}`, { token: a.admin.token });
+    expect(page.status).toBe(200);
+    // A token minted for the till cannot page from the admin device.
+    const now = Date.now();
+    const other = await signToken(ownerSessionKey(env), {
+      kind: 'export',
+      tenant_id: a.tenantId,
+      device_id: a.till.id,
+      exp: now + 3_600_000,
+      before: now,
+    });
+    expect(
+      (
+        await api(
+          `/shop/export?export_id=${encodeURIComponent(other)}&tbl=products`,
+          { token: a.admin.token },
+        )
+      ).status,
+    ).toBe(403);
+    // Even with a real owner session the bound device check refuses it.
+    const wrongDevice = await api(
+      `/shop/export?export_id=${encodeURIComponent(other)}&tbl=products`,
+      {
+        token: a.admin.token,
+        headers: ownerHeaders(IDS.owner, session),
+      },
+    );
+    expect(wrongDevice.status).toBe(400);
+    expect((await json<Err>(await wrongDevice.clone())).error.code).toBe(
+      'VALIDATION_FAILED',
+    );
+    // An expired token is refused even on its own device (with a real owner session,
+    // so the route's own expiry check is the one that runs).
+    const expired = await signToken(ownerSessionKey(env), {
+      kind: 'export',
+      tenant_id: a.tenantId,
+      device_id: a.admin.id,
+      exp: now - 1,
+      before: now,
+    });
+    const expiredRes = await api(
+      `/shop/export?export_id=${encodeURIComponent(expired)}&tbl=products`,
+      {
+        token: a.admin.token,
+        headers: ownerHeaders(IDS.owner, session),
+      },
+    );
+    expect(expiredRes.status).toBe(400);
+    expect((await json<Err>(expiredRes)).error.code).toBe('VALIDATION_FAILED');
+    // A non-admin till never reaches the export route.
+    expect(
+      (
+        await api(`/shop/export?${query}`, {
+          token: a.till.token,
+          headers: ownerHeaders(IDS.owner, session),
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it('collapses repeated onlyIfChanged writes to one audit row and one change_log row', async () => {
+    const a = await seedShop('Ops CAS');
+    const s = await ownerSession(a, a.ownerEmail ?? '');
+    await env.DB.prepare(
+      "INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) VALUES (?1, '01JC00000000000000000000CB', '01JC00000000000000000000C8', 'sales', 'x', 'over_refund', '{}', 'needs_owner', 1)",
+    )
+      .bind(a.tenantId)
+      .run();
+    const ack = (headers = ownerHeaders(IDS.owner, s)) =>
+      api('/shop/conflicts/01JC00000000000000000000CB/acknowledge', {
+        method: 'POST',
+        token: a.admin.token,
+        headers,
+      });
+    const ackHeaders = ownerHeaders(IDS.owner, s);
+    expect((await ack(ackHeaders)).status).toBe(200);
+    expect((await ack(ackHeaders)).status).toBe(200);
+    expect(await auditCount(a.tenantId, 'sync_conflict_ack')).toBe(1);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1 AND tbl = 'sync_conflicts'",
+        a.tenantId,
+      ),
+    ).toBe(1);
+    // The audit row names the acting device and the unlocked owner, never `server`.
+    const row = await env.DB.prepare(
+      "SELECT device_id, staff_id FROM audit_log WHERE tenant_id = ?1 AND action = 'sync_conflict_ack'",
+    )
+      .bind(a.tenantId)
+      .first<{ device_id: string; staff_id: string }>();
+    expect(row).toEqual({ device_id: a.admin.id, staff_id: IDS.owner });
+
+    // Cancelling an enrolment code twice writes one cancel audit only.
+    const created = await json<{ code: string }>(
+      await shopApi(a, s, '/shop/enrolment-codes', {
+        method: 'POST',
+        json: {
+          device_name: 'Counter 9',
+          branch_id: a.branchId,
+          is_admin: false,
+        },
+      }),
+    );
+    const once = await shopApi(a, s, `/shop/enrolment-codes/${created.code}`, {
+      method: 'DELETE',
+    });
+    const twice = await shopApi(a, s, `/shop/enrolment-codes/${created.code}`, {
+      method: 'DELETE',
+    });
+    expect(once.status).toBe(204);
+    expect(twice.status).toBe(404);
+    expect(await auditCount(a.tenantId, 'device_enrol_code')).toBe(2);
+
+    // Revoking twice keeps one revoke audit.
+    const revoke = () =>
+      shopApi(a, s, `/shop/devices/${a.till.id}/revoke`, { method: 'POST' });
+    expect((await revoke()).status).toBe(200);
+    expect((await revoke()).status).toBe(200);
+    expect(await auditCount(a.tenantId, 'device_revoke')).toBe(1);
+
+    // PATCH refuses a revoked device and leaves its row untouched.
+    const patch = await shopApi(a, s, `/shop/devices/${a.till.id}`, {
+      method: 'PATCH',
+      json: { name: 'Zombie' },
+    });
+    expect(patch.status).toBe(409);
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM devices WHERE tenant_id = ?1 AND id = ?2 AND name = 'Zombie'",
+        a.tenantId,
+        a.till.id,
+      ),
+    ).toBe(0);
+  });
+});
+
+describe('CORE-M1: a branch keeps the code of a device that moved away', () => {
+  it('reserves the old code and never hands it to a new device in either branch', async () => {
+    const a = await seedShop('Move codes');
+    const s = await ownerSession(a, a.ownerEmail ?? '');
+    const branch2 = '01JC0000000000000000000BR9';
+    await env.DB.prepare(
+      "INSERT INTO branches (tenant_id, id, name, bill_prefix, created_at, updated_at) VALUES (?1, ?2, 'Second', 'SEC', 1, 1)",
+    )
+      .bind(a.tenantId, branch2)
+      .run();
+    const moved = await json<{ device: { device_code: string } }>(
+      await shopApi(a, s, `/shop/devices/${a.till.id}`, {
+        method: 'PATCH',
+        json: { branch_id: branch2 },
+      }),
+    );
+    expect(moved.device.device_code).toBe('A');
+    // Both reservations exist: the old (branch, code) and the new one.
+    const reservations = await env.DB.prepare(
+      'SELECT branch_id, device_code FROM branch_device_codes WHERE tenant_id = ?1 ORDER BY branch_id, device_code',
+    )
+      .bind(a.tenantId)
+      .all<{ branch_id: string; device_code: string }>();
+    expect(reservations.results).toEqual(
+      expect.arrayContaining([
+        { branch_id: a.branchId, device_code: 'B' },
+        { branch_id: branch2, device_code: 'A' },
+      ]),
+    );
+    // A new device in the old branch gets the next free code, not the moved one.
+    const created = await json<{ code: string }>(
+      await shopApi(a, s, '/shop/enrolment-codes', {
+        method: 'POST',
+        json: {
+          device_name: 'Counter 4',
+          branch_id: a.branchId,
+          is_admin: false,
+        },
+      }),
+    );
+    const enrolled = await json<{ device: { device_code: string } }>(
+      await api('/devices/enrol', {
+        method: 'POST',
+        json: {
+          code: created.code,
+          user_agent: 'test',
+          app_version: '1.1.0',
+        },
+      }),
+    );
+    expect(enrolled.device.device_code).toBe('C');
   });
 });
 

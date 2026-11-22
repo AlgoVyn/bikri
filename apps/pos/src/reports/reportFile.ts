@@ -1,5 +1,6 @@
 import type { ReportBundle } from '../data/reportBundle.ts';
 import { canvasFont, prepareCanvasFonts } from '../lib/canvasFont.ts';
+import { formatTimestamp } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { CANVAS } from '../lib/palette.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
@@ -31,6 +32,8 @@ export type ReportFileMeta = {
   to: string;
   generatedAt: number;
   lang: string;
+  /** The shop's time zone for the generated-at stamp. */
+  timeZone: string;
   showProfit: boolean;
   labels: ReportFileLabels;
   bundle: ReportBundle;
@@ -66,11 +69,7 @@ async function draw(meta: ReportFileMeta): Promise<HTMLCanvasElement> {
     168,
   );
   ctx.fillText(
-    `${labels.generated}: ${new Intl.DateTimeFormat('en-PK', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'Asia/Karachi',
-    }).format(meta.generatedAt)}`,
+    `${labels.generated}: ${formatTimestamp(meta.generatedAt, meta.lang, meta.timeZone, 'datetimeShort')}`,
     MARGIN,
     198,
   );

@@ -257,13 +257,6 @@ export function sideEffects(
       state.on_hand += qty;
     }
   }
-  if (tbl === 'sales' && Number.isSafeInteger(row.invoice_seq)) {
-    // One device UPDATE at the end of the push instead of one per bill (D-278).
-    ctx.maxInvoiceSeq = Math.max(
-      ctx.maxInvoiceSeq ?? 0,
-      Number(row.invoice_seq),
-    );
-  }
   return out;
 }
 
@@ -501,6 +494,13 @@ export function stockRepairStatements(
       out.push(
         ...sideEffects(ctx, 'stock_movements', movement, avg, group, opId),
       );
+    else {
+      // A non-costed repair still moves stock. Later costed movements in the same push
+      // are planned against this overlay, so it must include the repaired quantity
+      // (API-L9); `sideEffects` already does this for the costed path.
+      const state = avg.get(productId);
+      if (state) state.on_hand += qty;
+    }
   };
   const grouped = (
     lines: Record<string, unknown>[],

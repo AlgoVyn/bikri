@@ -1,3 +1,4 @@
+import { normaliseNumericText } from '@bikri/core';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
@@ -663,7 +664,12 @@ export function PrinterWizard({
                         maxLength={6}
                         value={agentCode}
                         onChange={(e) =>
-                          setAgentCode(e.target.value.replace(/\D/gu, ''))
+                          setAgentCode(
+                            normaliseNumericText(e.target.value).replace(
+                              /\D/gu,
+                              '',
+                            ),
+                          )
                         }
                       />
                     </label>

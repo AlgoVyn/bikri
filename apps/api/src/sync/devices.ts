@@ -6,43 +6,50 @@ import type { DeviceRow } from '../types.ts';
  * Next device code in a branch: after every code in the branch registry and every code a
  * branch device still carries. The registry is backfilled once from invoice numbers; this
  * used to fetch and regex-parse every bill in the branch on each enrolment.
+ *
+ * Allocation is a compare-and-swap on the registry's primary key: `INSERT OR IGNORE`
+ * reports `changes = 0` when a concurrent enrolment took the same code, so the next free
+ * code is computed and claimed again instead of returning a colliding one (API-M6).
  */
 export async function allocateDeviceCode(
   db: TenantDb,
   branchId: string,
 ): Promise<string> {
-  const [registry, devices] = await db.batch([
-    db.prepare(
-      'SELECT device_code FROM branch_device_codes WHERE tenant_id = ?1 AND branch_id = ?2',
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const [registry, devices] = await db.batch([
+      db.prepare(
+        'SELECT device_code FROM branch_device_codes WHERE tenant_id = ?1 AND branch_id = ?2',
+        branchId,
+      ),
+      db.prepare(
+        'SELECT device_code, device_code_history FROM devices WHERE tenant_id = ?1 AND branch_id = ?2',
+        branchId,
+      ),
+    ]);
+    const used: string[] = [];
+    for (const r of (registry?.results ?? []) as { device_code: string }[])
+      used.push(r.device_code);
+    for (const r of (devices?.results ?? []) as {
+      device_code: string;
+      device_code_history: string;
+    }[]) {
+      used.push(r.device_code);
+      used.push(
+        ...String(r.device_code_history ?? '')
+          .split(',')
+          .filter(Boolean),
+      );
+    }
+    const code = nextDeviceCode(used);
+    // Reserve the code even if the device write later fails; a code is never reused.
+    const claimed = await db.run(
+      'INSERT OR IGNORE INTO branch_device_codes (tenant_id, branch_id, device_code) VALUES (?1, ?2, ?3)',
       branchId,
-    ),
-    db.prepare(
-      'SELECT device_code, device_code_history FROM devices WHERE tenant_id = ?1 AND branch_id = ?2',
-      branchId,
-    ),
-  ]);
-  const used: string[] = [];
-  for (const r of (registry?.results ?? []) as { device_code: string }[])
-    used.push(r.device_code);
-  for (const r of (devices?.results ?? []) as {
-    device_code: string;
-    device_code_history: string;
-  }[]) {
-    used.push(r.device_code);
-    used.push(
-      ...String(r.device_code_history ?? '')
-        .split(',')
-        .filter(Boolean),
+      code,
     );
+    if ((claimed.meta.changes ?? 0) === 1) return code;
   }
-  const code = nextDeviceCode(used);
-  // Reserve the code even if the device write later fails; a code is never reused.
-  await db.run(
-    'INSERT OR IGNORE INTO branch_device_codes (tenant_id, branch_id, device_code) VALUES (?1, ?2, ?3)',
-    branchId,
-    code,
-  );
-  return code;
+  throw new Error('could not allocate a device code');
 }
 
 /** The device as a till sees it (04 §3.2–3.3). */

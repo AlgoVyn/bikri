@@ -1,4 +1,5 @@
 import { businessDate, mulDivRound } from '@bikri/core';
+import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -21,6 +22,7 @@ import { PageLoading } from '../components/PageLoading';
 import { PrivacyValue } from '../components/privacy.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { isBusinessDate } from '../data/dates.ts';
 import { getDb } from '../data/db.ts';
 import {
   addDays,
@@ -267,7 +269,14 @@ export function ReportsPage() {
     const now = Date.now();
     const today = businessDate(now, timeZone);
     const selected = limited ? 'today' : preset;
-    if (selected === 'custom' && custom.from > custom.to) return null;
+    // A cleared native date input emits ""; it must not reach addDays/Date.parse.
+    if (
+      selected === 'custom' &&
+      (!isBusinessDate(custom.from) ||
+        !isBusinessDate(custom.to) ||
+        custom.from > custom.to)
+    )
+      return null;
     const range = reportRange(selected, now, timeZone, custom);
     const reportRangeValue: ReportRange = {
       ...range,
@@ -281,7 +290,8 @@ export function ReportsPage() {
       timeZone,
       slowMovers: tab === 'products',
     };
-    const span = daysBetween(range.from, range.to) + 1;
+    // daysBetween is inclusive (Today = 1); the previous window is the same span.
+    const span = daysBetween(range.from, range.to);
     const previousRange: ReportRange | undefined =
       span <= 90
         ? {
@@ -456,6 +466,7 @@ export function ReportsPage() {
     to: bundle.range.to,
     generatedAt: Date.now(),
     lang,
+    timeZone: data.timeZone,
     showProfit: cost,
     bundle,
     labels: {
@@ -533,11 +544,17 @@ export function ReportsPage() {
 
   const onTabKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const current = TABS.findIndex((item) => item.id === tab);
+    // RTL Urdu lays the strip out right-to-left, so ArrowRight moves to the
+    // previous tab and ArrowLeft to the next (the reverse of LTR).
+    const rtl = document.documentElement.dir === 'rtl';
     let next = current;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
-      next = (current + 1) % TABS.length;
-    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+    if (event.key === 'ArrowDown') next = (current + 1) % TABS.length;
+    else if (event.key === 'ArrowUp')
       next = (current - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'ArrowRight')
+      next = (current + (rtl ? -1 : 1) + TABS.length) % TABS.length;
+    else if (event.key === 'ArrowLeft')
+      next = (current + (rtl ? 1 : -1) + TABS.length) % TABS.length;
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = TABS.length - 1;
     else return;
@@ -1100,6 +1117,12 @@ function SummaryTab({
   );
 }
 
+function productName(product: MasterRow, lang: string): string {
+  return lang === 'ur' && String(product.name_ur ?? '').trim() !== ''
+    ? String(product.name_ur)
+    : String(product.name_en);
+}
+
 function ProductsTab({
   bundle,
   cost,
@@ -1131,6 +1154,9 @@ function ProductsTab({
           qtyText(row.qtyMilli, row.unit),
           <MoneyText key="revenue" paisa={row.revenue} />,
         ])}
+        rowKeys={products.bestByQty.map(
+          (row) => row.productId ?? `missing:${row.key}`,
+        )}
         empty={t('office.reports.no_products')}
       />
       <ReportTable
@@ -1145,6 +1171,9 @@ function ProductsTab({
           qtyText(row.qtyMilli, row.unit),
           <MoneyText key="revenue" paisa={row.revenue} />,
         ])}
+        rowKeys={products.bestByRevenue.map(
+          (row) => row.productId ?? `missing:${row.key}`,
+        )}
         empty={t('office.reports.no_products')}
       />
       {cost ? (
@@ -1157,6 +1186,9 @@ function ProductsTab({
             t('office.reports.profit'),
             t('office.reports.margin'),
           ]}
+          rowKeys={products.bestByProfit.map(
+            (row) => row.productId ?? `missing:${row.key}`,
+          )}
           rows={products.bestByProfit.map((row) => [
             name(row),
             <MoneyText key="revenue" paisa={row.revenue} />,
@@ -1187,6 +1219,7 @@ function ProductsTab({
           qtyText(row.qtyMilli),
           <MoneyText key="revenue" paisa={row.revenue} />,
         ])}
+        rowKeys={products.categories.map((row) => row.key)}
         empty={t('office.reports.no_products')}
       />
       <ReportTable
@@ -1201,6 +1234,7 @@ function ProductsTab({
           qtyText(row.qtyMilli),
           <MoneyText key="revenue" paisa={row.revenue} />,
         ])}
+        rowKeys={products.brands.map((row) => `brand:${row.key}`)}
         empty={t('office.reports.no_products')}
       />
       <ReportTable
@@ -1212,12 +1246,13 @@ function ProductsTab({
           t('office.reports.last_sale'),
         ]}
         rows={(slowMovers ?? []).map((row) => [
-          String(row.product.name_en),
+          productName(row.product, lang),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
           row.lastSale
             ? longDate(row.lastSale, lang)
             : t('office.reports.never_sold'),
         ])}
+        rowKeys={(slowMovers ?? []).map((row) => String(row.product.id))}
         empty={
           slowMoversReady
             ? t('office.reports.no_slow_movers')
@@ -1282,12 +1317,13 @@ function StockTab({
           ...(cost ? [t('office.reports.stock_value')] : []),
         ]}
         rows={stock.attention.map((row) => [
-          String(row.product.name_en),
+          productName(row.product, lang),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
           qtyText(Number(row.product.min_stock_milli ?? 0)),
           statusLabel(row.status),
           ...(cost ? [<MoneyText key="value" paisa={row.value} />] : []),
         ])}
+        rowKeys={stock.attention.map((row) => String(row.product.id))}
         empty={t('office.reports.no_stock_issues')}
       />
 
@@ -1307,6 +1343,7 @@ function StockTab({
           qtyText(row.outQty),
           qtyText(row.netQty),
         ])}
+        rowKeys={stock.movements.map((row) => row.reason)}
         empty={t('office.reports.no_movements')}
       />
 

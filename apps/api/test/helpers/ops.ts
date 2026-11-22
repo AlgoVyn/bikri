@@ -164,6 +164,7 @@ export function bundleSaleOps(
     bundleDiscount?: number;
     bundleQty?: number;
     prefix?: string;
+    replacesSaleId?: string;
   } = {},
 ): PushOp[] {
   const now = opts.now ?? Date.now();
@@ -208,7 +209,7 @@ export function bundleSaleOps(
     udhaar_amount: 0,
     cash_tendered: netTotal,
     change_given: 0,
-    replaces_sale_id: null,
+    replaces_sale_id: opts.replacesSaleId ?? null,
     note: '',
   };
   const lines = bundle.componentIds.map((productId, index) => ({

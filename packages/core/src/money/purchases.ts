@@ -33,6 +33,9 @@ export function computePurchase(
   if (otherCharges < 0) {
     throw new RangeError('other_charges must be non-negative');
   }
+  if (lines.length === 0 && otherCharges > 0) {
+    throw new RangeError('other charges need at least one line');
+  }
   const priced = lines.map((line) => {
     assertSafeInteger(line.qty_milli, 'qty_milli');
     assertSafeInteger(line.unit_cost, 'unit_cost');

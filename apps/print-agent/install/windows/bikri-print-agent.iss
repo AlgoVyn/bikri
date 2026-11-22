@@ -76,12 +76,15 @@ begin
   Result := True;
 end;
 
-function InitializeSetup(): Boolean;
+// Stop the old process only after the user has confirmed the install. Calling
+// this from InitializeSetup killed a working agent even when the wizard was
+// cancelled. PrepareToInstall runs after "Ready to install" -> Install.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  Result := StopAgent();
+  StopAgent();
+  Result := '';
 end;
 
-function InitializeUninstall(): Boolean;
-begin
-  Result := StopAgent();
-end;
+// Uninstall: the [UninstallRun] entry above stops the agent after the user
+// confirms. InitializeUninstall ran before the prompt, so a cancelled uninstall
+// left the till without a print service.

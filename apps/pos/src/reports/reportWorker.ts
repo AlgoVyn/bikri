@@ -46,16 +46,34 @@ let openDb: {
 } | null = null;
 
 function dbFor(tenantId: string): ReturnType<typeof openTenantDb> {
-  if (openDb?.tenantId === tenantId) return openDb.db;
+  if (openDb?.tenantId === tenantId) {
+    // A Dexie handle closed by a versionchange (another tab upgraded the DB) or a
+    // failed request must be reopened, not reused for every later report.
+    if (openDb.db.isOpen()) return openDb.db;
+    openDb = null;
+  }
   openDb?.db.close();
   openDb = { tenantId, db: openTenantDb(tenantId) };
   return openDb.db;
 }
 
+function dropDb(db: ReturnType<typeof openTenantDb>): void {
+  if (openDb?.db !== db) return;
+  openDb = null;
+  try {
+    db.close();
+  } catch {
+    // Already closed; the next request opens a fresh handle.
+  }
+}
+
 async function compute(request: Request): Promise<Response> {
   const { id, tenantId, range, previousRange, options } = request;
-  const db = dbFor(tenantId);
+  // dbFor/openTenantDb can throw (a blocked upgrade, a lost connection); keep it in
+  // the try so the page always gets a response instead of waiting forever.
+  let db: ReturnType<typeof openTenantDb> | null = null;
   try {
+    db = dbFor(tenantId);
     const bundle = await reportBundle(db, range, options);
     const previous =
       previousRange === undefined
@@ -68,6 +86,7 @@ async function compute(request: Request): Promise<Response> {
           ).summary;
     return { id, bundle, previous };
   } catch (error) {
+    if (db !== null) dropDb(db);
     return {
       id,
       error: error instanceof Error ? error.message : String(error),
@@ -94,9 +113,13 @@ async function pump(): Promise<void> {
       const response = await compute(request);
       post(response);
       // A page that sent a request while this one was running must settle even when its
-      // own request was replaced; the next completed bundle is the current one.
-      for (const id of superseded) post({ ...response, id });
-      superseded.clear();
+      // own request was replaced; the next completed bundle is the current one. Wait
+      // until no real request is queued, so a superseded id never receives the stale
+      // bundle that was already replaced by the one about to run.
+      if (pending === null) {
+        for (const id of superseded) post({ ...response, id });
+        superseded.clear();
+      }
     }
   } finally {
     running = false;

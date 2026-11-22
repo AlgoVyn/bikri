@@ -189,6 +189,19 @@ func TestSecurityChecks(t *testing.T) {
 		t.Fatalf("bad host status = %d", res.StatusCode)
 	}
 
+	// A loopback name on a different local port is still a rebinding vector:
+	// only the port this process is listening on is accepted (14 §7).
+	req, _ = http.NewRequest(http.MethodGet, httpServer.URL+"/v1/health", nil)
+	req.Host = "127.0.0.1:9"
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("bad host port status = %d", res.StatusCode)
+	}
+
 	// CORS preflight for the Bikri origin.
 	req, _ = http.NewRequest(http.MethodOptions, httpServer.URL+"/v1/jobs", nil)
 	req.Header.Set("Origin", "https://algovyn.com")
@@ -299,6 +312,107 @@ func TestSameLoopbackOrigin(t *testing.T) {
 		if got := sameLoopbackOrigin(tc.origin, tc.host); got != tc.want {
 			t.Fatalf("sameLoopbackOrigin(%q, %q) = %v, want %v", tc.origin, tc.host, got, tc.want)
 		}
+	}
+}
+
+func errorCode(t *testing.T, body []byte) string {
+	t.Helper()
+	var record map[string]string
+	if err := json.Unmarshal(body, &record); err != nil {
+		t.Fatalf("error body is not JSON: %s", body)
+	}
+	return record["error"]
+}
+
+func pairOnce(t *testing.T, s *Server, base string) string {
+	t.Helper()
+	code := s.auth.PairingCode()
+	body, _ := json.Marshal(map[string]string{"code": code, "clientName": "test"})
+	res, err := http.Post(base+"/v1/pair", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		payload, _ := io.ReadAll(res.Body)
+		t.Fatalf("pair status = %d: %s", res.StatusCode, payload)
+	}
+	var pair struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&pair); err != nil {
+		t.Fatal(err)
+	}
+	return pair.Token
+}
+
+func TestPairRateLimitUsesRateLimitedCode(t *testing.T) {
+	s, _ := testServer(t)
+	httpServer := httptest.NewServer(s.Handler())
+	defer httpServer.Close()
+	var last *http.Response
+	for i := 0; i < 6; i++ {
+		req, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/v1/pair", strings.NewReader(`{"code":"!!!!!!"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "https://algovyn.com")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if last != nil {
+			last.Body.Close()
+		}
+		last = res
+	}
+	defer last.Body.Close()
+	if last.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("sixth pair attempt = %d, want 429", last.StatusCode)
+	}
+	payload, _ := io.ReadAll(last.Body)
+	if code := errorCode(t, payload); code != "RATE_LIMITED" {
+		t.Fatalf("rate limit code = %q, want RATE_LIMITED", code)
+	}
+}
+
+func TestOversizedBodiesArePayloadTooLarge(t *testing.T) {
+	s, _ := testServer(t)
+	httpServer := httptest.NewServer(s.Handler())
+	defer httpServer.Close()
+
+	bigPair := `{"code":"` + strings.Repeat("a", 9<<10) + `"}`
+	req, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/v1/pair", strings.NewReader(bigPair))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://algovyn.com")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized pair body = %d: %s", res.StatusCode, payload)
+	}
+	if code := errorCode(t, payload); code != "PAYLOAD_TOO_LARGE" {
+		t.Fatalf("oversized pair code = %q", code)
+	}
+
+	token := pairOnce(t, s, httpServer.URL)
+	bigJob := `{"jobId":"job-1","printer":"Bixolon","mode":"raw","encoding":"escpos","data":"` +
+		strings.Repeat("a", 5<<20) + `"}`
+	req, _ = http.NewRequest(http.MethodPost, httpServer.URL+"/v1/jobs", strings.NewReader(bigJob))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized job body = %d: %s", res.StatusCode, payload)
+	}
+	if code := errorCode(t, payload); code != "PAYLOAD_TOO_LARGE" {
+		t.Fatalf("oversized job code = %q", code)
 	}
 }
 

@@ -236,6 +236,7 @@
     "bundle_price": "Bundle price",
     "bundle_items": "Items in this bundle",
     "bundle_items_empty": "Add at least one item to this bundle.",
+    "bundle_missing": "{{count}} component product is missing or deleted. Remove it before saving.",
     "bundle_add_item": "Add item",
     "bundle_search": "Search a product by name or SKU",
     "bundle_qty": "Qty per bundle",
@@ -814,6 +815,7 @@
     "delete_held": "Delete",
     "discount": "Discount",
     "discount_max": "Max {{amount}}",
+    "discount_invalid": "Enter a discount between 0 and 100%.",
     "discount_pct": "Discount %",
     "discount_type": "Discount in Rs or %",
     "discount_forbidden": "You don't have permission to give discounts.",
@@ -922,6 +924,7 @@
       "pin_mismatch": "PINs don't match",
       "pin_weak": "Choose a less obvious PIN",
       "product_name": "Enter the product name.",
+      "opening": "Enter a valid opening quantity.",
       "shop_name": "Enter the shop name (2 to 60 letters).",
       "tax": "Enter 0 to 25, up to 2 decimals.",
       "too_long": "Too long."

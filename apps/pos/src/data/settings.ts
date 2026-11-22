@@ -7,6 +7,7 @@ import {
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import { csvCell } from '../lib/csv.ts';
+import { isBusinessDate } from './dates.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LogoData } from './setup.ts';
 import { writeAction, writeScope } from './write.ts';
@@ -521,6 +522,11 @@ function rangeEpochs(
   filters: AuditFilters,
   timeZone: string,
 ): { start: number; end: number } {
+  // A cleared date picker emits ""; Date.parse("T12:00:00Z") is NaN and the
+  // time-zone offset formatter would throw. Return an empty range instead.
+  if (!isBusinessDate(filters.from) || !isBusinessDate(filters.to)) {
+    return { start: 0, end: 0 };
+  }
   const from = Date.parse(`${filters.from}T12:00:00Z`);
   const to = Date.parse(`${filters.to}T12:00:00Z`);
   // The shop's local day boundaries, not a fixed +05:00 (screens/17 Activity).

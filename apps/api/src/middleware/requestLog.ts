@@ -1,15 +1,14 @@
 import type { MiddlewareHandler } from 'hono';
-import { ApiError } from '../errors.ts';
+import type { ErrorStatus } from '../errors.ts';
 import type { AppEnv } from '../types.ts';
+import { statusForError } from './onError.ts';
 
 /** One structured line per API request; never includes search text, email addresses or rows. */
 export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
   const id = crypto.randomUUID();
   const start = performance.now();
   c.header('X-Request-Id', id);
-  try {
-    await next();
-  } finally {
+  const write = (status: ErrorStatus | number) => {
     const route = new URL(c.req.url).pathname
       // The plain enrolment code is a credential; never put it in Workers Logs.
       .replace(
@@ -20,16 +19,6 @@ export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
       tenant?: { id?: string };
       device?: { id?: string };
     };
-    // `finally` runs before Hono's onError turns a thrown error into a response, so
-    // `c.res.status` is still 200. Report the thrown ApiError's own status (a validation
-    // 400 or a missing-resource 404 is not a server fault); anything else is a 500.
-    const error = (c as { error?: unknown }).error;
-    const status =
-      error instanceof ApiError
-        ? error.status
-        : error !== undefined
-          ? 500
-          : c.res.status;
     console.log(
       JSON.stringify({
         level: 'info',
@@ -42,5 +31,14 @@ export const requestLog: MiddlewareHandler<AppEnv> = async (c, next) => {
         ms: Math.round(performance.now() - start),
       }),
     );
+  };
+  try {
+    await next();
+  } catch (error) {
+    // Hono's onError turns the throw into a response only after this middleware
+    // unwinds, so report the mapped status here and let the error keep propagating.
+    write(statusForError(error));
+    throw error;
   }
+  write(c.res.status);
 };

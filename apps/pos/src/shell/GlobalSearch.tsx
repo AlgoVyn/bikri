@@ -109,6 +109,7 @@ export function GlobalSearchHost() {
         <Dialog.Overlay className="bikri-overlay fixed inset-0 z-40 bg-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
+          aria-modal="true"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             inputRef.current?.focus();
@@ -204,9 +205,12 @@ export function GlobalSearchHost() {
                         tabIndex={-1}
                         aria-selected={index === active}
                         className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 aria-selected:bg-primary-subtle aria-selected:text-primary-subtle-ink"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          go(hit);
+                        onClick={() => go(hit)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            go(hit);
+                          }
                         }}
                       >
                         <span className="truncate">{hit.title}</span>

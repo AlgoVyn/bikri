@@ -7,7 +7,7 @@ import { BASE_PATH } from './paths.ts';
 export const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000',
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'sha256-vjPwkZNWSz239B2vfaji4dSVEAArUl6y0fWQtzpXIRI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
+    "default-src 'self'; script-src 'self' 'sha256-nLz+WGEFrckBx6NbiOb1M+4DmyupJVxjEprI4MF42kI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(self), usb=(self), serial=(self)',
@@ -51,7 +51,7 @@ export const STABLE_ASSET_PATHS = [
 /**
  * Root files that must revalidate on every load but must not inherit the broad
  * `no-transform`: Cloudflare disables Brotli/Gzip for `no-transform` responses,
- * and the service worker, manifest and pre-paint theme script are tiny but hot.
+ * and the service worker and manifest are tiny but hot.
  */
 export const ROOT_REVALIDATE_CACHE_CONTROL =
   'public, max-age=0, must-revalidate';
@@ -74,7 +74,7 @@ export function securityHeaderEntries(): ReadonlyArray<
  * rules detach and replace Cache-Control (Workers static-assets "Detach a
  * header"). HTML keeps `no-transform`; hashed assets and the Workbox runtime
  * become immutable, stable filenames revalidate daily, and the root service
- * worker, manifest and theme script revalidate without `no-transform`.
+ * worker and manifest revalidate without `no-transform`.
  */
 export function renderAssetHeaders(): string {
   const blocks: string[] = [];

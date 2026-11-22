@@ -156,6 +156,43 @@ export async function applyLedgerEntry(
   );
 }
 
+/** Recompute one party's cache row from every stored entry (after a multi-row batch). */
+export async function recomputePartyBalance(
+  src: TableSource,
+  row: SyncedRow,
+): Promise<void> {
+  const type = row.party_type as PartyType;
+  const id = String(row.party_id);
+  await partyBalances(src).put(
+    balanceOf(type, id, await partyEntries(src, type, id)),
+  );
+}
+
+/**
+ * Applies a batch of freshly stored ledger rows. A party with one fresh row can use the
+ * incremental path; with two or more the incremental path would count a later sibling
+ * twice (the first slow path already summed the whole stored batch), so recompute that
+ * party once instead.
+ */
+export async function applyLedgerEntries(
+  src: TableSource,
+  rows: readonly SyncedRow[],
+): Promise<void> {
+  const byParty = new Map<string, SyncedRow[]>();
+  for (const row of rows) {
+    const key = `${String(row.party_type)}\u0000${String(row.party_id)}`;
+    const group = byParty.get(key);
+    if (group) group.push(row);
+    else byParty.set(key, [row]);
+  }
+  for (const group of byParty.values()) {
+    const first = group[0];
+    if (!first) continue;
+    if (group.length === 1) await applyLedgerEntry(src, first);
+    else await recomputePartyBalance(src, first);
+  }
+}
+
 /** 02 §3.2: clear both caches and recompute them from movements and ledger entries. */
 export async function rebuildCaches(db: BikriDb): Promise<void> {
   // Two transactions, not one over four stores: the stock cache and the party cache

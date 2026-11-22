@@ -33,7 +33,14 @@ function readOnlyError(tenant: TenantRow): ApiError {
   });
 }
 
-/** Ops eligible in a read-only shop: whole transactions created before the device knew (13 §7.2). */
+/**
+ * Ops eligible in a read-only shop: whole transactions created before the device knew (13 §7.2).
+ *
+ * `readOnlySeenStatement` persists the first answer the device received — from `/me`, pull,
+ * snapshot or a rejected push — and the grace is measured from it. Push-first used to keep
+ * measuring from `status_changed_at` because it never persisted the acknowledgement, so a
+ * till that pushed first was refused ops a `/me`-first till would have kept (API-M5).
+ */
 export function readOnlyEligible(
   ops: PushOp[],
   seenAt: number | null,
@@ -135,8 +142,13 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   if (tenant.status === 'read_only') {
     const seenBefore = device.read_only_seen_at;
     ops = readOnlyEligible(ops, seenBefore, tenant.status_changed_at);
-    if (ops.length === 0) throw readOnlyError(tenant);
     const seen = readOnlySeenStatement(db, tenant, device, now);
+    if (ops.length === 0) {
+      // Persist the acknowledgement even on the 403, so a push-first till uses the same
+      // cutoff as one that called /me or /pull first (API-M5).
+      if (seen) await seen.run();
+      throw readOnlyError(tenant);
+    }
     if (seen) tail.push(seen);
   }
 

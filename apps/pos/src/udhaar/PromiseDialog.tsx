@@ -7,6 +7,7 @@ import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
@@ -40,6 +41,7 @@ export function PromiseDialog({
   const [amount, setAmount] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
+  const guard = useSubmitGuard();
 
   useEffect(() => {
     if (!open) return;
@@ -56,7 +58,7 @@ export function PromiseDialog({
   }, [open]);
 
   const save = async () => {
-    if (pending) return;
+    if (pending || !guard.lock()) return;
     setPending(true);
     try {
       const db = getDb();
@@ -81,6 +83,7 @@ export function PromiseDialog({
         toast.push(t(`office.udhaar.promise_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      guard.unlock();
       setPending(false);
     }
   };

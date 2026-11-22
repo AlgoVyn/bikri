@@ -15,8 +15,10 @@ import {
   type AgentPrintRequest,
   AgentRequestError,
 } from './agent.ts';
+import { prepareRasterFonts } from './canvasRaster.ts';
 import { fakeSerial, fakeUsb, joined } from './fakePrinters.ts';
 import {
+  blocksNeedRaster,
   kickDrawer,
   type PrintDeps,
   printBlocks,
@@ -24,7 +26,13 @@ import {
   processQueue,
   runJob,
 } from './printService.ts';
-import { chunks, PrintError, sendSerial, withTimeout } from './transports.ts';
+import {
+  chunks,
+  PrintError,
+  sendSerial,
+  sendUsb,
+  withTimeout,
+} from './transports.ts';
 
 afterEach(dropTestDbs);
 
@@ -226,6 +234,9 @@ describe('transports (06 §10)', () => {
     );
     expect(serial.port.openedWith).toMatchObject({ baudRate: 19200 });
     expect(joined(serial.port.sent)).toEqual(new Uint8Array([1, 2]));
+    // A successful send releases the writer lock but leaves the port open.
+    expect(serial.port.locked).toBe(false);
+    expect(serial.port.events).not.toContain('close-locked');
 
     const hanging = fakeSerial({ hang: true });
     await expect(
@@ -234,10 +245,108 @@ describe('transports (06 §10)', () => {
         new Uint8Array([3]),
         { baudRate: 9600, flowControl: 'none' },
         10,
+        10,
       ),
     ).rejects.toMatchObject({ code: 'TIMEOUT' });
     expect(hanging.port.aborted).toBe(true);
     expect(hanging.port.writable).toBeNull();
+  });
+
+  it('aborts and releases the serial writer before closing the port', async () => {
+    // Chrome rejects close() with "Cannot cancel a locked stream" while the
+    // writer still holds the lock; the old order leaked the physical port.
+    const hanging = fakeSerial({ hang: true });
+    await expect(
+      sendSerial(
+        hanging.port,
+        new Uint8Array([3]),
+        { baudRate: 9600, flowControl: 'none' },
+        10,
+        10,
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(hanging.port.events).toEqual([
+      'open',
+      'writer',
+      'abort',
+      'release',
+      'close',
+    ]);
+    expect(hanging.port.events).not.toContain('close-locked');
+    expect(hanging.port.locked).toBe(false);
+  });
+
+  it('times out a wedged serial open and closes the port', async () => {
+    const stuck = fakeSerial({ hangOpen: true });
+    await expect(
+      sendSerial(
+        stuck.port,
+        new Uint8Array([1]),
+        { baudRate: 9600, flowControl: 'none' },
+        10,
+        10,
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(stuck.port.events).toEqual(['open', 'close']);
+  });
+
+  it('does not hang when a serial close never answers', async () => {
+    const stuck = fakeSerial({ hang: true, hangClose: true });
+    await expect(
+      sendSerial(
+        stuck.port,
+        new Uint8Array([1]),
+        { baudRate: 9600, flowControl: 'none' },
+        10,
+        10,
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(stuck.port.events).toContain('close');
+  });
+
+  it('bounds WebUSB cleanup for a wedged IRP', async () => {
+    const usb = fakeUsb();
+    usb.device.fail = 'NotFoundError';
+    usb.device.closeHang = true;
+    await expect(
+      sendUsb(usb.device, new Uint8Array([1]), 50, 10),
+    ).rejects.toMatchObject({ code: 'DISCONNECTED' });
+  });
+
+  it('scans only printed strings for non-ASCII text', () => {
+    expect(blocksNeedRaster([{ t: 'text', text: 'SALE RECEIPT' }])).toBe(false);
+    expect(blocksNeedRaster([{ t: 'text', text: 'رسید' }])).toBe(true);
+    // The image block is test-only; its bytes must never be serialised to look
+    // for text (the old JSON.stringify walked the whole buffer).
+    expect(
+      blocksNeedRaster([
+        {
+          t: 'image',
+          source: {
+            width: 1,
+            height: 1,
+            data: new Uint8Array([200]),
+            format: 'gray',
+          },
+        },
+      ]),
+    ).toBe(false);
+  });
+
+  it('loads the JetBrains Mono face before rasterising', async () => {
+    const loads: string[] = [];
+    const doc = {
+      fonts: {
+        load: async (font: string) => {
+          loads.push(font);
+          return [];
+        },
+      },
+    } as unknown as Document;
+    await prepareRasterFonts(doc);
+    expect(
+      loads.filter((font) => font.includes('JetBrains Mono')),
+    ).toHaveLength(2);
   });
 
   it('timeout → TIMEOUT; claim refused → PERMISSION; cable out → DISCONNECTED; the sale is kept', async () => {
@@ -548,6 +657,21 @@ describe('print agent transport (docs/14)', () => {
     expect(
       await runJob(db, job, { usb: null, serial: null, agent }),
     ).toMatchObject({ status: 'failed', error: 'DISCONNECTED' });
+  });
+
+  it('reports an agent request timeout as TIMEOUT, not disconnected', async () => {
+    const { db } = await soldShop('psAgentSlow');
+    await db.kv.put({ key: 'printer', value: agentPrinter() });
+    const [job] = await db.print_jobs.toArray();
+    if (!job) throw new Error('no job');
+    const agent = fakeAgent({
+      print: async () => {
+        throw new AgentRequestError('TIMEOUT', 'no answer');
+      },
+    });
+    expect(
+      await runJob(db, job, { usb: null, serial: null, agent }),
+    ).toMatchObject({ status: 'failed', error: 'TIMEOUT' });
   });
 
   it('refuses a drawer kick in driver mode', async () => {

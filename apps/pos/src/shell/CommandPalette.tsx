@@ -197,11 +197,9 @@ export function CommandPalette() {
       },
     ];
     return items.filter((item) => {
-      if (
-        readOnly &&
-        ['sell', 'udhaar', 'expenses', 'day-close'].includes(item.id)
-      )
-        return false;
+      // Match the rail: read-only keeps the readable screens and hides only the
+      // write-only ones (starting a sale, closing the day).
+      if (readOnly && ['sell', 'day-close'].includes(item.id)) return false;
       if (item.id === 'sell') return can('sale.create');
       if (item.id === 'udhaar') return can('payment.receive');
       if (item.id === 'suppliers')
@@ -330,6 +328,7 @@ export function CommandPalette() {
         <Dialog.Overlay className="bikri-overlay fixed inset-0 z-50 bg-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
+          aria-modal="true"
           className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal"
         >
           <Dialog.Title className="sr-only font-semibold">

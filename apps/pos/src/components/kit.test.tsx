@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +27,34 @@ function QtyHarness() {
   const [value, setValue] = useState<number | null>(0);
   return (
     <QtyInput label="Quantity" unit="pc" value={value} onChange={setValue} />
+  );
+}
+
+function QtyCommitHarness() {
+  const [value, setValue] = useState<number | null>(2000);
+  const [calls, setCalls] = useState(0);
+  return (
+    <div>
+      <QtyInput
+        label="Cart quantity"
+        unit="pc"
+        value={value}
+        commitOnBlur
+        onChange={(next) => {
+          setCalls((count) => count + 1);
+          setValue(next);
+        }}
+      />
+      <button
+        type="button"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setValue(3000)}
+      >
+        External
+      </button>
+      <output data-testid="qty-value">{String(value)}</output>
+      <output data-testid="qty-calls">{calls}</output>
+    </div>
   );
 }
 
@@ -141,6 +175,36 @@ describe('money and quantity fields', () => {
     expect((screen.getByLabelText('Quantity') as HTMLInputElement).value).toBe(
       '0',
     );
+  });
+
+  it('does not revert a cart quantity changed externally while the field was dirty', async () => {
+    const user = userEvent.setup();
+    render(<QtyCommitHarness />);
+    const input = screen.getByLabelText('Cart quantity') as HTMLInputElement;
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, '2');
+    // The 200 ms commit wrote 2 to the parent while the draft stayed "2".
+    await waitFor(() =>
+      expect(screen.getByTestId('qty-value').textContent).toBe('2000'),
+    );
+    // A scan adds a third piece without moving focus out of the field.
+    await user.click(screen.getByRole('button', { name: 'External' }));
+    await waitFor(() => expect(input.value).toBe('3'));
+    fireEvent.blur(input);
+    expect(screen.getByTestId('qty-value').textContent).toBe('3000');
+  });
+
+  it('commits a typed quantity on blur once', async () => {
+    const user = userEvent.setup();
+    render(<QtyCommitHarness />);
+    const input = screen.getByLabelText('Cart quantity') as HTMLInputElement;
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, '5');
+    fireEvent.blur(input);
+    expect(screen.getByTestId('qty-value').textContent).toBe('5000');
+    expect(screen.getByTestId('qty-calls').textContent).toBe('1');
   });
 
   it('keeps money LTR inside bdi', () => {

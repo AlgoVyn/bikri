@@ -1,4 +1,9 @@
-import { priceBundle, QTY_UNITS, type QtyUnit } from '@bikri/core';
+import {
+  normaliseNumericText,
+  priceBundle,
+  QTY_UNITS,
+  type QtyUnit,
+} from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Navigate, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -42,9 +47,10 @@ import {
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { categoryName } from '../lib/category.ts';
-import { useHotkey } from '../shell/hotkeys.ts';
+import { composing, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { bundleComponentsFromProducts } from './bundlePrice.ts';
 import { qtyWithUnit } from './format.ts';
 import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
@@ -156,6 +162,8 @@ export function ProductFormPage({
   const [confirmUntrack, setConfirmUntrack] = useState(false);
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const newCategoryGuard = useRef(false);
+  const generateGuard = useRef(false);
   const pendingAnother = useRef(false);
   const pendingFreeConfirmed = useRef(false);
   const untrackDialogConfirmed = useRef(false);
@@ -685,6 +693,7 @@ export function ProductFormPage({
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     onKeyDown={(e) => {
+                      if (composing(e)) return;
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         (
@@ -699,16 +708,22 @@ export function ProductFormPage({
                     className={`${buttonQuiet} shrink-0`}
                     disabled={!newCategory.trim()}
                     onClick={async () => {
-                      const created = await addCategory(
-                        getDb(),
-                        newCategory,
-                        't1',
-                        {
-                          actor: staff?.id ?? null,
-                        },
-                      );
-                      set('category_id', created.id);
-                      setNewCategory(null);
+                      if (newCategoryGuard.current) return;
+                      newCategoryGuard.current = true;
+                      try {
+                        const created = await addCategory(
+                          getDb(),
+                          newCategory,
+                          't1',
+                          {
+                            actor: staff?.id ?? null,
+                          },
+                        );
+                        set('category_id', created.id);
+                        setNewCategory(null);
+                      } finally {
+                        newCategoryGuard.current = false;
+                      }
                     }}
                   >
                     {t('form.add')}
@@ -816,12 +831,18 @@ export function ProductFormPage({
                 type="button"
                 className={buttonQuiet}
                 onClick={async () => {
-                  const code = await generateBarcode(getDb());
-                  const list = [...draft.barcodes];
-                  const empty = list.findIndex((b) => !b.trim());
-                  if (empty >= 0) list[empty] = code;
-                  else list.push(code);
-                  set('barcodes', list);
+                  if (generateGuard.current) return;
+                  generateGuard.current = true;
+                  try {
+                    const code = await generateBarcode(getDb());
+                    const list = [...draft.barcodes];
+                    const empty = list.findIndex((b) => !b.trim());
+                    if (empty >= 0) list[empty] = code;
+                    else list.push(code);
+                    set('barcodes', list);
+                  } finally {
+                    generateGuard.current = false;
+                  }
                 }}
               >
                 {t('form.generate_barcode')}
@@ -1069,7 +1090,13 @@ export function ProductFormPage({
                         : undefined
                     }
                     onChange={(e) =>
-                      set('warranty_days', e.target.value.replace(/\D/gu, ''))
+                      set(
+                        'warranty_days',
+                        normaliseNumericText(e.target.value).replace(
+                          /\D/gu,
+                          '',
+                        ),
+                      )
                     }
                   />
                   {errorText('warranty_days', errors.warranty_days)}
@@ -1211,26 +1238,19 @@ function BundleRecipeEditor({
         )
         .slice(0, 8)
     : [];
+  // Compute the components first: while the catalogue live query resolves (or when a
+  // component was soft-deleted) the list is empty, and `priceBundle` throws on that.
+  const { components, missing } = bundleComponentsFromProducts(
+    items,
+    products,
+    method,
+  );
   const result =
-    items.length > 0
+    components.length > 0
       ? priceBundle({
           bundle_price: price,
           bundle_qty: 1,
-          components: items.flatMap((item) => {
-            const product = byId.get(item.component_product_id);
-            return product
-              ? [
-                  {
-                    qty_milli: item.qty_milli,
-                    unit_cost:
-                      method === 'last'
-                        ? Number(product.last_cost ?? 0)
-                        : Number(product.avg_cost ?? 0),
-                    unit_price: Number(product.price ?? 0),
-                  },
-                ]
-              : [];
-          }),
+          components,
         })
       : null;
   let available: number | null = null;
@@ -1321,6 +1341,14 @@ function BundleRecipeEditor({
           })}
         </ul>
       )}
+      {missing.length > 0 ? (
+        <p
+          role="alert"
+          className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink"
+        >
+          {t('form.bundle_missing', { count: missing.length })}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1">
         <label className="text-small" htmlFor="bundle-add-search">
           {t('form.bundle_add_item')}

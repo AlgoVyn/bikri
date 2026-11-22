@@ -8,7 +8,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
-import { SuppliersIcon } from '../components/icons.tsx';
+import { CloseIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -164,7 +164,15 @@ export function SupplierReturnPage({
   const total = allLines.reduce((sum, line) => sum + line.lineTotal, 0);
   const suggested = Math.max(0, total - Math.max(0, data?.balance ?? 0));
   useEffect(() => {
-    if (!refundTouched) setRefundReceived(suggested);
+    if (!refundTouched) {
+      setRefundReceived(suggested);
+      return;
+    }
+    // Reducing the return can lower (or zero) the suggested refund; a touched value
+    // above the new total is no longer valid even though its input may be unmounted.
+    setRefundReceived((current) =>
+      current !== null && current > suggested ? suggested : current,
+    );
   }, [suggested, refundTouched]);
   const reason =
     reasonKey === 'other'
@@ -439,6 +447,19 @@ export function SupplierReturnPage({
                   <MoneyText
                     paisa={mulDivRound(line.qtyMilli, line.unitCredit, 1000)}
                   />
+                  <button
+                    type="button"
+                    className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-danger"
+                    aria-label={`${t('office.suppliers.remove')} ${line.name}`}
+                    title={`${t('office.suppliers.remove')} ${line.name}`}
+                    onClick={() =>
+                      setUnlinked((current) =>
+                        current.filter((row) => row.key !== line.key),
+                      )
+                    }
+                  >
+                    <CloseIcon className="size-5" />
+                  </button>
                 </li>
               ))}
             </ul>

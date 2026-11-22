@@ -7,9 +7,6 @@ import { isLedgerTable, isMasterTable } from '@bikri/core';
 import {
   type ApplyContext,
   asPayment,
-  type CloseCashMove,
-  type CloseExpense,
-  type ClosePayment,
   key,
   type Lookups,
   type SaleInfo,
@@ -54,13 +51,6 @@ export async function loadLookups(
   const closeDevices = new Set<string>();
   let closeStart = Number.POSITIVE_INFINITY;
   let closeEnd = Number.NEGATIVE_INFINITY;
-  const pushedClosePayments = new Map<string, ClosePayment>();
-  const pushedCloseCashMoves = new Map<string, CloseCashMove>();
-  const pushedCloseExpenses = new Map<string, CloseExpense>();
-  const pushedCloses = new Map<
-    string,
-    { id: string; period_end: number; counted_cash: number }[]
-  >();
   const pushedSales = new Map<string, SaleInfo>();
   const pushedRefundBefore = new Map<string, number>();
   const pushedRefundAmountBefore = new Map<string, number>();
@@ -105,6 +95,14 @@ export async function loadLookups(
       typeof op.row?.sale_id === 'string'
     )
       saleIds.add(op.row.sale_id);
+    // A reissued sale is checked against the snapshot of the sale it replaces (07 §6.2),
+    // so its lines must be loaded as well.
+    if (
+      op.tbl === 'sales' &&
+      op.kind !== 'delete' &&
+      typeof op.row?.replaces_sale_id === 'string'
+    )
+      saleIds.add(op.row.replaces_sale_id);
     if (op.tbl === 'sale_voids' && typeof op.row?.sale_id === 'string')
       voidSaleIds.add(op.row.sale_id);
     if (op.tbl === 'sales' && typeof op.row?.customer_id === 'string')
@@ -145,16 +143,10 @@ export async function loadLookups(
           (op.changed_fields ?? []).includes('kind')
         )
           componentCandidates.add(id);
-        // A bundle row always needs its recipe for the active-recipe check; a
-        // bundle→simple change needs the old recipe to prove it is empty.
-        if (op.kind !== 'delete' && op.row?.kind === 'bundle')
-          bundleIds.add(id);
-        if (
-          op.kind !== 'delete' &&
-          op.row?.kind === 'simple' &&
-          (op.changed_fields ?? []).includes('kind')
-        )
-          bundleIds.add(id);
+        // The D-229 invariants are checked on the state every product op leaves, so its
+        // recipe must be loaded even when the op writes neither `kind` nor `track_stock`
+        // (API-H6). A deleted row keeps the old recipe for the delete checks.
+        if (op.kind !== 'delete') bundleIds.add(id);
       }
     }
     if (op.tbl === 'products' && typeof op.row?.id === 'string')
@@ -178,13 +170,6 @@ export async function loadLookups(
       closeDevices.add(op.row.device_id);
       closeStart = Math.min(closeStart, Number(op.row.period_start));
       closeEnd = Math.max(closeEnd, Number(op.row.period_end));
-      const list = pushedCloses.get(op.row.device_id) ?? [];
-      list.push({
-        id: String(op.row.id),
-        period_end: Number(op.row.period_end),
-        counted_cash: Number(op.row.counted_cash),
-      });
-      pushedCloses.set(op.row.device_id, list);
     }
     if (op.tbl === 'supplier_returns' && typeof op.row?.id === 'string')
       returnIds.add(op.row.id);
@@ -248,45 +233,6 @@ export async function loadLookups(
         partyIds.customer.add(op.row.party_id);
       if (op.row.party_type === 'supplier')
         partyIds.supplier.add(op.row.party_id);
-    }
-  }
-  if (closeDevices.size > 0) {
-    for (const op of ops) {
-      if (op.kind !== 'insert' || !op.row) continue;
-      const deviceId =
-        typeof op.row.device_id === 'string' ? op.row.device_id : '';
-      if (!closeDevices.has(deviceId)) continue;
-      const at = Number(op.row.created_at ?? 0);
-      if (at <= closeStart || at > closeEnd) continue;
-      if (op.tbl === 'payments') {
-        pushedClosePayments.set(String(op.row.id), {
-          id: String(op.row.id),
-          device_id: deviceId,
-          direction: String(op.row.direction),
-          purpose: String(op.row.purpose),
-          method: String(op.row.method),
-          amount: Number(op.row.amount),
-          created_at: at,
-        });
-      } else if (op.tbl === 'cash_moves') {
-        pushedCloseCashMoves.set(String(op.row.id), {
-          id: String(op.row.id),
-          device_id: deviceId,
-          kind: String(op.row.kind),
-          amount: Number(op.row.amount),
-          created_at: at,
-        });
-      } else if (op.tbl === 'expenses') {
-        pushedCloseExpenses.set(String(op.row.id), {
-          id: String(op.row.id),
-          device_id: deviceId,
-          amount: Number(op.row.amount),
-          method: String(op.row.method),
-          reverses_id:
-            typeof op.row.reverses_id === 'string' ? op.row.reverses_id : null,
-          created_at: at,
-        });
-      }
     }
   }
   const stmts: D1PreparedStatement[] = [
@@ -433,15 +379,16 @@ export async function loadLookups(
   chunked(
     saleIds,
     (p) =>
-      `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, name_snapshot, net FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
+      `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, bundle_name, bundle_price, bundle_discount, name_snapshot, net FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
     { saleLines: true },
   );
-  // Only the recipes this push can affect: the bundles named by sale/recipe ops,
-  // the bundles of touched recipe rows (a delete has no row payload) and the
-  // bundles that use a product being deleted or re-kinded. A normal sale with no
-  // bundle costs zero reads here (D-231).
+  // Only the recipes this push can affect: the bundles named by sale/recipe/product ops,
+  // the bundles of touched recipe rows (a delete has no row payload) and the bundles that
+  // use a product being deleted or re-kinded. A normal sale with no bundle costs zero
+  // reads here (D-231). Soft-deleted rows are included so a fresh-sale check can tell the
+  // stored recipe apart from the one the till sold (API-M2); the active maps filter them out.
   const bundleSql = (where: string) =>
-    `SELECT id, bundle_id, component_product_id, qty_milli, sort_order, updated_at, deleted_at FROM bundle_items WHERE tenant_id = ?1 AND deleted_at IS NULL AND ${where}`;
+    `SELECT id, bundle_id, component_product_id, qty_milli, sort_order, updated_at, deleted_at FROM bundle_items WHERE tenant_id = ?1 AND ${where}`;
   chunked(bundleIds, (p) => bundleSql(`bundle_id IN (${p})`), {
     bundleRows: true,
   });
@@ -582,6 +529,7 @@ export async function loadLookups(
     saleLinesBySale: new Map(),
     saleLineById: new Map(),
     bundleRecipes: new Map(),
+    bundleRecipeHistory: new Map(),
     bundleItemById: new Map(),
     bundleOfComponent: new Map(),
     bundleDeleted: new Set(),
@@ -601,10 +549,10 @@ export async function loadLookups(
     partyBalances: new Map(),
     products: new Map(),
     lastClose: new Map(),
-    pushedCloses,
-    closePayments: new Map(pushedClosePayments),
-    closeCashMoves: new Map(pushedCloseCashMoves),
-    closeExpenses: new Map(pushedCloseExpenses),
+    pushedCloses: new Map(),
+    closePayments: new Map(),
+    closeCashMoves: new Map(),
+    closeExpenses: new Map(),
     rowsRead: res.reduce(
       (sum, result) => sum + (result.meta.rows_read ?? 0),
       0,
@@ -639,6 +587,10 @@ export async function loadLookups(
       ),
       bundle_qty: Number(op.row.bundle_qty ?? 0),
       bundle_id: typeof op.row.bundle_id === 'string' ? op.row.bundle_id : null,
+      bundle_name:
+        typeof op.row.bundle_name === 'string' ? op.row.bundle_name : null,
+      bundle_price: Number(op.row.bundle_price ?? 0),
+      bundle_discount: Number(op.row.bundle_discount ?? 0),
       name_snapshot:
         typeof op.row.name_snapshot === 'string' ? op.row.name_snapshot : null,
       net: Number(op.row.net ?? 0),
@@ -725,6 +677,9 @@ export async function loadLookups(
           bundle_component_qty_milli: Number(r.bundle_component_qty_milli ?? 0),
           bundle_qty: Number(r.bundle_qty ?? 0),
           bundle_id: typeof r.bundle_id === 'string' ? r.bundle_id : null,
+          bundle_name: typeof r.bundle_name === 'string' ? r.bundle_name : null,
+          bundle_price: Number(r.bundle_price ?? 0),
+          bundle_discount: Number(r.bundle_discount ?? 0),
           name_snapshot:
             typeof r.name_snapshot === 'string' ? r.name_snapshot : null,
           net: Number(r.net ?? 0),
@@ -740,6 +695,9 @@ export async function loadLookups(
           bundle_component_qty_milli: line.bundle_component_qty_milli,
           bundle_qty: line.bundle_qty,
           bundle_id: line.bundle_id,
+          bundle_name: line.bundle_name,
+          bundle_price: line.bundle_price,
+          bundle_discount: line.bundle_discount,
           name_snapshot: line.name_snapshot,
           net: line.net,
         });
@@ -777,6 +735,7 @@ export async function loadLookups(
           track_stock: Number(r.track_stock ?? 0),
           updated_at: Number(r.updated_at ?? 0),
           kind: String(r.kind ?? 'simple'),
+          pushed: false,
         });
         look.onHand.set(String(r.id), {
           on_hand: Number(r.on_hand),
@@ -789,6 +748,19 @@ export async function loadLookups(
         look.bundleDeleted.add(String(r.id));
       } else if ('bundleRows' in k) {
         const bundleId = String(r.bundle_id);
+        const deletedAt =
+          r.deleted_at === null || r.deleted_at === undefined
+            ? null
+            : Number(r.deleted_at);
+        const history = look.bundleRecipeHistory.get(bundleId) ?? [];
+        history.push({
+          updated_at: Number(r.updated_at ?? 0),
+          deleted_at: deletedAt,
+        });
+        look.bundleRecipeHistory.set(bundleId, history);
+        // Active rows only: a deleted or soft-deleted recipe row no longer makes the
+        // product a component nor counts toward the recipe.
+        if (deletedAt !== null) continue;
         look.bundleRecipes.set(bundleId, [
           ...(look.bundleRecipes.get(bundleId) ?? []),
           {
@@ -797,10 +769,7 @@ export async function loadLookups(
             qty_milli: Number(r.qty_milli ?? 0),
             sort_order: Number(r.sort_order ?? 0),
             updated_at: Number(r.updated_at ?? 0),
-            deleted_at:
-              r.deleted_at === null || r.deleted_at === undefined
-                ? null
-                : Number(r.deleted_at),
+            deleted_at: null,
           },
         ]);
         look.bundleItemById.set(String(r.id), {
@@ -882,4 +851,57 @@ export async function loadLookups(
       });
   }
   return look;
+}
+
+/**
+ * Add a successfully planned transaction's cash rows and closes to the day-close view of
+ * the next transaction (API-L5). Pre-loading them from every op of the push let a later
+ * close be validated against payments from an earlier transaction that was rejected.
+ */
+export function applyCloseChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.kind !== 'insert' || !op.row) continue;
+    const id = typeof op.row.id === 'string' ? op.row.id : '';
+    const deviceId =
+      typeof op.row.device_id === 'string' ? op.row.device_id : '';
+    if (id === '' || deviceId === '') continue;
+    const at = Number(op.row.created_at ?? 0);
+    if (op.tbl === 'day_closes') {
+      const list = look.pushedCloses.get(deviceId) ?? [];
+      list.push({
+        id,
+        period_end: Number(op.row.period_end),
+        counted_cash: Number(op.row.counted_cash),
+      });
+      look.pushedCloses.set(deviceId, list);
+    } else if (op.tbl === 'payments') {
+      look.closePayments.set(id, {
+        id,
+        device_id: deviceId,
+        direction: String(op.row.direction),
+        purpose: String(op.row.purpose),
+        method: String(op.row.method),
+        amount: Number(op.row.amount),
+        created_at: at,
+      });
+    } else if (op.tbl === 'cash_moves') {
+      look.closeCashMoves.set(id, {
+        id,
+        device_id: deviceId,
+        kind: String(op.row.kind),
+        amount: Number(op.row.amount),
+        created_at: at,
+      });
+    } else if (op.tbl === 'expenses') {
+      look.closeExpenses.set(id, {
+        id,
+        device_id: deviceId,
+        amount: Number(op.row.amount),
+        method: String(op.row.method),
+        reverses_id:
+          typeof op.row.reverses_id === 'string' ? op.row.reverses_id : null,
+        created_at: at,
+      });
+    }
+  }
 }

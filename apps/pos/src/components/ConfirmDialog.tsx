@@ -44,6 +44,7 @@ export function ConfirmDialog({
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <Dialog.Content
+          aria-modal="true"
           className={contentClass}
           onOpenAutoFocus={(event) => {
             event.preventDefault();

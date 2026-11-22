@@ -11,6 +11,7 @@ import {
 } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CART_IDS, emptyCart, isEmptyCart, loadCarts } from '../data/cart.ts';
@@ -29,7 +30,7 @@ import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { cashierTodayOnly } from '../state/reportScope.ts';
+import { billVisible } from '../state/reportScope.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
@@ -298,22 +299,34 @@ export function RefundDialog({
       })
     : t('office.refund.title_plain');
 
-  // The refund route is shareable; keep the same same-day/report.view rule as the
-  // bill detail so a cashier cannot read an old bill by bookmarking this URL.
-  if (
-    detail &&
+  // The refund route is shareable; BillDetail owns the same today/branch rule. Wait
+  // for the shop's business date before rendering, or today's bill would flash while
+  // the date is unknown and then disappear.
+  const canViewBill =
+    detail !== undefined &&
+    detail !== null &&
     today !== undefined &&
-    (!can('report.view') || cashierTodayOnly(role, support)) &&
-    (String(detail.sale.business_date) !== today ||
-      (cashierTodayOnly(role, support) &&
-        branchId !== null &&
-        String(detail.sale.branch_id) !== branchId))
-  ) {
+    billVisible(
+      role,
+      support,
+      can('report.view'),
+      String(detail.sale.business_date) === today,
+      branchId === null || String(detail.sale.branch_id) === branchId,
+    );
+  if (detail && today !== undefined && !canViewBill) {
     return (
       <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
         <p className="text-text-muted" data-testid="refund-no-access">
           {t('shell.no_access')}
         </p>
+      </Modal>
+    );
+  }
+
+  if (detail !== undefined && today === undefined) {
+    return (
+      <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
+        <PageLoading compact />
       </Modal>
     );
   }
@@ -336,7 +349,7 @@ export function RefundDialog({
           >
             {t('office.bill.print_refund')}
           </button>
-          {reasonKey === 'exchange' ? (
+          {reasonKey === 'exchange' && !readOnly && can('sale.create') ? (
             <button
               type="button"
               className={buttonPrimary}

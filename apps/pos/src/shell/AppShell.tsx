@@ -136,6 +136,8 @@ function AppShellInner({ children }: { children: ReactNode }) {
       .catch(() => toast.push(t('errors.generic'), 'error'));
   };
 
+  // Read-only shops cannot start a sale, but their history, credits and expenses stay
+  // readable; those screens gate their own write controls with `useReadOnly`.
   const allowed = (item: NavItem) =>
     item.to !== '/sell' || !readOnly
       ? item.permAny !== undefined

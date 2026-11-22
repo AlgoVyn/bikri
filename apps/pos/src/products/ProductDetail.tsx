@@ -14,6 +14,7 @@ import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
+import { usePrivacyActive } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
   addBundle,
@@ -110,6 +111,8 @@ export function ProductDetailPage({
       enabled: canEdit && Boolean(detail),
     },
   );
+
+  const privacy = usePrivacyActive();
 
   if (detail === undefined) return <PageLoading compact />;
   if (detail === null) {
@@ -413,7 +416,7 @@ export function ProductDetailPage({
           <Figure label={t('products.price')} testId="detail-price" emphasize>
             <MoneyText paisa={price} />
           </Figure>
-          {showCost ? (
+          {showCost && !privacy ? (
             <Figure
               label={t('products.margin')}
               testId="detail-margin"
@@ -526,7 +529,7 @@ export function ProductDetailPage({
         ) : null}
       </section>
 
-      {totalQty > 0 ? (
+      {totalQty > 0 && !privacy ? (
         <section
           aria-labelledby="last14-heading"
           className="rounded-card border border-border bg-surface p-4"

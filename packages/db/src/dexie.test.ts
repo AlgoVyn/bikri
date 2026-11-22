@@ -111,6 +111,27 @@ describe('Dexie schema (02 §3)', () => {
     ).toBe(true);
   });
 
+  it('upgrades a V12 database: repairs refund lines pulled without a date', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v12'));
+    old.version(12).stores(DEXIE_SCHEMA_V12);
+    await old.open();
+    await old.table('refunds').add({
+      id: 'r1',
+      business_date: '2026-10-27',
+    });
+    await old.table('refund_lines').add({
+      id: 'l1',
+      refund_id: 'r1',
+      sale_line_id: 's1',
+    });
+    old.close();
+
+    const db = open('upgrade-v12');
+    await db.open();
+    expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
+    expect(db.verno).toBe(13);
+  });
+
   it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {
     const old = new Dexie(tenantDbName('upgrade-v9'));
     old.version(9).stores(DEXIE_SCHEMA_V9);

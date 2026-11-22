@@ -35,7 +35,9 @@ function dateFormatter(timeZone: string): Intl.DateTimeFormat {
       month: '2-digit',
       day: '2-digit',
     });
-    DATE_FORMATS.set(zone, formatter);
+    // Bound the cache: an operator import can name many zones, and each formatter is
+    // expensive. Past the cap, uncommon zones are formatted without caching.
+    if (DATE_FORMATS.size < 100) DATE_FORMATS.set(zone, formatter);
   }
   return formatter;
 }

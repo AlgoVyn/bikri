@@ -14,6 +14,7 @@ import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { findByCode } from '../data/cart.ts';
 import { ledgerContext, listCategoryOptions } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
@@ -52,6 +53,8 @@ export function StockCountPage() {
   const [categoryId, setCategoryId] = useState('');
   const [zero, setZero] = useState(false);
   const [scan, setScan] = useState('');
+  const [finishing, setFinishing] = useState(false);
+  const finishGuard = useSubmitGuard();
   const scanId = useId();
 
   // The live query is the cross-tab/initial source; our own edits update `draft`
@@ -198,6 +201,8 @@ export function StockCountPage() {
 
   const counted = Object.keys(draft.counted).length;
   const finish = async () => {
+    if (!finishGuard.lock()) return;
+    setFinishing(true);
     try {
       await flushCountDraft(getDb());
       const ctx = await ledgerContext(getDb(), staff?.id ?? '');
@@ -207,6 +212,9 @@ export function StockCountPage() {
       toast.push(t('count.finished', { count: r.movements }), 'info');
     } catch {
       toast.push(t('count.save_failed'), 'error');
+    } finally {
+      finishGuard.unlock();
+      setFinishing(false);
     }
   };
   const onScan = async (code: string) => {
@@ -278,6 +286,7 @@ export function StockCountPage() {
         <button
           type="button"
           className={buttonPrimary}
+          disabled={finishing || readOnly}
           onClick={() => void finish()}
         >
           {t('count.finish')}

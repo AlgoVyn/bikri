@@ -23,16 +23,20 @@ try {
     stored === 'ur' ? 'ur' : stored === 'roman-ur' ? 'roman-ur' : 'en';
   document.documentElement.lang = language;
   document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
+  // Only Urdu uses the Arabic script; roman-ur is Latin and gets Inter.
   const font =
-    language === 'en'
-      ? 'fonts/inter-latin-wght-normal.woff2'
-      : 'fonts/noto-naskh-arabic-arabic-wght-normal.woff2';
+    language === 'ur'
+      ? 'fonts/noto-naskh-arabic-arabic-wght-normal.woff2'
+      : 'fonts/inter-latin-wght-normal.woff2';
+  // Vite replaces %BASE_URL% with the app base (with a trailing slash) in dev and
+  // in the build. `document.baseURI` is the current route, so it requested
+  // /bikri/sales/fonts/… on a nested route and /fonts/… at /bikri.
   const preload = document.createElement('link');
   preload.rel = 'preload';
   preload.as = 'font';
   preload.type = 'font/woff2';
   preload.crossOrigin = '';
-  preload.href = new URL(font, document.baseURI).href;
+  preload.href = `%BASE_URL%${font}`;
   document.head.appendChild(preload);
 } catch {
   /* storage may be disabled */
