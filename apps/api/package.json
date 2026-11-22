@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @bikri/pos build && wrangler d1 migrations apply bikri --local && wrangler dev --port 8787 --local-upstream localhost:8787 --var ALLOWED_ORIGINS:http://localhost:8787,http://localhost:5173",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "types": "wrangler types --include-runtime false",
     "db:migrate:local": "wrangler d1 migrations apply bikri --local"
   },
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.8",
     "@cloudflare/workers-types": "5.20261026.1",
+    "@vitest/coverage-v8": "5.0.5",
     "vitest": "5.0.5",
     "wrangler": "4.153.0"
   }

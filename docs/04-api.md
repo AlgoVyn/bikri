@@ -83,8 +83,13 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 | 403 | `TENANT_SUSPENDED` | The caller's tenant is suspended or being deleted; the till keeps selling offline |
 | 403 | `TENANT_READ_ONLY` | The caller's tenant is `read_only` and the request would create or change business data (push ops created after the device learned it, file upload, ops import, conflict acknowledge); `details.since` = read-only start. The till keeps the ops pending and shows the read-only banner ([13 §7.2](13-multi-tenancy.md#72-shop-status-active-read-only-suspended-d-080)) |
 | 404 | `NOT_FOUND` | File, device or tenant not found **in the caller's tenant** (the same answer whether or not the id exists in another tenant) |
+| 400/409 | `CONSTRAINT_FAILED` | A row violates the schema, a server document check or a trigger (also returned per op in a push) |
 | 409 | `SCHEMA_OUTDATED` | Client schema version < `MIN_CLIENT_SCHEMA` |
+| 409 | `CONFLICT` | The row/device/request changed elsewhere (optimistic guard or duplicate state) |
+| 409 | `PENDING_OPS` | A device with unsynced ops cannot move branch |
 | 409 | `SLUG_TAKEN` / `NOT_IN_MAINTENANCE` / `LAST_ADMIN_DEVICE` / `BAD_STATUS_CHANGE` / `EMAIL_NOT_VERIFIED` | Operator and shop-admin endpoints (§3.7, §3.8); a shop request cannot be approved before its email is verified |
+| 502 | `APPROVAL_FAILED` | A shop request approval failed after the tenant was created; retry after resolving the request |
+| 503 | `SERVER_MISCONFIGURED` | A required Worker secret/binding is missing; the operator must fix the deployment |
 | 410 | `SNAPSHOT_REQUIRED` | Pull `since` is below the tenant's `change_log_floor` (changes pruned after 30 days); `details.change_log_floor` |
 | 413 | `PAYLOAD_TOO_LARGE` | Push body > 1 MB, image > 2 MB, public request body > 16 KB, shop import > 1 MB, operator import > 4 MB |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Upload not webp/png/jpeg |
@@ -212,11 +217,11 @@ Device token of an admin device (`is_admin = 1`) **and** `X-Bikri-Staff` = an ac
 ```
 Code alphabet: `23456789ABCDEFGHJKMNPQRSTVWXYZ` (30 symbols, no `0 O 1 I L U`, matching [screens/02](screens/02-enrol.md)); 8 chars (30⁸ ≈ 6.6 × 10¹¹) shown as `XXXX-XXXX`. Codes are generated with `crypto.getRandomValues` and rejection sampling; only the SHA-256 is stored, with the tenant.
 
-`GET /api/shop/enrolment-codes` → `{ codes: [ { code_hint: 'K7Q2-…', device_name, is_admin, expires_at } ] }` (unused, unexpired, this tenant only); `DELETE /api/shop/enrolment-codes/:code` → `204`. The page keeps the plain code in memory until it expires.
+`GET /api/shop/enrolment-codes` → `{ codes: [ { id, device_name, is_admin, expires_at, created_at } ] }` (unused, unexpired, this tenant only; `id` is the first 16 hex characters of the code hash); `DELETE /api/shop/enrolment-codes/:code` → `204`. The page keeps the plain code in memory until it expires.
 
-`GET /api/shop/devices` → `200 { "devices": [ { "id", "name", "branch_id", "device_code", "is_admin", "enrolled_at", "last_seen_at", "app_version", "pending_ops", "oldest_pending_at", "revoked_at" } ] }`
+`GET /api/shop/devices` → `200 { "devices": [ { "id", "name", "branch_id", "device_code", "is_admin", "kind", "enrolled_at", "last_seen_at", "app_version", "pending_ops", "oldest_pending_at", "revoked_at", "expires_at" } ] }`
 
-`PATCH /api/shop/devices/:id` `{ "name"?: string, "branch_id"?: string, "is_admin"?: boolean }` → `200 { "device": {...} }`. Moving a device to another branch assigns it a **new** `device_code` in the target branch (codes are never reused), so invoice numbers stay unique; the till picks up the new code on its next `/api/me` and continues its own `invoice_seq`. Removing admin from the last admin device → `409 LAST_ADMIN_DEVICE`.
+`PATCH /api/shop/devices/:id` `{ "name"?: string, "branch_id"?: string, "is_admin"?: boolean }` → `200 { "device": {...} }`. Moving a device to another branch assigns it a **new** `device_code` in the target branch (codes are never reused), so invoice numbers stay unique; the till picks up the new code on its next `/api/me` and continues its own `invoice_seq`; a device with pending ops answers `409 PENDING_OPS`. Removing admin from the last admin device → `409 LAST_ADMIN_DEVICE`.
 
 `POST /api/shop/devices/:id/revoke` → `200 { "revoked_at": 1793050000000 }` (`409 LAST_ADMIN_DEVICE` for the last admin device; the operator can still revoke it).
 

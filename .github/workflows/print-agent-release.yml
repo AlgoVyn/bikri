@@ -10,6 +10,9 @@ on:
       - "print-agent-v*"
 permissions:
   contents: read
+concurrency:
+  group: print-agent-release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -65,7 +68,7 @@ jobs:
         with:
           go-version-file: apps/print-agent/go.mod
       - name: Test
-        run: go test ./...
+        run: go test -race ./...
       - name: Build packages
         env:
           VERSION: ${{ github.ref_name }}

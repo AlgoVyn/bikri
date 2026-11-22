@@ -81,9 +81,13 @@ describe('active tenant (D-073)', () => {
   });
 
   it('refuses to open a database without a tenant in production', () => {
-    expect(() => {
-      if (!activeTenantId({ MODE: 'production' }))
-        throw new NoActiveTenantError();
-    }).toThrow(NoActiveTenantError);
+    // Force the production fallback: no stored tenant and no dev/test tenant.
+    vi.stubEnv('DEV', false);
+    vi.stubEnv('MODE', 'production');
+    try {
+      expect(() => getDb()).toThrow(NoActiveTenantError);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

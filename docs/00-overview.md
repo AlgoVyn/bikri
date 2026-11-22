@@ -13,7 +13,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 3. Keep udhaar (customer credit) and supplier dues exactly right, derived from history.
 4. Close the day with a cash figure that accounts for every cash movement.
 5. Full English, Urdu (RTL) and Roman Urdu UI; Urdu receipts.
-6. Run several shops within the Cloudflare free tier (about 10 reference-size shops, [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)), with a clear upgrade path (shards, Workers Paid).
+6. Run several shops within the Cloudflare free tier (about 3.6 reference-size shops, [13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)), with a clear upgrade path (shards, Workers Paid).
 7. **Strict tenant isolation:** no shop can ever read or change another shop's data ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)).
 
 ## 3. Scope

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertTenantScoped } from '../../src/db/tenantDb.ts';
+import { assertTenantScoped, TENANT_TABLES } from '../../src/db/tenantDb.ts';
 
 // I19 (10 §8, 13 §5): SQL written in apps/api/src outside platform/ that touches a tenant
 // table binds tenant_id = ?1, and nothing but db/tenantDb.ts and platform/ reaches env.DB.
@@ -85,6 +85,36 @@ describe('I19 static check', () => {
         offenders.push(
           `${file}: interpolated SQL without tenant_id = ?1: ${sql}`,
         );
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('names tenant_id in every platform statement that touches a tenant table', () => {
+    // Platform code may scan across tenants (cron, operator console), so it cannot use
+    // the `?1` guard. It must still name tenant_id, which keeps every statement auditable
+    // and prevents an accidental all-tenant read/write. The few global operations are
+    // listed explicitly: a global secret lookup, and the retention deletes that have no
+    // tenant context until their row's owner is read.
+    const globalAllowed = [
+      /^SELECT \* FROM enrolment_codes WHERE code_hash = \?1$/u,
+      /^DELETE FROM enrolment_codes WHERE expires_at < \?1$/u,
+      /^DELETE FROM owner_email_codes WHERE expires_at < \?1$/u,
+      /^DELETE FROM applied_ops WHERE rowid IN \(SELECT rowid FROM applied_ops WHERE applied_at < \?1 LIMIT \?2\)$/u,
+    ];
+    const tenantRef = new RegExp(
+      `\\b(?:FROM|JOIN|INTO|UPDATE)\\s+\\(?\\s*"?(?:${TENANT_TABLES.join('|')})"?\\b`,
+      'iu',
+    );
+    const offenders: string[] = [];
+    for (const [p, src] of Object.entries(SOURCES)) {
+      const file = rel(p);
+      if (!file.startsWith('platform/')) continue;
+      for (const sql of sqlLiterals(src)) {
+        if (!tenantRef.test(sql)) continue;
+        if (/\btenant_id\b/iu.test(sql)) continue;
+        if (globalAllowed.some((allowed) => allowed.test(sql.trim()))) continue;
+        offenders.push(`${file}: ${sql}`);
+      }
     }
     expect(offenders).toEqual([]);
   });

@@ -26,12 +26,12 @@ const banned = [
   { re: /\bDROP\s+VIEW\b/i, label: 'DROP VIEW' },
   {
     // `DROP COLUMN` and the optional-keyword form `DROP col`; never `DROP INDEX`.
-    re: /\bALTER\s+TABLE\b[\s\S]{0,200}?\bDROP\s+(?:COLUMN\s+)?(?!INDEX\b|TABLE\b|VIEW\b|TRIGGER\b)[A-Za-z_"`[]/i,
+    re: /\bALTER\s+TABLE\b[^;]{0,200}?\bDROP\s+(?:COLUMN\s+)?(?!INDEX\b|TABLE\b|VIEW\b|TRIGGER\b)[A-Za-z_"`[]/i,
     label: 'DROP COLUMN',
   },
   {
     // `RENAME TO`, `RENAME COLUMN old TO new` and `RENAME old TO new`.
-    re: /\bALTER\s+TABLE\b[\s\S]{0,200}?\bRENAME\s+(?:(?:COLUMN|TO)\b|[^\s;]+\s+TO\b)/i,
+    re: /\bALTER\s+TABLE\b[^;]{0,200}?\bRENAME\s+(?:(?:COLUMN|TO)\b|[^\s;]+\s+TO\b)/i,
     label: 'RENAME TABLE/COLUMN',
   },
 ];
@@ -203,7 +203,9 @@ export function stripComments(sql) {
  */
 export function destructiveFindings(sql) {
   if (/^--\s*bikri:allow-destructive\b/m.test(sql)) return [];
-  const cleaned = stripComments(sql);
+  // Mask literals and quoted identifiers: `'DROP TABLE'` in a seed value or comment-like
+  // text is data, not DDL (OPS-L3).
+  const cleaned = maskQuoted(stripComments(sql));
   return banned
     .filter((rule) => rule.re.test(cleaned))
     .map((rule) => rule.label);

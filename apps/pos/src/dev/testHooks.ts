@@ -4,6 +4,7 @@ import { router } from '../app.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
 import { jobReceipt } from '../print/receiptFiles.ts';
+import { printHtmlViaSystem } from '../print/systemPrint.ts';
 import { beepCount } from '../sell/beep.ts';
 import {
   finishSetupHere,
@@ -41,6 +42,11 @@ declare global {
       seedSupplier: typeof seedSupplier;
       /** Text the print service would print for a print job (null when it has no sale). */
       printJobText: (id: string) => Promise<string | null>;
+      /** Exercise the real system-print path and return the iframe text it would print. */
+      printHtml: (
+        html: string,
+        widthMm: 58 | 80,
+      ) => Promise<{ ok: boolean; code?: string; text: string }>;
     };
   }
 }
@@ -75,6 +81,20 @@ export function installTestHooks(): void {
             itemLayout: r.paper.itemLayout,
           })
         : null;
+    },
+    printHtml: async (html, widthMm) => {
+      let text = '';
+      const result = await printHtmlViaSystem(
+        html,
+        widthMm,
+        document,
+        (win) => {
+          text = win.document.body.textContent ?? '';
+        },
+      );
+      return result.ok
+        ? { ok: true, text }
+        : { ok: false, code: result.code, text };
     },
   };
 }

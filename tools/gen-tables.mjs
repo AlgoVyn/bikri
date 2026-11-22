@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stripComments } from './check-migrations-safe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = join(ROOT, 'packages/db/migrations');
@@ -20,7 +21,7 @@ const migrationFiles = readdirSync(MIGRATIONS)
   .sort();
 
 for (const name of migrationFiles) {
-  const sql = readFileSync(join(MIGRATIONS, name), 'utf8');
+  const sql = stripComments(readFileSync(join(MIGRATIONS, name), 'utf8'));
   for (const match of sql.matchAll(
     /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)\s*\(([\s\S]*?)\n\)\s*STRICT;/gu,
   )) {

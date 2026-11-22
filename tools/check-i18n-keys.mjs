@@ -85,7 +85,7 @@ function walk(dir) {
 walk(SOURCE);
 
 const missing = [];
-const literal = /\bt\(\s*(['"])((?:\\.|(?!\1).)+)\1/g;
+const literal = /\bt\(\s*(['"`])((?:\\.|(?!\1).)+)\1/gu;
 for (const file of files) {
   const source = readFileSync(file, 'utf8');
   const keys = allowedKeys(file);

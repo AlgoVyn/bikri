@@ -27,7 +27,7 @@ import {
 // email, adds a second till; data syncs between them; revoke and Leave this shop.
 
 /** Raise the tenant's prune floor in the local D1 so the next pull is stale (journey 20). */
-function raiseChangeLogFloor(tenantId: string): void {
+function raiseChangeLogFloor(tenantId: string): number {
   const dir = fileURLToPath(
     new URL(
       '../../apps/api/.wrangler/state/v3/d1/miniflare-D1DatabaseObject',
@@ -35,7 +35,7 @@ function raiseChangeLogFloor(tenantId: string): void {
     ),
   );
   const file = readdirSync(dir)
-    .filter((name) => name.endsWith('.sqlite'))
+    .filter((name) => name.endsWith('.sqlite') && name !== 'metadata.sqlite')
     .map((name) => ({
       name,
       at: statSync(join(dir, name)).mtimeMs,
@@ -45,6 +45,12 @@ function raiseChangeLogFloor(tenantId: string): void {
   if (!file) throw new Error(`no local D1 database under ${dir}`);
   const db = new DatabaseSync(join(dir, file));
   try {
+    const table = db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'change_log'",
+      )
+      .get();
+    if (!table) throw new Error(`${file} is not the tenant D1 database`);
     const row = db
       .prepare('SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?')
       .get(tenantId) as { seq?: number } | undefined;
@@ -54,6 +60,7 @@ function raiseChangeLogFloor(tenantId: string): void {
       floor,
       tenantId,
     );
+    return floor;
   } finally {
     db.close();
   }
@@ -382,12 +389,44 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     data: { reason: 'Payment overdue, e2e check' },
   });
   expect(ro.status(), await ro.text()).toBe(200);
+  // Two sales made before this till learned the status must still reach the server
+  // (the read-only cutoff is the status change, not the device's next pull).
+  await a.ctx.setOffline(true);
+  for (let i = 0; i < 2; i += 1) {
+    await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+    await a.page
+      .getByTestId('sell-tile')
+      .filter({ hasText: 'Type-C cable' })
+      .click();
+    await a.page.keyboard.press('F8');
+    await a.page.getByTestId('pay-done').click();
+    await expect(a.page.getByTestId('sale-saved')).toBeVisible();
+    // The completion screen is an overlay; close it before ringing the next sale.
+    await a.page.getByRole('button', { name: 'New sale' }).click();
+    await expect(a.page.getByTestId('sale-saved')).toBeHidden();
+  }
+  await a.ctx.setOffline(false);
   await syncNow(a.page);
+  expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(2);
   await expect(a.page.getByTestId('banner-read-only')).toBeVisible();
   await expect(a.page.getByTestId('staff-menu')).toHaveAttribute(
     'data-sync-state',
     'read-only',
   );
+  // Sell is blocked even through a deep link; readable screens stay open.
+  await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+  await expect(a.page).not.toHaveURL(/\/sell/u);
+  for (const [path, heading] of [
+    ['/sales', 'Sales'],
+    ['/reports', 'Reports'],
+    ['/settings/activity', 'Activity'],
+    ['/settings/backup', 'Backup & export'],
+  ] as const) {
+    await a.page.evaluate((to) => window.__bikriTest?.navigate(to), path);
+    await expect(
+      a.page.getByRole('heading', { name: heading, exact: false }).first(),
+    ).toBeVisible();
+  }
   // Journey 23 requires the banner in both languages, not English only.
   await setLanguage(a.page, 'ur');
   await expect(a.page.getByTestId('banner-read-only')).toContainText(
@@ -430,7 +469,7 @@ test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recov
   browser,
   request,
 }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(210_000);
   const email = `stale-${Date.now()}@e2e.test`;
   const shop = await createShop(request, email);
   const admin = `${API}/admin/tenants/${shop.tenant.id}`;
@@ -454,19 +493,51 @@ test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recov
   );
 
   // A sale the server has not seen yet must survive the forced snapshot.
+  const restorePoint = Date.now();
+  const syncResponses: { url: string; status: number }[] = [];
+  a.page.on('response', (response) => {
+    const url = response.url();
+    if (url.includes('/api/sync/pull') || url.includes('/api/sync/snapshot'))
+      syncResponses.push({ url, status: response.status() });
+  });
   await a.ctx.setOffline(true);
   await a.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
   await a.page.getByTestId('sell-tile').filter({ hasText: 'Charger' }).click();
   await a.page.keyboard.press('F8');
   await a.page.getByTestId('pay-done').click();
   await expect(a.page.getByTestId('sale-saved')).toBeVisible();
-  await a.ctx.setOffline(false);
+  const offlineSale = (
+    await idbAll<{ created_at: number }>(a.page, 'sales')
+  )[0];
+  expect(Number(offlineSale?.created_at)).toBeGreaterThanOrEqual(restorePoint);
+
+  // A second till adds a product after A's last pull. Only the forced snapshot can
+  // bring it to A, so finding it proves the snapshot actually hydrated IndexedDB.
+  const bCode = await request.post(`${admin}/enrolment-codes`, {
+    headers,
+    data: { device_name: 'Counter 2', grants_admin: false },
+  });
+  expect(bCode.status(), await bCode.text()).toBe(201);
+  const b = await newTill(browser);
+  await enrol(b.page, ((await bCode.json()) as { code: string }).code);
+  await b.page.waitForFunction(() => window.__bikriTest !== undefined);
+  await unlock(b.page);
+  await b.page.evaluate(() =>
+    window.__bikriTest?.seedProducts([
+      { name: 'Snapshot only', price: 25_000, cost: 10_000, stock: 5 },
+    ]),
+  );
+  await syncNow(b.page);
+  await expect(b.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
 
   // The server's nightly prune moved the floor past this till's cursor. Set the client
   // cursor low and the tenant floor to the current maximum: the next pull is stale.
-  await a.ctx.setOffline(true);
   await a.page.evaluate(() => window.__bikriTest?.setKv('pull_cursor', 0));
-  raiseChangeLogFloor(shop.tenant.id);
+  const floor = raiseChangeLogFloor(shop.tenant.id);
   await a.ctx.setOffline(false);
   await a.page.evaluate(() => window.__bikriTest?.navigate('/'));
   await syncNow(a.page);
@@ -477,8 +548,33 @@ test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recov
   );
   expect(await idbAll(a.page, 'sales')).toHaveLength(1);
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(1);
+  expect(
+    (await idbAll<{ name_en: string }>(a.page, 'products')).map(
+      (product) => product.name_en,
+    ),
+  ).toContain('Snapshot only');
+  const cursor = (
+    await idbAll<{ key: string; value: number }>(a.page, 'kv')
+  ).find((row) => row.key === 'pull_cursor')?.value;
+  expect(Number(cursor)).toBeGreaterThanOrEqual(floor);
+  expect(
+    syncResponses.some(
+      (response) =>
+        response.url.includes('/api/sync/pull') && response.status === 410,
+    ),
+  ).toBe(true);
+  expect(
+    syncResponses.some(
+      (response) =>
+        response.url.includes('/api/sync/snapshot') && response.status === 200,
+    ),
+  ).toBe(true);
+  await b.ctx.close();
 
   // A restore sets a new epoch; the till recovers without duplicating its sale.
+  const epochBefore = (
+    await idbAll<{ key: string; value: unknown }>(a.page, 'kv')
+  ).find((row) => row.key === 'restore_epoch')?.value;
   const maintenance = await request.post(`${admin}/maintenance`, {
     headers,
     data: { on: true, reason: 'Journey 20 restore drill' },
@@ -486,9 +582,16 @@ test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recov
   expect(maintenance.status(), await maintenance.text()).toBe(200);
   const epoch = await request.post(`${admin}/restore-epoch`, {
     headers,
-    data: { restore_point_at: Date.now(), reason: 'Journey 20 restore drill' },
+    data: {
+      restore_point_at: restorePoint,
+      reason: 'Journey 20 restore drill',
+    },
   });
   expect(epoch.status(), await epoch.text()).toBe(200);
+  const epochBody = (await epoch.json()) as {
+    tenant: { restore_epoch: string };
+  };
+  expect(epochBody.tenant.restore_epoch).not.toBe(epochBefore);
   const done = await request.post(`${admin}/maintenance`, {
     headers,
     data: {
@@ -514,5 +617,15 @@ test('journey 20: a stale till gets 410 SNAPSHOT_REQUIRED, snapshots, then recov
   );
   expect(await idbAll(a.page, 'sales')).toHaveLength(1);
   expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(1);
+  expect(
+    (await idbAll<{ key: string; value: unknown }>(a.page, 'kv')).find(
+      (row) => row.key === 'restore_epoch',
+    )?.value,
+  ).toBe(epochBody.tenant.restore_epoch);
+  expect(
+    (
+      await idbAll<{ recovery?: number; status: string }>(a.page, 'outbox')
+    ).filter((op) => op.recovery && op.status === 'pending'),
+  ).toHaveLength(0);
   await a.ctx.close();
 });

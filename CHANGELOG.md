@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Tests, CI, tooling and docs — 22 Nov 2026 review recheck
+- Journey 20 now proves the `410 SNAPSHOT_REQUIRED` and snapshot hydration with a second till, asserts the raised floor/cursor, and restores from a point captured before an offline sale; the local-D1 selector ignores `metadata.sqlite`.
+- Journey 23 covers two pre-read-only offline sales, a blocked `/sell` deep link, and readable Sales/Reports/Activity/Export; bundle tests cover the amber short-stock warning, stock return after refunds, recipe edit + historical reprint, and real `systemPrint`; the tenant test calls `getDb()`.
+- The isolation suite adds `/admin/tenants/:id/owners`, import `tenant_id` rejection, enrolment-branch/devices/files HTTP scoping, 404 body equality, `enrolled_by` omission, and schema/static checks for `tenant_usage`, `change_log_watermarks` and `platform/*`.
+- The Worker suite adds 201-op/1 MB push boundaries, the 200-op wall-clock guard, backup download traversal rejection, and a 90% line coverage gate; `newId()` initialises its PRNG lazily so coverage instrumentation cannot crash it.
+- Docs and tooling: CSP/version/migration-order checks, SQL arity checks, package README links, string-masked migration DDL, comment-stripped table generation, seeded `branch_device_codes`, no overwritten `cost_changed_at`, backup upload failure on a missing file, and CI timeout/race/concurrency/printf hardening.
+
 ### Printing and print agent 0.1.7 — 22 Nov 2026 review recheck
 - The Windows portable installer no longer wipes `HKCU\...\Run` and waits for the old process before copying; RAW fallback recognises `ERROR_INVALID_DATATYPE (1804)`.
 - Web Serial abort is bounded; jobs never overwrite terminal state and only terminal jobs are evicted; `crash.log` is capped and config saves fsync before rename.
@@ -15,7 +22,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Restore validates every row before the purge, ignores stale file picks, and resets the Restore tab after maintenance ends.
 - Whole-bill bundle refunds keep the restock checkbox; Home recomputes all attention items and scopes recent bills; global search gates customers by `payment.receive`.
 - Price Check hides Add product in read-only mode, guards late lookups and toasts failed cart adds; Home gates reports/backup/sell links and attention destinations.
-- Inline price commits once and restores on empty blur; device import hides when unenrolled; owner sign-in ignores closed responses; sync file removal/acknowledge obey owner/read-only; wizard test prints do not open the drawer and USB/serial controls follow browser support.
+- Inline price commits once and restores on empty blur; owner sign-in ignores closed responses; sync file removal/acknowledge obey owner/read-only; wizard test prints do not open the drawer and USB/serial controls follow browser support.
 - Restore/Sales deep links, expense date validation, item counts, cart arrow order, command palette dialogs/privacy, supplier-return zero lines, PromiseDialog timezone guards, category RTL input, label printing in read-only, report keys/deltas/peak, clipboard/plural/category filters and Price Check keys are fixed.
 ### POS data and sync — 22 Nov 2026 review recheck
 - A delivery with `updatePrice` now verifies `catalog.edit` in the repository; the Worker accepts the costed delivery and the price change.

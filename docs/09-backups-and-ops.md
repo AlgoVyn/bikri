@@ -131,7 +131,7 @@ Never with Time Travel (§3.1). Logical, from the console ([04 §3.7](04-api.md#
 - Operator console Overview: D1 size vs 500 MB, account-wide rows written/read today (Σ `tenant_usage`) vs 100k / 5M, per-tenant usage vs `daily_write_budget`, Σ budgets vs the 70 % Bikri share, last backup age, last prune, tenants by status. Tenant detail: devices with pending ops and oldest unsynced op (`devices.pending_ops` / `oldest_pending_at`, from the `X-Bikri-Pending` header, [03 §6](03-sync.md#6-scheduling)).
 - Shop owner (Settings → Devices / Sync): their devices, pending ops, conflicts, and "Today's sync budget: 62 %" from `/api/me`.
 - Warnings at 70 % of any account limit or of a tenant budget; at 80 % of a tenant budget its `poll_after_ms` doubles; at 100 % its pushes get `TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). Red "Consider Workers Paid ($5/month)" when the account stays above 70 % for 3 days.
-- Logs: `console.log` JSON lines `{ level, route, tenant_id, device_id, op_count, ms, error_code }`; view with `wrangler tail` or Workers Logs (observability enabled in `wrangler.jsonc`, sampling 10%). Never log tokens, enrolment codes, PIN hashes, phone numbers or customer names.
+- Logs: `console.log` JSON lines `{ level, route, tenant_id, device_id, op_count, ms, error_code }`; view with `wrangler tail` or Workers Logs (observability enabled in `wrangler.jsonc`, sampling 100%). Never log tokens, enrolment codes, PIN hashes, phone numbers or customer names.
 
 ## 5. Routine operations
 

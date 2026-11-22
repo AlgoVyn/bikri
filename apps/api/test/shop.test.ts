@@ -379,6 +379,7 @@ describe('shop admin (T-038, 04 §3.8)', () => {
       ),
     );
     expect(devices.rows.every((r) => !('token_hash' in r))).toBe(true);
+    expect(devices.rows.every((r) => !('enrolled_by' in r))).toBe(true);
     expect((await shopApi(b, sb, '/shop/export')).status).toBe(400);
     expect(
       (await shopApi(b, sb, '/shop/export', { method: 'POST' })).status,
@@ -725,6 +726,47 @@ describe('isolation I8, I23, I24', () => {
     for (const [path, init] of calls) {
       const r = await shopApi(b, sb, path, init);
       expect(r.status, path).toBe(404);
+      // Same body as an id that never existed, so a 404 cannot reveal A's row.
+      const unknown = await shopApi(
+        b,
+        sb,
+        path
+          .replace(a.till.id, '01JC00000000000000000000ZZ')
+          .replace(a.admin.id, '01JC00000000000000000000ZY')
+          .replace('01JC00000000000000000000C9', '01JC00000000000000000000ZX')
+          .replace(codeA.code, 'NOPE-NOPE-NOPE'),
+        init,
+      );
+      expect(unknown.status, `${path} unknown`).toBe(404);
+      expect(await r.json(), `${path} body`).toEqual(await unknown.json());
+    }
+
+    // Branch ids from A cannot be used to create a code or move B's device.
+    for (const branch of [a.branchId, '01JC00000000000000000000ZW']) {
+      const code = await shopApi(b, sb, '/shop/enrolment-codes', {
+        method: 'POST',
+        json: { device_name: 'Cross', branch_id: branch },
+      });
+      expect(code.status).toBe(404);
+      const move = await shopApi(b, sb, `/shop/devices/${b.till.id}`, {
+        method: 'PATCH',
+        json: { branch_id: branch },
+      });
+      expect(move.status).toBe(404);
+      if (branch !== a.branchId) continue;
+      const unknownCode = await shopApi(b, sb, '/shop/enrolment-codes', {
+        method: 'POST',
+        json: { device_name: 'Cross', branch_id: '01JC00000000000000000000ZV' },
+      });
+      expect(await code.json()).toEqual(await unknownCode.json());
+      expect(
+        await n(
+          'SELECT COUNT(*) AS n FROM devices WHERE tenant_id = ?1 AND id = ?2 AND branch_id = ?3',
+          b.tenantId,
+          b.till.id,
+          b.branchId,
+        ),
+      ).toBe(1);
     }
     expect(
       await n(

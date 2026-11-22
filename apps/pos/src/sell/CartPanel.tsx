@@ -508,7 +508,10 @@ function BundleRows({
                 {t('sell.bundle_item_count', { count: lines.length })}
               </span>
               {short ? (
-                <span className="shrink-0 rounded-full bg-warning-subtle px-1.5 text-caption text-warning-subtle-ink">
+                <span
+                  className="shrink-0 rounded-full bg-warning-subtle px-1.5 text-caption text-warning-subtle-ink"
+                  data-testid="badge-stock"
+                >
                   {t('sell.only_in_stock', {
                     qty: Math.max(0, available ?? 0),
                   })}

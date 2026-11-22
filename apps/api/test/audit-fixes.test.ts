@@ -57,10 +57,6 @@ describe('query and calculation audit regressions', () => {
     ]);
     // The sale's udhaar must make the later delete fail, even though the balance row
     // was read before the sale transaction ran.
-    console.log(
-      'LEDGER DELETE',
-      res.results.map((r) => r.error_code ?? r.result),
-    );
     expect(codeOf(res, 4)).toBe('CONSTRAINT_FAILED');
   });
 
@@ -155,10 +151,6 @@ describe('query and calculation audit regressions', () => {
       { ...sale[1]!, row: lineRow, tx_id: saleTx },
       { ...sale[2]!, row: paymentRow, tx_id: saleTx },
     ]);
-    console.log(
-      'COST',
-      res.results.map((r) => [r.result, r.error_code]),
-    );
     expect(codeOf(res, 0)).toBeNull();
     expect(codeOf(res, 1)).toBeNull();
     const saved = await env.DB.prepare(

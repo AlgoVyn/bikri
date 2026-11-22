@@ -149,6 +149,27 @@ async function printReceipt(page: Page): Promise<string> {
   );
 }
 
+async function reprintBill(page: Page, saleId: string): Promise<string> {
+  const before = (await idbAll<Row>(page, 'print_jobs')).length;
+  await page.evaluate(
+    (id) => window.__bikriTest?.navigate(`/sales/${id}`),
+    saleId,
+  );
+  const button = page.getByRole('button', { name: /^(Print|پرنٹ)$/u }).first();
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect
+    .poll(async () => (await idbAll<Row>(page, 'print_jobs')).length)
+    .toBeGreaterThan(before);
+  const job = (await idbAll<Row>(page, 'print_jobs')).at(-1);
+  return (
+    (await page.evaluate(
+      (id) => window.__bikriTest?.printJobText(String(id)),
+      String(job?.id),
+    )) ?? ''
+  );
+}
+
 async function serverRows(
   request: import('@playwright/test').APIRequestContext,
   tenantId: string,
@@ -264,6 +285,13 @@ test.describe('Bundles (journeys 26–27)', () => {
         (price) =>
           window.__bikriTest?.seedProducts([
             { name: 'Cable 1 m', price, cost: 900, stock: 20 },
+            {
+              name: 'SIM tool',
+              sku: 'SIM-TOOL',
+              price: 9_900,
+              cost: 1_000,
+              stock: 5,
+            },
           ]),
         CABLE_PRICE,
       );
@@ -274,13 +302,22 @@ test.describe('Bundles (journeys 26–27)', () => {
         (await idbAll<Row>(page, 'sales')).at(-1)?.id ?? '',
       );
 
-      // Edit the recipe price: the detail and new carts use it.
+      // Edit the price and add a component: the detail and new carts use both, the
+      // saved bill and its reprint keep the recipe and price they were sold with.
       await page.goto(`/bikri/products/${bundleId}/edit`);
       await page.locator('input[id$="-price"]').fill('55000');
+      await page.locator('#bundle-add-search').fill('SIM-TOOL');
+      await page
+        .locator('#bundle-add-search + ul button')
+        .filter({ hasText: 'SIM-TOOL' })
+        .click();
       await page.keyboard.press('Control+s');
       const detail = page.getByTestId('products-detail');
       await expect(detail.getByTestId('detail-bundle-saves')).toContainText(
-        '2,987',
+        '3,086',
+      );
+      await expect(detail.getByTestId('bundle-recipe')).toContainText(
+        'SIM tool',
       );
       await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
       await expect(
@@ -297,6 +334,15 @@ test.describe('Bundles (journeys 26–27)', () => {
       expect(saved.some((line) => line.bundle_price === EDIT_PRICE)).toBe(
         false,
       );
+      expect(saved.some((line) => line.name_snapshot === 'SIM tool')).toBe(
+        false,
+      );
+      const reprinted = await reprintBill(page, saleId);
+      expect(reprinted).toContain(BUNDLE);
+      for (const component of COMPONENTS)
+        expect(reprinted).toContain(component.name);
+      expect(reprinted).not.toContain('SIM tool');
+      expect(reprinted).toContain('56,500');
     }
   });
 
@@ -333,6 +379,10 @@ test.describe('Bundles (journeys 26–27)', () => {
       if ((await groupHeader.getAttribute('aria-expanded')) !== 'true')
         await groupHeader.click();
       await expect(group.getByTestId('bundle-component')).toHaveCount(4);
+      // Asking for more than the recipe can make shows the amber warning, not a block.
+      await group.locator('input[inputmode="numeric"]').fill('4');
+      await page.keyboard.press('Enter');
+      await expect(group.getByTestId('badge-stock')).toBeVisible();
       await group.locator('input[inputmode="numeric"]').fill('2');
       await page.keyboard.press('Enter');
       await expect(group.getByTestId('line-total')).toContainText('113,000');
@@ -369,6 +419,16 @@ test.describe('Bundles (journeys 26–27)', () => {
       );
       expect(saleMoves).toHaveLength(4);
       for (const move of saleMoves) expect(move.qty_delta_milli).toBe(-2000);
+      const levelsAfterSale = new Map(
+        (await idbAll<Row>(page, 'stock_levels')).map((level) => [
+          String(level.product_id),
+          Number(level.on_hand_milli),
+        ]),
+      );
+      for (const [index, id] of componentIds.entries())
+        expect(levelsAfterSale.get(id), COMPONENTS[index]?.name).toBe(
+          (COMPONENTS[index]?.stock ?? 0) * 1000 - 2000,
+        );
 
       // The sale snapshot keeps the bundle price it was sold at.
       const saved = (await idbAll<Row>(page, 'sale_lines')).filter(
@@ -428,6 +488,16 @@ test.describe('Bundles (journeys 26–27)', () => {
       await expect(page.getByTestId('bill-status')).toHaveText(
         locale === 'ur' ? 'کچھ رقم واپس' : 'Part refunded',
       );
+      const levelsAfterRefunds = new Map(
+        (await idbAll<Row>(page, 'stock_levels')).map((level) => [
+          String(level.product_id),
+          Number(level.on_hand_milli),
+        ]),
+      );
+      for (const [index, id] of componentIds.entries())
+        expect(levelsAfterRefunds.get(id), COMPONENTS[index]?.name).toBe(
+          (COMPONENTS[index]?.stock ?? 0) * 1000,
+        );
       await expectNoHorizontalScroll(page);
     }
   });

@@ -54,7 +54,7 @@ jobs:
           existing=$(curl -fsS \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/bikri-backups/objects?prefix=d1/$DATE." \
-            | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("result") or []))')
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("success") is True, d; print(len(d.get("result") or []))')
           if [ "$existing" != "0" ]; then
             echo "::error::d1/$DATE already exists; rerun with overwrite=true to replace it."
             exit 1
@@ -103,6 +103,7 @@ jobs:
         with:
           name: backup-${{ steps.date.outputs.date }}
           path: ${{ runner.temp }}/backup/backup-${{ steps.date.outputs.date }}.sql.gz.age
+          if-no-files-found: error
           retention-days: 90
       - name: Keep 30 daily + 12 monthly backups in R2
         env:

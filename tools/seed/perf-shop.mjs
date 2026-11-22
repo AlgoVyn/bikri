@@ -1074,6 +1074,11 @@ function main() {
       device_code_history: '',
     };
     insert('devices', { tenant_id: tenantId, ...seededDevice });
+    insert('branch_device_codes', {
+      tenant_id: tenantId,
+      branch_id: ctx.branchId,
+      device_code: 'A',
+    });
 
     for (const [code, nameEn, nameUr, icon, sortOrder] of EXPENSE_CATEGORIES)
       insert('expense_categories', {
@@ -2014,7 +2019,8 @@ function main() {
     // ---- derived stock cache ---------------------------------------------
 
     const setStock = db.prepare(
-      `UPDATE products SET on_hand_milli = ?2, cost_changed_at = created_at
+      `UPDATE products SET on_hand_milli = ?2,
+          cost_changed_at = CASE WHEN cost_changed_at = 0 THEN created_at ELSE cost_changed_at END
         WHERE tenant_id = ?1 AND id = ?3`,
     );
     for (const [productId, onHand] of stockTotals)

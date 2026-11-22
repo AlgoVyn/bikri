@@ -61,6 +61,7 @@ jobs:
         with:
           name: files-${{ steps.date.outputs.date }}
           path: ${{ runner.temp }}/files-${{ steps.date.outputs.date }}.tar.gz.age
+          if-no-files-found: error
           retention-days: 90
       - name: Summary
         if: always()
