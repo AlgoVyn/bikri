@@ -52,6 +52,8 @@ export type Block =
       align?: Align;
       bold?: boolean;
       size?: TextSize;
+      /** Pre-aligned text (column headers); do not apply the non-ASCII 60% wrap. */
+      nowrap?: boolean;
     }
   | {
       t: 'pair';

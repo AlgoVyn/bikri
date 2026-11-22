@@ -184,11 +184,15 @@ export function wrapText(text: string, width: number): string[] {
   // A cursor over the grapheme array: the old version rebuilt `rest` with
   // slice/join per line, which is O(n²) on a long footer (D-231).
   while (end - start > width) {
+    // Break at the last space inside the line, but never at leading indentation: a
+    // first word wider than the line used to break on its own indent and lose it.
     let breakAt = -1;
-    for (let i = start + width; i > start; i -= 1) {
+    let content = false;
+    for (let i = start; i <= start + width && i < end; i += 1) {
       if (chars[i] === ' ') {
-        breakAt = i;
-        break;
+        if (content) breakAt = i;
+      } else {
+        content = true;
       }
     }
     if (breakAt <= start) {
@@ -346,7 +350,9 @@ export function formatItemLines(
   if (textWidth(qty) > widths.qty || textWidth(amount) > widths.amount) {
     const lines = wrapText(name, charsPerLine);
     lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
-    if (detail !== undefined && detail.length > 0) {
+    // `breakdown` already carries the unit price/discount; printing `detail` too
+    // repeated the same price breakdown on narrow receipts.
+    if (breakdown === undefined && detail !== undefined && detail.length > 0) {
       const detailWidth = Math.max(1, charsPerLine - 2);
       for (const detailLine of wrapText(detail, detailWidth))
         lines.push(`  ${detailLine}`);
@@ -408,6 +414,7 @@ function pushText(
   bold: boolean,
   size: TextSize,
   charsPerLine: number,
+  nowrap = false,
 ): void {
   const paragraphs = text.split('\n');
   // Font B ('small') is 9 dots wide against Font A's 12, so 4/3 as many characters fit.
@@ -422,9 +429,10 @@ function pushText(
     // Urdu width is not the code-unit count. Hand the whole line to the renderer.
     // Urdu glyphs are wider than a monospace cell; use a safer wrap width and let
     // the raster renderer draw each line instead of handing it one clipped paragraph.
-    const wrapWidth = hasNonAscii(paragraph)
-      ? Math.max(1, Math.floor(width * 0.6))
-      : width;
+    const wrapWidth =
+      !nowrap && hasNonAscii(paragraph)
+        ? Math.max(1, Math.floor(width * 0.6))
+        : width;
     for (const line of wrapText(paragraph, wrapWidth)) {
       out.push({ kind: 'text', text: line, align, bold, size });
     }
@@ -448,6 +456,7 @@ function pushBlock(
         block.bold ?? false,
         block.size ?? 'normal',
         options.charsPerLine,
+        block.nowrap ?? false,
       );
       return;
     case 'pair': {

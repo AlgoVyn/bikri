@@ -19,7 +19,9 @@ Cross-builds used by CI:
 
 ```bash
 GOOS=windows GOARCH=amd64 go build ./...
+GOOS=darwin  GOARCH=amd64 go build ./...
 GOOS=darwin  GOARCH=arm64 go build ./...
+GOOS=linux   GOARCH=amd64 go build ./...
 GOOS=linux   GOARCH=arm64 go build ./...
 ```
 
@@ -31,8 +33,8 @@ The release workflow also builds a proper per-user Windows installer
 
 - `bikri-print-agent-setup.exe` — Windows installer, start-menu and log shortcuts, uninstaller;
 - `bikri-print-agent-windows-amd64.zip` — portable Windows build (`install.ps1`/`uninstall.ps1`);
-- `bikri-print-agent-linux-{amd64,arm64}.tar.gz` — binary, `install.sh`, systemd user unit;
-- `bikri-print-agent-darwin-{amd64,arm64}.tar.gz` — binary, `install.sh`;
+- `bikri-print-agent-linux-{amd64,arm64}.tar.gz` — binary, `install.sh`/`uninstall.sh`, systemd user unit;
+- `bikri-print-agent-darwin-{amd64,arm64}.tar.gz` — binary, `install.sh`/`uninstall.sh`;
 - `SHA256SUMS`.
 
 The wizard links directly to the GitHub release assets; there is no separate download page. Pushing a tag `print-agent-v*` runs `.github/workflows/print-agent-release.yml`, which builds the Windows installer on `windows-latest`, builds the archives on Ubuntu and publishes the release.

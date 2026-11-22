@@ -33,7 +33,7 @@ function statementItemLine(item: StatementItem, charsPerLine: number): string {
   const room = Math.max(1, width - 2 - suffix.length);
   const name =
     item.name.length > room
-      ? `${item.name.slice(0, Math.max(0, room - 1)).trimEnd()}…`
+      ? `${item.name.slice(0, Math.max(0, room - 3)).trimEnd()}...`
       : item.name;
   return `  ${name}${suffix}`;
 }
@@ -62,7 +62,7 @@ export function statementBlocks(
     { t: 'text', text: meta.labels.title, align: 'center' },
     {
       t: 'text',
-      text: [meta.customerName, meta.phone].filter(Boolean).join(' · '),
+      text: [meta.customerName, meta.phone].filter(Boolean).join(' - '),
       align: 'center',
       size: 'small',
     },
@@ -87,7 +87,7 @@ export function statementBlocks(
     const delta = row.debit - row.credit;
     blocks.push({
       t: 'pair',
-      left: `${row.dateShort ?? row.date} · ${row.descriptionShort ?? row.description}`,
+      left: `${row.dateShort ?? row.date} - ${row.descriptionShort ?? row.description}`,
       right: signed(delta),
     });
     for (const item of row.items ?? []) {

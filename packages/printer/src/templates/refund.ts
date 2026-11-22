@@ -79,6 +79,7 @@ export function buildRefundReceipt(
     blocks.push({
       t: 'text',
       text: formatColumnHeader(labels, paper.charsPerLine),
+      nowrap: true,
     });
   }
   for (const line of input.lines) {

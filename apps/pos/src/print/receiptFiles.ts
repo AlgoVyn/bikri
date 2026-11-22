@@ -93,6 +93,7 @@ export async function refundReceipt(
     paperMm: paper.paperMm,
     charsPerLine: paper.charsPerLine,
     dots: paper.dots,
+    qr: paper.qr,
     printLogo: printer?.print_logo !== false,
     // The builder kicks the drawer only when cash is handed back (06 §7), and a
     // reprint must never kick it again.

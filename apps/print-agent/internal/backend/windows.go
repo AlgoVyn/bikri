@@ -73,6 +73,7 @@ var (
 	procStretchDIBits     = gdi32.NewProc("StretchDIBits")
 	procGetDeviceCaps     = gdi32.NewProc("GetDeviceCaps")
 	procSetStretchBltMode = gdi32.NewProc("SetStretchBltMode")
+	procSetBrushOrgEx     = gdi32.NewProc("SetBrushOrgEx")
 )
 
 type windowsBackend struct {
@@ -628,6 +629,8 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 		_, _, _ = procSetMapMode.Call(hdc, gdiMMText)
 		// HALFTONE smooths the downscale/upscale instead of dropping rows.
 		_, _, _ = procSetStretchBltMode.Call(hdc, gdiHalftone)
+		// HALFTONE uses the brush origin; reset it so the first band is not offset.
+		_, _, _ = procSetBrushOrgEx.Call(hdc, 0, 0, 0)
 		bmi := bitmapInfoHeader{
 			biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
 			biWidth:       int32(width),
@@ -721,5 +724,6 @@ func lastError(err error) string {
 
 func isRawUnsupported(err error) bool {
 	errno, ok := err.(syscall.Errno)
-	return ok && (errno == 50 || errno == 87 || errno == 1)
+	// 1804 is ERROR_INVALID_DATATYPE: v4/XPS drivers reject the RAW spool type.
+	return ok && (errno == 50 || errno == 87 || errno == 1 || errno == 1804)
 }

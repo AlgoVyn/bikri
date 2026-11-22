@@ -188,8 +188,11 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 	if spoolID == "" {
 		// Driver-mode Windows and some CUPS queues finish synchronously and return
 		// no spool id. There is nothing to poll; reporting "spooled" made the till
-		// sleep 400 ms and then ask for a status that was already done.
-		rec.Status = "done"
+		// sleep 400 ms and then ask for a status that was already done. Do not
+		// overwrite a concurrent Cancel's terminal state.
+		if rec.Status == "received" {
+			rec.Status = "done"
+		}
 	} else if rec.Status == "received" {
 		rec.Status = "spooled"
 	}
@@ -273,8 +276,16 @@ func (m *Manager) Cancel(ctx context.Context, id string) (*JobStatus, bool, erro
 	if err := m.backend.Cancel(ctx, printer, spoolID); err != nil {
 		return nil, true, err
 	}
-	m.update(rec, "canceled", "", "")
-	return m.copy(rec), true, nil
+	m.mu.Lock()
+	if current := m.jobs[id]; current != nil && !isTerminal(current.Status) {
+		current.Status = "canceled"
+		current.Error = ""
+		current.Detail = ""
+		current.UpdatedAt = m.now().UnixMilli()
+	}
+	status := rec.JobStatus
+	m.mu.Unlock()
+	return &status, true, nil
 }
 
 // Recent returns the most recent jobs for diagnostics, newest first.
@@ -323,14 +334,20 @@ func (m *Manager) cleanupLocked() {
 		}
 	}
 	// Keep memory and the diagnostics list bounded even on a busy day (100 jobs
-	// per docs/14 §7). Drop the oldest first, regardless of its terminal state.
-	for len(m.jobs) >= maxJobs {
+	// per docs/14 §7). Evict only terminal jobs; an active job must stay pollable.
+	for len(m.jobs) > maxJobs {
 		var oldestID string
 		var oldestAt int64
 		for id, rec := range m.jobs {
+			if !isTerminal(rec.Status) {
+				continue
+			}
 			if oldestID == "" || rec.CreatedAt < oldestAt {
 				oldestID, oldestAt = id, rec.CreatedAt
 			}
+		}
+		if oldestID == "" {
+			break
 		}
 		delete(m.jobs, oldestID)
 	}
@@ -364,7 +381,7 @@ func validateRequest(req JobRequest) error {
 	if req.Copies < 0 || req.Copies > 3 {
 		return errors.New("copies must be 0-3")
 	}
-	if req.Data == "" {
+	if strings.TrimSpace(req.Data) == "" {
 		return errors.New("data is required")
 	}
 	return nil

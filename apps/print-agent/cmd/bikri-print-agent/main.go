@@ -73,8 +73,14 @@ func main() {
 	var crashLog *os.File
 	// Append: systemd (Restart=on-failure) and launchd (KeepAlive) restart the
 	// agent immediately after a panic, and O_TRUNC erased the stack trace of the
-	// crash that caused the restart before anyone could read it.
-	if crash, err := os.OpenFile(agent.CrashLogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
+	// crash that caused the restart before anyone could read it. Cap it so a
+	// restart loop cannot fill the disk (docs/14 §7).
+	crashPath := agent.CrashLogPath()
+	if info, err := os.Stat(crashPath); err == nil && info.Size() >= 2<<20 {
+		_ = os.Remove(crashPath + ".1")
+		_ = os.Rename(crashPath, crashPath+".1")
+	}
+	if crash, err := os.OpenFile(crashPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 		// Keep the file open for the process lifetime; the runtime writes to
 		// this descriptor on a fatal error and does not own/close it.
 		if err := debug.SetCrashOutput(crash, debug.CrashOptions{}); err == nil {

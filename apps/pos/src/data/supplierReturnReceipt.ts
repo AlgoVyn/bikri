@@ -1,6 +1,7 @@
 import { newId } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import {
+  formatItemCount,
   receiptLabelsFor,
   type SupplierReturnReceipt,
   urduSupplierReturnLabels,
@@ -60,7 +61,7 @@ export async function loadSupplierReturnReceipt(
         name: String(
           productById.get(String(line.product_id))?.name_en ?? line.product_id,
         ),
-        qty: String(Number(line.qty_milli) / 1000),
+        qty: formatItemCount(Number(line.qty_milli)),
         unitCredit: Number(line.unit_credit),
         lineTotal: Number(line.line_total),
       })),

@@ -8,7 +8,7 @@ export const AGENT_URL = 'http://127.0.0.1:17890';
 /** The only agent API version this PWA speaks (docs/14-print-agent.md §6). */
 export const AGENT_PROTOCOL = 1;
 /** Update this tag when publishing a new print-agent release. */
-export const AGENT_RELEASE_TAG = 'print-agent-v0.1.6';
+export const AGENT_RELEASE_TAG = 'print-agent-v0.1.7';
 export const AGENT_RELEASE_URL = `https://github.com/AlgoVyn/bikri/releases/tag/${AGENT_RELEASE_TAG}`;
 const releaseAsset = (name: string) =>
   `https://github.com/AlgoVyn/bikri/releases/download/${AGENT_RELEASE_TAG}/${name}`;

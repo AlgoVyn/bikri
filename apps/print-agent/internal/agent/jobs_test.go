@@ -217,8 +217,23 @@ func TestManagerCapsJobs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Active jobs are pollable and must not be evicted just to hit the cap.
+	if got := len(manager.Recent(500)); got != maxJobs+5 {
+		t.Fatalf("active jobs = %d, want %d", got, maxJobs+5)
+	}
+	manager.mu.Lock()
+	finished := 0
+	for _, rec := range manager.jobs {
+		if finished >= 5 {
+			break
+		}
+		rec.Status = "done"
+		finished++
+	}
+	manager.cleanupLocked()
+	manager.mu.Unlock()
 	if got := len(manager.Recent(500)); got != maxJobs {
-		t.Fatalf("stored jobs = %d, want %d", got, maxJobs)
+		t.Fatalf("stored jobs after terminal eviction = %d, want %d", got, maxJobs)
 	}
 }
 

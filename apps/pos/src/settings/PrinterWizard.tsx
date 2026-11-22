@@ -26,6 +26,13 @@ import type {
   UsbDeviceLike,
 } from '../print/transports.ts';
 
+function isStaleAgentToken(error: unknown): boolean {
+  return (
+    error instanceof AgentRequestError &&
+    (error.status === 401 || error.code === 'UNAUTHORIZED')
+  );
+}
+
 type Step = 'paper' | 'connection' | 'test';
 type Answer = 'yes' | 'no' | null;
 const BAUDS = [9600, 19200, 38400, 115200] as const;
@@ -92,7 +99,7 @@ export function PrinterWizard({
       : platform === 'linux'
         ? 'linux'
         : platform === 'macos'
-          ? 'macos'
+          ? 'macosArm'
           : null;
   const downloadKeys = [
     'windows',
@@ -172,8 +179,17 @@ export function PrinterWizard({
         try {
           const list = await agent.printers(url, current.agent.token);
           if (!cancelled) setAgentPrinters(list);
-        } catch {
-          if (!cancelled) setAgentError('agent_unreachable');
+        } catch (err) {
+          if (!cancelled) {
+            if (isStaleAgentToken(err)) {
+              setDraft((value) => {
+                const next = { ...value };
+                delete next.agent;
+                return next;
+              });
+              setAgentError('agent_already_paired');
+            } else setAgentError('agent_unreachable');
+          }
         }
       }
     })();
@@ -202,8 +218,15 @@ export function PrinterWizard({
           try {
             const list = await agent.printers(url, draft.agent.token);
             setAgentPrinters(list);
-          } catch {
-            setAgentError('agent_unreachable');
+          } catch (err) {
+            if (isStaleAgentToken(err)) {
+              setDraft((value) => {
+                const next = { ...value };
+                delete next.agent;
+                return next;
+              });
+              setAgentError('agent_already_paired');
+            } else setAgentError('agent_unreachable');
           }
         } else {
           setAgentError('agent_already_paired');
@@ -300,8 +323,15 @@ export function PrinterWizard({
         setAgentHealth(null);
         setAgentError('agent_unreachable');
       }
-    } catch {
-      setAgentError('agent_unreachable');
+    } catch (err) {
+      if (isStaleAgentToken(err)) {
+        setDraft((value) => {
+          const next = { ...value };
+          delete next.agent;
+          return next;
+        });
+        setAgentError('agent_already_paired');
+      } else setAgentError('agent_unreachable');
     } finally {
       setAgentBusy(false);
     }

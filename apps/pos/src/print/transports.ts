@@ -332,9 +332,9 @@ export async function sendSerial(
       const held = writer;
       writer = null;
       try {
-        await held?.abort();
+        if (held) await withTimeout(held.abort(), cleanupMs);
       } catch {
-        // The stream may already be errored.
+        // The stream may already be errored, or the driver never answered.
       }
       try {
         held?.releaseLock();
