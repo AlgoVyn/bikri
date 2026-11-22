@@ -33,6 +33,8 @@ describe('wrapText', () => {
     expect(wrapText('', 5)).toEqual([]);
     expect(wrapText('Cable\t1m\r', 12)).toEqual(['Cable 1m']);
     expect(() => wrapText('x', 0)).toThrow();
+    // A first word wider than the line must not break on its own indentation.
+    expect(wrapText('  SUPERLONGWORD', 8)[0]).toBe('  SUPERL');
   });
 
   it('never splits a surrogate pair or an Urdu base letter from its mark', () => {
@@ -149,6 +151,22 @@ describe('item columns (06 §4.1)', () => {
     expect(lines.join('\n')).toContain('Rs 12,34,56,789.00');
     expect(lines.join('\n')).toContain('Rs 1,00,000 each - less Rs 2,000');
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(48);
+  });
+
+  it('does not repeat detail after the breakdown on overflow', () => {
+    const lines = formatItemLines(
+      {
+        name: 'Rice bag',
+        qty: '12.345',
+        amount: 'Rs 12,34,56,789.00',
+        breakdown: ' 12.345 x 1,000',
+        detail: 'Rs 1,000 each',
+      },
+      48,
+      'columns',
+    );
+    expect(lines.join('\n')).toContain('12.345 x 1,000');
+    expect(lines.join('\n')).not.toContain('Rs 1,000 each');
   });
 
   it('wraps a long name to at most 2 lines and adds the indented detail', () => {
