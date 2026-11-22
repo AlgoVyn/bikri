@@ -619,131 +619,127 @@ export function DevicesPage() {
         </section>
       )}
 
-      {enrolled === false ? null : (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
-          <h2 className="text-title font-semibold">
-            {t('devices.import_title')}
-          </h2>
-          <p className="text-small text-text-muted">
-            {t('devices.import_help')}
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              id="unsynced-file"
-              type="file"
-              accept="application/json,.json"
-              className="peer sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const seq = importSeq.current + 1;
-                importSeq.current = seq;
-                setFileName(f.name);
-                void f
-                  .text()
-                  .then((text) => {
-                    if (seq !== importSeq.current) return;
-                    const p = previewUnsynced(text, db.tenantId);
-                    if ('error' in p) {
-                      setImportState(null);
-                      setError(
-                        p.error === 'other_shop'
-                          ? t('devices.import_other_shop')
-                          : t('devices.import_invalid'),
-                      );
-                    } else {
-                      setError(null);
-                      setImportState({ kind: 'preview', p });
-                    }
-                  })
-                  .catch(() => {
-                    if (seq !== importSeq.current) return;
+      <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <h2 className="text-title font-semibold">
+          {t('devices.import_title')}
+        </h2>
+        <p className="text-small text-text-muted">{t('devices.import_help')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            id="unsynced-file"
+            type="file"
+            accept="application/json,.json"
+            className="peer sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const seq = importSeq.current + 1;
+              importSeq.current = seq;
+              setFileName(f.name);
+              void f
+                .text()
+                .then((text) => {
+                  if (seq !== importSeq.current) return;
+                  const p = previewUnsynced(text, db.tenantId);
+                  if ('error' in p) {
                     setImportState(null);
-                    setError(t('devices.import_invalid'));
-                  })
-                  .finally(() => {
-                    // Allow choosing the same file again after a failed/ignored read.
-                    e.target.value = '';
-                  });
+                    setError(
+                      p.error === 'other_shop'
+                        ? t('devices.import_other_shop')
+                        : t('devices.import_invalid'),
+                    );
+                  } else {
+                    setError(null);
+                    setImportState({ kind: 'preview', p });
+                  }
+                })
+                .catch(() => {
+                  if (seq !== importSeq.current) return;
+                  setImportState(null);
+                  setError(t('devices.import_invalid'));
+                })
+                .finally(() => {
+                  // Allow choosing the same file again after a failed/ignored read.
+                  e.target.value = '';
+                });
+            }}
+          />
+          <label
+            htmlFor="unsynced-file"
+            className={`${buttonQuiet} cursor-pointer gap-2 peer-focus-visible:ring-2 peer-focus-visible:ring-primary`}
+          >
+            <UploadIcon />
+            {t('devices.import_choose')}
+          </label>
+          <span className="text-small text-text-muted" aria-live="polite">
+            {fileName ?? t('devices.import_no_file')}
+          </span>
+        </div>
+        {importState?.kind === 'preview' ? (
+          <div className="flex flex-col gap-2" data-testid="import-preview">
+            <p>
+              {t('devices.import_preview', {
+                count: importState.p.count,
+                from: timeText(i18n.language, importState.p.from, timeZone),
+                to: timeText(i18n.language, importState.p.to, timeZone),
+                sales: money(importState.p.sales),
+                payments: money(importState.p.payments),
+              })}
+            </p>
+            <button
+              type="button"
+              className={buttonPrimary}
+              onClick={() => {
+                const preview = importState.p;
+                const file = preview.file;
+                void guard(async () => {
+                  if (!staffId) return;
+                  try {
+                    setImportState({
+                      kind: 'running',
+                      done: 0,
+                      total: file.ops.length,
+                    });
+                    const out = await importUnsynced(
+                      db,
+                      staffId,
+                      file,
+                      (done) =>
+                        setImportState({
+                          kind: 'running',
+                          done,
+                          total: file.ops.length,
+                        }),
+                    );
+                    setImportState({ kind: 'done', ...out });
+                  } catch (error) {
+                    setImportState({ kind: 'preview', p: preview });
+                    throw error;
+                  }
+                });
               }}
-            />
-            <label
-              htmlFor="unsynced-file"
-              className={`${buttonQuiet} cursor-pointer gap-2 peer-focus-visible:ring-2 peer-focus-visible:ring-primary`}
             >
-              <UploadIcon />
-              {t('devices.import_choose')}
-            </label>
-            <span className="text-small text-text-muted" aria-live="polite">
-              {fileName ?? t('devices.import_no_file')}
-            </span>
+              {t('devices.import_go')}
+            </button>
           </div>
-          {importState?.kind === 'preview' ? (
-            <div className="flex flex-col gap-2" data-testid="import-preview">
-              <p>
-                {t('devices.import_preview', {
-                  count: importState.p.count,
-                  from: timeText(i18n.language, importState.p.from, timeZone),
-                  to: timeText(i18n.language, importState.p.to, timeZone),
-                  sales: money(importState.p.sales),
-                  payments: money(importState.p.payments),
-                })}
-              </p>
-              <button
-                type="button"
-                className={buttonPrimary}
-                onClick={() => {
-                  const preview = importState.p;
-                  const file = preview.file;
-                  void guard(async () => {
-                    if (!staffId) return;
-                    try {
-                      setImportState({
-                        kind: 'running',
-                        done: 0,
-                        total: file.ops.length,
-                      });
-                      const out = await importUnsynced(
-                        db,
-                        staffId,
-                        file,
-                        (done) =>
-                          setImportState({
-                            kind: 'running',
-                            done,
-                            total: file.ops.length,
-                          }),
-                      );
-                      setImportState({ kind: 'done', ...out });
-                    } catch (error) {
-                      setImportState({ kind: 'preview', p: preview });
-                      throw error;
-                    }
-                  });
-                }}
-              >
-                {t('devices.import_go')}
-              </button>
-            </div>
-          ) : null}
-          {importState?.kind === 'running' ? (
-            <p role="status">
-              {t('devices.import_running', {
-                done: importState.done,
-                total: importState.total,
-              })}
-            </p>
-          ) : null}
-          {importState?.kind === 'done' ? (
-            <p role="status">
-              {t('devices.import_done', {
-                applied: importState.applied,
-                rejected: importState.rejected,
-              })}
-            </p>
-          ) : null}
-        </section>
-      )}
+        ) : null}
+        {importState?.kind === 'running' ? (
+          <p role="status">
+            {t('devices.import_running', {
+              done: importState.done,
+              total: importState.total,
+            })}
+          </p>
+        ) : null}
+        {importState?.kind === 'done' ? (
+          <p role="status">
+            {t('devices.import_done', {
+              applied: importState.applied,
+              rejected: importState.rejected,
+            })}
+          </p>
+        ) : null}
+      </section>
 
       <ConfirmDialog
         open={confirmRevoke !== null}
