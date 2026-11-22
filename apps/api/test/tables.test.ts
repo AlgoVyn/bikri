@@ -24,9 +24,33 @@ describe('packages/db/src/tables.ts', () => {
   });
 
   it('builds row JSON within the 32-argument limit and keeps nulls', async () => {
-    const expr = rowJsonExpr('sales');
-    for (const call of expr.matchAll(/json_(?:object|insert)\(/g))
-      expect(call).toBeTruthy();
+    // Count each json_object/json_insert call's top-level arguments; SQLite refuses
+    // more than 32. Executing the expression over an empty table also proves every
+    // column name compiles.
+    const maxArgs = (expr: string): number => {
+      let max = 0;
+      for (const call of expr.matchAll(/json_(?:object|insert)\(/gu)) {
+        let depth = 1;
+        let args = 1;
+        for (
+          let i = (call.index ?? 0) + call[0].length;
+          i < expr.length && depth > 0;
+          i += 1
+        ) {
+          const ch = expr[i];
+          if (ch === '(') depth += 1;
+          else if (ch === ')') depth -= 1;
+          else if (ch === ',' && depth === 1) args += 1;
+        }
+        max = Math.max(max, args);
+      }
+      return max;
+    };
+    expect(maxArgs(rowJsonExpr('sales'))).toBeLessThanOrEqual(32);
+    expect(maxArgs(rowJsonExpr('products'))).toBeLessThanOrEqual(32);
+    await env.DB.prepare(
+      `SELECT ${rowJsonExpr('sales')} AS j FROM sales LIMIT 0`,
+    ).all();
     const row = await env.DB.prepare(
       `SELECT ${rowJsonExpr('devices')} AS j FROM (SELECT 'id1' AS id, 'n' AS name, 'b' AS branch_id, 'A' AS device_code, '' AS device_code_history, 0 AS is_admin, 'till' AS kind, NULL AS expires_at, NULL AS read_only_seen_at, 1 AS enrolled_at, 'x' AS enrolled_by, NULL AS revoked_at, NULL AS last_seen_at, 0 AS last_invoice_seq, 0 AS pending_ops, NULL AS oldest_pending_at, NULL AS user_agent, NULL AS app_version, 1 AS created_at, 2 AS updated_at)`,
     ).first<{ j: string }>();

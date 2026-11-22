@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Review leftovers — 22 Nov 2026
+- Snapshot start no longer carries the dead per-table `COUNT(*)` branch; all callers already used row-based progress.
+- The read-only cutoff docs now state that a push records `read_only_seen_at` even when it ends in 403, so a later `/me` or pull cannot widen the grace window.
+- Test honesty: the enrolment eviction test proves the kept bucket still blocks and the evicted one restarts, the expense-override test targets the expense it approves, the row-JSON test counts SQL arguments and executes the sales expression, and the public-request rate limiter is exercised.
+
 ### Print agent 0.1.6 — 22 Nov 2026 review
 - Release `print-agent-v0.1.6` with the Windows GUI log fan-out, `GetDefaultPrinterW` length query, CUPS natural scaling/ppi/media, GDI DPI scaling and Web Serial cleanup fixes, plus the job-state, installer and raster hardening from the review.
 - The wizard download links, Inno installer version and build fallback move to 0.1.6. The HTTP protocol stays 1, so an older agent keeps working until the shop updates.

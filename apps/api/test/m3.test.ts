@@ -698,10 +698,11 @@ describe('M3 server rules', () => {
     expect(codes(duplicate)).toEqual(['CONSTRAINT_FAILED']);
 
     // A cashier cannot approve another cashier's over-limit expense.
+    const overLimitId = newId(now);
     const approvedByCashier = await pushOk(shop.till, [
       op('expenses', 'insert', {
         ...base,
-        id: newId(now),
+        id: overLimitId,
         amount: 300000,
         staff_id: IDS.cashier,
       }),
@@ -709,7 +710,7 @@ describe('M3 server rules', () => {
         id: newId(now),
         action: 'override',
         entity: 'expenses',
-        entity_id: expenseId,
+        entity_id: overLimitId,
         before_json: null,
         after_json: JSON.stringify({
           permission: 'expense.create',
