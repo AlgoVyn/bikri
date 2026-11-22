@@ -255,13 +255,6 @@ test.describe('Bundles (journeys 26–27)', () => {
   test('journey 27: editing a bundle price updates new carts and leaves the saved bill unchanged', async ({
     page,
   }) => {
-    // UI-C2: the product form still crashes while its catalogue live query resolves
-    // (apps/pos is outside this PR). FIXME is removed with the app fix; the test is
-    // kept runnable so that fix is verified immediately.
-    test.fixme(
-      true,
-      'UI-C2: bundle edit crashes before the catalogue query resolves',
-    );
     test.setTimeout(120_000);
     for (const locale of LOCALES) {
       await openLocale(page, locale);
@@ -471,7 +464,19 @@ test('journey 26: an offline bundle sale and whole-bundle refund sync afterwards
     'synced',
     { timeout: 30_000 },
   );
+  // Warm the lazy route tree while online; the offline sale/refund is the subject of
+  // this test, not cold-loading the router chunk.
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/sales'));
+  await expect(till.page.getByTestId('staff-menu')).toBeVisible();
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/'));
 
+  // The first offline navigation needs the lazy route chunk; wait for the worker to
+  // finish precaching, reload so this page is controlled, and unlock again.
+  await till.page.evaluate(
+    async () => (await navigator.serviceWorker.ready).active?.state,
+  );
+  await till.page.reload();
+  await unlock(till.page);
   await till.ctx.setOffline(true);
   await till.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
   await sellTiles(till.page, 'en');
