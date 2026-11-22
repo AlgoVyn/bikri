@@ -773,9 +773,7 @@ export function ProductDetailPage({
                             {h.note}
                           </span>
                         ) : null}
-                        {h.ref ? (
-                          <HistoryRefLink historyRef={h.ref} block />
-                        ) : null}
+                        {h.ref ? <HistoryRefLink historyRef={h.ref} /> : null}
                       </span>
                       <span
                         className={`shrink-0 tabular-nums ${h.tone}`}
@@ -875,13 +873,7 @@ export function ProductDetailPage({
   );
 }
 
-function HistoryRefLink({
-  historyRef,
-  block = false,
-}: {
-  historyRef: HistoryRef;
-  block?: boolean;
-}) {
+function HistoryRefLink({ historyRef }: { historyRef: HistoryRef }) {
   const { t } = useTranslation();
   const isPurchase = historyRef.kind === 'purchase';
   const invoice = historyRef.invoiceNo;
@@ -892,9 +884,8 @@ function HistoryRefLink({
     : invoice
       ? t('products.history_bill', { invoice })
       : t('products.history_bill_plain');
-  const className = `mt-0.5 ${
-    block ? 'flex' : 'inline-flex'
-  } w-fit items-center gap-1 text-small font-medium text-primary underline-offset-2 hover:underline`;
+  const className =
+    'mt-0.5 flex w-fit items-center gap-1 text-small font-medium text-primary underline-offset-2 hover:underline';
   return isPurchase ? (
     <Link
       to="/suppliers/$supplierId"
