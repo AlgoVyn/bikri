@@ -61,7 +61,12 @@ export function createCanvasRasterRenderer(
       ctx.fillRect(0, 0, o.dots, height);
       ctx.fillStyle = '#000';
       ctx.textBaseline = 'middle';
-      ctx.font = `${o.bold ? 700 : 400} ${px}px ${o.rtl ? "'Noto Naskh Arabic UI', serif" : 'Inter, sans-serif'}`;
+      // ASCII lines are column-aligned; use the same monospace face as the PNG path.
+      ctx.font = `${o.bold ? 700 : 400} ${px}px ${
+        o.rtl
+          ? "'Noto Naskh Arabic UI', serif"
+          : "'JetBrains Mono', ui-monospace, monospace"
+      }`;
       ctx.direction = o.rtl ? 'rtl' : 'ltr';
       const align = o.rtl && o.align === 'left' ? 'right' : o.align;
       ctx.textAlign = align;

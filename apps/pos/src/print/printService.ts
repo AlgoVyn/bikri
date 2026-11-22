@@ -199,11 +199,14 @@ export async function printBlocks(
   // copies (the command is harmless if no drawer is attached).
   const drawer = blocks.some((block) => block.t === 'drawer');
   const body = blocks.filter((block) => block.t !== 'drawer');
-  const one = encodeFor(body, printer, {
-    logo,
-    renderer: deps.renderer,
-    language,
-  });
+  const one =
+    body.length === 0
+      ? new Uint8Array(0)
+      : encodeFor(body, printer, {
+          logo,
+          renderer: deps.renderer,
+          language,
+        });
   const parts: Uint8Array[] = [];
   for (let i = 0; i < copies; i += 1) parts.push(one);
   if (drawer)

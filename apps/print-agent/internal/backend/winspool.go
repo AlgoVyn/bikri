@@ -52,7 +52,14 @@ func gdiTargetSize(width, height, paperMm, dpiX, dpiY, horizRes int) (int, int) 
 	if targetWidth < 1 {
 		targetWidth = width
 	}
-	targetHeight := int(math.Round(float64(height) * float64(targetWidth) / float64(width)))
+	// Keep the physical aspect ratio when the driver's X and Y DPI differ.
+	scaleY := 1.0
+	if dpiX > 0 && dpiY > 0 {
+		scaleY = float64(dpiY) / float64(dpiX)
+	}
+	targetHeight := int(
+		math.Round(float64(height) * float64(targetWidth) / float64(width) * scaleY),
+	)
 	if targetHeight < 1 {
 		targetHeight = 1
 	}

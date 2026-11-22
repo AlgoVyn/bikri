@@ -172,7 +172,9 @@ function LabelsDialogContent({
     (sum, row) => sum + (row.barcode ? Math.max(0, row.copies) : 0),
     0,
   );
-  const first = rowsWithProducts.find((row) => row.copies > 0);
+  const first = rowsWithProducts.find(
+    (row) => row.copies > 0 && row.barcode !== null,
+  );
   let preview: { svg: string; widthMm: number } | null = null;
   let previewError: string | null = null;
   if (first?.barcode) {
@@ -217,7 +219,7 @@ function LabelsDialogContent({
     setQuery('');
   };
 
-  const print = () => {
+  const print = async () => {
     if (printing || totalCopies === 0) return;
     if (totalCopies > 1_000) {
       setError(t('office.labels.max_labels'));
@@ -261,7 +263,7 @@ function LabelsDialogContent({
     setError(null);
     setPrinting(true);
     try {
-      printLabelHtml(labels, settings);
+      await printLabelHtml(labels, settings);
     } finally {
       setPrinting(false);
     }
@@ -408,9 +410,20 @@ function LabelsDialogContent({
           </p>
           <div
             data-testid="label-preview"
-            className="mx-auto w-full overflow-auto rounded-control border border-border bg-white p-2"
+            className="mx-auto w-full overflow-auto rounded-control border border-border bg-white p-2 text-center text-body"
             style={{ maxWidth: `${Math.min(preview.widthMm * 2, 200)}mm` }}
           >
+            {first ? (
+              <p className="truncate font-medium">
+                {String(first.product.name_en)}
+                {settings.showPrice ? (
+                  <>
+                    {' · '}
+                    <MoneyText paisa={Number(first.product.price ?? 0)} />
+                  </>
+                ) : null}
+              </p>
+            ) : null}
             <div
               className="mx-auto"
               style={{ width: `${preview.widthMm}mm` }}

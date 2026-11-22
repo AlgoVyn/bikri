@@ -2,17 +2,20 @@ import { BASE_PATH } from '@bikri/core';
 import { LABEL_SIZES } from '@bikri/printer';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 
-export function printLabelHtml(
+export async function printLabelHtml(
   labels: string[],
   settings: LabelSettings,
-): void {
+): Promise<void> {
   const size = LABEL_SIZES[settings.size];
   const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
   frame.style.position = 'fixed';
   frame.style.inset = '0';
   frame.style.width = '0';
   frame.style.height = '0';
   frame.style.border = '0';
+  frame.style.visibility = 'hidden';
   document.body.append(frame);
   const doc = frame.contentDocument;
   if (!doc) {
@@ -24,12 +27,10 @@ export function printLabelHtml(
     settings.size === 'a4'
       ? '@page { size: A4; margin: 12.9mm 9mm; }'
       : `@page { size: ${size.widthMm}mm ${size.heightMm}mm; margin: 0; }`;
+  const startIndex = Math.min(23, Math.max(0, Math.trunc(settings.start ?? 0)));
   const skip =
     settings.size === 'a4'
-      ? Array.from(
-          { length: Math.min(23, settings.start) },
-          () => '<div></div>',
-        ).join('')
+      ? Array.from({ length: startIndex }, () => '<div></div>').join('')
       : '';
   const grid =
     settings.size === 'a4'
@@ -87,5 +88,12 @@ export function printLabelHtml(
   // The iframe loads its own @font-face rules; wait so the driver rasterises
   // the Urdu/Inter glyphs instead of a fallback font.
   const ready = doc.fonts?.ready ?? Promise.resolve();
-  void ready.then(start, start);
+  // A missing font file must not leave the dialog in "printing" forever.
+  await Promise.race([
+    ready,
+    new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+  ]).then(
+    () => start(),
+    () => start(),
+  );
 }

@@ -408,6 +408,7 @@ function pushText(
   bold: boolean,
   size: TextSize,
   charsPerLine: number,
+  nowrap = false,
 ): void {
   const paragraphs = text.split('\n');
   // Font B ('small') is 9 dots wide against Font A's 12, so 4/3 as many characters fit.
@@ -422,9 +423,10 @@ function pushText(
     // Urdu width is not the code-unit count. Hand the whole line to the renderer.
     // Urdu glyphs are wider than a monospace cell; use a safer wrap width and let
     // the raster renderer draw each line instead of handing it one clipped paragraph.
-    const wrapWidth = hasNonAscii(paragraph)
-      ? Math.max(1, Math.floor(width * 0.6))
-      : width;
+    const wrapWidth =
+      !nowrap && hasNonAscii(paragraph)
+        ? Math.max(1, Math.floor(width * 0.6))
+        : width;
     for (const line of wrapText(paragraph, wrapWidth)) {
       out.push({ kind: 'text', text: line, align, bold, size });
     }
@@ -448,6 +450,7 @@ function pushBlock(
         block.bold ?? false,
         block.size ?? 'normal',
         options.charsPerLine,
+        block.nowrap ?? false,
       );
       return;
     case 'pair': {

@@ -40,8 +40,8 @@ describe('customer statement print blocks', () => {
         {
           date: '13 Nov 2026',
           dateShort: '13/11/26',
-          description: 'Payment received · Cash',
-          descriptionShort: 'Payment · Cash',
+          description: 'Payment received - Cash',
+          descriptionShort: 'Payment - Cash',
           debit: 0,
           credit: 25000,
           balance: 125000,
@@ -75,7 +75,7 @@ describe('customer statement print blocks', () => {
     expect(blocks.at(-1)).toEqual({ t: 'cut' });
     expect(blocks).toContainEqual({
       t: 'pair',
-      left: '13/11/26 · Bill INV-1',
+      left: '13/11/26 - Bill INV-1',
       right: '+Rs 1,500',
     });
     expect(blocks).toContainEqual({
@@ -114,13 +114,13 @@ describe('customer statement print blocks', () => {
       (block): block is { t: 'text'; text: string; size: 'small' } =>
         block.t === 'text' && block.text.includes('Samsung Galaxy'),
     );
-    expect(itemLine?.text).toContain('…');
+    expect(itemLine?.text).toContain('...');
     expect(itemLine?.text.length ?? Infinity).toBeLessThanOrEqual(
       Math.floor((32 * 4) / 3),
     );
     expect(blocks).toContainEqual({
       t: 'pair',
-      left: '13/11/26 · Payment · Cash',
+      left: '13/11/26 - Payment - Cash',
       right: '-Rs 250',
     });
     expect(blocks).not.toContainEqual(

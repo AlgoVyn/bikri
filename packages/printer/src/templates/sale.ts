@@ -80,6 +80,7 @@ function pushItems(
     blocks.push({
       t: 'text',
       text: formatColumnHeader(labels, charsPerLine),
+      nowrap: true,
     });
   }
   const money = (paisa: number): string =>

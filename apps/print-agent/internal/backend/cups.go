@@ -160,17 +160,17 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
 	}
 	ext := ".bin"
-	var imageHeight int
+	var imageHeight, imageWidth int
 	if job.Encoding == "png" {
 		ext = ".png"
 		// Validate here too so a direct backend caller (or a future transport)
 		// cannot hand CUPS filters an unbounded PNG. The manager also validates
 		// centrally before any backend runs.
-		_, height, err := ImageConfig(job.Data)
+		width, height, err := ImageConfig(job.Data)
 		if err != nil {
 			return "", err
 		}
-		imageHeight = height
+		imageWidth, imageHeight = width, height
 	}
 	file, err := os.CreateTemp("", "bikri-print-*"+ext)
 	if err != nil {
@@ -198,6 +198,9 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	if job.Mode == "raw" {
 		args = append(args, "-o", "raw")
 	} else {
+		if job.WidthDots <= 0 {
+			job.WidthDots = imageWidth
+		}
 		args = append(args, cupsDriverArgs(job, imageHeight)...)
 	}
 	// `--` ends options: a file name or queue that begins with `-` can never be
