@@ -112,31 +112,19 @@ test('the receipt prints from a hidden iframe, not the till page', async ({
 }, info) => {
   test.skip(info.project.name !== 'desktop', 'one viewport is enough');
   await page.goto('/bikri/');
+  await page.waitForFunction(() => window.__bikriTest?.printHtml !== undefined);
   const printed = await page.evaluate(async (receipt) => {
-    // Same steps as apps/pos/src/print/systemPrint.ts (unit-tested there), in a real browser.
     let topPrinted = false;
     window.print = () => {
       topPrinted = true;
     };
-    const frame = document.createElement('iframe');
-    frame.style.visibility = 'hidden';
-    const loaded = new Promise((r) =>
-      frame.addEventListener('load', r, { once: true }),
-    );
-    frame.srcdoc = receipt;
-    document.body.append(frame);
-    await loaded;
-    const win = frame.contentWindow as Window;
-    let text = '';
-    win.print = () => {
-      text = win.document.body.textContent ?? '';
-    };
-    await win.document.fonts.ready;
-    win.print();
-    frame.remove();
-    return { text, topPrinted };
+    // The real system-print path: hidden iframe, fonts, fit-page CSS, then print.
+    const result = await window.__bikriTest?.printHtml(receipt, 80);
+    if (!result) throw new Error('print hook missing');
+    return { ...result, topPrinted };
   }, html(80));
   expect(printed.topPrinted).toBe(false);
+  expect(printed.ok).toBe(true);
   expect(printed.text).toContain('INV-A-1042');
   expect(printed.text.trim().endsWith('Powered by AlgoVyn')).toBe(true);
 });

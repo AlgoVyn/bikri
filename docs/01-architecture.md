@@ -252,6 +252,10 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     "SCHEMA_VERSION": "8",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",
+    "ENV": "production",                   // rejects ENV=test next to the production origin
+    "CLOUDFLARE_ACCOUNT_ID": "<account id>",
+    "REGISTER_LIMIT": "5",                 // public shop requests per IP per hour
+    "ENROL_LIMIT": "10",                   // enrolment attempts per IP per 10 minutes
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
@@ -262,7 +266,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   "ratelimits": [{ "name": "OWNER_SIGNIN_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } }],
   "triggers": { "crons": ["0 22 * * *"] },    // 03:00 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
   "observability": { "enabled": true }
-  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com", the platform operator),
+  // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com", the platform operator), EMAIL_ROUTING_TOKEN,
   // OWNER_CODE_KEY and OWNER_SESSION_KEY (32 random bytes each, owner email sign-in, 05 §3.2)
 }
 ```
@@ -277,7 +281,7 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
 /bikri/*
   Cache-Control: public, max-age=0, must-revalidate, no-transform
   Strict-Transport-Security: max-age=31536000
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-vjPwkZNWSz239B2vfaji4dSVEAArUl6y0fWQtzpXIRI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-nLz+WGEFrckBx6NbiOb1M+4DmyupJVxjEprI4MF42kI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(self), usb=(self), serial=(self)
@@ -412,7 +416,7 @@ Limits read from Cloudflare docs on 27 Oct 2026 (sources in [13 §2](13-multi-te
 
 Rules that keep usage low:
 - Reports and lists are computed on the device from IndexedDB, never from D1.
-- Pull only when the app is visible (`document.visibilityState === 'visible'`), every `poll_after_ms` (default 60 s, per tenant), plus immediately after a push.
+- Pull every `poll_after_ms` (default 60 s, per tenant) while the tab is open, including hidden tabs (D-238), plus immediately after a push.
 - `devices.last_seen_at` updated at most every 5 minutes.
 - Every query uses an index that starts with `tenant_id`, so one shop's queries never scan other shops' rows (D1 bills rows scanned).
 - Per-tenant daily write budget with `503 TENANT_QUOTA` ([13 §6](13-multi-tenancy.md#6-free-tier-budget-per-shop)). If the account limit itself is hit, D1 returns errors until 00:00 UTC (05:00 PKT) for every shop; tills keep selling offline and sync later. Upgrade path: Workers Paid, USD 5/month.

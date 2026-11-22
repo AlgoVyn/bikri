@@ -13,9 +13,24 @@ const PK_EXCEPTIONS: Record<string, string[]> = {
   enrolment_codes: ['code_hash'], // the code itself identifies the tenant (D-072)
   applied_ops: ['tenant_id', 'op_id'],
   branch_device_codes: ['tenant_id', 'branch_id', 'device_code'],
+  tenant_usage: ['tenant_id', 'day'],
+  change_log_watermarks: ['tenant_id', 'day'],
 };
 /** Cross-tenant indexes allowed by 10 §8 I20, plus globally unique secrets. */
-const INDEX_EXCEPTIONS = new Set(['applied_ops_at']);
+const INDEX_EXCEPTIONS = new Set([
+  'applied_ops_at',
+  // Platform cron sums all tenants for one UTC day.
+  'tenant_usage_day',
+]);
+/**
+ * Platform tables that still key per tenant. They are written only by the Worker/cron, but
+ * their tenant key, FK and day compound key must obey the same rules as tenant tables.
+ */
+const TENANT_KEYED_PLATFORM = [
+  'tenant_usage',
+  'change_log_watermarks',
+] as const;
+const TENANT_KEYED_TABLES = [...TENANT_TABLES, ...TENANT_KEYED_PLATFORM];
 const UNIQUE_EXCEPTIONS: Record<string, string[]> = {
   devices: ['token_hash'], // globally unique, identifies the tenant (02 §2)
   enrolment_codes: ['code_hash'],
@@ -55,7 +70,7 @@ describe('I20 schema check', () => {
     );
   });
 
-  for (const table of TENANT_TABLES) {
+  for (const table of TENANT_KEYED_TABLES) {
     it(`${table}: tenant_id, tenant-leading key, composite FKs, tenant-leading indexes`, async () => {
       const cols = await pragma<ColumnInfo>(`PRAGMA table_info('${table}')`);
       expect(
@@ -82,7 +97,7 @@ describe('I20 schema check', () => {
           continue;
         }
         expect(
-          (TENANT_TABLES as readonly string[]).includes(parent),
+          (TENANT_KEYED_TABLES as readonly string[]).includes(parent),
           `${table} references non-tenant table ${parent}`,
         ).toBe(true);
         expect(from[0], `${table} → ${parent} is not composite`).toBe(

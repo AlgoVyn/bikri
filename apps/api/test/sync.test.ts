@@ -19,6 +19,7 @@ import {
 } from './helpers/ops.ts';
 
 type PushOpLike = ReturnType<typeof op>;
+type Err = { error: { code: string } };
 
 const count = async (sql: string, ...params: unknown[]) =>
   Number(
@@ -521,6 +522,56 @@ describe('push (03 §4.1, §9)', () => {
         purchaseId,
       ),
     ).toBe(0);
+  });
+
+  it('rejects 201 ops before touching the database', async () => {
+    const shop = await seedShop('Boundary 201');
+    const ops = Array.from({ length: 201 }, (_, index) =>
+      op(
+        'products',
+        'upsert',
+        productRow(newId(), { sku: `MAX-${index}`, price: 1000 }),
+      ),
+    );
+    const res = await push(shop.till, ops);
+    expect(res.status).toBe(400);
+    expect((await json<Err>(res)).error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('rejects a push body over 1 MB with 413', async () => {
+    const shop = await seedShop('Boundary 1MB');
+    const res = await api('/sync/push', {
+      method: 'POST',
+      token: shop.till.token,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        device_id: shop.till.id,
+        schema_version: 2,
+        app_version: '1.1.0',
+        ops: [],
+        padding: 'x'.repeat(1_050_000),
+      }),
+    });
+    expect(res.status).toBe(413);
+    expect((await json<Err>(res)).error.code).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('applies a 200-op push under the CPU budget proxy', async () => {
+    const shop = await seedShop('Boundary CPU');
+    const ops = Array.from({ length: 200 }, (_, index) =>
+      op(
+        'products',
+        'upsert',
+        productRow(newId(), { sku: `CPU-${index}`, price: 1000 + index }),
+      ),
+    );
+    const started = performance.now();
+    const res = await push(shop.admin, ops);
+    const elapsed = performance.now() - started;
+    expect(res.status).toBe(200);
+    expect(elapsed, `200-op push took ${elapsed.toFixed(1)} ms`).toBeLessThan(
+      500,
+    );
   });
 });
 
@@ -1490,6 +1541,42 @@ describe('pull and snapshot', () => {
     expect(secondBody.changes.map((change) => change.tbl)).toEqual([
       'expenses',
     ]);
+  });
+
+  it('snapshot hides bundle rows from an old client', async () => {
+    const shop = await seedShop('Old snapshot');
+    const headers = { 'x-bikri-schema': '2' };
+    const items = await api('/sync/snapshot?tbl=bundle_items', {
+      token: shop.till.token,
+      headers,
+    });
+    expect(items.status).toBe(200);
+    expect(await json<{ rows: unknown[] }>(items)).toMatchObject({ rows: [] });
+    const products = await json<{ rows: { kind?: string }[] }>(
+      await api('/sync/snapshot?tbl=products', {
+        token: shop.till.token,
+        headers,
+      }),
+    );
+    expect(products.rows.some((row) => row.kind === 'bundle')).toBe(false);
+    const start = await json<{ tables: { tbl: string }[] }>(
+      await api('/sync/snapshot', { token: shop.till.token, headers }),
+    );
+    expect(start.tables.map((table) => table.tbl)).not.toContain(
+      'bundle_items',
+    );
+  });
+
+  it('rejects a malformed JSON body without a 500', async () => {
+    const shop = await seedShop('Bad JSON');
+    const res = await api('/sync/push', {
+      method: 'POST',
+      token: shop.till.token,
+      headers: { 'content-type': 'application/json' },
+      body: '{"ops":',
+    });
+    expect(res.status).toBe(400);
+    expect((await json<Err>(res)).error.code).toBe('VALIDATION_FAILED');
   });
 
   it('snapshot starts without counting every table and pages rows without tenant_id or token_hash', async () => {

@@ -54,6 +54,7 @@ export async function printHtmlViaSystem(
   html: string,
   widthMm: 58 | 80,
   doc: Document = document,
+  printWindow: (win: Window) => void = (win) => win.print(),
 ): Promise<SystemPrintResult> {
   const frame = doc.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
@@ -115,7 +116,7 @@ export async function printHtmlViaSystem(
     win.addEventListener('afterprint', cleanup, { once: true });
     timer = setTimeout(cleanup, CLEANUP_TIMEOUT_MS);
     win.focus();
-    win.print(); // blocks until the dialog closes in Chromium
+    printWindow(win); // the default blocks until the dialog closes in Chromium
     printed = true;
     return { ok: true };
   } finally {

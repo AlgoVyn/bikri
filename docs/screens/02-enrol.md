@@ -8,7 +8,7 @@ No Dukaan screenshot: Dukaan uses a vendor account + trial activation, which Bik
 
 Centered card: Bikri wordmark, heading "Connect this device to your shop", two options as tabs (`?code=` in the URL pre-fills the code and opens tab 1; the code is removed from the address bar with `history.replaceState`):
 
-1. **I have a code** — 8 character input (auto-uppercase, groups of 4 shown as `ABCD-EFGH`, ambiguous characters `0 O 1 I L` not used by the generator; input normalises them), Device name (text, default from user agent, e.g. "Chrome on Windows"), `Connect` button. A "Scan QR" button opens the camera (zxing-wasm) to read the QR shown in Settings → Devices on an admin device (or in the operator console).
+1. **I have a code** — 8 character input (auto-uppercase, groups of 4 shown as `ABCD-EFGH`, ambiguous characters `0 O 1 I L` not used by the generator; input normalises them), Device name (text, default from user agent, e.g. "Chrome on Windows"), `Connect` button. The QR shown in Settings → Devices (or the operator console) opens this page with the code filled in.
 2. **New shop** — explains "Setting up a new shop? Enter the owner pairing code you got from Algovyn. It works once and expires in 3 days." and switches to the same code field (owner pairing codes make this device an admin device, [05 §2](../05-auth-and-roles.md#2-device-enrolment)). Below the code field a link "What Algovyn can see" opens the terms and privacy notes ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)). Enrolment itself needs no email or Access sign-in; the owner's email code is asked later, for shop-admin actions ([05 §3.2](../05-auth-and-roles.md#32-owner-email-sign-in-d-082)).
 
 Below the form: "Do not have a pairing code? **Request a shop**" links to the public `/request` form (D-175). The request form links back to `/enrol` for people who already have a code. Footer: language switcher; "Revoked?" helper text when the reason is `DEVICE_REVOKED`: "This device was disconnected by the owner. Unsynced sales were kept on this device." with button `Export unsynced data` ([03 §8](../03-sync.md#8-device-revocation-and-data-loss-window)).
@@ -30,7 +30,7 @@ If the browser already belongs to another shop (`bikri.active_tenant` set, D-073
 
 ## On success
 
-Open (create) the Dexie database `bikri-<tenant_id>` from the response, set `localStorage['bikri.active_tenant'] = tenant_id`; store token in that database's `kv.device_token` (never localStorage), store `device_id`, `device_code`, `branch_id`, `is_admin`, `kv.tenant` (`id`, `display_name`) and `poll_after_ms`; call `navigator.storage.persist()`; run the initial full pull with a progress bar "Downloading your shop… 1,240 of 3,000"; then go to `/setup` (if not completed) or `/lock`.
+Open (create) the Dexie database `bikri-<tenant_id>` from the response, set `localStorage['bikri.active_tenant'] = tenant_id`; store token in that database's `kv.device_token` (never localStorage), store `device_id`, `device_code`, `branch_id`, `is_admin`, `kv.tenant` (`id`, `display_name`) and `poll_after_ms`; call `navigator.storage.persist()`; run the initial full pull with a progress bar "Downloading your shop…"; then go to `/setup` (if not completed) or `/lock`.
 
 ## Acceptance criteria
 

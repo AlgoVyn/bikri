@@ -250,7 +250,11 @@ export function parseDumpTenants(sql) {
       /^INSERT\s+INTO\s+["`[]?tenants["`\]]?\s*\(([^)]*)\)\s*VALUES\s*([\s\S]*)$/iu.exec(
         text,
       );
-    if (!head) continue;
+    if (!head) {
+      if (/^INSERT\s+INTO\s+["`[]?tenants\b/iu.test(text))
+        throw new Error('backup dump: unparseable tenants INSERT');
+      continue;
+    }
     const columns = head[1].split(',').map((column) =>
       column
         .trim()

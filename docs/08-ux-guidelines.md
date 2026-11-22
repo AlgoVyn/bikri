@@ -251,9 +251,9 @@ Measured on the reference shop PC (Intel i3 7th gen / 8 GB / Chrome stable, Wind
 | Done → sale saved (Dexie transaction committed) | < 150 ms |
 | Cold start (cached) → PIN screen | < 1.5 s |
 | PIN → Sell usable | < 400 ms |
-| JS initial bundle (gz) | < 290 KB (includes the blocking theme script and the active language catalog); route chunks < 100 KB |
+| JS initial bundle (gz) | < 290 KB (includes the inline CSP-hashed theme bootstrap and the active language catalog); route chunks < 100 KB |
 | Initial CSS (gz) | < 25 KB |
-| Offline precache (gz) | < 1.25 MB; content-hashed JS/CSS/fonts are served `immutable` and compressed (D-231) |
+| Offline precache (gz) | < 1.25 MB; content-hashed JS/CSS are served `immutable` and compressed; fonts use `max-age=86400` (D-237) |
 | Memory after 8 h of selling | < 300 MB, no growth > 10% per hour |
 | Lists | virtualised or paged above 100 rows; 60 fps scroll |
 

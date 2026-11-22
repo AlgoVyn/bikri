@@ -8,32 +8,86 @@ const tokensCss = readFileSync(
   'utf8',
 ).toLowerCase();
 
-/** Every declared value of a custom property, including dark aliases. */
-const declarations = new Map<string, Set<string>>();
-for (const match of tokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/gu)) {
-  const name = match[1] ?? '';
-  const value = (match[2] ?? '').trim();
-  if (!name) continue;
-  const values = declarations.get(name) ?? new Set<string>();
-  values.add(value);
-  declarations.set(name, values);
+/** Brace-matched bodies of every rule whose selector starts with `opener`. */
+function blockBodies(css: string, opener: string): string[] {
+  const bodies: string[] = [];
+  let from = 0;
+  for (;;) {
+    const at = css.indexOf(opener, from);
+    if (at < 0) break;
+    const open = css.indexOf('{', at + opener.length);
+    if (open < 0) break;
+    let depth = 0;
+    let end = -1;
+    for (let index = open; index < css.length; index += 1) {
+      if (css[index] === '{') depth += 1;
+      else if (css[index] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = index;
+          break;
+        }
+      }
+    }
+    if (end < 0) break;
+    bodies.push(css.slice(open + 1, end));
+    from = end + 1;
+  }
+  return bodies;
 }
 
-/** Resolve `var(--other)` aliases so a semantic token's real colour is checked. */
-function tokenValues(name: string, seen = new Set<string>()): Set<string> {
-  const values = new Set<string>();
-  if (seen.has(name)) return values;
-  seen.add(name);
-  for (const value of declarations.get(`--color-${name}`) ?? []) {
-    const alias = /^var\(\s*(--[\w-]+)\s*\)$/u.exec(value);
-    if (alias?.[1]) {
-      for (const resolved of declarations.get(alias[1]) ?? [])
-        values.add(resolved.toLowerCase());
-    } else {
+function declarationsIn(bodies: string[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const body of bodies)
+    for (const match of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/gu)) {
+      const name = match[1] ?? '';
+      const value = (match[2] ?? '').trim();
+      if (!name) continue;
+      const values = map.get(name) ?? new Set<string>();
       values.add(value);
+      map.set(name, values);
+    }
+  return map;
+}
+
+// Light values live in @theme; both dark selectors alias the --dark-* values declared in
+// the base :root. Keeping the scopes apart stops a dark value from satisfying a light pair
+// (and vice versa), which the previous flat map allowed.
+const light = declarationsIn(blockBodies(tokensCss, '@theme'));
+const base = declarationsIn(blockBodies(tokensCss, ':root {'));
+const darkSelector = declarationsIn(
+  blockBodies(tokensCss, '[data-theme="dark"]'),
+);
+const darkMedia = declarationsIn(
+  blockBodies(tokensCss, ':root:not([data-theme="light"])'),
+);
+
+/** Resolve `var(--other)` aliases inside a theme so a token's real colour is checked. */
+function resolveVariable(
+  theme: 'light' | 'dark',
+  variable: string,
+  seen: Set<string> = new Set(),
+): Set<string> {
+  const scopes = theme === 'dark' ? [darkSelector, base] : [light, base];
+  const values = new Set<string>();
+  if (seen.has(variable)) return values;
+  const nextSeen = new Set(seen).add(variable);
+  for (const scope of scopes) {
+    for (const value of scope.get(variable) ?? []) {
+      const alias = /^var\(\s*(--[\w-]+)\s*\)$/u.exec(value);
+      if (alias?.[1]) {
+        for (const resolved of resolveVariable(theme, alias[1], nextSeen))
+          values.add(resolved);
+      } else {
+        values.add(value);
+      }
     }
   }
   return values;
+}
+
+function tokenValues(theme: 'light' | 'dark', name: string): Set<string> {
+  return resolveVariable(theme, `--color-${name}`);
 }
 
 /** The semantic tokens a pair documents. @param {{ name: string }} pair */
@@ -87,10 +141,20 @@ function pairTokens(pair: { name: string }): { fg: string; bg: string } | null {
 }
 
 let failures = 0;
+// The two dark selectors must stay identical: a colour added to one but not the other
+// silently changes the theme for users who never picked it.
+for (const name of new Set([...darkSelector.keys(), ...darkMedia.keys()])) {
+  const selector = [...(darkSelector.get(name) ?? [])].sort().join('|');
+  const media = [...(darkMedia.get(name) ?? [])].sort().join('|');
+  if (selector === media) continue;
+  failures += 1;
+  console.log(`FAIL  dark selector drift: ${name} (${selector} vs ${media})`);
+}
 for (const pair of tokenPairs) {
+  const theme = pair.name.startsWith('dark ') ? 'dark' : 'light';
   const tokens = pairTokens(pair);
-  const fgValues = tokens ? tokenValues(tokens.fg) : new Set<string>();
-  const bgValues = tokens ? tokenValues(tokens.bg) : new Set<string>();
+  const fgValues = tokens ? tokenValues(theme, tokens.fg) : new Set<string>();
+  const bgValues = tokens ? tokenValues(theme, tokens.bg) : new Set<string>();
   const fg = pair.fg.toLowerCase();
   const bg = pair.bg.toLowerCase();
   const fgOk = fgValues.has(fg);

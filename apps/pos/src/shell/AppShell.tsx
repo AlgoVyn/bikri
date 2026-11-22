@@ -87,6 +87,11 @@ function AppShellInner({ children }: { children: ReactNode }) {
   const { updateReady, applyUpdate } = useUpdateReady();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
+  // The rail and N hotkey already hide Sell; a deep link or bookmark must not start a
+  // cart that the read-only guard can never save.
+  useEffect(() => {
+    if (readOnly && selling) void navigate({ to: '/', replace: true });
+  }, [readOnly, selling, navigate]);
   const shopName = useShopName();
   const desktop = useIsDesktop();
   const [compactRail, setCompactRail] = useState(readCompactRail);

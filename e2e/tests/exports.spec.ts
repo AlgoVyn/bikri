@@ -38,6 +38,7 @@ test.describe('Exports (T-049)', () => {
       'devices',
       'staff',
       'products',
+      'bundle_items',
       'customers',
       'sales',
       'sale_lines',

@@ -93,7 +93,7 @@ Reference shop (01 §8): 2 tills, 13 h/day open, 150 bills/day, 3 lines/bill.
 
 | Resource (per account, Free) | Per reference shop / day | Planned Bikri share | Shops that fit |
 |---|---|---|---|
-| Worker requests 100,000/day | ≈ 2,100 (60 s pulls while visible + pushes + files) | 70,000 (30 % kept for the website's other Workers and ops) | ≈ 33 |
+| Worker requests 100,000/day | ≈ 2,100 (60 s pulls while the tab is open + pushes + files) | 70,000 (30 % kept for the website's other Workers and ops) | ≈ 33 |
 | D1 rows written 100,000/day | ≈ 14,500 (a 3-line reference bill is ~97 rows after D-231 dropped 16 unused indexes and added 4 hot-path ones; the T-062 measurement was 127 before that cleanup; 150 bills/day) | 70,000 | **≈ 3.6** at the 70 % share with the 19,500 default budget |
 | D1 rows read 5,000,000/day | ≈ 25,000 (indexed pulls, push look-ups) + snapshots of new tills | 3,500,000 | > 100 |
 | D1 size 500 MB per DB (Free) | ≈ 153 MB per shop-year (T-062 measured 1.9 KB/bill permanent + steady-state 30-day `change_log`/90-day `applied_ops` at 150 bills/day, 419 KB/shop-day) | plan a new shard at ~450 MB | **≈ 3.3 shop-years per DB** |
@@ -205,7 +205,7 @@ What is not logged: the individual reads made by the support device (logging eac
 M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset, so `wrangler d1 migrations apply --remote` never ran. `apps/api/wrangler.jsonc` points at a real D1 database `bikri`, but no deploy has applied the migrations to it (this was not re-checked against Cloudflare when writing this doc; the check below covers it).
 
 - **T-008 rewrote `0001_init.sql` and `0002_seed.sql` in place** while M0 was still undeployed; an additive migration could not turn single-column primary keys into composite ones (SQLite needs a table rebuild). That rewrite is history. After the first remote deploy every schema change is an additive `000N_*.sql` migration: T-062 added `0003_perf_indexes.sql`. `SCHEMA_VERSION` stays `1` for index-only changes and is bumped when columns change.
-- The SQL blocks in [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) are the source of truth and `tools/check-docs.mjs` checks all three migration files against them.
+- The SQL blocks in [02 §2](02-data-model.md#2-d1-schema-migration-0001_initsql) are the source of truth and `tools/check-docs.mjs` checks all migration files against them.
 - Other M0 single-shop assumptions and what replaces them:
 
 | M0 assumption | Multi-tenant replacement |

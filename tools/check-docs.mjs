@@ -2,12 +2,13 @@
 // CI docs check (docs/10-testing.md §7):
 //  1. every relative link and image in AGENTS.md, README.md and docs/**/*.md resolves to a file
 //     (links into docs/reference/dukaan/ are skipped: that folder is local-only and gitignored, D-027);
-//  2. packages/db/migrations/0001_init.sql, 0002_seed.sql and 0003_perf_indexes.sql still match the SQL blocks in
-//     docs/02-data-model.md §2 / §2.1 (the doc is the schema source of truth, D-045).
+//  2. every packages/db/migrations/*.sql still matches its SQL block in
+//     docs/02-data-model.md §2 (the doc is the schema source of truth, D-045).
 // Node 24, no dependencies. Exit code 1 on any problem.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { functionArityFindings } from './check-migrations-safe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LOCAL_ONLY = [
@@ -69,6 +70,12 @@ const files = [
   join(ROOT, 'AGENTS.md'),
   join(ROOT, 'README.md'),
   ...mdFiles(join(ROOT, 'docs')),
+  ...['apps', 'packages'].flatMap((dir) =>
+    readdirSync(join(ROOT, dir))
+      .map((name) => join(ROOT, dir, name, 'README.md'))
+      .filter((file) => existsSync(file)),
+  ),
+  ...[join(ROOT, 'tools/backup/README.md')].filter((file) => existsSync(file)),
 ];
 for (const file of files) {
   for (const link of extractLinks(readFileSync(file, 'utf8'))) {
@@ -119,6 +126,46 @@ for (const name of migrationFiles) {
       `packages/db/migrations/${name} differs from its SQL block in docs/02-data-model.md`,
     );
 }
+// A SQL block copied into the doc must obey the same D1 32-argument limit (D-103).
+for (const block of blocks)
+  for (const { name, args } of functionArityFindings(block.sql))
+    problems.push(
+      `docs/02-data-model.md: ${name} has ${args} arguments (max 32)`,
+    );
+
+// The doc is the operational reference; its version, CSP header and section order must
+// match the Worker and the till (OPS-L2).
+const architecture = readFileSync(
+  join(ROOT, 'docs/01-architecture.md'),
+  'utf8',
+);
+const docAppVersion = /"APP_VERSION":\s*"([^"]+)"/u.exec(architecture)?.[1];
+const workerAppVersion = /"APP_VERSION":\s*"([^"]+)"/u.exec(
+  readFileSync(join(ROOT, 'apps/api/wrangler.jsonc'), 'utf8'),
+)?.[1];
+if (!docAppVersion || docAppVersion !== workerAppVersion)
+  problems.push(
+    `docs/01-architecture.md APP_VERSION ${docAppVersion ?? '?'} differs from wrangler.jsonc ${workerAppVersion ?? '?'}`,
+  );
+
+const docCsp = /^\s*Content-Security-Policy:\s*(.+)$/mu
+  .exec(architecture)?.[1]
+  ?.trim();
+const coreCsp = /'Content-Security-Policy':\s*"([^"]+)"/u.exec(
+  readFileSync(join(ROOT, 'packages/core/src/securityHeaders.ts'), 'utf8'),
+)?.[1];
+if (!docCsp || docCsp !== coreCsp)
+  problems.push(
+    'docs/01-architecture.md Content-Security-Policy differs from packages/core/src/securityHeaders.ts',
+  );
+
+const dexieAt = doc.indexOf('\n## 3. Dexie schema');
+for (const match of doc.matchAll(/^### 2\.\d+\s/gmu))
+  if ((match.index ?? 0) > dexieAt)
+    problems.push(
+      `docs/02-data-model.md: ${match[0].trim()} is under the Dexie section`,
+    );
+
 // Reviews keep finding duplicate decision numbers (L10); fail CI the next time.
 const decisions = readFileSync(join(ROOT, 'docs/decisions.md'), 'utf8');
 const seenDecisions = new Set();

@@ -12,6 +12,7 @@ import {
   IDS,
   json,
   SEED_PIN_HASH,
+  SEED_PIN_SALT,
   seedShop,
   setStatus,
 } from './helpers/fixtures.ts';
@@ -651,6 +652,123 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     ).toBe(1);
   });
 
+  it('owners, devices, enrolment branches and files stay inside the tenant (I11)', async () => {
+    const a = await seedShop('Scope A');
+    const b = await seedShop('Scope B');
+    const onlyA = newId();
+    const onlyB = newId();
+    const addOwner = (tenantId: string, id: string, name: string) =>
+      env.DB.prepare(
+        "INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, ?3, 'owner', ?4, ?5, ?6, ?6)",
+      )
+        .bind(tenantId, id, name, SEED_PIN_HASH, SEED_PIN_SALT, Date.now())
+        .run();
+    await addOwner(a.tenantId, onlyA, 'Owner A');
+    await addOwner(b.tenantId, onlyB, 'Owner B');
+
+    const ownersA = await json<{ owners: { id: string }[] }>(
+      await api(`/admin/tenants/${a.tenantId}/owners`),
+    );
+    const idsA = ownersA.owners.map((owner) => owner.id);
+    expect(idsA).toContain(onlyA);
+    expect(idsA).not.toContain(onlyB);
+    const ownersB = await json<{ owners: { id: string }[] }>(
+      await api(`/admin/tenants/${b.tenantId}/owners`),
+    );
+    expect(ownersB.owners.map((owner) => owner.id)).toContain(onlyB);
+    expect(ownersB.owners.map((owner) => owner.id)).not.toContain(onlyA);
+
+    const devicesA = await json<{ devices: { id: string }[] }>(
+      await api(`/admin/tenants/${a.tenantId}/devices`),
+    );
+    const deviceIds = devicesA.devices.map((device) => device.id);
+    expect(deviceIds.sort()).toEqual([a.admin.id, a.till.id].sort());
+    expect(deviceIds).not.toContain(b.till.id);
+
+    // A's branch must not be usable through B's path, and both unknown ids give one body.
+    const cross = await api(`/admin/tenants/${b.tenantId}/enrolment-codes`, {
+      method: 'POST',
+      json: { device_name: 'Cross', branch_id: a.branchId },
+    });
+    const unknown = await api(`/admin/tenants/${b.tenantId}/enrolment-codes`, {
+      method: 'POST',
+      json: { device_name: 'Cross', branch_id: '01JC00000000000000000000ZT' },
+    });
+    expect(cross.status).toBe(404);
+    expect(await cross.json()).toEqual(await unknown.json());
+
+    // The HTTP file GC only lists that tenant's prefix; a shop logo is referenced, so
+    // the plan still counts it but never deletes it.
+    const logo = `t/${a.tenantId}/shop/logo-test.png`;
+    await env.FILES.put(logo, 'logo');
+    await env.DB.prepare('UPDATE shop SET logo_key = ?2 WHERE tenant_id = ?1')
+      .bind(a.tenantId, logo)
+      .run();
+    await env.FILES.put(`t/${a.tenantId}/orphan-a.png`, 'a');
+    await env.FILES.put(`t/${b.tenantId}/orphan-b.png`, 'b');
+    const gcA = await api(`/admin/tenants/${a.tenantId}/files/gc`, {
+      method: 'POST',
+      json: { dry_run: true },
+    });
+    expect(await json<{ examined: number }>(gcA)).toMatchObject({
+      examined: 2,
+    });
+    expect(await env.FILES.head(`t/${b.tenantId}/orphan-b.png`)).not.toBeNull();
+  });
+
+  it('import rejects another tenant_id in a row; a valid row still imports', async () => {
+    const a = await seedShop('Import A');
+    const b = await seedShop('Import B');
+    const row = await env.DB.prepare(
+      'SELECT * FROM products WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(a.tenantId, IDS.product)
+      .first<Record<string, unknown>>();
+    if (!row) throw new Error('seed product missing');
+    const clientRow = { ...row };
+    delete clientRow.tenant_id;
+    // Server-maintained caches are not importable columns.
+    delete clientRow.on_hand_milli;
+    delete clientRow.cost_changed_at;
+
+    await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true, reason: 'Import test' },
+    });
+    const bad = await api(`/admin/tenants/${a.tenantId}/import`, {
+      method: 'POST',
+      json: {
+        tbl: 'products',
+        rows: [{ ...clientRow, tenant_id: b.tenantId }],
+      },
+    });
+    expect(bad.status).toBe(400);
+    expect((await json<Err>(bad)).error.code).toBe('VALIDATION_FAILED');
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM products WHERE tenant_id = ?1 AND id = ?2 AND price = 150000',
+        a.tenantId,
+        IDS.product,
+      ),
+    ).toBe(1);
+    const good = await api(`/admin/tenants/${a.tenantId}/import`, {
+      method: 'POST',
+      json: { tbl: 'products', rows: [{ ...clientRow, price: 77777 }] },
+    });
+    expect(good.status, await good.text()).toBe(200);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM products WHERE tenant_id = ?1 AND id = ?2 AND price = 77777',
+        a.tenantId,
+        IDS.product,
+      ),
+    ).toBe(1);
+    await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: false, reason: 'Import test finished' },
+    });
+  });
+
   it('import-ops refuses a revoked support device (view-only)', async () => {
     const shop = await seedShop('Imp support');
     const support = await addSupportDevice(shop, Date.now() + 3_600_000);
@@ -1183,5 +1301,17 @@ describe('operator export and restore (I17, I18, I27)', () => {
       await api('/admin/usage'),
     );
     expect(usage.last_backup?.key).toBe('d1/2026-10-26.sql.gz');
+    for (const key of [
+      'd1/../secret',
+      '..%2Fsecret',
+      'd1/..%2F..%2Fsecret',
+      'Bad Key',
+      'd1//double',
+    ]) {
+      const res = await api(
+        `/admin/backups/download?key=${encodeURIComponent(key)}`,
+      );
+      expect([400, 404], key).toContain(res.status);
+    }
   });
 });

@@ -271,6 +271,10 @@ declare global {
         opening?: number;
       }) => Promise<string>;
       printJobText: (id: string) => Promise<string | null>;
+      printHtml: (
+        html: string,
+        widthMm: 58 | 80,
+      ) => Promise<{ ok: boolean; code?: string; text: string }>;
     };
   }
 }
