@@ -253,7 +253,9 @@ export function SyncPage() {
             disabled={busy || !data.enrolled}
             onClick={() => {
               setBusy(true);
-              void syncNow().finally(() => setBusy(false));
+              void syncNow()
+                .catch(() => setError(t('errors.generic')))
+                .finally(() => setBusy(false));
             }}
           >
             {busy ? t('shell.sync_syncing') : t('syncpage.sync_now')}
@@ -283,7 +285,9 @@ export function SyncPage() {
                       onClick={() => {
                         const seq = e.seq;
                         if (typeof seq === 'number')
-                          void retryFailed(db, [seq]);
+                          void retryFailed(db, [seq]).catch(() =>
+                            setError(t('errors.generic')),
+                          );
                       }}
                     >
                       {t('syncpage.retry')}
@@ -336,7 +340,8 @@ export function SyncPage() {
                             // not carry a staff id; retry as the unlocked profile.
                             staff_id: staffId ?? e.staff_id ?? null,
                           })
-                          .then(() => syncNow());
+                          .then(() => syncNow())
+                          .catch(() => setError(t('errors.generic')));
                       }}
                     >
                       {t('syncpage.file_retry')}

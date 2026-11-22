@@ -27,8 +27,8 @@ import {
   expensesCsv,
   reverseExpense,
 } from '../data/expenses.ts';
-import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { tileBg } from '../products/tiles.ts';
@@ -63,7 +63,7 @@ export function ExpensesPage() {
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
   const readOnly = useReadOnly();
-  const tz = useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const tz = useShopTimeZone();
   const { today } = useBusinessDates(tz);
   const [stored] = useState(() =>
     readDateFilter('expenses', PRESETS, 'month', businessDate(Date.now(), tz)),

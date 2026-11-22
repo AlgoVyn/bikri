@@ -1292,15 +1292,6 @@ export async function saveProductEdit(
   return writeAction(
     db,
     async (w) => {
-      // Cache the new photo inside the action, after the read-only guard (SYNC-L9).
-      if (input.photo)
-        await Dexie.waitFor(
-          putFile(
-            db.tenantId,
-            photoKey(id, input.photo),
-            input.photo.blob,
-          ).catch(() => undefined),
-        );
       const before = await w.table<MasterRow>('products').get(id);
       if (!before) throw new Error(`Product ${id} not found`);
       const stillTracked =
@@ -1313,6 +1304,16 @@ export async function saveProductEdit(
         input.cost !== Number(before.last_cost)
       )
         throw new TrackedCostError();
+      // Cache the new photo only after every guard passed (SYNC-L9/POS-M3), so a
+      // rejected edit cannot leave an orphaned Cache Storage blob.
+      if (input.photo)
+        await Dexie.waitFor(
+          putFile(
+            db.tenantId,
+            photoKey(id, input.photo),
+            input.photo.blob,
+          ).catch(() => undefined),
+        );
       const patch: OpRow = {
         name_en: input.name_en.trim(),
         name_ur: input.name_ur?.trim() ?? '',

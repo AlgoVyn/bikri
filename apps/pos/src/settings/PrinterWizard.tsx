@@ -2,6 +2,7 @@ import { normaliseNumericText } from '@bikri/core';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
@@ -25,6 +26,8 @@ import type {
   SerialPortLike,
   UsbDeviceLike,
 } from '../print/transports.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 
 function isStaleAgentToken(error: unknown): boolean {
   return (
@@ -90,6 +93,9 @@ export function PrinterWizard({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
+  const { can, support } = useCurrentStaff();
+  const readOnly = useReadOnly();
   const deps = browserPrintDeps();
   const agent = deps.agent ?? httpAgentClient;
   const platform = agentPlatform();
@@ -402,9 +408,12 @@ export function PrinterWizard({
     setBusy(true);
     setError(null);
     try {
-      // A wizard test print must not open the cash drawer; that is a separate,
-      // permission-gated action (UI-M5).
-      await printTestPage(getDb(), draft, deps, { drawer: false });
+      // A drawer kick is a separate permission-gated action (UI-M5): the wizard may be
+      // open on a read-only/support device, or for a cashier without drawer.open.
+      await printTestPage(getDb(), draft, deps, {
+        drawer:
+          can('drawer.open') && !readOnly && !support && draft.drawer !== false,
+      });
       setTested(true);
     } catch (err) {
       setError(errorCode(err));
@@ -414,8 +423,12 @@ export function PrinterWizard({
   };
 
   const save = async () => {
-    await setKv(getDb(), 'printer', draft);
-    onDone();
+    try {
+      await setKv(getDb(), 'printer', draft);
+      onDone();
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
 
   return (

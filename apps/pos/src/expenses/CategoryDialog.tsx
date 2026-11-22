@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import { createExpenseCategory } from '../data/expenses.ts';
 import { ReadOnlyError } from '../data/write.ts';
@@ -21,6 +22,7 @@ export function CategoryDialog({
   const { t } = useTranslation();
   const toast = useToast();
   const { staff } = useCurrentStaff();
+  const submitGuard = useSubmitGuard();
   const [name, setName] = useState('');
   const [nameUr, setNameUr] = useState('');
   const [pending, setPending] = useState(false);
@@ -36,6 +38,7 @@ export function CategoryDialog({
 
   const save = async () => {
     if (name.trim() === '' || pending) return;
+    if (!submitGuard.lock()) return;
     setPending(true);
     try {
       await createExpenseCategory(getDb(), { name, nameUr }, staff?.id ?? null);
@@ -54,6 +57,7 @@ export function CategoryDialog({
         'error',
       );
     } finally {
+      submitGuard.unlock();
       setPending(false);
     }
   };

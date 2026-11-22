@@ -142,6 +142,8 @@ export function RestoreTab({
                         name === 'manifest.json' || name.endsWith('.json'),
                     }),
                   );
+                  // A newer pick (or Clear) may have landed while the archive inflated.
+                  if (seq !== pickSeq.current) return;
                   if (parsed.tenant.id !== tenantId) {
                     setZip(null);
                     setError(t('admin.restore_wrong_shop'));

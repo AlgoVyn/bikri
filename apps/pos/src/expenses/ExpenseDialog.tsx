@@ -6,6 +6,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
@@ -39,6 +40,7 @@ export function ExpenseDialog({
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
+  const submitGuard = useSubmitGuard();
   const categories =
     useLiveQuery(() => (open ? expenseCategories(getDb()) : []), [open]) ?? [];
   const zone = useLiveQuery(async () => {
@@ -121,6 +123,7 @@ export function ExpenseDialog({
 
   const save = async () => {
     if (!amount || amount <= 0 || !categoryId || pending) return;
+    if (!submitGuard.lock()) return;
     setPending(true);
     try {
       const db = getDb();
@@ -152,6 +155,7 @@ export function ExpenseDialog({
         toast.push(t(`office.expenses.expense_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      submitGuard.unlock();
       setPending(false);
     }
   };
@@ -285,6 +289,7 @@ export function ExpenseDialog({
               amount <= 0 ||
               !categoryId ||
               pending ||
+              !can('expense.create') ||
               (overLimit && !override)
             }
             onClick={() => void save()}

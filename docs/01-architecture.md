@@ -254,8 +254,6 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     "MAINTENANCE": "0",
     "ENV": "production",                   // rejects ENV=test next to the production origin
     "CLOUDFLARE_ACCOUNT_ID": "<account id>",
-    "REGISTER_LIMIT": "5",                 // public shop requests per IP per hour
-    "ENROL_LIMIT": "10",                   // enrolment attempts per IP per 10 minutes
     "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com", // from Zero Trust → Settings → Custom pages / team domain
     "BASE_PATH": "/bikri",
     "ALLOWED_ORIGINS": "https://algovyn.com",
@@ -263,7 +261,11 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
   },
   // owner email sign-in (05 §3.2): free sends to verified destination addresses, from the algovyn.com routing domain
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["bikri@algovyn.com"] }],
-  "ratelimits": [{ "name": "OWNER_SIGNIN_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } }],
+  "ratelimits": [
+    { "name": "OWNER_SIGNIN_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } },
+    { "name": "REGISTER_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } },
+    { "name": "ENROL_LIMIT", "namespace_id": "<unique integer per account>", "simple": { "limit": 10, "period": 60 } }
+  ],
   "triggers": { "crons": ["0 22 * * *"] },    // 03:00 Asia/Karachi: per-tenant prune + tenant deletion (03 §4.4); one trigger for all tenants; counts against the account's 5 free cron triggers
   "observability": { "enabled": true }
   // secrets (wrangler secret put): ACCESS_AUD, OWNER_EMAILS (= "operator@example.com", the platform operator), EMAIL_ROUTING_TOKEN,

@@ -5,6 +5,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { cashMove, ExpenseError } from '../data/expenses.ts';
@@ -27,6 +28,7 @@ export function CashMoveDialog({
   const money = useDisplayMoney();
   const toast = useToast();
   const { staff } = useCurrentStaff();
+  const submitGuard = useSubmitGuard();
   const [kind, setKind] = useState<'pay_in' | 'pay_out'>('pay_in');
   const [amount, setAmount] = useState<number | null>(null);
   const [reason, setReason] = useState('');
@@ -44,6 +46,7 @@ export function CashMoveDialog({
 
   const save = async () => {
     if (!amount || amount <= 0 || reason.trim() === '' || pending) return;
+    if (!submitGuard.lock()) return;
     setPending(true);
     try {
       const db = getDb();
@@ -64,6 +67,7 @@ export function CashMoveDialog({
         toast.push(t(`office.expenses.cash_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {
+      submitGuard.unlock();
       setPending(false);
     }
   };

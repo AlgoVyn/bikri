@@ -121,7 +121,9 @@ test.describe('Barcode labels (T-052)', () => {
     );
     const code = barcodes[0]?.barcode ?? '';
     expect(code).toMatch(/^2\d{11}$/u);
-    await expect(dialog.getByText(code, { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('listitem').getByText(code, { exact: true }),
+    ).toBeVisible();
 
     const preview = dialog.getByTestId('label-preview');
     await expect(preview.locator('svg')).toBeVisible();

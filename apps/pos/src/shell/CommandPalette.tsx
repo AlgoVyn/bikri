@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useNavigate } from '@tanstack/react-router';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   type ReactNode,
@@ -65,6 +65,7 @@ type Command = {
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const toast = useToast();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -183,9 +184,19 @@ export function CommandPalette() {
         icon: privacyEnabled ? <EyeOffIcon /> : <EyeIcon />,
         run: () => {
           setOpen(false);
-          void togglePrivacyMode(getDb()).catch(() =>
-            toast.push(t('errors.generic'), 'error'),
-          );
+          void togglePrivacyMode(getDb())
+            .then((next) =>
+              toast.push(
+                t(
+                  next
+                    ? pathname.startsWith('/sell')
+                      ? 'privacy.hidden_toast_selling'
+                      : 'privacy.hidden_toast'
+                    : 'privacy.visible_toast',
+                ),
+              ),
+            )
+            .catch(() => toast.push(t('errors.generic'), 'error'));
         },
       },
       {
@@ -214,7 +225,7 @@ export function CommandPalette() {
       if (item.id === 'cashiers') return can('settings.staff');
       return true;
     });
-  }, [can, lock, navigate, privacyEnabled, readOnly, t, toast]);
+  }, [can, lock, navigate, pathname, privacyEnabled, readOnly, t, toast]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -13,6 +13,7 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   applyPrices,
   type PriceChange,
@@ -64,6 +65,7 @@ export function PricesPage() {
   const [rows, setRows] = useState<PricePreviewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitGuard = useSubmitGuard();
   if (!can('catalog.edit') || readOnly)
     return <Navigate to="/products" replace />;
 
@@ -86,7 +88,8 @@ export function PricesPage() {
   };
   const changed = rows?.filter((r) => r.next !== r.old) ?? [];
   const apply = async () => {
-    if (!rows) return;
+    if (!rows || busy) return;
+    if (!submitGuard.lock()) return;
     setBusy(true);
     try {
       const ctx = await ledgerContext(getDb(), staff?.id ?? '');

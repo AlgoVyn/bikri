@@ -35,8 +35,8 @@ import {
 } from '../data/home.ts';
 import { defaultBranch, deviceInfo } from '../data/localTenant.ts';
 import { expectedCash, summary } from '../data/reports.ts';
-import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { onLocalWrite } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date';
 import { NAV } from '../shell/nav.ts';
@@ -161,8 +161,7 @@ export function HomePage() {
       }
       return next;
     });
-  const timeZone =
-    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const timeZone = useShopTimeZone();
   const { today, yesterday, now } = useBusinessDates(timeZone);
 
   const data = useLiveQuery(async (): Promise<HomeData> => {
@@ -191,7 +190,7 @@ export function HomePage() {
         ),
       ),
     };
-  }, [today, yesterday, role]);
+  }, [today, yesterday, role, support, branchId, can]);
 
   // Expected cash reads every payment/cash move/expense since the last close, so it
   // is not part of the main live query: a sale re-renders Home but does not re-read a

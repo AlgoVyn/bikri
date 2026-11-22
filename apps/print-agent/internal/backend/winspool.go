@@ -26,6 +26,7 @@ const (
 	gdiLogPixelsX = 88
 	gdiLogPixelsY = 90
 	gdiHorzRes    = 8
+	gdiVertRes    = 10
 	gdiMMText     = 1
 	gdiHalftone   = 4
 )

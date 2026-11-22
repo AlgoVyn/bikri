@@ -55,7 +55,7 @@ Name: "{autodesktop}\Bikri Print Agent"; Filename: "{app}\{#AppExe}"; Tasks: des
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "BikriPrintAgent"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-; Do not add skipifsilent: InitializeSetup stops the running agent, so a silent
+; Do not add skipifsilent: PrepareToInstall stops the running agent, so a silent
 ; upgrade must start the new binary again or the till loses its print service.
 Filename: "{app}\{#AppExe}"; Description: "Start Bikri Print Agent now"; Flags: nowait postinstall
 

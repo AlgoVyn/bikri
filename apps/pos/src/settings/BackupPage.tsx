@@ -55,7 +55,9 @@ function BackupContent() {
   const [serverProgress, setServerProgress] = useState<string | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   useEffect(() => {
-    void navigator.storage?.persisted?.().then((value) => setPersisted(value));
+    void Promise.resolve(navigator.storage?.persisted?.())
+      .then((value) => setPersisted(value ?? false))
+      .catch(() => setPersisted(false));
   }, []);
   const askPersist = async () => {
     await rememberPersistentStorage();

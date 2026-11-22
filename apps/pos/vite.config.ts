@@ -142,6 +142,7 @@ export default defineConfig({
               // main.tsx has a top-level `await initI18n()`; if it shared a chunk
               // with modules a lazy chunk imports, that lazy chunk would wait on an
               // entry chunk that is itself waiting for the lazy import (deadlock).
+              debugName: 'app-shared',
               name: (moduleId) =>
                 moduleId.includes('/src/main.tsx') ? null : 'app-shared',
               tags: ['$initial'],
@@ -152,6 +153,7 @@ export default defineConfig({
               // Lazy feature modules: one chunk per source area instead of one per
               // module. The operator console stays automatic so it can live under
               // assets/admin and remain excluded from the offline precache.
+              debugName: 'app-area',
               name: (moduleId) => {
                 if (/\/src\/(admin|routes\/admin)\//u.test(moduleId))
                   return null;
