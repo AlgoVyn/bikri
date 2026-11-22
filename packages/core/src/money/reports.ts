@@ -1,5 +1,5 @@
 /** Report formulas (07 §9). Kept in core so every screen and export uses one definition. */
-import { assertSafeInteger } from './money.ts';
+import { assertSafeInteger, subSafe } from './money.ts';
 
 /** Line revenue ex-tax and ex-rounding: net − bill-discount share (− tax when tax-inclusive). */
 export function lineRevenue(
@@ -11,5 +11,5 @@ export function lineRevenue(
   assertSafeInteger(net, 'net');
   assertSafeInteger(billDiscountAlloc, 'billDiscountAlloc');
   assertSafeInteger(taxAlloc, 'taxAlloc');
-  return net - billDiscountAlloc - (taxInclusive ? taxAlloc : 0);
+  return subSafe(subSafe(net, billDiscountAlloc), taxInclusive ? taxAlloc : 0);
 }

@@ -19,7 +19,7 @@ describe('@bikri/i18n catalogs', () => {
         en: { k: 'Hi {{name}}' },
         ur: { k: 'Hi {{name}' },
       }),
-    ).toContain('ur placeholders differ k');
+    ).toContain('ur malformed placeholders k');
   });
 
   it('loads one language on demand', async () => {

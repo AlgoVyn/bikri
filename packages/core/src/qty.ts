@@ -42,13 +42,13 @@ export function parseQtyToMilli(raw: string, unit: string): number | null {
     return null;
   }
   const match = qtyAllowsDecimals(unit)
-    ? /^(\d+)(?:\.(\d{0,3}))?$/.exec(text)
+    ? /^(?:(\d+)(?:\.(\d{0,3}))?|\.(\d{1,3}))$/.exec(text)
     : /^(\d+)$/.exec(text);
   if (match === null) {
     return null;
   }
-  const whole = Number(match[1]);
-  const fractionDigits = match[2] ?? '';
+  const whole = Number(match[1] ?? '0');
+  const fractionDigits = match[2] ?? match[3] ?? '';
   if (!Number.isSafeInteger(whole)) {
     return null;
   }
@@ -62,7 +62,7 @@ export function parseQtyToMilli(raw: string, unit: string): number | null {
 }
 
 /** Display milli-units in the unit's scale, trimming trailing decimal zeros. */
-export function formatQtyFromMilli(milli: number, unit: string): string {
+export function formatQtyFromMilli(milli: number, _unit: string): string {
   if (!Number.isSafeInteger(milli)) {
     throw new Error('formatQtyFromMilli expects safe integer milli-units');
   }
@@ -71,13 +71,10 @@ export function formatQtyFromMilli(milli: number, unit: string): string {
   const whole = Math.trunc(absolute / 1000);
   const fraction = absolute % 1000;
   const sign = negative ? '-' : '';
-  if (!qtyAllowsDecimals(unit) || fraction === 0) {
-    if (!qtyAllowsDecimals(unit) && fraction !== 0)
-      throw new Error(
-        `formatQtyFromMilli cannot show fractional ${unit} quantities`,
-      );
-    return `${sign}${whole}`;
-  }
+  if (fraction === 0) return `${sign}${whole}`;
+  // Display only: a mixed-unit aggregate or a product whose unit changed may carry a
+  // fractional value for an integer unit. Format it instead of throwing; user input is
+  // still validated by `parseQtyToMilli()`.
   const fractionText = String(fraction).padStart(3, '0').replace(/0+$/u, '');
   return `${sign}${whole}.${fractionText}`;
 }

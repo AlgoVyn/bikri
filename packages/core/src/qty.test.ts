@@ -16,6 +16,7 @@ describe('parseQtyToMilli', () => {
     expect(parseQtyToMilli('1.2', 'g')).toBe(1200);
     expect(parseQtyToMilli('0.5', 'l')).toBe(500);
     expect(parseQtyToMilli('۱٫۲۵', 'ml')).toBe(1250);
+    expect(parseQtyToMilli('.5', 'kg')).toBe(500);
     expect(parseQtyToMilli('1.2345', 'm')).toBeNull();
   });
 
@@ -34,7 +35,9 @@ describe('formatQtyFromMilli', () => {
     expect(formatQtyFromMilli(1000, 'kg')).toBe('1');
     expect(formatQtyFromMilli(-1000, 'pc')).toBe('-1');
     expect(formatQtyFromMilli(-500, 'm')).toBe('-0.5');
-    expect(() => formatQtyFromMilli(1500, 'pc')).toThrow(/fractional/);
+    // Display must never throw for a mixed-unit aggregate or an edited unit.
+    expect(formatQtyFromMilli(1500, 'pc')).toBe('1.5');
+    expect(formatQtyFromMilli(1, 'box')).toBe('0.001');
     expect(() => formatQtyFromMilli(Number.MAX_SAFE_INTEGER + 1, 'm')).toThrow(
       /safe integer/,
     );

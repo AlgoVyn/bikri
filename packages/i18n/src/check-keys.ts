@@ -72,9 +72,16 @@ export function compareCatalogs(
       if (text.trim() === '') {
         errors.push(`${locale} empty ${key}`);
       }
+      const got = placeholders(text);
+      if (got === 'malformed-braces') {
+        errors.push(`${locale} malformed placeholders ${key}`);
+        continue;
+      }
       if (reference !== undefined && locale !== 'en') {
         const expected = placeholders(reference.get(key) ?? '');
-        if (placeholders(text) !== expected)
+        // The `en` iteration already reports a malformed reference key once.
+        if (expected === 'malformed-braces') continue;
+        if (got !== expected)
           errors.push(`${locale} placeholders differ ${key}`);
       }
     }

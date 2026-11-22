@@ -22,7 +22,7 @@
     "success_body": "Hum pehle jaiza lenge. Agar munasib ho to Cloudflare ki email dekhein aur verification link par click karein. Aap ka registration code abhi jari nahi hua.",
     "check_status": "Darkhwast ki halat dekhein",
     "error_rate": "Bohat zyada darkhwastein. Ek minute baad koshish karein.",
-    "error_generic": "Darkhwast nahi bhej saki. Dobara koshish karein.",
+    "error_generic": "Darkhwast bheji nahi ja saki. Dobara koshish karein.",
     "status_pending": "Jaize ka intezar",
     "status_awaiting_email": "Apni email dekhein — Cloudflare verification bhej di",
     "status_email_verified": "Email verified — approval ka intezar",

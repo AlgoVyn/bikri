@@ -1885,126 +1885,6 @@ CREATE TABLE change_log_watermarks (
 or before the 30-day cutoff as its deletion ceiling. Rows written after the mark stay
 until the next run, so retention is 30 days plus at most one day.
 
-## 3. Dexie schema (till)
-
-`packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
-
-```ts
-// Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V12 = {
-  // master
-  shop: 'id',
-  branches: 'id, deleted_at',
-  devices: 'id, branch_id',
-  staff: 'id, active, deleted_at',
-  categories: 'id, sort_order, deleted_at',
-  products: 'id, sku, category_id, deleted_at, track_stock', // V9 track_stock; V12 drops name_en/updated_at/kind (filtered in memory)
-  bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
-  product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
-  customers: 'id, phone, credit_limit', // V12 drops name/deleted_at (filtered in memory)
-  suppliers: 'id',
-  expense_categories: 'id, code, sort_order',
-  promises: 'id, customer_id, [status+promised_on]',
-  sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
-  // ledger
-  sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
-  sale_lines: 'id, sale_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id
-
-  payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
-  refunds: 'id, sale_id, business_date, [device_id+created_at]',
-  refund_lines: 'id, refund_id, sale_line_id, business_date', // V10 adds the refund's business date (till-only; reports count refunds on their own date)
-  sale_voids: 'id, &sale_id, created_at, business_date',
-  ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], created_at', // V7 date page; V11 created_at; V12 drops source_id
-  stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date', // V4 adds [ref_type+ref_id] (refund/void restock)
-  purchases: 'id, [supplier_id+created_at], business_date',
-  purchase_lines: 'id, purchase_id',
-  supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date',
-  supplier_return_lines: 'id, return_id, purchase_line_id',
-  expenses: 'id, business_date, [device_id+created_at], reverses_id', // V3 reverses_id; V12 drops category_id
-  cash_moves: 'id, [device_id+created_at]',
-  day_closes: 'id, [device_id+period_end], business_date',
-  audit_log: 'id, [entity+entity_id], created_at',
-  // local-only
-  outbox: '++seq, &op_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status
-  kv: 'key',
-  carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
-  held_bills: 'id, created_at',
-  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index
-  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status
-  stock_levels: 'product_id',     // { product_id, on_hand_milli }
-  party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)
-  pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
-};
-```
-
-**Dexie V8 (bundles)** adds the `products.kind` index, the `bundle_items` table and the `sale_lines.bundle_id` index. The upgrade backfills `kind='simple'` on local product rows that lack it (an indexed field must exist); existing `sale_lines` get null bundle fields, and held carts keep their current lines. No server data is rewritten. A till that has never pulled a bundle has an empty `bundle_items` table.
-
-**Dexie V9 (D-231)** only adds indexes: `products.track_stock`, `customers.credit_limit` and `sync_conflicts.resolution` (Home's attention probes). IndexedDB backfills the entries from the stored rows; no data is rewritten. The client filter/statement changes in the same decision do not change the schema.
-
-**Dexie V10 (D-274)** denormalises the refund's `business_date` onto `refund_lines` as a **till-only** column: it is not in D1, is stripped from pushed ops (`LOCAL_ONLY_COLUMNS`), and is re-derived from the refund when a server row is merged. The upgrade backfills missing dates from the local `refunds` table, the same streaming pattern as V7's sale lines. Reports then read one date range instead of turning a busy refund list above the old key threshold into a full scan of every refund line the shop ever wrote.
-
-**Dexie V11 (D-277)** adds `sale_lines.[bundle_id+business_date]` so a bundle's 14-day chart reads only its window, plus `created_at` indexes on the ledger tables restore recovery bounds by the restore point. The upgrade backfills `party_balances.last_payment_at` from the matching `ledger_entries` payment rows for the chase list. Local-only indexes/columns; D1 is unchanged.
-
-**Dexie V12 (D-279)** removes indexes no query uses (and three prefix indexes already covered by a compound one), adds `file_queue.[status+created_at]` and `sale_voids.business_date`, and keeps only the range indexes the remaining scans need. The upgrade only adds/drops indexes; IndexedDB rebuilds them from stored rows. No server or wire change.
-
-### 3.1 Local-only tables
-
-| Table | Shape | Purpose |
-|---|---|---|
-| `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'sending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
-| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
-| `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
-| `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
-| `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
-| `print_jobs` | `{ id, sale_id?, refund_id?, kind, status: 'queued'|'printing'|'done'|'failed', error?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
-| `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
-| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at }` | Cache = Σ `ledger_entries.amount`; rebuildable |
-
-`CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key? }`.
-
-**Local retention (D-226).** A daily idle pass trims only local-only operational logs: completed `print_jobs` older than 90 days, failed `file_queue` uploads older than 30 days and `kv.pull_errors` older than 30 days. Business rows (sales, stock movements, ledger entries, refunds, day closes, audit) are never deleted on the till; the server backup and the shop export are the long-term record.
-
-### 3.2 Rebuild
-
-Settings → Sync → "Rebuild local data" (owner only; [screens/17](screens/17-settings.md#sync-everyone-sees-status-actions-need-owner)) pushes pending ops, then clears `stock_levels` and `party_balances` and recomputes them from movements and ledger entries. The app also runs a silent consistency check once a day at first unlock: recompute 20 random products and parties; if any differ, rebuild and log `cache_rebuilt` in `audit_log`.
-
-**Cart/held-bill shape (local-only).** A bundle group lives in the existing `Cart.lines` JSON; there is no local `bundle_cart` table. Each component line carries `bundle_id`, `bundle_group`, `bundle_name`, `bundle_qty`, `bundle_price` and `bundle_component_qty_milli`; the group header is derived from those fields. A held bill stores the recipe/price snapshot taken when the bundle was added, so editing or deleting the bundle later does not change an open or held cart. The cart adds the group as one block; the 60-line limit counts the component lines.
-
-## 4. Derived values
-
-| Value | Formula | Where |
-|---|---|---|
-| Stock on hand | Σ `stock_movements.qty_delta_milli` for the product (and branch, v2) | `stock_levels` cache on till; computed on demand on server |
-| Customer balance | Σ `ledger_entries.amount` where `party_type='customer'` | `party_balances`; > 0 means the customer owes the shop |
-| Supplier balance | Σ `ledger_entries.amount` where `party_type='supplier'` | `party_balances`; > 0 means the shop owes the supplier |
-| `sales.status` | `void` if a `sale_voids` row exists; else `refunded` if every line's refunded qty = sold qty; else `part_refunded` if any refund; else `paid` | Recomputed on the till and on the server whenever a refund or void for the sale is inserted. Not sent in ops. |
-| Average cost | [07 §7](07-money-rules.md#7-cost-weighted-average) | Server recomputes and writes `products.avg_cost`; till computes provisionally |
-| Bundle availability | `min(floor(on_hand_milli_i / qty_milli_i))` over active tracked components (untracked components ignored; all untracked → "made to order") | Read-only derivation on the till for the Sell tile, product detail and cart warning; no stored counter |
-| Bundle sold count | count of distinct `bundle_group` in `sale_lines` for a `bundle_id` (minus fully refunded groups) | Bundle product detail and a later bundle report; never sum `sale_lines.qty_milli` or the component count |
-
-## 5. Record recipes (which rows each action writes)
-
-All rows of one action are written in **one Dexie transaction** together with their outbox ops.
-
-| Action | Rows written |
-|---|---|
-| Bundle product create/edit | 1 `products` on create or when the bundle price/name changes (`kind='bundle'`, `track_stock=0`); 1..20 `bundle_items` upserts/soft deletes on a recipe edit; 1 `audit_log` `bundle_change` with the before/after recipe; a price edit also writes `price_change`. No stock movement |
-| Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); a bundle sale writes one line per component, never a line for the bundle product itself, with the seven `bundle_*` fields; `sales.line_count` and `sales.items_qty_milli` count those component lines/units, not bundles (a 4-component bundle × 2 is 4 lines and 8 units; the bundle header is a UI grouping only); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
-| Backdated sale | Same rows as Sale, plus 1 `audit_log` `sale_backdated` (`after_json`: attributed staff, business date, reason, recorded_at). The sale is written on the owner's device with `business_date` = the chosen date and `created_at` = the entry time; the attributed `staff_id` is the cashier who made it ([D-173](decisions.md#decisions-log)) |
-| Refund | 1 `refunds` (split into paid part and udhaar part, [07 §6.1](07-money-rules.md#61-refunds-on-udhaar-bills)); n `refund_lines`; a whole-bundle return writes one refund line per component and includes every component line of the touched `bundle_group` with the same `k` whole bundles; 1 `payments` (direction out, purpose refund, `method`, `amount`) if `amount > 0`; 1 `ledger_entries` (customer, −`udhaar_part`, source refund) if `udhaar_part > 0`; `stock_movements` (`refund_return`, +qty) for restocked lines; `audit_log` |
-| Void | 1 `sale_voids`; reversing `payments` (direction out, purpose void) for each original payment; reversing `ledger_entries` (−udhaar); `stock_movements` (`void_return`, +qty); `audit_log` |
-| Reissue | Void (above) + a new sale with `replaces_sale_id`, then `sale_voids.replacement_sale_id` is known up front because the new sale ID is generated before writing |
-| Customer payment | 1 `payments` (in, customer_payment, party) + 1 `ledger_entries` (−amount, source payment) ; promise status → `kept` if the balance reaches ≤ promised remaining |
-| Delivery (purchase) | 1 `purchases`; n `purchase_lines`; n `stock_movements` (`purchase`, +qty, `unit_cost` = `landed_unit_cost`); 1 `ledger_entries` (supplier, +total, source purchase); if paid_now > 0: 1 `payments` (out, purchase_paid_now) + 1 `ledger_entries` (supplier, −paid_now, source payment); product `last_cost` upsert per line |
-| Pay supplier | 1 `payments` (out, supplier_payment) + 1 `ledger_entries` (supplier, −amount) |
-| Return to supplier | 1 `supplier_returns`; n `supplier_return_lines`; n `stock_movements` (`supplier_return`, −qty, `ref_type` supplier_return, `unit_cost` NULL so avg cost is not recomputed) for lines with `track_stock = 1`; 1 `ledger_entries` (supplier, −total, source supplier_return); if `refund_received > 0`: 1 `payments` (direction in, purpose `supplier_refund`, `refund_method`, party supplier, `supplier_return_id`) + 1 `ledger_entries` (supplier, +refund_received, source payment); 1 `audit_log` `supplier_return` |
-| Stock adjust | 1 `stock_movements` (reason code, signed qty, note); for `count`: qty = counted − on_hand **at the moment of saving** (not the frozen "expected" shown when the count started) |
-| Bundle/component delete | Soft-delete the product (`deleted_at`, `rev + 1`) and write `product_delete`; a component used by an active bundle is blocked until the recipe is removed. Deleting a bundle leaves its `bundle_items`/saved sales untouched (history and reprints keep the snapshot) |
-| Expense | 1 `expenses`; a reversal is 1 more `expenses` row with `reverses_id` |
-| Pay-in / pay-out | 1 `cash_moves` |
-| Day close | 1 `day_closes`; forces a sync |
-| Opening balance for a customer/supplier | 1 `ledger_entries` (source opening) |
-
 ### 2.29 Review hardening (migration `0030_review_hardening.sql`)
 
 ```sql
@@ -2031,23 +1911,27 @@ SELECT
   'products',
   p.id,
   'upsert',
-  json_object(
-    'id', p.id,
-    'name_en', p.name_en,
-    'name_ur', p.name_ur,
-    'brand', p.brand,
-    'category_id', p.category_id,
-    'sku', p.sku,
-    'unit', p.unit,
-    'price', p.price,
-    'last_cost', p.last_cost,
-    'avg_cost', p.last_cost,
-    'min_stock_milli', p.min_stock_milli,
-    'track_stock', p.track_stock,
-    'tax_rate_bp', p.tax_rate_bp,
-    'track_serial', p.track_serial,
-    'warranty_days', p.warranty_days,
-    'pack_size_milli', p.pack_size_milli,
+  -- D1 allows 32 arguments per SQL function (D-103). Keep 16 pairs (32 arguments)
+  -- inside json_object and add the remaining 8 pairs with json_insert.
+  json_insert(
+    json_object(
+      'id', p.id,
+      'name_en', p.name_en,
+      'name_ur', p.name_ur,
+      'brand', p.brand,
+      'category_id', p.category_id,
+      'sku', p.sku,
+      'unit', p.unit,
+      'price', p.price,
+      'last_cost', p.last_cost,
+      'avg_cost', p.last_cost,
+      'min_stock_milli', p.min_stock_milli,
+      'track_stock', p.track_stock,
+      'tax_rate_bp', p.tax_rate_bp,
+      'track_serial', p.track_serial,
+      'warranty_days', p.warranty_days,
+      'pack_size_milli', p.pack_size_milli
+    ),
     'image_key', p.image_key,
     'notes', p.notes,
     'created_at', p.created_at,
@@ -2237,4 +2121,266 @@ The repair publishes the corrected `products.avg_cost` through the change log so
 enrolled till pulls it, and the triggers enforce the bundle, cost and watermark rules
 for the operator import path and for migrations that write tables directly.
 
+### 2.30 Review follow-up (migration `0031_review_followup.sql`)
+
+```sql
+-- 0031_review_followup.sql
+--
+-- Follow-up to 0030. Production already recorded 0030 as applied before its
+-- cost-repair predicate and bundle trigger were corrected, so those changes must
+-- ship as a new migration. The 0030 json_object split is for fresh databases only;
+-- this file is the authoritative repair for existing shops.
+--
+-- Additive only: no column, wire shape or API change.
+
+-- CORE-H1. 0024 initialised avg_cost from the catalogue cost for products with no
+-- stock movement, but did not bump rev, write change_log or set cost_changed_at.
+-- 0030 filtered `avg_cost = 0`, which matches none of those rows. Repair every
+-- simple product whose catalogue cost is known and was never published, and keep
+-- updated_at stable so the change_log row and the product row agree.
+INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at)
+SELECT
+  p.tenant_id,
+  'products',
+  p.id,
+  'upsert',
+  json_insert(
+    json_object(
+      'id', p.id,
+      'name_en', p.name_en,
+      'name_ur', p.name_ur,
+      'brand', p.brand,
+      'category_id', p.category_id,
+      'sku', p.sku,
+      'unit', p.unit,
+      'price', p.price,
+      'last_cost', p.last_cost,
+      'avg_cost', p.last_cost,
+      'min_stock_milli', p.min_stock_milli,
+      'track_stock', p.track_stock,
+      'tax_rate_bp', p.tax_rate_bp,
+      'track_serial', p.track_serial,
+      'warranty_days', p.warranty_days,
+      'pack_size_milli', p.pack_size_milli
+    ),
+    'image_key', p.image_key,
+    'notes', p.notes,
+    'created_at', p.created_at,
+    'updated_at', p.updated_at,
+    'deleted_at', p.deleted_at,
+    'rev', p.rev + 1,
+    'updated_by', p.updated_by,
+    'kind', p.kind
+  ),
+  NULL,
+  CAST(strftime('%s', 'now') AS INTEGER) * 1000
+FROM products p
+WHERE (p.avg_cost = 0 OR p.avg_cost = p.last_cost)
+  AND p.last_cost > 0
+  AND p.kind = 'simple'
+  AND p.cost_changed_at = 0;
+
+UPDATE products
+SET
+  avg_cost = last_cost,
+  rev = rev + 1,
+  cost_changed_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+WHERE (avg_cost = 0 OR avg_cost = last_cost)
+  AND last_cost > 0
+  AND kind = 'simple'
+  AND cost_changed_at = 0;
+
+-- CORE-H2. 0030's trigger was AFTER INSERT, where a stock movement cannot yet exist,
+-- so it never blocked simple -> bundle and scanned stock_movements on every bundle
+-- creation. Check the transition itself and inspect the old product state.
+DROP TRIGGER IF EXISTS products_bundle_stock_movements;
+CREATE TRIGGER products_bundle_stock_movements
+BEFORE UPDATE OF kind ON products
+WHEN NEW.kind = 'bundle'
+  AND OLD.kind <> 'bundle'
+  AND (
+    OLD.on_hand_milli <> 0
+    OR OLD.cost_changed_at <> 0
+    OR EXISTS (
+      SELECT 1 FROM stock_movements m
+      WHERE m.tenant_id = NEW.tenant_id AND m.product_id = NEW.id
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot have a stock movement');
+END;
+
+-- CORE-M1. A bundle_items row must belong to a product that is actually a bundle;
+-- the sync check enforces this, but the operator import path relies on triggers.
+CREATE TRIGGER bundle_items_parent_kind_insert
+BEFORE INSERT ON bundle_items
+WHEN NEW.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.bundle_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle item must belong to a bundle');
+END;
+
+DROP TRIGGER IF EXISTS bundle_items_parent_kind_update;
+CREATE TRIGGER bundle_items_parent_kind_update
+BEFORE UPDATE OF bundle_id, deleted_at ON bundle_items
+WHEN NEW.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.bundle_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle item must belong to a bundle');
+END;
+
+DROP TRIGGER IF EXISTS bundle_items_no_self_update;
+CREATE TRIGGER bundle_items_no_self_update
+BEFORE UPDATE OF bundle_id, component_product_id, deleted_at ON bundle_items
+WHEN NEW.deleted_at IS NULL AND NEW.bundle_id = NEW.component_product_id
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot contain itself');
+END;
+
+DROP TRIGGER IF EXISTS bundle_items_no_nested_update;
+CREATE TRIGGER bundle_items_no_nested_update
+BEFORE UPDATE OF bundle_id, component_product_id, deleted_at ON bundle_items
+WHEN NEW.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.component_product_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot contain another bundle');
+END;
+```
+
+## 3. Dexie schema (till)
+
+`packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
+
+```ts
+// Example only — exact index strings to implement.
+export const DEXIE_SCHEMA_V12 = {
+  // master
+  shop: 'id',
+  branches: 'id, deleted_at',
+  devices: 'id, branch_id',
+  staff: 'id, active, deleted_at',
+  categories: 'id, sort_order, deleted_at',
+  products: 'id, sku, category_id, deleted_at, track_stock', // V9 track_stock; V12 drops name_en/updated_at/kind (filtered in memory)
+  bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
+  product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
+  customers: 'id, phone, credit_limit', // V12 drops name/deleted_at (filtered in memory)
+  suppliers: 'id',
+  expense_categories: 'id, code, sort_order',
+  promises: 'id, customer_id, [status+promised_on]',
+  sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
+  // ledger
+  sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
+  sale_lines: 'id, sale_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id
+
+  payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
+  refunds: 'id, sale_id, business_date, [device_id+created_at], created_at',
+  refund_lines: 'id, refund_id, sale_line_id, business_date', // V10 adds the refund's business date (till-only; reports count refunds on their own date)
+  sale_voids: 'id, &sale_id, created_at, business_date',
+  ledger_entries: 'id, [party_type+party_id+created_at], [party_type+party_id+business_date+created_at], created_at', // V7 date page; V11 created_at; V12 drops source_id
+  stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date, created_at', // V4 adds [ref_type+ref_id]; V11 created_at
+  purchases: 'id, [supplier_id+created_at], business_date, created_at',
+  purchase_lines: 'id, purchase_id',
+  supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date, created_at',
+  supplier_return_lines: 'id, return_id, purchase_line_id',
+  expenses: 'id, business_date, [device_id+created_at], reverses_id, created_at', // V3 reverses_id; V12 drops category_id
+  cash_moves: 'id, [device_id+created_at], created_at',
+  day_closes: 'id, [device_id+period_end], business_date, created_at',
+  audit_log: 'id, [entity+entity_id], created_at',
+  // local-only
+  outbox: '++seq, &op_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status
+  kv: 'key',
+  carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
+  held_bills: 'id, created_at',
+  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index
+  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status
+  stock_levels: 'product_id',     // { product_id, on_hand_milli }
+  party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)
+  pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
+};
+```
+
+**Dexie V8 (bundles)** adds the `products.kind` index, the `bundle_items` table and the `sale_lines.bundle_id` index. The upgrade backfills `kind='simple'` on local product rows that lack it (an indexed field must exist); existing `sale_lines` get null bundle fields, and held carts keep their current lines. No server data is rewritten. A till that has never pulled a bundle has an empty `bundle_items` table.
+
+**Dexie V9 (D-231)** only adds indexes: `products.track_stock`, `customers.credit_limit` and `sync_conflicts.resolution` (Home's attention probes). IndexedDB backfills the entries from the stored rows; no data is rewritten. The client filter/statement changes in the same decision do not change the schema.
+
+**Dexie V10 (D-274)** denormalises the refund's `business_date` onto `refund_lines` as a **till-only** column: it is not in D1, is stripped from pushed ops (`LOCAL_ONLY_COLUMNS`), and is re-derived from the refund when a server row is merged. The upgrade backfills missing dates from the local `refunds` table, the same streaming pattern as V7's sale lines. Reports then read one date range instead of turning a busy refund list above the old key threshold into a full scan of every refund line the shop ever wrote.
+
+**Dexie V11 (D-277)** adds `sale_lines.[bundle_id+business_date]` so a bundle's 14-day chart reads only its window, plus `created_at` indexes on the ledger tables restore recovery bounds by the restore point. The upgrade backfills `party_balances.last_payment_at` from the matching `ledger_entries` payment rows for the chase list. Local-only indexes/columns; D1 is unchanged.
+
+**Dexie V12 (D-279)** removes indexes no query uses (and three prefix indexes already covered by a compound one), adds `file_queue.[status+created_at]` and `sale_voids.business_date`, and keeps only the range indexes the remaining scans need. The upgrade only adds/drops indexes; IndexedDB rebuilds them from stored rows. No server or wire change.
+
+**Dexie V13 (D-284)** backfills `refund_lines.business_date` from the local `refunds` table (the V10 repair missed rows written by a restore/replay path). It is local-only: the column is stripped from pushed ops and re-derived from the refund when a server row is merged.
+
+### 3.1 Local-only tables
+
+| Table | Shape | Purpose |
+|---|---|---|
+| `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'sending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
+| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `initial_sync_pending` (first enrolment has downloaded its snapshot), `pull_errors` (per-table pull failures shown on Sync), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
+| `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
+| `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
+| `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
+| `print_jobs` | `{ id, sale_id?, refund_id?, kind, status: 'queued'|'printing'|'done'|'failed', error?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
+| `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
+| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at }` | Cache = Σ `ledger_entries.amount`; rebuildable |
+
+`CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key? }`.
+
+**Local retention (D-226).** A daily idle pass trims only local-only operational logs: completed `print_jobs` older than 90 days, failed `file_queue` uploads older than 30 days and `kv.pull_errors` older than 30 days. Business rows (sales, stock movements, ledger entries, refunds, day closes, audit) are never deleted on the till; the server backup and the shop export are the long-term record.
+
+### 3.2 Rebuild
+
+Settings → Sync → "Rebuild local data" (owner only; [screens/17](screens/17-settings.md#sync-everyone-sees-status-actions-need-owner)) pushes pending ops, then clears `stock_levels` and `party_balances` and recomputes them from movements and ledger entries. The app also runs a silent consistency check once a day at first unlock: recompute 20 random products and parties; if any differ, rebuild and log `cache_rebuilt` in `audit_log`.
+
+**Cart/held-bill shape (local-only).** A bundle group lives in the existing `Cart.lines` JSON; there is no local `bundle_cart` table. Each component line carries `bundle_id`, `bundle_group`, `bundle_name`, `bundle_qty`, `bundle_price` and `bundle_component_qty_milli`; the group header is derived from those fields. A held bill stores the recipe/price snapshot taken when the bundle was added, so editing or deleting the bundle later does not change an open or held cart. The cart adds the group as one block; the 60-line limit counts the component lines.
+
+## 4. Derived values
+
+| Value | Formula | Where |
+|---|---|---|
+| Stock on hand | Σ `stock_movements.qty_delta_milli` for the product (and branch, v2) | `stock_levels` cache on till; computed on demand on server |
+| Customer balance | Σ `ledger_entries.amount` where `party_type='customer'` | `party_balances`; > 0 means the customer owes the shop |
+| Supplier balance | Σ `ledger_entries.amount` where `party_type='supplier'` | `party_balances`; > 0 means the shop owes the supplier |
+| `sales.status` | `void` if a `sale_voids` row exists; else `refunded` if every line's refunded qty = sold qty; else `part_refunded` if any refund; else `paid` | Recomputed on the till and on the server whenever a refund or void for the sale is inserted. Not sent in ops. |
+| Average cost | [07 §7](07-money-rules.md#7-cost-weighted-average) | Server recomputes and writes `products.avg_cost`; till computes provisionally |
+| Bundle availability | `min(floor(on_hand_milli_i / qty_milli_i))` over active tracked components (untracked components ignored; all untracked → "made to order") | Read-only derivation on the till for the Sell tile, product detail and cart warning; no stored counter |
+| Bundle sold count | count of distinct `bundle_group` in `sale_lines` for a `bundle_id` (minus fully refunded groups) | Bundle product detail and a later bundle report; never sum `sale_lines.qty_milli` or the component count |
+
+## 5. Record recipes (which rows each action writes)
+
+All rows of one action are written in **one Dexie transaction** together with their outbox ops.
+
+| Action | Rows written |
+|---|---|
+| Bundle product create/edit | 1 `products` on create or when the bundle price/name changes (`kind='bundle'`, `track_stock=0`); 1..20 `bundle_items` upserts/soft deletes on a recipe edit; 1 `audit_log` `bundle_change` with the before/after recipe; a price edit also writes `price_change`. No stock movement |
+| Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); a bundle sale writes one line per component, never a line for the bundle product itself, with the seven `bundle_*` fields; `sales.line_count` and `sales.items_qty_milli` count those component lines/units, not bundles (a 4-component bundle × 2 is 4 lines and 8 units; the bundle header is a UI grouping only); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
+| Backdated sale | Same rows as Sale, plus 1 `audit_log` `sale_backdated` (`after_json`: attributed staff, business date, reason, recorded_at). The sale is written on the owner's device with `business_date` = the chosen date and `created_at` = the entry time; the attributed `staff_id` is the cashier who made it ([D-173](decisions.md#decisions-log)) |
+| Refund | 1 `refunds` (split into paid part and udhaar part, [07 §6.1](07-money-rules.md#61-refunds-on-udhaar-bills)); n `refund_lines`; a whole-bundle return writes one refund line per component and includes every component line of the touched `bundle_group` with the same `k` whole bundles; 1 `payments` (direction out, purpose refund, `method`, `amount`) if `amount > 0`; 1 `ledger_entries` (customer, −`udhaar_part`, source refund) if `udhaar_part > 0`; `stock_movements` (`refund_return`, +qty) for restocked lines; `audit_log` |
+| Void | 1 `sale_voids`; reversing `payments` (direction out, purpose void) for each original payment; reversing `ledger_entries` (−udhaar); `stock_movements` (`void_return`, +qty); `audit_log` |
+| Reissue | Void (above) + a new sale with `replaces_sale_id`, then `sale_voids.replacement_sale_id` is known up front because the new sale ID is generated before writing |
+| Customer payment | 1 `payments` (in, customer_payment, party) + 1 `ledger_entries` (−amount, source payment) ; promise status → `kept` if the balance reaches ≤ promised remaining |
+| Delivery (purchase) | 1 `purchases`; n `purchase_lines`; n `stock_movements` (`purchase`, +qty, `unit_cost` = `landed_unit_cost`); 1 `ledger_entries` (supplier, +total, source purchase); if paid_now > 0: 1 `payments` (out, purchase_paid_now) + 1 `ledger_entries` (supplier, −paid_now, source payment); product `last_cost` upsert per line |
+| Pay supplier | 1 `payments` (out, supplier_payment) + 1 `ledger_entries` (supplier, −amount) |
+| Return to supplier | 1 `supplier_returns`; n `supplier_return_lines`; n `stock_movements` (`supplier_return`, −qty, `ref_type` supplier_return, `unit_cost` NULL so avg cost is not recomputed) for lines with `track_stock = 1`; 1 `ledger_entries` (supplier, −total, source supplier_return); if `refund_received > 0`: 1 `payments` (direction in, purpose `supplier_refund`, `refund_method`, party supplier, `supplier_return_id`) + 1 `ledger_entries` (supplier, +refund_received, source payment); 1 `audit_log` `supplier_return` |
+| Stock adjust | 1 `stock_movements` (reason code, signed qty, note); for `count`: qty = counted − on_hand **at the moment of saving** (not the frozen "expected" shown when the count started) |
+| Bundle/component delete | Soft-delete the product (`deleted_at`, `rev + 1`) and write `product_delete`; a component used by an active bundle is blocked until the recipe is removed. Deleting a bundle leaves its `bundle_items`/saved sales untouched (history and reprints keep the snapshot) |
+| Expense | 1 `expenses`; a reversal is 1 more `expenses` row with `reverses_id` |
+| Pay-in / pay-out | 1 `cash_moves` |
+| Day close | 1 `day_closes`; forces a sync |
+| Opening balance for a customer/supplier | 1 `ledger_entries` (source opening) |
 

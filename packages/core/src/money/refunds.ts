@@ -1,4 +1,10 @@
-import { assertSafeInteger, mulDivRound, roundTo, subSafe } from './money.ts';
+import {
+  assertSafeInteger,
+  mulDivRound,
+  roundTo,
+  subSafe,
+  sumSafe,
+} from './money.ts';
 
 export type RefundRounding = 'nearest' | 'down' | 'none';
 export type RefundMethod = 'cash' | 'card' | 'bank_wallet';
@@ -80,8 +86,9 @@ export function roundCashRefund(
   }
   let amount = amountForMode(paidExact, rounding);
   if (cap !== undefined && amount > cap) {
-    const floored = floorToRupee(paidExact);
-    amount = floored > cap ? cap : floored;
+    // `none` means no cash rounding, so the remainder itself is the ceiling. For
+    // nearest/down, keep the rupee floor but never exceed the remaining paid amount.
+    amount = rounding === 'none' ? cap : Math.min(floorToRupee(paidExact), cap);
   }
   return { amount, rounding: amount - paidExact };
 }
@@ -134,9 +141,10 @@ export function saleLineFinal(
   const rounding = line.rounding_alloc;
   for (const value of [net, billDiscount, tax, rounding])
     assertSafeInteger(value, 'sale line amount');
+  const afterDiscount = subSafe(net, billDiscount);
   return taxInclusive
-    ? net - billDiscount + rounding
-    : net - billDiscount + tax + rounding;
+    ? sumSafe([afterDiscount, rounding])
+    : sumSafe([afterDiscount, tax, rounding]);
 }
 
 /** Paisa refunded for `refundMilli` more units of a line (07 §6). */
@@ -225,6 +233,8 @@ export function splitRefund(input: SplitRefundInput): SplitRefundResult {
   for (const prior of input.prior_refunds ?? []) {
     assertSafeInteger(prior.amount, 'prior.amount');
     assertSafeInteger(prior.udhaar_part, 'prior.udhaar_part');
+    if (prior.amount < 0 || prior.udhaar_part < 0)
+      throw new RangeError('prior refund amounts must be non-negative');
     remainingPaid = subSafe(remainingPaid, prior.amount);
     remainingUdhaar = subSafe(remainingUdhaar, prior.udhaar_part);
   }

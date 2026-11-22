@@ -141,6 +141,8 @@ describe('computeCart edges', () => {
     );
     // Rounding beyond the available line value is malformed, not a negative line.
     expect(() => allocateRounding(-2, [1, 0])).toThrow(/rounding exceeds/);
+    expect(() => allocateRounding(-2, [1, -1])).toThrow(/non-negative/);
+    expect(() => allocateRounding(0, [1, -1])).toThrow(/non-negative/);
     expect(allocateRounding(0, [1])).toEqual([0]);
     expect(allocateRounding(1, [1, 1])).toEqual([1, 0]);
   });
@@ -387,6 +389,11 @@ describe('refund edges', () => {
       amount: 199,
       rounding: -51,
     });
+    // `none` must return the remaining paid amount, not a rupee-floored amount.
+    expect(roundCashRefund(6667, 'none', 6650)).toEqual({
+      amount: 6650,
+      rounding: -17,
+    });
     expect(roundCashRefund(6666, 'down', 10_000)).toEqual({
       amount: 6600,
       rounding: -66,
@@ -441,6 +448,17 @@ describe('refund edges', () => {
     });
     expect(khata.method).toBeNull();
     expect(khata.amount).toBe(0);
+  });
+
+  it('rejects negative prior refund amounts', () => {
+    expect(() =>
+      splitRefund({
+        exact: 100,
+        paid_total: 100,
+        udhaar_amount: 0,
+        prior_refunds: [{ amount: -1, udhaar_part: 0 }],
+      }),
+    ).toThrow(/non-negative/);
   });
 
   it('caps a card refund at the amount still paid after cash rounding', () => {

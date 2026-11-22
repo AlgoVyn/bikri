@@ -5,6 +5,7 @@ describe('parseMoneyToPaisa', () => {
   it('parses whole rupees and at most 2 decimals', () => {
     expect(parseMoneyToPaisa('43000')).toBe(4_300_000);
     expect(parseMoneyToPaisa('43,000')).toBe(4_300_000);
+    expect(parseMoneyToPaisa('43\u00A0000')).toBe(4_300_000);
     expect(parseMoneyToPaisa('Rs 43,000')).toBe(4_300_000);
     expect(parseMoneyToPaisa('Rs. 50')).toBe(5_000);
     expect(parseMoneyToPaisa('Rs. 100')).toBe(10_000);

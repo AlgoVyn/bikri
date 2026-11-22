@@ -36,6 +36,113 @@ const banned = [
   },
 ];
 
+/** Words that make an identifier followed by `(` a table/index definition, not a call. */
+const NOT_A_FUNCTION = new Set([
+  'TABLE',
+  'EXISTS',
+  'INTO',
+  'FROM',
+  'JOIN',
+  'UPDATE',
+  'VIEW',
+  'INDEX',
+  'TRIGGER',
+  'CHECK',
+  'KEY',
+  'UNIQUE',
+  'REFERENCES',
+  'AS',
+  'ON',
+  'VALUES',
+]);
+
+/** Mask quoted text so a `(` or function-like word inside a literal is ignored. */
+function maskQuoted(sql) {
+  let out = '';
+  let quote = '';
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (quote !== '') {
+      if (ch === quote) {
+        if (sql[i + 1] === quote) {
+          out += 'xx';
+          i += 1;
+        } else {
+          out += ch;
+          quote = '';
+        }
+      } else {
+        out += 'x';
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '[') {
+      const end = sql.indexOf(']', i + 1);
+      if (end === -1) {
+        out += 'x'.repeat(sql.length - i);
+        break;
+      }
+      out += `x${'x'.repeat(end - i - 1)}]`;
+      i = end;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * Count top-level arguments of the call whose `(` is at `open`.
+ * @param {string} sql
+ * @param {number} open
+ * @returns {number | null}
+ */
+function countArguments(sql, open) {
+  let depth = 0;
+  let commas = 0;
+  let content = false;
+  for (let i = open; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (ch === '(') {
+      depth += 1;
+      if (depth === 1) continue;
+    } else if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) return content ? commas + 1 : 0;
+    } else if (depth === 1) {
+      if (ch === ',') commas += 1;
+      else if (!/\s/u.test(ch)) content = true;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find SQL function calls with more than D1's 32-argument limit (D-103).
+ * @param {string} sql
+ * @returns {{ name: string, args: number }[]}
+ */
+export function functionArityFindings(sql) {
+  const cleaned = stripComments(sql);
+  const masked = maskQuoted(cleaned);
+  const findings = [];
+  for (const match of masked.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/gu)) {
+    const name = match[1] ?? '';
+    const at = match.index ?? 0;
+    const before = masked.slice(0, at).match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/u);
+    if (before?.[1] && NOT_A_FUNCTION.has(before[1].toUpperCase())) continue;
+    const open = at + match[0].lastIndexOf('(');
+    const args = countArguments(cleaned, open);
+    if (args !== null && args > 32) findings.push({ name, args });
+  }
+  return findings;
+}
+
 /**
  * Remove `--` and block comments without touching quoted SQL literals or identifiers.
  * @param {string} sql
@@ -129,7 +236,20 @@ export function main(dir = DIR) {
     process.exitCode = 1;
     return;
   }
-  console.log(`Checked ${files.length} migration files: no destructive DDL.`);
+  const arity = files.flatMap((file) =>
+    functionArityFindings(readFileSync(join(dir, file), 'utf8')).map(
+      ({ name, args }) => `${file}: ${name} has ${args} arguments (max 32)`,
+    ),
+  );
+  if (arity.length > 0) {
+    console.error('D1 functions may take at most 32 arguments (D-103):');
+    for (const problem of arity) console.error(`  - ${problem}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(
+    `Checked ${files.length} migration files: no destructive DDL, no >32-argument function.`,
+  );
 }
 
 const isCli =
