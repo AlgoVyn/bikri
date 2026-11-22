@@ -245,6 +245,8 @@ export async function planSupplierReturn(
     linkedCost: number | null;
     unitCredit: number | null;
   }> = [];
+  const purchaseLineById = new Map<string, SyncedRow>();
+  const requestedByLine = new Map<string, number>();
   for (const line of input.lines) {
     const product = products.get(line.productId);
     if (
@@ -266,6 +268,11 @@ export async function planSupplierReturn(
         (purchase && purchaseLine.purchase_id !== purchase.id)
       )
         throw new SupplierReturnError('purchase');
+      purchaseLineById.set(String(purchaseLine.id), purchaseLine);
+      requestedByLine.set(
+        String(purchaseLine.id),
+        (requestedByLine.get(String(purchaseLine.id)) ?? 0) + line.qtyMilli,
+      );
       // A line linked without an explicit delivery must still belong to this supplier;
       // the Worker checks the same rule when the return is pushed.
       if (!purchase) {
@@ -292,6 +299,21 @@ export async function planSupplierReturn(
       linkedCost,
       unitCredit: line.unitCredit ?? null,
     });
+  }
+  // Never return more than was delivered. The screen already clamps to `remaining`,
+  // so this only catches a stale form or a caller bypassing it; without it the local
+  // credit would be written and the Worker would only flag an `over_return` conflict.
+  for (const [purchaseLineId, requested] of requestedByLine) {
+    const purchaseLine = purchaseLineById.get(purchaseLineId);
+    if (!purchaseLine) continue;
+    const alreadyReturned = (
+      (await (src.table('supplier_return_lines') as Table<SyncedRow>)
+        .where('purchase_line_id')
+        .equals(purchaseLineId)
+        .toArray()) as SyncedRow[]
+    ).reduce((sum, row) => sum + n(row.qty_milli), 0);
+    if (alreadyReturned + requested > n(purchaseLine.qty_milli))
+      throw new SupplierReturnError('qty');
   }
   const balance = await (
     src.table('party_balances') as Table<{ balance: number }, [string, string]>

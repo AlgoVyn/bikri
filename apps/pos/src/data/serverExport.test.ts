@@ -103,6 +103,31 @@ describe('owner server export (T-053, 13 §7.3)', () => {
     expect(sessionStorage.getItem('bikri.server_export')).toBeNull();
   });
 
+  it('still exports when sessionStorage refuses writes (SYNC-L3)', async () => {
+    const db = await readyDb('server-export-quota');
+    await addShop(db, { name: 'Server Shop' });
+    request.mockImplementation(async (_db, _staff, path) => {
+      if (path === '/export') return start as never;
+      const url = new URL(path, 'http://bikri');
+      return page(
+        url.searchParams.get('tbl') ?? '',
+        url.searchParams.get('after') ?? '',
+      ) as never;
+    });
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+    try {
+      const result = await buildServerExport(db, 'st-1');
+      expect(result.manifest.source).toBe('server');
+    } finally {
+      setItem.mockRestore();
+    }
+    expect(() => clearServerExportSession()).not.toThrow();
+  });
+
   it('starts a fresh export when a resumed token has expired', async () => {
     const db = await readyDb('server-expired');
     await addShop(db, { name: 'Server Shop' });

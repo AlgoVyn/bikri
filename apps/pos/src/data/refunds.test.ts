@@ -238,6 +238,17 @@ describe('refund plan and split (07 §6)', () => {
     expect(rows).toMatchObject([
       { sale_line_id: cable?.id, qty_milli: 1000, amount: 45000, restock: 1 },
     ]);
+    // The stored line keeps its till-only date, but the wire op carries only columns
+    // the server stores (SYNC-L9).
+    expect(rows[0]?.business_date).toBeTruthy();
+    const lineOps = (await db.outbox.toArray()).filter(
+      (op) => op.tbl === 'refund_lines',
+    );
+    expect(lineOps).toHaveLength(1);
+    expect(lineOps[0]?.row).not.toHaveProperty('branch_id');
+    expect(lineOps[0]?.row).not.toHaveProperty('device_id');
+    expect(lineOps[0]?.row).not.toHaveProperty('staff_id');
+    expect(lineOps[0]?.row).not.toHaveProperty('business_date');
     const moves = await db.stock_movements
       .filter((m) => m.ref_id === 'refund-recipe')
       .toArray();

@@ -35,6 +35,18 @@ export function normaliseCodeInput(raw: string): string {
 
 export const CODE_RE = /^[2-9A-HJKMNP-TV-Z]{8}$/;
 
+/**
+ * Set by `enrolDevice`, cleared only when the enrolment's first snapshot completes
+ * (SYNC-H4). While set the app gate stays on the enrol screen and `SyncEngine.start`
+ * refuses to run, so two downloads never race on a freshly cleared database.
+ */
+export const INITIAL_SYNC_PENDING_KEY = 'initial_sync_pending';
+
+/** The first snapshot finished: let the gate open the app on the next reload. */
+export async function finishInitialSync(db: BikriDb): Promise<void> {
+  await db.kv.delete(INITIAL_SYNC_PENDING_KEY);
+}
+
 export function formatCode(code: string): string {
   const c = normaliseCodeInput(code);
   return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
@@ -125,6 +137,10 @@ export async function enrolDevice(
     },
     { key: 'invoice_seq', value: res.device.last_invoice_seq },
     { key: 'pull_cursor', value: 0 },
+    // The gate and the sync engine stay out of the way until the first snapshot has
+    // finished (SYNC-H4): otherwise the new token flips the gate out of `enrol` mid-download,
+    // unmounting the progress screen and starting a competing engine on a partial database.
+    { key: INITIAL_SYNC_PENDING_KEY, value: true },
     // The server tells a fresh device whether this shop is already live. Keep it even
     // if the first snapshot is interrupted, so the gate resumes the download instead
     // of showing the setup wizard for an existing shop.

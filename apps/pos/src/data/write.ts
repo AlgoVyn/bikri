@@ -152,6 +152,8 @@ export async function writeAction<T>(
   const actor = options.actor ?? null;
   const txId = newId(now);
   let opCount = 0;
+  /** A coalesced edit changed an already-queued op without adding a new one. */
+  let mutated = false;
 
   const run = async (tx: Transaction): Promise<T> => {
     const outbox = tx.table('outbox') as Table<OutboxEntry, number>;
@@ -302,6 +304,7 @@ export async function writeAction<T>(
             row: opRow(tbl, row),
             changed_fields: fields,
           });
+          mutated = true;
         } else {
           await queue({
             tbl,
@@ -361,7 +364,9 @@ export async function writeAction<T>(
     const inner = (e as { inner?: unknown }).inner;
     throw inner instanceof ReadOnlyError ? inner : e;
   }
-  if (opCount > 0) {
+  if (opCount > 0 || mutated) {
+    // A coalesced edit has opCount 0 but still changed a queued row: search caches and
+    // the debounced push must hear about it exactly like a fresh op (SYNC-M2).
     const touched =
       options.changedTables ??
       options.tables ??

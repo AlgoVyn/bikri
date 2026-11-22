@@ -132,6 +132,12 @@ describe('searchAll (screens/04)', () => {
     expect((await searchAll(db, '123456789012')).map((hit) => hit.id)).toEqual([
       'p-cable',
     ]);
+    // A soft-deleted barcode no longer resolves to its product (SYNC-L1).
+    await db.product_barcodes
+      .where('barcode')
+      .equals('123456789012')
+      .modify({ deleted_at: NOW });
+    expect(await searchAll(db, '123456789012')).toEqual([]);
     const bulk = await searchAll(db, 'bulk');
     expect(bulk.filter((hit) => hit.kind === 'product')).toHaveLength(5);
     expect(bulk.filter((hit) => hit.kind === 'bill')).toHaveLength(5);

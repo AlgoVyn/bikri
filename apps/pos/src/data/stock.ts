@@ -238,6 +238,20 @@ export type CountDraft = {
 };
 
 export const DRAFT_KEY = 'stock_count_draft';
+/**
+ * A tiny companion key written with every draft save. A tab compares it with the stamp of
+ * its cached draft instead of reading the 250 KB draft on every scan, so another tab's
+ * save/discard/start is noticed (SYNC-L7).
+ */
+export const DRAFT_STAMP_KEY = 'stock_count_draft_stamp';
+
+let stampSeq = 0;
+function newDraftStamp(): string {
+  stampSeq += 1;
+  return `${Date.now().toString(36)}-${stampSeq.toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
 
 export async function countProducts(
   db: BikriDb,
@@ -301,14 +315,17 @@ export async function loadCountDraft(db: BikriDb): Promise<CountDraft | null> {
   // Read kv first: Dexie's liveQuery must see this read before any non-Dexie
   // await, otherwise it never subscribes to the draft key and a started count
   // would leave the screen on the scope picker.
-  const stored =
-    ((await db.kv.get(DRAFT_KEY))?.value as CountDraft | undefined) ?? null;
+  const stored = (await db.kv.get(DRAFT_KEY))?.value as CountDraft | undefined;
+  const stamp = (await db.kv.get(DRAFT_STAMP_KEY))?.value;
   // A newer draft may still be waiting for the debounced write; return it so the
   // UI never reverts to the older kv copy.
   const pending = pendingDrafts.get(db);
   if (pending !== undefined) return pending.draft;
-  draftCache.set(db, stored);
-  return stored;
+  const draft = stored ?? null;
+  draftCache.set(db, draft);
+  if (typeof stamp === 'string') draftStamps.set(db, stamp);
+  else draftStamps.delete(db);
+  return draft;
 }
 
 export async function saveCountDraft(
@@ -317,8 +334,15 @@ export async function saveCountDraft(
 ): Promise<void> {
   cancelScheduledSave(db);
   draftCache.set(db, draft);
+  const stamp = newDraftStamp();
+  draftStamps.set(db, stamp);
   // Serialise writes: a debounced save and a Finish flush must land in call order.
-  const run = saveChain.then(() => db.kv.put({ key: DRAFT_KEY, value: draft }));
+  const run = saveChain.then(() =>
+    db.transaction('rw', db.kv, async () => {
+      await db.kv.put({ key: DRAFT_KEY, value: draft });
+      await db.kv.put({ key: DRAFT_STAMP_KEY, value: stamp });
+    }),
+  );
   saveChain = run.catch(() => undefined);
   await run;
 }
@@ -327,12 +351,21 @@ let saveChain: Promise<unknown> = Promise.resolve();
 
 /** Copy retained while a count is open, so a tap never re-reads the 250 KB draft. */
 const draftCache = new WeakMap<BikriDb, CountDraft | null>();
+/** Stamp of the stored draft that `draftCache` matches. */
+const draftStamps = new WeakMap<BikriDb, string>();
 /** A draft waiting for the debounced write; the UI already shows it. */
 const pendingDrafts = new WeakMap<
   BikriDb,
   { draft: CountDraft; timer: ReturnType<typeof setTimeout> }
 >();
 const DRAFT_WRITE_DELAY_MS = 350;
+
+/** False when another tab saved, discarded or restarted the draft since our last read. */
+async function draftIsCurrent(db: BikriDb): Promise<boolean> {
+  const stored = (await db.kv.get(DRAFT_STAMP_KEY))?.value;
+  const cached = draftStamps.get(db);
+  return typeof stored === 'string' ? stored === cached : cached === undefined;
+}
 
 function cancelScheduledSave(db: BikriDb): void {
   const pending = pendingDrafts.get(db);
@@ -381,11 +414,15 @@ export function updateCount(
 ): Promise<CountDraft | null> {
   const run = draftChain.then(async () => {
     let draft: CountDraft | null | undefined = pendingDrafts.get(db)?.draft;
-    if (draft === undefined)
-      draft = draftCache.has(db)
-        ? (draftCache.get(db) ?? null)
-        : await loadCountDraft(db);
-    if (!draft) return null;
+    // The cache is only valid while the stored draft still carries its stamp: another
+    // tab may have discarded or restarted the count, and this tab must not resurrect it.
+    if (draft === undefined && draftCache.has(db) && (await draftIsCurrent(db)))
+      draft = draftCache.get(db) ?? null;
+    if (draft === undefined) draft = await loadCountDraft(db);
+    if (!draft) {
+      draftCache.set(db, null);
+      return null;
+    }
     const counted = { ...draft.counted };
     const value = next(counted[productId]);
     if (value === null) delete counted[productId];
@@ -399,10 +436,16 @@ export function updateCount(
 export async function discardCount(db: BikriDb): Promise<void> {
   cancelScheduledSave(db);
   draftCache.set(db, null);
+  draftStamps.delete(db);
   await draftChain.catch(() => undefined);
   // Queue the delete behind any draft write that is already in flight, otherwise a
   // slow save could recreate the draft after it was discarded.
-  const run = saveChain.then(() => db.kv.delete(DRAFT_KEY));
+  const run = saveChain.then(() =>
+    db.transaction('rw', db.kv, async () => {
+      await db.kv.delete(DRAFT_KEY);
+      await db.kv.delete(DRAFT_STAMP_KEY);
+    }),
+  );
   saveChain = run.catch(() => undefined);
   await run;
 }
@@ -428,6 +471,10 @@ export async function finishCount(
   now = Date.now(),
 ): Promise<CountResult> {
   const stored = await loadCountDraft(db);
+  // Stop the 350 ms debounce before the first chunk commits. If it fired while a chunk
+  // was being written it would restore `applied: []` over the ids the chunk just
+  // committed, and a retry would apply those movements twice (SYNC-M7).
+  cancelScheduledSave(db);
   const source = {
     ...draft,
     expected: { ...draft.expected, ...(stored?.expected ?? {}) },
@@ -442,6 +489,7 @@ export async function finishCount(
   const chunkSize = 90;
   for (let offset = 0; offset < ids.length; offset += chunkSize) {
     const slice = ids.slice(offset, offset + chunkSize);
+    let chunkStamp = '';
     const part = await writeAction(
       db,
       async (w) => {
@@ -501,9 +549,11 @@ export async function finishCount(
         // dies after this commit, the retry skips the chunk instead of re-applying the
         // count over sales that happened in between.
         const nextApplied = [...new Set([...applied, ...slice])];
-        await w
-          .table<{ key: string; value: CountDraft }>('kv')
-          .put({ key: DRAFT_KEY, value: { ...source, applied: nextApplied } });
+        chunkStamp = newDraftStamp();
+        await w.table<{ key: string; value: unknown }>('kv').bulkPut([
+          { key: DRAFT_KEY, value: { ...source, applied: nextApplied } },
+          { key: DRAFT_STAMP_KEY, value: chunkStamp },
+        ]);
         return { movements, counted, valueDiff };
       },
       {
@@ -514,6 +564,7 @@ export async function finishCount(
     result.movements += part.movements;
     result.counted += part.counted;
     result.valueDiff += part.valueDiff;
+    if (chunkStamp !== '') draftStamps.set(db, chunkStamp);
     for (const id of slice) applied.add(id);
     await saveCountDraft(db, { ...source, applied: [...applied] });
   }

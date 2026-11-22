@@ -1,6 +1,7 @@
 import { CLIENT_SCHEMA_VERSION, newId } from '@bikri/core';
 import type { OutboxEntry } from '@bikri/db';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { finishInitialSync } from '../data/enrol.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { dropTestDbs } from '../data/testDb.ts';
 import { NOW, readyDb } from '../data/testShop.ts';
@@ -420,6 +421,109 @@ describe('push (03 §3, §4.1)', () => {
     await pushAll(db);
     expect(await db.products.get('p1')).toMatchObject({ price: 200, rev: 5 });
     expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('does not downgrade a newer revision applied from a pull shadow (SYNC-M1)', async () => {
+    const db = await enrolled('rev-guard');
+    await db.categories.add({
+      id: 'c1',
+      name_en: 'Local',
+      rev: 4,
+      created_at: 1,
+      updated_at: 1,
+      deleted_at: null,
+    } as never);
+    await writeAction(
+      db,
+      (w) => w.update('categories', 'c1', { name_en: 'Mine' }),
+      {
+        now: 2,
+      },
+    );
+    // A pull parked a newer server row while this edit was pending; the applied push
+    // reports an older server revision and must not lower it back.
+    await db.pull_shadow.put({
+      tbl: 'categories',
+      id: 'c1',
+      source: 'server',
+      row: {
+        id: 'c1',
+        name_en: 'Server',
+        rev: 6,
+        created_at: 1,
+        updated_at: 3,
+        deleted_at: null,
+      },
+    });
+    server.results = () => ({ result: 'applied', server_rev: 5 });
+    await pushAll(db);
+    expect(await db.categories.get('c1')).toMatchObject({
+      name_en: 'Server',
+      rev: 6,
+    });
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('does not release a claim another tab took over on a transport error (SYNC-M3)', async () => {
+    const db = await enrolled('claim-race');
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Race' }), {
+      now: 42,
+    });
+    const original = server.fetch;
+    let raced = false;
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (!raced && String(input).includes('/sync/push')) {
+          raced = true;
+          await db.outbox.toCollection().modify({
+            status: 'sending',
+            claim_token: 'other-tab',
+            sending_at: Date.now(),
+          });
+        }
+        return original(input, init);
+      },
+    );
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? { status: 500, json: { error: { code: 'INTERNAL', message: 'x' } } }
+        : undefined;
+    await expect(pushAll(db)).rejects.toBeInstanceOf(SyncHttpError);
+    const row = (await db.outbox.toArray())[0];
+    expect(row?.status).toBe('sending');
+    expect(row?.claim_token).toBe('other-tab');
+  });
+
+  it('does not reset an unanswered op claimed by another tab (SYNC-M3)', async () => {
+    const db = await enrolled('claim-race-answer');
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Race' }), {
+      now: 42,
+    });
+    const original = server.fetch;
+    let raced = false;
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (!raced && String(input).includes('/sync/push')) {
+          raced = true;
+          await db.outbox.toCollection().modify({
+            status: 'sending',
+            claim_token: 'other-tab',
+            sending_at: Date.now(),
+          });
+        }
+        return original(input, init);
+      },
+    );
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? { json: { results: [], server_time: 1, latest_seq: 0 } }
+        : undefined;
+    await pushAll(db);
+    const row = (await db.outbox.toArray())[0];
+    expect(row?.status).toBe('sending');
+    expect(row?.claim_token).toBe('other-tab');
   });
 
   it('flushes a visible till with a full cycle only when the outbox has work', async () => {
@@ -866,6 +970,117 @@ describe('pull (03 §4.2)', () => {
     expect((await db.sales.get('s-new'))?.status).toBe('refunded');
   });
 
+  it('drops the losing local void transaction when the server has a winning void (SYNC-H1)', async () => {
+    const db = await enrolled('pull-void-race');
+    const sale = {
+      id: 's1',
+      total: 1000,
+      paid_total: 1000,
+      status: 'paid',
+      business_date: '2026-10-27',
+      created_at: 1,
+    };
+    await db.sales.add(sale as never);
+    const txId = 'tx-local-void';
+    await db.sale_voids.add({
+      id: 'local-void',
+      sale_id: 's1',
+      reason: 'local',
+      replacement_sale_id: null,
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: '2026-10-27',
+      created_at: 2,
+    } as never);
+    await db.payments.add({
+      id: 'local-reversal',
+      direction: 'out',
+      method: 'cash',
+      purpose: 'void',
+      amount: 1000,
+      sale_id: 's1',
+      created_at: 2,
+    } as never);
+    await db.ledger_entries.add({
+      id: 'local-ledger',
+      party_type: 'customer',
+      party_id: 'c1',
+      amount: -500,
+      source_type: 'void',
+      source_id: 'local-void',
+      created_at: 2,
+    } as never);
+    await db.stock_movements.add({
+      id: 'local-movement',
+      product_id: 'p1',
+      qty_delta_milli: 1000,
+      reason_code: 'void_return',
+      ref_id: 'local-void',
+      created_at: 2,
+    } as never);
+    await db.audit_log.add({
+      id: 'local-audit',
+      action: 'void',
+      entity: 'sale_voids',
+      entity_id: 'local-void',
+      created_at: 2,
+    } as never);
+    for (const [tbl, id] of [
+      ['sale_voids', 'local-void'],
+      ['payments', 'local-reversal'],
+      ['ledger_entries', 'local-ledger'],
+      ['stock_movements', 'local-movement'],
+      ['audit_log', 'local-audit'],
+    ] as const) {
+      await db.outbox.add({
+        op_id: newId(),
+        tx_id: txId,
+        tbl,
+        kind: 'insert',
+        row_id: id,
+        row: { id },
+        created_at: 2,
+        status: 'pending',
+        attempts: 0,
+      });
+    }
+    server.changes = [
+      {
+        seq: 1,
+        tbl: 'sale_voids',
+        op: 'upsert',
+        row: {
+          id: 'server-void',
+          sale_id: 's1',
+          reason: 'server',
+          replacement_sale_id: null,
+          device_id: 'dev-2',
+          staff_id: 'st-1',
+          business_date: '2026-10-27',
+          created_at: 3,
+        },
+      },
+    ];
+    await pullAll(db);
+    expect(await getKv(db, 'pull_cursor', 0)).toBe(1);
+    expect(await getKv(db, 'pull_errors', [])).toEqual([]);
+    expect(await db.sale_voids.get('server-void')).toMatchObject({
+      reason: 'server',
+    });
+    expect(await db.sale_voids.get('local-void')).toBeUndefined();
+    for (const [tbl, id] of [
+      ['payments', 'local-reversal'],
+      ['ledger_entries', 'local-ledger'],
+      ['stock_movements', 'local-movement'],
+      ['audit_log', 'local-audit'],
+    ] as const)
+      expect(await db.table(tbl).get(id)).toBeUndefined();
+    expect(await db.outbox.count()).toBe(0);
+    // Caches are rebuilt without the discarded void: no double restock/credit.
+    expect(await db.stock_levels.get('p1')).toBeUndefined();
+    expect(await db.party_balances.get(['customer', 'c1'])).toBeUndefined();
+  });
+
   it('quarantines a malformed row and a unique collision without wedging the cursor', async () => {
     const db = await enrolled('pull-bad');
     server.changes = [
@@ -992,14 +1207,36 @@ describe('pull (03 §4.2)', () => {
       business_date: '2026-10-27',
       created_at: NOW,
     };
+    const txId = 'tx-losing-void';
     await db.sale_voids.add(local);
     await db.outbox.add({
       op_id: newId(),
-      tx_id: newId(),
+      tx_id: txId,
       tbl: 'sale_voids',
       kind: 'insert',
       row_id: 'local-void',
       row: local,
+      status: 'pending',
+      attempts: 0,
+      created_at: NOW,
+    });
+    // A void transaction also carries its reversal rows; all of them must go.
+    await db.payments.add({
+      id: 'local-reversal',
+      direction: 'out',
+      method: 'cash',
+      purpose: 'void',
+      amount: 500,
+      sale_id: 'sale-1',
+      created_at: NOW,
+    } as never);
+    await db.outbox.add({
+      op_id: newId(),
+      tx_id: txId,
+      tbl: 'payments',
+      kind: 'insert',
+      row_id: 'local-reversal',
+      row: { id: 'local-reversal' },
       status: 'pending',
       attempts: 0,
       created_at: NOW,
@@ -1024,6 +1261,7 @@ describe('pull (03 §4.2)', () => {
       reason: 'server',
     });
     expect(await db.sale_voids.get('local-void')).toBeUndefined();
+    expect(await db.payments.get('local-reversal')).toBeUndefined();
     expect(await db.outbox.count()).toBe(0);
     expect(await getKv(db, 'snapshot_state', null)).toBeNull();
     expect(await getKv(db, 'pull_cursor', 0)).toBe(70);
@@ -1422,6 +1660,124 @@ describe('pull (03 §4.2)', () => {
     // Recovery replays the rows it queued so the till is usable before the next push.
     expect(await db.sales.count()).toBe(1);
     expect(await db.sale_voids.count()).toBe(1);
+  });
+
+  it('keeps a recovered void & reissue in one transaction (SYNC-H2)', async () => {
+    const db = await enrolled('restore-reissue');
+    const base = {
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+      staff_id: 'st-1',
+      business_date: '2026-10-27',
+      created_at: 1000,
+    };
+    await db.sales.bulkAdd([
+      {
+        ...base,
+        id: 'orig',
+        invoice_no: 'A-A-1',
+        invoice_seq: 1,
+        paid_total: 1000,
+        udhaar_amount: 0,
+      },
+      {
+        ...base,
+        id: 'replacement',
+        invoice_no: 'A-A-2',
+        invoice_seq: 2,
+        paid_total: 1000,
+        udhaar_amount: 0,
+        replaces_sale_id: 'orig',
+      },
+    ] as never);
+    await db.sale_lines.bulkAdd([
+      { id: 'orig-line', sale_id: 'orig', created_at: 1000 },
+      { id: 'repl-line', sale_id: 'replacement', created_at: 1000 },
+    ] as never);
+    await db.sale_voids.add({
+      ...base,
+      id: 'void-1',
+      sale_id: 'orig',
+      reason: 'Wrong item',
+      replacement_sale_id: 'replacement',
+    } as never);
+    await db.payments.bulkAdd([
+      {
+        ...base,
+        id: 'void-pay',
+        direction: 'out',
+        method: 'cash',
+        purpose: 'void',
+        amount: 1000,
+        sale_id: 'orig',
+      },
+      {
+        ...base,
+        id: 'repl-pay',
+        direction: 'in',
+        method: 'cash',
+        purpose: 'sale',
+        amount: 1000,
+        sale_id: 'replacement',
+      },
+    ] as never);
+    await db.stock_movements.bulkAdd([
+      {
+        ...base,
+        id: 'void-move',
+        product_id: 'prod-1',
+        qty_delta_milli: 1000,
+        reason_code: 'void_return',
+        ref_id: 'void-1',
+      },
+      {
+        ...base,
+        id: 'repl-move',
+        product_id: 'prod-1',
+        qty_delta_milli: -1000,
+        reason_code: 'sale',
+        ref_id: 'replacement',
+      },
+    ] as never);
+    await db.audit_log.bulkAdd([
+      {
+        id: 'void-audit',
+        action: 'void',
+        entity: 'sale_voids',
+        entity_id: 'void-1',
+        device_id: 'dev-1',
+        created_at: 1000,
+      },
+      {
+        id: 'repl-audit',
+        action: 'sale_backdated',
+        entity: 'sales',
+        entity_id: 'replacement',
+        device_id: 'dev-1',
+        created_at: 1000,
+      },
+    ] as never);
+    server.tables = {};
+    await restoreRecovery(db, 500, 'epoch-2');
+    const queued = await db.outbox.toArray();
+    const voidOp = queued.find(
+      (op) => op.tbl === 'sale_voids' && op.row_id === 'void-1',
+    );
+    expect(voidOp).toBeDefined();
+    const groupTx = voidOp?.tx_id;
+    for (const [tbl, id] of [
+      ['sales', 'replacement'],
+      ['sale_lines', 'repl-line'],
+      ['payments', 'void-pay'],
+      ['payments', 'repl-pay'],
+      ['stock_movements', 'void-move'],
+      ['stock_movements', 'repl-move'],
+      ['audit_log', 'void-audit'],
+      ['audit_log', 'repl-audit'],
+    ] as const)
+      expect(
+        queued.find((op) => op.tbl === tbl && op.row_id === id)?.tx_id,
+      ).toBe(groupTx);
   });
 
   it('restore recovery re-sends master rows created or changed after the restore point', async () => {
@@ -1983,6 +2339,99 @@ describe('status, me and engine (03 §6–7)', () => {
     });
     engine?.stop();
     notifyLocalWrite();
+  });
+
+  it('does not start a competing engine during the enrolment download (SYNC-H4)', async () => {
+    const db = await enrolled('pending-start');
+    await setKv(db, 'initial_sync_pending', true);
+    expect(await SyncEngine.start(db)).toBeNull();
+    await finishInitialSync(db);
+    const engine = await SyncEngine.start(db);
+    expect(engine).not.toBeNull();
+    engine?.stop();
+  });
+
+  it('keeps the read-only learned age, records the fallback pull and skips file uploads (SYNC-M6)', async () => {
+    const db = await enrolled('ro-poll');
+    await writeAction(db, (w) => w.create('categories', { name_en: 'Held' }), {
+      now: 42,
+    });
+    await setKv(db, 'tenant_status', {
+      status: 'read_only',
+      since: 7,
+      learned_at: 111,
+    });
+    server.tenantStatus = { status: 'read_only', since: 7 };
+    await db.file_queue.add({
+      kind: 'product_image',
+      target_id: 'p1',
+      blob: new Blob(['x'], { type: 'image/webp' }),
+      sha256: 'a'.repeat(64),
+      status: 'pending',
+      created_at: 1,
+    } as never);
+    server.override = ({ path }) =>
+      path === '/sync/push'
+        ? {
+            status: 403,
+            json: {
+              error: {
+                code: 'TENANT_READ_ONLY',
+                message: 'ro',
+                details: { since: 7 },
+              },
+            },
+          }
+        : undefined;
+    server.log = [];
+    const engine = new SyncEngine(db);
+    await engine.run('full');
+    expect(await isReadOnly(db)).toBe(true);
+    expect(
+      (await getKv<{ learned_at?: number } | null>(db, 'tenant_status', null))
+        ?.learned_at,
+    ).toBe(111);
+    expect((await getKv(db, 'last_sync_at', 0)) as number).toBeGreaterThan(0);
+    expect(server.log.some((entry) => entry.path.startsWith('/files/'))).toBe(
+      false,
+    );
+
+    // A later poll whose push succeeds (before the reactivation pull arrives) still
+    // keeps the pending file: uploading it would only earn another 403.
+    server.override = null;
+    server.results = () => ({ result: 'applied', server_rev: 1 });
+    server.log = [];
+    await engine.run('full');
+    expect(server.log.some((entry) => entry.path.startsWith('/files/'))).toBe(
+      false,
+    );
+    expect(await db.file_queue.count()).toBe(1);
+    engine.stop();
+  });
+
+  it('coalesces follow-up requests into one run while a cycle is slow (SYNC-L5)', async () => {
+    const db = await enrolled('engine-coalesce');
+    const engine = new SyncEngine(db);
+    const calls: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    (engine as unknown as { cycle: (kind: string) => Promise<void> }).cycle =
+      async (kind: string) => {
+        calls.push(kind);
+        if (calls.length === 1) await gate;
+      };
+    const first = engine.run('pull');
+    const pushes = [
+      engine.run('push', true),
+      engine.run('full', true),
+      engine.run('push', true),
+    ];
+    release();
+    await Promise.all([first, ...pushes]);
+    expect(calls).toEqual(['pull', 'full']);
+    engine.stop();
   });
 
   it('engine does not start without a token; write debounce pushes after 5 s', async () => {

@@ -69,8 +69,14 @@ function readSession(): Session | null {
 }
 
 function writeSession(session: Session | null): void {
-  if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else sessionStorage.removeItem(SESSION_KEY);
+  // Private browsing and full quotas make sessionStorage throw; an export resume token
+  // is optional, so losing it must never break the export (SYNC-L3).
+  try {
+    if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* no session storage */
+  }
 }
 
 export function clearServerExportSession(): void {

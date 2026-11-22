@@ -13,6 +13,27 @@ describe('app gate (SYNC-H4)', () => {
     ).toBe('enrol');
   });
 
+  it('stays on the enrol page while its first snapshot downloads', () => {
+    expect(
+      appGate({
+        done: true,
+        enrolled: true,
+        devTenant: false,
+        setupCompleted: true,
+        initialSyncPending: true,
+      }),
+    ).toBe('enrol');
+    expect(
+      appGate({
+        done: false,
+        enrolled: true,
+        devTenant: false,
+        setupCompleted: false,
+        initialSyncPending: true,
+      }),
+    ).toBe('enrol');
+  });
+
   it('keeps an enrolled live shop in the download state while its first snapshot runs', () => {
     expect(
       appGate({

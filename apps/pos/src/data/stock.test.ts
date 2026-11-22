@@ -7,8 +7,11 @@ import {
   adjustStock,
   type CountDraft,
   countProducts,
+  DRAFT_KEY,
+  DRAFT_STAMP_KEY,
   discardCount,
   finishCount,
+  flushCountDraft,
   loadCountDraft,
   needsCost,
   needsNote,
@@ -394,5 +397,30 @@ describe('count draft updates', () => {
       ),
     );
     expect((await loadCountDraft(db))?.counted[p.id]).toBe(5000);
+  });
+
+  it('finish cancels the debounced draft so it cannot restore applied ids (SYNC-M7)', async () => {
+    const { db, ctx, p } = await shop('stk-debounce');
+    const draft = await startCount(db, { kind: 'all' }, NOW);
+    await updateCount(db, p.id, () => 9000);
+    const r = await finishCount(db, draft, { zeroUncounted: false }, ctx, NOW);
+    expect(r.movements).toBe(1);
+    // Let the 350 ms debounce fire; it must have been cancelled.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(await db.kv.get(DRAFT_KEY)).toBeUndefined();
+    expect(await loadCountDraft(db)).toBeNull();
+  });
+
+  it('notices another tab discarding the draft instead of resurrecting it (SYNC-L7)', async () => {
+    const { db, p } = await shop('stk-cross-tab');
+    await startCount(db, { kind: 'all' }, NOW);
+    await updateCount(db, p.id, () => 1000);
+    await flushCountDraft(db);
+    // Another tab discards the count: both keys are removed.
+    await db.kv.delete(DRAFT_KEY);
+    await db.kv.delete(DRAFT_STAMP_KEY);
+    expect(await updateCount(db, p.id, (c) => (c ?? 0) + 1000)).toBeNull();
+    expect(await loadCountDraft(db)).toBeNull();
+    expect(await db.kv.get(DRAFT_KEY)).toBeUndefined();
   });
 });

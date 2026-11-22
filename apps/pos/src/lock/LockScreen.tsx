@@ -1,7 +1,7 @@
 /** PIN lock (screens/03, T-035): profile chips, PIN dots and keypad; offline, local only. */
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonQuiet } from '../components/classes.ts';
@@ -24,16 +24,14 @@ import {
 } from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
 import { useSession } from '../state/session.ts';
-import { keypadDigits } from './keypad.ts';
+import {
+  digitOfKey,
+  isPinKeyBlocked,
+  keypadDigits,
+  ownsKeyTarget,
+} from './keypad.ts';
 
 const DOT_KEYS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8'];
-const URDU = '۰۱۲۳۴۵۶۷۸۹';
-
-function digitOf(key: string): string | null {
-  if (key >= '0' && key <= '9' && key.length === 1) return key;
-  const u = URDU.indexOf(key);
-  return u >= 0 ? String(u) : null;
-}
 
 function mmss(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -74,6 +72,14 @@ export function LockScreen() {
   const [locks, setLocks] = useState<Record<string, number>>({});
   const [forgot, setForgot] = useState(false);
   const countingDown = Object.values(locks).some((until) => until > now);
+  // The keypad appends digits outside React state so two fast taps cannot both read
+  // the same stale PIN, and a submit in flight cannot be started twice (SYNC-M4).
+  const pinRef = useRef('');
+  const submittingRef = useRef(false);
+  const setPinValue = useCallback((value: string) => {
+    pinRef.current = value;
+    setPin(value);
+  }, []);
 
   useEffect(() => {
     // A countdown needs one tick per second; an idle lock screen only needs to notice
@@ -101,60 +107,77 @@ export function LockScreen() {
 
   const submit = useCallback(
     async (value: string) => {
-      if (!chosen) return;
-      setBusy(true);
-      const res = await tryUnlock(db, String(chosen.id), value);
-      setBusy(false);
-      setPin('');
-      if (res.kind === 'ok') {
-        unlock({
-          staff_id: String(res.staff.id),
-          role: res.staff.role as 'owner' | 'manager' | 'cashier',
-          unlocked_at: Date.now(),
-        });
+      // A second submit for the same profile (rapid typing, a double event) must not
+      // burn another lockout attempt, and a locked profile never gets here at all.
+      if (!chosen || submittingRef.current) return;
+      const staffId = String(chosen.id);
+      if ((locks[staffId] ?? 0) > Date.now()) {
+        setPinValue('');
         return;
       }
-      setShake(true);
-      setTimeout(() => setShake(false), 200);
-      if (res.kind === 'locked') {
-        setLocks((l) => ({ ...l, [String(chosen.id)]: res.until }));
-        setMessage(
-          t('lock.locked_for', { time: mmss(res.until - Date.now()) }),
-        );
-      } else setMessage(t('lock.wrong', { count: res.triesLeft }));
+      submittingRef.current = true;
+      setBusy(true);
+      try {
+        const res = await tryUnlock(db, staffId, value);
+        setPinValue('');
+        if (res.kind === 'ok') {
+          unlock({
+            staff_id: String(res.staff.id),
+            role: res.staff.role as 'owner' | 'manager' | 'cashier',
+            unlocked_at: Date.now(),
+          });
+          return;
+        }
+        setShake(true);
+        setTimeout(() => setShake(false), 200);
+        if (res.kind === 'locked') {
+          setLocks((l) => ({ ...l, [staffId]: res.until }));
+          setMessage(
+            t('lock.locked_for', { time: mmss(res.until - Date.now()) }),
+          );
+        } else setMessage(t('lock.wrong', { count: res.triesLeft }));
+      } catch {
+        setPinValue('');
+        setMessage(t('errors.generic'));
+      } finally {
+        submittingRef.current = false;
+        setBusy(false);
+      }
     },
-    [chosen, db, t, unlock],
+    [chosen, db, locks, setPinValue, t, unlock],
   );
 
   const press = useCallback(
     (d: string) => {
       if (!chosen || busy) return;
+      if ((locks[String(chosen.id)] ?? 0) > Date.now()) return;
       const length = Number(chosen.pin_length ?? 4) || 4;
       setMessage(null);
-      setPin((p) => {
-        const next = (p + d).slice(0, length);
-        if (next.length === length) void submit(next);
-        return next;
-      });
+      const next = (pinRef.current + d).slice(0, length);
+      setPinValue(next);
+      if (next.length === length) void submit(next);
     },
-    [busy, chosen, submit],
+    [busy, chosen, locks, setPinValue, submit],
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const d = digitOf(e.key);
+      if (isPinKeyBlocked(e) || ownsKeyTarget(e.target)) return;
+      const d = digitOfKey(e.key);
       if (d !== null) {
         e.preventDefault();
         press(d);
-      } else if (e.key === 'Backspace') setPin((p) => p.slice(0, -1));
-      else if (e.key === 'Escape') {
-        if (pin) setPin('');
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setPinValue(pinRef.current.slice(0, -1));
+      } else if (e.key === 'Escape') {
+        if (pinRef.current) setPinValue('');
         else setChosen(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [press, pin]);
+  }, [press, setPinValue]);
 
   if (!data) return null;
   const keypad = prefs?.keypad ?? 'phone';
@@ -206,7 +229,7 @@ export function LockScreen() {
                 className={`flex min-h-14 items-center gap-2 rounded-full border px-3 ${chosen?.id === p.id ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`}
                 onClick={() => {
                   setChosen(p);
-                  setPin('');
+                  setPinValue('');
                   setMessage(null);
                 }}
               >
@@ -280,7 +303,7 @@ export function LockScreen() {
               <button
                 type="button"
                 className={`${key} text-body`}
-                onClick={() => setPin('')}
+                onClick={() => setPinValue('')}
               >
                 {t('lock.clear')}
               </button>
@@ -296,7 +319,7 @@ export function LockScreen() {
                 type="button"
                 className={key}
                 aria-label={t('lock.backspace')}
-                onClick={() => setPin((p) => p.slice(0, -1))}
+                onClick={() => setPinValue(pinRef.current.slice(0, -1))}
               >
                 ⌫
               </button>
