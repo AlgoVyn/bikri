@@ -364,13 +364,16 @@ export async function refundSale(
       await w.insertMany(
         'refund_lines',
         plan.lines.map((line) => ({
-          ...base,
+          // `refund_lines` stores no branch/device/staff and takes its date from the
+          // refund header (a till-only column); keep the wire payload to its columns.
           id: newId(w.now),
           refund_id: input.refundId,
           sale_line_id: line.saleLineId,
           qty_milli: line.qtyMilli,
           amount: line.amount,
           restock: line.restock ? 1 : 0,
+          business_date: date,
+          created_at: now,
         })),
       );
       if (plan.amount > 0 && plan.method) {

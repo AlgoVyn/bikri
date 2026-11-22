@@ -230,6 +230,70 @@ describe('udhaar data', () => {
     expect(queued.at(-1)?.row?.status).toBe('kept');
   });
 
+  it('takes a cashier payment without party.edit and leaves promises open (SYNC-H5)', async () => {
+    const { db, ctx } = await setup('payment-perm');
+    const ali = await customer(db);
+    await db.staff.add({
+      id: 'st-2',
+      name: 'Sana',
+      role: 'cashier',
+      active: 1,
+      // Cashier defaults grant party.edit; this till explicitly denied it.
+      permissions_json: '{"payment.receive":true,"party.edit":false}',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    const cashier = await ledgerContext(db, 'st-2');
+    await udhaarSale(db, ctx, ali.id, 300000);
+    const promise = await createPromise(
+      db,
+      {
+        customerId: ali.id,
+        promisedOn: businessDate(NOW + 86_400_000, TZ),
+        amount: 200000,
+      },
+      'st-1',
+      { today: TODAY, now: NOW },
+    );
+    await receivePayment(
+      db,
+      {
+        paymentId: 'cashier-pay',
+        customerId: ali.id,
+        amount: 200000,
+        method: 'cash',
+        date: TODAY,
+      },
+      cashier,
+      { role: 'cashier', today: TODAY, now: NOW + 1000 },
+    );
+    // The payment itself is queued; no promises op may ride along (the Worker would
+    // reject the whole transaction with 403).
+    expect((await db.promises.get(promise.id))?.status).toBe('open');
+    const promiseOps = await db.outbox
+      .filter((op) => op.tbl === 'promises' && op.row_id === promise.id)
+      .toArray();
+    expect(promiseOps.every((op) => op.row?.status !== 'kept')).toBe(true);
+    await db.staff.update('st-2', {
+      permissions_json: '{"payment.receive":true,"party.edit":true}',
+    });
+    await receivePayment(
+      db,
+      {
+        paymentId: 'cashier-pay-2',
+        customerId: ali.id,
+        amount: 100000,
+        method: 'cash',
+        date: TODAY,
+      },
+      cashier,
+      { role: 'cashier', today: TODAY, now: NOW + 2000 },
+    );
+    expect((await db.promises.get(promise.id))?.status).toBe('kept');
+  });
+
   it('refreshes promises to broken the day after the date', async () => {
     const { db, ctx } = await setup('broken');
     const ali = await customer(db);

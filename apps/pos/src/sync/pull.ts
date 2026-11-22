@@ -164,6 +164,66 @@ function isRowError(error: unknown): boolean {
 }
 
 /**
+ * A pulled `sale_voids` row collides with a local void for the same sale on the unique
+ * `sale_id`: two tills voided the bill offline and the other till won on the server.
+ * The server row is authoritative, so drop the whole losing local action (its void row,
+ * reversal payments, ledger entries, stock movements and audits) together with its
+ * outbox ops. Quarantining the server row instead would leave those local rows counted
+ * in the caches and later discard them again as a duplicate refund/void.
+ *
+ * Returns true when a losing local transaction was removed; the caller can retry the
+ * write and must rebuild the derived caches.
+ */
+async function dropLosingSaleVoid(
+  db: BikriDb,
+  row: SyncedRow,
+): Promise<boolean> {
+  const saleId = typeof row.sale_id === 'string' ? row.sale_id : '';
+  if (saleId === '' || typeof row.id !== 'string' || row.id === '')
+    return false;
+  const local = (await db.sale_voids.where('sale_id').equals(saleId).first()) as
+    | SyncedRow
+    | undefined;
+  if (!local || String(local.id) === row.id) return false;
+  // Only a locally created void can lose: an already-serving server void has no outbox
+  // op, and a duplicate server row for one sale is a malformed page, not this race.
+  const claims = await db.outbox
+    .where('[tbl+row_id]')
+    .equals(['sale_voids', String(local.id)])
+    .toArray();
+  if (claims.length === 0) return false;
+  const txIds = new Set(claims.map((entry) => String(entry.tx_id)));
+  const losers = await db.outbox
+    .filter((entry) => txIds.has(String(entry.tx_id)))
+    .toArray();
+  await db.transaction('rw', db.tables, async () => {
+    for (const entry of losers) {
+      await db.table(entry.tbl).delete(entry.row_id);
+      await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+    }
+    const seqs = losers
+      .map((entry) => entry.seq)
+      .filter((seq): seq is number => seq !== undefined);
+    if (seqs.length > 0) await db.outbox.bulkDelete(seqs);
+    // The void row itself can be missing from `losers` only if its op was coalesced
+    // away; delete the stored row either way so the unique index is free.
+    await db.sale_voids.delete(String(local.id));
+    await db.pull_shadow.delete(['sale_voids', String(local.id)]);
+  });
+  return true;
+}
+
+/** True when the server row lost its write race with a local void of the same sale. */
+function isSaleVoidCollision(tbl: string, error: unknown): boolean {
+  return (
+    tbl === 'sale_voids' &&
+    error instanceof Error &&
+    (error.name === 'ConstraintError' ||
+      (error.name === 'BulkError' && /Unique|constraint/iu.test(error.message)))
+  );
+}
+
+/**
  * Applies one pull page. If one malformed row aborts the page, retry row-by-row, quarantine the
  * bad rows under kv.pull_errors and advance the cursor so sync can continue.
  */
@@ -199,6 +259,24 @@ async function applyPage(
       );
     } catch (error) {
       if (!isRowError(error)) throw error;
+      if (
+        isSaleVoidCollision(row.tbl, error) &&
+        (await dropLosingSaleVoid(db, row.row))
+      ) {
+        await rebuildCaches(db);
+        try {
+          await db.transaction(
+            'rw',
+            mergeScope([row.tbl], rowCaches),
+            async (tx) => {
+              await mergeRows(tx, [row], { caches: rowCaches });
+            },
+          );
+          continue;
+        } catch (retryError) {
+          if (!isRowError(retryError)) throw retryError;
+        }
+      }
       errors.push({
         tbl: row.tbl,
         id: String(row.row.id ?? ''),
@@ -224,7 +302,8 @@ async function applyPage(
  * Merge one snapshot page. A bad row is quarantined like a pull row and the page still
  * advances, so a single unique collision can never wedge initial sync forever. A
  * `sale_voids` collision means another till already voided the same sale: the server's
- * void is the winner, so the local pending/failed void and its outbox entry are dropped.
+ * void is the winner, so the whole losing local void transaction is dropped first (see
+ * `dropLosingSaleVoid`), then the server row is written.
  *
  * Caches stay untouched while a snapshot downloads: `runSnapshotUnlocked` rebuilds
  * `stock_levels` and `party_balances` from the full local tables once at the end.
@@ -259,38 +338,17 @@ async function mergeSnapshotPage(
       });
     } catch (error) {
       if (!isRowError(error)) throw error;
-      const collision =
-        tbl === 'sale_voids' &&
-        error instanceof Error &&
-        error.name === 'ConstraintError' &&
-        typeof row.sale_id === 'string';
-      if (collision) {
-        const local = (await db.sale_voids
-          .where('sale_id')
-          .equals(String(row.sale_id))
-          .first()) as SyncedRow | undefined;
-        if (local && local.id !== row.id) {
-          await db.transaction(
-            'rw',
-            [db.sale_voids, db.outbox, db.pull_shadow],
-            async (tx) => {
-              await tx.table('sale_voids').delete(local.id);
-              await tx
-                .table('outbox')
-                .where('[tbl+row_id]')
-                .equals(['sale_voids', local.id])
-                .delete();
-              await tx.table('pull_shadow').delete(['sale_voids', local.id]);
-            },
-          );
-          try {
-            await db.transaction('rw', mergeScope([tbl]), async (tx) => {
-              await mergeRows(tx, [{ tbl, row }], { caches: false });
-            });
-            continue;
-          } catch (retryError) {
-            if (!isRowError(retryError)) throw retryError;
-          }
+      if (
+        isSaleVoidCollision(tbl, error) &&
+        (await dropLosingSaleVoid(db, row))
+      ) {
+        try {
+          await db.transaction('rw', mergeScope([tbl]), async (tx) => {
+            await mergeRows(tx, [{ tbl, row }], { caches: false });
+          });
+          continue;
+        } catch (retryError) {
+          if (!isRowError(retryError)) throw retryError;
         }
       }
       errors.push({
@@ -584,10 +642,24 @@ const text = (value: unknown): string =>
 
 /** Rebuild coherent documents so a recovered transaction stays under the server's op cap. */
 function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
-  const voidBySale = new Map<string, string>();
-  for (const { tbl, row } of rows)
-    if (tbl === 'sale_voids' && text(row.sale_id))
-      voidBySale.set(text(row.sale_id), String(row.id));
+  // A void & reissue is one document for the Worker: `checks/refunds.ts` requires the
+  // `sale_voids` row with a replacement and the replacement `sales` row in the same
+  // push group. Group the void, its reversal rows and the replacement bill (with its
+  // own lines/payments/ledger/movements) under the replacement sale, so a 200-op chunk
+  // boundary can never split a reissue into two rejected transactions.
+  const voidGroupById = new Map<string, string>();
+  const voidGroupBySale = new Map<string, string>();
+  for (const { tbl, row } of rows) {
+    if (tbl !== 'sale_voids') continue;
+    const id = String(row.id);
+    const saleId = text(row.sale_id);
+    const replacement = text(row.replacement_sale_id);
+    const group = replacement !== '' ? `sale:${replacement}` : `void:${id}`;
+    voidGroupById.set(id, group);
+    if (saleId !== '') voidGroupBySale.set(saleId, group);
+  }
+  const voidGroup = (id: string): string =>
+    voidGroupById.get(id) ?? `void:${id}`;
 
   const paymentGroup = new Map<string, string>();
   for (const { tbl, row } of rows) {
@@ -602,7 +674,7 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
     // transactions fail server-side after a restore (the sale group cannot see the refund
     // header, and the refund group has no payment).
     if (sale && row.purpose === 'void')
-      key = `void:${voidBySale.get(sale) ?? sale}`;
+      key = voidGroupBySale.get(sale) ?? `void:${sale}`;
     else if (refund) key = `refund:${refund}`;
     else if (sret) key = `sret:${sret}`;
     else if (purchase) key = `purchase:${purchase}`;
@@ -629,7 +701,7 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
       case 'supplier_return_lines':
         return `sret:${text(row.return_id)}`;
       case 'sale_voids':
-        return `void:${String(row.id)}`;
+        return voidGroup(String(row.id));
       case 'payments':
         return paymentGroup.get(String(row.id)) ?? `pay:${String(row.id)}`;
       case 'expenses':
@@ -637,7 +709,7 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
       case 'audit_log': {
         const entity = text(row.entity);
         const id = text(row.entity_id);
-        if (entity === 'sale_voids') return `void:${id}`;
+        if (entity === 'sale_voids') return voidGroup(id);
         if (entity === 'refunds') return `refund:${id}`;
         if (entity === 'sales') return `sale:${id}`;
         if (entity === 'expenses') return `expense:${id}`;
@@ -648,7 +720,7 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
         const id = text(row.source_id);
         if (source === 'sale') return `sale:${id}`;
         if (source === 'refund') return `refund:${id}`;
-        if (source === 'void') return `void:${id}`;
+        if (source === 'void') return voidGroup(id);
         if (source === 'payment') return paymentGroup.get(id) ?? `pay:${id}`;
         if (source === 'purchase') return `purchase:${id}`;
         if (source === 'supplier_return') return `sret:${id}`;
@@ -659,7 +731,7 @@ function recoveryGroups(rows: RecoveredOp[]): RecoveredOp[][] {
         const id = text(row.ref_id);
         if (reason === 'sale') return `sale:${id}`;
         if (reason === 'refund_return') return `refund:${id}`;
-        if (reason === 'void_return') return `void:${id}`;
+        if (reason === 'void_return') return voidGroup(id);
         if (reason === 'purchase') return `purchase:${id}`;
         if (reason === 'supplier_return') return `sret:${id}`;
         return `movement:${String(row.id)}`;

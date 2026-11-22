@@ -7,6 +7,7 @@ import {
   refundedRevenue,
 } from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
+import Dexie from 'dexie';
 import { categoryName } from '../lib/category.ts';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import type { SortDirection } from '../lib/sort.ts';
@@ -1204,11 +1205,13 @@ export async function saveNewProduct(
     ? await normaliseBundleItems(db, id, bundleItems ?? [])
     : null;
   const imageKey = photo ? photoKey(id, photo) : null;
-  // Cache first, so the thumbnail can render as soon as the row appears.
-  if (photo && imageKey) await putFile(db.tenantId, imageKey, photo.blob);
   const product = await writeAction(
     db,
     async (w) => {
+      // Cache first, so the thumbnail can render as soon as the row appears — but only
+      // after the read-only guard: a blocked save must not leave a file behind (SYNC-L9).
+      if (photo && imageKey)
+        await Dexie.waitFor(putFile(db.tenantId, imageKey, photo.blob));
       const created = await createProduct(
         w,
         {
@@ -1280,8 +1283,6 @@ export async function saveProductEdit(
   }
   const sku = input.sku?.trim() || String(current.sku);
   await checkCodes(db, input.barcodes ?? [], sku, id);
-  if (input.photo)
-    await putFile(db.tenantId, photoKey(id, input.photo), input.photo.blob);
   const recipe =
     isBundle && input.bundle_items !== undefined
       ? await normaliseBundleItems(db, id, input.bundle_items)
@@ -1289,6 +1290,11 @@ export async function saveProductEdit(
   return writeAction(
     db,
     async (w) => {
+      // Cache the new photo inside the action, after the read-only guard (SYNC-L9).
+      if (input.photo)
+        await Dexie.waitFor(
+          putFile(db.tenantId, photoKey(id, input.photo), input.photo.blob),
+        );
       const before = await w.table<MasterRow>('products').get(id);
       if (!before) throw new Error(`Product ${id} not found`);
       const stillTracked =

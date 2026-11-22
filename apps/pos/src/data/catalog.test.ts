@@ -1,6 +1,6 @@
 import { businessDate } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { seedSampleDay } from '../dev/sampleDay.ts';
 import {
   addCategory,
@@ -33,6 +33,7 @@ import {
   updateCategory,
 } from './catalog.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
+import { ReadOnlyError } from './write.ts';
 
 afterEach(dropTestDbs);
 
@@ -88,6 +89,45 @@ const cable = {
 };
 
 describe('products (screens/08)', () => {
+  it('does not cache a photo when the read-only guard blocks the save (SYNC-L9)', async () => {
+    const db = await readyDb('cat-photo-ro');
+    await db.kv.put({
+      key: 'tenant_status',
+      value: { status: 'read_only', since: 1, learned_at: 2 },
+    });
+    const puts: string[] = [];
+    const cache = {
+      put: async (request: Request | string) => {
+        puts.push(String(request));
+      },
+      match: async () => undefined,
+      delete: async () => true,
+      keys: async () => [],
+    };
+    vi.stubGlobal('caches', { open: async () => cache });
+    try {
+      const ctx = await ledgerContext(db, 'st-1');
+      await expect(
+        saveNewProduct(
+          db,
+          {
+            ...cable,
+            photo: {
+              blob: new Blob(['img']),
+              sha256: 'a'.repeat(64),
+              ext: 'webp',
+            },
+          },
+          ctx,
+          { now: NOW },
+        ),
+      ).rejects.toBeInstanceOf(ReadOnlyError);
+      expect(puts).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('AC 1: cost Rs 1,100 and opening 20 give on hand 20, avg and last cost 110000', async () => {
     const db = await readyDb();
     const ctx = await ledgerContext(db, 'st-1');

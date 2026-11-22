@@ -5,6 +5,7 @@ import {
   FILE_URL_CACHE_MAX,
   fileCacheUrl,
   fileUrlFor,
+  putFile,
 } from './fileCache.ts';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -16,6 +17,28 @@ describe('file cache keys', () => {
     expect(() => fileCacheUrl('t1', '../t2/products/p1/photo.webp')).toThrow(
       'invalid file key',
     );
+  });
+
+  it('retries caches.open after a rejection instead of caching it (SYNC-L4)', async () => {
+    let opens = 0;
+    const store = {
+      put: async () => undefined,
+      match: async () => undefined,
+      delete: async () => true,
+      keys: async () => [],
+    };
+    vi.stubGlobal('caches', {
+      open: async () => {
+        opens += 1;
+        if (opens === 1) throw new Error('SecurityError');
+        return store;
+      },
+    });
+    await expect(putFile('t3', 'k', new Blob(['x']))).rejects.toThrow(
+      'SecurityError',
+    );
+    await expect(putFile('t3', 'k', new Blob(['x']))).resolves.toBeUndefined();
+    expect(opens).toBe(2);
   });
 });
 

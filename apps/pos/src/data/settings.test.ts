@@ -86,6 +86,7 @@ describe('shop and staff settings (screens/17)', () => {
 
   it('validates shop fields and forces tax_mode off when tax is 0', async () => {
     const db = await setup('validation');
+    await addShop(db, { tax_rate_bp: 1700, tax_mode: 'inclusive' });
     await expect(
       updateShopSettings(db, { name: '  ' }, 'st-1', NOW),
     ).rejects.toMatchObject({ code: 'name' });
@@ -116,6 +117,38 @@ describe('shop and staff settings (screens/17)', () => {
           .toArray()
       ).filter((row) => row.action === 'shop_change'),
     ).toHaveLength(1);
+  });
+
+  it('writes no shop_change audit row when nothing changed (SYNC-L9)', async () => {
+    const db = await setup('no-change');
+    const before = await db.shop.get('shop');
+    const saved = await updateShopSettings(
+      db,
+      {
+        name: 'Bikri Mobile',
+        phone: '+923001234567',
+        address: 'Main Bazaar',
+        tax_rate_bp: 0,
+        tax_mode: 'exclusive',
+      },
+      'st-1',
+      NOW,
+    );
+    expect(saved.updated_at).toBe(before?.updated_at);
+    expect(await db.audit_log.count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+    // One real change still audits only the fields that changed.
+    await updateShopSettings(
+      db,
+      { name: 'Bikri Mobile', round_total_to: 500 },
+      'st-1',
+      NOW + 1,
+    );
+    const rows = await db.audit_log.toArray();
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]?.after_json))).toEqual({
+      round_total_to: 500,
+    });
   });
 
   it('AC 3: cannot remove the last active owner; can add a cashier with a PIN', async () => {

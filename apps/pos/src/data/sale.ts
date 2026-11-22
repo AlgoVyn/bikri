@@ -279,11 +279,17 @@ export async function completeSale(
     : input.maxDiscountBp;
   // A bundle sold below its shelf price follows the normal price-override rule.
   const seenBundleGroups = new Set<string>();
+  // A full-price bundle needs no `catalog.edit` approval: its component prices are
+  // derived, and the Worker never price-checks a bundle component line (SYNC-M5).
+  const fullPriceBundleGroups = new Set<string>();
   for (const line of cart.lines) {
     if (!line.bundle_group || seenBundleGroups.has(line.bundle_group)) continue;
     seenBundleGroups.add(line.bundle_group);
     const price = bundleBasePriceOf(cart, line.bundle_group);
-    if (price >= bundleListPriceOf(cart, line.bundle_group)) continue;
+    if (price >= bundleListPriceOf(cart, line.bundle_group)) {
+      fullPriceBundleGroups.add(line.bundle_group);
+      continue;
+    }
     if (
       !sellerPerm('catalog.edit') &&
       !overrideMatches(cart, 'catalog.edit', { line: line.key, price })
@@ -322,6 +328,9 @@ export async function completeSale(
     );
     for (const line of cart.lines) {
       if (!line.product_id) continue;
+      // A bundle component price is derived by `priceBundle`, not a manual override:
+      // the Worker checks the bundle group total and skips component lines (SYNC-M5).
+      if (line.bundle_id) continue;
       const product = products.get(line.product_id);
       if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
       if (sellerPerm('catalog.edit')) continue;
@@ -656,6 +665,20 @@ export async function completeSale(
       };
       for (const o of cart.overrides ?? []) {
         if (o.permission === 'sale.void') continue;
+        // Approving a derived component price of an undiscounted bundle never gated
+        // the bill; writing the audit row would only add noise (and the Worker ignores
+        // bundle component lines). A discounted bundle keeps its group approval.
+        if (
+          o.permission === 'catalog.edit' &&
+          typeof o.bound_line === 'string'
+        ) {
+          const approved = cart.lines.find((line) => line.key === o.bound_line);
+          if (
+            approved?.bundle_group &&
+            fullPriceBundleGroups.has(approved.bundle_group)
+          )
+            continue;
+        }
         // `bound_cart` is a large local signature used only by overrideMatches; the
         // server ignores it and the audit row has a 4,000-character column cap.
         const { bound_cart: _boundCart, ...approval } = o;

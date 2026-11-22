@@ -2,7 +2,7 @@
 import { BASE_PATH } from '@bikri/core';
 import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import {
@@ -18,7 +18,9 @@ import {
   CODE_RE,
   defaultDeviceName,
   enrolDevice,
+  finishInitialSync,
   formatCode,
+  INITIAL_SYNC_PENDING_KEY,
   leaveShop,
   markUnsyncedExported,
   normaliseCodeInput,
@@ -141,22 +143,50 @@ export function EnrolPage({
       .map((row) => ({ id: String(row.id), label: String(row.name) }));
   }, [connected?.db.tenantId]);
 
-  const download = async (target: BikriDb, shop: string) => {
-    setStage({ kind: 'downloading', shop, db: target, done: 0, total: 0 });
-    try {
-      await pullAll(target, (done, total) =>
-        setStage({ kind: 'downloading', shop, db: target, done, total }),
-      );
-      onDone();
-    } catch (e) {
-      setStage({
-        kind: 'failed',
-        shop,
-        db: target,
-        message: e instanceof Error ? e.message : String(e),
-      });
-    }
-  };
+  const download = useCallback(
+    async (target: BikriDb, shop: string) => {
+      setStage({ kind: 'downloading', shop, db: target, done: 0, total: 0 });
+      try {
+        await pullAll(target, (done, total) =>
+          setStage({ kind: 'downloading', shop, db: target, done, total }),
+        );
+        // The first snapshot is complete: the gate may open the app (SYNC-H4).
+        await finishInitialSync(target);
+        onDone();
+      } catch (e) {
+        setStage({
+          kind: 'failed',
+          shop,
+          db: target,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    },
+    [onDone],
+  );
+
+  // A reload in the middle of enrolment lands here with the token already stored and
+  // `initial_sync_pending` set. Resume the download instead of showing "already
+  // connected" over a half-empty database; the sync engine stays off until it finishes.
+  const resumePending = useLiveQuery(
+    async () =>
+      db ? (await db.kv.get(INITIAL_SYNC_PENDING_KEY))?.value === true : false,
+    [db?.tenantId],
+  );
+  const resuming = useRef(false);
+  useEffect(() => {
+    if (
+      resuming.current ||
+      resumePending !== true ||
+      !db ||
+      !shopName ||
+      revoked ||
+      stage.kind !== 'form'
+    )
+      return;
+    resuming.current = true;
+    void download(db, shopName);
+  }, [db, shopName, revoked, resumePending, stage.kind, download]);
 
   const connect = async () => {
     const normalised = normaliseCodeInput(code);

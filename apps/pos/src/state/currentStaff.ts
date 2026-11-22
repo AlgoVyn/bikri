@@ -73,8 +73,13 @@ function useCurrentStaffLive(): CurrentStaff {
     if (!live || live.role !== session.role) useSession.getState().lock();
   }, [session, loaded, live]);
   const support = session?.role === 'support';
+  // Without a PIN session this browser must never act as the owner (D-090). Until the
+  // live query resolves, only the local dev/e2e shop may assume the owner role;
+  // production falls back to the least-privileged role (SYNC-L2).
   const role = (live?.role ??
-    (loaded ? 'cashier' : (session?.role ?? 'owner'))) as Role;
+    (loaded
+      ? 'cashier'
+      : (session?.role ?? (localTenant ? 'owner' : 'cashier')))) as Role;
   const json = String(live?.permissions_json ?? '{}');
   // Stable `can` and result object: consumers use this in memo dependencies
   // (D-231).

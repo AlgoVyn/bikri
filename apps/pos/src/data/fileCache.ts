@@ -55,6 +55,11 @@ function fileCacheStore(): Promise<Cache> | null {
   if (pending === undefined) {
     pending = store.open(FILE_CACHE);
     byName.set(FILE_CACHE, pending);
+    // A rejection (quota, private mode, a closed cache) must not be cached for the
+    // page's lifetime: drop it so the next put/get can retry (SYNC-L4).
+    void pending.catch(() => {
+      if (byName?.get(FILE_CACHE) === pending) byName.delete(FILE_CACHE);
+    });
   }
   return pending;
 }

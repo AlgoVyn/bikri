@@ -1,8 +1,9 @@
 import { businessDate } from '@bikri/core';
-import type { MasterRow } from '@bikri/db';
+import type { Cart, MasterRow } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   addBundle,
+  addOverride,
   addProduct,
   bundleBasePriceOf,
   bundleDiscountOf,
@@ -465,6 +466,65 @@ describe('bundle product CRUD', () => {
     );
     return { db, ctx, first, second, bundle };
   }
+
+  it('backdates a full-price bundle without a catalog.edit approval (SYNC-M5)', async () => {
+    const { db, first, second, bundle } = await shop();
+    await db.staff.add({
+      id: 'st-cashier',
+      name: 'Cashier',
+      role: 'cashier',
+      active: 1,
+      permissions_json: '{"sale.create":true,"sale.backdate":true}',
+      max_discount_bp: 0,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    const cartId = 'c-backdate-bundle' as Cart['id'];
+    let cart = addBundle(
+      emptyCart(cartId),
+      bundle,
+      [
+        { product: first, qty_milli: 1000 },
+        { product: second, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    expect(cart.lines.every((line) => line.bundle_id)).toBe(true);
+    // A component price is below its own product price; that must not be treated as
+    // a manual discount, and a leftover override for it must not be audited.
+    const component = cart.lines[0];
+    cart = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      approved_at: NOW,
+      bound_line: String(component?.key),
+      bound_price: Number(component?.unit_price),
+    });
+    const backdated = businessDate(NOW - 86_400_000);
+    cart = {
+      ...cart,
+      backdate: {
+        business_date: backdated,
+        staff_id: 'st-cashier',
+        reason: 'Full-price bundle sold yesterday',
+      },
+    };
+    await db.carts.put(cart);
+    const { sale: stored, created } = await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 2500 }], { cartId }),
+      await ledgerContext(db, 'st-cashier'),
+      NOW,
+    );
+    expect(created).toBe(true);
+    expect(stored.business_date).toBe(backdated);
+    expect(
+      (await db.audit_log.toArray()).filter((row) => row.action === 'override'),
+    ).toEqual([]);
+  });
 
   it('ignores barcodes that point at a missing product', async () => {
     const { db } = await shop();

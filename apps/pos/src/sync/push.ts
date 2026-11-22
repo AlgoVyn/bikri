@@ -98,6 +98,29 @@ export type PushOutcome = {
 const CLAIM_STALE_MS = 2 * 60_000;
 
 /**
+ * Returns only our own claim to `pending`. A row claimed by another tab (a reclaimer
+ * after `CLAIM_STALE_MS`) keeps that tab's claim: undoing it would reopen an op the
+ * other tab is already sending, and a late second response could resurrect it.
+ */
+async function releaseClaims(
+  db: BikriDb,
+  seqs: readonly number[],
+  claimToken: string,
+): Promise<void> {
+  if (seqs.length === 0) return;
+  await db.outbox
+    .where('seq')
+    .anyOf([...seqs])
+    .modify((entry) => {
+      if (entry.status !== 'sending' || entry.claim_token !== claimToken)
+        return;
+      entry.status = 'pending';
+      entry.sending_at = undefined;
+      entry.claim_token = undefined;
+    });
+}
+
+/**
  * Pushes every pending op. Throws SyncHttpError / OfflineError for the engine to handle.
  * A cross-tab lock stops two tills from claiming and sending dependent transactions
  * out of order; the server is still idempotent when a lock is unavailable.
@@ -199,12 +222,9 @@ async function pushAllUnlocked(
       });
     } catch (error) {
       // A transport error leaves the ops pending for the next tick; a mutation made while this
-      // request was in flight must not coalesce into them.
-      await db.outbox.where('seq').anyOf(seqs).modify({
-        status: 'pending',
-        sending_at: undefined,
-        claim_token: undefined,
-      });
+      // request was in flight must not coalesce into them. A tab that reclaimed this claim
+      // while the request was in flight owns the row now: only undo our own claim.
+      await releaseClaims(db, seqs, claimToken);
       throw error;
     }
     out.sent += batch.length;
@@ -336,17 +356,31 @@ async function pushAllUnlocked(
             r.result === 'applied' &&
             typeof r.server_rev === 'number' &&
             Number.isSafeInteger(r.server_rev)
-          )
-            await db
-              .table(entry.tbl)
-              .update(entry.row_id, { rev: r.server_rev });
+          ) {
+            // A newer server shadow applied above may already carry a higher revision
+            // (another tab pulled `rev: 3` while this push produced `rev: 2`); never
+            // downgrade, or the next edit triggers a spurious field merge.
+            const current = (await db.table(entry.tbl).get(entry.row_id)) as
+              | Record<string, unknown>
+              | undefined;
+            if (r.server_rev > Number(current?.rev ?? 0))
+              await db
+                .table(entry.tbl)
+                .update(entry.row_id, { rev: r.server_rev });
+          }
         }
         if (rejectedRows.length > 0) await db.outbox.bulkPut(rejectedRows);
         const pendingRows: OutboxEntry[] = [];
         for (const entry of batch) {
           if (entry.seq === undefined || answered.has(entry.op_id)) continue;
           const current = currentBySeq.get(entry.seq);
-          if (!current) continue;
+          // Another tab may have reclaimed this row while the request was in flight;
+          // it owns the claim now and the server never answered this attempt.
+          if (
+            current?.status !== 'sending' ||
+            current.claim_token !== claimToken
+          )
+            continue;
           pendingRows.push({
             ...current,
             status: 'pending',

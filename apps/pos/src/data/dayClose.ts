@@ -247,14 +247,19 @@ export async function closeDay(
         w.table('shop') as Table<{ id: string; timezone?: string }>
       ).get('shop');
       const tz = String(shop?.timezone ?? 'Asia/Karachi') || 'Asia/Karachi';
+      // The clock can be corrected backwards after a close recorded in the future. The
+      // period must still start where that close ended and end after it (the Worker
+      // rejects `period_start > period_end` and requires `period_end = created_at`),
+      // so clamp the close time instead of writing an unclosable period (SYNC-H3).
+      const closeAt = Math.max(now, data.periodStart + 1);
       const dayClose: SyncedRow = {
         id: input.dayCloseId,
         device_id: ctx.device_id,
         branch_id: ctx.branch_id,
         staff_id: ctx.staff_id,
-        business_date: businessDate(now, tz),
+        business_date: businessDate(closeAt, tz),
         period_start: data.periodStart,
-        period_end: now,
+        period_end: closeAt,
         opening_cash: result.opening_cash,
         cash_sales: result.cash_sales,
         udhaar_cash_in: result.udhaar_cash_in,
@@ -278,7 +283,7 @@ export async function closeDay(
           ? JSON.stringify(input.denominations)
           : null,
         note,
-        created_at: now,
+        created_at: closeAt,
       };
       await w.insert('day_closes', dayClose);
       if (Math.abs(result.difference) >= 10_000)
@@ -294,7 +299,7 @@ export async function closeDay(
           }),
           device_id: ctx.device_id,
           staff_id: ctx.staff_id,
-          created_at: now,
+          created_at: closeAt,
         });
       return dayClose;
     },
@@ -323,7 +328,9 @@ export async function closeDay(
       // A missing printer config is not a configured printer: queueing a phantom
       // job here would print an old Z-report once a printer is finally added.
       if (printer?.transport && printer.print_day_close !== false)
-        await queueDayClosePrint(db, String(row.id), { now });
+        await queueDayClosePrint(db, String(row.id), {
+          now: Number(row.period_end) || now,
+        });
     } catch {
       // Printing is optional; the close itself is already saved.
     }

@@ -5,7 +5,12 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { seedSampleDay } from '../dev/sampleDay.ts';
 import { i18n, initI18n } from '../i18n/i18n.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
-import { addDays, reportBundle, reportDays } from './reportBundle.ts';
+import {
+  addDays,
+  reportBundle,
+  reportDays,
+  slowMoversReport,
+} from './reportBundle.ts';
 import { reportCsv, reportTotal } from './reportCsv.ts';
 import { completeSale } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
@@ -190,6 +195,58 @@ describe('report bundle (screens/16 ACs 1–3, 6)', () => {
     expect(slow.map((row) => row.product.id)).not.toContain('recent-lines');
     expect(slow.find((row) => row.product.id === 'slow-lines')?.lastSale).toBe(
       old,
+    );
+  });
+
+  it('ignores a void older than the 30-day window when reporting the last sale (SYNC-L8)', async () => {
+    const db = await readyDb('report-slow-old-void');
+    await addShop(db, { timezone: TZ });
+    await db.products.add({
+      id: 'slow-old',
+      name_en: 'Old item',
+      sku: 'SLOW-OLD',
+      price: 1000,
+      avg_cost: 500,
+      track_stock: 1,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    await db.stock_levels.put({ product_id: 'slow-old', on_hand_milli: 1000 });
+    const voidedDate = addDays(TODAY, -60);
+    const lastReal = addDays(TODAY, -100);
+    const line = (id: string, saleId: string, date: string) =>
+      ({
+        id,
+        sale_id: saleId,
+        product_id: 'slow-old',
+        business_date: date,
+        qty_milli: 1000,
+        unit_price: 1000,
+        gross: 1000,
+        discount: 0,
+        net: 1000,
+        unit_cost_snapshot: 500,
+        created_at: NOW,
+      }) as never;
+    await db.sale_lines.bulkAdd([
+      line('line-voided', 'sale-voided', voidedDate),
+      line('line-real', 'sale-real', lastReal),
+    ]);
+    await db.sale_voids.add({
+      id: 'void-old',
+      sale_id: 'sale-voided',
+      reason: 'test',
+      replacement_sale_id: null,
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: voidedDate,
+      created_at: NOW,
+    } as never);
+    const slow = await slowMoversReport(db, TODAY);
+    expect(slow.find((row) => row.product.id === 'slow-old')?.lastSale).toBe(
+      lastReal,
     );
   });
 

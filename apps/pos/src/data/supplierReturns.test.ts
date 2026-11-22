@@ -399,6 +399,45 @@ describe('return to supplier (screens/13 ACs 6–8, 07 §10)', () => {
     );
     const after = await supplierReturnData(db, 'sup-1', TODAY);
     expect(after?.purchases[0]?.lines[0]?.remaining).toBe(1000);
+    // A return over the remaining delivered quantity is refused before writing (SYNC-L6).
+    await expect(
+      planSupplierReturn(db, {
+        supplierId: 'sup-1',
+        purchaseId: 'pur-1',
+        lines: [
+          {
+            productId: 'charger',
+            purchaseLineId: 'pl-1',
+            qtyMilli: 1500,
+          },
+        ],
+        reason: 'Faulty',
+        refundReceived: 0,
+        refundMethod: null,
+      }),
+    ).rejects.toMatchObject({ code: 'qty' });
+    // Two lines for the same delivery line are summed before the check too.
+    await expect(
+      planSupplierReturn(db, {
+        supplierId: 'sup-1',
+        purchaseId: 'pur-1',
+        lines: [
+          {
+            productId: 'charger',
+            purchaseLineId: 'pl-1',
+            qtyMilli: 600,
+          },
+          {
+            productId: 'charger',
+            purchaseLineId: 'pl-1',
+            qtyMilli: 600,
+          },
+        ],
+        reason: 'Faulty',
+        refundReceived: 0,
+        refundMethod: null,
+      }),
+    ).rejects.toMatchObject({ code: 'qty' });
     await expect(
       planSupplierReturn(db, {
         supplierId: 'missing',
