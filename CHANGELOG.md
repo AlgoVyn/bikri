@@ -4,6 +4,10 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Print agent 0.1.6 — 22 Nov 2026 review
+- Release `print-agent-v0.1.6` with the Windows GUI log fan-out, `GetDefaultPrinterW` length query, CUPS natural scaling/ppi/media, GDI DPI scaling and Web Serial cleanup fixes, plus the job-state, installer and raster hardening from the review.
+- The wizard download links, Inno installer version and build fallback move to 0.1.6. The HTTP protocol stays 1, so an older agent keeps working until the shop updates.
+
 ### POS sync and data remediation — 22 Nov 2026 review
 - A pulled `sale_voids` row that loses its offline race with another till now removes the whole losing local void transaction (void, reversal payments, ledger, movements, audits and their outbox ops) before the server's void is written, on both incremental pull and snapshot, and the caches are rebuilt.
 - Restore recovery groups a void & reissue under its replacement sale, so a 200-op chunk boundary can no longer split the reissue into two rejected transactions.

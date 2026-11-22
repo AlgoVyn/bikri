@@ -511,7 +511,7 @@ test.describe('Print service agent install links (docs/14)', () => {
       page.getByRole('link', { name: 'Windows 10/11 (installer)' }),
     ).toHaveAttribute(
       'href',
-      'https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.5/bikri-print-agent-setup.exe',
+      'https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.6/bikri-print-agent-setup.exe',
     );
     await expect(
       page.getByRole('link', { name: 'SHA-256 checksums' }),
