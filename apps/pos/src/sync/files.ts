@@ -11,6 +11,17 @@ import {
 
 /** Uploads pending photos/logos; a 4xx marks the entry failed, network errors leave it pending. */
 export async function uploadQueued(db: BikriDb, max = 30): Promise<number> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) return uploadQueuedUnlocked(db, max);
+  // Two tabs must not upload the same blob and charge file_bytes twice (POS-M6).
+  return locks.request(
+    `bikri-files-${db.tenantId}`,
+    { ifAvailable: true },
+    async (lock) => (lock ? uploadQueuedUnlocked(db, max) : 0),
+  );
+}
+
+async function uploadQueuedUnlocked(db: BikriDb, max: number): Promise<number> {
   const token = await deviceToken(db);
   if (!token) return 0;
   const pending = await db.file_queue
@@ -102,7 +113,8 @@ export async function fetchRemoteFile(
     );
     if (!res.ok) return null;
     const blob = await res.blob();
-    await putFile(db.tenantId, key, blob);
+    // The download succeeded; a Cache Storage failure must not turn it into null.
+    await putFile(db.tenantId, key, blob).catch(() => undefined);
     return blob;
   } catch {
     return null;

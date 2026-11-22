@@ -294,6 +294,48 @@ describe('settings helpers', () => {
     await updateShopLogo(db, null, 'st-1', NOW + 2);
     expect((await db.shop.get('shop'))?.logo_key).toBeNull();
     expect(await db.kv.get('logo_bitmap')).toBeUndefined();
+    // No-op branch and logo saves write neither an audit/file_queue row nor an outbox op.
+    const outboxBefore = await db.outbox.count();
+    const auditBefore = await db.audit_log.count();
+    const filesBefore = await db.file_queue.count();
+    await updateBranchSettings(
+      db,
+      'br-1',
+      {
+        name: 'Main',
+        bill_prefix: 'MAIN',
+        address: 'Hall Road',
+        phone: '0300',
+      },
+      'st-1',
+      NOW + 3,
+    );
+    await updateShopLogo(db, null, 'st-1', NOW + 4);
+    expect(await db.outbox.count()).toBe(outboxBefore);
+    expect(await db.audit_log.count()).toBe(auditBefore);
+    expect(await db.file_queue.count()).toBe(filesBefore);
+  });
+
+  it('does not audit an unchanged staff edit', async () => {
+    const db = await setup('staff-noop');
+    await db.staff.update('st-1', { max_discount_bp: 0 });
+    const staff = await db.staff.get('st-1');
+    if (!staff) throw new Error('missing staff');
+    const auditBefore = await db.audit_log.count();
+    await saveStaff(
+      db,
+      {
+        id: staff.id,
+        name: String(staff.name),
+        role: 'owner',
+        active: true,
+        maxDiscountBp: Number(staff.max_discount_bp ?? 0),
+        permissions: {},
+      },
+      'st-1',
+      NOW + 5,
+    );
+    expect(await db.audit_log.count()).toBe(auditBefore);
   });
 
   it('validates staff input and updates an existing cashier', async () => {

@@ -127,7 +127,7 @@ export async function dayCloseData(
   const periodStart = last ? n(last.period_end) : n(deviceRow?.created_at);
   // A close recorded while the clock was ahead may be later than `now` after a
   // correction. Keep the period valid instead of hiding that close and double-counting.
-  const periodEnd = Math.max(now, periodStart);
+  const periodEnd = Math.max(now, periodStart + 1);
   const payments = await sumPayments(src, deviceId, periodStart, periodEnd);
   const cash = payments.filter((p) => p.method === 'cash');
   const pick = (direction: string, purposes: string[], rows = cash) =>

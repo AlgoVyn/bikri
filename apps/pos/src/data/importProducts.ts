@@ -352,6 +352,13 @@ export async function previewImport(
   const products = (await db.products.toArray()).filter((p) => !p.deleted_at);
   const byId = new Map(products.map((p) => [p.id, p]));
   const bySku = new Map(products.map((p) => [String(p.sku ?? ''), p.id]));
+  // A soft-deleted row still owns its SKU in D1. Do not silently invent another one
+  // during the import; show the same taken-SKU error as the live collision (POS-L6).
+  const deletedSkus = new Set(
+    (await db.products.toArray())
+      .filter((p) => p.deleted_at)
+      .map((p) => String(p.sku ?? '')),
+  );
   const byBarcode = new Map<string, string>();
   for (const b of await db.product_barcodes.toArray()) {
     if (!b.deleted_at && byId.has(String(b.product_id)))
@@ -369,6 +376,8 @@ export async function previewImport(
     if (rows.length >= MAX_IMPORT_ROWS)
       errors.push({ field: 'row', code: 'too_many_rows' });
     const parsed = parseRow(cells, mapping, errors);
+    if (parsed.sku && deletedSkus.has(parsed.sku))
+      errors.push({ field: 'sku', code: 'sku_taken' });
     let productId: string | null = parsed.sku
       ? (bySku.get(parsed.sku) ?? null)
       : null;

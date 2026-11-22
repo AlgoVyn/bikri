@@ -226,11 +226,8 @@ export function BillDetail({
   );
 
   const askVoid = (mode: 'void' | 'reissue') => {
-    // A manager's previous-day void needs another manager/owner to approve it (05 §5).
-    if (blocker === 'same_day' && role !== 'manager') {
-      toast.push(t('office.bill.void_same_day'), 'error');
-      return;
-    }
+    // An earlier-day void needs an owner approval, even for a manager or a cashier
+    // with a `sale.void` grant (05 §5).
     if (!can('sale.void') || blocker === 'same_day') {
       setApproving(mode);
       return;
@@ -984,6 +981,7 @@ export function BillDetail({
           if (!o) setApproving(null);
         }}
         permission="sale.void"
+        roles={blocker === 'same_day' ? ['owner'] : undefined}
         body={t('sell.override_sale_void')}
         onApproved={onApproved}
       />

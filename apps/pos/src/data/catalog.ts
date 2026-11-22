@@ -1211,7 +1211,9 @@ export async function saveNewProduct(
       // Cache first, so the thumbnail can render as soon as the row appears — but only
       // after the read-only guard: a blocked save must not leave a file behind (SYNC-L9).
       if (photo && imageKey)
-        await Dexie.waitFor(putFile(db.tenantId, imageKey, photo.blob));
+        await Dexie.waitFor(
+          putFile(db.tenantId, imageKey, photo.blob).catch(() => undefined),
+        );
       const created = await createProduct(
         w,
         {
@@ -1293,7 +1295,11 @@ export async function saveProductEdit(
       // Cache the new photo inside the action, after the read-only guard (SYNC-L9).
       if (input.photo)
         await Dexie.waitFor(
-          putFile(db.tenantId, photoKey(id, input.photo), input.photo.blob),
+          putFile(
+            db.tenantId,
+            photoKey(id, input.photo),
+            input.photo.blob,
+          ).catch(() => undefined),
         );
       const before = await w.table<MasterRow>('products').get(id);
       if (!before) throw new Error(`Product ${id} not found`);
@@ -1619,9 +1625,19 @@ export async function moveCategory(
       const b = rows[j];
       if (!a || !b) return;
       // Swap only the two positions; normalising the whole list would exceed the
-      // 200-op action limit on a large catalogue.
-      await w.update('categories', a.id, { sort_order: Number(b.sort_order) });
-      await w.update('categories', b.id, { sort_order: Number(a.sort_order) });
+      // 200-op action limit on a large catalogue. Offline-created categories can share
+      // a sort_order, in which case a plain swap would be a no-op.
+      const aOrder = Number(a.sort_order);
+      const bOrder = Number(b.sort_order);
+      if (aOrder === bOrder) {
+        await w.update('categories', a.id, {
+          sort_order: aOrder + (direction === 1 ? 1 : -1),
+        });
+        await w.update('categories', b.id, { sort_order: aOrder });
+      } else {
+        await w.update('categories', a.id, { sort_order: bOrder });
+        await w.update('categories', b.id, { sort_order: aOrder });
+      }
     },
     { ...opts, tables: writeScope('categories') },
   );

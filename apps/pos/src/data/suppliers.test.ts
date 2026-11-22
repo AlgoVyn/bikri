@@ -553,6 +553,25 @@ describe('suppliers and deliveries (T-045)', () => {
     await expect(
       saveDelivery(db, { ...base, lines: priceLines }, ctx, { today: TODAY }),
     ).rejects.toMatchObject({ code: 'too_many' });
+    await expect(
+      saveDelivery(
+        db,
+        {
+          ...base,
+          purchaseId: 'no-price-permission',
+          lines: [
+            {
+              productId: item.id,
+              qtyMilli: 1000,
+              unitCost: 1000,
+              updatePrice: 2000,
+            },
+          ],
+        },
+        ctx,
+        { today: TODAY, canEditPrice: false },
+      ),
+    ).rejects.toMatchObject({ code: 'price' });
     // Without price changes the same 60 lines stay inside the per-action op budget.
     const plainLines = priceLines.map(({ updatePrice, ...line }) => line);
     await expect(

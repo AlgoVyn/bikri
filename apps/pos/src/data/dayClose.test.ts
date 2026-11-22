@@ -152,7 +152,7 @@ describe('day close (T-047)', () => {
     const data = await dayCloseData(db, 'dev-1', NOW);
     expect(data.lastClose?.id).toBe('future-close');
     expect(data.periodStart).toBe(future);
-    expect(data.periodEnd).toBe(future);
+    expect(data.periodEnd).toBe(future + 1);
     expect(data.openingCash).toBe(50_000);
   });
 

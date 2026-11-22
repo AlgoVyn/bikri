@@ -181,13 +181,17 @@ export async function writeAction<T>(
         .equals([tbl, id])
         .toArray();
       const last = entries.at(-1);
-      // Never coalesce into an op that has already been sent. The server may have applied it
-      // and lost the response; its op id is then in `applied_ops`, so a replay is answered
-      // without applying the newer values. A fresh op id is the only safe carrier.
+      // Never coalesce into an op that has already been sent, and never coalesce across
+      // transactions or actors: a delivery/purchase can carry the same product update
+      // with companion rows in a different transaction, and the Worker validates the
+      // cost source and permission on the whole op (POS-H2). Same-transaction edits are
+      // one atomic action and stay coalesced.
       return last &&
         last.kind === 'upsert' &&
         last.status === 'pending' &&
-        last.sent_at === undefined
+        last.sent_at === undefined &&
+        last.tx_id === txId &&
+        last.row?.updated_by === actor
         ? last
         : undefined;
     };

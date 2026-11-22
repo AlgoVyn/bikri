@@ -39,6 +39,17 @@ const TODAY = businessDate(NOW, TZ);
 async function setup(prefix = 'udhaar') {
   const db = await readyDb(prefix);
   await addShop(db, { name: 'Bikri', timezone: TZ });
+  await db.staff.put({
+    id: 'st-1',
+    name: 'Owner',
+    role: 'owner',
+    permissions_json: '{}',
+    active: 1,
+    deleted_at: null,
+    created_at: NOW,
+    updated_at: NOW,
+    rev: 1,
+  } as never);
   const ctx = await ledgerContext(db, 'st-1');
   return { db, ctx };
 }
@@ -294,6 +305,31 @@ describe('udhaar data', () => {
     expect((await db.promises.get(promise.id))?.status).toBe('kept');
   });
 
+  it('does not refresh promises without an actor', async () => {
+    const { db } = await setup('promise-no-actor');
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: null }),
+    ).toBe(0);
+  });
+
+  it('does not refresh promises for a staff member without party.edit', async () => {
+    const { db } = await setup('promise-perm');
+    await db.staff.put({
+      id: 'st-2',
+      name: 'Cashier',
+      role: 'cashier',
+      active: 1,
+      permissions_json: '{"payment.receive":true,"party.edit":false}',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    } as never);
+    expect(
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-2' }),
+    ).toBe(0);
+  });
+
   it('refreshes promises to broken the day after the date', async () => {
     const { db, ctx } = await setup('broken');
     const ali = await customer(db);
@@ -305,14 +341,14 @@ describe('udhaar data', () => {
       { today: '2026-10-25', now: NOW },
     );
     expect(
-      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-1' }),
     ).toBe(1);
     expect((await db.promises.get(promise.id))?.status).toBe('broken');
     const op = await db.outbox
       .where('[tbl+row_id]')
       .equals(['promises', promise.id])
       .last();
-    expect(op?.row?.updated_by).toBe('staff-1');
+    expect(op?.row?.updated_by).toBe('st-1');
   });
 
   it('refreshes promises at most once per business day', async () => {
@@ -326,10 +362,10 @@ describe('udhaar data', () => {
       { today: '2026-10-25', now: NOW },
     );
     expect(
-      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-1' }),
     ).toBe(1);
     expect(
-      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-1' }),
     ).toBe(0);
   });
 
@@ -707,6 +743,9 @@ describe('udhaar data', () => {
         row.entity_id === ali.id,
     );
     expect(audit).toMatchObject({ staff_id: 'st-1', device_id: 'dev-1' });
+    const audits = await db.audit_log.count();
+    await deleteCustomer(db, ali.id, 'st-1', NOW + 5000);
+    expect(await db.audit_log.count()).toBe(audits);
     expect(String(audit?.before_json)).toContain('Ali');
   });
 });
@@ -859,7 +898,7 @@ describe('udhaar branch coverage', () => {
       ),
     ).rejects.toMatchObject({ code: 'customer' });
     expect(
-      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-1' }),
     ).toBe(0);
     const ali = await customer(db);
     await udhaarSale(db, ctx, ali.id, 100000);
@@ -874,7 +913,7 @@ describe('udhaar branch coverage', () => {
       { today: TODAY, now: NOW },
     );
     expect(
-      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'staff-1' }),
+      await refreshPromises(db, { today: TODAY, now: NOW, actor: 'st-1' }),
     ).toBe(0);
   });
 

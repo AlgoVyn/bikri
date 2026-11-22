@@ -95,7 +95,7 @@ describe('update prices (bulk)', () => {
     );
     const txs = new Map<string, number>();
     for (const o of await db.outbox.toArray()) {
-      if (before.has(o.tx_id)) continue;
+      if (before.has(o.tx_id) || o.tbl !== 'products') continue;
       txs.set(String(o.tx_id), (txs.get(String(o.tx_id)) ?? 0) + 1);
     }
     expect([...txs.values()]).toEqual([PRICE_CHUNK, 50]);
