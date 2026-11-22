@@ -4,6 +4,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Print agent 0.1.8 — 22 Nov 2026
+- Windows GDI driver mode paginates receipts taller than `VERTRES`; Linux/macOS archives include the uninstallers. Wizard links, Inno version and the build fallback move to 0.1.8.
+
 ### Review residual fixes — 22 Nov 2026
 - Home recomputes recent bills when the device branch resolves; Restore discards a ZIP that finishes inflating after a newer pick; device admin actions share a synchronous busy guard; Sync Now/Retry have rejection handlers.
 - Printer wizard gates the test-print drawer kick by `drawer.open`, read-only/support and the saved setting; palette privacy has success/error toasts; expense/cash/category/backdate/price/suggested/import submits use the synchronous submit guard, and Expense Save requires `expense.create`; settings persistence promises are caught.
