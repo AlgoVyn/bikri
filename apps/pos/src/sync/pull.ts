@@ -557,6 +557,13 @@ export async function reconcileRecoveredMasterFields(
                 !SYSTEM_FIELDS.has(key) &&
                 !sameValue(entry.row?.[key], local[key]),
             );
+      if (changed.length === 0) {
+        // The restored row already matches this till's copy; keeping a no-op op with
+        // its stale base_rev caused a spurious merge or a permanent rejection (POS-H5).
+        if (entry.seq !== undefined) await db.outbox.delete(entry.seq);
+        await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+        continue;
+      }
       const narrowed: Record<string, unknown> = { id: entry.row.id };
       for (const key of changed) narrowed[key] = entry.row[key];
       if ('updated_at' in entry.row) narrowed.updated_at = entry.row.updated_at;
@@ -565,6 +572,7 @@ export async function reconcileRecoveredMasterFields(
         await db.outbox.update(entry.seq, {
           changed_fields: changed,
           row: narrowed,
+          base_rev: Number(local.rev ?? 0),
         });
     }
   });
@@ -977,6 +985,27 @@ async function restoreRecoveryUnlocked(
         }
       }
 
+      // A tracked product's last_cost will be recomputed by the recovered costed
+      // movement; sending the old value in a separate transaction would need the
+      // delivery in the same group and could be rejected (POS-H5).
+      const costedProducts = new Set<string>();
+      for (const { tbl, row } of recoveredRows) {
+        if (tbl === 'stock_movements' && row.unit_cost != null)
+          costedProducts.add(String(row.product_id ?? ''));
+      }
+      for (let index = 0; index < masterRows.length; index += 1) {
+        const item = masterRows[index];
+        if (
+          item?.tbl !== 'products' ||
+          Number(item.row.track_stock ?? 0) !== 1 ||
+          !costedProducts.has(String(item.row.id))
+        )
+          continue;
+        const row = { ...item.row };
+        delete row.last_cost;
+        masterRows[index] = { ...item, row };
+      }
+
       const openingRows = recoveredRows.filter(
         ({ row }) => row.source_type === 'opening',
       );
@@ -1044,9 +1073,35 @@ async function restoreRecoveryUnlocked(
         addUnit(drafts, [party?.row, row]);
       }
 
+      const recipeByBundle = new Map<string, RecoveredMaster[]>();
       for (const item of masterRows) {
-        if (item.tbl === 'staff') continue;
+        if (item.tbl !== 'bundle_items') continue;
+        const bundleId = String(item.row.bundle_id ?? '');
+        recipeByBundle.set(bundleId, [
+          ...(recipeByBundle.get(bundleId) ?? []),
+          item,
+        ]);
+      }
+      const usedRecipe = new Set<string>();
+      for (const item of masterRows) {
+        if (item.tbl === 'staff' || item.tbl === 'bundle_items') continue;
         if (openingKeys.has(`${item.tbl}:${item.row.id}`)) continue;
+        const drafts = [masterDraft(item, now)];
+        const rows: SyncedRow[] = [item.row];
+        if (item.tbl === 'products' && String(item.row.kind) === 'bundle') {
+          for (const recipe of recipeByBundle.get(String(item.row.id)) ?? []) {
+            drafts.push(masterDraft(recipe, now));
+            rows.push(recipe.row);
+            usedRecipe.add(String(recipe.row.id));
+          }
+        }
+        addUnit(drafts, rows);
+      }
+      // A recipe row whose bundle product is not being re-sent (it already exists on
+      // the restored server) still needs its own unit.
+      for (const item of masterRows) {
+        if (item.tbl !== 'bundle_items') continue;
+        if (usedRecipe.has(String(item.row.id))) continue;
         addUnit([masterDraft(item, now)], [item.row]);
       }
 
@@ -1066,35 +1121,19 @@ async function restoreRecoveryUnlocked(
         addUnit([masterDraft(item, now)], [item.row]);
       }
 
-      const chunks: OutboxDraft[][] = [];
-      let chunk: OutboxDraft[] = [];
-      let chunkStaff = new Set<string>();
-      const flush = () => {
-        if (chunk.length === 0) return;
-        chunks.push(chunk);
-        chunk = [];
-        chunkStaff = new Set<string>();
-      };
-      for (const unit of units) {
-        const extra = [...unit.staff].filter((id) => !chunkStaff.has(id));
-        if (
-          chunk.length > 0 &&
-          chunk.length + unit.drafts.length + extra.length > MAX_OPS_PER_TX
-        )
-          flush();
-        for (const id of unit.staff) {
-          if (chunkStaff.has(id)) continue;
-          chunkStaff.add(id);
-          const staff = newStaff.get(id);
-          if (staff) chunk.push(masterDraft(staff, now));
-        }
-        chunk.push(...unit.drafts);
-      }
-      flush();
-
       await db.kv.put({ key: RECOVERY_KEY, value: true });
-      for (const drafts of chunks) {
+      for (const unit of units) {
+        // One transaction per document/unit: a rejected unit cannot quarantine the
+        // other recovered rows, and a bundle product stays with its recipe (POS-H5).
         const txId = newId(now);
+        const drafts: OutboxDraft[] = [];
+        for (const id of unit.staff) {
+          const staff = newStaff.get(id);
+          if (staff) drafts.push(masterDraft(staff, now));
+        }
+        drafts.push(...unit.drafts);
+        if (drafts.length > MAX_OPS_PER_TX)
+          throw new Error('restore recovery unit exceeds the op limit');
         for (const draft of drafts) {
           await db.outbox.add({
             op_id: newId(now),

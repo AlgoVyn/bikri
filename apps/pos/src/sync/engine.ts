@@ -30,8 +30,14 @@ export function backoffDelay(failures: number): number {
 type RunKind = 'first' | 'full' | 'push' | 'pull';
 
 /** `full` subsumes `push`/`pull`, `push` subsumes `pull`; `first` behaves like `full`. */
-function mergeRun(pending: RunKind | null, kind: RunKind): RunKind {
+export function mergeRun(pending: RunKind | null, kind: RunKind): RunKind {
   if (pending === null) return kind;
+  // A queued push and pull must both run; collapsing to `push` used to drop the pull.
+  if (
+    (pending === 'push' && kind === 'pull') ||
+    (pending === 'pull' && kind === 'push')
+  )
+    return 'full';
   const rank = (value: RunKind): number =>
     value === 'first' || value === 'full' ? 2 : value === 'push' ? 1 : 0;
   return rank(kind) > rank(pending) ? kind : pending;

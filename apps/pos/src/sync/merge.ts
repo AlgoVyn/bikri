@@ -226,6 +226,15 @@ export async function mergeRows(
     } else {
       await write(list);
     }
+    // The server row is now live; a pre-edit restore point would roll it back if the
+    // owner later discards a failed op (POS-H4).
+    const shadowTable = tx.table('pull_shadow') as Table<
+      { tbl: string; id: string },
+      [string, string]
+    >;
+    await shadowTable.bulkDelete(
+      list.map((row) => [tbl, row.id] as [string, string]),
+    );
 
     // A device moved to another branch (or renamed) keeps its local identity; the
     // next invoice must use the new code, not the one stored at enrolment.

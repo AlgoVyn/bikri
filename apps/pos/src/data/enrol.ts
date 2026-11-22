@@ -186,7 +186,11 @@ export class PendingFilesError extends Error {
 export async function pendingFileCount(db: BikriDb): Promise<number> {
   const pending = await db.file_queue.where('status').equals('pending').count();
   const failed = await db.file_queue.where('status').equals('failed').count();
-  return pending + failed;
+  const uploading = await db.file_queue
+    .where('status')
+    .equals('uploading')
+    .count();
+  return pending + failed + uploading;
 }
 
 export type UnsyncedSnapshot = { seq: number; fingerprint: string };

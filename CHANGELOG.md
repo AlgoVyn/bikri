@@ -4,6 +4,14 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS data and sync — 22 Nov 2026 review recheck
+- A delivery with `updatePrice` now verifies `catalog.edit` in the repository; the Worker accepts the costed delivery and the price change.
+- Outbox coalescing is limited to one transaction and actor, so a delivery/recipe companion can no longer be split from its product edit.
+- Earlier-day voids and reissues now require an owner approval on the till, matching the Worker; the reissue override is bound to the owner.
+- `discardFailed` keeps a newer pulled row instead of restoring a stale shadow; pull merge clears the consumed shadow.
+- Restore recovery drops no-op master ops, advances `base_rev`, keeps a bundle product with its recipe, strips a costed product's old `last_cost`, and gives each unit its own transaction.
+- Sync engine coalesces push+pull into a full run; read-only includes support devices; file uploads use a tenant-scoped cross-tab lock; stock count awaits the draft chain; import preview rejects a SKU owned by a soft-deleted product; day-close boundaries and support/upload counts are aligned.
+
 ### Worker API and sync — 22 Nov 2026 review recheck
 - Push planning advances `look.current` between transactions and bisects a lost `guardAssert`, so editing then deleting the same row in one push no longer wedges the till; D1 singleton failures stop the round and re-plan from committed state.
 - Rejected transactions no longer leak their customer/supplier/sale/refund lookups into later transactions; payments and ledger rows still require an applied or same-transaction party, while FK-backed sales/purchases may reference a party created later in the push.

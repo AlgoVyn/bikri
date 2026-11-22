@@ -475,10 +475,13 @@ export async function finishCount(
   // was being written it would restore `applied: []` over the ids the chunk just
   // committed, and a retry would apply those movements twice (SYNC-M7).
   cancelScheduledSave(db);
+  // The timer is cancelled, but a debounced write already running on saveChain must
+  // finish before the first chunk commits (POS-M4).
+  await saveChain.catch(() => undefined);
   const source = {
     ...draft,
     expected: { ...draft.expected, ...(stored?.expected ?? {}) },
-    counted: { ...draft.counted, ...(stored?.counted ?? {}) },
+    counted: { ...(stored?.counted ?? {}), ...draft.counted },
     applied: [
       ...new Set([...(draft.applied ?? []), ...(stored?.applied ?? [])]),
     ],
@@ -566,7 +569,9 @@ export async function finishCount(
     result.valueDiff += part.valueDiff;
     if (chunkStamp !== '') draftStamps.set(db, chunkStamp);
     for (const id of slice) applied.add(id);
-    await saveCountDraft(db, { ...source, applied: [...applied] });
+    // writeAction already persisted DRAFT_KEY/DRAFT_STAMP_KEY; update the in-memory
+    // cache without queuing a second draft write (POS-M4).
+    draftCache.set(db, { ...source, applied: [...applied] });
   }
   await writeAction(
     db,

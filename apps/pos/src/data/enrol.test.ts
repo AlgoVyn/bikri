@@ -206,14 +206,15 @@ describe('leave this shop', () => {
     expect(file.filename).toMatch(/^bikri-unsynced-.+\.json$/);
     await markUnsyncedExported(db, file.snapshot);
     expect(await unexportedOps(db)).toBe(0);
-    // A coalesced edit changes the exported row without changing its sequence.
+    // An edit in a new transaction is a new op (cross-transaction coalescing was
+    // removed for sync correctness).
     await writeAction(db, (w) =>
       w.update('categories', String(cat.id), { name_en: 'X2' }),
     );
-    expect(await unexportedOps(db)).toBe(1);
+    expect(await unexportedOps(db)).toBe(2);
     // A later write needs a new export.
     await writeAction(db, (w) => w.create('categories', { name_en: 'Y' }));
-    expect(await unexportedOps(db)).toBe(2);
+    expect(await unexportedOps(db)).toBe(3);
     // A marker written by an older app version has no fingerprint; sequence still works.
     await setKv(db, 'unsynced_exported', {
       at: 1,
@@ -249,8 +250,15 @@ describe('leave this shop', () => {
       sha256: 'e'.repeat(64),
       status: 'failed',
     });
+    await db.file_queue.add({
+      kind: 'product_image',
+      target_id: 'p2',
+      blob: new Blob(['z'], { type: 'image/png' }),
+      sha256: 'f'.repeat(64),
+      status: 'uploading',
+    });
     await expect(leaveShop(db)).rejects.toBeInstanceOf(PendingFilesError);
-    expect(await pendingFileCount(db)).toBe(2);
+    expect(await pendingFileCount(db)).toBe(3);
     await db.file_queue.clear();
     await expect(leaveShop(db)).resolves.toBeUndefined();
   });

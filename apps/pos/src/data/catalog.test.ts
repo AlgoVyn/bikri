@@ -773,6 +773,24 @@ describe('products (screens/08)', () => {
 });
 
 describe('categories', () => {
+  it('moves categories that share a sort_order', async () => {
+    const db = await readyDb();
+    const a = await addCategory(db, 'A');
+    const b = await addCategory(db, 'B');
+    await db.categories.update(a.id, { sort_order: 5 });
+    await db.categories.update(b.id, { sort_order: 5 });
+    await moveCategory(db, b.id, -1);
+    const rows = await listCategories(db);
+    const moved = rows.find((row) => row.id === b.id);
+    const other = rows.find((row) => row.id === a.id);
+    expect(Number(moved?.sort_order)).toBeLessThan(Number(other?.sort_order));
+    await moveCategory(db, b.id, 1);
+    const back = await listCategories(db);
+    expect(
+      Number(back.find((row) => row.id === b.id)?.sort_order),
+    ).toBeGreaterThan(Number(back.find((row) => row.id === a.id)?.sort_order));
+  });
+
   it('adds in order, renames, recolours, moves, and refuses delete while in use', async () => {
     const db = await readyDb();
     const ctx = await ledgerContext(db, 'st-1');

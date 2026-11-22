@@ -277,6 +277,16 @@ export async function completeSale(
   const sellerLimit = backdate
     ? Number(seller?.max_discount_bp ?? input.maxDiscountBp)
     : input.maxDiscountBp;
+  const recorder = backdate ? await db.staff.get(ctx.staff_id) : undefined;
+  const recorderCanEdit = Boolean(
+    recorder &&
+      can(
+        recorder.role as 'owner' | 'manager' | 'cashier',
+        String(recorder.permissions_json ?? '{}'),
+        'catalog.edit',
+      ),
+  );
+  const backdatePriceAudits: { lineKey: string; price: number }[] = [];
   // A bundle sold below its shelf price follows the normal price-override rule.
   const seenBundleGroups = new Set<string>();
   // A full-price bundle needs no `catalog.edit` approval: its component prices are
@@ -293,8 +303,13 @@ export async function completeSale(
     if (
       !sellerPerm('catalog.edit') &&
       !overrideMatches(cart, 'catalog.edit', { line: line.key, price })
-    )
-      throw new SaleInvalidError('bundle price approval');
+    ) {
+      if (!backdate || !recorderCanEdit)
+        throw new SaleInvalidError('bundle price approval');
+      // The recorder authorizes the attributed seller's past price with the same
+      // line-bound override audit the normal path writes (POS-M2).
+      backdatePriceAudits.push({ lineKey: line.key, price });
+    }
   }
   if (
     totals.lines.some((line) => line.below_cost === 1) &&
@@ -313,19 +328,9 @@ export async function completeSale(
   // against that seller has to run locally too. In particular, a recorder with
   // `catalog.edit` may authorize yesterday's price; the Worker requires a line-bound
   // `catalog.edit` override for that, not a silent old price.
-  const backdatePriceAudits: { lineKey: string; price: number }[] = [];
   if (backdate) {
     if (!sellerPerm('sale.create'))
       throw new SaleInvalidError('seller cannot create sales');
-    const recorder = await db.staff.get(ctx.staff_id);
-    const recorderCanEdit = Boolean(
-      recorder &&
-        can(
-          recorder.role as 'owner' | 'manager' | 'cashier',
-          String(recorder.permissions_json ?? '{}'),
-          'catalog.edit',
-        ),
-    );
     for (const line of cart.lines) {
       if (!line.product_id) continue;
       // A bundle component price is derived by `priceBundle`, not a manual override:
