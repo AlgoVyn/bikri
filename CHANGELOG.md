@@ -14,7 +14,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ### Printing and print agent 0.1.7 — 22 Nov 2026 review recheck
 - The Windows portable installer no longer wipes `HKCU\...\Run` and waits for the old process before copying; RAW fallback recognises `ERROR_INVALID_DATATYPE (1804)`.
 - Web Serial abort is bounded; jobs never overwrite terminal state and only terminal jobs are evicted; `crash.log` is capped and config saves fsync before rename.
-- 80 mm Urdu sale/refund column headers no longer re-wrap; ASCII Urdu-raster lines use the monospace face; credit statements stay ASCII; CUPS uses the PNG width for ppi/media; Windows GDI scales asymmetric DPI and resets the brush origin.
+- 80 mm Urdu sale/refund column headers no longer re-wrap; ASCII Urdu-raster lines use the monospace face; credit statements stay ASCII; wrapped lines keep their leading indent and an overflowed item no longer repeats its price detail; CUPS uses the PNG width for ppi/media; Windows GDI scales asymmetric DPI and resets the brush origin.
 - Label printing has a font timeout and awaits the print dialog; the preview filters by barcode and shows name/price; refund receipts print the configured QR; supplier-return quantities use the shared formatter; Linux/macOS uninstallers and ARM macOS download are present.
 
 ### POS UI and operator console — 22 Nov 2026 review recheck
