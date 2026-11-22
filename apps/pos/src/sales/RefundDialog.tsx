@@ -194,6 +194,20 @@ export function RefundDialog({
     return rows;
   }, [detail]);
 
+  const selectedBlocks = useMemo(() => {
+    if (!detail) return 0;
+    const keys = new Set<string>();
+    for (const choice of chosen) {
+      const line = detail.lines.find(
+        (entry) => entry.line.id === choice.saleLineId,
+      )?.line;
+      keys.add(
+        line?.bundle_group ? String(line.bundle_group) : choice.saleLineId,
+      );
+    }
+    return keys.size;
+  }, [chosen, detail]);
+
   const signature = JSON.stringify(chosen);
 
   const planRow = useLiveQuery(async () => {
@@ -366,6 +380,16 @@ export function RefundDialog({
     );
   }
 
+  if (detail === null) {
+    return (
+      <Modal open={open} onOpenChange={(o) => !o && onClose()} title={title}>
+        <p className="text-text-muted" data-testid="refund-not-found">
+          {t('office.refund.not_found')}
+        </p>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -513,13 +537,31 @@ export function RefundDialog({
                       </label>
                     </div>
                   ) : selected ? (
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="text-small text-text-muted">
-                        {t('office.refund.bundle_qty_value', {
-                          qty: block.remaining,
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="text-small text-text-muted">
+                          {t('office.refund.bundle_qty_value', {
+                            qty: block.remaining,
+                          })}
+                        </p>
+                        <MoneyText paisa={amount} />
+                      </div>
+                      <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 text-small">
+                        <input
+                          type="checkbox"
+                          className="size-4 shrink-0"
+                          checked={restock[block.key] !== false}
+                          onChange={(e) =>
+                            setRestock((current) => ({
+                              ...current,
+                              [block.key]: e.target.checked,
+                            }))
+                          }
+                        />
+                        {t('office.refund.bundle_restock', {
+                          count: block.lines.length,
                         })}
-                      </p>
-                      <MoneyText paisa={amount} />
+                      </label>
                     </div>
                   ) : null}
                   <p className="text-small text-text-muted">
@@ -641,7 +683,7 @@ export function RefundDialog({
           className="flex items-center justify-between border-t border-border px-2 py-1 text-small"
           data-testid="refund-running"
         >
-          <span>{t('office.refund.selected', { count: chosen.length })}</span>
+          <span>{t('office.refund.selected', { count: selectedBlocks })}</span>
           <MoneyText paisa={plan.exact} />
         </p>
       ) : null}

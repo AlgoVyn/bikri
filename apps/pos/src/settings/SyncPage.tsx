@@ -21,6 +21,7 @@ import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { writeAction } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { syncNow } from '../sync/engine.ts';
 import { discardFailed, retryFailed } from '../sync/push.ts';
 import { OwnerSigninRequired, shopRequest } from '../sync/shopApi.ts';
@@ -114,6 +115,7 @@ export function SyncPage() {
     })();
   }, []);
 
+  const readOnly = useReadOnly();
   if (!data) return null;
   const owner = role === 'owner';
 
@@ -339,17 +341,19 @@ export function SyncPage() {
                     >
                       {t('syncpage.file_retry')}
                     </button>
-                    <button
-                      type="button"
-                      className={buttonQuiet}
-                      onClick={() =>
-                        e.id === undefined
-                          ? undefined
-                          : setFileRemoveTarget(e.id)
-                      }
-                    >
-                      {t('syncpage.file_remove')}
-                    </button>
+                    {owner ? (
+                      <button
+                        type="button"
+                        className={buttonQuiet}
+                        onClick={() =>
+                          e.id === undefined
+                            ? undefined
+                            : setFileRemoveTarget(e.id)
+                        }
+                      >
+                        {t('syncpage.file_remove')}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -382,7 +386,7 @@ export function SyncPage() {
                     · {String(c.tbl)} ·{' '}
                     {formatWhen(i18n.language, Number(c.at), timeZone)}
                   </span>
-                  {owner && data.device?.is_admin ? (
+                  {owner && data.device?.is_admin && !readOnly ? (
                     <button
                       type="button"
                       className={buttonQuiet}
@@ -408,7 +412,9 @@ export function SyncPage() {
         confirmLabel={t('syncpage.file_remove')}
         onConfirm={() => {
           if (fileRemoveTarget !== null)
-            void db.file_queue.delete(fileRemoveTarget);
+            void db.file_queue
+              .delete(fileRemoveTarget)
+              .catch(() => setError(t('errors.generic')));
           setFileRemoveTarget(null);
         }}
       />

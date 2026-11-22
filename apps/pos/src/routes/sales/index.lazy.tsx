@@ -10,7 +10,7 @@ function SalesRoute() {
   const { bill } = Route.useSearch();
   return (
     <AreaStrings area="office">
-      <SalesWorkspace key={bill ?? 'list'} />
+      <SalesWorkspace key={bill ?? 'list'} bill={bill} />
     </AreaStrings>
   );
 }

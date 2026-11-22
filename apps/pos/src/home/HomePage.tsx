@@ -42,6 +42,7 @@ import { formatTimestamp } from '../lib/date';
 import { NAV } from '../shell/nav.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { billVisible } from '../state/reportScope.ts';
 import { useSession } from '../state/session.ts';
 
 type HomeData = {
@@ -128,8 +129,17 @@ export function HomePage() {
   const navigate = useNavigate();
   const justSetUp = useSession((s) => s.justSetUp);
   const setJustSetUp = useSession((s) => s.setJustSetUp);
-  const { staff, role, can } = useCurrentStaff();
+  const { staff, role, can, support, branchId } = useCurrentStaff();
   const readOnly = useReadOnly();
+  const canViewReports = can('report.view');
+  const attentionAllowed = (kind: string): boolean => {
+    if (kind === 'low_stock') return !readOnly;
+    if (kind === 'promises_due' || kind === 'over_limit')
+      return can('payment.receive');
+    if (kind === 'day_not_closed') return can('dayclose.create') && !readOnly;
+    if (kind === 'held_expiring') return can('sale.create') && !readOnly;
+    return true;
+  };
   const sampleGuard = useSubmitGuard();
   const toast = useToast();
   const [samplePending, setSamplePending] = useState(false);
@@ -171,7 +181,15 @@ export function HomePage() {
         (await db.sales.count()) -
         (await db.sales.where('status').equals('void').count()),
       today: await summary(db, { from: today, to: today }),
-      recent: await recentBills(db),
+      recent: (await recentBills(db)).filter(({ sale }) =>
+        billVisible(
+          role,
+          support,
+          can('report.view'),
+          String(sale.business_date) === today,
+          branchId === null || String(sale.branch_id) === branchId,
+        ),
+      ),
     };
   }, [today, yesterday, role]);
 
@@ -251,9 +269,9 @@ export function HomePage() {
       pendingTables = new Set([...(pendingTables ?? []), ...tables]);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        const changed = pendingTables;
         pendingTables = null;
-        void load(changed ?? undefined);
+        // Recompute every kind: a partial refresh replaced the other warnings.
+        void load();
       }, 250);
     };
     void load();
@@ -505,10 +523,12 @@ export function HomePage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Link to="/reports" className={buttonPrimary}>
-                    {t('nav.reports')}
-                  </Link>
-                  {can('export.data') ? (
+                  {canViewReports ? (
+                    <Link to="/reports" className={buttonPrimary}>
+                      {t('nav.reports')}
+                    </Link>
+                  ) : null}
+                  {can('export.data') && role === 'owner' ? (
                     <Link to="/settings/backup" className={buttonQuiet}>
                       {t('home.export_data')}
                     </Link>
@@ -550,31 +570,33 @@ export function HomePage() {
                   {t('home.attention')}
                 </h2>
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
-                  {attention.map((item) => (
-                    <li key={item.kind}>
-                      <Link
-                        to={ATTENTION_LINK[item.kind] ?? '/'}
-                        className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium transition-colors duration-150 hover:bg-surface-2 ${attentionTone(item)}`}
-                        data-testid={`attn-${item.kind}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="size-2 shrink-0 rounded-full bg-current"
-                        />
-                        <span className="min-w-0 flex-1">
-                          {attentionText(t, i18n.language, timeZone, item)}
-                        </span>
-                        <ChevronRightIcon className="size-4 text-base text-text-muted rtl:rotate-180" />
-                      </Link>
-                    </li>
-                  ))}
+                  {attention
+                    .filter((item) => attentionAllowed(item.kind))
+                    .map((item) => (
+                      <li key={item.kind}>
+                        <Link
+                          to={ATTENTION_LINK[item.kind] ?? '/'}
+                          className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium transition-colors duration-150 hover:bg-surface-2 ${attentionTone(item)}`}
+                          data-testid={`attn-${item.kind}`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="size-2 shrink-0 rounded-full bg-current"
+                          />
+                          <span className="min-w-0 flex-1">
+                            {attentionText(t, i18n.language, timeZone, item)}
+                          </span>
+                          <ChevronRightIcon className="size-4 text-base text-text-muted rtl:rotate-180" />
+                        </Link>
+                      </li>
+                    ))}
                 </ul>
               </section>
             ) : null}
           </div>
 
           <aside className="contents lg:col-start-2 lg:flex lg:flex-col lg:gap-4">
-            {readOnly ? null : (
+            {readOnly || !can('sale.create') ? null : (
               <Link
                 to="/sell"
                 className="group relative order-1 flex min-h-24 items-center gap-4 overflow-hidden rounded-card border-2 border-accent bg-rail p-4 text-rail-ink shadow-card transition-[filter,box-shadow] duration-150 hover:brightness-105 hover:shadow-card-hover active:brightness-95"

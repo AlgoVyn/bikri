@@ -227,7 +227,7 @@ export function DevicesTab({
       <Panel
         title={t('admin.tab_devices')}
         description={t('admin.devices_count', {
-          count: formatCount(devices.length, lang),
+          count: devices.length,
         })}
         bodyClassName="p-0"
       >

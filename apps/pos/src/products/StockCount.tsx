@@ -28,6 +28,7 @@ import {
   startCount,
   updateCount,
 } from '../data/stock.ts';
+import { categoryName } from '../lib/category.ts';
 import { beep } from '../sell/beep.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -40,7 +41,7 @@ const OVERSCAN = 8;
 
 /** Stock count (screens/09): scope → counted list → Finish count. */
 export function StockCountPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -172,7 +173,7 @@ export function StockCountPage() {
                   <option value="">—</option>
                   {categories?.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {String(c.name_en)}
+                      {categoryName(c, i18n.language)}
                     </option>
                   ))}
                 </select>

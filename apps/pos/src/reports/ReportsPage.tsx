@@ -729,7 +729,7 @@ function Delta({
   if (previous === 0) {
     return (
       <span className="text-small text-text-muted">
-        {t('office.reports.delta_new')}
+        {current === 0 ? '—' : t('office.reports.delta_new')}
       </span>
     );
   }
@@ -1319,7 +1319,10 @@ function StockTab({
         rows={stock.attention.map((row) => [
           productName(row.product, lang),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
-          qtyText(Number(row.product.min_stock_milli ?? 0)),
+          qtyText(
+            Number(row.product.min_stock_milli ?? 0),
+            String(row.product.unit ?? 'pc'),
+          ),
           statusLabel(row.status),
           ...(cost ? [<MoneyText key="value" paisa={row.value} />] : []),
         ])}
@@ -1384,7 +1387,7 @@ function StockTab({
               t('office.reports.returns_difference'),
             ]}
             rowKeys={stock.supplierReturns.rows.map(
-              (row) => `${row.date}-${row.supplierId}`,
+              (row, index) => `${row.date}-${row.supplierId}-${index}`,
             )}
             rows={stock.supplierReturns.rows.map((row) => [
               longDate(row.date, lang),

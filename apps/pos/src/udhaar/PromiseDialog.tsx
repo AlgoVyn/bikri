@@ -1,5 +1,5 @@
 import { businessDate } from '@bikri/core';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
@@ -42,17 +42,28 @@ export function PromiseDialog({
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
   const guard = useSubmitGuard();
+  const alive = useRef(true);
+  const dateTouched = useRef(false);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    dateTouched.current = false;
     setAmount(null);
     setNote('');
     setPending(false);
     // The shop's business date can differ from Karachi's; seed and bound the field with it.
     void shopTimeZone(getDb())
       .then((zone) => {
+        if (!alive.current) return;
         setTz(zone);
-        setDate(businessDate(Date.now(), zone));
+        if (!dateTouched.current) setDate(businessDate(Date.now(), zone));
       })
       .catch(() => undefined);
   }, [open]);
@@ -101,7 +112,10 @@ export function PromiseDialog({
           label={t('office.udhaar.promise_date')}
           value={date}
           min={businessDate(Date.now(), tz)}
-          onChange={setDate}
+          onChange={(value) => {
+            dateTouched.current = true;
+            setDate(value);
+          }}
         />
         <MoneyInput
           label={t('office.udhaar.promise_amount')}

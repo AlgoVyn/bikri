@@ -682,11 +682,20 @@ function BundleInlinePrice({
 }) {
   const { t } = useTranslation();
   const [value, setValue] = useState<number | null>(price);
+  const lastCommitted = useRef<number | null>(null);
   useEffect(() => {
     setValue(price);
+    lastCommitted.current = null;
   }, [price]);
   const commit = () => {
-    if (value !== null && value !== price) onPrice(value);
+    if (value === null) {
+      setValue(price);
+      return;
+    }
+    if (value !== price && lastCommitted.current !== value) {
+      lastCommitted.current = value;
+      onPrice(value);
+    }
   };
   return (
     <div>
@@ -872,11 +881,20 @@ function InlinePrice({
 }) {
   const { t } = useTranslation();
   const [price, setPrice] = useState<number | null>(line.unit_price);
+  const lastCommitted = useRef<number | null>(null);
   useEffect(() => {
     setPrice(line.unit_price);
+    lastCommitted.current = null;
   }, [line.unit_price]);
   const commit = () => {
-    if (price !== null && price !== line.unit_price) onPrice(line, price);
+    if (price === null) {
+      setPrice(line.unit_price);
+      return;
+    }
+    if (price !== line.unit_price && lastCommitted.current !== price) {
+      lastCommitted.current = price;
+      onPrice(line, price);
+    }
   };
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: commits the price when focus leaves the field

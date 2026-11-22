@@ -314,8 +314,12 @@ export function SalesList({
 
   const reprint = useCallback(
     async (saleId: string) => {
-      await queueSalePrint(getDb(), saleId, { reprint: true });
-      toast.push(t('office.bill.print_queued'));
+      try {
+        await queueSalePrint(getDb(), saleId, { reprint: true });
+        toast.push(t('office.bill.print_queued'));
+      } catch {
+        toast.push(t('errors.generic'), 'error');
+      }
     },
     [toast, t],
   );

@@ -103,7 +103,9 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
 
   const pick = async (product: MasterRow) => {
     seq.current += 1;
+    const mine = seq.current;
     const card = await priceCard(getDb(), product);
+    if (mine !== seq.current) return;
     setShown({ q: query.trim(), result: { kind: 'found', card } });
     inputRef.current?.focus();
     inputRef.current?.select();
@@ -122,6 +124,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
       return product && !product.deleted_at
         ? [
             {
+              id: String(row.component_product_id),
               name: String(product.name_en),
               qty: Number(row.qty_milli),
               unit: String(product.unit ?? 'pc'),
@@ -147,7 +150,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
         toast.push(t('sell.cart_full'), 'error');
       else if (error instanceof EmptyBundleError)
         toast.push(t('sell.bundle_empty'), 'error');
-      else throw error;
+      else toast.push(t('errors.generic'), 'error');
     }
   };
 
@@ -196,7 +199,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
       {shown?.result.kind === 'none' ? (
         <div role="status" className="flex flex-col items-start gap-2">
           <p className="text-title">{t('pricecheck.not_found')}</p>
-          {can('catalog.edit') ? (
+          {can('catalog.edit') && !readOnly ? (
             <Link
               to="/products/new"
               search={/^\d{4,}$/u.test(shown.q) ? { barcode: shown.q } : {}}
@@ -286,7 +289,7 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
               >
                 {t('pricecheck.items')}{' '}
                 {bundleItems.map((item, index) => (
-                  <span key={item.name}>
+                  <span key={item.id}>
                     {index > 0 ? ' · ' : ''}
                     {item.name} ×{formatQtyFromMilli(item.qty, item.unit)}
                   </span>

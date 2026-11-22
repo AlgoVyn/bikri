@@ -67,7 +67,8 @@ export function SummaryTab({
   const [issuedHeading, setIssuedHeading] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const status = tenant.status;
-  const maxWrite = Math.max(1, ...detail.usage.map((day) => day.rows_written));
+  const rawPeak = Math.max(0, ...detail.usage.map((day) => day.rows_written));
+  const maxWrite = Math.max(1, rawPeak);
   const supportable = status === 'active' || status === 'read_only';
   let actionTitle = t('admin.make_readonly');
   if (action?.kind === 'suspend') actionTitle = t('admin.suspend');
@@ -301,7 +302,7 @@ export function SummaryTab({
             </div>
             <p className="text-small text-text-muted">
               {t('admin.usage_peak', {
-                peak: formatCount(maxWrite, lang),
+                peak: formatCount(rawPeak, lang),
                 percent: peakPercent,
                 budget: formatCount(tenant.daily_write_budget, lang),
               })}

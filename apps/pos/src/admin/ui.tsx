@@ -537,6 +537,10 @@ export function PairingPanel({
             type="button"
             className={quietBtn}
             onClick={() => {
+              if (!navigator.clipboard?.writeText) {
+                toast.push(t('admin.copy_failed'), 'error');
+                return;
+              }
               void navigator.clipboard.writeText(link).then(
                 () => {
                   toast.push(t('admin.copied'), 'info');

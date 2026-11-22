@@ -125,7 +125,8 @@ export function ProductList({
   // still reveal it; privacy mode drops the cost/margin columns entirely.
   const showCost = can('cost.view') && !privacy;
   const canEdit = can('catalog.edit') && !readOnly;
-  const canLabel = canEdit || can('purchase.create');
+  // Printing labels does not write business data; keep it available in a read-only shop.
+  const canLabel = can('catalog.edit') || can('purchase.create');
   const toggle = (id: string) =>
     setSelected((current) => {
       const next = new Set(current);

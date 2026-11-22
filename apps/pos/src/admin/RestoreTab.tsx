@@ -91,6 +91,7 @@ export function RestoreTab({
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const abortRef = useRef(false);
+  const pickSeq = useRef(0);
   // Switching tabs unmounts this component; stop the async loop instead of letting a
   // second RestoreTab start another restore against the same tenant.
   useEffect(
@@ -120,6 +121,8 @@ export function RestoreTab({
           accept=".zip,application/zip"
           disabled={running}
           onPick={(file) => {
+            pickSeq.current += 1;
+            const seq = pickSeq.current;
             if (file === null) {
               setZip(null);
               setConfirmed(false);
@@ -129,6 +132,7 @@ export function RestoreTab({
             void file
               .arrayBuffer()
               .then(async (buffer) => {
+                if (seq !== pickSeq.current) return;
                 try {
                   const parsed = parseExport(
                     await unzip(new Uint8Array(buffer), {
@@ -177,6 +181,7 @@ export function RestoreTab({
                 }
               })
               .catch(() => {
+                if (seq !== pickSeq.current) return;
                 // Reading the picked file can fail (removed drive, permission); do not
                 // leave the operator with a silently ignored click.
                 setZip(null);
