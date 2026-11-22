@@ -104,7 +104,16 @@ test.describe('Stock adjust (T-021)', () => {
     await expect(dialog(page).getByRole('alert')).toHaveText(
       'Write a note for this reason (up to 120 characters).',
     );
-    await page.keyboard.press('Escape');
+    await dialog(page)
+      .getByLabel('Note (required)')
+      .fill('Misplaced in the drawer');
+    await dialog(page).getByRole('button', { name: 'Save' }).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(
+      page
+        .getByText('Misplaced in the drawer', { exact: true })
+        .filter({ visible: true }),
+    ).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 

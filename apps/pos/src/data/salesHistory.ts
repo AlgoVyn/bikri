@@ -661,6 +661,12 @@ export type BillLine = {
   keptMilli: number;
   unit: string;
   trackStock: boolean;
+  /** Current product row when it still exists and is not deleted; null for quick sales/deleted products. */
+  product: MasterRow | null;
+  /** Current bundle row for a bundle component line; null otherwise. */
+  bundleProduct: MasterRow | null;
+  /** Cart line note (stored in `sale_lines.serial`); empty when none. */
+  note: string;
 };
 
 export type BillRefund = {
@@ -724,8 +730,8 @@ export async function billDetail(
       await (src.table('products') as Table<MasterRow>).bulkGet([
         ...new Set(
           lines
-            .map((l) => l.product_id)
-            .filter((id): id is string => typeof id === 'string'),
+            .flatMap((line) => [line.product_id, line.bundle_id])
+            .filter((id): id is string => typeof id === 'string' && id !== ''),
         ),
       ])
     )
@@ -825,12 +831,19 @@ export async function billDetail(
       const product = line.product_id
         ? products.get(String(line.product_id))
         : undefined;
+      const bundleProduct = line.bundle_id
+        ? products.get(String(line.bundle_id))
+        : undefined;
       return {
         line,
         refundedMilli,
         keptMilli: Math.max(0, n(line.qty_milli) - refundedMilli),
         unit: String(product?.unit ?? 'pc'),
         trackStock: product?.track_stock === 1,
+        product: product && !product.deleted_at ? product : null,
+        bundleProduct:
+          bundleProduct && !bundleProduct.deleted_at ? bundleProduct : null,
+        note: line.serial ? String(line.serial) : '',
       };
     }),
     refunds: refunds.map((refund) => ({

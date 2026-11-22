@@ -122,6 +122,50 @@ test.describe('Products (T-014)', () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test('product notes show on the detail for every role and blank notes add no card', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/products');
+    await addCable(page);
+    await page.getByRole('link', { name: 'Edit', exact: true }).click();
+    await page
+      .getByLabel('Notes')
+      .fill('Wholesale rate changes weekly.\nBox includes the charger only.');
+    await page.getByRole('button', { name: /^Save/ }).last().click();
+    await expect(
+      page.getByRole('heading', { name: 'Type-C cable 1 m white' }),
+    ).toBeVisible();
+    const notes = page.getByTestId('product-notes');
+    await expect(notes).toBeVisible();
+    await expect(notes).toContainText('Wholesale rate changes weekly.');
+    await expect(notes).toContainText('Box includes the charger only.');
+
+    // Staff-visible: a cashier keeps the note after the actions they cannot use disappear.
+    await page.evaluate(() => window.__bikriTest?.unlockAs('cashier', 'Sana'));
+    await page.evaluate(() => window.__bikriTest?.navigate('/products'));
+    await page.getByRole('link', { name: /Type-C cable 1 m white/ }).click();
+    await expect(page.getByTestId('product-notes')).toBeVisible();
+    await expect(page.getByTestId('product-notes')).toContainText(
+      'Wholesale rate changes weekly.',
+    );
+
+    // An empty note renders no empty card.
+    const [plainId] = (await page.evaluate(
+      () =>
+        window.__bikriTest?.seedProducts([
+          { name: 'Plain item', price: 10000 },
+        ]) ?? [],
+    )) as string[];
+    await page.evaluate(
+      (id) => window.__bikriTest?.navigate(`/products/${id}`),
+      plainId,
+    );
+    await expect(
+      page.getByRole('heading', { name: 'Plain item' }),
+    ).toBeVisible();
+    await expect(page.getByTestId('product-notes')).toHaveCount(0);
+  });
+
   test('turning stock tracking off warns before saving and appears in history', async ({
     page,
   }) => {
@@ -179,6 +223,7 @@ test.describe('Products (T-014)', () => {
     await page.getByLabel('نام (اردو)').fill('چارجر');
     await page.getByLabel('فروخت کی قیمت').fill('1200');
     await page.getByLabel('ابتدائی اسٹاک').fill('5');
+    await page.getByLabel('نوٹس').fill('گاہک کے لیے نوٹ');
     await expectNoSeriousAxe(page);
     await page
       .getByRole('button', { name: /^محفوظ کریں/ })
@@ -189,6 +234,9 @@ test.describe('Products (T-014)', () => {
     ).toBeVisible();
     await expect(page.getByTestId('detail-on-hand')).toContainText('5 عدد');
     await expect(page.getByText('چارجر')).toBeVisible();
+    await expect(page.getByTestId('product-notes')).toContainText(
+      'گاہک کے لیے نوٹ',
+    );
     await expectNoSeriousAxe(page);
 
     // Turning tracking off warns in Urdu and can be cancelled before saving.

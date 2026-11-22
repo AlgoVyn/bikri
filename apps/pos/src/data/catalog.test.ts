@@ -23,6 +23,7 @@ import {
   type ProductSort,
   productDetail,
   productStockHistory,
+  productStockHistoryPage,
   productsCsv,
   removeCategory,
   removeProduct,
@@ -190,6 +191,145 @@ describe('products (screens/08)', () => {
     expect(all?.history).toHaveLength(251);
     expect(all?.hasMoreHistory).toBe(false);
     expect(await productStockHistory(db, p.id)).toHaveLength(251);
+  });
+
+  it('links sale, refund, void and purchase movements to their documents', async () => {
+    const db = await readyDb('cat-refs');
+    const ctx = await ledgerContext(db, 'st-1');
+    const p = await saveNewProduct(
+      db,
+      { ...cable, opening_milli: 0, barcodes: [] },
+      ctx,
+      { now: NOW - 20_000 },
+    );
+    await db.sales.bulkAdd([
+      { id: 's1', invoice_no: 'A-A-1', business_date: businessDate(NOW) },
+      { id: 's2', invoice_no: 'A-A-2', business_date: businessDate(NOW) },
+    ] as never);
+    await db.refunds.bulkAdd([
+      { id: 'r1', sale_id: 's1' },
+      { id: 'r2', sale_id: 's2' },
+      { id: 'r3', sale_id: 'missing-sale' },
+    ] as never);
+    await db.sale_voids.bulkAdd([
+      { id: 'v1', sale_id: 's1' },
+      { id: 'v2', sale_id: null },
+    ] as never);
+    await db.purchases.bulkAdd([
+      { id: 'p1', supplier_id: 'sup-1', supplier_invoice_no: 'SUP-9' },
+      { id: 'p2', supplier_id: 5, supplier_invoice_no: 'SUP-10' },
+    ] as never);
+    const movement = (
+      id: string,
+      reason_code: string,
+      ref_type: string | null,
+      ref_id: string | null,
+      created_at: number,
+    ) => ({
+      id,
+      product_id: p.id,
+      qty_delta_milli: 1,
+      reason_code,
+      ref_type,
+      ref_id,
+      unit_cost: null,
+      note: '',
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      business_date: businessDate(NOW),
+      created_at,
+    });
+    await db.stock_movements.bulkAdd([
+      movement('m-sale', 'sale', 'sale', 's1', NOW - 4),
+      movement('m-sale-dup', 'sale', 'sale', 's1', NOW - 5),
+      movement('m-sale-missing', 'sale', 'sale', 'missing-sale', NOW - 6),
+      movement('m-refund', 'refund_return', 'refund', 'r1', NOW - 3),
+      movement('m-refund-linked', 'refund_return', 'refund', 'r2', NOW - 7),
+      movement('m-refund-missing', 'refund_return', 'refund', 'r3', NOW - 8),
+      movement(
+        'm-refund-unknown',
+        'refund_return',
+        'refund',
+        'no-row',
+        NOW - 9,
+      ),
+      movement('m-void', 'void_return', 'void', 'v1', NOW - 2),
+      movement('m-void-nosale', 'void_return', 'void', 'v2', NOW - 10),
+      movement('m-void-unknown', 'void_return', 'void', 'no-row', NOW - 11),
+      movement('m-purchase', 'purchase', 'purchase', 'p1', NOW - 1),
+      movement('m-purchase-dup', 'purchase', 'purchase', 'p1', NOW - 12),
+      movement('m-purchase-bad', 'purchase', 'purchase', 'p2', NOW - 13),
+      movement(
+        'm-purchase-unknown',
+        'purchase',
+        'purchase',
+        'no-row',
+        NOW - 14,
+      ),
+      movement('m-opening', 'opening', 'opening', p.id, NOW),
+      movement('m-adjustment', 'entry_fix', 'adjustment', null, NOW + 1),
+    ] as never);
+    const page = await productStockHistoryPage(db, p.id, 200);
+    const refs = new Map(
+      page.rows.flatMap((row) =>
+        row.kind === 'movement'
+          ? [[String(row.movement.id), row.ref] as const]
+          : [],
+      ),
+    );
+    expect(refs.get('m-sale')).toEqual({
+      kind: 'sale',
+      saleId: 's1',
+      invoiceNo: 'A-A-1',
+    });
+    expect(refs.get('m-sale-dup')).toEqual({
+      kind: 'sale',
+      saleId: 's1',
+      invoiceNo: 'A-A-1',
+    });
+    expect(refs.get('m-sale-missing')).toBeNull();
+    expect(refs.get('m-refund')).toEqual({
+      kind: 'refund',
+      saleId: 's1',
+      invoiceNo: 'A-A-1',
+    });
+    expect(refs.get('m-refund-linked')).toEqual({
+      kind: 'refund',
+      saleId: 's2',
+      invoiceNo: 'A-A-2',
+    });
+    expect(refs.get('m-refund-missing')).toBeNull();
+    expect(refs.get('m-refund-unknown')).toBeNull();
+    expect(refs.get('m-void')).toEqual({
+      kind: 'void',
+      saleId: 's1',
+      invoiceNo: 'A-A-1',
+    });
+    expect(refs.get('m-void-nosale')).toBeNull();
+    expect(refs.get('m-void-unknown')).toBeNull();
+    expect(refs.get('m-purchase')).toEqual({
+      kind: 'purchase',
+      purchaseId: 'p1',
+      supplierId: 'sup-1',
+      invoiceNo: 'SUP-9',
+    });
+    expect(refs.get('m-purchase-dup')).toEqual({
+      kind: 'purchase',
+      purchaseId: 'p1',
+      supplierId: 'sup-1',
+      invoiceNo: 'SUP-9',
+    });
+    expect(refs.get('m-purchase-bad')).toBeNull();
+    expect(refs.get('m-purchase-unknown')).toBeNull();
+    expect(refs.get('m-opening')).toBeNull();
+    expect(refs.get('m-adjustment')).toBeNull();
+    // The full-history CSV read does not resolve document links.
+    const all = await productStockHistory(db, p.id);
+    const saleRow = all.find(
+      (row) => row.kind === 'movement' && row.movement.id === 'm-sale',
+    );
+    expect(saleRow?.kind === 'movement' ? saleRow.ref : null).toBeNull();
   });
 
   it('pages tracking changes with the movements in their time window', async () => {
@@ -1010,11 +1150,13 @@ it('exports the documented stock-history CSV header', () => {
         reason: 'sale',
         qty: '-1',
         balanceAfter: '4',
+        note: 'Counter stock',
         by: 'Adnan',
       },
     ],
     'Asia/Karachi',
   );
-  expect(csv.split('\r\n')[0]).toBe('date,reason,qty,balance_after,by');
+  expect(csv.split('\r\n')[0]).toBe('date,reason,qty,balance_after,note,by');
+  expect(csv).toContain('Counter stock');
   expect(csv).toContain('Adnan');
 });

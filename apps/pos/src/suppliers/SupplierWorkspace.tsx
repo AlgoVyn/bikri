@@ -3,7 +3,14 @@ import { SupplierList } from './SupplierList.tsx';
 import { SupplierStatement } from './SupplierStatement.tsx';
 
 /** Suppliers list + ledger side by side on desktop (screens/13). */
-export function SupplierWorkspace({ supplierId }: { supplierId?: string }) {
+export function SupplierWorkspace({
+  supplierId,
+  delivery,
+}: {
+  supplierId?: string;
+  /** Delivery details to open from a stock-history link (`?delivery=<purchaseId>`). */
+  delivery?: string;
+}) {
   return (
     <MasterDetail
       master={
@@ -15,7 +22,11 @@ export function SupplierWorkspace({ supplierId }: { supplierId?: string }) {
       }
       detail={
         supplierId ? (
-          <SupplierStatement supplierId={supplierId} embedded />
+          <SupplierStatement
+            supplierId={supplierId}
+            embedded
+            initialDeliveryId={delivery}
+          />
         ) : undefined
       }
       showDetail={supplierId !== undefined}

@@ -509,11 +509,25 @@ export async function listProducts(
   return filterAndSortProducts(rows, opts);
 }
 
+/** The bill or delivery a stock movement came from; the screen links to it. */
+export type HistoryRef =
+  | { kind: 'sale'; saleId: string; invoiceNo: string }
+  | { kind: 'refund'; saleId: string; invoiceNo: string }
+  | { kind: 'void'; saleId: string; invoiceNo: string }
+  | {
+      kind: 'purchase';
+      purchaseId: string;
+      supplierId: string;
+      invoiceNo: string;
+    };
+
 export type MovementHistoryRow = {
   kind: 'movement';
   movement: SyncedRow;
   balanceAfter: number;
   staffName: string;
+  /** Source document; null for opening, adjustments, counts and transfers. */
+  ref: HistoryRef | null;
 };
 
 /** A tracking switch change has no quantity; its balance is the on-hand at that moment. */
@@ -588,6 +602,108 @@ function historyId(row: HistoryRow): string {
   return String(row.kind === 'movement' ? row.movement.id : row.audit.id);
 }
 
+type HistoryRefSeed = { movementId: string; type: string; id: string };
+
+/**
+ * Resolve the bills/deliveries behind the page's movements in one batch. Only sale,
+ * refund, void and purchase movements have a screen to open; opening, adjustments,
+ * counts, transfers and supplier returns stay unlinked.
+ */
+async function loadHistoryRefs(
+  db: BikriDb,
+  movements: readonly SyncedRow[],
+): Promise<Map<string, HistoryRef>> {
+  const seeds: HistoryRefSeed[] = [];
+  for (const movement of movements) {
+    const type = String(movement.ref_type ?? '');
+    const id =
+      movement.ref_id === null || movement.ref_id === undefined
+        ? ''
+        : String(movement.ref_id);
+    if (
+      id !== '' &&
+      (type === 'sale' ||
+        type === 'refund' ||
+        type === 'void' ||
+        type === 'purchase')
+    )
+      seeds.push({ movementId: String(movement.id), type, id });
+  }
+  const refs = new Map<string, HistoryRef>();
+  if (seeds.length === 0) return refs;
+  const idsOf = (type: string) => [
+    ...new Set(
+      seeds.filter((seed) => seed.type === type).map((seed) => seed.id),
+    ),
+  ];
+  const [sales, refunds, voids, purchases] = await Promise.all([
+    db.sales.bulkGet(idsOf('sale')),
+    db.refunds.bulkGet(idsOf('refund')),
+    db.sale_voids.bulkGet(idsOf('void')),
+    db.purchases.bulkGet(idsOf('purchase')),
+  ]);
+  const saleById = new Map<string, SyncedRow>();
+  for (const sale of sales) if (sale) saleById.set(String(sale.id), sale);
+  const refundById = new Map<string, SyncedRow>();
+  for (const refund of refunds)
+    if (refund) refundById.set(String(refund.id), refund);
+  const voidById = new Map<string, SyncedRow>();
+  for (const row of voids) if (row) voidById.set(String(row.id), row);
+  const purchaseById = new Map<string, SyncedRow>();
+  for (const purchase of purchases)
+    if (purchase) purchaseById.set(String(purchase.id), purchase);
+  // A refund/void movement points at the refund/void, which points at the bill.
+  const linkedSaleIds = [
+    ...new Set(
+      [...refundById.values(), ...voidById.values()].flatMap((row) =>
+        typeof row.sale_id === 'string' ? [row.sale_id] : [],
+      ),
+    ),
+  ].filter((id) => !saleById.has(id));
+  if (linkedSaleIds.length > 0) {
+    for (const sale of await db.sales.bulkGet(linkedSaleIds))
+      if (sale) saleById.set(String(sale.id), sale);
+  }
+  for (const seed of seeds) {
+    if (seed.type === 'sale') {
+      const sale = saleById.get(seed.id);
+      if (sale)
+        refs.set(seed.movementId, {
+          kind: 'sale',
+          saleId: seed.id,
+          invoiceNo: String(sale.invoice_no ?? ''),
+        });
+      continue;
+    }
+    if (seed.type === 'refund' || seed.type === 'void') {
+      const row =
+        seed.type === 'refund'
+          ? refundById.get(seed.id)
+          : voidById.get(seed.id);
+      const sale =
+        row && typeof row.sale_id === 'string'
+          ? saleById.get(row.sale_id)
+          : undefined;
+      if (row && sale)
+        refs.set(seed.movementId, {
+          kind: seed.type,
+          saleId: String(sale.id),
+          invoiceNo: String(sale.invoice_no ?? ''),
+        });
+      continue;
+    }
+    const purchase = purchaseById.get(seed.id);
+    if (purchase && typeof purchase.supplier_id === 'string')
+      refs.set(seed.movementId, {
+        kind: 'purchase',
+        purchaseId: seed.id,
+        supplierId: purchase.supplier_id,
+        invoiceNo: String(purchase.supplier_invoice_no ?? ''),
+      });
+  }
+  return refs;
+}
+
 async function loadHistory(
   db: BikriDb,
   id: string,
@@ -608,6 +724,12 @@ async function loadHistory(
     : await base.reverse().toArray();
   const hasMore = page && movements.length > wanted;
   const shownMovements = hasMore ? movements.slice(0, wanted) : movements;
+  // The CSV export reads the whole history; resolving documents for it would turn a
+  // bounded page read into a shop-wide lookup. Only the screen page (and "Show older")
+  // asks for links.
+  const refs = page
+    ? await loadHistoryRefs(db, shownMovements)
+    : new Map<string, HistoryRef>();
   const oldestShown = shownMovements.at(-1);
   const audits = (
     await db.audit_log
@@ -633,6 +755,7 @@ async function loadHistory(
         movement,
         balanceAfter: 0,
         staffName: staff.get(String(movement.staff_id)) ?? '',
+        ref: refs.get(String(movement.id)) ?? null,
       }),
     ),
     ...shownAudits.map((audit): HistoryRow => {
@@ -1725,6 +1848,7 @@ export type StockHistoryCsvRow = {
   reason: string;
   qty: string;
   balanceAfter: string;
+  note: string;
   by: string;
 };
 
@@ -1742,7 +1866,7 @@ export function stockHistoryCsv(
     minute: '2-digit',
     hourCycle: 'h23',
   });
-  const header = ['date', 'reason', 'qty', 'balance_after', 'by'];
+  const header = ['date', 'reason', 'qty', 'balance_after', 'note', 'by'];
   return `${[header.join(',')]
     .concat(
       rows.map((row) =>
@@ -1751,6 +1875,7 @@ export function stockHistoryCsv(
           row.reason,
           row.qty,
           row.balanceAfter,
+          row.note,
           row.by,
         ]
           .map(csvCell)

@@ -8,9 +8,10 @@ export const Route = createLazyFileRoute('/suppliers/$supplierId/')({
 
 function SupplierRoute() {
   const { supplierId } = Route.useParams();
+  const { delivery } = Route.useSearch();
   return (
     <AreaStrings area="office">
-      <SupplierWorkspace supplierId={supplierId} />
+      <SupplierWorkspace supplierId={supplierId} delivery={delivery} />
     </AreaStrings>
   );
 }

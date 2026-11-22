@@ -236,6 +236,18 @@ describe('sales history (screens/10)', () => {
     expect(detail?.refundedTotal).toBe(346000);
     expect(detail?.audit.map((a) => a.action)).toContain('refund');
     expect(detail?.conflicts).toEqual([]);
+    expect(buds?.product?.name_en).toBe('Earbuds');
+    expect(buds?.bundleProduct).toBeNull();
+    expect(buds?.note).toBe('');
+
+    // The cart line note and the bill remark are surfaced by the detail screen.
+    await db.sale_lines.update(buds?.line.id ?? '', { serial: 'SN-123' });
+    await db.sales.update(firstId, { note: 'Deliver after 6 pm' });
+    const withNotes = await billDetail(db, firstId);
+    expect(
+      withNotes?.lines.find((l) => l.line.name_snapshot === 'Earbuds')?.note,
+    ).toBe('SN-123');
+    expect(withNotes?.sale.note).toBe('Deliver after 6 pm');
 
     await db.sync_conflicts.put({
       id: 'conflict-1',

@@ -32,7 +32,8 @@ Cards:
 1. **Price** Rs 1,499 · **Avg cost** Rs 1,120 · **Last cost** Rs 1,200 · **Profit per item** Rs 379 · **Margin** 25.3% (margin = (price − avg)/price; cost cards only with `cost.view`).
 2. **Stock**: on hand (derived from `stock_movements`), min stock, stock value (`cost.view`).
 3. **Last 14 days**: bar chart of qty sold per day (local data), total sold, revenue.
-4. **Stock history**: list of movements and stock-tracking changes newest first — date/time, reason (localised), ± qty (`—` for a tracking change), balance after, by whom, link to bill/delivery. A tracking change row also shows the low-stock alert before → after when it changed. The screen renders the newest 200 movements plus any tracking changes in that time window and appends older rows with `Show older`; Export CSV still writes the product's full history (tracking rows use `track_stock_off` / `track_stock_on`).
+4. **Notes** (only when set): the product's `notes` text, full width, line breaks kept, direction auto-detected for Urdu. Staff-visible: every role that can open the product sees it; never printed on receipts, labels or bills.
+5. **Stock history**: list of movements and stock-tracking changes newest first — date/time, reason (localised), the movement note when one was written, ± qty (`—` for a tracking change), balance after, by whom, and a link to the source bill or delivery (`Bill A-A-1042` → bill detail; `Delivery SUP-552` → supplier delivery details). A tracking change row also shows the low-stock alert before → after when it changed. The screen renders the newest 200 movements plus any tracking changes in that time window and appends older rows with `Show older`; Export CSV still writes the product's full history (including movement notes; tracking rows use `track_stock_off` / `track_stock_on`).
 
 ## Bundles (v1.1)
 
@@ -87,7 +88,7 @@ Single page form (sheet on mobile). Sections:
 | Track stock | switch | default on; off hides stock fields (services, quick items). Turning it off on a product that had it on shows an inline warning and asks for confirmation before saving: the current stock and history stay, sales/deliveries stop changing it and the low-stock alert is cleared. Cancelling the confirmation (or pressing Esc) puts the switch back on |
 | Low stock alert at | `QtyInput` | default 0 = off → `min_stock_milli` |
 | Warranty | select None / 7 days / 1 month / 3 / 6 / 12 months / custom days | printed on receipt line "Warranty till 26-04-2027" when > 0 |
-| Notes | textarea 0–500 | |
+| Notes | textarea 0–500 | Shown on the product detail (staff-visible). Never printed on receipts or labels |
 
 Header: the back arrow returns to this product's detail when editing or duplicating, and to the product list when adding; leaving with unsaved changes asks before discarding. Footer: `Save` (Ctrl+S), `Save and add another` (Ctrl+Shift+S), `Cancel` (Esc, confirm when dirty). Price change and an untracked product’s cost change write `audit_log` `price_change` / `cost_change`. A tracked product’s cost field is disabled on edit; turn tracking off first to edit it. Turning tracking on or off writes `audit_log` `track_stock_change` (with the old/new low-stock alert when it changes); it never writes a stock movement, so existing stock stays but is frozen while untracked. Editing cost on an existing untracked product does **not** change avg cost history; it sets `last_cost` only (owner warning: "Use a delivery to record new stock at a new cost").
 
@@ -122,3 +123,5 @@ List with drag to reorder (`sort_order`), rename, colour (the 8 Algovyn-based ti
 12. Deleting a component used by the bundle is blocked with the bundle name; deleting the bundle is allowed and old bills/receipts still print the old name and components.
 13. Editing the recipe or bundle price updates new carts only; a saved bill and its reprint are unchanged; `Duplicate` copies the recipe but leaves SKU, barcodes, photo and stock empty.
 14. A cashier sees no cost, margin or items total on the bundle list/detail or in CSV; the bundle is excluded from spreadsheet import and bulk price update; its barcode prints and price check shows the contents. English and Urdu at 1280×800 and 390×844.
+15. A product note shows in the detail's Notes card for the owner and a cashier, keeps line breaks, and a blank note renders no card. The note is absent from receipts and labels.
+16. A sale movement in Stock history links to its bill, a refund/void row links to the original bill, and a purchase movement links to the supplier's delivery details; opening, adjustment and count rows have no source link.
