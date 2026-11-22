@@ -4,6 +4,13 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### POS UI and operator console — 22 Nov 2026 review recheck
+- Fractional bundle quantities clamp correctly, `ProductForm` computes on-hand after the draft loads, and Reports shows the product unit for minimum stock.
+- Restore validates every row before the purge, ignores stale file picks, and resets the Restore tab after maintenance ends.
+- Whole-bill bundle refunds keep the restock checkbox; Home recomputes all attention items and scopes recent bills; global search gates customers by `payment.receive`.
+- Price Check hides Add product in read-only mode, guards late lookups and toasts failed cart adds; Home gates reports/backup/sell links and attention destinations.
+- Inline price commits once and restores on empty blur; device import hides when unenrolled; owner sign-in ignores closed responses; sync file removal/acknowledge obey owner/read-only; wizard test prints do not open the drawer and USB/serial controls follow browser support.
+- Restore/Sales deep links, expense date validation, item counts, cart arrow order, command palette dialogs/privacy, supplier-return zero lines, PromiseDialog timezone guards, category RTL input, label printing in read-only, report keys/deltas/peak, clipboard/plural/category filters and Price Check keys are fixed.
 ### POS data and sync — 22 Nov 2026 review recheck
 - A delivery with `updatePrice` now verifies `catalog.edit` in the repository; the Worker accepts the costed delivery and the price change.
 - Outbox coalescing is limited to one transaction and actor, so a delivery/recipe companion can no longer be split from its product edit.

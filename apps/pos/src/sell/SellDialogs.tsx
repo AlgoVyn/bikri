@@ -39,6 +39,7 @@ import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
+import { cartItemCount } from './itemCount.ts';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
 import { Modal } from './Modal.tsx';
 
@@ -366,7 +367,7 @@ export function HeldBillsDialog({
             </div>
             <p className="text-small text-text-muted">
               <bdi dir="ltr">{timeOf(h.held_at, i18n.language, timeZone)}</bdi>{' '}
-              · {t('sell.items', { count: h.lines.length })} ·{' '}
+              · {t('sell.items', { count: cartItemCount(h.lines) })} ·{' '}
               {staff?.get(h.held_by) ?? ''}
             </p>
             <div className="flex flex-wrap gap-2">

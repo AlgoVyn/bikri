@@ -69,6 +69,8 @@ export function OwnerSigninDialog({
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const codeRef = useRef<HTMLInputElement>(null);
+  const sendSeq = useRef(0);
+  const openRef = useRef(open);
 
   useEffect(() => {
     if (!open) return;
@@ -77,13 +79,17 @@ export function OwnerSigninDialog({
   }, [open]);
 
   const send = useCallback(async () => {
+    sendSeq.current += 1;
+    const mine = sendSeq.current;
     setBusy(true);
     setError(null);
     try {
       const res = await startOwnerSignin(db, staffId);
+      if (!openRef.current || mine !== sendSeq.current) return;
       setStart({ ...res, sent_at: Date.now() });
       setCode('');
     } catch (e) {
+      if (!openRef.current || mine !== sendSeq.current) return;
       setError(shopErrorMessage(t, e));
     } finally {
       setBusy(false);
@@ -95,7 +101,9 @@ export function OwnerSigninDialog({
   }, [open, start, busy, error, send]);
 
   useEffect(() => {
+    openRef.current = open;
     if (!open) {
+      sendSeq.current += 1;
       setStart(null);
       setError(null);
       setCode('');

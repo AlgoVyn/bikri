@@ -160,6 +160,7 @@
       "button_empty": "Raqam wapas",
       "button_khata": "Khatay se {{amount}} kam karein",
       "done": "Wapsi mehfooz ho gayi.",
+      "not_found": "Yeh bill is dukaan mein nahi mila.",
       "error_attempt": "Wapsi mehfooz nahi ho saki. Dobara koshish karein.",
       "error_line": "Yeh item is bill par nahi hai.",
       "error_missing": "Yeh bill is dukan ke data mein nahi hai.",

@@ -214,7 +214,12 @@ export async function searchProductIds(
 export async function searchAll(
   db: BikriDb,
   raw: string,
-  scope?: { allDates: boolean; today: string; branchId?: string | null },
+  scope?: {
+    allDates: boolean;
+    today: string;
+    branchId?: string | null;
+    includeCustomers?: boolean;
+  },
 ): Promise<SearchHit[]> {
   const q = raw.trim().toLowerCase();
   if (q === '') return [];
@@ -245,7 +250,7 @@ export async function searchAll(
     }
   }
   const customers: SearchHit[] = [];
-  for (const c of data.customers) {
+  for (const c of scope?.includeCustomers === false ? [] : data.customers) {
     if (c.deleted) continue;
     if (
       c.searchName.includes(q) ||

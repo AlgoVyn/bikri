@@ -48,7 +48,6 @@ function DisplayContent() {
   useEffect(() => {
     if (!stored) return;
     saved.current = stored;
-    setAutoLockText(String(stored.autoLockMinutes));
     setForm((current) =>
       touched.current
         ? current.privacyMode === stored.privacyMode
@@ -56,6 +55,7 @@ function DisplayContent() {
           : { ...current, privacyMode: stored.privacyMode }
         : stored,
     );
+    if (!touched.current) setAutoLockText(String(stored.autoLockMinutes));
   }, [stored]);
   useEffect(() => {
     applyDevicePrefs(form, i18n.language);

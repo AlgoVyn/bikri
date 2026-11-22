@@ -23,6 +23,7 @@ import {
 } from '../data/bulkPrice.ts';
 import { ledgerContext, listCategoryOptions } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { categoryName } from '../lib/category.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 
@@ -49,7 +50,7 @@ function changeOf(kind: Kind, raw: string): PriceChange | null {
 
 /** Update prices (bulk), screens/08: filter → change → rounding → preview → apply. */
 export function PricesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -133,7 +134,7 @@ export function PricesPage() {
                 <option value="">{t('products.all_categories')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {String(c.name_en)}
+                    {categoryName(c, i18n.language)}
                   </option>
                 ))}
               </select>

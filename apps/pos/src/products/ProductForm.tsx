@@ -3,6 +3,7 @@ import {
   priceBundle,
   QTY_UNITS,
   type QtyUnit,
+  qtyAllowsDecimals,
 } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { Navigate, useNavigate } from '@tanstack/react-router';
@@ -249,7 +250,6 @@ export function ProductFormPage({
   const backId = editId ?? duplicateOf;
   const wantsUntrack =
     isEdit && initial.track_stock && draft?.track_stock === false;
-  const onHandQty = qtyWithUnit(t, onHand, draft?.unit ?? 'pc');
   const isBundleDraft = draft?.kind === 'bundle';
   // A tracked product's cost is maintained by deliveries and stock movements.
   const costLocked =
@@ -332,6 +332,7 @@ export function ProductFormPage({
 
   if (draft === null) return <PageLoading compact />;
 
+  const onHandQty = qtyWithUnit(t, onHand, draft.unit);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDirty(true);
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -1286,6 +1287,9 @@ function BundleRecipeEditor({
         <ul className="flex flex-col divide-y divide-border">
           {items.map((item, index) => {
             const product = byId.get(item.component_product_id);
+            const componentUnit =
+              (product?.unit as QtyUnit | undefined) ?? 'pc';
+            const minQty = qtyAllowsDecimals(componentUnit) ? 1 : 1000;
             return (
               <li
                 key={item.component_product_id}
@@ -1310,14 +1314,17 @@ function BundleRecipeEditor({
                   <QtyInput
                     dense
                     label={t('form.bundle_qty')}
-                    unit={(product?.unit as QtyUnit | undefined) ?? 'pc'}
+                    unit={componentUnit}
                     value={item.qty_milli}
                     onChange={(milli) => {
                       if (milli === null) return;
                       onChange(
                         items.map((row, at) =>
                           at === index
-                            ? { ...row, qty_milli: Math.max(1, milli) }
+                            ? {
+                                ...row,
+                                qty_milli: Math.max(minQty, milli),
+                              }
                             : row,
                         ),
                       );

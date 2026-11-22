@@ -79,6 +79,8 @@ export function CategoryDialog({
           <input
             className={field}
             maxLength={40}
+            dir="rtl"
+            lang="ur"
             value={nameUr}
             onChange={(e) => setNameUr(e.target.value)}
           />

@@ -1,7 +1,7 @@
 import { businessDate, newId, saleLineFinal } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Fragment, type ReactNode, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonDanger,
@@ -532,13 +532,17 @@ export function BillDetail({
           label={t('office.bill.customer')}
           value={
             detail.customer ? (
-              <Link
-                to="/udhaar/$customerId"
-                params={{ customerId: String(detail.customer.id) }}
-                className="underline"
-              >
-                {String(detail.customer.name)}
-              </Link>
+              can('payment.receive') ? (
+                <Link
+                  to="/udhaar/$customerId"
+                  params={{ customerId: String(detail.customer.id) }}
+                  className="underline"
+                >
+                  {String(detail.customer.name)}
+                </Link>
+              ) : (
+                String(detail.customer.name)
+              )
             ) : (
               t('office.sales.walk_in')
             )
@@ -925,7 +929,9 @@ export function BillDetail({
                   onClick={() => {
                     void queueRefundPrint(getDb(), String(refund.id), {
                       reprint: true,
-                    }).then(() => toast.push(t('office.bill.print_queued')));
+                    })
+                      .then(() => toast.push(t('office.bill.print_queued')))
+                      .catch(() => toast.push(t('errors.generic'), 'error'));
                   }}
                 >
                   {t('office.bill.print_refund')}
@@ -1043,6 +1049,12 @@ function VoidDialog({
   const { t } = useTranslation();
   const [reason, setReason] = useState<ReasonKey | 'other' | ''>('');
   const [text, setText] = useState('');
+  useEffect(() => {
+    if (open) {
+      setReason('');
+      setText('');
+    }
+  }, [open]);
   const reasons = VOID_REASONS;
   const label =
     reason === 'other'

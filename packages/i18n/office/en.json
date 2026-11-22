@@ -160,6 +160,7 @@
       "button_empty": "Refund",
       "button_khata": "Reduce ledger by {{amount}}",
       "done": "Refund saved.",
+      "not_found": "This bill was not found in this shop.",
       "error_attempt": "The refund could not be saved. Try again.",
       "error_line": "That item is not on this bill.",
       "error_missing": "This bill is not in this shop's data.",

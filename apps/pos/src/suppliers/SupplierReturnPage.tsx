@@ -1,4 +1,4 @@
-import { businessDate, mulDivRound, newId } from '@bikri/core';
+import { businessDate, isQtyUnit, mulDivRound, newId } from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -151,15 +151,17 @@ export function SupplierReturnPage({
     : [];
   const allLines = [
     ...selected,
-    ...unlinked.map((line) => ({
-      productId: line.productId,
-      purchaseLineId: null,
-      qtyMilli: line.qtyMilli,
-      unitCredit: line.unitCredit,
-      lineTotal: mulDivRound(line.qtyMilli, line.unitCredit, 1000),
-      name: line.name,
-      unit: line.unit,
-    })),
+    ...unlinked
+      .filter((line) => line.qtyMilli > 0)
+      .map((line) => ({
+        productId: line.productId,
+        purchaseLineId: null,
+        qtyMilli: line.qtyMilli,
+        unitCredit: line.unitCredit,
+        lineTotal: mulDivRound(line.qtyMilli, line.unitCredit, 1000),
+        name: line.name,
+        unit: line.unit,
+      })),
   ];
   const total = allLines.reduce((sum, line) => sum + line.lineTotal, 0);
   const suggested = Math.max(0, total - Math.max(0, data?.balance ?? 0));
@@ -414,7 +416,7 @@ export function SupplierReturnPage({
                   <div className="w-32">
                     <QtyInput
                       label={`${t('office.suppliers.return_qty')} ${line.name}`}
-                      unit={line.unit as never}
+                      unit={isQtyUnit(line.unit) ? line.unit : 'pc'}
                       value={line.qtyMilli}
                       onChange={(value) =>
                         setUnlinked((current) =>

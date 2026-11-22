@@ -372,7 +372,9 @@ export function PrinterWizard({
     setBusy(true);
     setError(null);
     try {
-      await printTestPage(getDb(), draft, deps);
+      // A wizard test print must not open the cash drawer; that is a separate,
+      // permission-gated action (UI-M5).
+      await printTestPage(getDb(), draft, deps, { drawer: false });
       setTested(true);
     } catch (err) {
       setError(errorCode(err));
@@ -521,7 +523,7 @@ export function PrinterWizard({
                 })}
             </div>
           </fieldset>
-          {draft.transport === 'usb' ? (
+          {draft.transport === 'usb' && deps.usb ? (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -548,7 +550,7 @@ export function PrinterWizard({
               ) : null}
             </div>
           ) : null}
-          {draft.transport === 'serial' ? (
+          {draft.transport === 'serial' && deps.serial ? (
             <div className="flex flex-wrap items-end gap-2">
               <button
                 type="button"

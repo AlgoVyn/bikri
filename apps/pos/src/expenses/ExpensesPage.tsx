@@ -18,6 +18,7 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
+import { isBusinessDate } from '../data/dates.ts';
 import { getDb } from '../data/db.ts';
 import {
   ExpenseError,
@@ -76,7 +77,10 @@ export function ExpensesPage() {
   const [cashOpen, setCashOpen] = useState(false);
   const [reversing, setReversing] = useState<ExpenseRow | null>(null);
 
-  const customValid = custom.from <= custom.to;
+  const customValid =
+    isBusinessDate(custom.from) &&
+    isBusinessDate(custom.to) &&
+    custom.from <= custom.to;
   const range = (() => {
     if (preset === 'today') return { from: today, to: today };
     if (preset === '7d') return { from: addDays(today, -6), to: today };

@@ -43,8 +43,9 @@ export function GlobalSearchHost() {
         allDates,
         today,
         branchId: allDates ? null : branchId,
+        includeCustomers: can('payment.receive'),
       });
-    }, [deferredQuery, allDates, branchId, today]) ?? [];
+    }, [deferredQuery, allDates, branchId, today, can]) ?? [];
   const optionId = (index: number) => `${listId}-opt-${index}`;
 
   useEffect(() => {

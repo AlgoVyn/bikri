@@ -867,6 +867,8 @@ export function SellPage() {
         seen.add(key);
         keys.push(key);
       }
+      // The visual order is reversed by the "newest last" preference.
+      if (prefs?.cartOrder === 'newest_last') keys.reverse();
       const idx = keys.indexOf(selected ?? '');
       const next = Math.min(
         keys.length - 1,
@@ -1217,7 +1219,7 @@ export function SellPage() {
         open={dialog === 'clear'}
         onOpenChange={(o) => setDialog(o ? 'clear' : null)}
         title={t('sell.clear_title')}
-        body={t('sell.clear_body', { count: cart.lines.length })}
+        body={t('sell.clear_body', { count: cartItemCount(cart.lines) })}
         confirmLabel={t('sell.clear')}
         onConfirm={() => {
           setDialog(null);

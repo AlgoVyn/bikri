@@ -3,11 +3,18 @@ import { BillDetail } from './BillDetail.tsx';
 import { SalesList } from './SalesList.tsx';
 
 /** Sales list + bill detail side by side on desktop (screens/10). */
-export function SalesWorkspace({ saleId }: { saleId?: string }) {
+export function SalesWorkspace({
+  saleId,
+  bill,
+}: {
+  saleId?: string;
+  bill?: string;
+}) {
   return (
     <MasterDetail
       master={
         <SalesList
+          bill={bill}
           embedded={saleId !== undefined}
           detailOpen={saleId !== undefined}
           selectedId={saleId}

@@ -378,6 +378,12 @@ export function parseExport(
     }
     const rows = asRows(parsed);
     if (rows === null) throw new ExportZipError();
+    // Reject an unimportable row before the operator purges the live shop.
+    if (
+      tbl !== 'devices' &&
+      rows.some((row) => importableRow(row, tbl) === null)
+    )
+      throw new ExportZipError();
     const want = expected.get(tbl);
     if (want !== null && want !== undefined && rows.length !== want)
       throw new ExportZipError();

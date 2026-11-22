@@ -29,6 +29,7 @@ import {
   UsersIcon,
 } from '../components/icons.tsx';
 import { KeyBadge } from '../components/KeyBadge.tsx';
+import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -64,6 +65,7 @@ type Command = {
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const toast = useToast();
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const lock = useSession((state) => state.lock);
@@ -181,7 +183,9 @@ export function CommandPalette() {
         icon: privacyEnabled ? <EyeOffIcon /> : <EyeIcon />,
         run: () => {
           setOpen(false);
-          void togglePrivacyMode(getDb());
+          void togglePrivacyMode(getDb()).catch(() =>
+            toast.push(t('errors.generic'), 'error'),
+          );
         },
       },
       {
@@ -210,7 +214,7 @@ export function CommandPalette() {
       if (item.id === 'cashiers') return can('settings.staff');
       return true;
     });
-  }, [can, lock, navigate, privacyEnabled, readOnly, t]);
+  }, [can, lock, navigate, privacyEnabled, readOnly, t, toast]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -251,7 +255,11 @@ export function CommandPalette() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || composing(event)) return;
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k' &&
+        !dialogOpen()
+      ) {
         event.preventDefault();
         setMode('commands');
         setQuery('');

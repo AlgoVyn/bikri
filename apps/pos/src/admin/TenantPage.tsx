@@ -63,6 +63,7 @@ export function TenantPage({ id }: { id: string }) {
   );
   const [offOpen, setOffOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [restoreReset, setRestoreReset] = useState(0);
   const detail = query.data;
 
   useEffect(() => {
@@ -229,6 +230,7 @@ export function TenantPage({ id }: { id: string }) {
         {tab === 'export' ? <ExportTab tenantId={tenant.id} /> : null}
         {tab === 'restore' ? (
           <RestoreTab
+            key={`${tenant.id}:${restoreReset}`}
             tenantId={tenant.id}
             onChanged={() => {
               query.reload();
@@ -260,6 +262,7 @@ export function TenantPage({ id }: { id: string }) {
           )
             .then(() => {
               clearRestoreState(tenant.id, sessionStorage);
+              setRestoreReset((value) => value + 1);
               toast.push(t('admin.maintenance_off_done'), 'info');
               bump();
               query.reload();
