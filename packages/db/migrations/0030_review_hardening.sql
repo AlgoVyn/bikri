@@ -42,14 +42,14 @@ SELECT
       'warranty_days', p.warranty_days,
       'pack_size_milli', p.pack_size_milli
     ),
-    'image_key', p.image_key,
-    'notes', p.notes,
-    'created_at', p.created_at,
-    'updated_at', CAST(strftime('%s', 'now') AS INTEGER) * 1000,
-    'deleted_at', p.deleted_at,
-    'rev', p.rev + 1,
-    'updated_by', p.updated_by,
-    'kind', p.kind
+    '$.image_key', p.image_key,
+    '$.notes', p.notes,
+    '$.created_at', p.created_at,
+    '$.updated_at', CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+    '$.deleted_at', p.deleted_at,
+    '$.rev', p.rev + 1,
+    '$.updated_by', p.updated_by,
+    '$.kind', p.kind
   ),
   NULL,
   CAST(strftime('%s', 'now') AS INTEGER) * 1000
