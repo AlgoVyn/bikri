@@ -154,7 +154,9 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
 
   const budget = new CallBudget();
   budget.take(3); // token look-up, the closing batch and one spare
+  const applyStarted = performance.now();
   const outcome = await applyOps({ db, tenant, device, now, budget }, ops);
+  const applyMs = performance.now() - applyStarted;
   tail.push(...outcome.tail);
   tail.push(
     usageStatement(c.env, tenant.id, now, {
@@ -171,6 +173,12 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   const latest =
     (tailResults.at(-1)?.results?.[0] as { seq?: number | null } | undefined)
       ?.seq ?? tenant.change_log_floor;
+  // Test-only observability for the 200-op gate: wall-clock around planning+apply and
+  // the D1 call budget actually consumed. Never exposed in production.
+  if (String(c.env.ENV) === 'test') {
+    c.header('x-bikri-apply-ms', applyMs.toFixed(2));
+    c.header('x-bikri-d1-calls', String(budget.used));
+  }
   return c.json({
     results: outcome.results,
     server_time: now,
@@ -368,16 +376,21 @@ export async function snapshotPayload(
   const limit = Math.min(q.limit, maxLimit);
   const column = q.before === undefined ? null : cutoffColumn(q.tbl);
   const hideBundles = clientSchema < BUNDLE_SCHEMA && q.tbl === 'products';
-  const rows = await db.select(
-    `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''}${hideBundles ? " AND kind <> 'bundle'" : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
-    ...(column
-      ? [q.after, q.before as number, limit + 1]
-      : [q.after, limit + 1]),
-  );
+  const result = await db
+    .prepare(
+      `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''}${hideBundles ? " AND kind <> 'bundle'" : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
+      ...(column
+        ? [q.after, q.before as number, limit + 1]
+        : [q.after, limit + 1]),
+    )
+    .all<Record<string, unknown>>();
+  const rows = result.results;
   const page = rows.slice(0, limit);
   // The operator export is Access-only and deliberately outside the shop's read
-  // budget; till snapshots and owner exports still charge their pages.
-  if (chargeReads) addRowsRead(tenant.id, page.length);
+  // budget; till snapshots and owner exports still charge their pages. Use D1's
+  // real rows-read count rather than the page size (API-L6).
+  if (chargeReads)
+    addRowsRead(tenant.id, Number(result.meta.rows_read ?? page.length));
   return {
     tbl: q.tbl,
     rows: page,

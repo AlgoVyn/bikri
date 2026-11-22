@@ -40,7 +40,10 @@ import {
 import type { ReportRange } from '../data/reports.ts';
 import { rangeFor } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
-import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import {
+  useShopTimeZone,
+  useShopTimeZoneReady,
+} from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
@@ -167,6 +170,11 @@ function ReportRangeControls({
 
 /** Reports for one range, computed on the device (screens/16). */
 export function ReportsPage() {
+  const ready = useShopTimeZoneReady();
+  return ready ? <ReportsPageContent /> : <PageLoading compact />;
+}
+
+function ReportsPageContent() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { role, can, support } = useCurrentStaff();

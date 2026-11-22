@@ -9,6 +9,7 @@ import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { cashMove, ExpenseError } from '../data/expenses.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -63,7 +64,9 @@ export function CashMoveDialog({
       );
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ExpenseError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof ExpenseError)
         toast.push(t(`office.expenses.cash_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {

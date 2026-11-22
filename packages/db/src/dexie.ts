@@ -183,9 +183,10 @@ export const DEXIE_SCHEMA_V11 = {
  * compound one), and adds the compound indexes the remaining scans need. Dropping an
  * index is local-only; IndexedDB rebuilds the rest from stored rows.
  */
-// `sale_lines.bundle_id` and `file_queue.status` stay as standalone indexes even though
-// each is the first part of a compound index: Dexie's `.where('field')` needs the
-// single-column index and does not use `[field+other]` for a plain equality query.
+// `file_queue.status` stays as a standalone index even though it is the first part of a
+// compound index: Dexie's `.where('field')` needs the single-column index and does not
+// use `[field+other]` for a plain equality query. `sale_lines.bundle_id` has no such
+// caller and is dropped in V14.
 export const DEXIE_SCHEMA_V12 = {
   ...DEXIE_SCHEMA_V11,
   products: 'id, sku, category_id, deleted_at, track_stock',
@@ -207,6 +208,15 @@ export const DEXIE_SCHEMA_V12 = {
   print_jobs:
     'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at',
   sync_conflicts: 'id, resolution',
+} as const;
+
+/** V14 drops the unused standalone `sale_lines.bundle_id` index (the compound index remains). */
+export const DEXIE_SCHEMA_V14 = {
+  ...DEXIE_SCHEMA_V12,
+  // `tx_id` lets discardFailed read one rejected transaction instead of the whole queue.
+  outbox: '++seq, &op_id, tx_id, [status+seq], created_at, [tbl+row_id]',
+  sale_lines:
+    'id, sale_id, business_date, [product_id+business_date], [bundle_id+business_date]',
 } as const;
 
 export type DexieTableName = keyof typeof DEXIE_SCHEMA_V12;
@@ -575,6 +585,8 @@ export class BikriDb extends Dexie {
     this.version(13)
       .stores(DEXIE_SCHEMA_V12)
       .upgrade((tx) => backfillRefundLineDates(tx));
+    // V14 only drops an unused index; IndexedDB rebuilds the store from stored rows.
+    this.version(14).stores(DEXIE_SCHEMA_V14);
   }
 }
 

@@ -10,6 +10,7 @@ import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { createSupplier, updateSupplier } from '../data/suppliers.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -72,8 +73,13 @@ export function SupplierDialog({
           : t('office.suppliers.supplier_added'),
       );
       onOpenChange(false);
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('errors.generic'),
+        'error',
+      );
     } finally {
       guard.unlock();
       setPending(false);

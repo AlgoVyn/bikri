@@ -511,20 +511,17 @@ export async function discardFailed(
   seqs: number[],
 ): Promise<void> {
   let ledgerChanged = false;
-  const all = await db.outbox.toArray();
-  const failed = all.filter(
-    (e) => e.seq !== undefined && e.status === 'failed' && seqs.includes(e.seq),
+  const failed = (await db.outbox.where('seq').anyOf(seqs).toArray()).filter(
+    (entry) => entry.status === 'failed',
   );
   if (failed.length === 0) return;
   // A rejected document is one transaction. Remove every still-queued row of that transaction
   // (queued child lines included), not just the row the UI happened to show.
   const txIds = new Set(failed.map((e) => e.tx_id));
-  const entries = all.filter((e) => txIds.has(e.tx_id));
-  // A newer action may still be waiting for the same row. Restoring an older shadow
-  // would then overwrite that newer local edit, so leave the row for its own op.
-  const otherKeys = new Set(
-    all.filter((e) => !txIds.has(e.tx_id)).map((e) => `${e.tbl}:${e.row_id}`),
-  );
+  const entries = await db.outbox
+    .where('tx_id')
+    .anyOf([...txIds])
+    .toArray();
   const scope = new Set<DexieTableName>([
     'outbox',
     'pull_shadow',
@@ -539,22 +536,37 @@ export async function discardFailed(
     const saleIds = new Set<string>();
     const deleteSeqs: number[] = [];
     const ledgerDeletes = new Map<string, string[]>();
+    // A newer action may still be waiting for the same row. Restoring an older shadow
+    // would then overwrite that newer local edit, so leave the row for its own op.
+    const otherCache = new Map<string, boolean>();
+    const hasOther = async (tbl: string, rowId: string): Promise<boolean> => {
+      const key = `${tbl}:${rowId}`;
+      const cached = otherCache.get(key);
+      if (cached !== undefined) return cached;
+      const found = await db.outbox
+        .where('[tbl+row_id]')
+        .equals([tbl, rowId])
+        .filter((entry) => !txIds.has(entry.tx_id))
+        .count();
+      const value = found > 0;
+      otherCache.set(key, value);
+      return value;
+    };
     for (const e of entries) {
       if (e.seq === undefined) continue;
       deleteSeqs.push(e.seq);
-      const rowKey = `${e.tbl}:${e.row_id}`;
       if (isLedgerTable(e.tbl)) {
         if (e.tbl === 'refunds' || e.tbl === 'sale_voids') {
           const row = await db.table(e.tbl).get(e.row_id);
           if (row && typeof row.sale_id === 'string') saleIds.add(row.sale_id);
         }
-        if (!otherKeys.has(rowKey)) {
+        if (!(await hasOther(e.tbl, e.row_id))) {
           const list = ledgerDeletes.get(e.tbl) ?? [];
           list.push(e.row_id);
           ledgerDeletes.set(e.tbl, list);
           ledgerChanged = true;
         }
-      } else if (!otherKeys.has(rowKey)) {
+      } else if (!(await hasOther(e.tbl, e.row_id))) {
         const shadow = await db.pull_shadow.get([e.tbl, e.row_id]);
         if (shadow) {
           const current = await db.table(e.tbl).get(e.row_id);

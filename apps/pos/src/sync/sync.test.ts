@@ -364,6 +364,33 @@ describe('push (03 §3, §4.1)', () => {
     expect((await db.categories.get('c-bad'))?.name_en).toBe('Server');
   });
 
+  it('ignores unknown ids and leaves a pending edit for its own transaction', async () => {
+    const db = await enrolled('discard-pending');
+    const category = await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'First' }),
+      { now: NOW },
+    );
+    await writeAction(
+      db,
+      (w) => w.update('categories', category.id, { name_en: 'Second' }),
+      { now: NOW + 1 },
+    );
+    const [first] = await db.outbox.orderBy('seq').toArray();
+    if (first?.seq === undefined) throw new Error('no op');
+    await db.outbox.update(first.seq, { status: 'failed' });
+    await db.pull_shadow.put({
+      tbl: 'categories',
+      id: category.id,
+      row: { id: category.id, name_en: 'Server', rev: 1 },
+    });
+    await discardFailed(db, [9999]);
+    expect(await db.outbox.count()).toBe(2);
+    await discardFailed(db, [first.seq]);
+    expect(await db.outbox.count()).toBe(1);
+    expect((await db.categories.get(category.id))?.name_en).toBe('Second');
+  });
+
   it('keeps the applied row as the shadow for a newer pending edit', async () => {
     const db = await enrolled('shadow-newer');
     const category = await writeAction(

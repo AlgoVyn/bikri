@@ -1330,27 +1330,33 @@ function BundleRecipeEditor({
                     </p>
                   ) : null}
                 </div>
-                <div className="w-32">
-                  <QtyInput
-                    dense
-                    label={t('form.bundle_qty')}
-                    unit={componentUnit}
-                    value={item.qty_milli}
-                    onChange={(milli) => {
-                      if (milli === null) return;
-                      onChange(
-                        items.map((row, at) =>
-                          at === index
-                            ? {
-                                ...row,
-                                qty_milli: Math.max(minQty, milli),
-                              }
-                            : row,
-                        ),
-                      );
-                    }}
-                  />
-                </div>
+                {product ? (
+                  <div className="w-32">
+                    <QtyInput
+                      dense
+                      label={t('form.bundle_qty')}
+                      unit={componentUnit}
+                      value={item.qty_milli}
+                      onChange={(milli) => {
+                        if (milli === null) return;
+                        onChange(
+                          items.map((row, at) =>
+                            at === index
+                              ? {
+                                  ...row,
+                                  qty_milli: Math.max(minQty, milli),
+                                }
+                              : row,
+                          ),
+                        );
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // The component product is missing/deleted; its unit is unknown, so
+                  // never clamp the stored quantity to a guessed 'pc' (UI-H1).
+                  <span className="w-32 text-small text-text-muted">—</span>
+                )}
                 <button
                   type="button"
                   className={buttonQuiet}

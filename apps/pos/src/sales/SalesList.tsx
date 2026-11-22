@@ -23,6 +23,7 @@ import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
@@ -51,7 +52,10 @@ import {
   salesFilterOptions,
 } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
-import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import {
+  useShopTimeZone,
+  useShopTimeZoneReady,
+} from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
@@ -108,18 +112,26 @@ const METHOD_FILTERS: MethodFilter[] = [
 
 const STATUSES: SaleStatus[] = ['paid', 'part_refunded', 'refunded', 'void'];
 
-/** Sales history (screens/10). */
-export function SalesList({
-  bill,
-  embedded = false,
-  detailOpen = false,
-  selectedId,
-}: {
+type SalesListProps = {
   bill?: string;
   embedded?: boolean;
   detailOpen?: boolean;
   selectedId?: string;
-}) {
+};
+
+/** Sales history (screens/10). */
+export function SalesList(props: SalesListProps) {
+  // Seed the saved date filter only after the shop timezone is known.
+  const ready = useShopTimeZoneReady();
+  return ready ? <SalesListContent {...props} /> : <PageLoading compact />;
+}
+
+function SalesListContent({
+  bill,
+  embedded = false,
+  detailOpen = false,
+  selectedId,
+}: SalesListProps) {
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
   const navigate = useNavigate();

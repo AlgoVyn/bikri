@@ -15,6 +15,7 @@ import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
@@ -28,7 +29,10 @@ import {
   reverseExpense,
 } from '../data/expenses.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
-import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import {
+  useShopTimeZone,
+  useShopTimeZoneReady,
+} from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { tileBg } from '../products/tiles.ts';
@@ -59,6 +63,11 @@ function addDays(date: string, days: number): string {
 
 /** Expenses list (screens/14). */
 export function ExpensesPage() {
+  const ready = useShopTimeZoneReady();
+  return ready ? <ExpensesPageContent /> : <PageLoading compact />;
+}
+
+function ExpensesPageContent() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { staff, role, can } = useCurrentStaff();
