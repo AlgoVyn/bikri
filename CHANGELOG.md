@@ -6,7 +6,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ### Core and DB — 22 Nov 2026 review recheck
 - `formatQtyFromMilli()` formats fractional values for integer units instead of throwing, so a `kg` sale no longer crashes Sale Complete, Sales History, Reports or Product Edit; `parseQtyToMilli()` still rejects fractional `pc` input.
-- Migration `0030` now splits its 24-pair `json_object` into a 16-pair `json_object` plus `json_insert` (D1's 32-argument limit), and migration `0031` applies the corrected cost repair and bundle triggers to shops that already recorded `0030`.
+- Migration `0030` now splits its 24-pair `json_object` into a 16-pair `json_object` plus `json_insert` (D1's 32-argument limit), and migration `0031` applies the corrected cost repair and bundle triggers to shops that already recorded `0030`. The `json_insert` paths include their `$.` prefix; the first deploy attempt failed with `bad JSON path` and was rolled back before the Worker deploy.
 - The `0031` repair publishes the `0024` `avg_cost` rows that `0030`'s `avg_cost = 0` predicate missed; the bundle movement trigger now checks `simple -> bundle` and existing movements, and `bundle_items` gets parent-kind, resurrection and `deleted_at` guards.
 - `roundCashRefund(..., 'none', cap)` returns the remaining paid amount instead of a rupee-floored amount; quantity/percent/money parsers accept `.5`, `٪` and non-breaking spaces; allocation and money helpers validate safe integers and non-negative values.
 - `roman-ur` plural lookups use English one/other rules even on an Arabic/Russian host locale; i18n checking rejects malformed braces in every locale; Urdu/Roman Urdu till, settings and bundle-missing strings are corrected.
