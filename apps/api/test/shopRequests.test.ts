@@ -137,6 +137,20 @@ describe('public shop requests (D-175)', () => {
       },
     });
     expect(bad.status).toBe(400);
+
+    // REGISTER_LIMIT is 10/60 s per IP; the eleventh request is refused even though
+    // its body is valid.
+    const ip = nextIp();
+    let status = 0;
+    for (let i = 0; i < 11; i += 1) {
+      const res = await api('/public/shop-requests', {
+        method: 'POST',
+        headers: { 'cf-connecting-ip': ip },
+        json: requestFields(`rate-${i}-${Date.now()}@example.com`),
+      });
+      status = res.status;
+    }
+    expect(status).toBe(429);
   });
 });
 

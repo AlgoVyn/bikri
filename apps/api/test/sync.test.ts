@@ -242,7 +242,7 @@ describe('push (03 §4.1, §9)', () => {
     ]);
   });
 
-  it('6 + 11: invalid ops are isolated by bisection; others applied; ≤ 40 D1 calls', async () => {
+  it('6 + 11: invalid ops are isolated by bisection and the rest are applied', async () => {
     const shop = await seedShop('Bisect');
     const ops = [];
     const bad = new Set([17, 150]);

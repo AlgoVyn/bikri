@@ -304,13 +304,12 @@ export const SnapshotQuery = z.object({
   before: z.coerce.number().int().positive().optional(),
 });
 
-/** Snapshot start (counts) and pages, shared by the till snapshot and exports (03 §4.3). */
+/** Snapshot start and pages, shared by the till snapshot and exports (03 §4.3). */
 export async function snapshotPayload(
   query: (key: string) => string | undefined,
   db: AppEnv['Variables']['db'],
   tenant: TenantRow,
   maxLimit = 1000,
-  counts = false,
   clientSchema = BUNDLE_SCHEMA,
   chargeReads = true,
 ): Promise<Record<string, unknown>> {
@@ -333,35 +332,12 @@ export async function snapshotPayload(
         : null;
   if (!q.tbl) {
     const seq = await latestSeq(db, tenant.change_log_floor);
-    if (!counts) {
-      // The till snapshot and the owner export do not run one COUNT(*) per table: it
-      // scans every row, is charged to the same read budget as the pages, and made a
-      // large snapshot block itself before the first page. Progress is rows downloaded.
-      return {
-        snapshot_seq: seq,
-        tables: tables.map((tbl) => ({ tbl, rows: 0 })),
-      };
-    }
-    // The operator console's export tab needs per-table totals for its progress bars.
-    // It is Access-only and not on the till's read quota; do not charge these counts to
-    // the tenant's download budget, or a large operator export blocks itself.
-    const res = await db.batch(
-      tables.map((tbl) => {
-        const column = q.before === undefined ? null : cutoffColumn(tbl);
-        return db.prepare(
-          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1${column ? ` AND ${column} <= ?2` : ''}`,
-          ...(column ? [q.before as number] : []),
-        );
-      }),
-    );
+    // No per-table `COUNT(*)`: it scans every row, is charged to the same read budget
+    // as the pages, and made a large snapshot block before its first page. The till,
+    // owner and operator exports all derive progress from the rows they download.
     return {
       snapshot_seq: seq,
-      tables: tables.map((tbl, i) => ({
-        tbl,
-        rows: Number(
-          (res[i]?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
-        ),
-      })),
+      tables: tables.map((tbl) => ({ tbl, rows: 0 })),
     };
   }
   if (q.tbl === 'bundle_items' && clientSchema < BUNDLE_SCHEMA)
@@ -408,7 +384,6 @@ export async function snapshot(c: Context<AppEnv>): Promise<Response> {
       db,
       tenant,
       1000,
-      false,
       clientSchema,
     )),
     server_time: now,
