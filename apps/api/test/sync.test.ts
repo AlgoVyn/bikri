@@ -572,6 +572,8 @@ describe('push (03 §4.1, §9)', () => {
     expect(elapsed, `200-op push took ${elapsed.toFixed(1)} ms`).toBeLessThan(
       500,
     );
+    expect(Number(res.headers.get('x-bikri-d1-calls'))).toBeLessThanOrEqual(40);
+    expect(Number(res.headers.get('x-bikri-apply-ms'))).toBeLessThan(250);
   });
 });
 

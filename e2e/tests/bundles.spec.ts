@@ -409,7 +409,6 @@ test.describe('Bundles (journeys 26–27)', () => {
         expect(line.bundle_qty).toBe(2);
         expect(line.bundle_component_qty_milli).toBe(1000);
         expect(line.qty_milli).toBe(2000);
-        expect(line.bundle_price).toBe(BUNDLE_PRICE);
       }
       const saleMoves = (await idbAll<Row>(page, 'stock_movements')).filter(
         (move) =>

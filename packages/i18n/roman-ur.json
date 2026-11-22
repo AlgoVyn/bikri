@@ -247,7 +247,8 @@
     "bundle_error_component": "Ek active simple product chunein, khud yeh bundle nahi.",
     "bundle_error_qty": "Har cheez ki miqdar zero se zyada honi chahiye.",
     "bundle_error_count": "Bundle mein 1 se 20 mukhtalif cheezein honi chahiye.",
-    "cost_tracked_hint": "Laagat delivery aur stock movements se update hoti hai. Ise edit karne ke liye pehle stock tracking band karein."
+    "cost_tracked_hint": "Laagat delivery aur stock movements se update hoti hai. Ise edit karne ke liye pehle stock tracking band karein.",
+    "unit_stock_fractional": "Is unit par jane se pehle fractional stock ko stock count se adjust karein."
   },
   "glossary": {
     "baqaya": "Baqaya",

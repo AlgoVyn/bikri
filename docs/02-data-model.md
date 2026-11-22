@@ -2268,7 +2268,7 @@ END;
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V12 = {
+export const DEXIE_SCHEMA_V14 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -2285,7 +2285,7 @@ export const DEXIE_SCHEMA_V12 = {
   sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
   // ledger
   sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
-  sale_lines: 'id, sale_id, business_date, bundle_id, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id
+  sale_lines: 'id, sale_id, business_date, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id; V14 drops standalone bundle_id
 
   payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
   refunds: 'id, sale_id, business_date, [device_id+created_at], created_at',
@@ -2302,7 +2302,7 @@ export const DEXIE_SCHEMA_V12 = {
   day_closes: 'id, [device_id+period_end], business_date, created_at',
   audit_log: 'id, [entity+entity_id], created_at',
   // local-only
-  outbox: '++seq, &op_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status
+  outbox: '++seq, &op_id, tx_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status; V14 adds tx_id for discard
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
@@ -2325,6 +2325,8 @@ export const DEXIE_SCHEMA_V12 = {
 **Dexie V12 (D-279)** removes indexes no query uses (and three prefix indexes already covered by a compound one), adds `file_queue.[status+created_at]` and `sale_voids.business_date`, and keeps only the range indexes the remaining scans need. The upgrade only adds/drops indexes; IndexedDB rebuilds them from stored rows. No server or wire change.
 
 **Dexie V13 (D-284)** backfills `refund_lines.business_date` from the local `refunds` table (the V10 repair missed rows written by a restore/replay path). It is local-only: the column is stripped from pushed ops and re-derived from the refund when a server row is merged.
+
+**Dexie V14 (D-288)** drops the unused standalone `sale_lines.bundle_id` index and adds `outbox.tx_id`, so discarding a rejected transaction no longer reads the whole queue. Bundle history reads the `[bundle_id+business_date]` compound index. The upgrade is index-only; no row changes.
 
 ### 3.1 Local-only tables
 

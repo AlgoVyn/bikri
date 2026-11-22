@@ -19,7 +19,6 @@ import { downloadBlob } from '../print/receiptImage.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { deliveryDetailCsv } from './deliveryFile.ts';
 import { dateText } from './format.ts';
 
 export function DeliveryDetailDialog({
@@ -127,10 +126,13 @@ export function DeliveryDetailDialog({
     if (!data || !detail || busy) return;
     setBusy(true);
     try {
+      const { deliveryDetailCsv } = await import('./deliveryFile.ts');
       downloadText(
         `delivery-${invoiceNo.replace(/[^a-z0-9-]+/giu, '-')}.csv`,
         deliveryDetailCsv(fileMeta(detail, data.tz)),
       );
+    } catch {
+      toast.push(t('done.share_failed'), 'error');
     } finally {
       setBusy(false);
     }

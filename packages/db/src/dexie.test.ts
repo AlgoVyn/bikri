@@ -111,6 +111,15 @@ describe('Dexie schema (02 §3)', () => {
     ).toBe(true);
   });
 
+  it('V14 drops the unused standalone bundle_id index', async () => {
+    const db = open('upgrade-v14');
+    await db.open();
+    const names = db.sale_lines.schema.indexes.map((index) => index.name);
+    expect(names).not.toContain('bundle_id');
+    expect(names).toContain('[bundle_id+business_date]');
+    db.close();
+  });
+
   it('upgrades a V12 database: repairs refund lines pulled without a date', async () => {
     const old = new Dexie(tenantDbName('upgrade-v12'));
     old.version(12).stores(DEXIE_SCHEMA_V12);
@@ -129,7 +138,7 @@ describe('Dexie schema (02 §3)', () => {
     const db = open('upgrade-v12');
     await db.open();
     expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
-    expect(db.verno).toBe(13);
+    expect(db.verno).toBe(14);
   });
 
   it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {

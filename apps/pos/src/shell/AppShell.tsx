@@ -1,3 +1,4 @@
+import { loadAreaCatalog } from '@bikri/i18n';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -215,9 +216,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
           : 'en';
     const warm = () => {
       void import('../sell/SellPage.tsx').catch(() => undefined);
-      void import('@bikri/i18n')
-        .then((module) => module.loadAreaCatalog('office', language))
-        .catch(() => undefined);
+      void loadAreaCatalog('office', language).catch(() => undefined);
     };
     if (typeof window.requestIdleCallback === 'function') {
       const id = window.requestIdleCallback(warm, { timeout: 2_000 });

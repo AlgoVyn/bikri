@@ -31,6 +31,7 @@ import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { downloadText } from '../lib/download.ts';
 import { dayCloseReceipt, receiptPdf } from '../print/receiptFiles.ts';
@@ -164,8 +165,13 @@ export function DayClosePage() {
       void import('../sync/engine.ts')
         .then((m) => m.syncNow())
         .catch(() => undefined);
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('errors.generic'),
+        'error',
+      );
     } finally {
       closingRef.current = false;
       setPending(false);

@@ -17,6 +17,7 @@ import {
   expenseCategories,
 } from '../data/expenses.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { ApprovalDialog } from '../sales/ApprovalDialog.tsx';
 import { Modal } from '../sell/Modal.tsx';
@@ -151,7 +152,9 @@ export function ExpenseDialog({
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ExpenseError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof ExpenseError)
         toast.push(t(`office.expenses.expense_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {

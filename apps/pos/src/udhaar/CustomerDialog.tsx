@@ -24,6 +24,7 @@ import {
   updateCustomer,
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
@@ -130,7 +131,9 @@ export function CustomerDialog({
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof DuplicatePhoneError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof DuplicatePhoneError)
         setDuplicate({ id: err.ownerId, name: err.ownerName });
       else toast.push(t('errors.generic'), 'error');
     } finally {
