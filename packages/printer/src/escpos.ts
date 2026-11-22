@@ -257,6 +257,7 @@ export function encodeEscPos(
   });
   return encodeCommands(commands, {
     dots: options.dots,
+    charsPerLine: options.charsPerLine,
     leftMarginDots,
     sendWidth: options.sendWidth !== false,
     cut: options.cut ?? 'partial',
@@ -270,6 +271,7 @@ export function encodeEscPos(
 
 type EncodeState = {
   dots: number;
+  charsPerLine: number;
   leftMarginDots: number;
   sendWidth: boolean;
   cut: CutMode;
@@ -343,6 +345,14 @@ function encodeCommands(
           const renderer = requireRenderer(state.renderer);
           const rendered = renderer.renderLine(command.text, {
             dots: state.dots,
+            // Font B fits 4/3 columns and double width halves them, matching the
+            // text-mode `pushText` layout. The raster grid must use the same count.
+            charsPerLine:
+              command.size === 'small'
+                ? Math.floor((state.charsPerLine * 4) / 3)
+                : command.size === 'double'
+                  ? Math.max(1, Math.floor(state.charsPerLine / 2))
+                  : state.charsPerLine,
             align: command.align,
             bold: command.bold,
             size: command.size,

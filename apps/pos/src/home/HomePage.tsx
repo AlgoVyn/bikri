@@ -191,7 +191,7 @@ export function HomePage() {
         ),
       ),
     };
-  }, [today, yesterday, role]);
+  }, [today, yesterday, role, support, branchId, can]);
 
   // Expected cash reads every payment/cash move/expense since the last close, so it
   // is not part of the main live query: a sale re-renders Home but does not re-read a

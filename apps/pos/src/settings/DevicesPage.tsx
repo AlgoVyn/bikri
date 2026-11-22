@@ -214,6 +214,25 @@ export function DevicesPage() {
     [run, t],
   );
 
+  // React state disables a control only after the next render; this ref stops two
+  // rapid clicks (or Enter + click) from sending the same device mutation twice.
+  const deviceBusyRef = useRef(false);
+  const [deviceBusy, setDeviceBusy] = useState(false);
+  const mutateDevice = useCallback(
+    async (fn: () => Promise<void>) => {
+      if (deviceBusyRef.current) return;
+      deviceBusyRef.current = true;
+      setDeviceBusy(true);
+      try {
+        await guard(fn);
+      } finally {
+        deviceBusyRef.current = false;
+        setDeviceBusy(false);
+      }
+    },
+    [guard],
+  );
+
   const load = useCallback(async () => {
     if (!staffId) return;
     const [d, c] = await Promise.all([
@@ -392,8 +411,9 @@ export function DevicesPage() {
                     <button
                       type="button"
                       className={buttonQuiet}
+                      disabled={deviceBusy}
                       onClick={() =>
-                        void guard(async () => {
+                        void mutateDevice(async () => {
                           if (!staffId) return;
                           await shopRequest(
                             db,
@@ -456,7 +476,7 @@ export function DevicesPage() {
                         className="flex gap-2"
                         onSubmit={(e) => {
                           e.preventDefault();
-                          void guard(async () => {
+                          void mutateDevice(async () => {
                             if (!staffId) return;
                             await shopRequest(db, staffId, `/devices/${d.id}`, {
                               method: 'PATCH',
@@ -480,6 +500,7 @@ export function DevicesPage() {
                           type="submit"
                           className={buttonPrimary}
                           disabled={
+                            deviceBusy ||
                             renaming.name.trim() === '' ||
                             renaming.name === d.name
                           }
@@ -553,10 +574,10 @@ export function DevicesPage() {
                                   ? t('devices.move_pending')
                                   : undefined
                               }
-                              disabled={d.pending_ops > 0}
+                              disabled={d.pending_ops > 0 || deviceBusy}
                               value={d.branch_id}
                               onChange={(e) =>
-                                void guard(async () => {
+                                void mutateDevice(async () => {
                                   if (!staffId) return;
                                   await shopRequest(
                                     db,
@@ -581,8 +602,9 @@ export function DevicesPage() {
                           <button
                             type="button"
                             className={buttonQuiet}
+                            disabled={deviceBusy}
                             onClick={() =>
-                              void guard(async () => {
+                              void mutateDevice(async () => {
                                 if (!staffId) return;
                                 await shopRequest(
                                   db,
@@ -606,6 +628,7 @@ export function DevicesPage() {
                       <button
                         type="button"
                         className={buttonDangerQuiet}
+                        disabled={deviceBusy}
                         onClick={() => setConfirmRevoke(d)}
                       >
                         {t('devices.revoke')}
@@ -750,7 +773,7 @@ export function DevicesPage() {
         onConfirm={() => {
           const d = confirmRevoke;
           if (!d) return;
-          void guard(async () => {
+          void mutateDevice(async () => {
             if (!staffId) return;
             await shopRequest(db, staffId, `/devices/${d.id}/revoke`, {
               method: 'POST',

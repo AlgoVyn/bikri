@@ -53,7 +53,8 @@ mkdir -p dist/linux-amd64 dist/linux-arm64
 cp dist/bikri-print-agent dist/linux-amd64/
 cp dist/bikri-print-agent-linux-arm64 dist/linux-arm64/bikri-print-agent
 for dir in linux-amd64 linux-arm64; do
-  cp install/linux/install.sh install/linux/bikri-print-agent.service "dist/${dir}/"
+  cp install/linux/install.sh install/linux/uninstall.sh \
+    install/linux/bikri-print-agent.service "dist/${dir}/"
   stage_readme "dist/${dir}/BUILD.txt" "${dir}"
 done
 
@@ -62,7 +63,7 @@ mkdir -p dist/darwin-amd64 dist/darwin-arm64
 cp dist/bikri-print-agent-darwin-amd64 dist/darwin-amd64/bikri-print-agent
 cp dist/bikri-print-agent-darwin-arm64 dist/darwin-arm64/bikri-print-agent
 for dir in darwin-amd64 darwin-arm64; do
-  cp install/macos/install.sh "dist/${dir}/"
+  cp install/macos/install.sh install/macos/uninstall.sh "dist/${dir}/"
   stage_readme "dist/${dir}/BUILD.txt" "${dir}"
 done
 

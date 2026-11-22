@@ -42,7 +42,14 @@ export function createCanvasRasterRenderer(
   >();
   return {
     renderLine(text: string, o: RenderLineOptions): RasterSource {
-      const px = PX[o.size];
+      // JetBrains Mono advances ~0.6em per glyph. Size ASCII lines from the column
+      // count so 32/48-column text lands on the same grid as the ESC/POS text path;
+      // `maxWidth` alone would condense a fixed 24px line instead.
+      const columns =
+        o.charsPerLine ?? Math.max(1, Math.round(o.dots / (o.rtl ? 20 : 12)));
+      const px = o.rtl
+        ? PX[o.size]
+        : Math.max(8, Math.floor(o.dots / (columns * 0.6)));
       const tall = o.size === 'double-height' ? 2 : 1;
       const height = Math.ceil(px * (o.rtl ? 1.7 : 1.25)) * tall;
       const key = `${o.dots}x${height}`;

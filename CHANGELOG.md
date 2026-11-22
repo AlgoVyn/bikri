@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Review residual fixes — 22 Nov 2026
+- Home recomputes recent bills when the device branch resolves; Restore discards a ZIP that finishes inflating after a newer pick; device admin actions share a synchronous busy guard; Sync Now/Retry have rejection handlers.
+- Printer wizard gates the test-print drawer kick by `drawer.open`, read-only/support and the saved setting; palette privacy has success/error toasts; expense/cash/category/backdate/price/suggested/import submits use the synchronous submit guard, and Expense Save requires `expense.create`; settings persistence promises are caught.
+- Label preview shows the shop name, localized name, price and human-readable barcode; Urdu activity uses the Settings term; the ledger credit total is safe-integer checked; a rejected tracked-cost edit no longer leaves an orphan photo blob.
+- Raster text is sized from the laid-out column count, Windows GDI splits tall receipts into VERTRES page bands, and the Linux/macOS archives now ship the uninstallers. Docs rate-limit bindings match `wrangler.jsonc`.
+
 ### Tests, CI, tooling and docs — 22 Nov 2026 review recheck
 - Journey 20 now proves the `410 SNAPSHOT_REQUIRED` and snapshot hydration with a second till, asserts the raised floor/cursor, and restores from a point captured before an offline sale; the local-D1 selector ignores `metadata.sqlite`.
 - Journey 23 covers two pre-read-only offline sales, a blocked `/sell` deep link, and readable Sales/Reports/Activity/Export; bundle tests cover the amber short-stock warning, stock return after refunds, recipe edit + historical reprint, and real `systemPrint`; the tenant test calls `getDb()`.

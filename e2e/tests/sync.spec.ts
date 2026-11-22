@@ -426,6 +426,17 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
     await expect(
       a.page.getByRole('heading', { name: heading, exact: false }).first(),
     ).toBeVisible();
+    if (path === '/settings/activity')
+      await expect(
+        a.page.getByText('Payment overdue, e2e check').first(),
+      ).toBeVisible();
+    if (path === '/settings/backup') {
+      const [download] = await Promise.all([
+        a.page.waitForEvent('download'),
+        a.page.getByRole('button', { name: 'Download full export' }).click(),
+      ]);
+      expect(download.suggestedFilename()).toMatch(/\.zip$/u);
+    }
   }
   // Journey 23 requires the banner in both languages, not English only.
   await setLanguage(a.page, 'ur');

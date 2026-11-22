@@ -59,8 +59,12 @@ function LabelsContent() {
     }
   }, [stored]);
   const save = async () => {
-    await setKv(getDb(), 'label', form);
-    toast.push(t('office.labels.saved'));
+    try {
+      await setKv(getDb(), 'label', form);
+      toast.push(t('office.labels.saved'));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
   };
   const printTest = () => {
     try {

@@ -21,6 +21,8 @@ export type RasterSource = {
 export type RenderLineOptions = {
   /** Paper width in dots (384 for 58 mm, 576 for 80 mm, overridable). */
   dots: number;
+  /** Columns this line was laid out for; raster text must match the same grid. */
+  charsPerLine?: number;
   align: Align;
   bold: boolean;
   size: TextSize;

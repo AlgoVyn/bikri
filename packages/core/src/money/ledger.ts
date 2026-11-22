@@ -68,6 +68,7 @@ export function oldestUnpaidAt(
       }
       if (pay > 0) {
         credit += pay;
+        assertSafeInteger(credit, 'credit');
       }
     }
   }

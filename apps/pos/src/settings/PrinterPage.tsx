@@ -116,7 +116,9 @@ export function PrinterPage() {
   }, [deps.agent, printer?.agent?.url, printer?.transport]);
 
   const update = (p: Partial<PrinterKv>) =>
-    void setKv(getDb(), 'printer', { ...printer, ...p });
+    void setKv(getDb(), 'printer', { ...printer, ...p }).catch(() =>
+      toast.push(t('errors.generic'), 'error'),
+    );
 
   const run = async (what: 'test' | 'drawer') => {
     try {
@@ -352,9 +354,11 @@ export function PrinterPage() {
               type="button"
               className={buttonQuiet}
               onClick={() => {
-                void cancelQueuedPrintJobs(getDb()).then((count) =>
-                  toast.push(t('printer.cancelled_many', { count }), 'info'),
-                );
+                void cancelQueuedPrintJobs(getDb())
+                  .then((count) =>
+                    toast.push(t('printer.cancelled_many', { count }), 'info'),
+                  )
+                  .catch(() => toast.push(t('errors.generic'), 'error'));
               }}
             >
               {t('printer.cancel_waiting', { count: queued })}
@@ -398,7 +402,11 @@ export function PrinterPage() {
                   <button
                     type="button"
                     className={buttonQuiet}
-                    onClick={() => void retryPrintJob(getDb(), job.id)}
+                    onClick={() =>
+                      void retryPrintJob(getDb(), job.id).catch(() =>
+                        toast.push(t('errors.generic'), 'error'),
+                      )
+                    }
                   >
                     {t('done.retry')}
                   </button>
@@ -408,9 +416,9 @@ export function PrinterPage() {
                     type="button"
                     className={buttonQuiet}
                     onClick={() => {
-                      void cancelPrintJob(getDb(), job.id).then(() =>
-                        toast.push(t('printer.cancelled'), 'info'),
-                      );
+                      void cancelPrintJob(getDb(), job.id)
+                        .then(() => toast.push(t('printer.cancelled'), 'info'))
+                        .catch(() => toast.push(t('errors.generic'), 'error'));
                     }}
                   >
                     {t('printer.cancel')}

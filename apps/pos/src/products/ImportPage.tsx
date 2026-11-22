@@ -11,6 +11,7 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { TaskAside, TaskLayout } from '../components/TaskLayout.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
@@ -58,6 +59,7 @@ export function ImportPage() {
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [stage, setStage] = useState<Stage>({ step: 'choose' });
+  const submitGuard = useSubmitGuard();
   const [readError, setReadError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -109,6 +111,7 @@ export function ImportPage() {
   };
 
   const doImport = async (preview: ImportPreview) => {
+    if (!submitGuard.lock()) return;
     const total = preview.summary.new + preview.summary.updates;
     setStage({ step: 'importing', done: 0, total, preview });
     try {
@@ -133,6 +136,8 @@ export function ImportPage() {
           : t('import.import_failed'),
         'error',
       );
+    } finally {
+      submitGuard.unlock();
     }
   };
 

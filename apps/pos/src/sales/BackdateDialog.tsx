@@ -1,7 +1,7 @@
 import { can as canDo, type Role } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -10,6 +10,7 @@ import {
 } from '../components/classes.ts';
 import { PastDatePicker } from '../components/PastDatePicker.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   BACKDATE_REASON_MAX,
   BackdateError,
@@ -45,6 +46,7 @@ export function BackdateDialog({
   const [staffId, setStaffId] = useState(staff?.id ?? '');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitGuard = useSubmitGuard();
   const people = useLiveQuery(async () => {
     if (!open) return [];
     const rows = (await getDb().staff.toArray()).filter(
@@ -64,13 +66,19 @@ export function BackdateDialog({
     );
   }, [open]);
 
+  // Capture the defaults without resetting an open draft when the clock rolls over or
+  // the staff row refreshes (UI-M14).
+  const defaults = useRef({ today, staffId: staff?.id ?? '' });
+  useEffect(() => {
+    defaults.current = { today, staffId: staff?.id ?? '' };
+  }, [today, staff?.id]);
   useEffect(() => {
     if (!open) return;
-    setDate(today);
-    setStaffId(staff?.id ?? '');
+    setDate(defaults.current.today);
+    setStaffId(defaults.current.staffId);
     setReason('');
     setBusy(false);
-  }, [open, today, staff?.id]);
+  }, [open]);
 
   const valid =
     isBusinessDate(date) &&
@@ -81,6 +89,7 @@ export function BackdateDialog({
 
   const submit = async () => {
     if (!valid || busy) return;
+    if (!submitGuard.lock()) return;
     setBusy(true);
     try {
       const { cartId } = await startBackdate(getDb(), {
@@ -102,6 +111,7 @@ export function BackdateDialog({
               : 'office.backdate.error_generic';
       toast.push(t(key), 'error');
     } finally {
+      submitGuard.unlock();
       setBusy(false);
     }
   };

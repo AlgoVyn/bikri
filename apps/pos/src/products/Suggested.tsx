@@ -6,6 +6,7 @@ import { ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   ledgerContext,
   SUGGESTED_PRODUCTS,
@@ -24,6 +25,7 @@ export function SuggestedPage() {
   const readOnly = useReadOnly();
   const [picked, setPicked] = useState<Record<string, number | null>>({});
   const [pending, setPending] = useState(false);
+  const submitGuard = useSubmitGuard();
   const chosen = Object.entries(picked).filter(
     ([, price]) => price !== null,
   ) as [string, number][];
@@ -82,6 +84,7 @@ export function SuggestedPage() {
         disabled={pending || chosen.length === 0}
         onClick={async () => {
           if (pending) return;
+          if (!submitGuard.lock()) return;
           setPending(true);
           try {
             const db = getDb();
@@ -93,6 +96,7 @@ export function SuggestedPage() {
           } catch {
             toast.push(t('errors.generic'), 'error');
           } finally {
+            submitGuard.unlock();
             setPending(false);
           }
         }}

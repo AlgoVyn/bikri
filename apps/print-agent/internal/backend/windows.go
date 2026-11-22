@@ -615,50 +615,68 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	dpiX := deviceCaps(hdc, gdiLogPixelsX)
 	dpiY := deviceCaps(hdc, gdiLogPixelsY)
 	horzRes := deviceCaps(hdc, gdiHorzRes)
+	vertRes := deviceCaps(hdc, gdiVertRes)
 	destWidth, destHeight := gdiTargetSize(width, height, job.PaperMM, dpiX, dpiY, horzRes)
+	// A fixed-length page queue clips anything taller than VERTRES. Split the bitmap
+	// into page-high source bands instead of sending one oversized StretchDIBits.
+	pageHeight := destHeight
+	if vertRes > 0 && vertRes < pageHeight {
+		pageHeight = vertRes
+	}
 	for i := 0; i < max(1, job.Copies); i++ {
-		if err := ctx.Err(); err != nil {
-			abort()
-			return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
-		}
-		r1, _, callErr = procStartPage.Call(hdc)
-		if !gdiSucceeded(r1) {
-			abort()
-			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
-		}
-		_, _, _ = procSetMapMode.Call(hdc, gdiMMText)
-		// HALFTONE smooths the downscale/upscale instead of dropping rows.
-		_, _, _ = procSetStretchBltMode.Call(hdc, gdiHalftone)
-		// HALFTONE uses the brush origin; reset it so the first band is not offset.
-		_, _, _ = procSetBrushOrgEx.Call(hdc, 0, 0, 0)
-		bmi := bitmapInfoHeader{
-			biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
-			biWidth:       int32(width),
-			biHeight:      -int32(height),
-			biPlanes:      1,
-			biBitCount:    32,
-			biCompression: 0, // BI_RGB
-			biSizeImage:   uint32(len(bits)),
-		}
-		r1, _, callErr = procStretchDIBits.Call(
-			hdc,
-			0, 0, uintptr(destWidth), uintptr(destHeight),
-			0, 0, uintptr(width), uintptr(height),
-			uintptr(unsafe.Pointer(&bits[0])),
-			uintptr(unsafe.Pointer(&bmi)),
-			0,          // DIB_RGB_COLORS
-			0x00CC0020, // SRCCOPY
-		)
-		runtime.KeepAlive(bits)
-		runtime.KeepAlive(bmi)
-		if !gdiSucceeded(r1) {
-			abort()
-			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
-		}
-		r1, _, callErr = procEndPage.Call(hdc)
-		if !gdiSucceeded(r1) {
-			abort()
-			return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+		for top := 0; top < destHeight; top += pageHeight {
+			if err := ctx.Err(); err != nil {
+				abort()
+				return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
+			}
+			bandDestHeight := min(pageHeight, destHeight-top)
+			srcTop := top * height / destHeight
+			srcHeight := bandDestHeight * height / destHeight
+			if srcHeight < 1 {
+				srcHeight = 1
+			}
+			if srcTop+srcHeight > height {
+				srcHeight = height - srcTop
+			}
+			r1, _, callErr = procStartPage.Call(hdc)
+			if !gdiSucceeded(r1) {
+				abort()
+				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+			}
+			_, _, _ = procSetMapMode.Call(hdc, gdiMMText)
+			// HALFTONE smooths the downscale/upscale instead of dropping rows.
+			_, _, _ = procSetStretchBltMode.Call(hdc, gdiHalftone)
+			// HALFTONE uses the brush origin; reset it so the first band is not offset.
+			_, _, _ = procSetBrushOrgEx.Call(hdc, 0, 0, 0)
+			bmi := bitmapInfoHeader{
+				biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
+				biWidth:       int32(width),
+				biHeight:      -int32(height),
+				biPlanes:      1,
+				biBitCount:    32,
+				biCompression: 0, // BI_RGB
+				biSizeImage:   uint32(len(bits)),
+			}
+			r1, _, callErr = procStretchDIBits.Call(
+				hdc,
+				0, 0, uintptr(destWidth), uintptr(bandDestHeight),
+				0, uintptr(srcTop), uintptr(width), uintptr(srcHeight),
+				uintptr(unsafe.Pointer(&bits[0])),
+				uintptr(unsafe.Pointer(&bmi)),
+				0,          // DIB_RGB_COLORS
+				0x00CC0020, // SRCCOPY
+			)
+			runtime.KeepAlive(bits)
+			runtime.KeepAlive(bmi)
+			if !gdiSucceeded(r1) {
+				abort()
+				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+			}
+			r1, _, callErr = procEndPage.Call(hdc)
+			if !gdiSucceeded(r1) {
+				abort()
+				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+			}
 		}
 	}
 	r1, _, callErr = procEndDoc.Call(hdc)

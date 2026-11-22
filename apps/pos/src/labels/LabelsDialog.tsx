@@ -414,15 +414,23 @@ function LabelsDialogContent({
             style={{ maxWidth: `${Math.min(preview.widthMm * 2, 200)}mm` }}
           >
             {first ? (
-              <p className="truncate font-medium">
-                {String(first.product.name_en)}
-                {settings.showPrice ? (
-                  <>
-                    {' · '}
-                    <MoneyText paisa={Number(first.product.price ?? 0)} />
-                  </>
+              <div className="flex flex-col gap-0.5">
+                {settings.showShop ? (
+                  <span className="truncate text-caption text-text-muted">
+                    {data?.shopName}
+                  </span>
                 ) : null}
-              </p>
+                <span className="truncate font-medium">
+                  {labelName(first.product)}
+                  {settings.showPrice ? (
+                    <>
+                      {' · '}
+                      <MoneyText paisa={Number(first.product.price ?? 0)} />
+                    </>
+                  ) : null}
+                </span>
+                <span className="font-mono text-caption">{first.barcode}</span>
+              </div>
             ) : null}
             <div
               className="mx-auto"
