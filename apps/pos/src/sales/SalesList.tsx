@@ -50,8 +50,8 @@ import {
   salesCsv,
   salesFilterOptions,
 } from '../data/salesHistory.ts';
-import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
+import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
@@ -125,8 +125,7 @@ export function SalesList({
   const navigate = useNavigate();
   const { can, role, support, branchId } = useCurrentStaff();
   const limited = !can('report.view') || cashierTodayOnly(role, support);
-  const timeZone =
-    useLiveQuery(() => shopTimeZone(getDb()), []) ?? 'Asia/Karachi';
+  const timeZone = useShopTimeZone();
   const { today, yesterday } = useBusinessDates(timeZone);
   const [stored] = useState(() =>
     readDateFilter('sales', SALES_PRESETS, 'today', today),
