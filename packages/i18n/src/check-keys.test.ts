@@ -24,6 +24,17 @@ describe('compareCatalogs', () => {
     expect(errors).toContain('en empty common.a');
   });
 
+  it('fails on malformed braces even when every locale has them', () => {
+    const malformed = { common: { a: 'Hi {{name}' } };
+    const errors = compareCatalogs({
+      en: malformed,
+      ur: malformed,
+      'roman-ur': malformed,
+    });
+    expect(errors).toContain('en malformed placeholders common.a');
+    expect(errors).toContain('ur malformed placeholders common.a');
+  });
+
   it('fails when a placeholder differs between locales', () => {
     const errors = compareCatalogs({
       en: { common: { a: 'Hi {{name}}' } },

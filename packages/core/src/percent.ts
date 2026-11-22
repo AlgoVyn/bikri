@@ -9,7 +9,7 @@ export function parsePercentToBp(raw: string): number | null {
   const text = normaliseNumericText(raw)
     .trim()
     .replace('\u2212', '-')
-    .replace(/%$/u, '')
+    .replace(/[%٪]$/u, '')
     .replaceAll(',', '')
     .replaceAll(' ', '');
   const match = /^([+-]?)(\d*)(?:\.(\d*))?$/u.exec(text);

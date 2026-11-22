@@ -6,6 +6,7 @@ describe('parsePercentToBp', () => {
     expect(parsePercentToBp('10')).toBe(1000);
     expect(parsePercentToBp('2.5')).toBe(250);
     expect(parsePercentToBp('12.345%')).toBe(1235);
+    expect(parsePercentToBp('12.5٪')).toBe(1250);
     expect(parsePercentToBp('-5')).toBe(-500);
     expect(parsePercentToBp('−7.5')).toBe(-750);
     expect(parsePercentToBp('۱۰')).toBe(1000);

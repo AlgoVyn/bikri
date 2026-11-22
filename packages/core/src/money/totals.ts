@@ -199,6 +199,11 @@ export function allocateRounding(
   rounding: number,
   bases: readonly number[],
 ): number[] {
+  assertSafeInteger(rounding, 'rounding');
+  for (const base of bases) {
+    assertSafeInteger(base, 'base');
+    if (base < 0) throw new RangeError('bases must be non-negative');
+  }
   const out = bases.map(() => 0);
   if (rounding === 0) return out;
   if (rounding > 0) return allocate(rounding, bases);

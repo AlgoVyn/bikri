@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   destructiveFindings,
+  functionArityFindings,
   stripComments,
 } from './check-migrations-safe.mjs';
 
@@ -65,6 +66,27 @@ describe('destructive migration guard', () => {
     expect(stripComments('SELECT 1; /* drop table */ SELECT 2;')).not.toContain(
       'drop table',
     );
+  });
+
+  it('rejects SQL functions above the D1 32-argument limit', () => {
+    const pairs = Array.from({ length: 17 }, (_, i) => `'k${i}', 1`).join(', ');
+    expect(functionArityFindings(`SELECT json_object(${pairs});`)).toEqual([
+      { name: 'json_object', args: 34 },
+    ]);
+    const sixteen = Array.from({ length: 16 }, (_, i) => `'k${i}', 1`).join(
+      ', ',
+    );
+    expect(functionArityFindings(`SELECT json_object(${sixteen});`)).toEqual(
+      [],
+    );
+  });
+
+  it('does not treat table definitions or literals as function calls', () => {
+    expect(
+      functionArityFindings(
+        "CREATE TABLE t (id TEXT); INSERT INTO t (id) VALUES ('json_object(1,2)');",
+      ),
+    ).toEqual([]);
   });
 
   it('honours the reviewed allow marker', () => {
