@@ -391,7 +391,7 @@ test('catalog syncs to a support till that is view-only; operator read-only bloc
   // Journey 23 requires the banner in both languages, not English only.
   await setLanguage(a.page, 'ur');
   await expect(a.page.getByTestId('banner-read-only')).toContainText(
-    'یہ دکان صرف پڑھنے کے لیے ہے',
+    'یہ دکان صرف دیکھنے کے لیے ہے',
   );
   await setLanguage(a.page, 'en');
   await a.page.evaluate(() => {
