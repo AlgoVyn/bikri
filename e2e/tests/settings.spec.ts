@@ -281,6 +281,10 @@ test.describe('Settings (T-050)', () => {
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings');
+    // Import exists only on an enrolled till (the dev seed shop has no token).
+    await page.evaluate(() =>
+      window.__bikriTest?.setKv('device_token', 'e2e-device-token'),
+    );
     await page.evaluate(() =>
       window.__bikriTest?.navigate('/settings/devices'),
     );
