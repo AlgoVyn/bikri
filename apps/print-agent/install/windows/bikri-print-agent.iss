@@ -4,7 +4,7 @@
 
 #define AppName "Bikri Print Agent"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.7"
+  #define MyAppVersion "0.1.8"
 #endif
 #define AppPublisher "Algovyn"
 #define AppExe "bikri-print-agent.exe"
