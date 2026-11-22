@@ -159,7 +159,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
           note,
         },
         ctx,
-        { today },
+        { today, canEditPrice: can('catalog.edit') },
       );
       const after = await supplierBalance(db, supplierId);
       const labelRows = valid.map((line) => {

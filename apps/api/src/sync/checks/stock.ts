@@ -222,9 +222,16 @@ export function checkStockMovement(
     const productId = String(row.product_id);
     const voidRow = sourceInGroup(group, 'sale_voids', ref);
     const saleId = typeof voidRow?.sale_id === 'string' ? voidRow.sale_id : '';
+    // A same-transaction sale+void has the same lines in both sources; count each id once.
     const saleLines = [
-      ...(look.saleLinesBySale.get(saleId) ?? []),
-      ...linkedInGroup(group, 'sale_lines', 'sale_id', saleId),
+      ...new Map([
+        ...(look.saleLinesBySale.get(saleId) ?? []).map(
+          (line) => [String(line.id), line] as const,
+        ),
+        ...linkedInGroup(group, 'sale_lines', 'sale_id', saleId).map(
+          (line) => [String(line.id), line] as const,
+        ),
+      ]).values(),
     ];
     const sold = saleLines
       .filter((line) => line.product_id === productId)

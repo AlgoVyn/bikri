@@ -126,25 +126,29 @@ describe('writeAction (03 §3)', () => {
 
   it('notifies listeners when an edit coalesces into a pending op (SYNC-M2)', async () => {
     const db = freshDb();
-    const created = await writeAction(db, (w) =>
-      w.create('products', { name_en: 'P', sku: 'P-1', price: 100 }),
-    );
     const seen: { count: number; tables: string[] }[] = [];
     const off = onLocalWrite((count, tables) =>
       seen.push({ count, tables: [...tables] }),
     );
     try {
-      // The second edit is merged into the still-pending create (no new outbox row).
+      // Both writes are one action/transaction; the second is merged into the create.
       await writeAction(
         db,
-        (w) => w.update('products', created.id, { price: 200 }),
+        async (w) => {
+          const created = await w.create('products', {
+            name_en: 'P',
+            sku: 'P-1',
+            price: 100,
+          });
+          await w.update('products', created.id, { price: 200 });
+        },
         { tables: writeScope('products'), changedTables: ['products'] },
       );
     } finally {
       off();
     }
     expect(await db.outbox.count()).toBe(1);
-    expect(seen).toEqual([{ count: 0, tables: ['products'] }]);
+    expect(seen).toEqual([{ count: 1, tables: ['products'] }]);
   });
 
   it('an aborted action leaves neither rows, ops nor cache changes', async () => {
@@ -193,6 +197,30 @@ describe('writeAction (03 §3)', () => {
       expect(w.opCount).toBe(MAX_OPS_PER_TX);
     });
     expect(await db.outbox.count()).toBe(MAX_OPS_PER_TX);
+  });
+
+  it('does not coalesce another actor into a pending edit', async () => {
+    const db = freshDb();
+    await db.products.put({
+      id: 'p1',
+      name_en: 'X',
+      price: 1,
+      created_at: 1,
+      updated_at: 1,
+      rev: 2,
+    });
+    await writeAction(db, (w) => w.update('products', 'p1', { price: 2 }), {
+      actor: 'owner-1',
+      now: NOW,
+    });
+    await writeAction(db, (w) => w.update('products', 'p1', { price: 3 }), {
+      actor: 'manager-1',
+      now: NOW + 1,
+    });
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops[0]?.row?.updated_by).toBe('owner-1');
+    expect(ops[1]?.row?.updated_by).toBe('manager-1');
   });
 
   it('does not coalesce a second edit into an op already in flight', async () => {
@@ -258,23 +286,28 @@ describe('writeAction (03 §3)', () => {
     expect(ops.find((op) => op.seq !== first.seq)?.op_id).not.toBe(first.op_id);
   });
 
-  it('coalesces edits of a pending new row into its create op', async () => {
+  it('coalesces edits of a pending new row only within one transaction', async () => {
     const db = freshDb();
     await writeAction(
       db,
-      (w) => w.create('products', { id: 'p1', name_en: 'X', price: 1 }),
+      async (w) => {
+        await w.create('products', { id: 'p1', name_en: 'X', price: 1 });
+        await w.update('products', 'p1', { price: 2 });
+      },
       { now: NOW },
     );
-    await writeAction(db, (w) => w.update('products', 'p1', { price: 2 }), {
-      now: NOW + 1,
-    });
     const ops = await db.outbox.toArray();
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({
       base_rev: 0,
       changed_fields: [],
-      row: { price: 2, updated_at: NOW + 1 },
+      row: { price: 2, updated_at: NOW },
     });
+    // A later transaction is a separate action, not a silent merge into the create.
+    await writeAction(db, (w) => w.update('products', 'p1', { price: 3 }), {
+      now: NOW + 1,
+    });
+    expect(await db.outbox.count()).toBe(2);
   });
 
   it('edits of a synced row send base_rev and the union of changed fields', async () => {
@@ -288,12 +321,10 @@ describe('writeAction (03 §3)', () => {
       updated_at: 1,
       rev: 7,
     });
-    await writeAction(db, (w) =>
-      w.update('products', 'p1', { price: 2, name_en: 'X' }),
-    );
-    await writeAction(db, (w) =>
-      w.update('products', 'p1', { cost: 3, rev: 99, id: 'zz' }),
-    );
+    await writeAction(db, async (w) => {
+      await w.update('products', 'p1', { price: 2, name_en: 'X' });
+      await w.update('products', 'p1', { cost: 3, rev: 99, id: 'zz' });
+    });
     const ops = await db.outbox.toArray();
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({

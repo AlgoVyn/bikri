@@ -53,10 +53,17 @@ export function readOnlySeenStatement(
 export function revokeSupportDeviceStatements(
   db: TenantDb,
   now: number,
+  onlyExpired = false,
 ): D1PreparedStatement[] {
+  // Automatic expiry re-checks the tenant deadline and the device expiry in SQL, so a
+  // concurrent start/extension cannot be revoked by a stale read (API-M1). An explicit
+  // owner/operator end passes `false` and revokes every live support device.
+  const expiryGuard = onlyExpired
+    ? ' AND COALESCE(expires_at, 0) <= ?2 AND EXISTS (SELECT 1 FROM tenants t WHERE t.id = ?1 AND t.support_until IS NOT NULL AND t.support_until <= ?2)'
+    : '';
   return [
     db.prepare(
-      "UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL",
+      `UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND kind = 'support' AND revoked_at IS NULL${expiryGuard}`,
       now,
     ),
     // `changes()` is still the UPDATE's row count for the first statement after it.
@@ -77,7 +84,9 @@ export async function endExpiredSupport(
   now: number,
 ): Promise<boolean> {
   if (tenant.support_until === null || tenant.support_until > now) return false;
-  const [revoked] = await db.batch(revokeSupportDeviceStatements(db, now));
+  const [revoked] = await db.batch(
+    revokeSupportDeviceStatements(db, now, true),
+  );
   if ((revoked?.meta.changes ?? 0) === 0) return false;
   await db.batch(
     auditStatements(db, {

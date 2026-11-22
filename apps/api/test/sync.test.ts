@@ -215,6 +215,43 @@ describe('push (03 §4.1, §9)', () => {
     expect(row?.deleted_at).not.toBeNull();
   });
 
+  it('4b: two transactions editing the same row in one push do not livelock', async () => {
+    const shop = await seedShop('SameRowTwice');
+    const at = Date.now();
+    const base = productRow(IDS.product, {
+      name_en: 'Twice phone',
+      sku: 'PHN-0001',
+      price: 150000,
+      category_id: IDS.category,
+    });
+    const res = await pushOk(shop.till, [
+      op(
+        'products',
+        'upsert',
+        { ...base, price: 155000 },
+        { tx_id: newId(at), base_rev: 3, changed_fields: ['price'] },
+      ),
+      op(
+        'products',
+        'delete',
+        { id: IDS.product },
+        {
+          tx_id: newId(at + 1),
+          base_rev: 3,
+          updated_by: IDS.owner,
+        },
+      ),
+    ]);
+    expect(res.results.map((r) => r.result)).toEqual(['applied', 'applied']);
+    const row = await env.DB.prepare(
+      'SELECT deleted_at, rev FROM products WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.product)
+      .first<{ deleted_at: number | null; rev: number }>();
+    expect(row?.deleted_at).not.toBeNull();
+    expect(row?.rev).toBe(5);
+  });
+
   it('5: a sale referencing a customer created in the same batch, in reverse order (deferred FKs)', async () => {
     const shop = await seedShop('Deferred');
     const customerId = newId();

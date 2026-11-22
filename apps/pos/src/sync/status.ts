@@ -51,8 +51,11 @@ export async function applyStatus(
 }
 
 export async function isReadOnly(db: BikriDb): Promise<boolean> {
-  return (
+  if (
     (await getKv<StoredTenantStatus | null>(db, 'tenant_status', null))
       ?.status === 'read_only'
-  );
+  )
+    return true;
+  // A support device is view-only even while the shop is active (13 §7.5).
+  return (await getKv<string>(db, 'device_kind', '')) === 'support';
 }

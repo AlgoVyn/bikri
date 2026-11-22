@@ -253,22 +253,23 @@ export async function updateBranchSettings(
         address: patch.address.trim(),
         phone: patch.phone.trim(),
       });
-      await w.insert('audit_log', {
-        id: newId(now),
-        action: 'branch_change',
-        entity: 'branches',
-        entity_id: branchId,
-        before_json: JSON.stringify({
-          name: before.name,
-          bill_prefix: before.bill_prefix,
-          address: before.address,
-          phone: before.phone,
-        }),
-        after_json: JSON.stringify(patch),
-        device_id: deviceId,
-        staff_id: actor ?? '',
-        created_at: now,
-      });
+      if (w.opCount > 0)
+        await w.insert('audit_log', {
+          id: newId(now),
+          action: 'branch_change',
+          entity: 'branches',
+          entity_id: branchId,
+          before_json: JSON.stringify({
+            name: before.name,
+            bill_prefix: before.bill_prefix,
+            address: before.address,
+            phone: before.phone,
+          }),
+          after_json: JSON.stringify(patch),
+          device_id: deviceId,
+          staff_id: actor ?? '',
+          created_at: now,
+        });
       return updated;
     },
     { now, actor, tables: writeScope('branches', 'audit_log') },
@@ -378,32 +379,33 @@ export async function saveStaff(
           color: 'c1',
         });
       }
-      await w.insert('audit_log', {
-        id: newId(now),
-        action: 'staff_change',
-        entity: 'staff',
-        entity_id: row.id,
-        before_json: before
-          ? JSON.stringify({
-              name: before.name,
-              role: before.role,
-              active: before.active,
-              max_discount_bp: before.max_discount_bp,
-              permissions_json: before.permissions_json,
-            })
-          : null,
-        after_json: JSON.stringify({
-          name,
-          role: input.role,
-          active: input.active ? 1 : 0,
-          max_discount_bp: input.maxDiscountBp,
-          permissions_json: permissionsJson(input.permissions),
-          pin_changed: Boolean(input.pin),
-        }),
-        device_id: deviceId,
-        staff_id: actor ?? '',
-        created_at: now,
-      });
+      if (w.opCount > 0)
+        await w.insert('audit_log', {
+          id: newId(now),
+          action: 'staff_change',
+          entity: 'staff',
+          entity_id: row.id,
+          before_json: before
+            ? JSON.stringify({
+                name: before.name,
+                role: before.role,
+                active: before.active,
+                max_discount_bp: before.max_discount_bp,
+                permissions_json: before.permissions_json,
+              })
+            : null,
+          after_json: JSON.stringify({
+            name,
+            role: input.role,
+            active: input.active ? 1 : 0,
+            max_discount_bp: input.maxDiscountBp,
+            permissions_json: permissionsJson(input.permissions),
+            pin_changed: Boolean(input.pin),
+          }),
+          device_id: deviceId,
+          staff_id: actor ?? '',
+          created_at: now,
+        });
       return row;
     },
     { now, actor, tables: writeScope('staff', 'audit_log') },
@@ -659,6 +661,7 @@ export async function updateShopLogo(
     async (w) => {
       const current = await w.table<MasterRow, string>('shop').get('shop');
       if (!current) throw new SettingsError('name');
+      if (String(current.logo_key ?? '') === String(logoKey ?? '')) return;
       await w.update('shop', 'shop', { logo_key: logoKey });
       if (logo) {
         await w.table('file_queue').add({
@@ -678,17 +681,18 @@ export async function updateShopLogo(
           .table<{ key: string; value: unknown }, string>('kv')
           .delete('logo_bitmap');
       }
-      await w.insert('audit_log', {
-        id: newId(now),
-        action: 'shop_change',
-        entity: 'shop',
-        entity_id: 'shop',
-        before_json: JSON.stringify({ logo_key: current.logo_key ?? null }),
-        after_json: JSON.stringify({ logo_key: logoKey }),
-        device_id: deviceId,
-        staff_id: actor ?? '',
-        created_at: now,
-      });
+      if (w.opCount > 0)
+        await w.insert('audit_log', {
+          id: newId(now),
+          action: 'shop_change',
+          entity: 'shop',
+          entity_id: 'shop',
+          before_json: JSON.stringify({ logo_key: current.logo_key ?? null }),
+          after_json: JSON.stringify({ logo_key: logoKey }),
+          device_id: deviceId,
+          staff_id: actor ?? '',
+          created_at: now,
+        });
     },
     { now, actor, tables: writeScope('shop', 'file_queue', 'audit_log') },
   );

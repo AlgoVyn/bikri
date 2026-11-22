@@ -92,12 +92,18 @@ export async function verifyAccessJwt(
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [h, p, s] = parts as [string, string, string];
-  const header = parseSegment(
-    new TextDecoder().decode(fromBase64url(h)),
-  ) as JwtHeader | null;
-  const claims = parseSegment(
-    new TextDecoder().decode(fromBase64url(p)),
-  ) as JwtClaims | null;
+  const decode = (part: string): string | null => {
+    try {
+      return new TextDecoder().decode(fromBase64url(part));
+    } catch {
+      return null;
+    }
+  };
+  const headerText = decode(h);
+  const claimsText = decode(p);
+  if (headerText === null || claimsText === null) return null;
+  const header = parseSegment(headerText) as JwtHeader | null;
+  const claims = parseSegment(claimsText) as JwtClaims | null;
   if (!header || !claims) return null;
   if (header.alg !== 'RS256' || typeof header.kid !== 'string') return null;
   const domain = opts.teamDomain.replace(/^https?:\/\//, '');

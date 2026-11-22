@@ -666,26 +666,42 @@ admin.post('/tenants/:id/devices/:deviceId/revoke', async (c) => {
     throw new ApiError('NOT_FOUND', 404, 'No such device in this shop');
   if (device.revoked_at !== null)
     return c.json({ revoked_at: device.revoked_at });
-  await db.batch([
+  const res = await db.batch([
     db.prepare(
-      'UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3',
+      'UPDATE devices SET revoked_at = ?2, updated_at = ?2 WHERE tenant_id = ?1 AND id = ?3 AND revoked_at IS NULL',
       now,
       id,
     ),
-    changeLogStatement(db, 'devices', id, 'upsert', null, now),
+    changeLogStatement(db, 'devices', id, 'upsert', null, now, true),
     ...auditStatements(db, {
       action: 'device_revoke',
       entity: 'devices',
       entityId: id,
       after: { name: device.name, by: by(c.var.operator) },
       now,
+      onlyIfChanged: true,
     }),
   ]);
+  if ((res[0]?.meta.changes ?? 0) === 0) {
+    const current = await db.first<DeviceRow>(
+      'SELECT * FROM devices WHERE tenant_id = ?1 AND id = ?2',
+      id,
+    );
+    return c.json({ revoked_at: current?.revoked_at ?? now });
+  }
   return c.json({ revoked_at: now });
 });
 
 admin.post('/tenants/:id/import-ops', async (c) => {
   const { tenant, db } = c.var;
+  // The shop is being restored/deleted; importing offline ops into that state would
+  // race the purge/import and recreate rows the operator is replacing (API-L4).
+  if (tenant.status === 'deleting' || tenant.status === 'maintenance')
+    throw new ApiError(
+      'BAD_STATUS_CHANGE',
+      409,
+      'Offline ops cannot be imported while the shop is in maintenance or being deleted',
+    );
   const body = ImportOpsBody.parse(await readJsonBody(c, 1_000_000));
   const now = Date.now();
   const out = await importOps(c.env, db, tenant, body.device_id, body.ops, now);
@@ -723,6 +739,8 @@ admin.post('/tenants/:id/reset-owner-pin', async (c) => {
       'The PIN verifier is malformed',
     );
   const now = Date.now();
+  // One batch: a second-batch failure used to leave the new PIN applied without its
+  // change_log/audit row, so tills never pulled the reset (API-M6).
   const res = await db.batch([
     db.prepare(
       "UPDATE staff SET pin_hash = ?3, pin_salt = ?4, pin_iterations = ?5, pin_length = ?6, rev = rev + 1, updated_at = ?7, updated_by = 'server' WHERE tenant_id = ?1 AND id = ?2 AND role = 'owner' AND active = 1 AND deleted_at IS NULL",
@@ -733,19 +751,18 @@ admin.post('/tenants/:id/reset-owner-pin', async (c) => {
       body.pin_length,
       now,
     ),
-  ]);
-  if ((res[0]?.meta.changes ?? 0) !== 1)
-    throw new ApiError('NOT_FOUND', 404, 'No such owner in this shop');
-  await db.batch([
-    changeLogStatement(db, 'staff', body.staff_id, 'upsert', null, now),
+    changeLogStatement(db, 'staff', body.staff_id, 'upsert', null, now, true),
     ...auditStatements(db, {
       action: 'pin_reset',
       entity: 'staff',
       entityId: body.staff_id,
       after: { by: by(c.var.operator) },
       now,
+      onlyIfChanged: true,
     }),
   ]);
+  if ((res[0]?.meta.changes ?? 0) !== 1)
+    throw new ApiError('NOT_FOUND', 404, 'No such owner in this shop');
   return c.json({ ok: true });
 });
 

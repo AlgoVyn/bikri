@@ -124,6 +124,13 @@ export function checkBundleSaleGroups(
       throw new Reject('CONSTRAINT_FAILED');
     groups.set(bundleGroup, [...(groups.get(bundleGroup) ?? []), line]);
   }
+  // A Void & Reissue may keep, remove, re-quantify or re-discount a bundle from the
+  // replaced bill. A bundle that was not in the replaced bill (or whose recipe/price
+  // changed) is a fresh sale and must pass the normal recipe/list-price checks.
+  const replaced = sale.replaces_sale_id
+    ? replacedBundleSnapshots(look, String(sale.replaces_sale_id))
+    : [];
+  const usedReplaced = new Set<number>();
   for (const bundleLines of groups.values()) {
     const first = bundleLines[0];
     if (!first) continue;
@@ -173,6 +180,19 @@ export function checkBundleSaleGroups(
     if (net !== (bundlePrice - bundleDiscount) * bundleQty)
       throw new Reject('CONSTRAINT_FAILED');
 
+    const matched = replaced.findIndex(
+      (snapshot, index) =>
+        !usedReplaced.has(index) &&
+        snapshot.bundleId === bundleId &&
+        snapshot.bundleName === bundleName &&
+        snapshot.bundlePrice === bundlePrice &&
+        sameComponents(snapshot.components, components),
+    );
+    if (matched >= 0) {
+      usedReplaced.add(matched);
+      continue;
+    }
+
     const pushedProduct = group.find(
       (candidate) =>
         candidate.tbl === 'products' &&
@@ -193,13 +213,18 @@ export function checkBundleSaleGroups(
           ? entryAt >= item.updated_at
           : entryAt >= item.deleted_at),
     );
+    const pushedInPush =
+      pushedProduct !== undefined ||
+      (product as { pushed?: boolean }).pushed === true;
     const fresh =
-      !sale.replaces_sale_id &&
       recipeSeen &&
-      (pushedProduct !== undefined ||
+      (pushedInPush ||
         (entryAt >= Number(product.updated_at) &&
           Number(product.updated_at) <= deviceSeenAt));
-    if (fresh) {
+    // A non-matched reissue (changed price/recipe, or a bundle added to a non-bundle
+    // bill) must pass the current checks even when the device's recipe copy is stale;
+    // otherwise a cashier could bypass the price floor by changing the snapshot.
+    if (fresh || sale.replaces_sale_id) {
       if (
         bundlePrice < Number(product.price) &&
         !allowed('catalog.edit') &&
@@ -228,7 +253,6 @@ export function checkBundleSaleGroups(
       }
     }
   }
-  if (sale.replaces_sale_id) checkReissuedBundleGroups(look, sale, groups);
   if (
     sale.bundle_discount_total !== undefined &&
     n(sale.bundle_discount_total) !== bundleDiscountTotal
@@ -236,45 +260,58 @@ export function checkBundleSaleGroups(
     throw new Reject('CONSTRAINT_FAILED');
 }
 
-/** The replacement bill's bundle groups, same bundle and same snapshot as the replaced bill. */
-function checkReissuedBundleGroups(
+function sameComponents(
+  left: Map<string, number>,
+  right: Map<string, number>,
+): boolean {
+  if (left.size !== right.size) return false;
+  for (const [productId, qty] of left)
+    if (right.get(productId) !== qty) return false;
+  return true;
+}
+
+/**
+ * Bundle snapshots of the replaced bill, keyed by the bundle identity and the component
+ * quantities per bundle. Quantity and discount differences are deliberately not part of
+ * the identity: a reissue may re-quantify or re-discount an unchanged bundle.
+ */
+function replacedBundleSnapshots(
   look: Lookups,
-  sale: Record<string, unknown>,
-  groups: Map<string, Record<string, unknown>[]>,
-): void {
-  const replacedId = String(sale.replaces_sale_id);
-  const replacedGroups = new Map<string, Record<string, unknown>[]>();
+  replacedId: string,
+): {
+  bundleId: string;
+  bundleName: string;
+  bundlePrice: number;
+  components: Map<string, number>;
+}[] {
+  const byGroup = new Map<string, Record<string, unknown>[]>();
   for (const line of look.saleLinesBySale.get(replacedId) ?? []) {
     if (typeof line.bundle_group !== 'string') continue;
-    replacedGroups.set(line.bundle_group, [
-      ...(replacedGroups.get(line.bundle_group) ?? []),
+    byGroup.set(line.bundle_group, [
+      ...(byGroup.get(line.bundle_group) ?? []),
       line as unknown as Record<string, unknown>,
     ]);
   }
-  if (replacedGroups.size === 0) return;
-  const signature = (lines: Record<string, unknown>[]): string => {
-    const first = lines[0] ?? {};
-    const components = lines
-      .map(
-        (line) =>
-          `${String(line.product_id)}:${Number(line.bundle_component_qty_milli)}`,
-      )
-      .sort()
-      .join(',');
-    return [
-      String(first.bundle_id),
-      String(first.bundle_name ?? ''),
-      Number(first.bundle_qty ?? 0),
-      Number(first.bundle_price ?? 0),
-      Number(first.bundle_discount ?? 0),
+  const out = [];
+  for (const lines of byGroup.values()) {
+    const first = lines[0];
+    if (!first) continue;
+    const components = new Map<string, number>();
+    for (const line of lines) {
+      const productId = String(line.product_id ?? '');
+      const perBundle = Number(line.bundle_component_qty_milli ?? 0);
+      if (!productId || perBundle <= 0) continue;
+      components.set(productId, perBundle);
+    }
+    if (components.size === 0) continue;
+    out.push({
+      bundleId: String(first.bundle_id),
+      bundleName: String(first.bundle_name ?? ''),
+      bundlePrice: Number(first.bundle_price ?? 0),
       components,
-    ].join('|');
-  };
-  const expected = [...replacedGroups.values()].map(signature).sort();
-  const actual = [...groups.values()].map(signature).sort();
-  if (
-    expected.length !== actual.length ||
-    expected.some((value, index) => value !== actual[index])
-  )
-    throw new Reject('CONSTRAINT_FAILED');
+    });
+  }
+  return out;
 }
+
+/** The replacement bill's bundle groups, same bundle and same snapshot as the replaced bill. */

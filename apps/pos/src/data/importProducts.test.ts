@@ -36,6 +36,26 @@ describe('import spreadsheet (screens/08)', () => {
     });
   });
 
+  it('reports a SKU owned by a soft-deleted product instead of regenerating it', async () => {
+    const { db } = await shop('import-deleted-sku');
+    await db.products.put({
+      id: 'gone',
+      name_en: 'Old',
+      sku: 'OLD-1',
+      price: 1000,
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: NOW,
+      rev: 2,
+    } as never);
+    const g = grid('name_en,sku,price\nNew,OLD-1,25');
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.rows[0]?.errors).toContainEqual({
+      field: 'sku',
+      code: 'sku_taken',
+    });
+  });
+
   it('the template maps itself; English and Roman Urdu headers auto-match', () => {
     const [head] = grid(templateCsv());
     expect(head).toEqual([...TEMPLATE_COLUMNS]);

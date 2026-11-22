@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { addDays, BackdateError, startBackdate } from './backdate.ts';
 import { addProduct, addQuickSale, emptyCart } from './cart.ts';
 import { ledgerContext } from './catalog.ts';
+import { setKv } from './kv.ts';
 import { completeSale, SaleInvalidError } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
 import { NOW, sale, shopWithStock } from './testShop.ts';
+import { ReadOnlyError } from './write.ts';
 
 afterEach(dropTestDbs);
 
@@ -28,6 +30,19 @@ async function withCashier() {
 }
 
 describe('record a past sale (D-173)', () => {
+  it('refuses to start on a read-only shop or support device', async () => {
+    const { db } = await withCashier();
+    await setKv(db, 'tenant_status', { status: 'read_only' });
+    await expect(
+      startBackdate(db, {
+        actorId: 'st-1',
+        date: YESTERDAY,
+        staffId: 'st-2',
+        reason: 'Late entry',
+      }),
+    ).rejects.toBeInstanceOf(ReadOnlyError);
+  });
+
   it('starts a cart with the date, attributed cashier and reason; nothing is written to the ledger', async () => {
     const { db } = await withCashier();
     const { cartId } = await startBackdate(db, {

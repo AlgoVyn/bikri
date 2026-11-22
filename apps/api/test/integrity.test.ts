@@ -2,7 +2,13 @@ import { env } from 'cloudflare:workers';
 import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { IDS, seedShop } from './helpers/fixtures.ts';
-import { op, type PushResponse, pushOk, saleOps } from './helpers/ops.ts';
+import {
+  op,
+  type PushResponse,
+  productRow,
+  pushOk,
+  saleOps,
+} from './helpers/ops.ts';
 
 const now = Date.now();
 const codes = (res: PushResponse) =>
@@ -624,6 +630,56 @@ describe('document integrity checks (03 §4.1, 07 §5)', () => {
       ),
     ).toEqual(['CONSTRAINT_FAILED']);
   });
+  it('rejects a customer soft delete through upsert with unpaid udhaar (API-H3)', async () => {
+    const shop = await seedShop('Soft delete balance');
+    await udhaarSale(shop);
+    const customer = await env.DB.prepare(
+      'SELECT * FROM customers WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, IDS.customer)
+      .first<Record<string, unknown>>();
+    expect(customer).not.toBeNull();
+    const res = await pushOk(shop.admin, [
+      op(
+        'customers',
+        'upsert',
+        {
+          ...customer,
+          deleted_at: now,
+          updated_at: now,
+          updated_by: IDS.owner,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: Number(customer?.rev ?? 1),
+          changed_fields: ['deleted_at'],
+        },
+      ),
+    ]);
+    expect(codes(res)).toEqual(['CONSTRAINT_FAILED']);
+  });
+
+  it('does not let a last_cost push hide track_stock in the row payload (API-M3)', async () => {
+    const shop = await seedShop('Tracked cost guard');
+    const res = await pushOk(shop.admin, [
+      op(
+        'products',
+        'upsert',
+        {
+          ...productRow(IDS.product, { last_cost: 1000 }),
+          last_cost: 5000,
+          track_stock: 0,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: 3,
+          changed_fields: ['last_cost'],
+        },
+      ),
+    ]);
+    expect(codes(res)).toEqual(['CONSTRAINT_FAILED']);
+  });
+
   it('caps short text fields per table (review L6)', async () => {
     const shop = await seedShop('Text caps');
     const ok = saleOps(shop, shop.till, 1);

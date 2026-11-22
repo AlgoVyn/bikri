@@ -15,6 +15,8 @@ import type { Table, Transaction } from 'dexie';
 import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { clearSearchCache } from '../data/search.ts';
+import { clearSoldCache } from '../state/catalogue.ts';
 import { jsonBytes, MAX_BATCH_OPS, nextTxBatch } from './chunk.ts';
 import { tillRequest } from './client.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
@@ -131,7 +133,7 @@ export async function pushAll(
 ): Promise<PushOutcome> {
   const locks = globalThis.navigator?.locks;
   if (locks?.request)
-    return locks.request('bikri-push', () =>
+    return locks.request(`bikri-push-${db.tenantId}`, () =>
       pushAllUnlocked(db, maxRounds, true),
     ) as Promise<PushOutcome>;
   return pushAllUnlocked(db, maxRounds, false);
@@ -313,17 +315,28 @@ async function pushAllUnlocked(
               const local = (await db.table(entry.tbl).get(entry.row_id)) as
                 | Record<string, unknown>
                 | undefined;
-              await db.pull_shadow.put({
-                tbl: entry.tbl,
-                id: entry.row_id,
-                source: 'local',
-                row: {
-                  ...(local ?? {}),
-                  ...entry.row,
+              const existing = await db.pull_shadow.get([
+                entry.tbl,
+                entry.row_id,
+              ]);
+              const settledRev = Number(r.server_rev ?? 0);
+              if (
+                !(
+                  existing?.source === 'server' &&
+                  Number(existing.row.rev ?? 0) > settledRev
+                )
+              )
+                await db.pull_shadow.put({
+                  tbl: entry.tbl,
                   id: entry.row_id,
-                  rev: r.server_rev ?? local?.rev ?? 0,
-                },
-              });
+                  source: 'local',
+                  row: {
+                    ...(local ?? {}),
+                    ...entry.row,
+                    id: entry.row_id,
+                    rev: r.server_rev ?? local?.rev ?? 0,
+                  },
+                });
             }
           } else {
             const shadow = await db.pull_shadow.get([entry.tbl, entry.row_id]);
@@ -544,7 +557,14 @@ export async function discardFailed(
       } else if (!otherKeys.has(rowKey)) {
         const shadow = await db.pull_shadow.get([e.tbl, e.row_id]);
         if (shadow) {
-          await db.table(e.tbl).put(shadow.row);
+          const current = await db.table(e.tbl).get(e.row_id);
+          const shadowRev = Number(shadow.row.rev ?? 0);
+          const currentRev = Number(current?.rev ?? 0);
+          if (shadow.source === 'server' || shadowRev >= currentRev) {
+            await db.table(e.tbl).put(shadow.row);
+          }
+          // A shadow older than the live server row is a stale restore point; keep
+          // the pulled row instead of rolling it back (POS-H4).
           await db.pull_shadow.delete([e.tbl, e.row_id]);
         } else if (e.kind === 'upsert' && (e.base_rev ?? 0) === 0) {
           // A rejected local create has no server copy to restore.
@@ -557,4 +577,7 @@ export async function discardFailed(
     await recomputeDiscardedStatuses(tx, saleIds);
   });
   if (ledgerChanged) await rebuildCaches(db);
+  // Search and the catalogue's sold snapshot still contain the discarded rows.
+  clearSearchCache();
+  if (ledgerChanged) clearSoldCache();
 }

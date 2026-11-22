@@ -35,6 +35,8 @@ export type DeliveryInput = {
 export type DeliveryOptions = {
   today: string;
   now?: number;
+  /** The acting staff may change the catalogue price (`catalog.edit`). */
+  canEditPrice?: boolean;
 };
 
 export type DeliveryDetailLine = {
@@ -117,12 +119,11 @@ export async function saveDelivery(
       throw new DeliveryError('qty');
     if (!Number.isSafeInteger(line.unitCost) || line.unitCost < 0)
       throw new DeliveryError('cost');
-    if (
-      line.updatePrice !== null &&
-      line.updatePrice !== undefined &&
-      (!Number.isSafeInteger(line.updatePrice) || line.updatePrice < 0)
-    )
-      throw new DeliveryError('price');
+    if (line.updatePrice !== null && line.updatePrice !== undefined) {
+      if (!Number.isSafeInteger(line.updatePrice) || line.updatePrice < 0)
+        throw new DeliveryError('price');
+      if (options.canEditPrice === false) throw new DeliveryError('price');
+    }
   }
   if (!Number.isSafeInteger(input.otherCharges) || input.otherCharges < 0)
     throw new DeliveryError('paid');

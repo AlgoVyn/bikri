@@ -5,9 +5,9 @@
  */
 import {
   movementChangesAvgCost,
-  mulDivRound,
   newId,
   nextAvgCost,
+  roundHalfAway,
 } from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import {
@@ -546,14 +546,24 @@ export function stockRepairStatements(
       );
       const missing = info.qty - moved;
       if (missing <= 0) continue;
-      const cost = lines
-        .filter((line) => line.product_id === productId)
-        .reduce(
-          (sum, line) =>
-            sum + number(line.qty_milli) * number(line.landed_unit_cost),
-          0,
-        );
-      const unitCost = info.qty > 0 ? mulDivRound(cost, 1, info.qty) : null;
+      // Accumulate in BigInt: the product of a large quantity and a large landed cost
+      // can exceed Number.MAX_SAFE_INTEGER before the division (API-L1).
+      let cost = 0n;
+      for (const line of lines) {
+        if (line.product_id !== productId) continue;
+        cost +=
+          BigInt(number(line.qty_milli)) *
+          BigInt(number(line.landed_unit_cost));
+      }
+      let unitCost: number | null = null;
+      if (info.qty > 0) {
+        try {
+          unitCost = roundHalfAway(cost, BigInt(info.qty));
+        } catch {
+          // An out-of-range repair would otherwise surface as an HTTP 500.
+          continue;
+        }
+      }
       if (unitCost !== null && !Number.isSafeInteger(unitCost)) continue;
       addMovement(productId, missing, 'purchase', 'purchase', id, unitCost);
     }

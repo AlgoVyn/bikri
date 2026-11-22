@@ -1038,7 +1038,7 @@ describe('API-M2: bundle recipe freshness, same-push bundles and reissues', () =
     ]);
   });
 
-  it('refuses a reissue whose bundle snapshot differs from the replaced sale', async () => {
+  it('requires catalog.edit for a reissue whose bundle price differs from the replaced sale', async () => {
     const shop = await seedShop('M2 reissue');
     const bundle = await addBundleFixture(shop);
     const original = bundleSaleOps(shop, shop.till, 1, bundle);
@@ -1046,7 +1046,7 @@ describe('API-M2: bundle recipe freshness, same-push bundles and reissues', () =
     const replacedId = String(original[0]?.row?.id ?? '');
     const replacement = bundleSaleOps(shop, shop.till, 2, bundle, {
       replacesSaleId: replacedId,
-      bundlePrice: 250000,
+      bundlePrice: 150000,
     });
     const replacementId = String(replacement[0]?.row?.id ?? '');
     const tx = String(replacement[0]?.tx_id ?? '');
@@ -1054,7 +1054,7 @@ describe('API-M2: bundle recipe freshness, same-push bundles and reissues', () =
       ...replacement,
       ...reissueVoid(shop, replacedId, replacementId, tx),
     ]);
-    expect(wrong.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(wrong.results[0]?.error_code).toBe('FORBIDDEN');
   });
 });
 

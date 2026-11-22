@@ -70,7 +70,7 @@ export function voidBlocker(
   if (detail.refunds.length > 0) return 'refunded';
   if (!allowed && !override) return 'forbidden';
   if (
-    role === 'manager' &&
+    role !== 'owner' &&
     !override &&
     String(detail.sale.business_date) !== today
   )
@@ -116,7 +116,7 @@ export async function computeVoid(
   const shop = await (src.table('shop') as Table<MasterRow>).get('shop');
   const timeZone = String(shop?.timezone ?? 'Asia/Karachi') || 'Asia/Karachi';
   if (
-    role === 'manager' &&
+    role !== 'owner' &&
     !options.override &&
     String(sale.business_date) !==
       businessDate(options.now ?? Date.now(), timeZone)

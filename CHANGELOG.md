@@ -11,6 +11,20 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Price Check hides Add product in read-only mode, guards late lookups and toasts failed cart adds; Home gates reports/backup/sell links and attention destinations.
 - Inline price commits once and restores on empty blur; device import hides when unenrolled; owner sign-in ignores closed responses; sync file removal/acknowledge obey owner/read-only; wizard test prints do not open the drawer and USB/serial controls follow browser support.
 - Restore/Sales deep links, expense date validation, item counts, cart arrow order, command palette dialogs/privacy, supplier-return zero lines, PromiseDialog timezone guards, category RTL input, label printing in read-only, report keys/deltas/peak, clipboard/plural/category filters and Price Check keys are fixed.
+### POS data and sync — 22 Nov 2026 review recheck
+- A delivery with `updatePrice` now verifies `catalog.edit` in the repository; the Worker accepts the costed delivery and the price change.
+- Outbox coalescing is limited to one transaction and actor, so a delivery/recipe companion can no longer be split from its product edit.
+- Earlier-day voids and reissues now require an owner approval on the till, matching the Worker; the reissue override is bound to the owner.
+- `discardFailed` keeps a newer pulled row instead of restoring a stale shadow; pull merge clears the consumed shadow.
+- Restore recovery drops no-op master ops, advances `base_rev`, keeps a bundle product with its recipe, strips a costed product's old `last_cost`, and gives each unit its own transaction.
+- Sync engine coalesces push+pull into a full run; read-only includes support devices; file uploads use a tenant-scoped cross-tab lock; stock count awaits the draft chain; import preview rejects a SKU owned by a soft-deleted product; day-close boundaries and support/upload counts are aligned.
+
+### Worker API and sync — 22 Nov 2026 review recheck
+- Push planning advances `look.current` between transactions and bisects a lost `guardAssert`, so editing then deleting the same row in one push no longer wedges the till; D1 singleton failures stop the round and re-plan from committed state.
+- Rejected transactions no longer leak their customer/supplier/sale/refund lookups into later transactions; payments and ledger rows still require an applied or same-transaction party, while FK-backed sales/purchases may reference a party created later in the push.
+- A soft delete through `customers`/`suppliers` upsert now enforces the zero-balance rule; duplicate ledger inserts guard their side effects; a reissue validates a changed bundle price/recipe instead of rejecting every edit or bypassing checks.
+- Support expiry re-checks the deadline in SQL and only audits when devices were revoked; device edits/revokes use optimistic guards; owner PIN reset is one atomic batch; malformed Access JWTs return 401 instead of 500; shop requests mask emails and cannot overwrite `failed`.
+- `last_cost` guards use the effective `track_stock` write list; `void_return` deduplicates same-transaction sale lines; malformed day closes no longer poison the lookup window; purchase stock repair uses BigInt; partial staff PIN writes are rejected; read-only/support pull reads flush in coarse batches.
 
 ### Core and DB — 22 Nov 2026 review recheck
 - `formatQtyFromMilli()` formats fractional values for integer units instead of throwing, so a `kg` sale no longer crashes Sale Complete, Sales History, Reports or Product Edit; `parseQtyToMilli()` still rejects fractional `pc` input.

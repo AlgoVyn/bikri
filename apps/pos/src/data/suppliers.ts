@@ -294,19 +294,20 @@ export async function deleteSupplier(
     async (w) => {
       const before = await w.table<MasterRow, string>('suppliers').get(id);
       await w.remove('suppliers', id);
-      await w.insert('audit_log', {
-        id: newId(now),
-        action: 'party_delete',
-        entity: 'suppliers',
-        entity_id: id,
-        before_json: before
-          ? JSON.stringify({ name: before.name, phone: before.phone ?? '' })
-          : null,
-        after_json: null,
-        device_id: device?.id ?? '',
-        staff_id: actor ?? '',
-        created_at: now,
-      });
+      if (before?.deleted_at == null)
+        await w.insert('audit_log', {
+          id: newId(now),
+          action: 'party_delete',
+          entity: 'suppliers',
+          entity_id: id,
+          before_json: before
+            ? JSON.stringify({ name: before.name, phone: before.phone ?? '' })
+            : null,
+          after_json: null,
+          device_id: device?.id ?? '',
+          staff_id: actor ?? '',
+          created_at: now,
+        });
     },
     { now, actor, tables: writeScope('suppliers', 'audit_log') },
   );

@@ -934,6 +934,16 @@ export async function refreshPromises(
 ): Promise<number> {
   // Status refresh is a server-auditable promise edit; without an actor the push is rejected.
   if (!options.actor) return 0;
+  const actor = await db.staff.get(options.actor);
+  if (
+    !actor ||
+    !can(
+      actor.role as Role,
+      String(actor.permissions_json ?? '{}'),
+      'party.edit',
+    )
+  )
+    return 0;
   // Opening the chase list must never write in a read-only shop or on a support device.
   if (await isReadOnly(db)) return 0;
   if ((await db.kv.get('device_kind'))?.value === 'support') return 0;

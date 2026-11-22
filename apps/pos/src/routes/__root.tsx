@@ -27,13 +27,14 @@ const EnrolPage = lazy(() =>
 );
 
 function Gate() {
-  const { gate, db, revoked, enrolled, shopName } = useAppGate();
+  const { gate, db, revoked, enrolled, shopName, initialSyncPending } =
+    useAppGate();
   const session = useSession((s) => s.session);
   // T-035: an enrolled shop starts locked; the local dev/e2e shop keeps acting as owner (D-090).
   useAutoLock(enrolled && !revoked);
   // T-033/T-036: sync runs whenever this browser holds a device token for the open shop.
   useEffect(() => {
-    if (!db || !enrolled || revoked) return;
+    if (!db || !enrolled || revoked || initialSyncPending) return;
     let engine: SyncEngine | null = null;
     let cancelled = false;
     void import('../sync/engine.ts')
@@ -46,7 +47,7 @@ function Gate() {
       cancelled = true;
       engine?.stop();
     };
-  }, [db, enrolled, revoked]);
+  }, [db, enrolled, revoked, initialSyncPending]);
   const afterSetup = useSession((s) => s.afterSetup);
   const { pathname } = useLocation();
   const onSetup = pathname === '/setup' || pathname === '/setup/';

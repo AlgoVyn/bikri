@@ -1,4 +1,9 @@
-import { can as canDo, type Permission, type Role } from '@bikri/core';
+import {
+  businessDate,
+  can as canDo,
+  type Permission,
+  type Role,
+} from '@bikri/core';
 import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -86,6 +91,8 @@ import {
 type OverridePermission = Permission | 'udhaar.hard_limit';
 type OverrideRequest = {
   permission: OverridePermission;
+  /** Restrict the PIN approver, e.g. an earlier-day void needs the owner. */
+  roles?: Role[];
   onApproved: (approvedBy: string) => void;
 };
 
@@ -97,7 +104,7 @@ export function SellPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
-  const { staff, can } = useCurrentStaff();
+  const { staff, can, role } = useCurrentStaff();
   const timeZone = useShopTimeZone();
   const readOnly = useReadOnly();
   const money = useShopMoney();
@@ -320,8 +327,9 @@ export function SellPage() {
   };
 
   // --- overrides (05 §4.1) ---
-  const approvers = (permission: OverridePermission) =>
+  const approvers = (permission: OverridePermission, roles?: Role[]) =>
     approversFor(allStaff, (s) => {
+      if (roles !== undefined && !roles.includes(s.role as Role)) return false;
       if (permission === 'udhaar.hard_limit')
         return (
           s.id !== staff?.id && (s.role === 'owner' || s.role === 'manager')
@@ -460,9 +468,15 @@ export function SellPage() {
       });
       return;
     }
+    const reissueSale = current.reissue
+      ? await getDb().sales.get(current.reissue.sale_id)
+      : undefined;
+    const earlierDay =
+      reissueSale !== undefined &&
+      String(reissueSale.business_date) !== businessDate(Date.now(), timeZone);
     const voidNeeded =
       current.reissue != null &&
-      !can('sale.void') &&
+      (earlierDay ? role !== 'owner' : !can('sale.void')) &&
       !overrideMatches(current, 'sale.void');
     const need: OverridePermission | null = checks.belowCost
       ? 'sale.below_cost'
@@ -474,6 +488,7 @@ export function SellPage() {
     if (need) {
       setOverride({
         permission: need,
+        roles: need === 'sale.void' && earlierDay ? ['owner'] : undefined,
         onApproved: (by) => {
           const bound = cartSignature(current);
           void mutate((c) =>
@@ -1252,7 +1267,7 @@ export function SellPage() {
         }
         profiles={
           override
-            ? approvers(override.permission).map((s) => ({
+            ? approvers(override.permission, override.roles).map((s) => ({
                 id: s.id,
                 label: String(s.name),
               }))
