@@ -67,6 +67,46 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     expect(csv).toContain('A-A-2');
   });
 
+  test('bill remark, line note and product links connect the bill to the catalogue', async ({
+    page,
+  }) => {
+    await sellOne(page, 'Earbuds', 350000);
+    const saleId = page.url().match(/\/sales\/([^/?#]+)/u)?.[1] ?? '';
+    expect(saleId).not.toBe('');
+    const lines = await idbAll<Row>(page, 'sale_lines');
+    const line = lines.find((row) => row.sale_id === saleId);
+    expect(line).toBeTruthy();
+    await idbUpdate(page, 'sales', saleId, { note: 'Deliver after 6 pm' });
+    await idbUpdate(page, 'sale_lines', String(line?.id), {
+      serial: 'SN-12345',
+    });
+    await page.reload();
+
+    await expect(page.getByTestId('bill-remark')).toContainText(
+      'Deliver after 6 pm',
+    );
+    await expect(page.getByTestId('bill-line-note')).toContainText('SN-12345');
+    const productLink = page
+      .getByTestId('sales-detail')
+      .getByRole('link', { name: /Open product: Earbuds/u });
+    await expect(productLink).toBeVisible();
+    await productLink.click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Earbuds', level: 1 }),
+    ).toBeVisible();
+    const historyRef = page
+      .getByTestId('history-ref')
+      .filter({ hasText: /^Bill /u })
+      .first();
+    await expect(historyRef).toBeVisible();
+    await historyRef.click();
+    await expect(page.getByTestId('bill-status')).toBeVisible();
+    await expect(page.getByTestId('bill-remark')).toContainText(
+      'Deliver after 6 pm',
+    );
+  });
+
   test('every sales column sorts in both directions', async ({
     page,
   }, testInfo) => {

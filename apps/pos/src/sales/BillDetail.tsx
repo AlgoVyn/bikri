@@ -589,7 +589,18 @@ export function BillDetail({
           </thead>
           <tbody>
             {detail.lines.map(
-              ({ line, refundedMilli, keptMilli, unit }, lineIndex) => {
+              (
+                {
+                  line,
+                  refundedMilli,
+                  keptMilli,
+                  unit,
+                  product,
+                  bundleProduct,
+                  note,
+                },
+                lineIndex,
+              ) => {
                 const qty = Number(line.qty_milli);
                 const group = line.bundle_group
                   ? String(line.bundle_group)
@@ -607,11 +618,13 @@ export function BillDetail({
                           <span className="flex flex-wrap items-center gap-2 font-medium">
                             <span>
                               {t('office.bill.bundle_label')}{' '}
-                              <span
-                                className={`data-name ${isLatinName(String(line.bundle_name ?? '')) ? 'ltr-name' : ''}`}
-                              >
-                                {String(line.bundle_name ?? '')}
-                              </span>
+                              <ProductNameLink
+                                id={bundleProduct?.id ?? null}
+                                name={String(line.bundle_name ?? '')}
+                                latin={isLatinName(
+                                  String(line.bundle_name ?? ''),
+                                )}
+                              />
                             </span>
                             <span className="rounded-full bg-surface px-1.5 text-caption font-medium text-text-muted">
                               {t('sell.bundle_pill')}
@@ -631,11 +644,20 @@ export function BillDetail({
                     ) : null}
                     <tr className="border-b border-border last:border-0">
                       <td className={group ? 'p-2 ps-6' : 'p-2'}>
-                        <span
-                          className={`data-name block ${isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''}`}
-                        >
-                          {String(line.name_snapshot)}
-                        </span>
+                        <ProductNameLink
+                          id={product?.id ?? null}
+                          name={String(line.name_snapshot)}
+                          latin={isLatinName(String(line.name_snapshot))}
+                          className="block"
+                        />
+                        {note ? (
+                          <span
+                            className="block text-small text-text-muted"
+                            data-testid="bill-line-note"
+                          >
+                            {t('office.bill.line_note')}: {note}
+                          </span>
+                        ) : null}
                         {embedded ? null : (
                           <span className="block text-text-muted sm:hidden">
                             {t('office.bill.qty_price', {
@@ -721,6 +743,23 @@ export function BillDetail({
           </tbody>
         </table>
       </section>
+
+      {String(sale.note ?? '').trim() !== '' ? (
+        <p
+          data-testid="bill-remark"
+          className="rounded-control bg-surface-2 p-2 text-small"
+        >
+          <span className="font-medium">{t('office.bill.remark')}: </span>
+          <span
+            dir="auto"
+            className={`whitespace-pre-wrap break-words ${
+              isLatinName(String(sale.note)) ? '' : 'font-urdu'
+            }`}
+          >
+            {String(sale.note)}
+          </span>
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <section className="rounded-card border border-border bg-surface p-3 text-small">
@@ -998,6 +1037,35 @@ export function BillDetail({
         timeZone={timeZone}
       />
     </div>
+  );
+}
+
+function ProductNameLink({
+  id,
+  name,
+  latin,
+  className = '',
+}: {
+  id: string | null;
+  name: string;
+  latin: boolean;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const classes = `data-name ${latin ? 'ltr-name' : ''} ${className}`.trim();
+  if (!id) return <span className={classes}>{name}</span>;
+  return (
+    <Link
+      to="/products/$id"
+      params={{ id }}
+      aria-label={t('office.bill.open_product', { name })}
+      className={`${classes} underline decoration-dotted underline-offset-2 hover:decoration-solid`}
+    >
+      {name}
+      <span aria-hidden="true" className="ms-1 text-small text-text-muted">
+        ↗
+      </span>
+    </Link>
   );
 }
 

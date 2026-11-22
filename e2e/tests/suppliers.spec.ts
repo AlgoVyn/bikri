@@ -141,6 +141,25 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     expect(deliveryPdfBytes.subarray(0, 8).toString('latin1')).toBe('%PDF-1.4');
     await delivery.getByRole('button', { name: 'Close', exact: true }).click();
 
+    // The product's stock history opens the same delivery through the deep link.
+    await page.evaluate(
+      (id) => window.__bikriTest?.navigate(`/products/${id}`),
+      productId,
+    );
+    const deliveryLink = page
+      .getByTestId('history-ref')
+      .filter({ hasText: /^Delivery SUP-552/u })
+      .first();
+    await expect(deliveryLink).toBeVisible();
+    await deliveryLink.click();
+    await expect(
+      page.getByRole('dialog', { name: 'Delivery #SUP-552' }),
+    ).toBeVisible();
+    await page
+      .getByRole('dialog', { name: 'Delivery #SUP-552' })
+      .getByRole('button', { name: 'Close', exact: true })
+      .click();
+
     await expect(page.getByTestId('supplier-balance')).toContainText(
       'You owe Rs 500',
     );

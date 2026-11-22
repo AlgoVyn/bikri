@@ -26,6 +26,7 @@ import {
 import {
   ComponentInUseError,
   componentCost,
+  type HistoryRef,
   ledgerContext,
   loadBundleRecipe,
   PRODUCT_HISTORY_PAGE,
@@ -157,11 +158,13 @@ export function ProductDetailPage({
   const historyView = detail.history.map((h) => {
     if (h.kind === 'movement') {
       const delta = Number(h.movement.qty_delta_milli);
+      const note = String(h.movement.note ?? '').trim();
       return {
         key: `movement-${String(h.movement.id)}`,
         at: Number(h.movement.created_at),
         reason: t(`stock.reason.${String(h.movement.reason_code)}`),
-        note: null,
+        note: note === '' ? null : note,
+        ref: h.ref,
         qty: `${delta > 0 ? '+' : '−'}${formatQtyFromMilli(Math.abs(delta), unit)}`,
         tone: delta < 0 ? 'text-danger' : 'text-success',
         balance: formatQtyFromMilli(h.balanceAfter, unit),
@@ -191,6 +194,7 @@ export function ProductDetailPage({
         h.trackStock === 1 ? 'stock.reason.track_on' : 'stock.reason.track_off',
       ),
       note: minText,
+      ref: null,
       qty: null,
       tone: '',
       balance: formatQtyFromMilli(h.balanceAfter, unit),
@@ -252,6 +256,7 @@ export function ProductDetailPage({
                   unit,
                 ),
                 balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
+                note: String(h.movement.note ?? ''),
                 by: h.staffName,
               }
             : {
@@ -260,6 +265,7 @@ export function ProductDetailPage({
                   h.trackStock === 1 ? 'track_stock_on' : 'track_stock_off',
                 qty: '',
                 balanceAfter: formatQtyFromMilli(h.balanceAfter, unit),
+                note: '',
                 by: h.staffName,
               },
         ),
@@ -647,6 +653,26 @@ export function ProductDetailPage({
         </section>
       ) : null}
 
+      {String(p.notes ?? '').trim() !== '' ? (
+        <section
+          aria-labelledby="notes-heading"
+          className="rounded-card border border-border bg-surface p-4"
+          data-testid="product-notes"
+        >
+          <h2 id="notes-heading" className="text-title font-semibold">
+            {t('products.notes')}
+          </h2>
+          <p
+            dir="auto"
+            className={`mt-2 whitespace-pre-wrap break-words ${
+              isLatinName(String(p.notes)) ? '' : 'font-urdu'
+            }`}
+          >
+            {String(p.notes)}
+          </p>
+        </section>
+      ) : null}
+
       <section
         aria-labelledby="history-heading"
         className={bundle ? 'hidden' : undefined}
@@ -706,6 +732,7 @@ export function ProductDetailPage({
                               {h.note}
                             </span>
                           ) : null}
+                          {h.ref ? <HistoryRefLink historyRef={h.ref} /> : null}
                         </td>
                         <td
                           className={`px-3 py-2 text-start ${h.tone}`}
@@ -745,6 +772,9 @@ export function ProductDetailPage({
                           <span className="block text-small font-normal text-text-muted">
                             {h.note}
                           </span>
+                        ) : null}
+                        {h.ref ? (
+                          <HistoryRefLink historyRef={h.ref} block />
                         ) : null}
                       </span>
                       <span
@@ -842,6 +872,48 @@ export function ProductDetailPage({
         />
       ) : null}
     </div>
+  );
+}
+
+function HistoryRefLink({
+  historyRef,
+  block = false,
+}: {
+  historyRef: HistoryRef;
+  block?: boolean;
+}) {
+  const { t } = useTranslation();
+  const isPurchase = historyRef.kind === 'purchase';
+  const invoice = historyRef.invoiceNo;
+  const label = isPurchase
+    ? invoice
+      ? t('products.history_delivery', { invoice })
+      : t('products.history_delivery_plain')
+    : invoice
+      ? t('products.history_bill', { invoice })
+      : t('products.history_bill_plain');
+  const className = `mt-0.5 ${
+    block ? 'flex' : 'inline-flex'
+  } w-fit items-center gap-1 text-small font-medium text-primary underline-offset-2 hover:underline`;
+  return isPurchase ? (
+    <Link
+      to="/suppliers/$supplierId"
+      params={{ supplierId: historyRef.supplierId }}
+      search={{ delivery: historyRef.purchaseId }}
+      className={className}
+      data-testid="history-ref"
+    >
+      {label}
+    </Link>
+  ) : (
+    <Link
+      to="/sales/$id"
+      params={{ id: historyRef.saleId }}
+      className={className}
+      data-testid="history-ref"
+    >
+      {label}
+    </Link>
   );
 }
 

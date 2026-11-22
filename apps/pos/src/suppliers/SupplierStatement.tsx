@@ -45,9 +45,12 @@ const STATEMENT_PAGE = 200;
 export function SupplierStatement({
   supplierId,
   embedded = false,
+  initialDeliveryId,
 }: {
   supplierId: string;
   embedded?: boolean;
+  /** Opens the delivery details dialog directly (`?delivery=<purchaseId>`). */
+  initialDeliveryId?: string;
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -56,7 +59,9 @@ export function SupplierStatement({
   const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [deliveryId, setDeliveryId] = useState<string | null>(null);
+  const [deliveryId, setDeliveryId] = useState<string | null>(
+    initialDeliveryId ?? null,
+  );
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [visibleRows, setVisibleRows] = useState(STATEMENT_PAGE);
@@ -89,6 +94,10 @@ export function SupplierStatement({
   // A new supplier or date filter starts again at the newest page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter changes
   useEffect(() => setVisibleRows(STATEMENT_PAGE), [supplierId, from, to]);
+  // Deep link from a stock movement: open the delivery even when this screen is mounted.
+  useEffect(() => {
+    setDeliveryId(initialDeliveryId ?? null);
+  }, [initialDeliveryId]);
 
   useHotkey(
     plainKey('d'),
@@ -581,7 +590,16 @@ export function SupplierStatement({
         purchaseId={deliveryId}
         open={deliveryId !== null}
         onOpenChange={(open) => {
-          if (!open) setDeliveryId(null);
+          if (!open) {
+            setDeliveryId(null);
+            if (initialDeliveryId)
+              void navigate({
+                to: '/suppliers/$supplierId',
+                params: { supplierId },
+                search: {},
+                replace: true,
+              });
+          }
         }}
       />
     </div>
