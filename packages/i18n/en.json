@@ -247,7 +247,8 @@
     "bundle_error_component": "Choose an active simple product that is not this bundle.",
     "bundle_error_qty": "Each item needs a quantity above zero.",
     "bundle_error_count": "A bundle needs between 1 and 20 different items.",
-    "cost_tracked_hint": "Cost is updated by deliveries and stock movements. To edit it, turn off stock tracking first."
+    "cost_tracked_hint": "Cost is updated by deliveries and stock movements. To edit it, turn off stock tracking first.",
+    "unit_stock_fractional": "Adjust the fractional stock with a stock count before switching to this unit."
   },
   "glossary": {
     "baqaya": "Balance",

@@ -8,7 +8,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 - Dexie V14 drops the unused standalone `sale_lines.bundle_id` index and adds `outbox.tx_id`; `discardFailed` now reads one rejected transaction instead of the whole queue.
 - Sales, Expenses and Reports wait for the shop timezone before seeding saved date filters; the shared timezone hook reports readiness without changing hook order.
 - Snapshot pages charge D1's real `rows_read`; a test-only `x-bikri-d1-calls` / `x-bikri-apply-ms` header gives the 200-op gate a call and internal-apply guard alongside the wall-clock proxy.
-- Product unit changes round fractional opening/minimum and refuse to clamp a missing bundle component to `pc`; ReadOnlyError shows the read-only toast in the remaining day-close/expense/supplier/customer dialogs; label/print/download promises are caught.
+- Product unit changes round fractional opening/minimum, refuse an integer unit while tracked stock is fractional, and never clamp a missing bundle component to `pc`; ReadOnlyError shows the read-only toast in the remaining day-close/expense/supplier/customer dialogs; label/print/download promises are caught.
 - `loadAreaCatalog` is a static import (it was already in the initial graph) and the delivery CSV loads with the other delivery exports; the bundle test drops its duplicate price assertion.
 
 ### Print agent 0.1.8 — 22 Nov 2026

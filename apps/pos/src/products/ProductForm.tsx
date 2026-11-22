@@ -976,6 +976,10 @@ export function ProductFormPage({
                     set('unit', unit);
                     return;
                   }
+                  if (isEdit && draft.track_stock && onHand % 1000 !== 0) {
+                    toast.push(t('form.unit_stock_fractional'), 'error');
+                    return;
+                  }
                   // An integer unit cannot keep a fractional opening/minimum.
                   const whole = (value: number | null) =>
                     value === null ? null : Math.round(value / 1000) * 1000;
