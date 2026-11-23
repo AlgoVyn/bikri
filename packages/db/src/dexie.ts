@@ -219,7 +219,7 @@ export const DEXIE_SCHEMA_V14 = {
     'id, sale_id, business_date, [product_id+business_date], [bundle_id+business_date]',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V12;
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V14;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',

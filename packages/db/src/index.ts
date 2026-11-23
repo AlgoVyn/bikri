@@ -11,6 +11,7 @@ export {
   clearTenantDb,
   DEXIE_SCHEMA_V1,
   DEXIE_SCHEMA_V12,
+  DEXIE_SCHEMA_V14,
   type DexieTableName,
   deleteTenantDb,
   type FileQueueEntry,

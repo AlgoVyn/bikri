@@ -277,7 +277,7 @@ Asset layout: `apps/pos` builds into `apps/pos/dist/bikri/` (Vite `base: '/bikri
 
 ### 5.2 Security headers
 
-API responses get them from a Hono middleware. Static assets get them from a Workers-assets `_headers` file, which must sit at the **root of the assets directory** (`apps/pos/dist/_headers`, written by the post-build step, rules for `/bikri/*`), not inside `dist/bikri/` (Vite would put `public/_headers` there). T-002 checks with `curl -sI https://algovyn.com/bikri/` that CSP and HSTS are present on the HTML:
+API responses get them from a Hono middleware. Static assets get them from a Workers-assets `_headers` file, which must sit at the **root of the assets directory** (`apps/pos/dist/_headers`, written by the post-build step, rules for `/bikri` and `/bikri/*`), not inside `dist/bikri/` (Vite would put `public/_headers` there). T-002 checks with `curl -sI https://algovyn.com/bikri/` that CSP and HSTS are present on the HTML:
 
 ```
 /bikri/*
@@ -317,6 +317,8 @@ API responses get them from a Hono middleware. Static assets get them from a Wor
   Cache-Control: public, max-age=0, must-revalidate
 
 ```
+
+The post-build emits the same header block for the bare `/bikri` path as well: Cloudflare's `/*` wildcard does not match the prefix on its own.
 
 `_headers` rules apply in file order and a repeated `Cache-Control` is joined (RFC 9111 then keeps the first value), so the narrow asset rules **detach** the broad value before setting their own (D-231). Content-hashed files under `/assets/*` and the content-hashed Workbox runtime never change under the same URL, so they skip revalidation for a year; HTML, `sw.js` and `manifest.webmanifest` keep `max-age=0`. The root files detach `no-transform` so they are compressed. Icons, fonts and brand images keep stable filenames (`app-icon-192.png`, `inter-latin-wght-normal.woff2`, `bikri-pos-email.png`) because the manifest, `index.html`, installed PWAs and the server email template refer to them, so they revalidate daily instead of being `immutable` (D-237).
 

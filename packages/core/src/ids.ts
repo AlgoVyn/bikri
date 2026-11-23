@@ -4,13 +4,17 @@ import { monotonicFactory } from 'ulidx';
  * ULIDs are identifiers, never secrets. `crypto.getRandomValues` is used everywhere it
  * exists (browsers, Workers); the fallback keeps test module evaluators working when a
  * coverage runtime has no Web Crypto installed.
+ *
+ * Exported for the unit test. A PRNG draw must stay inside [0, 1): `0xff / 0xff`
+ * reached exactly 1 and only the base-32 encoder's clamp kept it valid, so divide by
+ * `0x100` instead.
  */
-function randomUnit(): number {
+export function randomUnit(): number {
   const source = globalThis.crypto;
   if (typeof source?.getRandomValues === 'function') {
     const byte = new Uint8Array(1);
     source.getRandomValues(byte);
-    return (byte[0] ?? 0) / 0xff;
+    return (byte[0] ?? 0) / 0x100;
   }
   return Math.random();
 }

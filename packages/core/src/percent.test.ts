@@ -23,4 +23,9 @@ describe('parsePercentToBp', () => {
     expect(parsePercentToBp('1.2345')).toBeNull();
     expect(Object.is(parsePercentToBp('-0'), -0)).toBe(false);
   });
+
+  it('strips non-breaking and thin spaces inside a percentage', () => {
+    expect(parsePercentToBp('1\u00A02.5')).toBe(1_250);
+    expect(parsePercentToBp('1\u20092.345%')).toBe(1_235);
+  });
 });

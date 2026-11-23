@@ -59,12 +59,15 @@ describe('security headers', () => {
 
   it('keeps no-transform on HTML and caches hashed and stable assets correctly', () => {
     const file = renderAssetHeaders();
-    expect(file.startsWith(`${BASE_PATH}/*\n`)).toBe(true);
+    expect(file.startsWith(`${BASE_PATH}\n`)).toBe(true);
     const blocks = parseBlocks(file);
-    expect(blocks[`${BASE_PATH}/*`]).toEqual({
-      'Cache-Control': ASSET_CACHE_CONTROL,
-      ...SECURITY_HEADERS,
-    });
+    // `/bikri` itself and everything under `/bikri/*` both carry the security headers.
+    for (const path of [BASE_PATH, `${BASE_PATH}/*`]) {
+      expect(blocks[path]).toEqual({
+        'Cache-Control': ASSET_CACHE_CONTROL,
+        ...SECURITY_HEADERS,
+      });
+    }
     expect(ASSET_CACHE_CONTROL).toContain('no-transform');
     for (const path of IMMUTABLE_ASSET_PATHS) {
       expect(blocks[path]).toEqual({
