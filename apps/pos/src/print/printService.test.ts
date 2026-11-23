@@ -28,6 +28,7 @@ import {
 } from './printService.ts';
 import {
   chunks,
+  clampBaudRate,
   PrintError,
   sendSerial,
   sendUsb,
@@ -215,6 +216,96 @@ describe('transports (06 §10)', () => {
     await printTestPage(db, usbPrinter(), { usb, serial: null, renderer });
     expect(usb.device.sent.length).toBeGreaterThan(1);
     expect(usb.device.sent.every((c) => c.length <= 4096)).toBe(true);
+  });
+
+  it('serializes concurrent sends to one USB device', async () => {
+    const usb = fakeUsb();
+    let active = 0;
+    let peak = 0;
+    usb.device.transferOut = async (_endpoint, data) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      usb.device.sent.push(new Uint8Array(data as unknown as Uint8Array));
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      return { status: 'ok' };
+    };
+    const first = new Uint8Array(5000).fill(1);
+    const second = new Uint8Array(5000).fill(2);
+    await Promise.all([
+      sendUsb(usb.device, first),
+      sendUsb(usb.device, second),
+    ]);
+    // Chunks of one send never interleave with the other (`GS v 0` raster bands).
+    expect(peak).toBe(1);
+    expect(usb.device.sent.map((chunk) => chunk[0])).toEqual([1, 1, 2, 2]);
+    expect(joined(usb.device.sent)).toEqual(joined([first, second]));
+  });
+
+  it('does not make one USB device wait for another', async () => {
+    const slow = fakeUsb();
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    let reached!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    slow.device.transferOut = async () => {
+      reached();
+      await gate;
+      return { status: 'ok' };
+    };
+    const other = fakeUsb({ serialNumber: 'P2' });
+    const pending = sendUsb(slow.device, new Uint8Array([1]));
+    await waiting;
+    await sendUsb(other.device, new Uint8Array([2]));
+    expect(joined(other.device.sent)).toEqual(new Uint8Array([2]));
+    openGate();
+    await pending;
+  });
+
+  it('serializes concurrent sends to one serial port', async () => {
+    const serial = fakeSerial({ strictLock: true });
+    await Promise.all([
+      sendSerial(
+        serial.port,
+        new Uint8Array([1]),
+        { baudRate: 9600, flowControl: 'none' },
+        1000,
+      ),
+      sendSerial(
+        serial.port,
+        new Uint8Array([2]),
+        { baudRate: 9600, flowControl: 'none' },
+        1000,
+      ),
+    ]);
+    // The second send waits for the writer lock; the port opens only once.
+    expect(serial.port.events.filter((event) => event === 'open')).toHaveLength(
+      1,
+    );
+    expect(
+      serial.port.events.filter((event) => event === 'writer'),
+    ).toHaveLength(2);
+    expect(serial.port.events).not.toContain('abort');
+    expect(serial.port.events).not.toContain('close-locked');
+    expect(joined(serial.port.sent)).toEqual(new Uint8Array([1, 2]));
+  });
+
+  it('clamps an unsupported serial baud rate before opening the port', async () => {
+    expect(clampBaudRate(12345)).toBe(9600);
+    expect(clampBaudRate(0)).toBe(9600);
+    expect(clampBaudRate(115200)).toBe(115200);
+    const serial = fakeSerial();
+    await sendSerial(
+      serial.port,
+      new Uint8Array([1]),
+      { baudRate: 12345, flowControl: 'none' },
+      1000,
+    );
+    expect(serial.port.openedWith).toMatchObject({ baudRate: 9600 });
   });
 
   it('reopens serial for a config change and releases a timed-out write', async () => {

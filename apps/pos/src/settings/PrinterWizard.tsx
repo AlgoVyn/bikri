@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
-import { setKv } from '../data/kv.ts';
+import { getKv, setKv } from '../data/kv.ts';
 import type { PrinterKv } from '../data/receipt.ts';
 import {
   AGENT_DOWNLOADS,
@@ -16,18 +16,27 @@ import {
   type AgentMode,
   type AgentPrinter,
   AgentRequestError,
+  agentCompatible,
   agentPlatform,
   httpAgentClient,
 } from '../print/agent.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { errorCode, printTestPage } from '../print/printService.ts';
-import type {
-  PrintErrorCode,
-  SerialPortLike,
-  UsbDeviceLike,
+import {
+  type PrintErrorCode,
+  SERIAL_BAUD_RATES,
+  type SerialPortLike,
+  type UsbDeviceLike,
 } from '../print/transports.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import {
+  AGENT_PENDING_KEY,
+  printerConnected,
+  type SerialChoice,
+  serialChoiceOf,
+  withSerialChoice,
+} from './printerWizardState.ts';
 
 function isStaleAgentToken(error: unknown): boolean {
   return (
@@ -38,7 +47,7 @@ function isStaleAgentToken(error: unknown): boolean {
 
 type Step = 'paper' | 'connection' | 'test';
 type Answer = 'yes' | 'no' | null;
-const BAUDS = [9600, 19200, 38400, 115200] as const;
+const BAUDS = SERIAL_BAUD_RATES;
 
 const choice = (on: boolean) =>
   `flex min-h-14 flex-1 flex-col items-start justify-center rounded-card border-2 p-3 text-start ${on ? 'border-primary bg-primary-subtle text-primary-subtle-ink' : 'border-border bg-surface'}`;
@@ -150,17 +159,47 @@ export function PrinterWizard({
   const [agentError, setAgentError] = useState<string | null>(null);
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentChecking, setAgentChecking] = useState(true);
+  const [serialChoice, setSerialChoice] = useState<SerialChoice>(() =>
+    serialChoiceOf(current ?? {}),
+  );
   const patch = (p: Partial<PrinterKv>) => setDraft((d) => ({ ...d, ...p }));
+  const changeSerialChoice = (next: SerialChoice) => {
+    setSerialChoice(next);
+    setDraft((d) => withSerialChoice(d, next));
+  };
   const patchAgent = (p: Partial<NonNullable<PrinterKv['agent']>>) =>
     setDraft((d) =>
       d.agent === undefined ? d : { ...d, agent: { ...d.agent, ...p } },
     );
+  const rememberAgent = async (config: NonNullable<PrinterKv['agent']>) => {
+    await setKv(getDb(), AGENT_PENDING_KEY, config);
+  };
 
   useEffect(() => {
     if (!desktop) return;
     let cancelled = false;
     void (async () => {
-      const url = current?.agent?.url ?? AGENT_URL;
+      // A pairing that completed before Save lives here: the agent already
+      // dropped its one-time code and would answer ALREADY_PAIRED after a
+      // reload, so recover the token instead of locking the shop out.
+      const pending = current?.agent?.token
+        ? null
+        : await getKv<NonNullable<PrinterKv['agent']> | null>(
+            getDb(),
+            AGENT_PENDING_KEY,
+            null,
+          );
+      const url = current?.agent?.url ?? pending?.url ?? AGENT_URL;
+      if (pending && !current?.agent?.token) {
+        setDraft((value) => ({
+          ...value,
+          transport: 'agent',
+          agent: {
+            ...pending,
+            printerName: value.agent?.printerName || pending.printerName,
+          },
+        }));
+      }
       setAgentChecking(true);
       let health: AgentHealth;
       try {
@@ -175,15 +214,16 @@ export function PrinterWizard({
       if (cancelled) return;
       setAgentHealth(health);
       setAgentChecking(false);
-      if (health.protocol !== AGENT_PROTOCOL) {
+      if (!agentCompatible(health)) {
         setAgentError('agent_outdated');
         return;
       }
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
-      if (health.paired && current?.agent?.token) {
+      const token = current?.agent?.token ?? pending?.token;
+      if (health.paired && token) {
         try {
-          const list = await agent.printers(url, current.agent.token);
+          const list = await agent.printers(url, token);
           if (!cancelled) setAgentPrinters(list);
         } catch (err) {
           if (!cancelled) {
@@ -193,10 +233,15 @@ export function PrinterWizard({
                 delete next.agent;
                 return next;
               });
+              await getDb().kv.delete(AGENT_PENDING_KEY);
               setAgentError('agent_already_paired');
             } else setAgentError('agent_unreachable');
           }
         }
+      } else if (health.paired) {
+        // A token in this browser was expected but is gone: only the agent's
+        // own Unpair can start a new pairing.
+        setAgentError('agent_already_paired');
       }
     })();
     return () => {
@@ -209,21 +254,32 @@ export function PrinterWizard({
     setAgentChecking(true);
     setAgentError(null);
     try {
-      const url = draft.agent?.url ?? AGENT_URL;
+      const pending = draft.agent?.token
+        ? null
+        : await getKv<NonNullable<PrinterKv['agent']> | null>(
+            getDb(),
+            AGENT_PENDING_KEY,
+            null,
+          );
+      const url = draft.agent?.url ?? pending?.url ?? AGENT_URL;
       const health = await agent.health(url);
       setAgentHealth(health);
       setAgentChecking(false);
-      if (health.protocol !== AGENT_PROTOCOL) {
+      if (!agentCompatible(health)) {
         setAgentError('agent_outdated');
         return;
       }
       if (!health.paired && health.pairingCode)
         setAgentCode(health.pairingCode);
       if (health.paired) {
-        if (draft.agent?.token) {
+        const token = draft.agent?.token ?? pending?.token;
+        if (token) {
           try {
-            const list = await agent.printers(url, draft.agent.token);
+            const list = await agent.printers(url, token);
             setAgentPrinters(list);
+            if (!draft.agent?.token && pending) {
+              patch({ transport: 'agent', agent: pending });
+            }
           } catch (err) {
             if (isStaleAgentToken(err)) {
               setDraft((value) => {
@@ -231,6 +287,7 @@ export function PrinterWizard({
                 delete next.agent;
                 return next;
               });
+              await getDb().kv.delete(AGENT_PENDING_KEY);
               setAgentError('agent_already_paired');
             } else setAgentError('agent_unreachable');
           }
@@ -251,6 +308,10 @@ export function PrinterWizard({
     setAgentBusy(true);
     setAgentError(null);
     try {
+      if (!agentCompatible(agentHealth)) {
+        setAgentError('agent_outdated');
+        return;
+      }
       const code = agentCode.trim() || agentHealth?.pairingCode || '';
       if (code.length !== 6) {
         setAgentError('agent_pair_failed');
@@ -265,11 +326,14 @@ export function PrinterWizard({
         printerName: '',
         mode: 'raw' as AgentMode,
       };
+      // The agent forgets its pairing code and answers ALREADY_PAIRED from now
+      // on. Persist the token before anything else can fail or be cancelled.
+      await rememberAgent(config);
       patch({ transport: 'agent', agent: config });
       try {
         const health = await agent.health(url);
         setAgentHealth(health);
-        if (health.protocol !== AGENT_PROTOCOL) {
+        if (!agentCompatible(health)) {
           setAgentError('agent_outdated');
           return;
         }
@@ -277,7 +341,7 @@ export function PrinterWizard({
         setAgentHealth((health) => ({
           ...(health ?? {
             app: 'bikri-print-agent',
-            version: '',
+            version: agentHealth?.version ?? '',
             protocol: AGENT_PROTOCOL,
             platform: '',
             paired: true,
@@ -291,7 +355,11 @@ export function PrinterWizard({
         const list = await agent.printers(url, paired.token);
         setAgentPrinters(list);
         const chosen = list.find((p) => p.isDefault) ?? list[0];
-        if (chosen) patch({ agent: { ...config, printerName: chosen.name } });
+        if (chosen) {
+          const selected = { ...config, printerName: chosen.name };
+          await rememberAgent(selected);
+          patch({ agent: selected });
+        }
       } catch {
         setAgentError('agent_unreachable');
       }
@@ -314,6 +382,7 @@ export function PrinterWizard({
     setAgentError(null);
     try {
       await agent.unpair(config.url, config.token);
+      await getDb().kv.delete(AGENT_PENDING_KEY);
       setDraft((currentDraft) => {
         const next = { ...currentDraft };
         delete next.agent;
@@ -336,6 +405,7 @@ export function PrinterWizard({
           delete next.agent;
           return next;
         });
+        await getDb().kv.delete(AGENT_PENDING_KEY);
         setAgentError('agent_already_paired');
       } else setAgentError('agent_unreachable');
     } finally {
@@ -388,8 +458,8 @@ export function PrinterWizard({
         serial: {
           usbVendorId: info.usbVendorId,
           usbProductId: info.usbProductId,
-          baudRate: draft.serial?.baudRate ?? 9600,
-          flowControl: draft.serial?.flowControl ?? 'none',
+          baudRate: serialChoice.baudRate,
+          flowControl: serialChoice.flowControl,
         },
       });
     } catch (err) {
@@ -397,12 +467,7 @@ export function PrinterWizard({
     }
   };
 
-  const connected =
-    draft.transport === 'system' ||
-    (draft.transport === 'usb' && Boolean(draft.usb)) ||
-    (draft.transport === 'serial' && Boolean(draft.serial)) ||
-    (draft.transport === 'agent' &&
-      Boolean(draft.agent?.token && draft.agent.printerName));
+  const connected = printerConnected(draft, agentHealth);
 
   const test = async () => {
     setBusy(true);
@@ -423,8 +488,12 @@ export function PrinterWizard({
   };
 
   const save = async () => {
+    if (!connected) return;
     try {
-      await setKv(getDb(), 'printer', draft);
+      const db = getDb();
+      await setKv(db, 'printer', draft);
+      // The token now lives in `kv.printer`; the recovery copy is no longer needed.
+      await db.kv.delete(AGENT_PENDING_KEY);
       onDone();
     } catch {
       toast.push(t('errors.generic'), 'error');
@@ -606,14 +675,11 @@ export function PrinterWizard({
                 <span className="text-small">{t('printer.baud')}</span>
                 <select
                   className="h-11 rounded-control border border-border-strong bg-surface px-2"
-                  value={draft.serial?.baudRate ?? 9600}
+                  value={serialChoice.baudRate}
                   onChange={(e) =>
-                    patch({
-                      serial: {
-                        flowControl: 'none',
-                        ...draft.serial,
-                        baudRate: Number(e.target.value),
-                      },
+                    changeSerialChoice({
+                      ...serialChoice,
+                      baudRate: Number(e.target.value),
                     })
                   }
                 >
@@ -622,6 +688,22 @@ export function PrinterWizard({
                       {b}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-small">{t('printer.flow_control')}</span>
+                <select
+                  className="h-11 rounded-control border border-border-strong bg-surface px-2"
+                  value={serialChoice.flowControl}
+                  onChange={(e) =>
+                    changeSerialChoice({
+                      ...serialChoice,
+                      flowControl: e.target.value as 'none' | 'hardware',
+                    })
+                  }
+                >
+                  <option value="none">{t('printer.flow_none')}</option>
+                  <option value="hardware">{t('printer.flow_hardware')}</option>
                 </select>
               </label>
               {draft.serial ? (
@@ -721,7 +803,11 @@ export function PrinterWizard({
                     <button
                       type="button"
                       className={buttonPrimary}
-                      disabled={agentBusy || agentCode.trim().length !== 6}
+                      disabled={
+                        agentBusy ||
+                        agentCode.trim().length !== 6 ||
+                        !agentCompatible(agentHealth)
+                      }
                       onClick={() => void pairAgent()}
                     >
                       {t('printer.agent_pair')}
@@ -1003,6 +1089,7 @@ export function PrinterWizard({
           <button
             type="button"
             className={buttonPrimary}
+            disabled={!connected}
             onClick={() => void save()}
           >
             {t('printer.save')}

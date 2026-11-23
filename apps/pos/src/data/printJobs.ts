@@ -5,12 +5,16 @@ export async function retryPrintJob(db: BikriDb, id: string): Promise<void> {
   await db.print_jobs.update(id, { status: 'queued', error: undefined });
 }
 
-/** Drops one waiting job. Jobs already printing cannot be cancelled. */
-export async function cancelPrintJob(db: BikriDb, id: string): Promise<void> {
-  await db.transaction('rw', db.print_jobs, async () => {
+/** Drops one waiting job; reports whether it was still cancellable. */
+export async function cancelPrintJob(
+  db: BikriDb,
+  id: string,
+): Promise<boolean> {
+  return db.transaction('rw', db.print_jobs, async () => {
     const job = await db.print_jobs.get(id);
-    if (job?.status !== 'queued') return;
+    if (job?.status !== 'queued') return false;
     await db.print_jobs.delete(id);
+    return true;
   });
 }
 

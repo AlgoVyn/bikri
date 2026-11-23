@@ -74,6 +74,54 @@ describe('renderReceiptHtml (06 §5.3)', () => {
     expect(html.match(/class="feed"/g)).toHaveLength(2);
   });
 
+  it('keeps pair column spacing when the label is Urdu', () => {
+    const html = renderReceiptHtml(
+      [{ t: 'pair', left: 'کل بیلنس', right: 'Rs 1,250' }],
+      { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
+    );
+    // A flex row, not a space-padded `.l` line that `.urdu` would collapse.
+    expect(html).toContain(
+      '<div class="pair"><span class="rtl" dir="rtl" lang="ur">کل بیلنس</span><span class="v">Rs 1,250</span></div>',
+    );
+    expect(html).not.toContain('class="l urdu"');
+  });
+
+  it('renders an item as a grid with name, qty and amount columns', () => {
+    const html = renderReceiptHtml(
+      [{ t: 'item', name: 'USB-C cable 1m', qty: '2', amount: 'Rs 900' }],
+      { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
+    );
+    expect(html).toContain(
+      '<div class="row" style="grid-template-columns:minmax(0,1fr) 5ch 15ch">',
+    );
+    expect(html).toContain('<span>USB-C cable 1m</span>');
+    expect(html).toContain('<span class="v">2</span>');
+    expect(html).toContain('<span class="v">Rs 900</span>');
+  });
+
+  it('keeps an Urdu item name inside its own grid cell', () => {
+    const html = renderReceiptHtml(
+      [{ t: 'item', name: 'کیبل 1m', qty: '2', amount: 'Rs 900' }],
+      { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
+    );
+    expect(html).toContain(
+      '<span class="rtl" dir="rtl" lang="ur">کیبل 1m</span>',
+    );
+    expect(html).toContain('<span class="v">Rs 900</span>');
+  });
+
+  it('keeps a stacked 58 mm item name and its qty/amount pair row separate', () => {
+    const html = renderReceiptHtml(
+      [{ t: 'item', name: 'Samsung A15', qty: '1', amount: 'Rs 40,000' }],
+      { widthMm: 58, charsPerLine: 32, itemLayout: 'stacked' },
+    );
+    expect(html).toContain('<div class="l">Samsung A15</div>');
+    expect(html).toContain(
+      '<div class="pair"><span>1</span><span class="v">Rs 40,000</span></div>',
+    );
+    expect(html).not.toContain('class="row"');
+  });
+
   it('sizes the page to the content height', () => {
     expect(fitPageCss(80, 960)).toBe('@page { size: 80mm 256mm; margin: 0 }');
     expect(fitPageCss(58, 10)).toBe('@page { size: 58mm 20mm; margin: 0 }');

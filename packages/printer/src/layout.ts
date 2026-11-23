@@ -322,15 +322,13 @@ export type ItemFields = {
   breakdown?: string;
 };
 
-/**
- * Columns: name in the left column (max 2 lines), qty and amount on the first line.
- * Stacked (58 mm): name lines, then `breakdown` (or the qty) on the left and the amount on the right.
- */
-export function formatItemLines(
+type ItemParts = { lines: string[]; cells?: LaidCell[]; cellIndex: number };
+
+function itemParts(
   item: ItemFields,
   charsPerLine: number,
   mode: ItemLayout,
-): string[] {
+): ItemParts {
   if (!Number.isInteger(charsPerLine) || charsPerLine < 1) {
     throw new Error('charsPerLine must be a positive integer');
   }
@@ -341,15 +339,28 @@ export function formatItemLines(
     item.detail === undefined ? undefined : sanitizeInline(item.detail);
   const breakdown =
     item.breakdown === undefined ? undefined : sanitizeInline(item.breakdown);
+  /** The qty/amount line is a pair row in every layout; HTML draws it as two cells. */
+  const pairCells = (pairLines: string[]): LaidCell[] | undefined =>
+    pairLines.length === 1
+      ? [
+          { text: (breakdown ?? qty).trimStart() },
+          { text: amount, align: 'end' },
+        ]
+      : undefined;
   if (mode === 'stacked') {
-    const lines = wrapText(name, charsPerLine);
-    lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
-    return lines;
+    const nameLines = wrapText(name, charsPerLine);
+    const pairLines = formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine);
+    return {
+      lines: [...nameLines, ...pairLines],
+      cells: pairCells(pairLines),
+      cellIndex: nameLines.length,
+    };
   }
   const widths = columnWidths(charsPerLine);
   if (textWidth(qty) > widths.qty || textWidth(amount) > widths.amount) {
-    const lines = wrapText(name, charsPerLine);
-    lines.push(...formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine));
+    const nameLines = wrapText(name, charsPerLine);
+    const pairLines = formatPair(breakdown ?? ` ${qty}`, amount, charsPerLine);
+    const lines = [...nameLines, ...pairLines];
     // `breakdown` already carries the unit price/discount; printing `detail` too
     // repeated the same price breakdown on narrow receipts.
     if (breakdown === undefined && detail !== undefined && detail.length > 0) {
@@ -357,7 +368,11 @@ export function formatItemLines(
       for (const detailLine of wrapText(detail, detailWidth))
         lines.push(`  ${detailLine}`);
     }
-    return lines;
+    return {
+      lines,
+      cells: pairCells(pairLines),
+      cellIndex: nameLines.length,
+    };
   }
   const wrapped = name.length === 0 ? [''] : wrapText(name, widths.name);
   const names = limitWrappedLines(wrapped, 2, widths.name);
@@ -382,7 +397,27 @@ export function formatItemLines(
       lines.push(`  ${detailLine}`);
     }
   }
-  return lines;
+  return {
+    lines,
+    cells: [
+      { text: names[0] ?? '' },
+      { text: qty, align: 'end' },
+      { text: amount, align: 'end' },
+    ],
+    cellIndex: 0,
+  };
+}
+
+/**
+ * Columns: name in the left column (max 2 lines), qty and amount on the first line.
+ * Stacked (58 mm): name lines, then `breakdown` (or the qty) on the left and the amount on the right.
+ */
+export function formatItemLines(
+  item: ItemFields,
+  charsPerLine: number,
+  mode: ItemLayout,
+): string[] {
+  return itemParts(item, charsPerLine, mode).lines;
 }
 
 export type LayoutOptions = {
@@ -396,6 +431,17 @@ export type LaidText = {
   align: Align;
   bold: boolean;
   size: TextSize;
+  /**
+   * Column content for HTML rendering (pair label/value, item name/qty/amount).
+   * The plain string `text` stays the ESC/POS source of truth.
+   */
+  cells?: LaidCell[];
+};
+
+/** One column of a laid text line; `end` means right-aligned (value column). */
+export type LaidCell = {
+  text: string;
+  align?: 'start' | 'end';
 };
 
 export type LaidCommand =
@@ -407,6 +453,11 @@ export type LaidCommand =
   | { kind: 'cut' }
   | { kind: 'drawer' };
 
+/** Columns available at `size`; Font B (`small`) fits 4/3 of Font A's cells. */
+function columnsFor(size: TextSize, charsPerLine: number): number {
+  return size === 'small' ? Math.floor((charsPerLine * 4) / 3) : charsPerLine;
+}
+
 function pushText(
   out: LaidCommand[],
   text: string,
@@ -417,9 +468,7 @@ function pushText(
   nowrap = false,
 ): void {
   const paragraphs = text.split('\n');
-  // Font B ('small') is 9 dots wide against Font A's 12, so 4/3 as many characters fit.
-  const columns =
-    size === 'small' ? Math.floor((charsPerLine * 4) / 3) : charsPerLine;
+  const columns = columnsFor(size, charsPerLine);
   const width =
     size === 'double' ? Math.max(1, Math.floor(columns / 2)) : columns;
   for (const paragraph of paragraphs) {
@@ -461,34 +510,44 @@ function pushBlock(
       return;
     case 'pair': {
       const size = block.size ?? 'normal';
+      const columns = columnsFor(size, options.charsPerLine);
       const width =
-        size === 'double'
-          ? Math.max(1, Math.floor(options.charsPerLine / 2))
-          : options.charsPerLine;
-      for (const line of formatPair(block.left, block.right, width)) {
-        out.push({
-          kind: 'text',
-          text: line,
-          align: 'left',
-          bold: block.bold ?? false,
-          size,
-        });
-      }
-      return;
-    }
-    case 'item': {
-      const lines = formatItemLines(
-        block,
-        options.charsPerLine,
-        options.itemLayout,
-      );
+        size === 'double' ? Math.max(1, Math.floor(columns / 2)) : columns;
+      const lines = formatPair(block.left, block.right, width);
       for (const line of lines) {
         out.push({
           kind: 'text',
           text: line,
           align: 'left',
           bold: block.bold ?? false,
+          size,
+          // A one-line pair is a real row, not text with run-together spaces:
+          // HTML must keep the label and value apart when either side is Urdu.
+          cells:
+            lines.length === 1
+              ? [
+                  { text: sanitizeInline(block.left) },
+                  { text: sanitizeInline(block.right), align: 'end' },
+                ]
+              : undefined,
+        });
+      }
+      return;
+    }
+    case 'item': {
+      const { lines, cells, cellIndex } = itemParts(
+        block,
+        options.charsPerLine,
+        options.itemLayout,
+      );
+      for (const [index, line] of lines.entries()) {
+        out.push({
+          kind: 'text',
+          text: line,
+          align: 'left',
+          bold: block.bold ?? false,
           size: 'normal',
+          cells: index === cellIndex ? cells : undefined,
         });
       }
       return;

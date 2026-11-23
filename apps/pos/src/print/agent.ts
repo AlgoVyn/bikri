@@ -7,8 +7,10 @@
 export const AGENT_URL = 'http://127.0.0.1:17890';
 /** The only agent API version this PWA speaks (docs/14-print-agent.md §6). */
 export const AGENT_PROTOCOL = 1;
+/** Older agents are reported in the wizard and cannot be saved (docs/14 §6). */
+export const AGENT_MIN_VERSION = '0.1.9';
 /** Update this tag when publishing a new print-agent release. */
-export const AGENT_RELEASE_TAG = 'print-agent-v0.1.8';
+export const AGENT_RELEASE_TAG = 'print-agent-v0.1.9';
 export const AGENT_RELEASE_URL = `https://github.com/AlgoVyn/bikri/releases/tag/${AGENT_RELEASE_TAG}`;
 const releaseAsset = (name: string) =>
   `https://github.com/AlgoVyn/bikri/releases/download/${AGENT_RELEASE_TAG}/${name}`;
@@ -126,6 +128,74 @@ export class AgentRequestError extends Error {
   }
 }
 
+/**
+ * The agent only ever runs on this machine (docs/14 §6), so a bearer token or a
+ * receipt must never leave for another origin — even if a stored `kv.printer`
+ * was edited or migrated from another deployment.
+ */
+export class AgentUrlError extends Error {
+  readonly code = 'INSECURE_URL';
+  constructor(url: string) {
+    super(`print service URL must be loopback http, not ${url}`);
+    this.name = 'AgentUrlError';
+  }
+}
+
+/**
+ * Accepts exactly `http://127.0.0.1:<port>` or `http://localhost:<port>` and
+ * returns that origin (no path, credentials, query or fragment).
+ */
+export function loopbackBase(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new AgentUrlError(url);
+  }
+  if (
+    parsed.protocol !== 'http:' ||
+    (parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost') ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.search !== '' ||
+    parsed.hash !== '' ||
+    (parsed.pathname !== '/' && parsed.pathname !== '')
+  )
+    throw new AgentUrlError(url);
+  return parsed.origin;
+}
+
+/** Numeric `major.minor.patch`; a suffix (`0.1.9-test`) still compares by numbers. */
+function versionParts(version: string): number[] | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/u.exec(version.trim());
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+/** True when `version` is at least `minimum` (`major.minor.patch`). */
+export function agentVersionAtLeast(
+  version: string,
+  minimum = AGENT_MIN_VERSION,
+): boolean {
+  const current = versionParts(version);
+  const floor = versionParts(minimum);
+  if (!current || !floor) return false;
+  for (let index = 0; index < 3; index += 1) {
+    const left = current[index] ?? 0;
+    const right = floor[index] ?? 0;
+    if (left !== right) return left > right;
+  }
+  return true;
+}
+
+/** Protocol and minimum version this PWA needs before pairing or saving (docs/14 §6). */
+export function agentCompatible(health: AgentHealth | null): boolean {
+  return (
+    health !== null &&
+    health.protocol === AGENT_PROTOCOL &&
+    agentVersionAtLeast(health.version)
+  );
+}
+
 const HEALTH_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
 // The agent allows a spooler up to 30 s for POST /v1/jobs; aborting at 15 s
@@ -134,7 +204,7 @@ const PRINT_TIMEOUT_MS = 35_000;
 const STATUS_TIMEOUT_MS = 3000;
 
 function base(url: string): string {
-  return url.replace(/\/+$/u, '');
+  return loopbackBase(url);
 }
 
 async function request<T>(
@@ -212,14 +282,14 @@ function headers(token?: string, json = false): Record<string, string> {
 
 /** The real loopback client. Tests can inject a fake AgentClient instead. */
 export const httpAgentClient: AgentClient = {
-  health(url = AGENT_URL) {
+  async health(url = AGENT_URL) {
     return request<AgentHealth>(
       `${base(url)}/v1/health`,
       {},
       HEALTH_TIMEOUT_MS,
     );
   },
-  pair(url, code, clientName = 'Bikri') {
+  async pair(url, code, clientName = 'Bikri') {
     return request<{ token: string; agentId: string }>(
       `${base(url)}/v1/pair`,
       {
@@ -230,14 +300,14 @@ export const httpAgentClient: AgentClient = {
       REQUEST_TIMEOUT_MS,
     );
   },
-  printers(url, token) {
+  async printers(url, token) {
     return request<AgentPrinter[]>(
       `${base(url)}/v1/printers`,
       { headers: headers(token) },
       REQUEST_TIMEOUT_MS,
     );
   },
-  print(url, token, body) {
+  async print(url, token, body) {
     return request<AgentJob>(
       `${base(url)}/v1/jobs`,
       {
@@ -248,14 +318,14 @@ export const httpAgentClient: AgentClient = {
       PRINT_TIMEOUT_MS,
     );
   },
-  job(url, token, id) {
+  async job(url, token, id) {
     return request<AgentJob>(
       `${base(url)}/v1/jobs/${encodeURIComponent(id)}`,
       { headers: headers(token) },
       STATUS_TIMEOUT_MS,
     );
   },
-  cancel(url, token, id) {
+  async cancel(url, token, id) {
     return request<AgentJob>(
       `${base(url)}/v1/jobs/${encodeURIComponent(id)}`,
       { method: 'DELETE', headers: headers(token) },
@@ -270,7 +340,7 @@ export const httpAgentClient: AgentClient = {
       { expectJson: false },
     );
   },
-  diagnostics(url, token) {
+  async diagnostics(url, token) {
     return request<unknown>(
       `${base(url)}/v1/diagnostics`,
       { headers: headers(token) },

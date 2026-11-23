@@ -105,6 +105,49 @@ describe('visible line padding', () => {
   });
 });
 
+describe('pair layout', () => {
+  it('lays a small pair at the Font B width, not the Font A width', () => {
+    const laid = layOut(
+      [
+        {
+          t: 'pair',
+          left: 'Opening',
+          right: 'Rs 500',
+          size: 'small',
+        },
+      ],
+      { charsPerLine: 48, itemLayout: 'columns' },
+    );
+    const line = laid.find((command) => command.kind === 'text');
+    if (line?.kind !== 'text') throw new Error('no text line');
+    expect(line.size).toBe('small');
+    // Font B is 9 dots wide against Font A's 12: 48 → 64 columns.
+    expect(line.text).toHaveLength(64);
+    expect(line.text.startsWith('Opening ')).toBe(true);
+    expect(line.text.endsWith('Rs 500')).toBe(true);
+  });
+
+  it('exposes pair and item columns for the HTML fallback', () => {
+    const laid = layOut(
+      [
+        { t: 'pair', left: 'Balance', right: 'Rs 1,250' },
+        { t: 'item', name: 'USB-C cable 1m', qty: '2', amount: 'Rs 900' },
+      ],
+      { charsPerLine: 48, itemLayout: 'columns' },
+    );
+    const texts = laid.filter((command) => command.kind === 'text');
+    expect(texts[0]?.cells).toEqual([
+      { text: 'Balance' },
+      { text: 'Rs 1,250', align: 'end' },
+    ]);
+    expect(texts[1]?.cells).toEqual([
+      { text: 'USB-C cable 1m' },
+      { text: '2', align: 'end' },
+      { text: 'Rs 900', align: 'end' },
+    ]);
+  });
+});
+
 describe('item columns (06 §4.1)', () => {
   it('uses name 1–28, qty 29–33, amount 34–48 at 48 columns', () => {
     expect(columnWidths(48)).toEqual({ name: 28, qty: 5, amount: 15 });

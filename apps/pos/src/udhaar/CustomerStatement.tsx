@@ -130,6 +130,8 @@ export function CustomerStatement({
       shopName: String(shop?.name ?? ''),
       shopAddress: String(shop?.address ?? ''),
       shopPhone: String(shop?.phone ?? ''),
+      showLogo: Number(shop?.show_logo_on_receipt ?? 1) !== 0,
+      showShopName: Number(shop?.show_shop_name_on_receipt ?? 1) !== 0,
       logo: ((await db.kv.get('logo_bitmap'))?.value ??
         null) as RasterSource | null,
     };
@@ -160,6 +162,8 @@ export function CustomerStatement({
     shopName,
     shopAddress,
     shopPhone,
+    showLogo,
+    showShopName,
     logo,
   } = data;
   const phone = String(customer.phone ?? '');
@@ -201,6 +205,8 @@ export function CustomerStatement({
     shopAddress,
     shopPhone,
     logo,
+    showLogo,
+    showShopName,
     customerName: name,
     phone,
     balance,

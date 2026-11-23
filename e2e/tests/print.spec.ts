@@ -79,9 +79,11 @@ for (const mm of [80, 58] as const) {
             getComputedStyle(document.querySelector('p.powered-by') as Element)
               .fontSize,
           ),
-          urdu: lines
-            .filter((l) => l.classList.contains('urdu'))
-            .map((l) => l.dir),
+          // Structured pair/item rows carry the RTL cell as `.rtl`; plain text lines
+          // keep `.l.urdu`. Both must declare an RTL direction.
+          urdu: [
+            ...document.querySelectorAll<HTMLElement>('.l.urdu, .rtl'),
+          ].map((l) => l.dir),
         };
       });
       const expectedMm = mm === 80 ? 72 : 48;

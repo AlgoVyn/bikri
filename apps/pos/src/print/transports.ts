@@ -30,6 +30,40 @@ export const JOB_TIMEOUT_MS = 8000;
  */
 export const CLEANUP_TIMEOUT_MS = 1500;
 
+/** Web Serial baud rates Bikri offers (06 §5.2); anything else falls back to 9600. */
+export const SERIAL_BAUD_RATES = [9600, 19200, 38400, 115200] as const;
+
+export function clampBaudRate(baudRate: number): number {
+  return (SERIAL_BAUD_RATES as readonly number[]).includes(baudRate)
+    ? baudRate
+    : 9600;
+}
+
+/**
+ * Runs one send after every earlier send to the same device. Direct callers
+ * (`openDrawer`, the wizard test page, a customer statement) do not go through
+ * `processQueue`, and interleaved WebUSB `transferOut` chunks or a second
+ * `getWriter()` on a locked port corrupt the receipt already printing.
+ */
+function serializeSend<K extends object, T>(
+  queues: WeakMap<K, Promise<void>>,
+  key: K,
+  run: () => Promise<T>,
+): Promise<T> {
+  const previous = queues.get(key) ?? Promise.resolve();
+  const result = previous.then(run);
+  // The tail never rejects, so a failed job cannot poison the next send.
+  const tail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  queues.set(key, tail);
+  void tail.then(() => {
+    if (queues.get(key) === tail) queues.delete(key);
+  });
+  return result;
+}
+
 // --- minimal WebUSB / Web Serial shapes ---
 export type UsbEndpointLike = {
   endpointNumber: number;
@@ -200,6 +234,9 @@ const claimed = new WeakMap<
   { iface: number; endpoint: number }
 >();
 
+/** One in-flight send per physical USB device; see {@link serializeSend}. */
+const usbQueues = new WeakMap<UsbDeviceLike, Promise<void>>();
+
 async function releaseUsb(
   device: UsbDeviceLike,
   state: { iface: number } | undefined,
@@ -222,11 +259,22 @@ async function releaseUsb(
   }
 }
 
-export async function sendUsb(
+export function sendUsb(
   device: UsbDeviceLike,
   bytes: Uint8Array,
   ms = JOB_TIMEOUT_MS,
   cleanupMs = CLEANUP_TIMEOUT_MS,
+): Promise<void> {
+  return serializeSend(usbQueues, device, () =>
+    sendUsbNow(device, bytes, ms, cleanupMs),
+  );
+}
+
+async function sendUsbNow(
+  device: UsbDeviceLike,
+  bytes: Uint8Array,
+  ms: number,
+  cleanupMs: number,
 ): Promise<void> {
   // One deadline for open + claim + every chunk. Giving each chunk a fresh `ms`
   // let a slow printer stretch one job to minutes.
@@ -284,6 +332,9 @@ type SerialOptions = Pick<SerialSaved, 'baudRate' | 'flowControl'>;
 /** Options the port was opened with; a settings change closes and reopens it. */
 const serialOpen = new WeakMap<SerialPortLike, SerialOptions>();
 
+/** One in-flight send per physical serial port; see {@link serializeSend}. */
+const serialQueues = new WeakMap<SerialPortLike, Promise<void>>();
+
 async function closeSerial(
   port: SerialPortLike,
   closeMs = CLEANUP_TIMEOUT_MS,
@@ -297,23 +348,35 @@ async function closeSerial(
   }
 }
 
-export async function sendSerial(
+export function sendSerial(
   port: SerialPortLike,
   bytes: Uint8Array,
   options: SerialOptions,
   ms = JOB_TIMEOUT_MS,
   cleanupMs = CLEANUP_TIMEOUT_MS,
 ): Promise<void> {
+  return serializeSend(serialQueues, port, () =>
+    sendSerialNow(port, bytes, options, ms, cleanupMs),
+  );
+}
+
+async function sendSerialNow(
+  port: SerialPortLike,
+  bytes: Uint8Array,
+  options: SerialOptions,
+  ms: number,
+  cleanupMs: number,
+): Promise<void> {
   // A raw receipt can be several KB; at 9600 baud that takes longer than the
   // fixed job timeout. Allow the wire time plus one second of device overhead.
-  const baudRate = options.baudRate > 0 ? options.baudRate : 9600;
+  const baudRate = clampBaudRate(options.baudRate);
   const wireMs = Math.ceil((bytes.length * 10 * 1000) / baudRate);
   const timeoutMs = Math.max(ms, wireMs + 1000);
   const current = serialOpen.get(port);
   if (
     port.writable &&
     (!current ||
-      current.baudRate !== options.baudRate ||
+      current.baudRate !== baudRate ||
       current.flowControl !== options.flowControl)
   )
     await closeSerial(port, cleanupMs);
@@ -354,7 +417,7 @@ export async function sendSerial(
       // A wedged COM/USB-serial port used to hang processQueue permanently.
       await withDeadline(
         port.open({
-          baudRate: options.baudRate,
+          baudRate,
           dataBits: 8,
           stopBits: 1,
           parity: 'none',
@@ -364,7 +427,7 @@ export async function sendSerial(
         cleanup,
       );
       serialOpen.set(port, {
-        baudRate: options.baudRate,
+        baudRate,
         flowControl: options.flowControl,
       });
     }

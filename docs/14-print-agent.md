@@ -220,7 +220,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 
 ### Versioning
 
-`/health` returns `protocol: 1` and `version`. Bikri requires a minimum protocol and agent version; an older agent is reported in the UI instead of being used silently. `/v1` stays backward compatible within a major protocol.
+`/health` returns `protocol: 1` and `version`. Bikri requires a minimum protocol and agent version; an older agent is reported in the UI instead of being used silently. `/v1` stays backward compatible within a major protocol. The PWA currently requires protocol `1` and agent **0.1.9** or newer (`AGENT_MIN_VERSION` in `apps/pos/src/print/agent.ts`); the wizard marks an older agent as outdated and refuses to save it.
 
 ## 7. Security
 

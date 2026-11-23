@@ -320,6 +320,8 @@ Wizard steps:
 3. **Test print:** sends the test page (§4.3): ruler `1234567890…` exactly `chars_per_line` wide, bold/double sample, logo, Urdu raster line, QR, cut, then drawer kick if enabled. The screen asks three yes/no questions: *Did the ruler fit on one line?* (no → offer 42 chars / 512 dots for 80 mm, or the 58 mm preset), *Is the Urdu line readable?* (no → raster unsupported: switch receipt language to English and note it), *Did the paper cut / drawer open?* (no → set cut to none / check drawer pin 2↔5).
 4. **Save:** stores `kv.printer = { transport: 'usb'|'serial'|'system'|'agent', paper_mm, chars_per_line, dots, usb?: {vendorId, productId, serialNumber}, serial?: {usbVendorId, usbProductId, baudRate, flowControl}, agent?: {url, token, agentId, printerName, mode: 'raw'|'driver'}, cut: 'partial'|'full'|'none', qr: boolean, drawer_pin: 2|5, status_query: boolean, auto_print: boolean, copies: 1|2|3, print_logo: boolean, print_day_close: boolean }`.
 
+A successful agent pairing stores its token in `kv.printer_agent_pending` immediately (before Save): the agent has already consumed the one-time pairing code, so the wizard recovers this token after a cancel or reload instead of leaving the shop locked out with `agent_already_paired`. Save clears the pending copy.
+
 If a USB `claimInterface` fails on Windows, the wizard explains the driver issue (§5.1) and offers Serial or System printing instead of failing.
 
 Other fields: auto-print after sale (default on), copies (1–3), print logo on this device (on; the shop-level receipt switch can also hide it), print Z-report after day close (on), QR on receipt (off), drawer pin, cut type, preview at the chosen width.

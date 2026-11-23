@@ -43,6 +43,7 @@ export {
   type ItemFields,
   type ItemLayout,
   itemLayoutFor,
+  type LaidCell,
   type LaidCommand,
   type LaidText,
   type LayoutOptions,

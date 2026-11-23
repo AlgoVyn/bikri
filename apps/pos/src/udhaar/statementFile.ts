@@ -25,6 +25,10 @@ export type StatementFileMeta = {
   shopPhone: string;
   /** Gray/RGBA shop logo from `kv.logo_bitmap`. */
   logo?: RasterSource | null;
+  /** Shop setting `show_logo_on_receipt`; false hides the logo on the thermal print. */
+  showLogo?: boolean;
+  /** Shop setting `show_shop_name_on_receipt`; false hides the name on the thermal print. */
+  showShopName?: boolean;
   customerName: string;
   phone: string;
   balance: number;

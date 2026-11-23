@@ -350,7 +350,7 @@ test.describe('Print service agent (docs/14)', () => {
       if (url.pathname === '/v1/health')
         return json({
           app: 'bikri-print-agent',
-          version: '0.1.0-test',
+          version: '0.1.9-test',
           protocol: 1,
           platform: 'windows/amd64',
           paired,
@@ -439,7 +439,7 @@ test.describe('Print service agent compatibility mode (docs/14)', () => {
       if (url.pathname === '/v1/health')
         return json({
           app: 'bikri-print-agent',
-          version: '0.1.0-test',
+          version: '0.1.9-test',
           protocol: 1,
           platform: 'windows/amd64',
           paired,
@@ -511,7 +511,7 @@ test.describe('Print service agent install links (docs/14)', () => {
       page.getByRole('link', { name: 'Windows 10/11 (installer)' }),
     ).toHaveAttribute(
       'href',
-      'https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.8/bikri-print-agent-setup.exe',
+      'https://github.com/AlgoVyn/bikri/releases/download/print-agent-v0.1.9/bikri-print-agent-setup.exe',
     );
     await expect(
       page.getByRole('link', { name: 'SHA-256 checksums' }),
