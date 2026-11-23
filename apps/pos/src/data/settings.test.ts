@@ -205,6 +205,19 @@ describe('shop and staff settings (screens/17)', () => {
       'time,staff,device,action,entity,summary',
     );
   });
+
+  it('caps NTN/STRN at 30 characters on the settings write path', async () => {
+    const db = await setup();
+    await updateShopSettings(
+      db,
+      { ntn: '9'.repeat(45), strn: '8'.repeat(45) },
+      'st-1',
+      NOW,
+    );
+    const shop = await db.shop.get('shop');
+    expect(shop?.ntn).toBe('9'.repeat(30));
+    expect(shop?.strn).toBe('8'.repeat(30));
+  });
 });
 
 describe('settings helpers', () => {

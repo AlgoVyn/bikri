@@ -38,6 +38,7 @@ import {
   SetupAlreadyDoneError,
   type SetupDraft,
   type SetupInput,
+  SHOP_GOVT_ID_MAX,
   saveSetupDraft,
 } from '../data/setup.ts';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
@@ -88,6 +89,15 @@ export function parseTaxPercent(text: string): number | null {
   const [whole = '0', frac = ''] = clean.split('.');
   const bp = Number(whole) * 100 + Number(frac.padEnd(2, '0'));
   return bp <= 2500 ? bp : null;
+}
+
+/**
+ * `kv.setup_draft` deliberately never stores the PIN, so a reload can only resume up to
+ * the owner/PIN step. Restoring a later step let Finish run with an empty PIN (UI-C1).
+ */
+export function resumeStep(step: number): Step {
+  if (!Number.isFinite(step)) return 0;
+  return Math.min(Math.max(Math.trunc(step), 0), 2) as Step;
 }
 
 function Field({
@@ -154,7 +164,7 @@ export function SetupWizard() {
     void (async () => {
       const draft = await loadSetupDraft(db);
       if (draft) {
-        setStep(draft.step as Step);
+        setStep(resumeStep(draft.step));
         setShop(draft.shop);
         setOwnerName(draft.owner.name);
         setReceipt(draft.receipt);
@@ -236,9 +246,17 @@ export function SetupWizard() {
     withProduct: boolean,
     then: '/' | '/products/import' = '/',
   ) => {
-    const found = withProduct ? validate(4) : {};
-    setErrors(found);
-    if (Object.keys(found).length > 0) return focusFirstError(found);
+    // Revalidate every prior step: a draft restore can land here with fields that were
+    // never checked (or an empty PIN), and finishSetup would commit an unusable shop.
+    const checked: Step[] = withProduct ? [1, 2, 3, 4] : [1, 2, 3];
+    for (const s of checked) {
+      const found = validate(s);
+      if (Object.keys(found).length === 0) continue;
+      setErrors(found);
+      setStep(s);
+      return focusFirstError(found);
+    }
+    setErrors({});
     // Enter and a click on Finish can land in the same tick; lock before awaiting.
     if (finishGuard.current) return;
     finishGuard.current = true;
@@ -560,9 +578,13 @@ export function SetupWizard() {
                     <input
                       id={id('ntn')}
                       className={fieldClass}
+                      maxLength={SHOP_GOVT_ID_MAX}
                       value={shop.ntn}
                       onChange={(e) =>
-                        setShop({ ...shop, ntn: e.target.value })
+                        setShop({
+                          ...shop,
+                          ntn: e.target.value.slice(0, SHOP_GOVT_ID_MAX),
+                        })
                       }
                     />
                   </Field>
@@ -570,9 +592,13 @@ export function SetupWizard() {
                     <input
                       id={id('strn')}
                       className={fieldClass}
+                      maxLength={SHOP_GOVT_ID_MAX}
                       value={shop.strn}
                       onChange={(e) =>
-                        setShop({ ...shop, strn: e.target.value })
+                        setShop({
+                          ...shop,
+                          strn: e.target.value.slice(0, SHOP_GOVT_ID_MAX),
+                        })
                       }
                     />
                   </Field>

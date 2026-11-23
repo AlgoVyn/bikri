@@ -56,11 +56,12 @@ export function SupplierStatement({
   const toast = useToast();
   const navigate = useNavigate();
   const { can, role } = useCurrentStaff();
+  const canSeeDelivery = can('purchase.create') || can('cost.view');
   const readOnly = useReadOnly();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deliveryId, setDeliveryId] = useState<string | null>(
-    initialDeliveryId ?? null,
+    canSeeDelivery ? (initialDeliveryId ?? null) : null,
   );
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -95,9 +96,25 @@ export function SupplierStatement({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter changes
   useEffect(() => setVisibleRows(STATEMENT_PAGE), [supplierId, from, to]);
   // Deep link from a stock movement: open the delivery even when this screen is mounted.
+  // Without `purchase.create`/`cost.view` the dialog would reveal unit costs, so clear the
+  // parameter instead of opening it (screens/13, UI-H1).
   useEffect(() => {
-    setDeliveryId(initialDeliveryId ?? null);
-  }, [initialDeliveryId]);
+    if (!initialDeliveryId) {
+      setDeliveryId(null);
+      return;
+    }
+    if (!canSeeDelivery) {
+      setDeliveryId(null);
+      void navigate({
+        to: '/suppliers/$supplierId',
+        params: { supplierId },
+        search: {},
+        replace: true,
+      });
+      return;
+    }
+    setDeliveryId(initialDeliveryId);
+  }, [initialDeliveryId, canSeeDelivery, navigate, supplierId]);
 
   useHotkey(
     plainKey('d'),

@@ -1,4 +1,4 @@
-import { hashPin, newId, type PinHash } from '@bikri/core';
+import { hashPin, newId, PIN_PATTERN, type PinHash } from '@bikri/core';
 import {
   type BikriDb,
   EXPENSE_CATEGORY_TEMPLATES,
@@ -23,6 +23,9 @@ export const BUSINESS_TYPES = [
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
 export const ROUND_OPTIONS = [1, 100, 500, 1000] as const;
 export const DEFAULT_FOOTER = 'Shukriya! Phir tashreef laiye.';
+
+/** NTN/STRN are short government ids; the till caps them so D1's text limit is never hit. */
+export const SHOP_GOVT_ID_MAX = 30;
 
 export type LogoData = {
   /** PNG of the resized logo (≤ 576 px wide). */
@@ -94,6 +97,9 @@ export async function finishSetup(
   options: { now?: number; logo?: LogoData | null; pinHash?: PinHash } = {},
 ): Promise<SetupResult> {
   const now = options.now ?? Date.now();
+  // The wizard persists its draft without the PIN; a reload on the last step must never
+  // commit `pin_length: 0` (UI-C1). Validate here as well as in hashPin.
+  if (!PIN_PATTERN.test(input.owner.pin)) throw new RangeError('invalid PIN');
   const pin = options.pinHash ?? (await hashPin(input.owner.pin));
   const branch = await defaultBranch(db);
   const device = await deviceInfo(db);
@@ -127,8 +133,8 @@ export async function finishSetup(
         phone: input.shop.phone,
         address: input.shop.address.trim(),
         city: input.shop.city.trim(),
-        ntn: input.shop.ntn.trim(),
-        strn: input.shop.strn.trim(),
+        ntn: input.shop.ntn.trim().slice(0, SHOP_GOVT_ID_MAX),
+        strn: input.shop.strn.trim().slice(0, SHOP_GOVT_ID_MAX),
         currency: 'PKR',
         timezone: 'Asia/Karachi',
         receipt_header: input.receipt.header.trim(),

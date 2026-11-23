@@ -91,10 +91,10 @@ export function SummaryTab({
   };
 
   const total = detail.usage.reduce((sum, day) => sum + day.rows_written, 0);
-  const peak = Math.max(1, ...detail.usage.map((day) => day.rows_written));
+  // Use the real peak, not the chart's 1-row floor: a shop with no writes is 0%, not 0.1%.
   const peakPercent =
     tenant.daily_write_budget > 0
-      ? Math.round((peak / tenant.daily_write_budget) * 1000) / 10
+      ? Math.round((rawPeak / tenant.daily_write_budget) * 1000) / 10
       : 0;
 
   return (

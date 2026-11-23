@@ -10,6 +10,7 @@ import {
   pageClass,
 } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
+import { draftQty } from '../components/draftQty.ts';
 import { CloseIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
@@ -30,7 +31,8 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 type Line = {
   key: string;
   product: MasterRow;
-  qtyMilli: number;
+  /** Null while the field is empty; it is not saved until positive (UI-H4). */
+  qtyMilli: number | null;
   unitCost: number;
   updatePrice: boolean;
   price: number;
@@ -119,12 +121,15 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
     setQuery('');
   };
 
-  const valid = lines.filter((line) => line.qtyMilli > 0 && line.unitCost >= 0);
+  const valid = lines.filter(
+    (line): line is Line & { qtyMilli: number } =>
+      draftQty(line.qtyMilli) > 0 && line.unitCost >= 0,
+  );
   const purchase =
     valid.length > 0
       ? computePurchase(
           valid.map((line) => ({
-            qty_milli: line.qtyMilli,
+            qty_milli: draftQty(line.qtyMilli),
             unit_cost: line.unitCost,
           })),
           otherCharges ?? 0,
@@ -324,7 +329,9 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {lines.map((line, index) => {
-              const lineResult = purchase?.lines[valid.indexOf(line)];
+              const validAt = valid.findIndex((row) => row.key === line.key);
+              const lineResult =
+                validAt >= 0 ? purchase?.lines[validAt] : undefined;
               const rawUnit = String(line.product.unit);
               const unit = isQtyUnit(rawUnit) ? rawUnit : 'pc';
               return (
@@ -369,7 +376,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                         onChange={(milli) =>
                           setLines((current) =>
                             current.map((l, i) =>
-                              i === index ? { ...l, qtyMilli: milli ?? 0 } : l,
+                              i === index ? { ...l, qtyMilli: milli } : l,
                             ),
                           )
                         }

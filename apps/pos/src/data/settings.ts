@@ -9,7 +9,7 @@ import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import { csvCell } from '../lib/csv.ts';
 import { isBusinessDate } from './dates.ts';
 import { deviceInfo } from './localTenant.ts';
-import type { LogoData } from './setup.ts';
+import { type LogoData, SHOP_GOVT_ID_MAX } from './setup.ts';
 import { writeAction, writeScope } from './write.ts';
 
 const n = (value: unknown): number => Number(value ?? 0);
@@ -180,7 +180,9 @@ export async function updateShopSettings(
         ? 1
         : 0
       : typeof value === 'string'
-        ? value.trim()
+        ? field === 'ntn' || field === 'strn'
+          ? value.trim().slice(0, SHOP_GOVT_ID_MAX)
+          : value.trim()
         : value;
   }
   if (patch.tax_rate_bp === 0) clean.tax_mode = 'exclusive';

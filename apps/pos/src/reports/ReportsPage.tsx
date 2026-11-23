@@ -689,7 +689,11 @@ function ReportsPageContent() {
         {tab === 'udhaar' ? <UdhaarTab bundle={bundle} lang={lang} /> : null}
         {tab === 'staff' ? <StaffTab bundle={bundle} /> : null}
         {tab === 'day_closes' ? (
-          <DayCloseTab bundle={bundle} lang={lang} />
+          <DayCloseTab
+            bundle={bundle}
+            lang={lang}
+            showExpected={can('dayclose.view_expected')}
+          />
         ) : null}
         {tab === 'expenses' ? (
           <ExpensesTab bundle={bundle} lang={lang} />
@@ -1362,25 +1366,31 @@ function StockTab({
         <h2 className="text-title font-semibold">
           {t('office.reports.supplier_returns')}
         </h2>
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <ul
+          className={`grid grid-cols-1 gap-3 ${cost ? 'sm:grid-cols-3' : ''}`}
+        >
           <li>
             <Metric
               label={t('office.reports.returns_count')}
               value={stock.supplierReturns.count}
             />
           </li>
-          <li>
-            <Metric
-              label={t('office.reports.returns_credit')}
-              value={<MoneyText paisa={stock.supplierReturns.credit} />}
-            />
-          </li>
-          <li>
-            <Metric
-              label={t('office.reports.returns_difference')}
-              value={<MoneyText paisa={stock.supplierReturns.difference} />}
-            />
-          </li>
+          {cost ? (
+            <>
+              <li>
+                <Metric
+                  label={t('office.reports.returns_credit')}
+                  value={<MoneyText paisa={stock.supplierReturns.credit} />}
+                />
+              </li>
+              <li>
+                <Metric
+                  label={t('office.reports.returns_difference')}
+                  value={<MoneyText paisa={stock.supplierReturns.difference} />}
+                />
+              </li>
+            </>
+          ) : null}
         </ul>
         <p className="text-small text-text-muted">
           {t('office.reports.returns_hint')}
@@ -1391,8 +1401,12 @@ function StockTab({
             headers={[
               t('office.reports.date'),
               t('office.reports.supplier'),
-              t('office.reports.credit'),
-              t('office.reports.returns_difference'),
+              ...(cost
+                ? [
+                    t('office.reports.credit'),
+                    t('office.reports.returns_difference'),
+                  ]
+                : []),
             ]}
             rowKeys={stock.supplierReturns.rows.map(
               (row, index) => `${row.date}-${row.supplierId}-${index}`,
@@ -1400,8 +1414,12 @@ function StockTab({
             rows={stock.supplierReturns.rows.map((row) => [
               longDate(row.date, lang),
               row.supplierName,
-              <MoneyText key="credit" paisa={row.total} />,
-              <MoneyText key="difference" paisa={row.difference} />,
+              ...(cost
+                ? [
+                    <MoneyText key="credit" paisa={row.total} />,
+                    <MoneyText key="difference" paisa={row.difference} />,
+                  ]
+                : []),
             ])}
             empty={t('office.reports.no_returns')}
           />
@@ -1509,7 +1527,16 @@ function StaffTab({ bundle }: { bundle: ReportBundle }) {
   );
 }
 
-function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
+function DayCloseTab({
+  bundle,
+  lang,
+  showExpected,
+}: {
+  bundle: ReportBundle;
+  lang: string;
+  /** `dayclose.view_expected`: without it the cash figures stay hidden (05 §6). */
+  showExpected: boolean;
+}) {
   const { t } = useTranslation();
   const closes = bundle.dayCloses;
   return (
@@ -1521,38 +1548,43 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
             value={closes.rows.length}
           />
         </li>
-        <li>
-          <Metric
-            label={t('office.reports.expected')}
-            value={<MoneyText paisa={closes.expected} />}
-          />
-        </li>
-        <li>
-          <Metric
-            label={t('office.reports.counted')}
-            value={<MoneyText paisa={closes.counted} />}
-          />
-        </li>
-        <li>
-          <Metric
-            label={t('office.reports.shorts')}
-            value={
-              <span>
-                {closes.shortCount} · <MoneyText paisa={closes.shortTotal} />
-              </span>
-            }
-          />
-        </li>
-        <li>
-          <Metric
-            label={t('office.reports.overs')}
-            value={
-              <span>
-                {closes.overCount} · <MoneyText paisa={closes.overTotal} />
-              </span>
-            }
-          />
-        </li>
+        {showExpected ? (
+          <>
+            <li>
+              <Metric
+                label={t('office.reports.expected')}
+                value={<MoneyText paisa={closes.expected} />}
+              />
+            </li>
+            <li>
+              <Metric
+                label={t('office.reports.counted')}
+                value={<MoneyText paisa={closes.counted} />}
+              />
+            </li>
+            <li>
+              <Metric
+                label={t('office.reports.shorts')}
+                value={
+                  <span>
+                    {closes.shortCount} ·{' '}
+                    <MoneyText paisa={closes.shortTotal} />
+                  </span>
+                }
+              />
+            </li>
+            <li>
+              <Metric
+                label={t('office.reports.overs')}
+                value={
+                  <span>
+                    {closes.overCount} · <MoneyText paisa={closes.overTotal} />
+                  </span>
+                }
+              />
+            </li>
+          </>
+        ) : null}
       </ul>
       <ReportTable
         title={t('office.reports.tab_day_closes')}
@@ -1561,9 +1593,13 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
           t('office.reports.date'),
           t('office.reports.device'),
           t('office.reports.cashier'),
-          t('office.reports.expected'),
-          t('office.reports.counted'),
-          t('office.reports.difference'),
+          ...(showExpected
+            ? [
+                t('office.reports.expected'),
+                t('office.reports.counted'),
+                t('office.reports.difference'),
+              ]
+            : []),
           t('office.reports.note'),
         ]}
         rowKeys={closes.rows.map((row) => String(row.close.id))}
@@ -1571,20 +1607,30 @@ function DayCloseTab({ bundle, lang }: { bundle: ReportBundle; lang: string }) {
           longDate(String(row.close.business_date), lang),
           row.deviceName,
           row.staffName,
-          <MoneyText key="expected" paisa={Number(row.close.expected_cash)} />,
-          <MoneyText key="counted" paisa={Number(row.close.counted_cash)} />,
-          <span
-            key="difference"
-            className={
-              Number(row.close.difference) === 0
-                ? 'text-success-subtle-ink'
-                : Number(row.close.difference) < 0
-                  ? 'text-danger'
-                  : 'text-warning-subtle-ink'
-            }
-          >
-            <MoneyText paisa={Number(row.close.difference)} />
-          </span>,
+          ...(showExpected
+            ? [
+                <MoneyText
+                  key="expected"
+                  paisa={Number(row.close.expected_cash)}
+                />,
+                <MoneyText
+                  key="counted"
+                  paisa={Number(row.close.counted_cash)}
+                />,
+                <span
+                  key="difference"
+                  className={
+                    Number(row.close.difference) === 0
+                      ? 'text-success-subtle-ink'
+                      : Number(row.close.difference) < 0
+                        ? 'text-danger'
+                        : 'text-warning-subtle-ink'
+                  }
+                >
+                  <MoneyText paisa={Number(row.close.difference)} />
+                </span>,
+              ]
+            : []),
           String(row.close.note ?? '') || '—',
         ])}
         empty={t('office.reports.no_closes')}

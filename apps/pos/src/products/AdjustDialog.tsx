@@ -7,6 +7,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
@@ -54,6 +55,7 @@ export function AdjustDialog({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const saveGuard = useSubmitGuard();
   const noteId = useId();
   const reasonId = useId();
 
@@ -84,7 +86,7 @@ export function AdjustDialog({
   };
 
   const save = async () => {
-    if (saving || signed === null) return;
+    if (saving || signed === null || !saveGuard.lock()) return;
     setSaving(true);
     setError(null);
     try {
@@ -117,6 +119,7 @@ export function AdjustDialog({
             : t('adjust.err_product'),
       );
     } finally {
+      saveGuard.unlock();
       setSaving(false);
     }
   };

@@ -176,7 +176,11 @@ export function ProductList({
       disabled: !rows || rows.length === 0,
       onSelect: () => {
         if (rows)
-          downloadText('bikri-products.csv', productsCsv(rows, showCost));
+          downloadText(
+            'bikri-products.csv',
+            // Export is never masked by Privacy Mode (screens/04), but `cost.view` still gates it.
+            productsCsv(rows, can('cost.view')),
+          );
       },
     });
   }

@@ -118,6 +118,54 @@ describe('finishSetup (screens/01)', () => {
     await db.delete();
   });
 
+  it('rejects an empty PIN (draft reload) and never stores pin_length 0', async () => {
+    const db = await devDb();
+    const pinHash = await hashPin('4826', 1000);
+    await expect(
+      finishSetup(db, input({ owner: { name: 'Adnan', pin: '' } }), {
+        now: NOW,
+        pinHash,
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
+    expect(await db.staff.count()).toBe(0);
+    expect(await isSetupDone(db)).toBe(false);
+    db.close();
+    await db.delete();
+  });
+
+  it('accepts a valid 4-digit PIN and records its length', async () => {
+    const db = await devDb();
+    const { owner } = await finishSetup(
+      db,
+      input({ owner: { name: 'Adnan', pin: '4826' } }),
+      { now: NOW, pinHash: await hashPin('4826', 1000) },
+    );
+    expect(owner.pin_length).toBe(4);
+    expect(owner.pin_hash).not.toBe('');
+    db.close();
+    await db.delete();
+  });
+
+  it('caps NTN and STRN at 30 characters', async () => {
+    const db = await devDb();
+    await finishSetup(
+      db,
+      input({
+        shop: {
+          ...input().shop,
+          ntn: '9'.repeat(45),
+          strn: '8'.repeat(45),
+        },
+      }),
+      { now: NOW, pinHash: await hashPin('4826', 1000) },
+    );
+    const shop = await db.shop.get('shop');
+    expect(shop?.ntn).toBe('9'.repeat(30));
+    expect(shop?.strn).toBe('8'.repeat(30));
+    db.close();
+    await db.delete();
+  });
+
   it('adds the first product with opening stock and stores inclusive tax only when rate > 0', async () => {
     const db = await devDb();
     const pinHash = await hashPin('4826', 1000);

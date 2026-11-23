@@ -261,7 +261,7 @@ export function ExpenseDialog({
             {!override ? (
               <button
                 type="button"
-                className="underline"
+                className="inline-flex min-h-11 items-center px-1 underline"
                 onClick={() => setApproving(true)}
               >
                 {t('office.expenses.ask_manager')}

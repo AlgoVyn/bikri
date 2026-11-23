@@ -9,6 +9,9 @@ export type PinHash = {
 
 const WEAK = new Set(['1234', '4321', '1212']);
 
+/** 05 §4: a PIN is 4–6 digits. Hashing anything else would store a verifier no lock can open. */
+export const PIN_PATTERN = /^\d{4,6}$/;
+
 /**
  * Weak PINs rejected at creation (05 §4): repeated digits, 1234, 4321, 1212 and 19xx / 20xx
  * years. A PIN already used by another active staff member is checked separately against the
@@ -16,7 +19,7 @@ const WEAK = new Set(['1234', '4321', '1212']);
  * PINs cannot answer it.
  */
 export function isWeakPin(pin: string): boolean {
-  if (!/^\d{4,6}$/.test(pin)) return true;
+  if (!PIN_PATTERN.test(pin)) return true;
   if (/^(\d)\1+$/.test(pin)) return true;
   if (WEAK.has(pin)) return true;
   if (pin.length === 4 && /^(19|20)\d\d$/.test(pin)) return true;
@@ -62,6 +65,9 @@ export async function hashPin(
   iterations: number = PIN_ITERATIONS,
   salt: Uint8Array<ArrayBuffer> = crypto.getRandomValues(new Uint8Array(16)),
 ): Promise<PinHash> {
+  // A buggy caller (an empty PIN restored from a draft, a mistyped staff form) must never
+  // commit a verifier that no lock can open; D1 rejects it too (CHECK pin_length 4–6).
+  if (!PIN_PATTERN.test(pin)) throw new RangeError('invalid PIN');
   if (!Number.isSafeInteger(iterations) || iterations < 1_000)
     throw new RangeError('invalid PBKDF2 iteration count');
   const hash = await derive(pin, salt, iterations);

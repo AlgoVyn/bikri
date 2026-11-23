@@ -21,10 +21,10 @@ Toolbar: range chips Today / Yesterday / 7 days / 30 days / This month / Last mo
 Tabs:
 1. **Summary**: a first row of four KPI cards (Sold, Profit — or Average bill when the user cannot see cost — Bills, Expenses) with amounts that step down for narrow cards and long figures (28 px for a short amount on a wide desktop, never below 13 px) so a paisa amount always stays inside its card, and the delta under each; a compact secondary row for Average bill, Net profit, Margin and Tax collected; daily bar chart (sold, profit line); payment mix donut (cash/card/bank-wallet/udhaar); udhaar given vs received with the refund count/amount shown once. The hourly chart appears only for a single day with 3 or more active hours; one active hour renders as a compact text row, not a near-empty card ([07 §9](../07-money-rules.md#9-reports-formulas)).
 2. **Products**: best sellers by qty and revenue, slow movers (no sale in 30 days with stock > 0), profit by product (`cost.view`), by category, by brand.
-3. **Stock**: stock value (avg cost), low stock, out of stock, negative stock exceptions, stock movement summary by reason, supplier returns (count, credit, return difference — informational, not in profit).
+3. **Stock**: stock value (avg cost), low stock, out of stock, negative stock exceptions, stock movement summary by reason, supplier returns (count always; credit and return difference only with `cost.view` — informational, not in profit).
 4. **Udhaar**: total owed, aging buckets (same as chase list), top debtors.
 5. **Staff**: bills, sold, discounts given, refunds, cancellations by cashier.
-6. **Day closes**: list of closes with expected, counted, difference and note; totals of shorts/overs.
+6. **Day closes**: list of closes with expected, counted, difference and note; totals of shorts/overs. Without `dayclose.view_expected` the expected/counted/difference columns and the expected/counted/shorts/overs totals are hidden; the list keeps date, device, cashier and note.
 7. **Expenses**: by category.
 
 Table headers and cells share one start alignment (left in English/Roman Urdu, right in Urdu), matching the main lists (D-214); amounts stay tabular and never truncate. On phones the summary cards stay two-up, long KPI amounts step down at narrow widths and for long figures rather than spilling into the next card, the range row stacks below the presets, and chart labels stay readable (never below 10 px); charts are simple SVG components (no heavy chart library; < 30 KB gz). Large ranges compute in a Web Worker with a progress indicator.
@@ -42,7 +42,7 @@ Table headers and cells share one start alignment (left in English/Roman Urdu, r
 | Stock | `product,sku,on_hand,min_stock,avg_cost,stock_value,status` (without `cost.view`: `product,sku,on_hand,min_stock,status`) |
 | Udhaar | `bucket,name,phone,balance,age_days,promise_date` |
 | Staff | `cashier,bills,sold,discounts,refunds,refunded_amount,cancelled_bills,cancelled_amount,net_sold` |
-| Day closes | `date,device,cashier,expected,counted,difference,note` |
+| Day closes | `date,device,cashier,expected,counted,difference,note` (without `dayclose.view_expected`: `date,device,cashier,note`) |
 | Expenses | `category,amount,share_pct` |
 
 The summary PDF (and Share) is built with the other exports in T-049; this screen ships the CSV of every tab.
@@ -56,6 +56,6 @@ Generated with pdf-lib on the device: A4 portrait, shop logo + name, range, gene
 1. "Today" Sold equals the sum of that day's bill totals minus refunds made that day.
 2. Profit for T2 sale with costs Rs 38,000 and Rs 2,500 = (3,954,023 − 3,800,000) + (345,977 − 250,000) paisa = Rs 2,500.00.
 3. A refund today of a bill from yesterday reduces today's sold, not yesterday's.
-4. Cashier sees only Today and no profit cards.
+4. Cashier sees only Today and no profit cards or cost-derived supplier-return figures; day-close cash columns and totals need `dayclose.view_expected`.
 5. 90-day report with 20,000 bills renders in < 2 s on the reference PC.
 6. CSV export columns documented per tab are present and amounts are in rupees with 2 decimals (`43000.00`) — CSV never contains paisa integers.

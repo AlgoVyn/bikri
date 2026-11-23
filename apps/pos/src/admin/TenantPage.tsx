@@ -64,6 +64,8 @@ export function TenantPage({ id }: { id: string }) {
   const [offOpen, setOffOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [restoreReset, setRestoreReset] = useState(0);
+  /** True while RestoreTab is purging/importing; End maintenance would revive a half shop. */
+  const [restoreActive, setRestoreActive] = useState(false);
   const detail = query.data;
 
   useEffect(() => {
@@ -183,6 +185,7 @@ export function TenantPage({ id }: { id: string }) {
           <button
             type="button"
             className={quietBtn}
+            disabled={restoreActive || pending}
             onClick={() => setOffOpen(true)}
           >
             {t('admin.end_maintenance')}
@@ -237,6 +240,7 @@ export function TenantPage({ id }: { id: string }) {
               bump();
             }}
             onState={bump}
+            onActiveChange={setRestoreActive}
           />
         ) : null}
         {tab === 'delete' ? (
@@ -254,6 +258,7 @@ export function TenantPage({ id }: { id: string }) {
         body={t('admin.maintenance_off_body')}
         confirmLabel={t('admin.end_maintenance')}
         onConfirm={() => {
+          if (restoreActive || pending) return;
           setPending(true);
           void setMaintenance(
             tenant.id,

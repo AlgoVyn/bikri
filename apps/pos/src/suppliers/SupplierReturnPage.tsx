@@ -1,4 +1,10 @@
-import { businessDate, isQtyUnit, mulDivRound, newId } from '@bikri/core';
+import {
+  businessDate,
+  formatQtyFromMilli,
+  isQtyUnit,
+  mulDivRound,
+  newId,
+} from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +14,7 @@ import {
   buttonQuiet,
   pageClass,
 } from '../components/classes.ts';
+import { draftQty } from '../components/draftQty.ts';
 import { CloseIcon, SuppliersIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
@@ -37,7 +44,8 @@ type Unlinked = {
   productId: string;
   name: string;
   unit: string;
-  qtyMilli: number;
+  /** Null while the field is empty; it is not saved until positive (UI-H4). */
+  qtyMilli: number | null;
   unitCredit: number;
   trackStock: boolean;
 };
@@ -152,13 +160,13 @@ export function SupplierReturnPage({
   const allLines = [
     ...selected,
     ...unlinked
-      .filter((line) => line.qtyMilli > 0)
+      .filter((line) => draftQty(line.qtyMilli) > 0)
       .map((line) => ({
         productId: line.productId,
         purchaseLineId: null,
-        qtyMilli: line.qtyMilli,
+        qtyMilli: draftQty(line.qtyMilli),
         unitCredit: line.unitCredit,
-        lineTotal: mulDivRound(line.qtyMilli, line.unitCredit, 1000),
+        lineTotal: mulDivRound(draftQty(line.qtyMilli), line.unitCredit, 1000),
         name: line.name,
         unit: line.unit,
       })),
@@ -317,6 +325,8 @@ export function SupplierReturnPage({
               const key = String(line.purchaseLine.id);
               const qty = linkedQty[key] ?? 0;
               const credit = linkedCredit[key] ?? line.landedCost;
+              const rawUnit = String(line.product.unit ?? 'pc');
+              const unit = isQtyUnit(rawUnit) ? rawUnit : 'pc';
               return (
                 <li
                   key={key}
@@ -330,11 +340,12 @@ export function SupplierReturnPage({
                         {String(line.product.name_en)}
                       </p>
                       <p className="text-small text-text-muted">
-                        {t('office.suppliers.received')} {line.received / 1000}{' '}
-                        · {t('office.suppliers.returned')}{' '}
-                        {line.returned / 1000} ·{' '}
+                        {t('office.suppliers.received')}{' '}
+                        {formatQtyFromMilli(line.received, unit)} ·{' '}
+                        {t('office.suppliers.returned')}{' '}
+                        {formatQtyFromMilli(line.returned, unit)} ·{' '}
                         {t('office.suppliers.remaining')}{' '}
-                        {line.remaining / 1000}
+                        {formatQtyFromMilli(line.remaining, unit)}
                       </p>
                     </div>
                     <div className="shrink-0 text-end">
@@ -351,7 +362,7 @@ export function SupplierReturnPage({
                   >
                     <QtyInput
                       label={`${t('office.suppliers.return_qty')} ${String(line.product.name_en)}`}
-                      unit={String(line.product.unit ?? 'pc') as never}
+                      unit={unit}
                       value={qty || null}
                       onChange={(value) =>
                         setLinkedQty((current) => ({
@@ -422,7 +433,7 @@ export function SupplierReturnPage({
                         setUnlinked((current) =>
                           current.map((row) =>
                             row.key === line.key
-                              ? { ...row, qtyMilli: value ?? 0 }
+                              ? { ...row, qtyMilli: value }
                               : row,
                           ),
                         )
@@ -447,7 +458,11 @@ export function SupplierReturnPage({
                     </div>
                   ) : null}
                   <MoneyText
-                    paisa={mulDivRound(line.qtyMilli, line.unitCredit, 1000)}
+                    paisa={mulDivRound(
+                      draftQty(line.qtyMilli),
+                      line.unitCredit,
+                      1000,
+                    )}
                   />
                   <button
                     type="button"

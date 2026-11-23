@@ -71,6 +71,23 @@ function PhoneHarness() {
   );
 }
 
+function PhoneValidityHarness() {
+  const [value, setValue] = useState('+923001234567');
+  const [valid, setValid] = useState(true);
+  return (
+    <div>
+      <PhoneInput
+        label="Phone"
+        value={value}
+        onChange={(next) => setValue(next ?? '')}
+        onValidityChange={setValid}
+      />
+      <output data-testid="phone-value">{value}</output>
+      <output data-testid="phone-valid">{String(valid)}</output>
+    </div>
+  );
+}
+
 function PastDateHarness() {
   const [value, setValue] = useState('2026-10-27');
   return (
@@ -207,6 +224,17 @@ describe('money and quantity fields', () => {
     expect(screen.getByTestId('qty-calls').textContent).toBe('1');
   });
 
+  it('keeps an invalid draft and shows the error on blur (UI-M1)', async () => {
+    const user = userEvent.setup();
+    render(<QtyHarness />);
+    const input = screen.getByLabelText('Quantity') as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, '1.5');
+    fireEvent.blur(input);
+    expect(input.value).toBe('1.5');
+    expect(screen.getByText('Enter a valid quantity.')).toBeTruthy();
+  });
+
   it('keeps money LTR inside bdi', () => {
     render(<MoneyText paisa={-50000} />);
     const node = screen.getByText(
@@ -270,6 +298,21 @@ describe('phone and search', () => {
     const field = screen.getByLabelText('Phone');
     await user.type(field, '12');
     fireEvent.blur(field);
+    expect(
+      screen.getByText('Enter a valid Pakistan phone number.'),
+    ).toBeTruthy();
+  });
+
+  it('keeps the last valid phone and flags the form while the text is unparseable', async () => {
+    render(<PhoneValidityHarness />);
+    const field = screen.getByLabelText('Phone') as HTMLInputElement;
+    // Replacing the text in one event, like selecting all and typing a typo: the
+    // invalid value must not be committed as an empty phone (UI-M6).
+    fireEvent.change(field, { target: { value: '12' } });
+    fireEvent.blur(field);
+    expect(field.value).toBe('12');
+    expect(screen.getByTestId('phone-value').textContent).toBe('+923001234567');
+    expect(screen.getByTestId('phone-valid').textContent).toBe('false');
     expect(
       screen.getByText('Enter a valid Pakistan phone number.'),
     ).toBeTruthy();

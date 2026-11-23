@@ -51,7 +51,7 @@ export function CategoryDialog({
       toast.push(
         err instanceof ReadOnlyError
           ? t('tenant.readOnly.blocked')
-          : err instanceof Error
+          : err instanceof RangeError && err.message === 'category exists'
             ? t('office.expenses.category_exists')
             : t('errors.generic'),
         'error',

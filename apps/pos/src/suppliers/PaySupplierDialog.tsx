@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast.tsx';
 import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { paySupplier, SupplierPaymentError } from '../data/purchases.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -78,7 +79,9 @@ export function PaySupplierDialog({
       );
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof SupplierPaymentError)
+      if (err instanceof ReadOnlyError)
+        toast.push(t('tenant.readOnly.blocked'), 'error');
+      else if (err instanceof SupplierPaymentError)
         toast.push(t(`office.suppliers.payment_error_${err.code}`), 'error');
       else toast.push(t('errors.generic'), 'error');
     } finally {

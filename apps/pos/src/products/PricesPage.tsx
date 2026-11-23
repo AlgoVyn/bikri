@@ -99,6 +99,7 @@ export function PricesPage() {
     } catch {
       toast.push(t('errors.generic'), 'error');
     } finally {
+      submitGuard.unlock();
       setBusy(false);
     }
   };

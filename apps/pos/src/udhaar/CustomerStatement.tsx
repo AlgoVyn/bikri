@@ -26,6 +26,7 @@ import {
   reminderLink,
   reminderMessage,
   type Statement,
+  type StatementEntry,
   statementCsv,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
@@ -41,6 +42,7 @@ import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { billVisible } from '../state/reportScope.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
 import { printCustomerStatement } from './creditPrint.ts';
 import {
@@ -68,7 +70,7 @@ export function CustomerStatement({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { can, role, staff } = useCurrentStaff();
+  const { can, role, support, branchId, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
   const canEditPromises = can('party.edit');
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -194,6 +196,16 @@ export function CustomerStatement({
   // row separately, so paging the screen does not truncate an export.
   const shownRows = statement.rows;
   const shownOpening = statement.openingBalance;
+  // A bill link that opens "You don't have access" is worse than plain text; share the
+  // same today/branch rule as BillDetail (05 §6, UI-H1).
+  const canViewBill = (row: StatementEntry) =>
+    billVisible(
+      role,
+      support,
+      can('report.view'),
+      String(row.entry.business_date) === today,
+      branchId === null || String(row.entry.branch_id) === branchId,
+    );
   const periodValue =
     from || to
       ? `${from ? dateText(from, i18n.language, tz) : '…'} – ${
@@ -587,7 +599,7 @@ export function CustomerStatement({
                   </span>
                 </div>
                 <p className="mt-1 flex flex-wrap items-center gap-2">
-                  {row.saleId ? (
+                  {row.saleId && canViewBill(row) ? (
                     <Link
                       to="/sales/$id"
                       params={{ id: row.saleId }}
@@ -674,7 +686,7 @@ export function CustomerStatement({
                     </td>
                     <td className="p-2">
                       <span className="flex flex-wrap items-center gap-2">
-                        {row.saleId ? (
+                        {row.saleId && canViewBill(row) ? (
                           <Link
                             to="/sales/$id"
                             params={{ id: row.saleId }}

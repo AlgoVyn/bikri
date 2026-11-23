@@ -13,6 +13,7 @@ export function PhoneInput({
   testId,
   showWhatsApp = true,
   required = false,
+  onValidityChange,
 }: {
   id?: string;
   label: string;
@@ -25,6 +26,8 @@ export function PhoneInput({
   showWhatsApp?: boolean;
   /** Visible required mark next to the label. */
   required?: boolean;
+  /** Lets a form block Save while the typed number cannot be parsed (UI-M6). */
+  onValidityChange?: (valid: boolean) => void;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -75,8 +78,16 @@ export function PhoneInput({
         onChange={(event) => {
           const next = event.target.value;
           setDraft(next);
-          const parsed = next.trim() === '' ? null : parsePkPhone(next, kind);
-          onChange(parsed === null ? null : parsed.e164);
+          if (next.trim() === '') {
+            onValidityChange?.(true);
+            onChange(null);
+            return;
+          }
+          const parsed = parsePkPhone(next, kind);
+          // Never send null for text the user is still fixing: the form keeps its last
+          // valid phone and blocks Save until this parses (UI-M6).
+          onValidityChange?.(parsed !== null);
+          if (parsed !== null) onChange(parsed.e164);
         }}
       />
       {invalid ? (

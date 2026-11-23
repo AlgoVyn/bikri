@@ -89,13 +89,15 @@ function Gate() {
 
 function RootLayout() {
   const { pathname } = useLocation();
+  // `/request-status/` and `/admin/` must match their parameterless forms too.
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/u, '') : pathname;
   // The operator console never opens a shop database or the PIN lock (screens/19).
-  const admin = pathname === '/admin' || pathname.startsWith('/admin/');
+  const admin = path === '/admin' || path.startsWith('/admin/');
   // Public shop-request pages work before any shop/device exists (D-175).
   const publicPage =
-    pathname === '/request' ||
-    pathname === '/request-status' ||
-    pathname.startsWith('/request/');
+    path === '/request' ||
+    path === '/request-status' ||
+    path.startsWith('/request/');
   return (
     <ToastProvider>{admin || publicPage ? <Outlet /> : <Gate />}</ToastProvider>
   );

@@ -30,6 +30,7 @@ import {
   Meter,
   Panel,
   quietBtn,
+  RefreshError,
   StatCard,
   StatusBadge,
 } from './ui.tsx';
@@ -98,6 +99,7 @@ export function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <RefreshError message={error} />
       <PageHeader
         icon={<ReportsIcon />}
         title={t('admin.overview_title')}
