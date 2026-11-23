@@ -277,7 +277,7 @@ test.describe('Settings (T-050)', () => {
     ).toBeVisible();
   });
 
-  test('Devices has a visible import picker and a compact receipt preview', async ({
+  test('Devices hides the unsynced import before enrolment; receipt preview stays compact', async ({
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings');
@@ -292,8 +292,11 @@ test.describe('Settings (T-050)', () => {
       await dialog.getByRole('button', { name: 'Cancel' }).click();
       await expect(dialog).toHaveCount(0);
     }
-    await expect(page.getByText('Choose file', { exact: true })).toBeVisible();
-    await expect(page.getByText('No file chosen')).toBeVisible();
+    // The dev shop is not enrolled: importing ops needs a device token and is hidden
+    // rather than offering a picker that cannot be used (UI-L7).
+    await expect(
+      page.getByRole('heading', { name: 'Import unsynced ops' }),
+    ).toHaveCount(0);
 
     await page.goto('/bikri/settings/shop');
     await expect(page.getByTestId('receipt-preview-card')).toBeVisible();
