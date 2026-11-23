@@ -115,13 +115,13 @@ List with drag to reorder (`sort_order`), rename, colour (the 8 Algovyn-based ti
 5. Importing the template with 1,000 valid rows finishes in < 10 s and creates 1,000 opening movements.
 6. Bulk +10% with Rs 10 rounding turns Rs 1,499 into Rs 1,650.
 7. `Duplicate` on "Type-C cable 1 m white" opens a new product with the same category, brand, price, cost, unit and warranty, and empty SKU, barcodes, photo and opening stock; saving creates a separate product.
-7. Stock history balance-after column matches on hand after the latest row.
-8. Turning `Track stock` off on a tracked product shows the warning and asks before saving; after confirming, no stock movement is written, the old on-hand and history stay, and Stock history gains a "Stock tracking turned off" row showing the on-hand balance at that moment.
-9. Creating a bundle with a phone, charger, case and protector at Rs 56,500 shows items total Rs 59,980, customer saves Rs 3,480, derived cost/margin and availability 3 bundles; the saved product has `kind='bundle'`, `track_stock=0` and four `bundle_items`.
-10. The bundle list row shows the `Bundle` pill and "3 bundles" availability; the detail has no `Adjust stock`, opening stock or low-stock fields, and its 30-day figure counts bundles, not components.
-11. Selling the bundle deducts each tracked component by the bundle quantity; an untracked service component gets no stock movement; a component out of stock shows the amber warning on Sell but does not block.
-12. Deleting a component used by the bundle is blocked with the bundle name; deleting the bundle is allowed and old bills/receipts still print the old name and components.
-13. Editing the recipe or bundle price updates new carts only; a saved bill and its reprint are unchanged; `Duplicate` copies the recipe but leaves SKU, barcodes, photo and stock empty.
-14. A cashier sees no cost, margin or items total on the bundle list/detail or in CSV; the bundle is excluded from spreadsheet import and bulk price update; its barcode prints and price check shows the contents. English and Urdu at 1280×800 and 390×844.
-15. A product note shows in the detail's Notes card for the owner and a cashier, keeps line breaks, and a blank note renders no card. The note is absent from receipts and labels.
-16. A sale movement in Stock history links to its bill, a refund/void row links to the original bill, and a purchase movement links to the supplier's delivery details; opening, adjustment and count rows have no source link.
+8. Stock history balance-after column matches on hand after the latest row.
+9. Turning `Track stock` off on a tracked product shows the warning and asks before saving; after confirming, no stock movement is written, the old on-hand and history stay, and Stock history gains a "Stock tracking turned off" row showing the on-hand balance at that moment.
+10. Creating a bundle with a phone, charger, case and protector at Rs 56,500 shows items total Rs 59,980, customer saves Rs 3,480, derived cost/margin and availability 3 bundles; the saved product has `kind='bundle'`, `track_stock=0` and four `bundle_items`.
+11. The bundle list row shows the `Bundle` pill and "3 bundles" availability; the detail has no `Adjust stock`, opening stock or low-stock fields, and its 30-day figure counts bundles, not components.
+12. Selling the bundle deducts each tracked component by the bundle quantity; an untracked service component gets no stock movement; a component out of stock shows the amber warning on Sell but does not block.
+13. Deleting a component used by the bundle is blocked with the bundle name; deleting the bundle is allowed and old bills/receipts still print the old name and components.
+14. Editing the recipe or bundle price updates new carts only; a saved bill and its reprint are unchanged; `Duplicate` copies the recipe but leaves SKU, barcodes, photo and stock empty.
+15. A cashier sees no cost, margin or items total on the bundle list/detail or in CSV; the bundle is excluded from spreadsheet import and bulk price update; its barcode prints and price check shows the contents. English and Urdu at 1280×800 and 390×844.
+16. A product note shows in the detail's Notes card for the owner and a cashier, keeps line breaks, and a blank note renders no card. The note is absent from receipts and labels.
+17. A sale movement in Stock history links to its bill, a refund/void row links to the original bill, and a purchase movement links to the supplier's delivery details; opening, adjustment and count rows have no source link.

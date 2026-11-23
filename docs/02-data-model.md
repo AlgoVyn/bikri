@@ -1649,7 +1649,8 @@ header (`pushShopHeader`) skips the shop-name line while still printing the logo
 address, phone and tax numbers; the WhatsApp receipt text skips the name too. It is
 a shop-level setting in Settings → Shop profile & receipt and does not change sales.
 The schema marker bump lives in migration `0023` so a database that already applied
-`0022` still advances. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 7; the
+`0022` still advances. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 8 (bumped
+by the logo field in `0025`); the
 Worker's bundle pull gate stays at schema 5 because it marks when bundles shipped,
 not the current schema.
 
@@ -2496,11 +2497,11 @@ export const DEXIE_SCHEMA_V14 = {
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
 | `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
-| `print_jobs` | `{ id, sale_id?, refund_id?, kind, status: 'queued'|'printing'|'done'|'failed', error?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
+| `print_jobs` | `{ id, sale_id?, refund_id?, day_close_id?, supplier_return_id?, kind, status: 'queued'|'printing'|'done'|'failed', started_at?, error?, reprint?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
 | `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
-| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at }` | Cache = Σ `ledger_entries.amount`; rebuildable |
+| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? }` | Cache = Σ `ledger_entries.amount`; rebuildable |
 
-`CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key? }`.
+`CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key?, list_price?, note?, track_stock?, unit?, bundle_id?, bundle_group?, bundle_name?, bundle_qty?, bundle_price?, bundle_list_price?, bundle_base_price?, bundle_discount_type?, bundle_discount_value?, bundle_component_qty_milli? }`.
 
 **Local retention (D-226).** A daily idle pass trims only local-only operational logs: completed `print_jobs` older than 90 days, failed `file_queue` uploads older than 30 days and `kv.pull_errors` older than 30 days. Business rows (sales, stock movements, ledger entries, refunds, day closes, audit) are never deleted on the till; the server backup and the shop export are the long-term record.
 
