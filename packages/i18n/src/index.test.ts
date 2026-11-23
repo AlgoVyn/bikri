@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { compareCatalogs, duplicateJsonKeys } from './check-keys.ts';
-import { loadAllCatalogs, loadCatalog } from './index.ts';
+import {
+  type LocaleCode,
+  loadAllCatalogs,
+  loadAreaCatalog,
+  loadCatalog,
+} from './index.ts';
 
 describe('@bikri/i18n catalogs', () => {
   it('ships identical non-empty keys for en, ur and roman-ur', async () => {
@@ -26,5 +31,18 @@ describe('@bikri/i18n catalogs', () => {
     const ur = await loadCatalog('ur');
     expect(ur.common.app_name).toBeTruthy();
     expect(Object.keys(ur)).toEqual(Object.keys(await loadCatalog('en')));
+  });
+
+  it('loads each area and falls back to English for an unsupported locale', async () => {
+    const english = await loadAreaCatalog('office', 'en');
+    expect(english.office).toBeTruthy();
+    for (const area of ['admin', 'office', 'public'] as const) {
+      expect(await loadAreaCatalog(area, 'roman-UR' as LocaleCode)).toEqual(
+        await loadAreaCatalog(area, 'en'),
+      );
+      expect(await loadAreaCatalog(area, 'fr' as LocaleCode)).toEqual(
+        await loadAreaCatalog(area, 'en'),
+      );
+    }
   });
 });

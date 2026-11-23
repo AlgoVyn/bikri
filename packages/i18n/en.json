@@ -47,7 +47,7 @@
     "up": "Move {{name}} up",
     "name_ur": "Urdu name",
     "delete_title": "Delete category “{{name}}”?",
-    "delete_body": "Products in this category will keep their products but lose this category colour."
+    "delete_body": "Only an empty category can be deleted. Move its products to another category first."
   },
   "common": {
     "app_name": "Bikri",
@@ -202,7 +202,6 @@
     "opening": "Opening stock",
     "photo": "Photo",
     "photo_error": "This image could not be read. Try a JPG or PNG.",
-    "photo_later": "Photos come next.",
     "photo_pick": "Take or choose photo",
     "photo_preview": "Photo preview",
     "photo_remove": "Remove photo",

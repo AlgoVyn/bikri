@@ -432,6 +432,7 @@ for (const action of [
   'shop_change',
   'staff_change',
   'branch_change',
+  'bundle_change',
   'price_change',
   'cost_change',
   'track_stock_change',

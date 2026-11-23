@@ -47,7 +47,16 @@ export async function loadAreaCatalog(
       : area === 'office'
         ? officeFiles
         : publicFiles;
-  return (await files[locale]()).default as Record<string, unknown>;
+  // Mirror `loadCatalog`: a canonicalized or unsupported locale falls back to English
+  // instead of throwing on a missing dynamic import.
+  switch (locale) {
+    case 'ur':
+      return (await files.ur()).default as Record<string, unknown>;
+    case 'roman-ur':
+      return (await files['roman-ur']()).default as Record<string, unknown>;
+    default:
+      return (await files.en()).default as Record<string, unknown>;
+  }
 }
 
 type JsonModule = Promise<{ default: unknown }>;

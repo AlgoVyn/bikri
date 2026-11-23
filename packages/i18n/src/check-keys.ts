@@ -28,6 +28,63 @@ export function flattenKeys(value: unknown, prefix = ''): Map<string, string> {
   return flat;
 }
 
+const LRI = '\u2066';
+const PDI = '\u2069';
+
+/**
+ * A number range or `W × H` dimension. U+2013 and U+00D7 are bidi-neutral, so in an
+ * RTL paragraph "3–30" renders as "30–3" unless it sits inside an LRI…PDI isolate
+ * (CORE-M5). Urdu digits are included because catalogs may use them.
+ */
+const URDU_RANGE =
+  /[\d\u0660-\u0669\u06F0-\u06F9]+\s*[–×-]\s*[\d\u0660-\u0669\u06F0-\u06F9]+/gu;
+
+function isolated(text: string, start: number, end: number): boolean {
+  const before = text.slice(0, start);
+  const open = before.lastIndexOf(LRI);
+  if (open < 0 || before.lastIndexOf(PDI) > open) return false;
+  return text.indexOf(PDI, end) >= 0;
+}
+
+/** Keys in a `ur` catalog with a numeric range outside a U+2066…U+2069 isolate. */
+export function unisolatedNumericRanges(value: unknown): string[] {
+  const found = new Set<string>();
+  for (const [key, text] of flattenKeys(value)) {
+    for (const match of text.matchAll(URDU_RANGE)) {
+      if (
+        !isolated(text, match.index ?? 0, (match.index ?? 0) + match[0].length)
+      )
+        found.add(key);
+    }
+  }
+  return [...found].sort();
+}
+
+/**
+ * Areas are merged into the active language's single `translation` namespace
+ * (`areas.tsx`), so a root key and an area key must never flatten to the same path.
+ */
+export function crossAreaDuplicates(
+  catalogs: Readonly<Record<string, unknown>>,
+): string[] {
+  const errors: string[] = [];
+  const owners = new Map<string, string>();
+  for (const [area, value] of Object.entries(catalogs)) {
+    let flat: Map<string, string>;
+    try {
+      flat = flattenKeys(value);
+    } catch {
+      continue; // compareCatalogs already reports the malformed catalog.
+    }
+    for (const key of flat.keys()) {
+      const owner = owners.get(key);
+      if (owner === undefined) owners.set(key, area);
+      else errors.push(`duplicate key ${key} in ${owner} and ${area}`);
+    }
+  }
+  return errors.sort();
+}
+
 /** Returns a sorted list of problems. Empty means the catalogs match. */
 export function compareCatalogs(
   catalogs: Readonly<Record<string, unknown>>,
@@ -91,6 +148,8 @@ export function compareCatalogs(
 
 export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
   const errors: string[] = [];
+  const perLocale = new Map<string, Record<string, unknown>>();
+  for (const locale of LOCALE_FILES) perLocale.set(locale, {});
   // The app catalogs and the operator console's own catalogs (D-112) are checked separately.
   for (const [dir, label] of [
     [rootDir, ''],
@@ -98,6 +157,7 @@ export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
     [resolve(rootDir, 'office'), 'office/'],
     [resolve(rootDir, 'public'), 'public/'],
   ] as const) {
+    const area = label === '' ? 'root' : label.slice(0, -1);
     const catalogs: Record<string, unknown> = {};
     for (const locale of LOCALE_FILES) {
       const file = resolve(dir, `${locale}.json`);
@@ -105,9 +165,24 @@ export async function checkLocaleFiles(rootDir: string): Promise<string[]> {
       for (const duplicate of duplicateJsonKeys(text)) {
         errors.push(`${label}${locale}: duplicate key ${duplicate}`);
       }
-      catalogs[locale] = JSON.parse(text) as unknown;
+      const parsed: unknown = JSON.parse(text);
+      catalogs[locale] = parsed;
+      const bucket = perLocale.get(locale);
+      if (bucket !== undefined) bucket[area] = parsed;
     }
     errors.push(...compareCatalogs(catalogs).map((e) => `${label}${e}`));
+    if (catalogs.ur !== undefined) {
+      errors.push(
+        ...unisolatedNumericRanges(catalogs.ur).map(
+          (key) => `${label}ur: unisolated numeric range ${key}`,
+        ),
+      );
+    }
+  }
+  for (const locale of LOCALE_FILES) {
+    const areas = perLocale.get(locale);
+    if (areas === undefined) continue;
+    errors.push(...crossAreaDuplicates(areas).map((e) => `${locale}: ${e}`));
   }
   return errors.sort();
 }

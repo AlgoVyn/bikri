@@ -1,8 +1,10 @@
 import { hashPin } from '@bikri/core';
 import type { SyncedRow } from '@bikri/db';
+import { LOCALE_CODES, loadAreaCatalog } from '@bikri/i18n';
 import { afterEach, describe, expect, it } from 'vitest';
 import { addProduct, cartTotals, emptyCart, shopMoney } from './cart.ts';
 import {
+  AUDIT_ACTIONS,
   auditCsv,
   auditList,
   auditSummary,
@@ -508,5 +510,60 @@ describe('settings helpers', () => {
     const all = await auditList(db, { from: TODAY, to: TODAY });
     expect(all).toHaveLength(2);
     expect(auditCsv(all, TZ)).toContain('shop_change');
+  });
+});
+
+/**
+ * Mirrors `CLIENT_AUDIT_ACTIONS` in `apps/api/src/sync/applyOpsShared.ts`, the actions a
+ * till may write. Both lists must also be selectable in the Activity filters.
+ */
+const CLIENT_AUDIT_ACTIONS = [
+  'backup_restore',
+  'branch_change',
+  'bundle_change',
+  'cache_rebuilt',
+  'cost_change',
+  'credit_limit_change',
+  'day_close_difference',
+  'discount_over_limit',
+  'drawer_open',
+  'override',
+  'party_delete',
+  'pin_reset',
+  'price_change',
+  'product_delete',
+  'refund',
+  'reissue',
+  'sale_backdated',
+  'shop_change',
+  'staff_change',
+  'stock_count',
+  'supplier_return',
+  'sync_ops_discarded',
+  'track_stock_change',
+  'void',
+] as const;
+
+describe('activity action labels', () => {
+  it('has a filter label and an i18n key for every audit action', async () => {
+    for (const action of CLIENT_AUDIT_ACTIONS) {
+      expect(AUDIT_ACTIONS, `filter list misses ${action}`).toContain(action);
+    }
+    const actions = new Set([...AUDIT_ACTIONS, ...CLIENT_AUDIT_ACTIONS]);
+    for (const locale of LOCALE_CODES) {
+      const catalog = (await loadAreaCatalog('office', locale)) as {
+        office?: { activity?: Record<string, unknown> };
+      };
+      const activity = catalog.office?.activity ?? {};
+      for (const action of actions) {
+        const key = `action_${action}`;
+        expect(activity[key], `${locale} missing ${key}`).toEqual(
+          expect.any(String),
+        );
+        expect(String(activity[key]).trim(), `${locale} empty ${key}`).not.toBe(
+          '',
+        );
+      }
+    }
   });
 });
