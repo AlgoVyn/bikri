@@ -1,6 +1,8 @@
 import {
   hasNonAscii,
   type ItemLayout,
+  type LaidCell,
+  type LaidText,
   layOut,
   lineNeedsRtl,
 } from './layout.ts';
@@ -45,6 +47,14 @@ const COMMON_CSS = [
   '.dh { transform: scaleY(2); transform-origin: top left; height: 2.7em }',
   '.logo-wrap { text-align: center } img.logo { max-width: 60%; }',
   ".urdu { font-family: 'Noto Naskh Arabic UI', 'Noto Naskh Arabic', serif; direction: rtl; line-height: 1.7; white-space: normal }",
+  // Rows keep their columns even when a cell is Urdu: flex/grid spaces them, so
+  // `.urdu`'s `white-space: normal` can never collapse the padding.
+  '.pair { display: flex; justify-content: space-between; gap: 1ch; align-items: baseline }',
+  '.pair > span { white-space: pre-wrap }',
+  '.row { display: grid; align-items: baseline }',
+  '.row > .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }',
+  '.row > .v, .pair > .v { text-align: end }',
+  ".rtl { font-family: 'Noto Naskh Arabic UI', 'Noto Naskh Arabic', serif }",
   '.qr { text-align: center; font-size: 0.8em }',
   // 06 §4.4: the Powered by line; other small (Font B) text is 3/4 of the body.
   '.powered-by { text-align: center; font-size: 8px; margin: 2mm 0 0 }',
@@ -59,6 +69,37 @@ function escapeHtml(text: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function cellHtml(cell: LaidCell): string {
+  const classes: string[] = [];
+  if (cell.align === 'end') classes.push('v');
+  const rtl = lineNeedsRtl(cell.text);
+  if (rtl) classes.push('rtl');
+  const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+  // `dir="auto"` keeps an Urdu label inside its own cell instead of flipping the row.
+  const dir = rtl ? ' dir="auto"' : '';
+  return `<span${classAttr}${dir}>${escapeHtml(cell.text)}</span>`;
+}
+
+/**
+ * A pair (label/value) or item (name/qty/amount) row as real columns. The ESC/POS
+ * side keeps the space-padded string in `command.text`; only the HTML fallback
+ * needs structure so Urdu cells do not collapse the spacing.
+ */
+function cellsHtml(cells: LaidCell[], command: LaidText): string {
+  const classes = [cells.length > 2 ? 'row' : 'pair'];
+  if (command.bold) classes.push('b');
+  if (command.size === 'small') classes.push('sm');
+  if (command.size === 'double') classes.push('dw');
+  if (command.size === 'double-height') classes.push('dh');
+  const style =
+    cells.length > 2
+      ? ' style="grid-template-columns:minmax(0,1fr) 5ch 15ch"'
+      : '';
+  return `<div class="${classes.join(' ')}"${style}>${cells
+    .map(cellHtml)
+    .join('')}</div>`;
 }
 
 /**
@@ -126,6 +167,10 @@ export function renderReceiptHtml(
           command.align === 'center'
         ) {
           body.push(`<p class="powered-by">${POWERED_BY}</p>`);
+          break;
+        }
+        if (command.cells && command.cells.length > 0) {
+          body.push(cellsHtml(command.cells, command));
           break;
         }
         const classes = ['l'];
