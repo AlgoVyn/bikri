@@ -70,6 +70,8 @@ export type DeviceVars = {
   db: TenantDb;
   /** Today's usage, joined into the device token lookup (13 §6). */
   usage: { pushes: number; rows_written: number; rows_read: number };
+  /** `device.last_seen_at` as of this request: the last pull/snapshot (API-M5). */
+  deviceSeenAt: number;
   /** Set by shopAdmin: the owner unlocked on the admin device (X-Bikri-Staff). */
   ownerId: string;
 };

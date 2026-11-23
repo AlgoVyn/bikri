@@ -7,9 +7,65 @@ import {
   key,
   type Lookups,
   overrideForLine,
+  type ProductLookupRow,
   Reject,
 } from '../applyOpsShared.ts';
 import type { PushOp } from '../opSchema.ts';
+
+/**
+ * The product state a same-group `products` op leaves (API-H2). `planOp` writes only
+ * `changed_fields` for an existing master row, so the raw `op.row` must never carry an
+ * unwritten `price`/`kind`/`track_stock` into a sale check in the same push. A stored
+ * soft-delete is preserved; a product created by this push writes every supplied column.
+ */
+export function pushedProduct(
+  look: Lookups,
+  group: PushOp[],
+  id: string,
+): ProductLookupRow | undefined {
+  const op = group.find(
+    (candidate) =>
+      candidate.tbl === 'products' &&
+      candidate.kind !== 'delete' &&
+      candidate.row?.id === id,
+  );
+  if (!op?.row) return undefined;
+  const stored = look.products.get(id);
+  if (!stored) {
+    return {
+      price: Number(op.row.price ?? 0),
+      avg_cost: Number(op.row.last_cost ?? 0),
+      last_cost: Number(op.row.last_cost ?? 0),
+      track_stock: Number(op.row.track_stock ?? 0),
+      updated_at: Number(op.row.updated_at ?? op.row.created_at ?? 0),
+      kind: String(op.row.kind ?? 'simple'),
+      deleted_at:
+        op.row.deleted_at === null || op.row.deleted_at === undefined
+          ? null
+          : Number(op.row.deleted_at),
+      pushed: true,
+    };
+  }
+  const changed = new Set(op.changed_fields ?? []);
+  const pick = <K extends keyof ProductLookupRow>(
+    field: K,
+  ): ProductLookupRow[K] =>
+    changed.has(field) && op.row?.[field] !== undefined
+      ? (op.row[field] as ProductLookupRow[K])
+      : stored[field];
+  return {
+    price: Number(pick('price')),
+    // `avg_cost` is server-managed and never written from a client row.
+    avg_cost: stored.avg_cost,
+    last_cost: Number(pick('last_cost')),
+    track_stock: Number(pick('track_stock')),
+    // `planOp` always writes updated_at for an existing row.
+    updated_at: Number(op.row.updated_at ?? stored.updated_at),
+    kind: String(pick('kind')),
+    deleted_at: stored.deleted_at ?? (pick('deleted_at') as number | null),
+    pushed: true,
+  };
+}
 
 /** Active component ids of a bundle after the recipe ops in this push. */
 export function activeBundleComponents(
@@ -193,13 +249,8 @@ export function checkBundleSaleGroups(
       continue;
     }
 
-    const pushedProduct = group.find(
-      (candidate) =>
-        candidate.tbl === 'products' &&
-        candidate.kind !== 'delete' &&
-        candidate.row?.id === bundleId,
-    )?.row;
-    const product = pushedProduct ?? look.products.get(bundleId);
+    const pushed = pushedProduct(look, group, bundleId);
+    const product = pushed ?? look.products.get(bundleId);
     if (!product || String(product.kind ?? 'simple') !== 'bundle')
       throw new Reject('CONSTRAINT_FAILED');
 
@@ -214,8 +265,7 @@ export function checkBundleSaleGroups(
           : entryAt >= item.deleted_at),
     );
     const pushedInPush =
-      pushedProduct !== undefined ||
-      (product as { pushed?: boolean }).pushed === true;
+      pushed !== undefined || (product as { pushed?: boolean }).pushed === true;
     const fresh =
       recipeSeen &&
       (pushedInPush ||

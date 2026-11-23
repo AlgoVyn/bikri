@@ -36,6 +36,12 @@ export type ApplyContext = {
   device: DeviceRow;
   now: number;
   budget: CallBudget;
+  /**
+   * The last time the device completed a pull or snapshot, before this request. Freshness
+   * checks use it to decide whether the till could know a server-side price/cost change;
+   * `/me` and push must not advance it (API-M5).
+   */
+  deviceSeenAt?: number;
 };
 
 export type ApplyOutcome = {
@@ -154,6 +160,19 @@ export type Planned = {
 };
 
 export type Group = { txId: string; planned: Planned[] };
+
+/** A master product's state for sale/bundle checks (API-H2, API-M5). */
+export type ProductLookupRow = {
+  price: number;
+  avg_cost: number;
+  last_cost: number;
+  track_stock: number;
+  updated_at: number;
+  kind: string;
+  deleted_at: number | null;
+  /** The product row was created or edited earlier in this push: the device knows it. */
+  pushed: boolean;
+};
 
 export type Lookups = {
   staff: Map<string, StaffRow>;
@@ -279,20 +298,7 @@ export type Lookups = {
   /** Stored ledger balance for a party being checked or deleted. */
   partyBalances: Map<string, number>;
   /** Current product price/cost/tracking, for sale price and cost checks. */
-  products: Map<
-    string,
-    {
-      price: number;
-      avg_cost: number;
-      last_cost: number;
-      track_stock: number;
-      updated_at: number;
-      kind: string;
-      deleted_at: number | null;
-      /** The product row was created or edited earlier in this push: the device knows it. */
-      pushed: boolean;
-    }
-  >;
+  products: Map<string, ProductLookupRow>;
   /** The latest stored close of each device, for period chaining. */
   lastClose: Map<
     string,
@@ -888,15 +894,22 @@ export function partyUsableAt(
   if (!partyExists(look, group, type, id, allowForward))
     throw new Reject('FOREIGN_KEY');
   if (typeof id !== 'string') return false;
+  const partyKey = key(type, id);
+  // A stored soft-deleted party is never resurrected by an edit of the same push
+  // (API-M2). Resolve its stored state before the push-wide forward map, which carries
+  // the client's `deleted_at: null` from an edit to an already-deleted row.
+  const storedDeleted = look.partyDeleted.get(partyKey);
+  if (storedDeleted !== undefined && storedDeleted !== null)
+    return typeof at === 'number' && at <= storedDeleted;
   if (allowForward) {
-    const forwardDeleted = look.forwardPartyDeleted.get(key(type, id));
+    const forwardDeleted = look.forwardPartyDeleted.get(partyKey);
     if (forwardDeleted !== undefined)
       return (
         forwardDeleted === null ||
         (typeof at === 'number' && at <= forwardDeleted)
       );
   }
-  const deleted = look.partyDeleted.get(key(type, id));
+  const deleted = look.partyDeleted.get(partyKey);
   if (deleted !== undefined)
     return deleted === null || (typeof at === 'number' && at <= deleted);
   const table = type === 'customer' ? 'customers' : 'suppliers';

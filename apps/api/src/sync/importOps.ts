@@ -56,7 +56,17 @@ export async function importOps(
   budget.take(3);
   const outcome =
     eligible.length > 0
-      ? await applyOps({ db, tenant, device, now, budget }, eligible)
+      ? await applyOps(
+          {
+            db,
+            tenant,
+            device,
+            now,
+            budget,
+            deviceSeenAt: Number(device.last_seen_at ?? 0),
+          },
+          eligible,
+        )
       : { results: [], rowsWritten: 0, rowsRead: 0, tail: [] };
   await db.batch([
     ...outcome.tail,

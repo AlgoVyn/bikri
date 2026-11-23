@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
-import { pruneAll } from '../../src/platform/prune.ts';
+import { passFinished, pruneAll } from '../../src/platform/prune.ts';
 import {
   addBundleFixture,
   addSupportDevice,
@@ -400,5 +400,115 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
       .first<{ status: string }>();
     // The near-full account budget must pause the delete instead of blowing the cap.
     expect(tenant?.status).toBe('deleting');
+  });
+
+  it('API-M3: keeps the only cutoff watermark across nights', async () => {
+    const shop = await seedShop('Prune watermark');
+    // A future run date has no tenant_usage rows yet, so earlier tests cannot consume
+    // this run's account write budget.
+    const now = Date.now() + 400 * DAY;
+    await env.DB.prepare('UPDATE tenants SET created_at = ?2 WHERE id = ?1')
+      .bind(shop.tenantId, now - 60 * DAY)
+      .run();
+    await pushOk(shop.till, saleOps(shop, shop.till, 1));
+    await env.DB.prepare('UPDATE change_log SET at = ?2 WHERE tenant_id = ?1')
+      .bind(shop.tenantId, now - 40 * DAY)
+      .run();
+    const night1 = new Date(now).toISOString().slice(0, 10);
+    const cutoffDay = new Date(now - 30 * DAY).toISOString().slice(0, 10);
+    const watermarks = (day: string) =>
+      n(
+        'SELECT COUNT(*) AS n FROM change_log_watermarks WHERE tenant_id = ?1 AND day = ?2',
+        shop.tenantId,
+        day,
+      );
+
+    await pruneAll(env, now);
+    // Night 1 backfilled the cutoff day's watermark.
+    expect(await watermarks(cutoffDay)).toBe(1);
+    expect(await watermarks(night1)).toBe(1);
+    // Night 2 has no newer watermark at or before its cutoff, so deleting the only
+    // covering row would re-trigger the fallback scan on Night 3.
+    await pruneAll(env, now + DAY);
+    expect(await watermarks(cutoffDay)).toBe(1);
+  });
+
+  it('API-M3: advances prune_cursor past a high-volume tenant', async () => {
+    const a = await seedShop('Cursor A');
+    const b = await seedShop('Cursor B');
+    const now = Date.now() + 400 * DAY;
+    await env.DB.prepare(
+      'UPDATE tenants SET created_at = ?2 WHERE id IN (?1, ?3)',
+    )
+      .bind(a.tenantId, now - 60 * DAY, b.tenantId)
+      .run();
+    const old = now - 40 * DAY;
+    await env.DB.prepare(
+      `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 300)
+       INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at)
+       SELECT ?1, 'products', 'p' || x, 'upsert', '{}', NULL, ?2 FROM c`,
+    )
+      .bind(a.tenantId, old)
+      .run();
+    await env.DB.prepare(
+      `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 5)
+       INSERT INTO change_log (tenant_id, tbl, row_id, op, row_json, device_id, at)
+       SELECT ?1, 'products', 'q' || x, 'upsert', '{}', NULL, ?2 FROM c`,
+    )
+      .bind(b.tenantId, old)
+      .run();
+    await env.DB.prepare(
+      "UPDATE meta SET value = ?1 WHERE key = 'prune_cursor'",
+    )
+      .bind(a.tenantId)
+      .run();
+    // ~100 account writes for this run: the first tenant cannot finish, but the cursor
+    // must move on instead of retrying it forever.
+    const ids = (
+      await env.DB.prepare(
+        "SELECT id FROM tenants WHERE status NOT IN ('deleted','deleting') ORDER BY id",
+      ).all<{ id: string }>()
+    ).results.map((row) => row.id);
+    const at = ids.indexOf(a.tenantId);
+    if (at < 0) throw new Error('cursor tenant missing');
+    const expectedNext = ids[at + 1] ?? ids[0] ?? '';
+    await env.DB.prepare(
+      `INSERT INTO tenant_usage (tenant_id, day, pushes, rows_written, rows_read)
+       VALUES (?1, ?2, 0, 89900, 0)
+       ON CONFLICT(tenant_id, day) DO UPDATE SET rows_written = 89900`,
+    )
+      .bind(a.tenantId, new Date(now).toISOString().slice(0, 10))
+      .run();
+
+    await pruneAll(env, now);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1',
+        a.tenantId,
+      ),
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await env.DB.prepare(
+          "SELECT value FROM meta WHERE key = 'prune_cursor'",
+        ).first<{ value: string }>()
+      )?.value,
+    ).toBe(expectedNext);
+
+    // The next run starts at the next tenant; the high-volume tenant is last in that
+    // rotation, so the small tenant is reached before the budget is spent again.
+    await pruneAll(env, now + 1000);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM change_log WHERE tenant_id = ?1',
+        b.tenantId,
+      ),
+    ).toBe(0);
+  });
+
+  it('API-M3: a full delete chunk means rows remain, however much budget is left', () => {
+    expect(passFinished(2_000, 2_000)).toBe(false);
+    expect(passFinished(1_999, 2_000)).toBe(true);
+    expect(passFinished(0, 2_000)).toBe(true);
   });
 });

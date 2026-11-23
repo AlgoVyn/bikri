@@ -81,6 +81,26 @@ export function assertQuota(
 /** A shop cannot read the shared D1 budget without bound (13 §6). */
 export const READ_BUDGET_FLOOR = 1_000_000;
 
+/**
+ * Flush this isolate's pending rows-read counter into today's usage row. Pull and
+ * snapshot both use the same 5,000-row batch so the D1 counter stays accurate even for
+ * a shop that never pushes (read-only shops, support devices) (API-L4).
+ */
+async function flushPendingReads(
+  db: AppEnv['Variables']['db'],
+  tenantId: string,
+): Promise<void> {
+  const rows = takeRowsRead(tenantId);
+  if (rows <= 0) return;
+  await db
+    .prepare(
+      'INSERT INTO tenant_usage (tenant_id, day, rows_read) VALUES (?1, ?2, ?3) ON CONFLICT (tenant_id, day) DO UPDATE SET rows_read = rows_read + ?3',
+      new Date().toISOString().slice(0, 10),
+      rows,
+    )
+    .run();
+}
+
 export function assertReadQuota(
   tenant: TenantRow,
   usage: { rows_read: number },
@@ -155,7 +175,17 @@ export async function push(c: Context<AppEnv>): Promise<Response> {
   const budget = new CallBudget();
   budget.take(3); // token look-up, the closing batch and one spare
   const applyStarted = performance.now();
-  const outcome = await applyOps({ db, tenant, device, now, budget }, ops);
+  const outcome = await applyOps(
+    {
+      db,
+      tenant,
+      device,
+      now,
+      budget,
+      deviceSeenAt: c.var.deviceSeenAt,
+    },
+    ops,
+  );
   const applyMs = performance.now() - applyStarted;
   tail.push(...outcome.tail);
   tail.push(
@@ -286,18 +316,8 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
   if (
     (tenant.status === 'read_only' || device.kind === 'support') &&
     pendingRowsRead(tenant.id) >= 5_000
-  ) {
-    const rows = takeRowsRead(tenant.id);
-    if (rows > 0) {
-      await db
-        .prepare(
-          'INSERT INTO tenant_usage (tenant_id, day, rows_read) VALUES (?1, ?2, ?3) ON CONFLICT (tenant_id, day) DO UPDATE SET rows_read = rows_read + ?3',
-          new Date().toISOString().slice(0, 10),
-          rows,
-        )
-        .run();
-    }
-  }
+  )
+    await flushPendingReads(db, tenant.id);
   // SQLite already holds valid row JSON. Embed it raw instead of parsing every row
   // only to have c.json stringify the whole page again on catch-up pulls.
   const changes = page
@@ -389,8 +409,14 @@ export async function snapshotPayload(
   // The operator export is Access-only and deliberately outside the shop's read
   // budget; till snapshots and owner exports still charge their pages. Use D1's
   // real rows-read count rather than the page size (API-L6).
-  if (chargeReads)
+  if (chargeReads) {
     addRowsRead(tenant.id, Number(result.meta.rows_read ?? page.length));
+    // Snapshot pages are a read-only shop's or support device's only sync traffic; flush
+    // in the same 5,000-row batches as pull instead of waiting for a push that never
+    // comes (API-L4).
+    if (pendingRowsRead(tenant.id) >= 5_000)
+      await flushPendingReads(db, tenant.id);
+  }
   return {
     tbl: q.tbl,
     rows: page,

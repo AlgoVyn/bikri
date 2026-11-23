@@ -36,6 +36,7 @@ import {
 import {
   activeBundleComponents,
   productDeletedInGroup,
+  pushedProduct,
 } from './checks/bundles.ts';
 import { checkLedgerEntry } from './checks/ledger.ts';
 import { checkRefund, checkVoid } from './checks/refunds.ts';
@@ -309,7 +310,7 @@ export function checkOp(
             allowed,
             entryAt,
             costs,
-            Number(ctx.device.last_seen_at ?? 0),
+            Number(ctx.deviceSeenAt ?? ctx.device.last_seen_at ?? 0),
           );
           checkBackdatedSale(look, group, row, entryAt, ctx.now);
         } catch (error) {
@@ -682,11 +683,30 @@ export function checkOp(
         const stored = look.lastClose.get(deviceId);
         // A close is a continuation of the device's drawer. An older close must not be
         // inserted after a newer one: it would overlap and its opening float could be
-        // fabricated. Restore replays are ordered by the client.
-        const outOfOrder =
+        // fabricated. Restore replays are ordered by the client, and closes planned
+        // earlier in this push chain too (API-L2).
+        const pushedBefore = (look.pushedCloses.get(deviceId) ?? []).filter(
+          (close) => close.id !== closeId,
+        );
+        const latestPushed = pushedBefore.reduce<
+          (typeof pushedBefore)[number] | undefined
+        >(
+          (latest, close) =>
+            latest === undefined || close.period_end > latest.period_end
+              ? close
+              : latest,
+          undefined,
+        );
+        const lastClose =
           stored !== undefined &&
-          stored.id !== closeId &&
-          stored.period_end >= periodEnd;
+          (latestPushed === undefined ||
+            stored.period_end >= latestPushed.period_end)
+            ? stored
+            : latestPushed;
+        const outOfOrder =
+          lastClose !== undefined &&
+          lastClose.id !== closeId &&
+          lastClose.period_end >= periodEnd;
         if (outOfOrder) throw new Reject('CONSTRAINT_FAILED');
         const candidates = [
           ...(stored && stored.period_end < periodEnd ? [stored] : []),
@@ -969,15 +989,10 @@ export function checkOp(
     const bundleId = String(row.bundle_id ?? '');
     const componentId = String(row.component_product_id ?? '');
     const qty = Number(row.qty_milli ?? 0);
-    const pushed = (id: string) =>
-      group.find(
-        (candidate) =>
-          candidate.tbl === 'products' &&
-          candidate.kind !== 'delete' &&
-          candidate.row?.id === id,
-      )?.row;
-    const bundle = pushed(bundleId) ?? look.products.get(bundleId);
-    const component = pushed(componentId) ?? look.products.get(componentId);
+    const bundle =
+      pushedProduct(look, group, bundleId) ?? look.products.get(bundleId);
+    const component =
+      pushedProduct(look, group, componentId) ?? look.products.get(componentId);
     if (
       !bundle ||
       String(bundle.kind ?? 'simple') !== 'bundle' ||
@@ -1064,12 +1079,14 @@ export function checkOp(
     if (updater.role === 'cashier' && !isNew) throw new Reject('FORBIDDEN');
     if (updater.role === 'cashier' && isNew) {
       const defaultLimit = look.shop?.default_credit_limit ?? null;
+      // An omitted `credit_limit` means "no limit" for D1, so it must be compared as
+      // null too; otherwise a cashier bypasses a non-null shop default (API-L1).
+      const creditLimit = row.credit_limit ?? null;
       if (
-        row.credit_limit !== undefined &&
-        (row.credit_limit === null
+        creditLimit === null
           ? defaultLimit !== null
           : defaultLimit === null ||
-            Number(row.credit_limit) !== Number(defaultLimit))
+            Number(creditLimit) !== Number(defaultLimit)
       )
         throw new Reject('FORBIDDEN');
     }
