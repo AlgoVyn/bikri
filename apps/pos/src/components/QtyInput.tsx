@@ -25,6 +25,7 @@ export function QtyInput({
   dense = false,
   hideLabel = false,
   commitOnBlur = false,
+  onBlurValue,
 }: {
   id?: string;
   label: string;
@@ -40,6 +41,8 @@ export function QtyInput({
   hideLabel?: boolean;
   /** Write only on blur/Enter instead of every keystroke (cart lines, bundle qty). */
   commitOnBlur?: boolean;
+  /** Called once on blur with the parsed value, e.g. to clamp a recipe line. */
+  onBlurValue?: (milli: number | null) => void;
 }) {
   const { t } = useTranslation();
   const autoId = useId();
@@ -155,16 +158,26 @@ export function QtyInput({
           onBlur={() => {
             setTouched(true);
             cancelCommit();
-            if (!dirty.current) {
-              // Nothing typed since the last commit; show the parent's value.
-              setDraft(null);
-              return;
-            }
             const text = draft ?? '';
             const empty = text.trim() === '';
             const next = empty ? null : parseQtyToMilli(text, unit);
+            // Keep an invalid non-empty draft and show `errors.qty_invalid` rather
+            // than silently wiping what the user typed (mirrors MoneyInput, UI-M1).
             if (!empty && next === null) return;
+            if (!commitOnBlur) {
+              // Every keystroke was already emitted; only the display is normalised.
+              setDraft(null);
+              onBlurValue?.(next);
+              return;
+            }
+            if (!dirty.current) {
+              // Nothing typed since the last commit; show the parent's value.
+              setDraft(null);
+              onBlurValue?.(next);
+              return;
+            }
             emit(next);
+            onBlurValue?.(next);
           }}
           onKeyDown={(event) => {
             if (commitOnBlur && event.key === 'Enter') {

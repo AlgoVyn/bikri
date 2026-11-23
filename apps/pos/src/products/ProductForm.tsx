@@ -36,6 +36,7 @@ import {
   DuplicateBarcodeError,
   DuplicateSkuError,
   duplicateDraft,
+  FractionalStockError,
   generateBarcode,
   ledgerContext,
   listCategoryOptions,
@@ -52,6 +53,7 @@ import { composing, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { bundleComponentsFromProducts } from './bundlePrice.ts';
+import { bundleQtyValid, clampBundleQty } from './bundleQty.ts';
 import { qtyWithUnit } from './format.ts';
 import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
@@ -81,7 +83,10 @@ type Draft = {
 };
 
 type Errors = Partial<
-  Record<'name_en' | 'price' | 'sku' | 'warranty_days' | 'bundle', string>
+  Record<
+    'name_en' | 'price' | 'sku' | 'warranty_days' | 'bundle' | 'unit',
+    string
+  >
 > & { barcodes?: Record<number, string> };
 
 const EMPTY: Draft = {
@@ -351,17 +356,37 @@ export function ProductFormPage({
       next.name_en = t('form.name_required');
     if (d.price === null) next.price = t('form.price_required');
     if (d.kind === 'bundle') {
+      const units = new Map(
+        catalogue.all.map((product) => [
+          product.id,
+          String(product.unit ?? 'pc') as QtyUnit,
+        ]),
+      );
       const valid =
         d.bundle_items.length >= 1 &&
         d.bundle_items.length <= 20 &&
-        d.bundle_items.every(
-          (item) =>
+        d.bundle_items.every((item) => {
+          const unit = units.get(item.component_product_id);
+          return (
             item.component_product_id !== editId &&
             Number.isSafeInteger(item.qty_milli) &&
-            item.qty_milli > 0,
-        );
+            item.qty_milli > 0 &&
+            // Unknown (not yet loaded) units only require a positive quantity.
+            (unit === undefined || bundleQtyValid(item.qty_milli, unit))
+          );
+        });
       if (!valid) next.bundle = t('form.bundle_items_required');
     }
+    // Read the live level, not the possibly-unresolved `onHand` live query: an
+    // integer unit cannot track 0.5 kg (UI-M2).
+    if (
+      isEdit &&
+      d.track_stock &&
+      d.kind === 'simple' &&
+      !qtyAllowsDecimals(d.unit) &&
+      ((await db.stock_levels.get(editId))?.on_hand_milli ?? 0) % 1000 !== 0
+    )
+      next.unit = t('form.unit_stock_fractional');
     if (d.warranty === 'custom') {
       const days = Number(d.warranty_days);
       if (!Number.isInteger(days) || days < 1 || days > 3650)
@@ -397,6 +422,7 @@ export function ProductFormPage({
       'sku',
       'price',
       'bundle',
+      'unit',
       'warranty_days',
     ];
     for (const key of order) {
@@ -404,6 +430,7 @@ export function ProductFormPage({
       if (key === 'sku' && !e.sku) continue;
       if (key === 'price' && !e.price) continue;
       if (key === 'bundle' && !e.bundle) continue;
+      if (key === 'unit' && !e.unit) continue;
       if (key === 'warranty_days' && !e.warranty_days) continue;
       document.getElementById(`${formId}-${key}`)?.focus();
       return;
@@ -489,6 +516,8 @@ export function ProductFormPage({
         setErrors({ bundle: t(`form.bundle_error_${error.code}`) });
       else if (error instanceof TrackedCostError)
         toast.push(t('form.cost_tracked_hint'), 'error');
+      else if (error instanceof FractionalStockError)
+        toast.push(t('form.unit_stock_fractional'), 'error');
       else if (error instanceof ComponentInUseError)
         toast.push(
           t('products.component_in_use', { name: error.bundleName }),
@@ -569,8 +598,11 @@ export function ProductFormPage({
                     setPhotoUrl(URL.createObjectURL(photo.blob));
                     set('photo', photo);
                   } catch (error) {
-                    if (error instanceof PhotoError) setPhotoError(true);
-                    else throw error;
+                    setPhotoError(true);
+                    // An event handler cannot rethrow into React; anything other than a
+                    // decode failure still needs visible feedback, not a console rejection.
+                    if (!(error instanceof PhotoError))
+                      toast.push(t('errors.generic'), 'error');
                   }
                 }}
               />
@@ -722,6 +754,8 @@ export function ProductFormPage({
                         );
                         set('category_id', created.id);
                         setNewCategory(null);
+                      } catch {
+                        toast.push(t('errors.generic'), 'error');
                       } finally {
                         newCategoryGuard.current = false;
                       }
@@ -970,6 +1004,10 @@ export function ProductFormPage({
                 id={fieldId('unit')}
                 className={fieldClass}
                 value={draft.unit}
+                aria-invalid={errors.unit ? true : undefined}
+                aria-describedby={
+                  errors.unit ? `${fieldId('unit')}-error` : undefined
+                }
                 onChange={(e) => {
                   const unit = e.target.value as QtyUnit;
                   if (qtyAllowsDecimals(unit)) {
@@ -1002,6 +1040,14 @@ export function ProductFormPage({
                   </option>
                 ))}
               </select>
+              {errors.unit ? (
+                <p
+                  id={`${fieldId('unit')}-error`}
+                  className="mt-1 text-small text-danger"
+                >
+                  {errors.unit}
+                </p>
+              ) : null}
             </div>
             {isBundleDraft ? null : (
               <label className="flex min-h-11 items-center gap-3 self-end">
@@ -1015,7 +1061,19 @@ export function ProductFormPage({
                   }
                   className="size-5"
                   checked={draft.track_stock}
-                  onChange={(e) => set('track_stock', e.target.checked)}
+                  onChange={(e) => {
+                    // Turning tracking on is the bypass the unit select guard misses.
+                    if (
+                      e.target.checked &&
+                      isEdit &&
+                      !qtyAllowsDecimals(draft.unit) &&
+                      onHand % 1000 !== 0
+                    ) {
+                      toast.push(t('form.unit_stock_fractional'), 'error');
+                      return;
+                    }
+                    set('track_stock', e.target.checked);
+                  }}
                 />
                 {t('form.track_stock')}
               </label>
@@ -1282,7 +1340,10 @@ function BundleRecipeEditor({
   for (const item of items) {
     const product = byId.get(item.component_product_id);
     if (product?.track_stock !== 1) continue;
-    const canMake = Math.floor((levels.get(product.id) ?? 0) / item.qty_milli);
+    const canMake =
+      item.qty_milli > 0
+        ? Math.floor((levels.get(product.id) ?? 0) / item.qty_milli)
+        : 0;
     available = available === null ? canMake : Math.min(available, canMake);
   }
   const add = (id: string) => {
@@ -1313,7 +1374,6 @@ function BundleRecipeEditor({
             const product = byId.get(item.component_product_id);
             const componentUnit =
               (product?.unit as QtyUnit | undefined) ?? 'pc';
-            const minQty = qtyAllowsDecimals(componentUnit) ? 1 : 1000;
             return (
               <li
                 key={item.component_product_id}
@@ -1342,15 +1402,22 @@ function BundleRecipeEditor({
                       unit={componentUnit}
                       value={item.qty_milli}
                       onChange={(milli) => {
+                        // Keep the raw draft (including 0) while typing so "0.5" can
+                        // reach the input; the minimum is enforced on blur and save
+                        // (UI-H4).
                         if (milli === null) return;
                         onChange(
                           items.map((row, at) =>
-                            at === index
-                              ? {
-                                  ...row,
-                                  qty_milli: Math.max(minQty, milli),
-                                }
-                              : row,
+                            at === index ? { ...row, qty_milli: milli } : row,
+                          ),
+                        );
+                      }}
+                      onBlurValue={(milli) => {
+                        const clamped = clampBundleQty(milli, componentUnit);
+                        if (clamped === item.qty_milli) return;
+                        onChange(
+                          items.map((row, at) =>
+                            at === index ? { ...row, qty_milli: clamped } : row,
                           ),
                         );
                       }}
