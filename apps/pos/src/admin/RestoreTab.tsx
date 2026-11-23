@@ -74,10 +74,13 @@ export function RestoreTab({
   tenantId,
   onChanged,
   onState,
+  onActiveChange,
 }: {
   tenantId: string;
   onChanged: () => void;
   onState: () => void;
+  /** Lets the page banner disable End maintenance while purge/import runs (UI-M8). */
+  onActiveChange?: (active: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -242,7 +245,7 @@ export function RestoreTab({
             {t('admin.restore_done')}
           </p>
         ) : null}
-        <label className="flex items-start gap-2 text-small">
+        <label className="flex min-h-11 items-start gap-2 py-1 text-small">
           <input
             type="checkbox"
             className="mt-0.5"
@@ -271,6 +274,7 @@ export function RestoreTab({
               activeRestore.add(tenantId);
               abortRef.current = false;
               setRunning(true);
+              onActiveChange?.(true);
               setError(null);
               const tables = slicesOf(loaded);
               void (async () => {
@@ -409,6 +413,7 @@ export function RestoreTab({
                 .finally(() => {
                   activeRestore.delete(tenantId);
                   setRunning(false);
+                  onActiveChange?.(false);
                 });
             }}
           >
