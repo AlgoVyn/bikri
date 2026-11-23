@@ -2896,3 +2896,113 @@ describe('API-L4: snapshot flushes pending reads', () => {
     expect(Number(usage?.rows_read ?? 0)).toBeGreaterThanOrEqual(5_500);
   });
 });
+
+describe('POS-H2: a reissue keeps the voided bill price', () => {
+  /** A same-day void + replacement sale for one original sale. */
+  const reissueOps = (
+    shop: Shop,
+    originalId: string,
+    seq: number,
+    price: number,
+    now: number,
+  ) => {
+    const tx = newId();
+    const ops = saleOps(shop, shop.till, seq, {
+      total: price,
+      now,
+      replacesSaleId: originalId,
+    }).map((entry) => ({ ...entry, tx_id: tx }));
+    const replacementId = String(ops[0]?.row?.id);
+    const date = businessDate(now, 'Asia/Karachi');
+    ops.push(
+      op(
+        'sale_voids',
+        'insert',
+        {
+          id: newId(now),
+          sale_id: originalId,
+          reason: 'Reissue',
+          replacement_sale_id: replacementId,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: date,
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+      op(
+        'payments',
+        'insert',
+        {
+          id: newId(now),
+          direction: 'out',
+          method: 'cash',
+          purpose: 'void',
+          amount: 100_000,
+          cash_tendered: null,
+          change_given: null,
+          reference: '',
+          sale_id: originalId,
+          refund_id: null,
+          purchase_id: null,
+          supplier_return_id: null,
+          party_type: null,
+          party_id: null,
+          note: '',
+          branch_id: shop.branchId,
+          device_id: shop.till.id,
+          staff_id: IDS.owner,
+          business_date: date,
+          created_at: now,
+        },
+        { tx_id: tx },
+      ),
+    );
+    return ops;
+  };
+
+  it('accepts an unchanged line price without catalog.edit; a changed price is forbidden', async () => {
+    const shop = await seedShop('Reissue price');
+    const now = Date.now();
+    const first = saleOps(shop, shop.till, 1, {
+      total: 100_000,
+      now: now - 2_000,
+    });
+    const second = saleOps(shop, shop.till, 2, {
+      total: 100_000,
+      now: now - 2_000,
+    });
+    await pushOk(shop.till, [...first, ...second]);
+    const firstId = String(first[0]?.row?.id);
+    const secondId = String(second[0]?.row?.id);
+    // The till has seen the new catalogue price; the original price is now below it.
+    await env.DB.prepare(
+      'UPDATE products SET price = 120_000, updated_at = ?2, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3',
+    )
+      .bind(shop.tenantId, now - 1_000, IDS.product)
+      .run();
+    await env.DB.prepare(
+      'UPDATE devices SET last_seen_at = ?2 WHERE tenant_id = ?1 AND id = ?3',
+    )
+      .bind(shop.tenantId, now, shop.till.id)
+      .run();
+
+    const kept = await pushOk(
+      shop.till,
+      reissueOps(shop, firstId, 3, 100_000, now),
+    );
+    expect(kept.results.map((r) => r.result)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+      'applied',
+      'applied',
+    ]);
+
+    const lowered = await pushOk(
+      shop.till,
+      reissueOps(shop, secondId, 4, 90_000, now + 1),
+    );
+    expect(lowered.results[0]?.error_code).toBe('FORBIDDEN');
+  });
+});

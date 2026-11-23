@@ -377,7 +377,19 @@ export function checkSalePolicy(
       priceKnown &&
       entryAt >= product.updated_at
     ) {
+      // A reissue that keeps an original line's price is not a new discount: the shop
+      // promised that price on the voided bill, and the bundle check already matches
+      // unchanged reissue groups the same way (POS-H2). Only a changed (lower) price
+      // needs `catalog.edit`.
+      const reissuedAtOriginalPrice =
+        typeof row.replaces_sale_id === 'string' &&
+        (look.saleLinesBySale.get(row.replaces_sale_id) ?? []).some(
+          (original) =>
+            original.product_id === line.product_id &&
+            Number(original.unit_price ?? 0) === unitPrice,
+        );
       if (
+        !reissuedAtOriginalPrice &&
         unitPrice < product.price &&
         !allowed('catalog.edit') &&
         !overrideForLine(

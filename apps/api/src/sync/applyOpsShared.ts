@@ -218,6 +218,7 @@ export type Lookups = {
       bundle_discount?: number | null;
       name_snapshot?: string | null;
       net?: number;
+      unit_price?: number | null;
     }[]
   >;
   /** sale_line_id → its sale line, for refund restock repair and bundle checks. */
@@ -236,6 +237,7 @@ export type Lookups = {
       bundle_discount?: number | null;
       name_snapshot?: string | null;
       net?: number;
+      unit_price?: number | null;
     }
   >;
   /** Active recipe rows of the bundles referenced by this push, for fresh-sale checks. */
