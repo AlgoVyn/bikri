@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
   idbPut,
@@ -53,7 +54,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await expect(line).toContainText('Refunded: 1');
     await expect(line).toContainText('On bill: 1');
 
-    await page.getByRole('link', { name: 'Back to sales' }).click();
+    await clickRecordBack(page, 'Back to sales');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('button', { name: 'Export CSV' }).click(),
@@ -91,6 +92,11 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
       .getByRole('link', { name: /Open product: Earbuds/u });
     await expect(productLink).toBeVisible();
     await productLink.click();
+    const productPeek = page.getByRole('dialog');
+    await expect(productPeek).toContainText('Product reference');
+    await productPeek
+      .getByRole('button', { name: 'Open full product' })
+      .click();
 
     await expect(
       page.getByRole('heading', { name: 'Earbuds', level: 1 }),
@@ -101,6 +107,9 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
       .first();
     await expect(historyRef).toBeVisible();
     await historyRef.click();
+    const billPeek = page.getByRole('dialog');
+    await expect(billPeek).toContainText('Bill reference');
+    await billPeek.getByRole('button', { name: 'Open full bill' }).click();
     await expect(page.getByTestId('bill-status')).toBeVisible();
     await expect(page.getByTestId('bill-remark')).toContainText(
       'Deliver after 6 pm',
@@ -215,7 +224,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
       1,
     );
 
-    await page.getByRole('link', { name: 'Back to sales' }).click();
+    await clickRecordBack(page, 'Back to sales');
     const [sale] = await idbAll<{ id: string }>(page, 'sales');
     expect(sale).toBeDefined();
     await idbPut(page, 'print_jobs', {

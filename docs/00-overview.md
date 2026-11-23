@@ -105,7 +105,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | **Day close** | End-of-shift count of the cash drawer against the expected amount. |
 | **Short / Over** | Counted cash is less / more than expected. |
 | **Pay-in / Pay-out** | Cash added to / taken out of the drawer that is not a sale or expense (e.g. float top-up, owner drawing). |
-| **Godown** | Back-store / warehouse. |
+| **Godown** | Back-store / warehouse. The stock-in reason is labelled `Received from storage` in the app. |
 | **Quick sale** | A sale line for an item not in the catalogue (name + price typed). |
 | **Bundle** (بنڈل / سیٹ) | A fixed recipe of real products sold together for one bundle price. The bundle is a product (`kind='bundle'`) with `track_stock=0`; the bill stores one component sale line per item, so stock and refunds stay per product. Returns are whole-bundle only. |
 | **Held bill** | A cart parked to serve another customer, resumed later. |

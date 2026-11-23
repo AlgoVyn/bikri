@@ -30,6 +30,8 @@ import {
   statementCsv,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
+import { useRecordBack } from '../peek/recordBack.ts';
+import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import { errorCode } from '../print/printService.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import {
@@ -69,6 +71,8 @@ export function CustomerStatement({
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const openPeek = useOpenPeek();
+  const recordBack = useRecordBack('/udhaar', 'peek.customers');
   const toast = useToast();
   const { can, role, support, branchId, staff } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -169,6 +173,7 @@ export function CustomerStatement({
     logo,
   } = data;
   const phone = String(customer.phone ?? '');
+  const address = String(customer.address ?? '');
   const name = String(customer.name);
   const reminder = reminderLink(
     phone,
@@ -359,15 +364,22 @@ export function CustomerStatement({
     >
       <SubpageHeader
         backTo="/udhaar"
-        backLabel={t('office.udhaar.back_customers')}
+        backLabel={recordBack?.label ?? t('office.udhaar.back_customers')}
+        onBack={recordBack?.onActivate}
+        hideBackBelowLg
         icon={<UsersIcon />}
         title={name}
         stackActions={embedded}
         subtitle={
-          phone ? (
-            <a href={`tel:${phone}`} dir="ltr" className="underline">
-              {phone}
-            </a>
+          phone || address ? (
+            <span className="flex flex-col gap-0.5">
+              {phone ? (
+                <a href={`tel:${phone}`} dir="ltr" className="underline">
+                  {phone}
+                </a>
+              ) : null}
+              {address ? <span className="break-words">{address}</span> : null}
+            </span>
           ) : undefined
         }
         actions={
@@ -604,6 +616,16 @@ export function CustomerStatement({
                       to="/sales/$id"
                       params={{ id: row.saleId }}
                       className="underline"
+                      onClick={(event) =>
+                        openPeek(
+                          event,
+                          { kind: 'bill', id: String(row.saleId) },
+                          {
+                            key: 'peek.origin_customer',
+                            params: { name: String(data.customer.name) },
+                          },
+                        )
+                      }
                     >
                       {rows[index]?.description}
                     </Link>
@@ -691,6 +713,18 @@ export function CustomerStatement({
                             to="/sales/$id"
                             params={{ id: row.saleId }}
                             className="underline"
+                            onClick={(event) =>
+                              openPeek(
+                                event,
+                                { kind: 'bill', id: String(row.saleId) },
+                                {
+                                  key: 'peek.origin_customer',
+                                  params: {
+                                    name: String(data.customer.name),
+                                  },
+                                },
+                              )
+                            }
                           >
                             {rows[index]?.description}
                           </Link>

@@ -6,7 +6,12 @@ import {
   qtyAllowsDecimals,
 } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
-import { Navigate, useNavigate } from '@tanstack/react-router';
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -149,6 +154,8 @@ export function ProductFormPage({
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const router = useRouter();
+  const location = useLocation();
   const toast = useToast();
   const { staff, can } = useCurrentStaff();
   const readOnly = useReadOnly();
@@ -315,10 +322,25 @@ export function ProductFormPage({
     }
   }, [can, navigate, t, toast]);
 
-  const leave = () =>
-    backId
-      ? void navigate({ to: '/products/$id', params: { id: backId } })
-      : void navigate({ to: '/products' });
+  const childOfProduct =
+    (location.state as unknown as Record<string, unknown> | undefined)
+      ?.bikriChild === 'product';
+  const leave = () => {
+    if (backId) {
+      if (childOfProduct) {
+        router.history.back();
+        return;
+      }
+      void navigate({
+        to: '/products/$id',
+        params: { id: backId },
+        state: true,
+        replace: true,
+      });
+      return;
+    }
+    void navigate({ to: '/products', replace: true });
+  };
 
   useHotkey(
     (e) => (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's',
@@ -503,7 +525,18 @@ export function ProductFormPage({
         void navigate({ to: '/products/new', search: {} });
         setTimeout(() => nameRef.current?.focus(), 0);
       } else {
-        void navigate({ to: '/products/$id', params: { id: saved.id } });
+        if (editId) {
+          if (childOfProduct) router.history.back();
+          else
+            void navigate({
+              to: '/products/$id',
+              params: { id: editId },
+              state: true,
+              replace: true,
+            });
+        } else {
+          void navigate({ to: '/products/$id', params: { id: saved.id } });
+        }
       }
     } catch (error) {
       if (error instanceof DuplicateBarcodeError)

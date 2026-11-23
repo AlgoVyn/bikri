@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
   openReadyShop,
@@ -152,6 +153,10 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       .first();
     await expect(deliveryLink).toBeVisible();
     await deliveryLink.click();
+    const deliveryPeek = page.getByRole('dialog');
+    await expect(deliveryPeek).toContainText('Delivery reference');
+    await expect(deliveryPeek).toContainText('SUP-552');
+    await deliveryPeek.getByRole('button', { name: 'Open delivery' }).click();
     await expect(
       page.getByRole('dialog', { name: 'Delivery #SUP-552' }),
     ).toBeVisible();
@@ -300,7 +305,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await page.getByRole('button', { name: 'All time' }).click();
     await expect(page.getByText(/Delivery #SUP-552, 1 item/)).toBeVisible();
 
-    await page.getByRole('link', { name: 'Back to suppliers' }).click();
+    await clickRecordBack(page, 'Back to suppliers');
     await expect(page.getByText('Total you owe suppliers')).toBeVisible();
     const [csv] = await Promise.all([
       page.waitForEvent('download'),

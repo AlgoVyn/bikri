@@ -11,12 +11,18 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BikriMark } from '../components/BikriMark.tsx';
 import { buttonPrimary } from '../components/classes.ts';
-import { MoreIcon, RefreshIcon } from '../components/icons.tsx';
+import {
+  ChevronLeftIcon,
+  MoreIcon,
+  RefreshIcon,
+} from '../components/icons.tsx';
 import { PrivacyProvider } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { pruneLocalHistoryIfDue } from '../data/retention.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { PeekGate } from '../peek/PeekGate.tsx';
+import { recordBackForPath, useRecordBack } from '../peek/recordBack.ts';
 import { usePrintService } from '../print/usePrintService.ts';
 import { useUpdateReady } from '../pwa/useUpdateReady.ts';
 import { AppSessionProvider } from '../state/appSession.tsx';
@@ -84,6 +90,11 @@ function AppShellInner({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const selling = isSellingRoute(pathname);
+  const recordFallback = recordBackForPath(pathname);
+  const recordBack = useRecordBack(
+    recordFallback?.to ?? null,
+    recordFallback?.shortLabelKey ?? null,
+  );
   const toast = useToast();
   const { updateReady, applyUpdate } = useUpdateReady();
   const { can } = useCurrentStaff();
@@ -350,12 +361,28 @@ function AppShellInner({ children }: { children: ReactNode }) {
       </a>
       {!desktop ? (
         <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar">
-          <span
-            className="min-w-0 flex-1 truncate font-semibold"
-            data-testid="screen-title-bar"
-          >
-            {screenTitle ?? shopName ?? t('common.app_name')}
-          </span>
+          {recordBack ? (
+            <button
+              type="button"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-0.5 text-start"
+              data-testid="topbar-back"
+              aria-label={recordBack.label}
+              title={recordBack.label}
+              onClick={recordBack.onActivate}
+            >
+              <ChevronLeftIcon className="size-5 shrink-0 rtl:rotate-180" />
+              <span className="min-w-0 truncate text-body font-semibold">
+                {recordBack.shortLabel}
+              </span>
+            </button>
+          ) : (
+            <span
+              className="min-w-0 flex-1 truncate font-semibold"
+              data-testid="screen-title-bar"
+            >
+              {screenTitle ?? shopName ?? t('common.app_name')}
+            </span>
+          )}
           <div className="flex shrink-0 items-center gap-1">
             <GlobalSearchTrigger variant="topbar" />
             {updateReady ? (
@@ -526,6 +553,9 @@ function AppShellInner({ children }: { children: ReactNode }) {
       </PrivacyProvider>
       <GlobalSearchHost />
       <CommandPalette />
+      <PrivacyProvider active={privacyActive}>
+        <PeekGate />
+      </PrivacyProvider>
     </div>
   );
 }

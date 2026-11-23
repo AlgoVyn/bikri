@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
   openReadyShop,
@@ -200,7 +201,7 @@ test.describe('Credit (T-043, T-044)', () => {
     );
     expect(statementText).toContain('date,description,debit,credit,balance');
 
-    await page.getByRole('link', { name: 'Back to customers' }).click();
+    await clickRecordBack(page, 'Back to customers');
     const [csv] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('button', { name: 'Export CSV' }).click(),

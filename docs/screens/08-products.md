@@ -1,6 +1,6 @@
 # 08 — Products
 
-**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`. On ≥ 1280 px the list and the selected product share one master–detail screen ("Select a product" until one is picked); the embedded list shows name, price and stock, while the detail keeps every column and action. Below 1280 px the detail is a full page. At every width the detail header starts with the shared circular back button and a 40 px product photo beside the name (the same header rhythm as Sales, Udhaar and Suppliers); the back button clears the selection.
+**Routes** `/products` (list), `/products/:id` (detail), `/products/new`, `/products/:id/edit`, `/products/import`, `/products/categories`, `/products/price-update`. View: everyone; edit: `catalog.edit`; delete: `catalog.delete`; cost/margin/profit: `cost.view`. On ≥ 1280 px the list and the selected product share one master–detail screen ("Select a product" until one is picked); the embedded list shows name, price and stock, while the detail keeps every column and action. Below 1280 px the detail is a full page. At ≥1024 px the detail header starts with the shared circular back button and a 40 px product photo beside the name (the same header rhythm as Sales, Udhaar and Suppliers); below 1024 px the shell top bar carries the back control. The back button clears the selection.
 
 ## Reference
 
@@ -48,6 +48,9 @@ The English UI label is **Bundle**; Roman Urdu uses **Bundle**. The Urdu label i
 - Select mode may include bundles for category changes, labels and delete, but **not** for Update prices in v1.1.
 
 **Product detail**
+
+Stock-history bill and delivery links open a read-only reference peek (D-296); `Open full` opens the bill or supplier delivery and keeps a back path to the product.
+
 - Header: photo/monogram, name, `Bundle` pill, category/SKU/barcodes. Actions: `Edit`, `Print label`, `Sell`, `Duplicate`, `Delete`; no `Adjust stock` and no stock-adjust shortcut.
 - Price and Margin cards use the derived figures. The three-figure row shows **Avg cost**, **Items total** (sum of component shelf prices) and **Available** (bundles). Price card hint: "Customer saves Rs X vs items" (can be negative when the bundle costs more).
 - `Last 14 days` shows bundles sold (the sum of each group's `bundle_qty`) and bundle revenue; returns subtract whole bundles on the refund's business date.

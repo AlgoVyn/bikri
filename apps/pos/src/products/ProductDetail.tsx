@@ -1,5 +1,10 @@
 import { formatQtyFromMilli, isTimeZone, mulDivRound } from '@bikri/core';
-import { Link, useNavigate } from '@tanstack/react-router';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +47,8 @@ import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
+import { useRecordBack } from '../peek/recordBack.ts';
+import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import { shortDate } from '../reports/format.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { mutateCart } from '../sell/useSell.ts';
@@ -73,6 +80,9 @@ export function ProductDetailPage({
   const { t, i18n } = useTranslation();
   const displayMoney = useDisplayMoney();
   const navigate = useNavigate();
+  const router = useRouter();
+  const location = useLocation();
+  const recordBack = useRecordBack('/products', 'nav.products');
   const toast = useToast();
   const { staff, can, role, support, branchId } = useCurrentStaff();
   // One shop read powers the time zone, cost method and money format; the detail
@@ -110,7 +120,12 @@ export function ProductDetailPage({
 
   useHotkey(
     plainKey('e'),
-    () => void navigate({ to: '/products/$id/edit', params: { id } }),
+    () =>
+      void navigate({
+        to: '/products/$id/edit',
+        params: { id },
+        state: (previous) => ({ ...previous, bikriChild: 'product' }),
+      }),
     {
       enabled: canEdit && Boolean(detail),
     },
@@ -296,12 +311,16 @@ export function ProductDetailPage({
       }
     >
       <header className="flex flex-wrap items-start gap-3">
-        {embedded ? (
+        {embedded && recordBack ? (
           <Link
             to="/products"
-            aria-label={t('products.back')}
-            title={t('products.back')}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
+            aria-label={recordBack.label}
+            title={recordBack.label}
+            onClick={(event) => {
+              event.preventDefault();
+              recordBack.onActivate();
+            }}
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 max-lg:hidden"
           >
             <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           </Link>
@@ -379,6 +398,10 @@ export function ProductDetailPage({
                 <Link
                   to="/products/$id/edit"
                   params={{ id }}
+                  state={(previous) => ({
+                    ...previous,
+                    bikriChild: 'product',
+                  })}
                   className={`${buttonQuiet} gap-2`}
                 >
                   {t('products.edit')}
@@ -397,6 +420,10 @@ export function ProductDetailPage({
                 <Link
                   to="/products/$id/adjust"
                   params={{ id }}
+                  state={(previous) => ({
+                    ...previous,
+                    bikriChild: 'product',
+                  })}
                   className={buttonQuiet}
                 >
                   {t('adjust.button')}
@@ -413,6 +440,10 @@ export function ProductDetailPage({
                       void navigate({
                         to: '/products/new',
                         search: { duplicate: id },
+                        state: (previous) => ({
+                          ...previous,
+                          bikriChild: 'product',
+                        }),
                       }),
                   },
                 ]
@@ -524,6 +555,10 @@ export function ProductDetailPage({
                     <Link
                       to="/products/$id/edit"
                       params={{ id }}
+                      state={(previous) => ({
+                        ...previous,
+                        bikriChild: 'product',
+                      })}
                       className="underline underline-offset-2"
                     >
                       {t('products.min_stock_off')}
@@ -749,6 +784,9 @@ export function ProductDetailPage({
                             <HistoryRefLink
                               historyRef={h.ref}
                               access={historyAccess}
+                              productName={String(
+                                p.name_en || p.name_ur || p.sku || '',
+                              )}
                             />
                           ) : null}
                         </td>
@@ -795,6 +833,9 @@ export function ProductDetailPage({
                           <HistoryRefLink
                             historyRef={h.ref}
                             access={historyAccess}
+                            productName={String(
+                              p.name_en || p.name_ur || p.sku || '',
+                            )}
                           />
                         ) : null}
                       </span>
@@ -889,7 +930,21 @@ export function ProductDetailPage({
           product={p}
           onHand={detail.onHand}
           open
-          onClose={() => void navigate({ to: '/products/$id', params: { id } })}
+          onClose={() => {
+            const state = location.state as unknown as
+              | Record<string, unknown>
+              | undefined;
+            if (state?.bikriChild === 'product') {
+              router.history.back();
+              return;
+            }
+            void navigate({
+              to: '/products/$id',
+              params: { id },
+              state: true,
+              replace: true,
+            });
+          }}
         />
       ) : null}
     </div>
@@ -899,11 +954,14 @@ export function ProductDetailPage({
 function HistoryRefLink({
   historyRef,
   access,
+  productName,
 }: {
   historyRef: HistoryRef;
   access: HistoryLinkAccess;
+  productName: string;
 }) {
   const { t } = useTranslation();
+  const openPeek = useOpenPeek();
   const isPurchase = historyRef.kind === 'purchase';
   const invoice = historyRef.invoiceNo;
   // The invoice stays LTR inside an RTL label; the wording itself follows the language.
@@ -930,6 +988,13 @@ function HistoryRefLink({
       search={{ delivery: historyRef.purchaseId }}
       className={className}
       data-testid="history-ref"
+      onClick={(event) =>
+        openPeek(
+          event,
+          { kind: 'delivery', id: historyRef.purchaseId },
+          { key: 'peek.origin_product', params: { name: productName } },
+        )
+      }
     >
       {label}
     </Link>
@@ -939,6 +1004,13 @@ function HistoryRefLink({
       params={{ id: historyRef.saleId }}
       className={className}
       data-testid="history-ref"
+      onClick={(event) =>
+        openPeek(
+          event,
+          { kind: 'bill', id: historyRef.saleId },
+          { key: 'peek.origin_product', params: { name: productName } },
+        )
+      }
     >
       {label}
     </Link>

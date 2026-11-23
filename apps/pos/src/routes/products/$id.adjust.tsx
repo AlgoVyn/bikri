@@ -21,6 +21,6 @@ function Adjust() {
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   if (!can('stock.adjust') || readOnly)
-    return <Navigate to="/products/$id" params={{ id }} replace />;
+    return <Navigate to="/products/$id" params={{ id }} state={true} replace />;
   return <ProductWorkspace key={id} id={id} adjust />;
 }

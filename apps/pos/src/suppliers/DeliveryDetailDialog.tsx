@@ -240,6 +240,17 @@ export function DeliveryDetailDialog({
         </p>
       ) : (
         <div className="flex flex-col gap-4">
+          {String(detail.supplier.phone ?? '').trim() ||
+          String(detail.supplier.address ?? '').trim() ? (
+            <div className="text-small text-text-muted">
+              {String(detail.supplier.phone ?? '').trim() ? (
+                <p dir="ltr">{String(detail.supplier.phone)}</p>
+              ) : null}
+              {String(detail.supplier.address ?? '').trim() ? (
+                <p className="break-words">{String(detail.supplier.address)}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-3 rounded-card bg-surface-2 p-3 sm:grid-cols-4">
             <div>
               <p className="text-small text-text-muted">

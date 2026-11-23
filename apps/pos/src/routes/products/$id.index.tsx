@@ -1,4 +1,5 @@
 import { createFileRoute, lazyRouteComponent } from '@tanstack/react-router';
+import { peekSearch } from '../../peek/search.ts';
 
 const ProductWorkspace = lazyRouteComponent(
   () => import('../../products/ProductWorkspace.tsx'),
@@ -6,6 +7,7 @@ const ProductWorkspace = lazyRouteComponent(
 );
 
 export const Route = createFileRoute('/products/$id/')({
+  validateSearch: peekSearch,
   component: ProductRoute,
 });
 

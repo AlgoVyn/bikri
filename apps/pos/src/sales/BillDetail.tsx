@@ -15,7 +15,7 @@ import {
   fieldClass,
   pageClass,
 } from '../components/classes.ts';
-import { ChevronLeftIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, ChevronRightIcon } from '../components/icons.tsx';
 import { useMasterDetailWide } from '../components/MasterDetail.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
@@ -39,6 +39,8 @@ import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date';
+import { useRecordBack } from '../peek/recordBack.ts';
+import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
 import {
   closeShareWindow,
@@ -94,6 +96,8 @@ export function BillDetail({
   const { t, i18n } = useTranslation();
   const money = useDisplayMoney();
   const navigate = useNavigate();
+  const recordBack = useRecordBack('/sales', 'nav.sales');
+  const openPeek = useOpenPeek();
   const toast = useToast();
   const readOnly = useReadOnly();
   const { staff, role, can, support, branchId } = useCurrentStaff();
@@ -224,7 +228,11 @@ export function BillDetail({
     plainKey('r'),
     () => {
       if (canRefund && canViewBill)
-        void navigate({ to: '/sales/$id/refund', params: { id: saleId } });
+        void navigate({
+          to: '/sales/$id/refund',
+          params: { id: saleId },
+          state: (previous) => ({ ...previous, bikriChild: 'bill' }),
+        });
     },
     { enabled: canRefund && canViewBill },
   );
@@ -393,7 +401,11 @@ export function BillDetail({
         label: t('office.bill.refund'),
         tone: 'danger' as const,
         onSelect: () =>
-          void navigate({ to: '/sales/$id/refund', params: { id: saleId } }),
+          void navigate({
+            to: '/sales/$id/refund',
+            params: { id: saleId },
+            state: (previous) => ({ ...previous, bikriChild: 'bill' }),
+          }),
       };
     if (action.kind === 'void')
       return {
@@ -414,22 +426,20 @@ export function BillDetail({
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/sales"
-          aria-label={t('office.bill.back')}
-          title={t('office.bill.back')}
-          className={
-            embedded
-              ? 'inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2'
-              : buttonQuiet
-          }
-        >
-          {embedded ? (
+        {recordBack ? (
+          <Link
+            to="/sales"
+            aria-label={recordBack.label}
+            title={recordBack.label}
+            onClick={(event) => {
+              event.preventDefault();
+              recordBack.onActivate();
+            }}
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text hover:bg-surface-2 max-lg:hidden"
+          >
             <ChevronLeftIcon className="size-5 rtl:rotate-180" />
-          ) : (
-            t('office.bill.back')
-          )}
-        </Link>
+          </Link>
+        ) : null}
         <h1 className="me-auto font-mono text-h1 font-semibold">
           {String(sale.invoice_no)}
         </h1>
@@ -531,6 +541,16 @@ export function BillDetail({
               to="/sales/$id"
               params={{ id: detail.replacementSaleId }}
               className="underline"
+              onClick={(event) =>
+                openPeek(
+                  event,
+                  { kind: 'bill', id: detail.replacementSaleId ?? '' },
+                  {
+                    key: 'peek.origin_bill',
+                    params: { invoice: String(sale.invoice_no) },
+                  },
+                )
+              }
             >
               {t('office.bill.replaced_by', {
                 invoice: detail.replacementInvoiceNo ?? '',
@@ -548,6 +568,16 @@ export function BillDetail({
             to="/sales/$id"
             params={{ id: detail.replacedSaleId }}
             className="underline"
+            onClick={(event) =>
+              openPeek(
+                event,
+                { kind: 'bill', id: detail.replacedSaleId ?? '' },
+                {
+                  key: 'peek.origin_bill',
+                  params: { invoice: String(sale.invoice_no) },
+                },
+              )
+            }
           >
             {detail.replacedInvoiceNo}
           </Link>
@@ -570,6 +600,16 @@ export function BillDetail({
                   to="/udhaar/$customerId"
                   params={{ customerId: String(detail.customer.id) }}
                   className="underline"
+                  onClick={(event) =>
+                    openPeek(
+                      event,
+                      { kind: 'customer', id: String(detail.customer?.id) },
+                      {
+                        key: 'peek.origin_bill',
+                        params: { invoice: String(sale.invoice_no) },
+                      },
+                    )
+                  }
                 >
                   {String(detail.customer.name)}
                 </Link>
@@ -657,6 +697,7 @@ export function BillDetail({
                                 latin={isLatinName(
                                   String(line.bundle_name ?? ''),
                                 )}
+                                saleInvoice={String(sale.invoice_no)}
                               />
                             </span>
                             <span className="rounded-full bg-surface px-1.5 text-caption font-medium text-text-muted">
@@ -681,6 +722,7 @@ export function BillDetail({
                           id={product?.id ?? null}
                           name={String(line.name_snapshot)}
                           latin={isLatinName(String(line.name_snapshot))}
+                          saleInvoice={String(sale.invoice_no)}
                           className="block"
                         />
                         {note ? (
@@ -1095,14 +1137,17 @@ function ProductNameLink({
   id,
   name,
   latin,
+  saleInvoice,
   className = '',
 }: {
   id: string | null;
   name: string;
   latin: boolean;
+  saleInvoice: string;
   className?: string;
 }) {
   const { t } = useTranslation();
+  const openPeek = useOpenPeek();
   const classes = `data-name ${latin ? 'ltr-name' : ''} ${className}`.trim();
   if (!id) return <span className={classes}>{name}</span>;
   return (
@@ -1111,11 +1156,22 @@ function ProductNameLink({
       params={{ id }}
       aria-label={t('office.bill.open_product', { name })}
       className={`${classes} underline decoration-dotted underline-offset-2 hover:decoration-solid`}
+      onClick={(event) =>
+        openPeek(
+          event,
+          { kind: 'product', id },
+          {
+            key: 'peek.origin_bill',
+            params: { invoice: saleInvoice },
+          },
+        )
+      }
     >
       {name}
-      <span aria-hidden="true" className="ms-1 text-small text-text-muted">
-        ↗
-      </span>
+      <ChevronRightIcon
+        aria-hidden="true"
+        className="ms-1 inline size-3 text-text-muted rtl:rotate-180"
+      />
     </Link>
   );
 }

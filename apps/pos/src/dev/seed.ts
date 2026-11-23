@@ -295,12 +295,14 @@ export async function seedDemoShop(): Promise<void> {
   await seedCustomer({
     name: 'Bilal Ahmed',
     phone: '+923001112233',
+    address: '12-A Gulberg III, Lahore',
     balance: 1250000,
     limit: 5000000,
   });
   await seedSupplier({
     name: 'Hall Road Mobiles',
     phone: '+924235761234',
+    address: 'Shop 42, Hall Road, Lahore',
     opening: 8500000,
   });
   await seedTodaySales();
@@ -310,6 +312,7 @@ export async function seedDemoShop(): Promise<void> {
 export async function seedSupplier(s: {
   name: string;
   phone?: string;
+  address?: string;
   opening?: number;
 }): Promise<string> {
   const db = getDb();
@@ -320,6 +323,7 @@ export async function seedSupplier(s: {
     {
       name: s.name,
       phone: s.phone ?? '',
+      address: s.address ?? '',
       opening: s.opening ?? 0,
     },
     ctx,
@@ -372,6 +376,7 @@ export async function seedManyProducts(n: number): Promise<void> {
 export async function seedCustomer(c: {
   name: string;
   phone?: string;
+  address?: string;
   limit?: number | null;
   hard?: boolean;
   balance?: number;
@@ -383,7 +388,7 @@ export async function seedCustomer(c: {
     const row = await w.create('customers', {
       name: c.name,
       phone: c.phone ?? '',
-      address: '',
+      address: c.address ?? '',
       note: '',
       credit_limit: c.limit ?? null,
       hard_limit: c.hard ? 1 : 0,

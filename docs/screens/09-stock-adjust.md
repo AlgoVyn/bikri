@@ -14,7 +14,7 @@ Header: product name, "On hand 12 pc". Tabs:
 
 | Tab | Reasons (`reason_code`) | Qty sign | Cost |
 |---|---|---|---|
-| **Stock in** | Received from godown (`received_godown`), Bought locally (`received_local`), Customer return without bill (`customer_return`), Other (`received_other`) | + | `MoneyInput` unit cost required for `received_*` (default last cost); updates avg ([07 §7](../07-money-rules.md#7-cost-weighted-average)) |
+| **Stock in** | Received from storage (`received_godown`), Bought locally (`received_local`), Customer return without bill (`customer_return`), Other (`received_other`) | + | `MoneyInput` unit cost required for `received_*` (default last cost); updates avg ([07 §7](../07-money-rules.md#7-cost-weighted-average)) |
 | **Stock out** | Damaged (`damaged`), Expired (`expired`), Lost/stolen (`lost`), Spoiled (`spoiled`), Wrong item delivered (`wrong_item`) | − | none |
 | **Count** | Counted quantity → `count` with qty = counted − on hand | ± | none |
 | **Fix entry** | `entry_fix` with mandatory note (correcting a typo in a previous adjust) | ± | none |
