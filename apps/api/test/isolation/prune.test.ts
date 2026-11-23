@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
+import { TENANT_TABLES } from '../../src/db/tenantDb.ts';
 import { passFinished, pruneAll } from '../../src/platform/prune.ts';
 import {
   addBundleFixture,
@@ -207,22 +208,9 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
       }>();
     expect(tenant?.status).toBe('deleted');
     expect(tenant?.owner_email).toBeNull();
-    for (const tbl of [
-      'sales',
-      'sale_lines',
-      'products',
-      'bundle_items',
-      'devices',
-      'branch_device_codes',
-      'change_log',
-      'applied_ops',
-      'branches',
-      'shop',
-      'staff',
-      'enrolment_codes',
-      'owner_email_codes',
-      'tenant_usage',
-    ]) {
+    // Every tenant table (plus the usage counter) must be empty, not a hand-picked
+    // subset that silently misses a new table (OPS-L2/I16).
+    for (const tbl of [...TENANT_TABLES, 'tenant_usage']) {
       expect(
         await n(
           `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1`,
