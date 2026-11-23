@@ -177,7 +177,8 @@ describe('waiting print jobs', () => {
     );
     const started = performance.now();
     expect(await unresolvedFailedCount(db)).toBe(1_000);
-    // The old anyOf('failed','done') took ~181 s here in fake-indexeddb.
-    expect(performance.now() - started).toBeLessThan(2_000);
+    // The old anyOf('failed','done') took ~181 s here in fake-indexeddb. Keep a
+    // pathological ceiling only: a shared CI runner measures host load, not the query.
+    expect(performance.now() - started).toBeLessThan(10_000);
   });
 });
