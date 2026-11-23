@@ -351,7 +351,7 @@ export async function loadLookups(
   chunked(
     saleIds,
     (p) =>
-      `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, bundle_name, bundle_price, bundle_discount, name_snapshot, net FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
+      `SELECT id, sale_id, product_id, qty_milli, bundle_group, bundle_component_qty_milli, bundle_qty, bundle_id, bundle_name, bundle_price, bundle_discount, name_snapshot, net, unit_price FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (${p})`,
     { saleLines: true },
   );
   // Only the recipes this push can affect: the bundles named by sale/recipe/product ops,
@@ -645,6 +645,7 @@ export async function loadLookups(
           name_snapshot:
             typeof r.name_snapshot === 'string' ? r.name_snapshot : null,
           net: Number(r.net ?? 0),
+          unit_price: Number(r.unit_price ?? 0),
         };
         const list = look.saleLinesBySale.get(saleId) ?? [];
         list.push(line);
@@ -662,6 +663,7 @@ export async function loadLookups(
           bundle_discount: line.bundle_discount,
           name_snapshot: line.name_snapshot,
           net: line.net,
+          unit_price: line.unit_price,
         });
       } else if ('saleMoved' in k) {
         const saleId = String(r.sale_id);
@@ -799,13 +801,17 @@ export function applyLookupChanges(
       const id = op.kind === 'delete' ? op.row_id : op.row?.id;
       if (typeof id !== 'string' || id === '') continue;
       set.add(id);
-      look.partyDeleted.set(
-        key(type, id),
+      const deleted =
         op.kind === 'delete'
           ? now
           : op.row?.deleted_at === null || op.row?.deleted_at === undefined
             ? null
-            : Number(op.row.deleted_at),
+            : Number(op.row.deleted_at);
+      const previous = look.partyDeleted.get(key(type, id));
+      // A soft-deleted party is never resurrected by an edit later in the push (API-M2).
+      look.partyDeleted.set(
+        key(type, id),
+        previous === null || previous === undefined ? deleted : previous,
       );
       continue;
     }
@@ -864,6 +870,7 @@ export function applyLookupChanges(
             ? op.row.name_snapshot
             : null,
         net: Number(op.row.net ?? 0),
+        unit_price: Number(op.row.unit_price ?? 0),
       };
       look.saleLineById.set(id, line);
       look.saleLineSale.set(id, saleId);
@@ -887,6 +894,36 @@ export function applyLookupChanges(
         saleId,
         (look.pushedRefundAmount.get(saleId) ?? 0) + Number(op.row.amount ?? 0),
       );
+    }
+    if (op.tbl === 'sale_voids' && typeof op.row.sale_id === 'string')
+      look.existingVoids.add(op.row.sale_id);
+    if (op.tbl === 'expenses' && op.kind === 'insert') {
+      // An offline expense and its reversal are separate transactions of one push; the
+      // reversal check must see the original and its existing reversal (API-M1).
+      const reverses =
+        typeof op.row.reverses_id === 'string' ? op.row.reverses_id : null;
+      look.expenses.set(id, {
+        amount: Number(op.row.amount ?? 0),
+        method: String(op.row.method ?? ''),
+        reverses_id: reverses,
+        business_date: String(op.row.business_date ?? ''),
+      });
+      if (reverses !== null) look.existingReversals.add(reverses);
+    }
+    if (
+      op.tbl === 'purchase_lines' &&
+      op.kind === 'insert' &&
+      typeof op.row.purchase_id === 'string'
+    ) {
+      // A supplier return in a later transaction of this push links to the delivery line
+      // pushed earlier; its supplier must still be verified (API-M1).
+      const supplier = ops.find(
+        (candidate) =>
+          candidate.tbl === 'purchases' &&
+          candidate.row?.id === op.row?.purchase_id,
+      )?.row?.supplier_id;
+      if (typeof supplier === 'string')
+        look.purchaseLineSupplier.set(id, supplier);
     }
   }
 }

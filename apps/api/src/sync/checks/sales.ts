@@ -261,7 +261,24 @@ export function checkSalePolicy(
   // lines to fake a below-cost flag or a tax share.
   const nets = lines.map((line) => n(line.net));
   const billAlloc = allocate(bill, nets);
-  const taxAlloc = allocate(expectedTax, nets);
+  let taxAlloc = allocate(expectedTax, nets);
+  // Inclusive tax is part of the net, so a line can only absorb tax up to what is left
+  // after its bill-discount share. The unadjusted largest-remainder split can give the
+  // same line the last paisa of both allocations and make its revenue negative. Mirror
+  // `computeCart` (07 §3): re-allocate inclusive tax against the post-bill-discount
+  // bases when that would happen (API-H3).
+  if (
+    inclusive &&
+    nets.some(
+      (net, index) =>
+        net - (billAlloc[index] as number) - (taxAlloc[index] as number) < 0,
+    )
+  ) {
+    taxAlloc = allocate(
+      expectedTax,
+      nets.map((net, index) => net - (billAlloc[index] as number)),
+    );
+  }
   const bases = nets.map((net, index) =>
     inclusive
       ? net - (billAlloc[index] as number)
@@ -360,7 +377,19 @@ export function checkSalePolicy(
       priceKnown &&
       entryAt >= product.updated_at
     ) {
+      // A reissue that keeps an original line's price is not a new discount: the shop
+      // promised that price on the voided bill, and the bundle check already matches
+      // unchanged reissue groups the same way (POS-H2). Only a changed (lower) price
+      // needs `catalog.edit`.
+      const reissuedAtOriginalPrice =
+        typeof row.replaces_sale_id === 'string' &&
+        (look.saleLinesBySale.get(row.replaces_sale_id) ?? []).some(
+          (original) =>
+            original.product_id === line.product_id &&
+            Number(original.unit_price ?? 0) === unitPrice,
+        );
       if (
+        !reissuedAtOriginalPrice &&
         unitPrice < product.price &&
         !allowed('catalog.edit') &&
         !overrideForLine(

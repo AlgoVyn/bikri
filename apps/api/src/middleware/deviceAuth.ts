@@ -46,6 +46,10 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('device', device);
   c.set('db', db);
   c.set('usage', usage);
+  // The till "knows" server changes only up to its last completed download. Push and /me
+  // must not advance this, or an offline backlog pushed before the first pull would be
+  // validated as if the till had already seen every remote price/cost change (API-M5).
+  c.set('deviceSeenAt', Number(device.last_seen_at ?? 0));
   // Photos/logos are content-addressed and cached by the file route; a global
   // no-store here used to override its immutable header (D-231).
   if (!(c.req.method === 'GET' && c.req.path.startsWith(`${API_BASE}/files/`)))
@@ -58,16 +62,22 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     String(c.env.MAINTENANCE) !== '1' &&
     (tenant.status === 'active' || tenant.status === 'read_only');
   const pending = parsePending(c.req.header('x-bikri-pending'));
+  // `last_seen_at` means "last successful download" for freshness checks: only pull and
+  // snapshot advance it. Other requests still record the pending backlog/app version.
+  const advancesSeen =
+    c.req.path === `${API_BASE}/sync/pull` ||
+    c.req.path === `${API_BASE}/sync/snapshot`;
   if (gateAllows && now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {
     const app =
       (c.req.header('x-bikri-app') ?? '').slice(0, 20) || device.app_version;
     const write = db.run(
-      'UPDATE devices SET last_seen_at = ?2, pending_ops = ?3, oldest_pending_at = ?4, app_version = ?5 WHERE tenant_id = ?1 AND id = ?6',
+      'UPDATE devices SET last_seen_at = CASE WHEN ?7 = 1 THEN ?2 ELSE last_seen_at END, pending_ops = ?3, oldest_pending_at = ?4, app_version = ?5 WHERE tenant_id = ?1 AND id = ?6',
       now,
       pending?.count ?? device.pending_ops,
       pending ? pending.oldest : device.oldest_pending_at,
       app,
       device.id,
+      advancesSeen ? 1 : 0,
     );
     try {
       c.executionCtx.waitUntil(write.catch(() => undefined));

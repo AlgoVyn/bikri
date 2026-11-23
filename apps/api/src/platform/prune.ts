@@ -74,6 +74,16 @@ function writtenRowsOf(result: unknown): number {
   return Number.isFinite(rows) ? rows : 0;
 }
 
+/**
+ * Whether one DELETE pass of a deleting tenant is finished: only a chunk that came back
+ * short of its limit saw the end of the pass. A full chunk means rows remain, even when
+ * the remaining write budget is too small for another loop iteration; the tenant must
+ * not be marked `deleted` then (API-M3).
+ */
+export function passFinished(deleted: number, limit: number): boolean {
+  return deleted < limit;
+}
+
 export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const calls = new Calls();
   const report: PruneReport = {
@@ -194,10 +204,14 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   let budget = LOG_MAX_PER_RUN;
   let lastTenant = cursor;
   let completed = true;
-  for (const tenant_id of ordered) {
+  for (let at = 0; at < ordered.length; at += 1) {
+    const tenant_id = ordered[at] as string;
+    // Where the next run continues when this tenant is done or uses its whole share.
+    // Advancing past a high-volume tenant prevents it from starving the rest (API-M3).
+    const nextTenant = ordered[at + 1] ?? ordered[0] ?? '';
     const target = targetByTenant.get(tenant_id);
     if (target === undefined || target <= 0) {
-      lastTenant = tenant_id;
+      lastTenant = nextTenant;
       continue;
     }
     // Leave one call for the cursor write at the end of this pass.
@@ -212,14 +226,16 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     );
     let floor = floorRow?.change_log_floor ?? 0;
     if (floor >= target) {
-      lastTenant = tenant_id;
+      lastTenant = nextTenant;
       continue;
     }
     while (floor < target && budget > 0 && calls.ok(2)) {
       const limit = Math.min(
         LOG_CHUNK,
         budget,
-        Math.floor(calls.writesLeft() / 4),
+        // Four writes per log row (table + three indexes) plus the floor update, and
+        // one write reserved for the `prune_cursor` update at the end of the pass.
+        Math.floor(Math.max(0, calls.writesLeft() - 1) / 5),
       );
       if (limit <= 0) {
         completed = false;
@@ -248,7 +264,16 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       report.change_log[tenant_id] = (report.change_log[tenant_id] ?? 0) + n;
       floor = next;
     }
-    lastTenant = tenant_id;
+    if (floor >= target) {
+      lastTenant = nextTenant;
+      continue;
+    }
+    completed = false;
+    // The tenant did not finish (per-run log budget, account write budget or D1 call
+    // budget). Resume at the next tenant so a high-volume shop cannot starve the rest;
+    // its remaining rows come round again (API-M3).
+    lastTenant = nextTenant;
+    break;
   }
   if (calls.ok() && calls.hasWrites(1)) {
     await calls.run(() =>
@@ -292,10 +317,19 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
           ).bind(now - DAY),
           DB.prepare('DELETE FROM tenant_usage WHERE day < ?1').bind(day90),
           // Superseded per-day watermarks: only the newest row at or before the cutoff
-          // day is read, so older ones would grow without bound (API-H7).
-          DB.prepare('DELETE FROM change_log_watermarks WHERE day < ?1').bind(
-            cutoffDay,
-          ),
+          // day is read, so older ones would grow without bound (API-H7). Keep the only
+          // watermark when it is the newest one covering the cutoff: deleting it would
+          // re-trigger the unindexed change_log fallback scan on the next night (API-M3).
+          DB.prepare(
+            `DELETE FROM change_log_watermarks
+             WHERE day < ?1
+               AND EXISTS (
+                 SELECT 1 FROM change_log_watermarks newer
+                 WHERE newer.tenant_id = change_log_watermarks.tenant_id
+                   AND newer.day <= ?1
+                   AND newer.day > change_log_watermarks.day
+               )`,
+          ).bind(cutoffDay),
           // Public requests hold name/email/phone. A closed request has no operator use
           // after the retention window (09 §9).
           DB.prepare(
@@ -374,6 +408,11 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       for (const tbl of DELETE_ORDER) {
         if (!nonEmpty.has(tbl)) continue;
         for (const where of passesFor(tbl)) {
+          // A pass is finished only when a chunk comes back short of its limit. A chunk
+          // that filled the limit means rows remain, even if the remaining write budget
+          // is too small for another loop iteration; the tenant is not `deleted` then
+          // (API-M3).
+          let passDone = false;
           while (left > 0 && calls.ok(2) && calls.hasWrites(5)) {
             const limit = Math.min(
               DELETE_CHUNK,
@@ -390,7 +429,14 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
             const n = res.meta.changes ?? 0;
             left -= n;
             report.deleted_rows[t.id] = (report.deleted_rows[t.id] ?? 0) + n;
-            if (n < limit) break;
+            if (passFinished(n, limit)) {
+              passDone = true;
+              break;
+            }
+          }
+          if (!passDone) {
+            done = false;
+            break;
           }
           if (left <= 0 || !calls.ok(2) || !calls.hasWrites(1)) {
             done = false;

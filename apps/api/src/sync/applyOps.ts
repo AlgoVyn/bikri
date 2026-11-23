@@ -137,8 +137,10 @@ function planOp(
               id,
               op.op_id,
             ),
-            appliedOp(db, op, deviceId, now, 'applied', null, false),
+            // `changeLog`'s `onlyIfChanged` guard reads the UPDATE's `changes()`, so it
+            // must run before `appliedOp` (which always writes a row) (API-L3).
             changeLog(db, tbl, id, 'delete', deviceId, now, true),
+            appliedOp(db, op, deviceId, now, 'applied', null, false),
           ],
           result: { op_id: op.op_id, result: 'applied' },
           guard: null,
@@ -500,6 +502,16 @@ function groupByTx(ops: PushOp[]): PushOp[][] {
   return groups;
 }
 
+/**
+ * What to do when D1 rolled a batch back with a guard assertion: bisect a multi-group
+ * batch to find the lost group, but stop the round for a lost singleton so later groups
+ * are re-planned from committed D1 state instead of the rolled-back in-memory lookups
+ * they were validated against (API-H4).
+ */
+export function guardFailureAction(listLength: number): 'bisect' | 'stop' {
+  return listLength > 1 ? 'bisect' : 'stop';
+}
+
 /** Apply the product rows of a successfully planned transaction to the next group in order. */
 /** Apply the ledger rows of a successfully planned transaction to later balance checks. */
 function applyLedgerChanges(look: Lookups, ops: PushOp[]): void {
@@ -522,17 +534,30 @@ function applyLedgerChanges(look: Lookups, ops: PushOp[]): void {
   }
 }
 
-function applyProductChanges(look: Lookups, ops: PushOp[]): void {
+function applyProductChanges(
+  look: Lookups,
+  costs: CostMap,
+  ops: PushOp[],
+): void {
   for (const op of ops) {
-    if (
-      op.tbl !== 'products' ||
-      op.kind === 'delete' ||
-      typeof op.row?.id !== 'string'
-    )
+    if (op.tbl !== 'products') continue;
+    const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+    if (typeof id !== 'string') continue;
+    const previous = look.products.get(id);
+    if (op.kind === 'delete') {
+      // planOp soft-deletes the row; the in-memory state must follow so a later
+      // transaction of this push cannot use the product again (API-M2).
+      if (!previous) continue;
+      look.products.set(id, {
+        ...previous,
+        deleted_at: Number(op.created_at ?? previous.updated_at),
+        pushed: true,
+      });
       continue;
-    const previous = look.products.get(op.row.id);
+    }
+    if (!op.row) continue;
     if (!previous) {
-      look.products.set(op.row.id, {
+      look.products.set(id, {
         price: Number(op.row.price ?? 0),
         avg_cost: Number(op.row.last_cost ?? 0),
         last_cost: Number(op.row.last_cost ?? 0),
@@ -550,22 +575,28 @@ function applyProductChanges(look: Lookups, ops: PushOp[]): void {
     // planOp writes only `changed_fields` (plus updated_at/updated_by) for an existing
     // row. The in-memory state used by later transactions must follow the same list;
     // otherwise a permitted `last_cost` upsert could smuggle `price: 0` into a sale
-    // later in the same push.
+    // later in the same push. A soft-deleted row is never resurrected (API-M2).
     const changed = new Set(op.changed_fields ?? []);
     const pick = <K extends keyof typeof previous>(field: K) =>
       changed.has(field) && op.row?.[field] !== undefined
         ? op.row[field]
         : previous[field];
-    look.products.set(op.row.id, {
+    look.products.set(id, {
       price: Number(pick('price')),
       avg_cost: previous.avg_cost,
       last_cost: Number(pick('last_cost')),
       track_stock: Number(pick('track_stock')),
       updated_at: Number(op.row.updated_at ?? previous.updated_at),
       kind: String(pick('kind')),
-      deleted_at: pick('deleted_at') as number | null,
+      deleted_at: previous.deleted_at ?? (pick('deleted_at') as number | null),
       pushed: true,
     });
+    // A `last_cost`-only upsert (no stock movement) must reach the running cost state
+    // later transactions of this push read for `cost_method = 'last'` sales (API-M5).
+    if (changed.has('last_cost') && op.row.last_cost !== undefined) {
+      const cost = costs.get(id);
+      if (cost) costs.set(id, { ...cost, last_cost: Number(op.row.last_cost) });
+    }
   }
 }
 
@@ -765,8 +796,10 @@ function applyCurrentChanges(look: Lookups, ops: PushOp[], now: number): void {
     look.current.set(at, {
       id,
       rev: cur ? cur.rev + 1 : 1,
+      // A soft-deleted row is never resurrected by a later edit of the same push,
+      // even when the edit lists `deleted_at` (API-M2).
       deleted_at: cur
-        ? pick('deleted_at', cur.deleted_at)
+        ? (cur.deleted_at ?? pick('deleted_at', cur.deleted_at))
         : ((row.deleted_at as number | null | undefined) ?? null),
       setup_completed_at: cur
         ? pick('setup_completed_at', cur.setup_completed_at)
@@ -888,25 +921,32 @@ export async function applyOps(
       try {
         const planned = ops.map((op) => planOp(ctx, look, ops, op, groupAvg));
         // A stored parent must not receive new children from a duplicate row. If every
-        // insert in the transaction already exists this is a true replay (no side effects);
-        // a mixture is a forged/invalid document and is rejected as a whole.
+        // `insert` in the transaction already exists this is a true replay (no side
+        // effects); a partially existing insert set is a forged/invalid document and is
+        // rejected as a whole. Master upserts are not inserts, so a legitimate replay
+        // that mixes ledger inserts with master upserts is not rejected (API-H1).
+        const insertCount = planned.filter(
+          (p) => p.op.kind === 'insert',
+        ).length;
         const existing = planned.filter((p) => p.existingInsert).length;
-        if (existing > 0 && existing < planned.length)
+        if (existing > 0 && existing < insertCount)
           throw new Reject('CONSTRAINT_FAILED');
         groups.push({ txId: ops[0]?.tx_id ?? '', planned });
         // A replay (existingInsert) wrote no row; do not advance the lookup or revision
-        // overlays for it. Everything else is visible to the next transaction (API-H2).
+        // overlays for it. Everything else is visible to the next transaction, and a
+        // replayed ledger row must not overwrite the stored values a later close or
+        // document check reads (API-H1).
         const appliedOps = planned
           .filter((entry) => !entry.existingInsert)
           .map((entry) => entry.op);
         applyLookupChanges(look, appliedOps, ctx.now);
         applyCurrentChanges(look, appliedOps, ctx.now);
-        applyProductChanges(look, ops);
-        applyBundleChanges(look, ops);
-        applyStaffChanges(look, ops);
-        applyShopChanges(look, ops);
-        applyLedgerChanges(look, ops);
-        applyCloseChanges(look, ops);
+        applyProductChanges(look, groupAvg, appliedOps);
+        applyBundleChanges(look, appliedOps);
+        applyStaffChanges(look, appliedOps);
+        applyShopChanges(look, appliedOps);
+        applyLedgerChanges(look, appliedOps);
+        applyCloseChanges(look, appliedOps);
         groupAvg.commit();
       } catch (error) {
         if (!(error instanceof Reject)) throw error;
@@ -965,14 +1005,16 @@ export async function applyOps(
           // group that actually lost its guard is retried in round 2; a singleton is
           // retried intact. Replaying every group without bisecting was the permanent
           // sync livelock (API-C1).
-          if (list.length > 1) {
+          if (guardFailureAction(list.length) === 'bisect') {
             const mid = Math.ceil(list.length / 2);
             await run(list.slice(0, mid));
             await run(list.slice(mid));
             return;
           }
           for (const g of list) lost.push(g.planned.map((p) => p.op));
-          return;
+          // The lost singleton rolled back changes later groups were planned with.
+          // Stop this round and re-plan the rest from committed D1 state (API-H4).
+          throw new StopExecution();
         }
         if (!isD1ConstraintError(error)) throw error;
         if (list.length === 1) {

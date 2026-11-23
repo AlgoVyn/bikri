@@ -241,15 +241,38 @@ export function sideEffects(
           Number(row.created_at ?? now),
         );
         state.pushed = true;
+        // A costed delivery/stock-in usually carries a companion `products` upsert that
+        // already bumped `rev` and logged `last_cost` (the only cost field a till pulls).
+        // Bumping it again would make D1 `rev` disagree with `server_rev` and roll the
+        // client into a spurious field_merge (API-M4).
+        const companion = group.some(
+          (candidate) =>
+            candidate.tbl === 'products' &&
+            candidate.kind !== 'delete' &&
+            candidate.row?.id === row.product_id,
+        );
         out.push(
           guardedUpdate(
             ctx,
-            'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
+            companion
+              ? 'UPDATE products SET avg_cost = ?2, last_cost = ?4 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)'
+              : 'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
             [state.avg_cost, String(row.product_id), Number(row.unit_cost)],
             opId,
           ),
-          changeLog(db, 'products', row.product_id, 'upsert', null, now, true),
         );
+        if (!companion)
+          out.push(
+            changeLog(
+              db,
+              'products',
+              row.product_id,
+              'upsert',
+              null,
+              now,
+              true,
+            ),
+          );
       }
       // on_hand_milli and cost_changed_at are maintained by the
       // products_stock_after_movement trigger, so this path never bumps rev or writes a
