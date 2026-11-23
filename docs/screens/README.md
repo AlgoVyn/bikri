@@ -41,8 +41,8 @@ Every list exports locally, offline. Amounts are rupees (list exports are compac
 
 | List | Header |
 |---|---|
-| Products | `name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,sold_30_days` (`cost,avg_cost` only with `cost.view`) |
-| Product stock history | `date,reason,qty,balance_after,by` |
+| Products | `name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,kind,sold_30_days` (`cost,avg_cost` only with `cost.view`) |
+| Product stock history | `date,reason,qty,balance_after,note,by` |
 | Sales | `invoice_no,date,time,customer,items,subtotal,discounts,tax,total,cash,card,bank_wallet,udhaar,refunded,status,cashier,device` |
 | Customers | `name,phone,balance,oldest_unpaid_days,credit_limit,promise_on,last_activity` |
 | Customer statement | `date,description,debit,credit,balance` |

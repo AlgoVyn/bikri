@@ -1,50 +1,45 @@
 #!/usr/bin/env node
-// Generates packages/db/src/tables.ts (column lists per D1 table) from every migration,
-// in order. Run after changing a migration:
+// Generates packages/db/src/tables.ts (column lists per D1 table) by executing every
+// migration in order in an in-memory SQLite database and reading PRAGMA table_info.
+// This follows table rebuilds (`DROP TABLE` / `ALTER TABLE ... RENAME TO`) and does not
+// need to parse SQL. Run after changing a migration:
 //   node tools/gen-tables.mjs
 // The script formats the file with Biome so `biome ci .` stays green.
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { stripComments } from './check-migrations-safe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = join(ROOT, 'packages/db/migrations');
 const OUT = join(ROOT, 'packages/db/src/tables.ts');
 
-const tables = new Map();
-const created = new Set();
-
 const migrationFiles = readdirSync(MIGRATIONS)
   .filter((file) => /^\d{4}_.+\.sql$/u.test(file))
   .sort();
 
+const db = new DatabaseSync(':memory:');
+db.exec('PRAGMA foreign_keys = ON');
 for (const name of migrationFiles) {
-  const sql = stripComments(readFileSync(join(MIGRATIONS, name), 'utf8'));
-  for (const match of sql.matchAll(
-    /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)\s*\(([\s\S]*?)\n\)\s*STRICT;/gu,
-  )) {
-    const [, table, body] = match;
-    if (!table || body === undefined || created.has(table)) continue;
-    created.add(table);
-    const cols = [];
-    for (const line of body.split('\n')) {
-      const col = /^\s*([a-z_][a-z0-9_]*)\s+(TEXT|INTEGER|REAL|BLOB)\b/u.exec(
-        line,
-      );
-      if (col?.[1]) cols.push(col[1]);
-    }
-    tables.set(table, cols);
-  }
-  // Columns added by later migrations, in the order D1 reports them.
-  for (const match of sql.matchAll(
-    /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+([a-z_][a-z0-9_]*)/giu,
-  )) {
-    const [, table, column] = match;
-    const cols = table ? tables.get(table) : undefined;
-    if (cols && column && !cols.includes(column)) cols.push(column);
-  }
+  // Comments are valid SQL; run the file exactly as deployed so the generated columns
+  // match the real schema, including any rebuild a later migration performs.
+  db.exec(readFileSync(join(MIGRATIONS, name), 'utf8'));
+}
+
+const tables = new Map();
+const tableRows = db
+  .prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY rowid",
+  )
+  .all();
+for (const row of tableRows) {
+  const table = String(row.name);
+  const cols = db
+    .prepare(`PRAGMA table_info(${JSON.stringify(table)})`)
+    .all()
+    .map((column) => String(column.name));
+  tables.set(table, cols);
 }
 
 const body = [...tables.entries()]

@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { businessDate } from '@bikri/core';
+import { businessDate, CLIENT_SCHEMA_VERSION } from '@bikri/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { sha256Hex } from '../src/auth/crypto.ts';
 import {
@@ -305,13 +305,32 @@ describe('deviceAuth, tenantGate and /api/me', () => {
     const s = await seedShop('Suspended', { status: 'suspended' });
     const d = await seedShop('Deleting', { status: 'deleting' });
     for (const shop of [s, d]) {
-      for (const path of ['/me', '/sync/pull?since=0', '/sync/snapshot']) {
+      for (const path of [
+        '/me',
+        '/sync/pull?since=0',
+        '/sync/snapshot',
+        '/files/missing',
+        '/shop/devices',
+      ]) {
         const res = await api(path, { token: shop.admin.token });
         expect(res.status, path).toBe(403);
         expect((await json<{ error: { code: string } }>(res)).error.code).toBe(
           'TENANT_SUSPENDED',
         );
       }
+      const push = await api('/sync/push', {
+        method: 'POST',
+        token: shop.admin.token,
+        json: {
+          device_id: shop.admin.id,
+          schema_version: CLIENT_SCHEMA_VERSION,
+          ops: [],
+        },
+      });
+      expect(push.status, '/sync/push').toBe(403);
+      expect((await json<{ error: { code: string } }>(push)).error.code).toBe(
+        'TENANT_SUSPENDED',
+      );
     }
   });
 

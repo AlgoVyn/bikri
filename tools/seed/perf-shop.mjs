@@ -1637,7 +1637,7 @@ function main() {
         insert('audit_log', {
           tenant_id: tenantId,
           id: idAt(refund.at, `refund-audit:${number}`),
-          action: 'refund.create',
+          action: 'refund',
           entity: 'refunds',
           entity_id: refundId,
           before_json: null,

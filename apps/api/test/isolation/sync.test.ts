@@ -193,6 +193,207 @@ describe('sync isolation', () => {
     });
   });
 
+  it('I3: B rows referencing A-only sale, staff, supplier and purchase-line ids answer like unknown ids', async () => {
+    const a = await seedShop('Fk2 A');
+    const b = await seedShop('Fk2 B');
+    await pushOk(a.till, saleOps(a, a.till, 7));
+    const now = Date.now();
+    const day = businessDate(now, 'Asia/Karachi');
+    const aSale = await env.DB.prepare(
+      'SELECT id FROM sales WHERE tenant_id = ?1 LIMIT 1',
+    )
+      .bind(a.tenantId)
+      .first<{ id: string }>();
+    const aStaff = newId();
+    await env.DB.prepare(
+      "INSERT INTO staff (tenant_id, id, name, role, pin_hash, pin_salt, created_at, updated_at) VALUES (?1, ?2, 'A only', 'cashier', ?3, ?4, 1, 1)",
+    )
+      .bind(a.tenantId, aStaff, 'a'.repeat(44), 'b'.repeat(24))
+      .run();
+    const aSupplier = newId();
+    await env.DB.prepare(
+      "INSERT INTO suppliers (tenant_id, id, name, created_at, updated_at) VALUES (?1, ?2, 'A only', 1, 1)",
+    )
+      .bind(a.tenantId, aSupplier)
+      .run();
+    const aPurchase = newId();
+    const aLine = newId();
+    await env.DB.prepare(
+      'INSERT INTO purchases (tenant_id, id, supplier_id, total, line_count, branch_id, device_id, staff_id, business_date, created_at) VALUES (?1, ?2, ?3, 100, 1, ?4, ?5, ?6, ?7, ?8)',
+    )
+      .bind(
+        a.tenantId,
+        aPurchase,
+        aSupplier,
+        a.branchId,
+        a.till.id,
+        IDS.owner,
+        day,
+        now,
+      )
+      .run();
+    await env.DB.prepare(
+      'INSERT INTO purchase_lines (tenant_id, id, purchase_id, line_no, product_id, qty_milli, unit_cost, line_total, landed_unit_cost, created_at) VALUES (?1, ?2, ?3, 1, ?4, 1000, 100, 100, 100, ?5)',
+    )
+      .bind(a.tenantId, aLine, aPurchase, IDS.product, now)
+      .run();
+
+    // Each builder returns the ops and the row id whose B-side insert must not exist.
+    type RefCase = {
+      check: readonly [string, string];
+      ops: ReturnType<typeof op>[];
+    };
+    const payment = (saleId: string): RefCase => {
+      const id = newId();
+      return {
+        check: ['payments', id] as const,
+        ops: [
+          op('payments', 'insert', {
+            id,
+            sale_id: saleId,
+            direction: 'in',
+            method: 'cash',
+            purpose: 'sale',
+            amount: 100,
+            branch_id: b.branchId,
+            device_id: b.till.id,
+            staff_id: IDS.owner,
+            business_date: day,
+            created_at: now,
+          }),
+        ],
+      };
+    };
+    const move = (staffId: string): RefCase => {
+      const id = newId();
+      return {
+        check: ['stock_movements', id] as const,
+        ops: [
+          op('stock_movements', 'insert', {
+            id,
+            product_id: IDS.product,
+            qty_delta_milli: 1000,
+            reason_code: 'received_local',
+            ref_type: 'adjustment',
+            ref_id: null,
+            unit_cost: 100,
+            branch_id: b.branchId,
+            device_id: b.till.id,
+            staff_id: staffId,
+            business_date: day,
+            created_at: now,
+          }),
+        ],
+      };
+    };
+    const ledger = (supplierId: string): RefCase => {
+      const id = newId();
+      return {
+        check: ['ledger_entries', id] as const,
+        ops: [
+          op('ledger_entries', 'insert', {
+            id,
+            party_type: 'supplier',
+            party_id: supplierId,
+            amount: 100,
+            source_type: 'purchase',
+            source_id: aPurchase,
+            branch_id: b.branchId,
+            device_id: b.till.id,
+            staff_id: IDS.owner,
+            business_date: day,
+            created_at: now,
+          }),
+        ],
+      };
+    };
+    const supplierReturn = (purchaseLineId: string): RefCase => {
+      const returnId = newId();
+      return {
+        check: ['supplier_returns', returnId] as const,
+        ops: [
+          op('supplier_returns', 'insert', {
+            id: returnId,
+            supplier_id: IDS.supplier,
+            reason: 'A only',
+            total: 100,
+            refund_received: 0,
+            line_count: 1,
+            branch_id: b.branchId,
+            device_id: b.till.id,
+            staff_id: IDS.owner,
+            business_date: day,
+            created_at: now,
+          }),
+          op('supplier_return_lines', 'insert', {
+            id: newId(),
+            return_id: returnId,
+            line_no: 1,
+            product_id: IDS.product,
+            purchase_line_id: purchaseLineId,
+            qty_milli: 1000,
+            unit_credit: 100,
+            line_total: 100,
+            cost_snapshot: 0,
+            created_at: now,
+          }),
+          op('ledger_entries', 'insert', {
+            id: newId(),
+            party_type: 'supplier',
+            party_id: IDS.supplier,
+            amount: -100,
+            source_type: 'supplier_return',
+            source_id: returnId,
+            branch_id: b.branchId,
+            device_id: b.till.id,
+            staff_id: IDS.owner,
+            business_date: day,
+            created_at: now,
+          }),
+        ],
+      };
+    };
+
+    const cases: Array<{
+      label: string;
+      aOnly: RefCase;
+      unknown: RefCase;
+    }> = [
+      {
+        label: 'sale',
+        aOnly: payment(aSale?.id ?? newId()),
+        unknown: payment(newId()),
+      },
+      { label: 'staff', aOnly: move(aStaff), unknown: move(newId()) },
+      {
+        label: 'supplier',
+        aOnly: ledger(aSupplier),
+        unknown: ledger(newId()),
+      },
+      {
+        label: 'purchase_line',
+        aOnly: supplierReturn(aLine),
+        unknown: supplierReturn(newId()),
+      },
+    ];
+    for (const { label, aOnly, unknown } of cases) {
+      const withA = await pushOk(b.till, aOnly.ops);
+      const withUnknown = await pushOk(b.till, unknown.ops);
+      const aCodes = (withA.results ?? []).map((r) => r.error_code);
+      const unknownCodes = (withUnknown.results ?? []).map((r) => r.error_code);
+      expect(aCodes.length, label).toBeGreaterThan(0);
+      expect(aCodes, label).toEqual(unknownCodes);
+      expect(
+        await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM ${aOnly.check[0]} WHERE tenant_id = ?1 AND id = ?2`,
+        )
+          .bind(b.tenantId, aOnly.check[1])
+          .first(),
+        label,
+      ).toEqual({ n: 0 });
+    }
+  });
+
   it('I4: a tenant_id key inside a B row is ignored; the row lands in B', async () => {
     const a = await seedShop('Key A');
     const b = await seedShop('Key B');
