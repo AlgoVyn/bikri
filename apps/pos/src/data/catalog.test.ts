@@ -304,22 +304,30 @@ describe('products (screens/08)', () => {
       kind: 'sale',
       saleId: 's1',
       invoiceNo: 'A-A-1',
+      businessDate: businessDate(NOW),
+      branchId: '',
     });
     expect(refs.get('m-sale-dup')).toEqual({
       kind: 'sale',
       saleId: 's1',
       invoiceNo: 'A-A-1',
+      businessDate: businessDate(NOW),
+      branchId: '',
     });
     expect(refs.get('m-sale-missing')).toBeNull();
     expect(refs.get('m-refund')).toEqual({
       kind: 'refund',
       saleId: 's1',
       invoiceNo: 'A-A-1',
+      businessDate: businessDate(NOW),
+      branchId: '',
     });
     expect(refs.get('m-refund-linked')).toEqual({
       kind: 'refund',
       saleId: 's2',
       invoiceNo: 'A-A-2',
+      businessDate: businessDate(NOW),
+      branchId: '',
     });
     expect(refs.get('m-refund-missing')).toBeNull();
     expect(refs.get('m-refund-unknown')).toBeNull();
@@ -327,6 +335,8 @@ describe('products (screens/08)', () => {
       kind: 'void',
       saleId: 's1',
       invoiceNo: 'A-A-1',
+      businessDate: businessDate(NOW),
+      branchId: '',
     });
     expect(refs.get('m-void-nosale')).toBeNull();
     expect(refs.get('m-void-unknown')).toBeNull();

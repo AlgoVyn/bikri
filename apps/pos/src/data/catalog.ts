@@ -4,6 +4,7 @@ import {
   mulDivRound,
   newId,
   type OpRow,
+  qtyAllowsDecimals,
   refundedRevenue,
 } from '@bikri/core';
 import type { BikriDb, FileQueueEntry, MasterRow, SyncedRow } from '@bikri/db';
@@ -227,6 +228,14 @@ export class TrackedCostError extends Error {
   constructor() {
     super('Tracked product cost can only change through stock movements');
     this.name = 'TrackedCostError';
+  }
+}
+
+/** An integer unit cannot track stock whose live on-hand is fractional (kg → pc). */
+export class FractionalStockError extends Error {
+  constructor() {
+    super('Fractional stock cannot use an integer unit');
+    this.name = 'FractionalStockError';
   }
 }
 
@@ -511,9 +520,14 @@ export async function listProducts(
 
 /** The bill or delivery a stock movement came from; the screen links to it. */
 export type HistoryRef =
-  | { kind: 'sale'; saleId: string; invoiceNo: string }
-  | { kind: 'refund'; saleId: string; invoiceNo: string }
-  | { kind: 'void'; saleId: string; invoiceNo: string }
+  | {
+      kind: 'sale' | 'refund' | 'void';
+      saleId: string;
+      invoiceNo: string;
+      /** The bill's own date/branch decide whether this profile may open it (05 §6). */
+      businessDate: string;
+      branchId: string;
+    }
   | {
       kind: 'purchase';
       purchaseId: string;
@@ -689,6 +703,8 @@ async function loadHistoryRefs(
           kind: 'sale',
           saleId: seed.id,
           invoiceNo: String(sale.invoice_no ?? ''),
+          businessDate: String(sale.business_date ?? ''),
+          branchId: String(sale.branch_id ?? ''),
         });
       continue;
     }
@@ -706,6 +722,8 @@ async function loadHistoryRefs(
           kind: seed.type,
           saleId: String(sale.id),
           invoiceNo: String(sale.invoice_no ?? ''),
+          businessDate: String(sale.business_date ?? ''),
+          branchId: String(sale.branch_id ?? ''),
         });
       continue;
     }
@@ -1429,6 +1447,16 @@ export async function saveProductEdit(
   }
   const sku = input.sku?.trim() || String(current.sku);
   await checkCodes(db, input.barcodes ?? [], sku, id);
+  // The last write path: a bulk edit, an import or a stale form must not switch an
+  // integer unit onto fractional live stock (UI-M2).
+  const nextUnit = input.unit ?? String(current.unit ?? 'pc');
+  if (
+    !isBundle &&
+    input.track_stock !== false &&
+    !qtyAllowsDecimals(nextUnit) &&
+    ((await db.stock_levels.get(id))?.on_hand_milli ?? 0) % 1000 !== 0
+  )
+    throw new FractionalStockError();
   const recipe =
     isBundle && input.bundle_items !== undefined
       ? await normaliseBundleItems(db, id, input.bundle_items)

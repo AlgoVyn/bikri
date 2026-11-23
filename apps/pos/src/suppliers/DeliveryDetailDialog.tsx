@@ -36,12 +36,15 @@ export function DeliveryDetailDialog({
   const { can } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [busy, setBusy] = useState(false);
+  // Defence in depth for the deep link: the dialog itself never loads a delivery for a
+  // profile that may not see purchase costs (screens/13, UI-H1).
+  const canSeeCost = can('purchase.create') || can('cost.view');
   const canReturn = can('purchase.create') && !readOnly;
   const canLabels = can('catalog.edit') || can('purchase.create');
   const canExport = can('export.data');
 
   const data = useLiveQuery(async () => {
-    if (!open || !purchaseId) return null;
+    if (!open || !purchaseId || !canSeeCost) return null;
     const db = getDb();
     const detail = await loadDeliveryDetail(db, purchaseId);
     if (!detail) return null;
@@ -54,7 +57,7 @@ export function DeliveryDetailDialog({
       shopAddress: String(shop?.address ?? ''),
       shopPhone: String(shop?.phone ?? ''),
     };
-  }, [open, purchaseId]);
+  }, [open, purchaseId, canSeeCost]);
 
   const close = () => onOpenChange(false);
   const detail: DeliveryDetail | null = data?.detail ?? null;
@@ -222,7 +225,14 @@ export function DeliveryDetailDialog({
       description={detail ? String(detail.supplier.name) : undefined}
       full
     >
-      {data === undefined ? (
+      {!canSeeCost ? (
+        <p
+          className="p-6 text-center text-text-muted"
+          data-testid="delivery-no-access"
+        >
+          {t('shell.no_access')}
+        </p>
+      ) : data === undefined ? (
         <PageLoading compact />
       ) : !data || !detail ? (
         <p className="p-6 text-center text-text-muted">

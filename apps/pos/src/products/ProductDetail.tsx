@@ -37,6 +37,7 @@ import {
   stockHistoryCsv,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
@@ -50,6 +51,7 @@ import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
 import { isLatinName, marginText, qtyWithUnit } from './format.ts';
+import { type HistoryLinkAccess, historyLinkVisible } from './historyLink.ts';
 import { ProductThumb } from './ProductThumb.tsx';
 
 const LabelsDialog = lazy(() =>
@@ -72,13 +74,14 @@ export function ProductDetailPage({
   const displayMoney = useDisplayMoney();
   const navigate = useNavigate();
   const toast = useToast();
-  const { staff, can } = useCurrentStaff();
+  const { staff, can, role, support, branchId } = useCurrentStaff();
   // One shop read powers the time zone, cost method and money format; the detail
   // screen used to subscribe to `shop` three times.
   const shop = useLiveQuery(() => getDb().shop.get('shop'), []);
   const timeZone = isTimeZone(shop?.timezone)
     ? String(shop?.timezone)
     : 'Asia/Karachi';
+  const { today } = useBusinessDates(timeZone);
   const wide = useMediaQuery('(min-width: 640px)');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
@@ -201,6 +204,16 @@ export function ProductDetailPage({
       by: h.staffName,
     };
   });
+
+  const historyAccess: HistoryLinkAccess = {
+    role,
+    support,
+    canViewReports: can('report.view'),
+    canViewCost: can('cost.view'),
+    canCreatePurchase: can('purchase.create'),
+    today,
+    branchId,
+  };
 
   const addToSale = async () => {
     try {
@@ -732,7 +745,12 @@ export function ProductDetailPage({
                               {h.note}
                             </span>
                           ) : null}
-                          {h.ref ? <HistoryRefLink historyRef={h.ref} /> : null}
+                          {h.ref ? (
+                            <HistoryRefLink
+                              historyRef={h.ref}
+                              access={historyAccess}
+                            />
+                          ) : null}
                         </td>
                         <td
                           className={`px-3 py-2 text-start ${h.tone}`}
@@ -773,7 +791,12 @@ export function ProductDetailPage({
                             {h.note}
                           </span>
                         ) : null}
-                        {h.ref ? <HistoryRefLink historyRef={h.ref} /> : null}
+                        {h.ref ? (
+                          <HistoryRefLink
+                            historyRef={h.ref}
+                            access={historyAccess}
+                          />
+                        ) : null}
                       </span>
                       <span
                         className={`shrink-0 tabular-nums ${h.tone}`}
@@ -873,19 +896,33 @@ export function ProductDetailPage({
   );
 }
 
-function HistoryRefLink({ historyRef }: { historyRef: HistoryRef }) {
+function HistoryRefLink({
+  historyRef,
+  access,
+}: {
+  historyRef: HistoryRef;
+  access: HistoryLinkAccess;
+}) {
   const { t } = useTranslation();
   const isPurchase = historyRef.kind === 'purchase';
   const invoice = historyRef.invoiceNo;
-  const label = isPurchase
-    ? invoice
-      ? t('products.history_delivery', { invoice })
-      : t('products.history_delivery_plain')
-    : invoice
-      ? t('products.history_bill', { invoice })
-      : t('products.history_bill_plain');
+  // The invoice stays LTR inside an RTL label; the wording itself follows the language.
+  const label = invoice ? (
+    <>
+      {t(isPurchase ? 'products.history_delivery' : 'products.history_bill', {
+        invoice: '',
+      }).trim()}{' '}
+      <bdi dir="ltr">{invoice}</bdi>
+    </>
+  ) : isPurchase ? (
+    t('products.history_delivery_plain')
+  ) : (
+    t('products.history_bill_plain')
+  );
+  if (!historyLinkVisible(historyRef, access))
+    return <span className="mt-0.5 block text-small">{label}</span>;
   const className =
-    'mt-0.5 flex w-fit items-center gap-1 text-small font-medium text-primary underline-offset-2 hover:underline';
+    'mt-0.5 flex min-h-11 w-fit items-center gap-1 text-small font-medium text-primary underline-offset-2 hover:underline';
   return isPurchase ? (
     <Link
       to="/suppliers/$supplierId"
