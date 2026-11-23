@@ -103,6 +103,7 @@ export {
   isPinVerifierValid,
   isWeakPin,
   PIN_ITERATIONS,
+  PIN_PATTERN,
   verifyPin,
 } from './pin.ts';
 export type { QtyUnit } from './qty.ts';

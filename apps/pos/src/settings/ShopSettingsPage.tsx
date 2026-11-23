@@ -29,7 +29,7 @@ import {
   updateShopLogo,
   updateShopSettings,
 } from '../data/settings.ts';
-import type { LogoData } from '../data/setup.ts';
+import { type LogoData, SHOP_GOVT_ID_MAX } from '../data/setup.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { ditheredPreview, LogoError, processLogo } from '../setup/logo.ts';
 import { ReceiptPreview } from '../setup/ReceiptPreview.tsx';
@@ -82,6 +82,8 @@ function ShopForm() {
   const [logoProcessing, setLogoProcessing] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** A typed phone that cannot be parsed must block Save, not erase the saved one. */
+  const [phoneValid, setPhoneValid] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const loaded = useRef(false);
 
@@ -133,6 +135,10 @@ function ShopForm() {
   const shopGuard = useSubmitGuard();
   const branchGuard = useSubmitGuard();
   const saveShop = async () => {
+    if (!phoneValid) {
+      toast.push(t('errors.phone_invalid'), 'error');
+      return;
+    }
     if (!shopGuard.lock()) return;
     setSaving(true);
     try {
@@ -262,6 +268,7 @@ function ShopForm() {
             showWhatsApp={false}
             value={form.phone}
             onChange={(phone) => setForm({ ...form, phone: phone ?? '' })}
+            onValidityChange={setPhoneValid}
           />
           <label className="flex flex-col gap-1 text-small">
             {t('setup.city')}
@@ -293,9 +300,13 @@ function ShopForm() {
               dir="ltr"
               inputMode="numeric"
               className={monoFieldClass}
+              maxLength={SHOP_GOVT_ID_MAX}
               value={form.ntn}
               onChange={(event) =>
-                setForm({ ...form, ntn: event.target.value })
+                setForm({
+                  ...form,
+                  ntn: event.target.value.slice(0, SHOP_GOVT_ID_MAX),
+                })
               }
             />
           </label>
@@ -305,9 +316,13 @@ function ShopForm() {
               dir="ltr"
               inputMode="numeric"
               className={monoFieldClass}
+              maxLength={SHOP_GOVT_ID_MAX}
               value={form.strn}
               onChange={(event) =>
-                setForm({ ...form, strn: event.target.value })
+                setForm({
+                  ...form,
+                  strn: event.target.value.slice(0, SHOP_GOVT_ID_MAX),
+                })
               }
             />
           </label>
@@ -357,7 +372,7 @@ function ShopForm() {
         <button
           type="button"
           className={`${buttonPrimary} self-start`}
-          disabled={saving || readOnly || logoProcessing}
+          disabled={saving || readOnly || logoProcessing || !phoneValid}
           onClick={() => void saveShop()}
         >
           {t('office.settings.save')}
@@ -608,7 +623,7 @@ function ShopForm() {
         <button
           type="button"
           className={`${buttonQuiet} self-start`}
-          disabled={saving || readOnly || logoProcessing}
+          disabled={saving || readOnly || logoProcessing || !phoneValid}
           onClick={() => void saveShop()}
         >
           {t('office.settings.save')}

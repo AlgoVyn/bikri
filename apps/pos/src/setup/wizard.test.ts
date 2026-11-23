@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { previewBlocks } from './ReceiptPreview.tsx';
-import { parseTaxPercent } from './SetupWizard.tsx';
+import { parseTaxPercent, resumeStep } from './SetupWizard.tsx';
+
+describe('setup draft resume (UI-C1)', () => {
+  it('never resumes past the owner/PIN step because the PIN is not persisted', () => {
+    expect(resumeStep(4)).toBe(2);
+    expect(resumeStep(3)).toBe(2);
+    expect(resumeStep(2)).toBe(2);
+    expect(resumeStep(1)).toBe(1);
+    expect(resumeStep(0)).toBe(0);
+    expect(resumeStep(-3)).toBe(0);
+    expect(resumeStep(Number.NaN)).toBe(0);
+  });
+});
 
 describe('setup step 3 helpers', () => {
   it('parses tax percent to basis points (0–25, 2 decimals)', () => {

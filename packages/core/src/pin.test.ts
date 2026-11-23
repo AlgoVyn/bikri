@@ -39,6 +39,15 @@ describe('PIN rules (05 §4)', () => {
     expect(PIN_ITERATIONS).toBe(150_000);
   });
 
+  it('refuses a PIN outside 4–6 digits instead of hashing it', async () => {
+    for (const pin of ['', '  4826', '4826 ', '123', '1234567', '12a4']) {
+      await expect(hashPin(pin, 1000), pin).rejects.toBeInstanceOf(RangeError);
+    }
+    // A valid 4-digit PIN still hashes and verifies as before.
+    const stored = await hashPin('4826', 1000);
+    expect(await verifyPin('4826', stored)).toBe(true);
+  });
+
   it('is deterministic for a given salt (known vector)', async () => {
     const salt = new Uint8Array(16);
     const a = await hashPin('4826', 1000, salt);
