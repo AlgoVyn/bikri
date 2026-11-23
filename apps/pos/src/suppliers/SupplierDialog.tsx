@@ -34,6 +34,8 @@ export function SupplierDialog({
   const [note, setNote] = useState('');
   const [opening, setOpening] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+  /** A typed phone that cannot be parsed blocks Save instead of erasing it (UI-M6). */
+  const [phoneValid, setPhoneValid] = useState(true);
   const guard = useSubmitGuard();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens or another supplier is selected; a live row update must not wipe typed input.
@@ -48,7 +50,7 @@ export function SupplierDialog({
   }, [open, editing?.id]);
 
   const save = async () => {
-    if (name.trim() === '' || pending || !guard.lock()) return;
+    if (name.trim() === '' || !phoneValid || pending || !guard.lock()) return;
     setPending(true);
     try {
       const db = getDb();
@@ -113,6 +115,7 @@ export function SupplierDialog({
           label={t('office.suppliers.phone')}
           value={phone}
           onChange={(next) => setPhone(next ?? '')}
+          onValidityChange={setPhoneValid}
         />
         <label className="flex flex-col gap-1 text-small">
           {t('office.suppliers.address')}
@@ -151,7 +154,7 @@ export function SupplierDialog({
         <button
           type="button"
           className={`${buttonPrimary} max-md:flex-1`}
-          disabled={name.trim() === '' || pending}
+          disabled={name.trim() === '' || !phoneValid || pending}
           onClick={() => void save()}
         >
           {t('office.suppliers.save')}

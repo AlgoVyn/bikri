@@ -377,7 +377,8 @@ function StaffDialog({
           </legend>
           <button
             type="button"
-            className="text-small underline"
+            className="inline-flex min-h-11 items-center px-1 text-small underline"
+            disabled={role === 'owner'}
             onClick={() => setOverrides({})}
           >
             {t('office.staff.reset_permissions')}
@@ -385,14 +386,17 @@ function StaffDialog({
         </div>
         <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-control border border-border p-2 sm:grid-cols-2">
           {PERMISSIONS.map((permission) => {
-            const ownerOnly = role !== 'owner' && OWNER_ONLY.has(permission);
+            const isOwner = role === 'owner';
+            const ownerOnly = !isOwner && OWNER_ONLY.has(permission);
             return (
               <li key={permission}>
                 <label className="flex items-center gap-2 text-small">
                   <input
                     type="checkbox"
-                    disabled={ownerOnly}
-                    checked={ownerOnly ? false : checked(permission)}
+                    disabled={isOwner || ownerOnly}
+                    checked={
+                      isOwner ? true : ownerOnly ? false : checked(permission)
+                    }
                     onChange={(event) =>
                       toggle(permission, event.target.checked)
                     }
@@ -400,7 +404,9 @@ function StaffDialog({
                   <span className="min-w-0 flex-1">
                     {t(`office.staff.perm_${permission.replaceAll('.', '_')}`)}
                   </span>
-                  {overrides[permission] !== undefined && !ownerOnly ? (
+                  {!isOwner &&
+                  overrides[permission] !== undefined &&
+                  !ownerOnly ? (
                     <span className="text-text-muted">
                       {t('office.staff.override')}
                     </span>

@@ -353,6 +353,10 @@ export function HomePage() {
 
   const runTiles = tiles.filter((tile) => RUN_ROUTES.has(tile.to));
   const manageTiles = tiles.filter((tile) => !RUN_ROUTES.has(tile.to));
+  // Filter before the length guard: a hidden row must not leave an empty section.
+  const visibleAttention = attention.filter((item) =>
+    attentionAllowed(item.kind),
+  );
 
   return (
     <div className={pageClass('standard', 'gap-6')}>
@@ -560,7 +564,7 @@ export function HomePage() {
               <QuickActions tiles={manageTiles} label="home.manage" />
             </div>
 
-            {data && attention.length > 0 ? (
+            {data && visibleAttention.length > 0 ? (
               <section aria-labelledby="attention-heading" className="order-5">
                 <h2
                   id="attention-heading"
@@ -569,26 +573,24 @@ export function HomePage() {
                   {t('home.attention')}
                 </h2>
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
-                  {attention
-                    .filter((item) => attentionAllowed(item.kind))
-                    .map((item) => (
-                      <li key={item.kind}>
-                        <Link
-                          to={ATTENTION_LINK[item.kind] ?? '/'}
-                          className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium transition-colors duration-150 hover:bg-surface-2 ${attentionTone(item)}`}
-                          data-testid={`attn-${item.kind}`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="size-2 shrink-0 rounded-full bg-current"
-                          />
-                          <span className="min-w-0 flex-1">
-                            {attentionText(t, i18n.language, timeZone, item)}
-                          </span>
-                          <ChevronRightIcon className="size-4 text-base text-text-muted rtl:rotate-180" />
-                        </Link>
-                      </li>
-                    ))}
+                  {visibleAttention.map((item) => (
+                    <li key={item.kind}>
+                      <Link
+                        to={ATTENTION_LINK[item.kind] ?? '/'}
+                        className={`flex min-h-12 items-center gap-3 px-4 py-3 text-small font-medium transition-colors duration-150 hover:bg-surface-2 ${attentionTone(item)}`}
+                        data-testid={`attn-${item.kind}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="size-2 shrink-0 rounded-full bg-current"
+                        />
+                        <span className="min-w-0 flex-1">
+                          {attentionText(t, i18n.language, timeZone, item)}
+                        </span>
+                        <ChevronRightIcon className="size-4 text-base text-text-muted rtl:rotate-180" />
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </section>
             ) : null}

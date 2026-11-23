@@ -1,4 +1,9 @@
-import { type CartResult, mulDivRound, type QtyUnit } from '@bikri/core';
+import {
+  type CartResult,
+  formatQtyFromMilli,
+  mulDivRound,
+  type QtyUnit,
+} from '@bikri/core';
 import type { Cart, CartBackdate, CartLine } from '@bikri/db';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -813,7 +818,7 @@ function LineRow({
                   data-testid="badge-stock"
                 >
                   {t('sell.only_in_stock', {
-                    qty: Math.max(0, Math.floor((onHand ?? 0) / 1000)),
+                    qty: formatQtyFromMilli(Math.max(0, onHand ?? 0), unit),
                   })}
                 </span>
               ) : null}

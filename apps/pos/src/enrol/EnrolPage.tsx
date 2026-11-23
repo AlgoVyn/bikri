@@ -143,17 +143,29 @@ export function EnrolPage({
       .map((row) => ({ id: String(row.id), label: String(row.name) }));
   }, [connected?.db.tenantId]);
 
+  // A "Not my shop" click during the download must win over the in-flight pull:
+  // bumping the generation makes every later callback (progress, finish, onDone) a no-op.
+  const downloadSeq = useRef(0);
+  const cancelDownload = () => {
+    downloadSeq.current += 1;
+  };
   const download = useCallback(
     async (target: BikriDb, shop: string) => {
+      const generation = downloadSeq.current + 1;
+      downloadSeq.current = generation;
       setStage({ kind: 'downloading', shop, db: target, done: 0, total: 0 });
       try {
-        await pullAll(target, (done, total) =>
-          setStage({ kind: 'downloading', shop, db: target, done, total }),
-        );
+        await pullAll(target, (done, total) => {
+          if (generation !== downloadSeq.current) return;
+          setStage({ kind: 'downloading', shop, db: target, done, total });
+        });
+        if (generation !== downloadSeq.current) return;
         // The first snapshot is complete: the gate may open the app (SYNC-H4).
         await finishInitialSync(target);
+        if (generation !== downloadSeq.current) return;
         onDone();
       } catch (e) {
+        if (generation !== downloadSeq.current) return;
         setStage({
           kind: 'failed',
           shop,
@@ -188,40 +200,48 @@ export function EnrolPage({
     void download(db, shopName);
   }, [db, shopName, revoked, resumePending, stage.kind, download]);
 
+  const connectGuard = useRef(false);
   const connect = async () => {
-    const normalised = normaliseCodeInput(code);
-    if (!CODE_RE.test(normalised)) {
-      setError(t('enrol.err_code'));
-      return;
-    }
-    if (revoked && db) {
-      const count = await unexportedOps(db);
-      if (count > 0) {
-        setError(t('enrol.leave_blocked', { count }));
-        return;
-      }
-      const files = await pendingFileCount(db);
-      if (files > 0) {
-        setError(t('enrol.leave_files_blocked', { count: files }));
-        return;
-      }
-    }
-    setBusy(true);
-    setError(null);
+    // Lock synchronously: the awaits below let a double click start two enrolments.
+    if (connectGuard.current) return;
+    connectGuard.current = true;
     try {
-      const { db: target, res } = await enrolDevice(normalised, name.trim());
-      void download(target, res.tenant.display_name);
-    } catch (e) {
-      if (e instanceof OfflineError) setError(t('enrol.err_offline'));
-      else if (e instanceof SyncHttpError) {
-        if (e.code === 'BAD_ENROLMENT_CODE') setError(t('enrol.err_bad'));
-        else if (e.code === 'TENANT_SUSPENDED')
-          setError(t('enrol.err_suspended'));
-        else if (e.code === 'RATE_LIMITED') setError(t('enrol.err_rate'));
-        else setError(t('enrol.err_other', { message: e.message || e.code }));
-      } else setError(t('enrol.err_other', { message: String(e) }));
+      const normalised = normaliseCodeInput(code);
+      if (!CODE_RE.test(normalised)) {
+        setError(t('enrol.err_code'));
+        return;
+      }
+      if (revoked && db) {
+        const count = await unexportedOps(db);
+        if (count > 0) {
+          setError(t('enrol.leave_blocked', { count }));
+          return;
+        }
+        const files = await pendingFileCount(db);
+        if (files > 0) {
+          setError(t('enrol.leave_files_blocked', { count: files }));
+          return;
+        }
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const { db: target, res } = await enrolDevice(normalised, name.trim());
+        void download(target, res.tenant.display_name);
+      } catch (e) {
+        if (e instanceof OfflineError) setError(t('enrol.err_offline'));
+        else if (e instanceof SyncHttpError) {
+          if (e.code === 'BAD_ENROLMENT_CODE') setError(t('enrol.err_bad'));
+          else if (e.code === 'TENANT_SUSPENDED')
+            setError(t('enrol.err_suspended'));
+          else if (e.code === 'RATE_LIMITED') setError(t('enrol.err_rate'));
+          else setError(t('enrol.err_other', { message: e.message || e.code }));
+        } else setError(t('enrol.err_other', { message: String(e) }));
+      } finally {
+        setBusy(false);
+      }
     } finally {
-      setBusy(false);
+      connectGuard.current = false;
     }
   };
 
@@ -321,9 +341,10 @@ export function EnrolPage({
         <button
           type="button"
           className="self-start text-primary text-small underline"
-          onClick={() =>
-            void leave(stage.db, { kind: 'left', shop: stage.shop })
-          }
+          onClick={() => {
+            cancelDownload();
+            void leave(stage.db, { kind: 'left', shop: stage.shop });
+          }}
         >
           {t('enrol.not_mine')}
         </button>

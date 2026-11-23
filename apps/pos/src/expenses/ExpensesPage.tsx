@@ -18,6 +18,7 @@ import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { ledgerContext } from '../data/catalog.ts';
 import { isBusinessDate } from '../data/dates.ts';
 import { getDb } from '../data/db.ts';
@@ -33,6 +34,7 @@ import {
   useShopTimeZone,
   useShopTimeZoneReady,
 } from '../data/useShopTimeZone.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { tileBg } from '../products/tiles.ts';
@@ -85,6 +87,7 @@ function ExpensesPageContent() {
   const [newOpen, setNewOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
   const [reversing, setReversing] = useState<ExpenseRow | null>(null);
+  const reverseGuard = useSubmitGuard();
 
   const customValid =
     isBusinessDate(custom.from) &&
@@ -129,7 +132,7 @@ function ExpensesPageContent() {
     (role !== 'cashier' || String(row.expense.business_date) === today);
 
   const reverse = async () => {
-    if (!reversing) return;
+    if (!reversing || !reverseGuard.lock()) return;
     try {
       const db = getDb();
       const ctx = await ledgerContext(db, staff?.id ?? '');
@@ -145,12 +148,15 @@ function ExpensesPageContent() {
       toast.push(t('office.expenses.reversed_done'));
     } catch (err) {
       toast.push(
-        err instanceof ExpenseError
-          ? t(`office.expenses.expense_error_${err.code}`)
-          : t('errors.generic'),
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : err instanceof ExpenseError
+            ? t(`office.expenses.expense_error_${err.code}`)
+            : t('errors.generic'),
         'error',
       );
     } finally {
+      reverseGuard.unlock();
       setReversing(null);
     }
   };

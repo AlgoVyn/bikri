@@ -54,6 +54,8 @@ async function draw(meta: ReportFileMeta): Promise<HTMLCanvasElement> {
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas not available');
+  // Urdu labels must shape right-to-left; English and Roman Urdu stay LTR (UI-L8).
+  ctx.direction = meta.lang.startsWith('ur') ? 'rtl' : 'ltr';
   ctx.fillStyle = CANVAS.paper;
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.fillStyle = CANVAS.ink;

@@ -8,7 +8,7 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CartFullError, EmptyBundleError } from '../data/cart.ts';
-import { loadBundleRecipe } from '../data/catalog.ts';
+import { componentCost, loadBundleRecipe } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import {
   type PriceCheckResult,
@@ -128,11 +128,16 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
               name: String(product.name_en),
               qty: Number(row.qty_milli),
               unit: String(product.unit ?? 'pc'),
+              cost: componentCost(
+                product,
+                Number(row.qty_milli),
+                money.cost_method,
+              ),
             },
           ]
         : [];
     });
-  }, [card?.product.id]);
+  }, [card?.product.id, card?.product.kind, money.cost_method]);
   // A read-only/support device must not start a cart it can never save.
   const canSell = can('sale.create') && !readOnly;
 
@@ -164,7 +169,10 @@ function PriceCheckBody({ onClose }: { onClose: () => void }) {
   const product = card?.product;
   const unit = String(product?.unit ?? 'pc');
   const price = Number(product?.price ?? 0);
-  const avg = Number(product?.avg_cost ?? 0);
+  const avg =
+    product?.kind === 'bundle'
+      ? (bundleItems ?? []).reduce((sum, item) => sum + item.cost, 0)
+      : Number(product?.avg_cost ?? 0);
 
   return (
     <div className="flex flex-col gap-4">

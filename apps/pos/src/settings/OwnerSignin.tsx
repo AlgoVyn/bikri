@@ -8,6 +8,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { OfflineError, SyncHttpError } from '../sync/client.ts';
 import {
   normaliseSigninCode,
@@ -71,6 +72,7 @@ export function OwnerSigninDialog({
   const codeRef = useRef<HTMLInputElement>(null);
   const sendSeq = useRef(0);
   const openRef = useRef(open);
+  const confirmGuard = useSubmitGuard();
 
   useEffect(() => {
     if (!open) return;
@@ -120,6 +122,8 @@ export function OwnerSigninDialog({
       setError(t('owner.code_six'));
       return;
     }
+    // Enter plus a click can submit twice in one tick; lock before awaiting.
+    if (!confirmGuard.lock()) return;
     setBusy(true);
     setError(null);
     try {
@@ -135,6 +139,7 @@ export function OwnerSigninDialog({
         );
       } else setError(shopErrorMessage(t, e));
     } finally {
+      confirmGuard.unlock();
       setBusy(false);
     }
   };
@@ -229,12 +234,15 @@ export function useShopAdmin(db: BikriDb | null, staffId: string | null) {
   >([]);
 
   const ensure = useCallback(() => {
-    if (staffId && ownerSessionValid(staffId)) return Promise.resolve();
+    // A hook called with no database or staff (a render before enrolment) must fail
+    // fast with the typed error instead of opening a dialog that can never resolve.
+    if (!db || !staffId) return Promise.reject(new OwnerSigninRequired());
+    if (ownerSessionValid(staffId)) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
       waiters.current.push({ resolve, reject });
       setOpen(true);
     });
-  }, [staffId]);
+  }, [db, staffId]);
 
   const run = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T> => {

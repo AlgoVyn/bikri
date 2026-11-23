@@ -56,6 +56,8 @@ export function CustomerDialog({
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
+  /** A typed phone that cannot be parsed blocks Save instead of erasing it (UI-M6). */
+  const [phoneValid, setPhoneValid] = useState(true);
   const guard = useSubmitGuard();
   const removeGuard = useSubmitGuard();
   const balance = useLiveQuery(
@@ -84,7 +86,7 @@ export function CustomerDialog({
   }, [open, editing?.id]);
 
   const save = async () => {
-    if (name.trim() === '' || pending || !guard.lock()) return;
+    if (name.trim() === '' || !phoneValid || pending || !guard.lock()) return;
     setPending(true);
     setDuplicate(null);
     try {
@@ -161,8 +163,7 @@ export function CustomerDialog({
     }
   };
 
-  const canDelete =
-    editing !== null && can('party.delete') && (balance ?? 0) === 0;
+  const canDelete = editing !== null && can('party.delete') && balance === 0;
 
   return (
     <>
@@ -190,6 +191,7 @@ export function CustomerDialog({
             label={t('office.udhaar.phone')}
             value={phone}
             onChange={(next) => setPhone(next ?? '')}
+            onValidityChange={setPhoneValid}
           />
           <label className="flex flex-col gap-1 text-small">
             {t('office.udhaar.address')}
@@ -276,7 +278,7 @@ export function CustomerDialog({
               <button
                 type="button"
                 className={`${buttonPrimary} max-md:flex-1`}
-                disabled={name.trim() === '' || pending}
+                disabled={name.trim() === '' || !phoneValid || pending}
                 onClick={() => void save()}
               >
                 {t('office.udhaar.save')}
