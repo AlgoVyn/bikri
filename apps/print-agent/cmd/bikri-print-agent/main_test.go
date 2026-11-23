@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -134,7 +135,9 @@ func TestStartupConfigErrorsReachTheLogFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(logged, []byte("load config")) || !bytes.Contains(logged, []byte(configPath)) {
+	// The JSON handler escapes Windows backslashes; compare the quoted path so the
+	// assertion works on both C:\... and /tmp/... runners.
+	if !bytes.Contains(logged, []byte("load config")) || !bytes.Contains(logged, []byte(strconv.Quote(configPath))) {
 		t.Fatalf("agent.log does not contain the config error: %s", logged)
 	}
 }
