@@ -25,6 +25,7 @@ import {
   supplierStatementCsv,
 } from '../data/suppliers.ts';
 import { downloadText } from '../lib/download.ts';
+import { useRecordBack } from '../peek/recordBack.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
 import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
@@ -55,6 +56,7 @@ export function SupplierStatement({
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
+  const recordBack = useRecordBack('/suppliers', 'nav.suppliers');
   const { can, role } = useCurrentStaff();
   const canSeeDelivery = can('purchase.create') || can('cost.view');
   const readOnly = useReadOnly();
@@ -109,6 +111,7 @@ export function SupplierStatement({
         to: '/suppliers/$supplierId',
         params: { supplierId },
         search: {},
+        state: true,
         replace: true,
       });
       return;
@@ -157,6 +160,8 @@ export function SupplierStatement({
     logo,
   } = data;
   const name = String(supplier.name);
+  const supplierPhone = String(supplier.phone ?? '');
+  const supplierAddress = String(supplier.address ?? '');
   const mapRows = (value: typeof statement) =>
     value.rows.map((row) => ({
       date: dateText(String(row.entry.business_date), i18n.language, tz),
@@ -187,7 +192,7 @@ export function SupplierStatement({
     shopPhone,
     logo,
     customerName: name,
-    phone: String(supplier.phone ?? ''),
+    phone: supplierPhone,
     balance,
     from: from || null,
     to: to || null,
@@ -289,19 +294,28 @@ export function SupplierStatement({
     >
       <SubpageHeader
         backTo="/suppliers"
-        backLabel={t('office.suppliers.back')}
+        backLabel={recordBack?.label ?? t('office.suppliers.back')}
+        onBack={recordBack?.onActivate}
+        hideBackBelowLg
         icon={<SuppliersIcon />}
         title={name}
         stackActions={embedded}
         subtitle={
-          supplier.phone ? (
-            <a
-              href={`tel:${String(supplier.phone)}`}
-              dir="ltr"
-              className="underline"
-            >
-              {String(supplier.phone)}
-            </a>
+          supplierPhone || supplierAddress ? (
+            <span className="flex flex-col gap-0.5">
+              {supplierPhone ? (
+                <a
+                  href={`tel:${supplierPhone}`}
+                  dir="ltr"
+                  className="underline"
+                >
+                  {supplierPhone}
+                </a>
+              ) : null}
+              {supplierAddress ? (
+                <span className="break-words">{supplierAddress}</span>
+              ) : null}
+            </span>
           ) : undefined
         }
         actions={
@@ -614,6 +628,7 @@ export function SupplierStatement({
                 to: '/suppliers/$supplierId',
                 params: { supplierId },
                 search: {},
+                state: true,
                 replace: true,
               });
           }

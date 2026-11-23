@@ -197,6 +197,14 @@ Breakpoints: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. Reference vie
 
 ## 5. Interaction patterns
 
+### Reference peek and back
+
+A record-to-record link opens a **read-only reference peek** instead of leaving the current record. The peek is a 560 px end-side panel over a scrim at ≥1280 and a 92 dVH bottom sheet below; it carries the entity reference, the origin (`From bill A-A-1042`), a summary (three figures, a few facts and three recent rows) and exactly one primary action, `Open full …`. Peek bodies never write, never contain another peek link and never show forms or destructive actions.
+
+Closing returns to the exact origin — list filters, selection, scroll and an open bill are untouched. `Open full` replaces the peek entry, opens the canonical record and gives that record a `Back to <origin>` control. Browser Back, Android Back and the visible back/close controls all close the peek.
+
+Below 1024 px a detail page's back control lives in the fixed top bar; the in-page detail back is hidden. At ≥1024 px the in-page back is an icon-only 44 px button whose accessible name names the destination (`Back to bill A-A-1042`). The origin's name is always visible in the phone top bar; a direct link with no origin falls back to the canonical parent list.
+
 - Focus is always visible (2 px `--color-primary` ring + 2 px offset).
 - Amount inputs select all on focus (REQ-B07). Enter submits the primary action of the focused form.
 - Destructive actions (void, delete, refund) use danger colour, a confirm dialog that states the consequence in money/stock terms, and a reason where the data model requires one.

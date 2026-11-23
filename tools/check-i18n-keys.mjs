@@ -45,6 +45,7 @@ const OFFICE_DIRS = new Set([
   'expenses',
   'labels',
   'settings',
+  'peek',
 ]);
 
 /** Which catalogs a source file may use: base + its feature area. */

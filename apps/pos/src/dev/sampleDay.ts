@@ -39,6 +39,7 @@ export async function seedSampleDay(
       const customer = await w.create('customers', {
         name: 'Bilal',
         phone: '+923001112233',
+        address: '12-A Gulberg III, Lahore',
         credit_limit: null,
       });
       const sale = (

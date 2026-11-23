@@ -183,7 +183,7 @@ test('phone sales: one pane at a time', async ({ page }, testInfo) => {
   await page.getByRole('link', { name: /A-A-1/ }).click();
   await expect(page.getByTestId('sales-detail')).toBeVisible();
   await expect(page.getByTestId('sales-master')).toBeHidden();
-  await expect(page.getByRole('link', { name: 'Back to sales' })).toBeVisible();
+  await expect(page.getByTestId('topbar-back')).toBeVisible();
 });
 
 test('1024: the list and detail become one pane each', async ({

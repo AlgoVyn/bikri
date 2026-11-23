@@ -25,6 +25,18 @@ export async function setLanguage(
   await page.waitForTimeout(120);
 }
 
+/** Record-page back: top bar below 1024, icon-only in-page link at 1024+. */
+export async function clickRecordBack(
+  page: Page,
+  label: string,
+): Promise<void> {
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await page.getByTestId('topbar-back').click();
+    return;
+  }
+  await page.getByRole('link', { name: label }).click();
+}
+
 /** No serious/critical axe violation (08 §8; T-063). */
 export async function expectNoSeriousAxe(page: Page): Promise<void> {
   // Axe reads computed colours. A form that fills in from IndexedDB can be caught

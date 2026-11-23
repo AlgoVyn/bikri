@@ -29,6 +29,7 @@ export function SubpageHeader({
   actions,
   stackActions = false,
   showBack = true,
+  hideBackBelowLg = false,
 }: {
   backTo: SubpageParent;
   /** Params when the parent is a dynamic detail route, e.g. `/products/$id`. */
@@ -47,6 +48,8 @@ export function SubpageHeader({
   stackActions?: boolean;
   /** Hide the back affordance when the parent list is already on screen. */
   showBack?: boolean;
+  /** Hide the in-page back control on phones; the shell top bar provides it there. */
+  hideBackBelowLg?: boolean;
 }) {
   const Heading = titleLevel;
   return (
@@ -62,7 +65,9 @@ export function SubpageHeader({
             event.preventDefault();
             onBack();
           }}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2"
+          className={`inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface text-text transition-colors duration-150 hover:bg-surface-2 active:bg-surface-2 ${
+            hideBackBelowLg ? 'max-lg:hidden' : ''
+          }`}
         >
           <ChevronLeftIcon className="size-5 rtl:rotate-180" />
         </Link>
