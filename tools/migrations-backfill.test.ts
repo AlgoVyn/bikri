@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -231,9 +231,7 @@ describe('incremental migration backfills (OPS-M1)', () => {
       avg_cost: number;
       rev: number;
       cost_changed_at: number;
-    }>(
-      "SELECT avg_cost, rev, cost_changed_at FROM products WHERE id = 'p3'",
-    );
+    }>("SELECT avg_cost, rev, cost_changed_at FROM products WHERE id = 'p3'");
     expect(p3.avg_cost).toBe(1500);
     expect(p3.rev).toBe(2);
     expect(p3.cost_changed_at).toBeGreaterThan(0);
@@ -249,9 +247,7 @@ describe('incremental migration backfills (OPS-M1)', () => {
       avg_cost: number;
       rev: number;
       cost_changed_at: number;
-    }>(
-      "SELECT avg_cost, rev, cost_changed_at FROM products WHERE id = 'p2'",
-    );
+    }>("SELECT avg_cost, rev, cost_changed_at FROM products WHERE id = 'p2'");
     expect(p2.avg_cost).toBe(3000);
     expect(p2.rev).toBe(2);
     expect(p2.cost_changed_at).toBeGreaterThan(0);
