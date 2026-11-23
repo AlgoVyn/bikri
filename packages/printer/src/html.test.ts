@@ -81,7 +81,7 @@ describe('renderReceiptHtml (06 §5.3)', () => {
     );
     // A flex row, not a space-padded `.l` line that `.urdu` would collapse.
     expect(html).toContain(
-      '<div class="pair"><span class="rtl" dir="auto">کل بیلنس</span><span class="v">Rs 1,250</span></div>',
+      '<div class="pair"><span class="rtl" dir="rtl" lang="ur">کل بیلنس</span><span class="v">Rs 1,250</span></div>',
     );
     expect(html).not.toContain('class="l urdu"');
   });
@@ -104,7 +104,7 @@ describe('renderReceiptHtml (06 §5.3)', () => {
       [{ t: 'item', name: 'کیبل 1m', qty: '2', amount: 'Rs 900' }],
       { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
     );
-    expect(html).toContain('<span class="rtl" dir="auto">کیبل 1m</span>');
+    expect(html).toContain('<span class="rtl" dir="rtl" lang="ur">کیبل 1m</span>');
     expect(html).toContain('<span class="v">Rs 900</span>');
   });
 

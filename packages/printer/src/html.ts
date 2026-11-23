@@ -77,8 +77,9 @@ function cellHtml(cell: LaidCell): string {
   const rtl = lineNeedsRtl(cell.text);
   if (rtl) classes.push('rtl');
   const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
-  // `dir="auto"` keeps an Urdu label inside its own cell instead of flipping the row.
-  const dir = rtl ? ' dir="auto"' : '';
+  // `dir="rtl"` keeps an Urdu label inside its own cell instead of flipping the row;
+  // the structured row, not `.urdu`'s `white-space`, preserves the column spacing.
+  const dir = rtl ? ' dir="rtl" lang="ur"' : '';
   return `<span${classAttr}${dir}>${escapeHtml(cell.text)}</span>`;
 }
 
