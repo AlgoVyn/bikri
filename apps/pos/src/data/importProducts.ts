@@ -36,6 +36,10 @@ const MAX_IMPORT_OPS = 170;
 export const MAX_NAME = 80;
 /** Mirrors categories.name_en in the D1 schema. */
 export const MAX_CATEGORY_NAME = 40;
+/** Mirror `TEXT_CAPS.products` in `apps/api/src/sync/applyOpsCheck.ts`. */
+const MAX_BRAND = 40;
+const MAX_SKU = 40;
+const MAX_UNIT = 16;
 export const TEMPLATE_FILE = 'bikri-products-template.csv';
 
 /**
@@ -207,6 +211,9 @@ export type ErrorCode =
   | 'name_required'
   | 'name_too_long'
   | 'category_too_long'
+  | 'brand_too_long'
+  | 'sku_too_long'
+  | 'unit_too_long'
   | 'price_required'
   | 'price_invalid'
   | 'cost_invalid'
@@ -320,16 +327,27 @@ function parseRow(
   const name = get('name_en');
   if (name.length > MAX_NAME)
     errors.push({ field: 'name_en', code: 'name_too_long' });
+  const nameUr = get('name_ur');
+  if (nameUr.length > MAX_NAME)
+    errors.push({ field: 'name_ur', code: 'name_too_long' });
   const category = get('category');
   if (category.length > MAX_CATEGORY_NAME)
     errors.push({ field: 'category', code: 'category_too_long' });
+  const brand = get('brand');
+  if (brand.length > MAX_BRAND)
+    errors.push({ field: 'brand', code: 'brand_too_long' });
+  const sku = get('sku');
+  if (sku.length > MAX_SKU) errors.push({ field: 'sku', code: 'sku_too_long' });
+  // The whole chunk would fail on the Worker's `TEXT_CAPS.products`, not just this row.
+  if (unit.length > MAX_UNIT)
+    errors.push({ field: 'unit', code: 'unit_too_long' });
   return {
     name_en: name,
-    name_ur: get('name_ur'),
+    name_ur: nameUr,
     category,
-    brand: get('brand'),
+    brand,
     barcodes: [...new Set(barcodes)],
-    sku: get('sku'),
+    sku,
     price: money(get('price'), 'price', 'price_invalid'),
     cost: money(get('cost'), 'cost', 'cost_invalid'),
     stock_milli: qty(get('stock'), 'stock', 'stock_invalid'),

@@ -218,6 +218,26 @@ describe('products (screens/08)', () => {
     await db.purchases.bulkAdd([
       { id: 'p1', supplier_id: 'sup-1', supplier_invoice_no: 'SUP-9' },
       { id: 'p2', supplier_id: 5, supplier_invoice_no: 'SUP-10' },
+      { id: 'p3', supplier_id: 'sup-gone', supplier_invoice_no: 'SUP-11' },
+      { id: 'p4', supplier_id: 'sup-missing', supplier_invoice_no: 'SUP-12' },
+    ] as never);
+    await db.suppliers.bulkAdd([
+      {
+        id: 'sup-1',
+        name: 'Metro',
+        created_at: NOW,
+        updated_at: NOW,
+        deleted_at: null,
+        rev: 1,
+      },
+      {
+        id: 'sup-gone',
+        name: 'Closed',
+        created_at: NOW,
+        updated_at: NOW,
+        deleted_at: NOW + 1,
+        rev: 1,
+      },
     ] as never);
     const movement = (
       id: string,
@@ -260,6 +280,8 @@ describe('products (screens/08)', () => {
       movement('m-purchase', 'purchase', 'purchase', 'p1', NOW - 1),
       movement('m-purchase-dup', 'purchase', 'purchase', 'p1', NOW - 12),
       movement('m-purchase-bad', 'purchase', 'purchase', 'p2', NOW - 13),
+      movement('m-purchase-gone', 'purchase', 'purchase', 'p3', NOW - 15),
+      movement('m-purchase-nosup', 'purchase', 'purchase', 'p4', NOW - 16),
       movement(
         'm-purchase-unknown',
         'purchase',
@@ -321,6 +343,8 @@ describe('products (screens/08)', () => {
       invoiceNo: 'SUP-9',
     });
     expect(refs.get('m-purchase-bad')).toBeNull();
+    expect(refs.get('m-purchase-gone')).toBeNull();
+    expect(refs.get('m-purchase-nosup')).toBeNull();
     expect(refs.get('m-purchase-unknown')).toBeNull();
     expect(refs.get('m-opening')).toBeNull();
     expect(refs.get('m-adjustment')).toBeNull();

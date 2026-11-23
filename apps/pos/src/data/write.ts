@@ -206,7 +206,8 @@ export async function writeAction<T>(
     // restoring this row, so local-only changes such as a delivery's avg/last cost never
     // survive a server refusal. A `rev = 0` row can still exist on the server when the
     // response to its create was lost, so keep the restore point for it too: Discard must
-    // never delete a row the server has (03 §3, §5).
+    // never delete a row the server has. `discardFailed` deletes a rev-0 restore point
+    // only when no create op for the row remains in the outbox.
     const rememberBeforeEdit = async (
       tbl: MasterTable,
       row: MasterRow,

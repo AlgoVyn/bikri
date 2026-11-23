@@ -2,18 +2,23 @@ import type { Cart } from '@bikri/db';
 import { afterEach, describe, expect, it } from 'vitest';
 import { discardFailed } from '../sync/push.ts';
 import {
+  addBundle,
   addOverride,
   addProduct,
+  bundleBasePriceOf,
   cartSignature,
   emptyCart,
   loadCarts,
+  updateLine,
 } from './cart.ts';
+import { ledgerContext, saveNewProduct } from './catalog.ts';
 import { createCustomer } from './customers.ts';
 import {
   completeSale,
   mergeRows,
   SaleInvalidError,
   settle,
+  startReissue,
   udhaarCheck,
 } from './sale.ts';
 import { dropTestDbs } from './testDb.ts';
@@ -489,5 +494,242 @@ describe('sale recipe (02 §5)', () => {
       NOW,
     );
     expect(second.sale.invoice_no).toBe('A-A-1');
+  });
+});
+
+describe('catalogue price changes (POS-H2)', () => {
+  const row = { created_at: NOW, updated_at: NOW, deleted_at: null, rev: 1 };
+
+  async function withStaff(
+    prefix: string,
+    staffRole: 'cashier' | 'manager',
+    permissionsJson = '{}',
+  ) {
+    const fx = await shopWithStock(prefix);
+    await fx.db.staff.add({
+      id: staffRole === 'cashier' ? 'st-2' : 'st-mgr',
+      name: staffRole === 'cashier' ? 'Cashier' : 'Manager',
+      role: staffRole,
+      active: 1,
+      permissions_json: permissionsJson,
+      max_discount_bp: 1000,
+      ...row,
+    });
+    return {
+      ...fx,
+      cashier: await ledgerContext(fx.db, 'st-2'),
+      manager: await ledgerContext(fx.db, 'st-mgr'),
+    };
+  }
+
+  it('checks a held bill against the current price and accepts a line-bound approval', async () => {
+    const { db, cashier, phone } = await withStaff('held-price', 'cashier');
+    const cart = addProduct(emptyCart('c1'), phone, 1000, 'avg');
+    await db.carts.put(cart);
+    // The bill waits in a held cart while another till raises the price.
+    await db.products.update(phone.id, {
+      price: 4_400_000,
+      rev: 2,
+      updated_at: NOW + 1,
+    });
+    const input = sale(cart, [{ method: 'cash', amount: 4_200_000 }]);
+    await expect(completeSale(db, input, cashier, NOW + 2)).rejects.toThrow(
+      'price approval',
+    );
+    const approved = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      approved_at: NOW + 2,
+      bound_line: String(cart.lines[0]?.key),
+      bound_price: 4_200_000,
+    });
+    await db.carts.put(approved);
+    const { created } = await completeSale(
+      db,
+      sale(approved, [{ method: 'cash', amount: 4_200_000 }]),
+      cashier,
+      NOW + 3,
+    );
+    expect(created).toBe(true);
+    const audit = await db.audit_log
+      .where('[entity+entity_id]')
+      .equals(['sales', String((await db.sales.toArray())[0]?.id)])
+      .toArray();
+    expect(
+      audit.some(
+        (entry) =>
+          entry.action === 'override' &&
+          JSON.parse(String(entry.after_json)).permission === 'catalog.edit',
+      ),
+    ).toBe(true);
+  });
+
+  it('does not re-check an unchanged price on a reissue', async () => {
+    const { db, cashier, phone } = await withStaff(
+      'reissue-unchanged',
+      'cashier',
+      '{"sale.void":true}',
+    );
+    const cart = addProduct(emptyCart('c1'), phone, 1000, 'avg');
+    await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 4_200_000 }], {
+        saleId: 'sale-old',
+      }),
+      cashier,
+      NOW,
+    );
+    await db.products.update(phone.id, {
+      price: 4_400_000,
+      rev: 2,
+      updated_at: NOW + 1,
+    });
+    const reissueCart = await startReissue(db, {
+      saleId: 'sale-old',
+      cartId: 'c2',
+      reason: 'Wrong item',
+      now: NOW + 2,
+    });
+    expect(reissueCart.lines[0]?.unit_price).toBe(4_200_000);
+    const { created } = await completeSale(
+      db,
+      sale(reissueCart, [{ method: 'cash', amount: 4_200_000 }], {
+        saleId: 'sale-new',
+        cartId: 'c2',
+      }),
+      cashier,
+      NOW + 3,
+    );
+    expect(created).toBe(true);
+  });
+
+  it('re-checks a changed price on a reissue', async () => {
+    const { db, cashier, phone } = await withStaff(
+      'reissue-changed',
+      'cashier',
+      '{"sale.void":true}',
+    );
+    await completeSale(
+      db,
+      sale(
+        addProduct(emptyCart('c1'), phone, 1000, 'avg'),
+        [{ method: 'cash', amount: 4_200_000 }],
+        { saleId: 'sale-old' },
+      ),
+      cashier,
+      NOW,
+    );
+    await db.products.update(phone.id, {
+      price: 4_400_000,
+      rev: 2,
+      updated_at: NOW + 1,
+    });
+    const reissueCart = await startReissue(db, {
+      saleId: 'sale-old',
+      cartId: 'c2',
+      reason: 'Wrong item',
+      now: NOW + 2,
+    });
+    const changed = updateLine(reissueCart, String(reissueCart.lines[0]?.key), {
+      unit_price: 4_300_000,
+    });
+    await db.carts.put(changed);
+    await expect(
+      completeSale(
+        db,
+        sale(changed, [{ method: 'cash', amount: 4_300_000 }], {
+          saleId: 'sale-new',
+          cartId: 'c2',
+        }),
+        cashier,
+        NOW + 3,
+      ),
+    ).rejects.toThrow('price approval');
+  });
+
+  it('accepts a normal cash sale at the current price without an approval', async () => {
+    const { db, cashier, phone } = await withStaff('normal-price', 'cashier');
+    const cart = addProduct(emptyCart('c1'), phone, 1000, 'avg');
+    const { created, sale: stored } = await completeSale(
+      db,
+      sale(cart, [{ method: 'cash', amount: 4_200_000 }]),
+      cashier,
+      NOW,
+    );
+    expect(created).toBe(true);
+    expect(
+      (
+        await db.audit_log
+          .where('[entity+entity_id]')
+          .equals(['sales', String(stored.id)])
+          .toArray()
+      ).some((entry) => entry.action === 'override'),
+    ).toBe(false);
+  });
+
+  it('checks a bundle group against the current bundle price', async () => {
+    const { db, cashier, phone, buds } = await withStaff(
+      'bundle-price',
+      'cashier',
+    );
+    const bundle = await saveNewProduct(
+      db,
+      {
+        name_en: 'Starter Pack',
+        price: 4_500_000,
+        cost: 0,
+        track_stock: false,
+        kind: 'bundle',
+        bundle_items: [
+          { component_product_id: phone.id, qty_milli: 1000 },
+          { component_product_id: buds.id, qty_milli: 1000 },
+        ],
+      },
+      cashier,
+      { now: NOW },
+    );
+    const cart = addBundle(
+      emptyCart('c1'),
+      bundle,
+      [
+        { product: phone, qty_milli: 1000 },
+        { product: buds, qty_milli: 1000 },
+      ],
+      1,
+      'avg',
+    );
+    await db.carts.put(cart);
+    await db.products.update(bundle.id, {
+      price: 4_700_000,
+      rev: 2,
+      updated_at: NOW + 1,
+    });
+    const firstKey = String(cart.lines[0]?.key);
+    const group = String(cart.lines[0]?.bundle_group);
+    await expect(
+      completeSale(
+        db,
+        sale(cart, [{ method: 'cash', amount: 4_500_000 }]),
+        cashier,
+        NOW + 2,
+      ),
+    ).rejects.toThrow('bundle price approval');
+    const approved = addOverride(cart, {
+      permission: 'catalog.edit',
+      approved_by: 'st-1',
+      approved_at: NOW + 2,
+      bound_line: firstKey,
+      bound_price: bundleBasePriceOf(cart, group),
+    });
+    await db.carts.put(approved);
+    const { created } = await completeSale(
+      db,
+      sale(approved, [{ method: 'cash', amount: 4_500_000 }]),
+      cashier,
+      NOW + 3,
+    );
+    expect(created).toBe(true);
+    const audit = await db.audit_log.toArray();
+    expect(audit.some((entry) => entry.action === 'override')).toBe(true);
   });
 });

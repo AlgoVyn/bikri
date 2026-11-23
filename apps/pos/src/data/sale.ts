@@ -146,6 +146,64 @@ export type SaleInput = {
 
 export type SaleResult = { sale: SyncedRow; created: boolean };
 
+/** A cart line or bundle group priced below today's catalogue (POS-H2). */
+export type CataloguePriceOverrun = { key: string; price: number };
+
+/**
+ * Every cart line/group whose price is below the current catalogue price, bound to the
+ * cart key the price approval uses. Bundle components are derived by `priceBundle`, so a
+ * bundle group is compared as one (shelf) price against its bundle product. On a
+ * reissue, an unchanged line/group keeps the replaced bill's price: that is not a new
+ * discount, and only changed prices are re-checked (POS-H2).
+ */
+export function belowCataloguePrices(
+  cart: Cart,
+  products: ReadonlyMap<string, MasterRow>,
+  replacedLines: readonly SyncedRow[] = [],
+): CataloguePriceOverrun[] {
+  const replacedBundles = new Map<string, number>();
+  const replacedSimple = new Map<string, number>();
+  for (const row of replacedLines) {
+    if (typeof row.bundle_group === 'string') {
+      if (!replacedBundles.has(row.bundle_group))
+        replacedBundles.set(row.bundle_group, Number(row.bundle_price ?? 0));
+      continue;
+    }
+    if (typeof row.product_id !== 'string') continue;
+    const key = `${row.product_id}\u0000${Number(row.unit_price ?? 0)}`;
+    replacedSimple.set(key, (replacedSimple.get(key) ?? 0) + 1);
+  }
+  const out: CataloguePriceOverrun[] = [];
+  const seenGroups = new Set<string>();
+  for (const line of cart.lines) {
+    if (line.bundle_id && line.bundle_group) {
+      if (seenGroups.has(line.bundle_group)) continue;
+      seenGroups.add(line.bundle_group);
+      const bundle = products.get(line.bundle_id);
+      if (!bundle) continue;
+      const price = bundleBasePriceOf(cart, line.bundle_group);
+      if (price >= Number(bundle.price ?? 0)) continue;
+      if (replacedBundles.get(line.bundle_group) === price) continue;
+      out.push({ key: line.key, price });
+      continue;
+    }
+    // A bundle component price is derived by `priceBundle`, not a manual override:
+    // the Worker checks the bundle group total and skips component lines (SYNC-M5).
+    if (line.bundle_id || !line.product_id) continue;
+    const product = products.get(line.product_id);
+    if (!product) continue;
+    if (line.unit_price >= Number(product.price ?? 0)) continue;
+    const key = `${line.product_id}\u0000${line.unit_price}`;
+    const unchanged = replacedSimple.get(key) ?? 0;
+    if (unchanged > 0) {
+      replacedSimple.set(key, unchanged - 1);
+      continue;
+    }
+    out.push({ key: line.key, price: line.unit_price });
+  }
+  return out;
+}
+
 /** Sale recipe (02 §5): one Dexie transaction with its outbox ops; then the cart tab is empty. */
 export async function completeSale(
   db: BikriDb,
@@ -286,30 +344,70 @@ export async function completeSale(
         'catalog.edit',
       ),
   );
-  const backdatePriceAudits: { lineKey: string; price: number }[] = [];
-  // A bundle sold below its shelf price follows the normal price-override rule.
+  const priceAudits: { lineKey: string; price: number }[] = [];
+  // A bundle sold below its snapshot shelf price is a manual discount; one at the
+  // shelf price but under today's catalogue price still needs an approval (POS-H2).
   const seenBundleGroups = new Set<string>();
-  // A full-price bundle needs no `catalog.edit` approval: its component prices are
-  // derived, and the Worker never price-checks a bundle component line (SYNC-M5).
-  const fullPriceBundleGroups = new Set<string>();
+  // A bundle at or above both its snapshot shelf price and today's catalogue price
+  // needs no `catalog.edit` approval: its component prices are derived, and the Worker
+  // never price-checks a bundle component line (SYNC-M5). A stale approval for it is
+  // not audited.
+  const unapprovedBundleGroups = new Set<string>();
+  const bundleProducts = new Map<string, MasterRow>();
+  const bundleIds = [
+    ...new Set(
+      cart.lines
+        .filter((line) => line.bundle_id && line.bundle_group)
+        .map((line) => String(line.bundle_id)),
+    ),
+  ];
+  for (const p of await db.products.bulkGet(bundleIds))
+    if (p) bundleProducts.set(p.id, p);
+  const catalogue = new Map(products);
+  for (const [id, product] of bundleProducts) catalogue.set(id, product);
   for (const line of cart.lines) {
     if (!line.bundle_group || seenBundleGroups.has(line.bundle_group)) continue;
     seenBundleGroups.add(line.bundle_group);
-    const price = bundleBasePriceOf(cart, line.bundle_group);
-    if (price >= bundleListPriceOf(cart, line.bundle_group)) {
-      fullPriceBundleGroups.add(line.bundle_group);
+    const price = bundleBasePriceOf(pricedCart, line.bundle_group);
+    const bundle = line.bundle_id
+      ? catalogue.get(String(line.bundle_id))
+      : undefined;
+    if (
+      price >= bundleListPriceOf(pricedCart, line.bundle_group) &&
+      (!bundle || price >= Number(bundle.price ?? 0))
+    )
+      unapprovedBundleGroups.add(line.bundle_group);
+  }
+  // Every sale, not only a backdated one: a held bill, an open cart or a reissue can
+  // carry yesterday's price across a catalogue increase, and the Worker checks the
+  // attributed seller against today's catalogue (POS-H2).
+  const replacedLines = reissue
+    ? await db.sale_lines.where('sale_id').equals(reissue.sale_id).toArray()
+    : [];
+  for (const overrun of belowCataloguePrices(
+    pricedCart,
+    catalogue,
+    replacedLines,
+  )) {
+    if (sellerPerm('catalog.edit')) continue;
+    if (
+      overrideMatches(pricedCart, 'catalog.edit', {
+        line: overrun.key,
+        price: overrun.price,
+      })
+    )
+      continue;
+    if (backdate && recorderCanEdit) {
+      // The recorder authorizes the attributed seller's price with the same line-bound
+      // override audit the normal path writes (POS-M2).
+      priceAudits.push({ lineKey: overrun.key, price: overrun.price });
       continue;
     }
-    if (
-      !sellerPerm('catalog.edit') &&
-      !overrideMatches(cart, 'catalog.edit', { line: line.key, price })
-    ) {
-      if (!backdate || !recorderCanEdit)
-        throw new SaleInvalidError('bundle price approval');
-      // The recorder authorizes the attributed seller's past price with the same
-      // line-bound override audit the normal path writes (POS-M2).
-      backdatePriceAudits.push({ lineKey: line.key, price });
-    }
+    throw new SaleInvalidError(
+      pricedCart.lines.find((line) => line.key === overrun.key)?.bundle_group
+        ? 'bundle price approval'
+        : 'price approval',
+    );
   }
   if (
     totals.lines.some((line) => line.below_cost === 1) &&
@@ -325,30 +423,10 @@ export async function completeSale(
     throw new SaleInvalidError('udhaar permission');
 
   // A past sale is attributed to another staff member, so every check the Worker makes
-  // against that seller has to run locally too. In particular, a recorder with
-  // `catalog.edit` may authorize yesterday's price; the Worker requires a line-bound
-  // `catalog.edit` override for that, not a silent old price.
+  // against that seller has to run locally too.
   if (backdate) {
     if (!sellerPerm('sale.create'))
       throw new SaleInvalidError('seller cannot create sales');
-    for (const line of cart.lines) {
-      if (!line.product_id) continue;
-      // A bundle component price is derived by `priceBundle`, not a manual override:
-      // the Worker checks the bundle group total and skips component lines (SYNC-M5).
-      if (line.bundle_id) continue;
-      const product = products.get(line.product_id);
-      if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
-      if (sellerPerm('catalog.edit')) continue;
-      if (
-        overrideMatches(cart, 'catalog.edit', {
-          line: line.key,
-          price: line.unit_price,
-        })
-      )
-        continue;
-      if (!recorderCanEdit) throw new SaleInvalidError('price approval');
-      backdatePriceAudits.push({ lineKey: line.key, price: line.unit_price });
-    }
   }
 
   // A simple cash sale needs far fewer stores than the old static 17-store scope:
@@ -372,7 +450,7 @@ export async function completeSale(
   const audited =
     reissue !== null ||
     backdate !== null ||
-    backdatePriceAudits.length > 0 ||
+    priceAudits.length > 0 ||
     manualDiscount > sellerLimit ||
     (cart.overrides?.some((override) => override.permission !== 'sale.void') ??
       false);
@@ -447,7 +525,7 @@ export async function completeSale(
       const reissuePlan = reissue
         ? await computeVoid(w, reissue.sale_id, {
             staffId: ctx.staff_id,
-            override: voidOverride !== undefined,
+            approvedBy: voidOverride?.approved_by ?? null,
             now,
           })
         : null;
@@ -680,7 +758,7 @@ export async function completeSale(
           const approved = cart.lines.find((line) => line.key === o.bound_line);
           if (
             approved?.bundle_group &&
-            fullPriceBundleGroups.has(approved.bundle_group)
+            unapprovedBundleGroups.has(approved.bundle_group)
           )
             continue;
         }
@@ -702,7 +780,7 @@ export async function completeSale(
       }
       // The recorder authorized a past price for the attributed seller. Write the same
       // line-bound audit the normal price-override path writes.
-      for (const price of backdatePriceAudits) {
+      for (const price of priceAudits) {
         const boundLine = saleLineIds.get(price.lineKey);
         if (!boundLine) continue;
         audit('override', {

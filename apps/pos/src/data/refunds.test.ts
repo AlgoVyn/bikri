@@ -854,6 +854,21 @@ describe('whole-bundle refunds (07 §6.2, v1.1)', () => {
     ).rejects.toMatchObject({ code: 'bundle' });
   });
 
+  it('rejects a bundle refund whose components disagree on restock (POS-L1)', async () => {
+    const { db, saleId, lines } = await bundleSale();
+    await expect(
+      computeRefund(
+        db,
+        saleId,
+        [
+          { saleLineId: lines[0]?.id ?? '', qtyMilli: 1000, restock: true },
+          { saleLineId: lines[1]?.id ?? '', qtyMilli: 1000, restock: false },
+        ],
+        'cash',
+      ),
+    ).rejects.toMatchObject({ code: 'bundle' });
+  });
+
   it('returns whole bundles only and restocks every component', async () => {
     const { db, ctx, saleId, lines } = await bundleSale();
     const [phone, charger] = lines;

@@ -27,9 +27,11 @@ import {
   overrideMatches,
   parseQtyPrefix,
   paymentChecks,
+  qtyRejectsFraction,
   removeBundle,
   removeLine,
   resumeHeld,
+  saleApprovers,
   saveCart,
   shopMoney,
   updateBundleQty,
@@ -601,5 +603,93 @@ describe('carts, codes and held bills in Dexie', () => {
     expect(isEmptyCart((await loadCarts(b)).c1)).toBe(true);
     expect(await listHeld(b)).toEqual([]);
     expect(await findByCode(b, 'SKU-a')).toBeNull();
+  });
+});
+
+describe('sale approvers and the whole-unit guard (UI-H6, UI-H7)', () => {
+  const person = (id: string, raw: Record<string, unknown>): MasterRow =>
+    ({
+      id,
+      name: id,
+      active: 1,
+      pin_hash: 'hash',
+      deleted_at: null,
+      permissions_json: '{}',
+      max_discount_bp: 0,
+      ...raw,
+    }) as unknown as MasterRow;
+
+  it('lets a single owner approve their own hard-limit override', () => {
+    const owner = person('owner', { role: 'owner' });
+    expect(
+      saleApprovers([owner], {
+        permission: 'udhaar.hard_limit',
+        sellerId: 'owner',
+      }).map((s) => s.id),
+    ).toEqual(['owner']);
+  });
+
+  it('does not let a manager self-approve a hard limit but keeps the owner', () => {
+    const manager = person('mgr', { role: 'manager' });
+    const owner = person('owner', { role: 'owner' });
+    expect(
+      saleApprovers([manager, owner], {
+        permission: 'udhaar.hard_limit',
+        sellerId: 'mgr',
+      }).map((s) => s.id),
+    ).toEqual(['owner']);
+  });
+
+  it('excludes the attributed cashier, not the recording owner, on a backdated sale', () => {
+    const owner = person('owner', { role: 'owner' });
+    const cashier = person('cashier', {
+      role: 'cashier',
+      permissions_json: '{"catalog.edit":true}',
+    });
+    expect(
+      saleApprovers([owner, cashier], {
+        permission: 'catalog.edit',
+        sellerId: 'cashier',
+      }).map((s) => s.id),
+    ).toEqual(['owner']);
+    // A non-backdated sale still excludes its own seller.
+    expect(
+      saleApprovers([owner, cashier], {
+        permission: 'catalog.edit',
+        sellerId: 'owner',
+      }).map((s) => s.id),
+    ).toEqual(['cashier']);
+  });
+
+  it('applies the role and discount-limit filters', () => {
+    const owner = person('owner', { role: 'owner' });
+    const manager = person('manager', {
+      role: 'manager',
+      max_discount_bp: 500,
+    });
+    const cashier = person('cashier', { role: 'cashier' });
+    const staff = [owner, manager, cashier];
+    expect(
+      saleApprovers(staff, {
+        permission: 'sale.void',
+        roles: ['owner'],
+        sellerId: 'cashier',
+      }).map((s) => s.id),
+    ).toEqual(['owner']);
+    expect(
+      saleApprovers(staff, {
+        permission: 'sale.discount',
+        sellerId: 'cashier',
+        manualDiscountBp: 1000,
+      }).map((s) => s.id),
+    ).toEqual(['owner']);
+  });
+
+  it('rejects a fractional quantity for a whole unit only', () => {
+    expect(qtyRejectsFraction('pc', 1500)).toBe(true);
+    expect(qtyRejectsFraction('box', 1)).toBe(true);
+    expect(qtyRejectsFraction('pc', 2000)).toBe(false);
+    expect(qtyRejectsFraction('kg', 1500)).toBe(false);
+    expect(qtyRejectsFraction('m', 1)).toBe(false);
   });
 });

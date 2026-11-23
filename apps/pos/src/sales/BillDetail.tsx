@@ -1,4 +1,9 @@
-import { businessDate, newId, saleLineFinal } from '@bikri/core';
+import {
+  businessDate,
+  formatQtyFromMilli,
+  newId,
+  saleLineFinal,
+} from '@bikri/core';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Fragment, type ReactNode, useEffect, useState } from 'react';
@@ -16,6 +21,7 @@ import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import {
   CART_IDS,
   type CartId,
@@ -55,6 +61,27 @@ import {
   VOID_REASONS,
 } from './format.ts';
 
+/** One entry of the bill's "More" menu; the component supplies the label and action. */
+export type BillAction = { kind: 'refund' | 'void' | 'reissue' };
+
+/**
+ * The bill's extra actions. A void & reissue also writes a replacement bill, so it needs
+ * `sale.create` on top of the void rules; a plain void stays on `sale.void` (UI-L5).
+ */
+export function billActions(input: {
+  canRefund: boolean;
+  canVoid: boolean;
+  canCreate: boolean;
+}): BillAction[] {
+  const actions: BillAction[] = [];
+  if (input.canRefund) actions.push({ kind: 'refund' });
+  if (input.canVoid) {
+    actions.push({ kind: 'void' });
+    if (input.canCreate) actions.push({ kind: 'reissue' });
+  }
+  return actions;
+}
+
 /** Bill detail (screens/10). `/sales/:id`, with the refund modal at `/sales/:id/refund`. */
 export function BillDetail({
   saleId,
@@ -70,6 +97,7 @@ export function BillDetail({
   const toast = useToast();
   const readOnly = useReadOnly();
   const { staff, role, can, support, branchId } = useCurrentStaff();
+  const submitGuard = useSubmitGuard();
   const [voidOpen, setVoidOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
@@ -237,6 +265,8 @@ export function BillDetail({
   };
 
   const runVoid = async (reason: string, approvedBy: string | null) => {
+    // Two rapid clicks would queue two `newId()` void rows before React re-renders.
+    if (!submitGuard.lock()) return;
     try {
       const db = getDb();
       const ctx = await ledgerContext(db, staff?.id ?? '');
@@ -273,10 +303,13 @@ export function BillDetail({
           : t('errors.generic'),
         'error',
       );
+    } finally {
+      submitGuard.unlock();
     }
   };
 
   const openReissue = async (reason: string, approvedBy: string | null) => {
+    if (!submitGuard.lock()) return;
     try {
       const db = getDb();
       const carts = await loadCarts(db);
@@ -312,6 +345,8 @@ export function BillDetail({
           : t('errors.generic'),
         'error',
       );
+    } finally {
+      submitGuard.unlock();
     }
   };
 
@@ -326,7 +361,9 @@ export function BillDetail({
       ? t('office.void.summary_paid', { amount: money(paidBack) })
       : null,
     returnQty > 0
-      ? t('office.void.summary_stock', { qty: returnQty / 1000 })
+      ? t('office.void.summary_stock', {
+          qty: formatQtyFromMilli(returnQty, 'pc'),
+        })
       : null,
     Number(sale.udhaar_amount) > 0
       ? t('office.void.summary_khata', {
@@ -345,35 +382,31 @@ export function BillDetail({
     setPendingApproval({ mode, approvedBy });
   };
 
-  const moreActions = [
-    ...(canRefund
-      ? [
-          {
-            label: t('office.bill.refund'),
-            tone: 'danger' as const,
-            onSelect: () =>
-              void navigate({
-                to: '/sales/$id/refund',
-                params: { id: saleId },
-              }),
-          },
-        ]
-      : []),
-    ...(canVoid
-      ? [
-          {
-            label: t('office.bill.void'),
-            tone: 'danger' as const,
-            onSelect: () => askVoid('void'),
-          },
-          {
-            label: t('office.bill.void_reissue'),
-            tone: 'danger' as const,
-            onSelect: () => askVoid('reissue'),
-          },
-        ]
-      : []),
-  ];
+  const moreActions = billActions({
+    canRefund,
+    canVoid,
+    // A reissue writes a new bill, so it needs `sale.create` as well (UI-L5).
+    canCreate: can('sale.create'),
+  }).map((action) => {
+    if (action.kind === 'refund')
+      return {
+        label: t('office.bill.refund'),
+        tone: 'danger' as const,
+        onSelect: () =>
+          void navigate({ to: '/sales/$id/refund', params: { id: saleId } }),
+      };
+    if (action.kind === 'void')
+      return {
+        label: t('office.bill.void'),
+        tone: 'danger' as const,
+        onSelect: () => askVoid('void'),
+      };
+    return {
+      label: t('office.bill.void_reissue'),
+      tone: 'danger' as const,
+      onSelect: () => askVoid('reissue'),
+    };
+  });
   return (
     <div
       className={
@@ -655,13 +688,19 @@ export function BillDetail({
                             className="block text-small text-text-muted"
                             data-testid="bill-line-note"
                           >
-                            {t('office.bill.line_note')}: {note}
+                            {t('office.bill.line_note')}:{' '}
+                            <bdi
+                              dir="auto"
+                              className={isLatinName(note) ? '' : 'font-urdu'}
+                            >
+                              {note}
+                            </bdi>
                           </span>
                         ) : null}
                         {embedded ? null : (
                           <span className="block text-text-muted sm:hidden">
                             {t('office.bill.qty_price', {
-                              qty: `${qty / 1000} ${t(`unit.${unit}`)}`,
+                              qty: `${formatQtyFromMilli(qty, unit)} ${t(`unit.${unit}`)}`,
                               price: money(Number(line.unit_price)),
                             })}
                           </span>
@@ -675,14 +714,15 @@ export function BillDetail({
                             }
                           >
                             {refundedMilli > 0
-                              ? `${t('office.bill.col_refunded')}: ${refundedMilli / 1000} · `
+                              ? `${t('office.bill.col_refunded')}: ${formatQtyFromMilli(refundedMilli, unit)} · `
                               : ''}
-                            {`${t('office.bill.col_kept')}: ${keptMilli / 1000}`}
+                            {`${t('office.bill.col_kept')}: ${formatQtyFromMilli(keptMilli, unit)}`}
                           </span>
                         ) : null}
                       </td>
                       <td className="p-2 text-start tabular-nums">
-                        {qty / 1000} {t(`unit.${unit}`)}
+                        <bdi dir="ltr">{formatQtyFromMilli(qty, unit)}</bdi>{' '}
+                        {t(`unit.${unit}`)}
                       </td>
                       <td
                         className={
@@ -724,7 +764,9 @@ export function BillDetail({
                             : 'hidden p-2 text-start sm:table-cell'
                         }
                       >
-                        {refundedMilli > 0 ? refundedMilli / 1000 : '—'}
+                        {refundedMilli > 0
+                          ? formatQtyFromMilli(refundedMilli, unit)
+                          : '—'}
                       </td>
                       <td
                         className={
@@ -733,7 +775,7 @@ export function BillDetail({
                             : 'hidden p-2 text-start sm:table-cell'
                         }
                       >
-                        {keptMilli / 1000}
+                        {formatQtyFromMilli(keptMilli, unit)}
                       </td>
                     </tr>
                   </Fragment>
@@ -931,15 +973,22 @@ export function BillDetail({
                   })}
                 </p>
                 <ul className="my-1 text-text-muted">
-                  {lines.map((rl) => (
-                    <li key={rl.id}>
-                      {String(
-                        detail.lines.find((l) => l.line.id === rl.sale_line_id)
-                          ?.line.name_snapshot ?? '',
-                      )}{' '}
-                      × {Number(rl.qty_milli) / 1000}
-                    </li>
-                  ))}
+                  {lines.map((rl) => {
+                    const saleLine = detail.lines.find(
+                      (l) => l.line.id === rl.sale_line_id,
+                    );
+                    return (
+                      <li key={rl.id}>
+                        {String(saleLine?.line.name_snapshot ?? '')} ×{' '}
+                        <bdi dir="ltr">
+                          {formatQtyFromMilli(
+                            Number(rl.qty_milli),
+                            saleLine?.unit ?? 'pc',
+                          )}
+                        </bdi>
+                      </li>
+                    );
+                  })}
                 </ul>
                 {Number(refund.udhaar_part) > 0 ? (
                   <p>
@@ -1026,7 +1075,9 @@ export function BillDetail({
           if (!o) setApproving(null);
         }}
         permission="sale.void"
-        roles={blocker === 'same_day' ? ['owner'] : undefined}
+        roles={
+          String(sale.business_date) !== data.today ? ['owner'] : undefined
+        }
         body={t('sell.override_sale_void')}
         onApproved={onApproved}
       />

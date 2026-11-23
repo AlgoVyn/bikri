@@ -1,11 +1,15 @@
 import {
   type CartResult,
   type CostMethod,
+  can as canDo,
   computeCart,
   MAX_LINES_PER_DOCUMENT,
   mulDivRound,
   newId,
+  type Permission,
   priceBundle,
+  qtyAllowsDecimals,
+  type Role,
   type TaxMode,
 } from '@bikri/core';
 import type {
@@ -797,4 +801,50 @@ export function approversFor(
       String(s.pin_hash ?? '') !== '' &&
       allowed(s),
   );
+}
+
+/**
+ * `1.5 pc` is not a quantity: a whole-unit product may only be sold in whole units
+ * (UI-H6). Decimal units (kg, m, l, ml, g) accept any milli quantity.
+ */
+export function qtyRejectsFraction(unit: string, qtyMilli: number): boolean {
+  return !qtyAllowsDecimals(unit) && qtyMilli % 1000 !== 0;
+}
+
+/**
+ * Who may approve one Sell action (05 §4.1). The excluded staff member is the sale's
+ * attributed seller — the cashier on a backdated bill — because their permissions are
+ * what the check failed on; the recorder may still approve (UI-H7). An owner can
+ * always self-approve a hard credit limit, or a single-owner shop has no approver.
+ */
+export function saleApprovers(
+  staff: readonly MasterRow[],
+  options: {
+    permission: Permission | 'udhaar.hard_limit';
+    roles?: readonly Role[];
+    /** The staff member the sale is attributed to (not necessarily the recorder). */
+    sellerId?: string | null;
+    /** Manual discount share of the cart, for the `sale.discount` limit check. */
+    manualDiscountBp?: number;
+  },
+): MasterRow[] {
+  const sellerId = options.sellerId ?? null;
+  return approversFor(staff, (s) => {
+    if (options.roles !== undefined && !options.roles.includes(s.role as Role))
+      return false;
+    if (options.permission === 'udhaar.hard_limit')
+      return s.role === 'owner' || (s.role === 'manager' && s.id !== sellerId);
+    if (s.id === sellerId) return false;
+    const ok = canDo(
+      s.role as Role,
+      String(s.permissions_json ?? '{}'),
+      options.permission,
+    );
+    if (options.permission !== 'sale.discount') return ok;
+    return (
+      ok &&
+      (s.role === 'owner' ||
+        Number(s.max_discount_bp ?? 0) >= Number(options.manualDiscountBp ?? 0))
+    );
+  });
 }

@@ -507,6 +507,115 @@ describe('push (03 §3, §4.1)', () => {
     expect(await db.outbox.count()).toBe(0);
   });
 
+  it('settles a normal applied edit with the server row and no shadow', async () => {
+    const db = await enrolled('shadow-applied');
+    await db.products.put(
+      product('p-ok', { rev: 1, avg_cost: 500, on_hand_milli: 1000 }),
+    );
+    await writeAction(
+      db,
+      (w) => w.update('products', 'p-ok', { name_en: 'Renamed' }),
+      { now: NOW },
+    );
+    server.results = () => ({ result: 'applied', server_rev: 2 });
+    await pushAll(db);
+    expect(await db.pull_shadow.count()).toBe(0);
+    // The server-managed cost is the local (still unconfirmed) value; a plain applied
+    // edit proves the row is the server row, so it is kept as-is.
+    expect(await db.products.get('p-ok')).toMatchObject({
+      name_en: 'Renamed',
+      avg_cost: 500,
+      rev: 2,
+    });
+  });
+
+  it('keeps the pre-edit cost in the restore point when a newer op is rejected (POS-H1)', async () => {
+    const db = await enrolled('shadow-cost');
+    await db.products.put(
+      product('p1', { rev: 1, avg_cost: 500, last_cost: 500 }),
+    );
+    await writeAction(
+      db,
+      (w) => w.update('products', 'p1', { name_en: 'Renamed' }),
+      { now: NOW },
+    );
+    // A costed delivery in a second transaction changes the server-managed cost while
+    // the first edit is still in the outbox (its op payload omits avg_cost).
+    await writeAction(
+      db,
+      (w) => w.update('products', 'p1', { avg_cost: 700, last_cost: 900 }),
+      { now: NOW + 1 },
+    );
+    const [first, second] = await db.outbox.orderBy('seq').toArray();
+    server.results = (op) =>
+      op.op_id === first?.op_id
+        ? { result: 'applied', server_rev: 2 }
+        : { result: 'rejected', error_code: 'CONSTRAINT_FAILED' };
+    await pushAll(db);
+    // The restore point is the pre-edit row plus the accepted op, not the live row
+    // with the unaccepted delivery cost.
+    expect(await db.pull_shadow.get(['products', 'p1'])).toMatchObject({
+      source: 'local',
+      row: { name_en: 'Renamed', avg_cost: 500, last_cost: 500, rev: 2 },
+    });
+    await discardFailed(db, [second?.seq ?? 0]);
+    expect(await db.products.get('p1')).toMatchObject({
+      name_en: 'Renamed',
+      avg_cost: 500,
+      last_cost: 500,
+    });
+  });
+
+  it('deletes a never-synced row when its create and edit are both discarded (POS-H1)', async () => {
+    const db = await enrolled('discard-create-edit');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-phantom', name_en: 'First' }),
+      { now: NOW },
+    );
+    await writeAction(
+      db,
+      (w) => w.update('categories', 'c-phantom', { name_en: 'Second' }),
+      { now: NOW + 1 },
+    );
+    // The edit's shadow is the never-synced `rev: 0` create.
+    expect(await db.pull_shadow.get(['categories', 'c-phantom'])).toMatchObject(
+      {
+        source: 'local',
+        row: { rev: 0 },
+      },
+    );
+    await db.outbox.toCollection().modify({ status: 'failed' });
+    const seqs = (await db.outbox.toArray()).map(
+      (entry) => entry.seq as number,
+    );
+    await discardFailed(db, seqs);
+    expect(await db.categories.get('c-phantom')).toBeUndefined();
+    expect(await db.pull_shadow.count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('keeps a rev-0 row while its create op still exists (POS-H1)', async () => {
+    const db = await enrolled('discard-create-kept');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { id: 'c-pending', name_en: 'First' }),
+      { now: NOW },
+    );
+    await writeAction(
+      db,
+      (w) => w.update('categories', 'c-pending', { name_en: 'Second' }),
+      { now: NOW + 1 },
+    );
+    const edit = await db.outbox.orderBy('seq').last();
+    await db.outbox.update(edit?.seq as number, { status: 'failed' });
+    // Only the edit is discarded; the create op remains, so the row may still exist
+    // on the server and must not be deleted.
+    await discardFailed(db, [edit?.seq as number]);
+    expect(await db.categories.get('c-pending')).toBeDefined();
+    expect(await db.outbox.count()).toBe(1);
+  });
+
   it('does not downgrade a newer revision applied from a pull shadow (SYNC-M1)', async () => {
     const db = await enrolled('rev-guard');
     await db.categories.add({
@@ -644,7 +753,7 @@ describe('push (03 §3, §4.1)', () => {
     engine.stop();
   });
 
-  it('serialises a pull through the per-tenant pull lock', async () => {
+  it('serialises a pull through the shared per-tenant sync lock', async () => {
     const db = await enrolled('pull-lock');
     const names: string[] = [];
     vi.stubGlobal('navigator', {
@@ -660,20 +769,20 @@ describe('push (03 §3, §4.1)', () => {
       },
     });
     await pullAll(db);
-    expect(names).toContain(`bikri-pull-${db.tenantId}`);
+    expect(new Set(names)).toEqual(new Set([`bikri-sync-${db.tenantId}`]));
   });
 
   it('serialises a push through navigator.locks when the browser provides it', async () => {
     const db = await enrolled('push-lock');
-    let used = false;
+    const names: string[] = [];
     vi.stubGlobal('navigator', {
       ...globalThis.navigator,
       locks: {
         request: async (
-          _name: string,
+          name: string,
           fn: () => Promise<unknown>,
         ): Promise<unknown> => {
-          used = true;
+          names.push(name);
           return fn();
         },
       },
@@ -684,8 +793,67 @@ describe('push (03 §3, §4.1)', () => {
       { now: 44 },
     );
     await pushAll(db);
-    expect(used).toBe(true);
+    expect(names).toContain(`bikri-sync-${db.tenantId}`);
     expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('cannot overlap a push with a pull across tabs (POS-M1)', async () => {
+    const db = await enrolled('sync-lock');
+    await writeAction(
+      db,
+      (w) => w.create('categories', { name_en: 'Locked' }),
+      { now: 45 },
+    );
+    // A real per-name queue: two calls with the same name never run together.
+    const queues = new Map<string, Promise<unknown>>();
+    vi.stubGlobal('navigator', {
+      ...globalThis.navigator,
+      locks: {
+        request: (
+          name: string,
+          fn: () => Promise<unknown>,
+        ): Promise<unknown> => {
+          const previous = queues.get(name) ?? Promise.resolve();
+          const next = previous.then(fn, fn);
+          queues.set(
+            name,
+            next.then(
+              () => undefined,
+              () => undefined,
+            ),
+          );
+          return next;
+        },
+      },
+    });
+    const events: string[] = [];
+    let releasePush: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releasePush = resolve;
+    });
+    const originalFetch = server.fetch;
+    vi.stubGlobal(
+      'fetch',
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/sync/push')) {
+          events.push('push');
+          await gate;
+        } else if (url.includes('/sync/pull')) {
+          events.push('pull');
+        }
+        return originalFetch(input, init);
+      },
+    );
+    const pushing = pushAll(db);
+    await vi.waitFor(() => expect(events).toEqual(['push']));
+    const pulling = pullAll(db);
+    // Give the pull every chance to start while the push is still in flight.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(events).toEqual(['push']);
+    releasePush();
+    await Promise.all([pushing, pulling]);
+    expect(events).toEqual(['push', 'pull']);
   });
 
   it('queues a push requested while a pull is already running', async () => {

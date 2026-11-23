@@ -231,6 +231,14 @@ describe('void recipe (02 §5)', () => {
         '2026-10-27',
         false,
       ),
+    ).toBe('same_day');
+    expect(
+      voidBlocker(
+        { sale: { ...saleRow, business_date: '2026-10-27' }, refunds: [] },
+        'cashier',
+        '2026-10-27',
+        false,
+      ),
     ).toBe('forbidden');
   });
 });
@@ -651,6 +659,32 @@ describe('void and reissue branches', () => {
         NOW + 2 * 86_400_000,
       ),
     ).rejects.toMatchObject({ code: 'same_day' });
+    // A past-day void accepts only an owner's approval; a manager's PIN is not an
+    // owner override and would be rejected by the Worker (POS-H3).
+    await older.db.staff.add({
+      id: 'mgr-approver',
+      name: 'Second manager',
+      role: 'manager',
+      active: 1,
+      permissions_json: '{}',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+    });
+    await expect(
+      voidSale(
+        older.db,
+        {
+          voidId: newId(),
+          saleId: older.saleId,
+          reason: 'Wrong item',
+          override: { approved_by: 'mgr-approver' },
+        },
+        { ...older.ctx, staff_id: 'mgr-day' },
+        NOW + 2 * 86_400_000,
+      ),
+    ).rejects.toMatchObject({ code: 'forbidden' });
     await voidSale(
       older.db,
       {
