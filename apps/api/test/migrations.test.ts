@@ -958,4 +958,215 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
       );
     });
   });
+
+  describe('restore-safe bundle and import guards (0032)', () => {
+    beforeAll(insertTenants);
+
+    it('restores a soft-deleted recipe row after its component became a bundle (CORE-H1)', async () => {
+      await insert('products', {
+        tenant_id: A.id,
+        id: 'p-h1',
+        name_en: 'Former component',
+        sku: 'H1-COMP',
+        price: 1_000,
+        track_stock: 0,
+        ...master,
+      }).run();
+      await db
+        .prepare(
+          "UPDATE products SET kind = 'bundle', track_stock = 0, updated_at = ?1 WHERE tenant_id = ?2 AND id = 'p-h1'",
+        )
+        .bind(T + 1, A.id)
+        .run();
+      // The export replayed by /import still contains the old soft-deleted row.
+      await insert('bundle_items', {
+        tenant_id: A.id,
+        id: 'bi-h1',
+        bundle_id: 'p2',
+        component_product_id: 'p-h1',
+        qty_milli: 1000,
+        sort_order: 1,
+        deleted_at: T,
+        ...master,
+      }).run();
+      // An active row still cannot nest a bundle.
+      await expectRejected(
+        insert('bundle_items', {
+          tenant_id: A.id,
+          id: 'bi-h1-active',
+          bundle_id: 'p2',
+          component_product_id: 'p-h1',
+          qty_milli: 1000,
+          sort_order: 2,
+          ...master,
+        }),
+        /a bundle cannot contain another bundle/,
+      );
+      // A sale rung before the conversion keeps its historical component line.
+      await insert('sale_lines', {
+        tenant_id: A.id,
+        id: 'sl-h1',
+        sale_id: 's1',
+        line_no: 24,
+        product_id: 'p-h1',
+        name_snapshot: 'Former component',
+        qty_milli: 1000,
+        unit_price: 1_000,
+        gross: 1_000,
+        net: 1_000,
+        bundle_id: 'p2',
+        bundle_group: 'group-h1',
+        bundle_name: 'Starter Pack',
+        bundle_qty: 1,
+        bundle_price: 1_000,
+        bundle_discount: 0,
+        bundle_component_qty_milli: 1000,
+        created_at: T,
+      }).run();
+      // A plain sale of the product before it became a bundle restores too.
+      await insert('sale_lines', {
+        tenant_id: A.id,
+        id: 'sl-h1-plain',
+        sale_id: 's1',
+        line_no: 25,
+        product_id: 'p-h1',
+        name_snapshot: 'Former component',
+        qty_milli: 1000,
+        unit_price: 1_000,
+        gross: 1_000,
+        net: 1_000,
+        created_at: T,
+      }).run();
+      const row = await db
+        .prepare(
+          'SELECT deleted_at FROM bundle_items WHERE tenant_id = ?1 AND id = ?2',
+        )
+        .bind(A.id, 'bi-h1')
+        .first<{ deleted_at: number }>();
+      expect(row?.deleted_at).toBe(T);
+    });
+
+    it('converts a zero-movement product with a published catalogue cost to a bundle (CORE-H2)', async () => {
+      await insert('products', {
+        tenant_id: A.id,
+        id: 'p-h2',
+        name_en: 'Costed counter item',
+        sku: 'H2-COST',
+        price: 2_000,
+        last_cost: 1_500,
+        avg_cost: 1_500,
+        cost_changed_at: T,
+        track_stock: 0,
+        ...master,
+      }).run();
+      await db
+        .prepare(
+          "UPDATE products SET kind = 'bundle', track_stock = 0, updated_at = ?1 WHERE tenant_id = ?2 AND id = 'p-h2'",
+        )
+        .bind(T + 1, A.id)
+        .run();
+      const row = await db
+        .prepare(
+          'SELECT kind, track_stock FROM products WHERE tenant_id = ?1 AND id = ?2',
+        )
+        .bind(A.id, 'p-h2')
+        .first<{ kind: string; track_stock: number }>();
+      expect(row).toEqual({ kind: 'bundle', track_stock: 0 });
+      // A product with real stock history still cannot become a bundle.
+      await expectRejected(
+        db
+          .prepare(
+            "UPDATE products SET kind = 'bundle', track_stock = 0 WHERE tenant_id = ?1 AND id = 'p1'",
+          )
+          .bind(A.id),
+        /a bundle cannot have a stock movement/,
+      );
+    });
+
+    it('rejects a synthetic bundle sale line and partial bundle metadata (CORE-L2)', async () => {
+      const line = {
+        tenant_id: A.id,
+        sale_id: 's1',
+        name_snapshot: 'Starter Pack',
+        qty_milli: 1000,
+        unit_price: 4_500_000,
+        gross: 4_500_000,
+        net: 4_500_000,
+        created_at: T,
+      };
+      await expectRejected(
+        insert('sale_lines', {
+          ...line,
+          id: 'sl-bundle',
+          line_no: 20,
+          product_id: 'p2',
+        }),
+        /a bundle cannot be a sale line/,
+      );
+      await expectRejected(
+        insert('sale_lines', {
+          ...line,
+          id: 'sl-partial',
+          line_no: 21,
+          product_id: 'p1',
+          bundle_id: 'p2',
+        }),
+        /bundle sale line metadata must be complete/,
+      );
+      await expectRejected(
+        insert('sale_lines', {
+          ...line,
+          id: 'sl-discount',
+          line_no: 22,
+          product_id: 'p1',
+          bundle_discount: 1_000,
+        }),
+        /bundle discount needs a bundle group and price/,
+      );
+      // A full component line stays valid.
+      await insert('sale_lines', {
+        ...line,
+        id: 'sl-component',
+        line_no: 23,
+        product_id: 'p1',
+        bundle_id: 'p2',
+        bundle_group: 'group-h1',
+        bundle_name: 'Starter Pack',
+        bundle_qty: 1,
+        bundle_price: 4_500_000,
+        bundle_discount: 0,
+        bundle_component_qty_milli: 1000,
+      }).run();
+    });
+
+    it('rejects self-reversal and reversing a reversal (CORE-L2)', async () => {
+      const expense = {
+        tenant_id: A.id,
+        category_id: 'tea_snacks',
+        amount: 20_000,
+        ...ledgerCtx,
+      };
+      await expectRejected(
+        insert('expenses', {
+          ...expense,
+          id: 'ex-self',
+          reverses_id: 'ex-self',
+        }),
+        /an expense cannot reverse itself/,
+      );
+      await insert('expenses', {
+        ...expense,
+        id: 'ex-rev1',
+        reverses_id: 'ex1',
+      }).run();
+      await expectRejected(
+        insert('expenses', {
+          ...expense,
+          id: 'ex-rev2',
+          reverses_id: 'ex-rev1',
+        }),
+        /an expense reversal cannot be reversed/,
+      );
+    });
+  });
 });
