@@ -64,12 +64,14 @@ describe('waiting print jobs', () => {
 
   it('cancels one queued job and leaves printing/done/failed jobs alone', async () => {
     const db = await setup();
-    await cancelPrintJob(db, 'q1');
+    expect(await cancelPrintJob(db, 'q1')).toBe(true);
     expect(await db.print_jobs.get('q1')).toBeUndefined();
     expect((await db.print_jobs.get('q2'))?.status).toBe('queued');
     expect((await db.print_jobs.get('p1'))?.status).toBe('printing');
     expect((await db.print_jobs.get('d1'))?.status).toBe('done');
     expect((await db.print_jobs.get('f1'))?.status).toBe('failed');
+    expect(await cancelPrintJob(db, 'p1')).toBe(false);
+    expect(await cancelPrintJob(db, 'missing')).toBe(false);
   });
 
   it('cancels every waiting job and reports the count', async () => {

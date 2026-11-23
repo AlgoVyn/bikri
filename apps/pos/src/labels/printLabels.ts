@@ -49,6 +49,8 @@ export async function printLabelHtml(
     ${page}
     .sheet{${grid}}
     .label{${labelCss}display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.3mm;text-align:center}
+    /* A roll label is one page each, but the last one must not feed a blank label. */
+    .label:last-child{break-after:auto;page-break-after:auto}
     .shop{font-family:"Noto Naskh Arabic UI",Inter,Arial,sans-serif;font-size:7pt;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
     .name{font-family:"Noto Naskh Arabic UI",Inter,Arial,sans-serif;font-size:8pt;font-weight:700;line-height:1.35;max-height:3.2em;overflow:hidden;width:100%}
     .price{font-size:10pt;font-weight:700;line-height:1.1}

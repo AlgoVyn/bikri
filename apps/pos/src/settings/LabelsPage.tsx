@@ -66,11 +66,11 @@ function LabelsContent() {
       toast.push(t('errors.generic'), 'error');
     }
   };
-  const printTest = () => {
+  const printTest = async () => {
     try {
       const barcode = 'BIKRI-TEST';
       const svg = barcodeLabelSvg(barcode, LABEL_SIZES[form.size], form.dpi);
-      printLabelHtml(
+      await printLabelHtml(
         [
           `<div class="label">
             ${form.showShop ? `<div class="shop" dir="auto">${escapeLabelHtml(String(shop?.name ?? ''))}</div>` : ''}
@@ -184,7 +184,11 @@ function LabelsContent() {
           >
             {t('office.labels.save')}
           </button>
-          <button type="button" className={buttonQuiet} onClick={printTest}>
+          <button
+            type="button"
+            className={buttonQuiet}
+            onClick={() => void printTest()}
+          >
             {t('office.labels.print_test')}
           </button>
         </div>

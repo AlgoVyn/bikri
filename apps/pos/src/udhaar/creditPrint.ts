@@ -1,22 +1,27 @@
 import type { BikriDb } from '@bikri/db';
-import { type Block, hasNonAscii } from '@bikri/printer';
+import { type Block, formatReceiptMoney, hasNonAscii } from '@bikri/printer';
 import { receiptPaper } from '../data/receipt.ts';
 import type { StatementItem } from '../data/udhaar.ts';
 import { qtyCsv } from '../lib/csv.ts';
-import { formatShopMoney } from '../lib/money.ts';
+import { shopGrouping } from '../lib/money.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
 import { printBlocks, readPrinter } from '../print/printService.ts';
 import { PrintError } from '../print/transports.ts';
 import type { StatementFileMeta } from './statementFile.ts';
 
+/** PC437-safe money: ASCII `-`, grouped like the shop setting (06 §4). */
+function money(paisa: number): string {
+  return formatReceiptMoney(paisa, shopGrouping());
+}
+
 function signed(paisa: number): string {
-  if (paisa === 0) return formatShopMoney(0);
-  return `${paisa > 0 ? '+' : '-'}${formatShopMoney(Math.abs(paisa))}`;
+  if (paisa === 0) return money(0);
+  return `${paisa > 0 ? '+' : '-'}${money(Math.abs(paisa))}`;
 }
 
 /** Remove the space in `Rs 500` so unit price and line total fit one thermal line. */
 function compactMoney(paisa: number): string {
-  return formatShopMoney(paisa).replace(/^Rs\s?/u, 'Rs');
+  return money(paisa).replace(/^(-?)Rs /u, '$1Rs');
 }
 
 /**
@@ -31,9 +36,14 @@ function statementItemLine(item: StatementItem, charsPerLine: number): string {
   const capacity = Math.floor((charsPerLine * 4) / 3);
   const width = hasNonAscii(item.name) ? Math.floor(capacity * 0.6) : capacity;
   const room = Math.max(1, width - 2 - suffix.length);
+  // Code points, never UTF-16 units: slicing an emoji in half breaks printing.
+  const chars = Array.from(item.name);
   const name =
-    item.name.length > room
-      ? `${item.name.slice(0, Math.max(0, room - 3)).trimEnd()}...`
+    chars.length > room
+      ? `${chars
+          .slice(0, Math.max(0, room - 3))
+          .join('')
+          .trimEnd()}...`
       : item.name;
   return `  ${name}${suffix}`;
 }
@@ -56,9 +66,16 @@ export function statementBlocks(
   charsPerLine = 48,
 ): Block[] {
   const closingBalance = meta.rows.at(-1)?.balance ?? meta.openingBalance;
-  const blocks: Block[] = [
-    { t: 'logo' },
-    { t: 'text', text: meta.shopName, align: 'center', bold: true },
+  const blocks: Block[] = [];
+  if (meta.showLogo !== false) blocks.push({ t: 'logo' });
+  if (meta.showShopName !== false && meta.shopName.trim().length > 0)
+    blocks.push({
+      t: 'text',
+      text: meta.shopName,
+      align: 'center',
+      bold: true,
+    });
+  blocks.push(
     { t: 'text', text: meta.labels.title, align: 'center' },
     {
       t: 'text',
@@ -69,12 +86,12 @@ export function statementBlocks(
     {
       t: 'pair',
       left: meta.labels.balance,
-      right: formatShopMoney(closingBalance),
+      right: money(closingBalance),
       bold: true,
     },
     { t: 'text', text: meta.labels.asOf, align: 'center', size: 'small' },
     { t: 'rule', char: '-' },
-  ];
+  );
   if (meta.openingBalance !== 0) {
     blocks.push({
       t: 'pair',
@@ -102,7 +119,7 @@ export function statementBlocks(
   blocks.push({
     t: 'pair',
     left: meta.labels.total,
-    right: formatShopMoney(closingBalance),
+    right: money(closingBalance),
     bold: true,
   });
   return finish(blocks);

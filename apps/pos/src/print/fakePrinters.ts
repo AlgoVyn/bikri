@@ -104,7 +104,13 @@ export type FakeSerial = SerialLike & {
 };
 
 export function fakeSerial(
-  options: { hang?: boolean; hangOpen?: boolean; hangClose?: boolean } = {},
+  options: {
+    hang?: boolean;
+    hangOpen?: boolean;
+    hangClose?: boolean;
+    /** Throw like Chrome when a second writer asks for a locked stream. */
+    strictLock?: boolean;
+  } = {},
 ): FakeSerial {
   const sent: Uint8Array[] = [];
   const port: FakeSerial['port'] = {
@@ -119,6 +125,8 @@ export function fakeSerial(
       port.openedWith = o;
       port.writable = {
         getWriter: () => {
+          if (options.strictLock && port.locked)
+            throw new TypeError('The stream is locked');
           port.locked = true;
           port.events.push('writer');
           return {

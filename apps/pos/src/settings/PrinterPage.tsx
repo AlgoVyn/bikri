@@ -21,6 +21,7 @@ import { formatTimestamp } from '../lib/date.ts';
 import {
   AGENT_URL,
   type AgentHealth,
+  agentCompatible,
   httpAgentClient,
 } from '../print/agent.ts';
 import { browserPrintDeps } from '../print/printDeps.ts';
@@ -194,11 +195,13 @@ export function PrinterPage() {
         {printer?.transport === 'agent' ? (
           <p className="text-small text-text-muted" data-testid="agent-status">
             {agentHealth
-              ? t('printer.agent_running')
+              ? agentCompatible(agentHealth)
+                ? `${t('printer.agent_running')} · ${t(
+                    'printer.agent_version',
+                    { version: agentHealth.version },
+                  )}`
+                : t('printer.agent_outdated')
               : t('printer.agent_stopped')}
-            {agentHealth
-              ? ` · ${t('printer.agent_version', { version: agentHealth.version })}`
-              : ''}
           </p>
         ) : null}
         <p className="text-small text-text-muted">{t('printer.never_loses')}</p>
@@ -417,7 +420,10 @@ export function PrinterPage() {
                     className={buttonQuiet}
                     onClick={() => {
                       void cancelPrintJob(getDb(), job.id)
-                        .then(() => toast.push(t('printer.cancelled'), 'info'))
+                        .then((cancelled) => {
+                          if (cancelled)
+                            toast.push(t('printer.cancelled'), 'info');
+                        })
                         .catch(() => toast.push(t('errors.generic'), 'error'));
                     }}
                   >
