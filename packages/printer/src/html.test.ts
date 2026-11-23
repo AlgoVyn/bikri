@@ -104,7 +104,9 @@ describe('renderReceiptHtml (06 §5.3)', () => {
       [{ t: 'item', name: 'کیبل 1m', qty: '2', amount: 'Rs 900' }],
       { widthMm: 80, charsPerLine: 48, itemLayout: 'columns' },
     );
-    expect(html).toContain('<span class="rtl" dir="rtl" lang="ur">کیبل 1m</span>');
+    expect(html).toContain(
+      '<span class="rtl" dir="rtl" lang="ur">کیبل 1m</span>',
+    );
     expect(html).toContain('<span class="v">Rs 900</span>');
   });
 
